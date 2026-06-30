@@ -10,9 +10,19 @@ import (
 	"strings"
 )
 
-// RunScripts runs profile scripts in spec order.
+// scriptResult pairs a script with its run status.
+type scriptResult struct {
+	script string
+	status string // "ok" | "fail"
+}
+
+// RunScripts runs profile scripts in spec order. A failing script is logged
+// and the rest still run; a per-script status report prints at the end, and
+// the run returns an error if any script failed.
 func (h Host) RunScripts(scripts []string) error {
 	env := h.scriptsEnv()
+	var results []scriptResult
+	var failed []string
 	for _, script := range scripts {
 		h.fs.Log("run-scripts", script)
 		if h.DryRun() {
@@ -22,8 +32,20 @@ func (h Host) RunScripts(scripts []string) error {
 		c.Env = env
 		c.Stdout, c.Stderr = os.Stdout, os.Stderr
 		if err := c.Run(); err != nil {
-			return fmt.Errorf("script failed: %s: %w", script, err)
+			h.fs.Log("run-scripts(fail)", fmt.Sprintf("%s: %v", script, err))
+			results = append(results, scriptResult{script, "fail"})
+			failed = append(failed, script)
+		} else {
+			results = append(results, scriptResult{script, "ok"})
 		}
+	}
+
+	for _, r := range results {
+		h.fs.Log("run-scripts(report)", fmt.Sprintf("%s %s", r.status, r.script))
+	}
+
+	if len(failed) > 0 {
+		return fmt.Errorf("scripts failed: %s", strings.Join(failed, ", "))
 	}
 	return nil
 }
