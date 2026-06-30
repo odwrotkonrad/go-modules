@@ -16,6 +16,8 @@ variables:
 test:
   image: golang:1.26-bookworm
   stage: test
+  rules:
+    - if: $CI_PIPELINE_SOURCE == "merge_request_event"
   cache:
     - key:
         files:
@@ -32,7 +34,7 @@ test:
 release:
   stage: release
   image: registry.gitlab.com/gitlab-org/release-cli:latest
-  needs: [test]
+  needs: []
   rules:
     - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
   script:
