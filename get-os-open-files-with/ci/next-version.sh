@@ -5,8 +5,17 @@
 set -eu
 
 api="${CI_API_V4_URL}/projects/${CI_PROJECT_ID}/repository/tags?per_page=100&order_by=version&sort=desc"
+
+fetch() {
+  if command -v curl >/dev/null 2>&1; then
+    curl -fsSL --header "JOB-TOKEN: ${CI_JOB_TOKEN}" "$1"
+  else
+    wget -qO- --header="JOB-TOKEN: ${CI_JOB_TOKEN}" "$1"
+  fi
+}
+
 latest=$(
-  curl -fsSL --header "JOB-TOKEN: ${CI_JOB_TOKEN}" "$api" \
+  fetch "$api" \
     | grep -oE '"name":"v[0-9]+\.[0-9]+\.[0-9]+"' \
     | sed -E 's/.*"v([0-9]+\.[0-9]+\.[0-9]+)"/\1/' \
     | sort -t. -k1,1n -k2,2n -k3,3n \
