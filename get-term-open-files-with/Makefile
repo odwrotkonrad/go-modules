@@ -3,7 +3,7 @@ SHELL := /bin/sh
 GO ?= go
 BIN := get-term-open-files-with
 
-.PHONY: test build vet install release-snapshot release
+.PHONY: test build vet install
 
 ##[>] Targets [genai-include]
 #[what] run all tests
@@ -21,13 +21,5 @@ vet:
 #[what] install the binary into $GOPATH/bin
 install:
 	$(GO) install .
-
-#[what] build a local snapshot release (no publish)
-release-snapshot:
-	goreleaser release --snapshot --clean
-
-#[what] cut a release from the current tag (publish)
-release:
-	goreleaser release --clean
 ##[<] Targets
 ##[<] 🤖🤖
