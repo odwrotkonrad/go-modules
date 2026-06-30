@@ -7,6 +7,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"runtime"
 	"strings"
 
 	"github.com/go-git/go-git/v5"
@@ -84,7 +85,11 @@ func (f FS) Chmod(chmodArg, dest string) error {
 }
 
 func (f FS) Symlink(target, dest string) error {
-	return f.mutate("ln", dest, dest, "ln", "-fhs", target, dest)
+	noDeref := "-n"
+	if runtime.GOOS == "darwin" {
+		noDeref = "-h"
+	}
+	return f.mutate("ln", dest, dest, "ln", "-fs", noDeref, target, dest)
 }
 
 func (f FS) Copy(src, dest string, mode os.FileMode) error {
