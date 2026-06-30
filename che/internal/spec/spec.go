@@ -209,9 +209,13 @@ func (r *Raw) Resolve(profile, root string) (Resolved, error) {
 	if err := r.mergeInto(&eff, profile, nil); err != nil {
 		return Resolved{}, err
 	}
+	scripts, err := expandScripts(filepath.Dir(root), fsutil.ExpandAll(eff.scripts))
+	if err != nil {
+		return Resolved{}, err
+	}
 	res := Resolved{
 		ExtraDirs: eff.dirs,
-		Scripts:   fsutil.ExpandAll(eff.scripts),
+		Scripts:   scripts,
 		Services:  fsutil.ExpandAll(eff.services),
 		Copies:    eff.richCopy,
 		Templates: eff.richTmpl,
@@ -221,6 +225,39 @@ func (r *Raw) Resolve(profile, root string) (Resolved, error) {
 	}
 	applyExcludes(eff.exclude, &res)
 	return res, nil
+}
+
+// expandScripts resolves each repo-relative script entry to repo-relative file
+// paths, IN SPEC ORDER (globs expand sorted in place). Resolving here, before
+// applyExcludes, lets run-scripts excludes match real files (not glob strings).
+// Each entry must resolve to >=1 file ([why] catches typos/renames).
+func expandScripts(repoRoot string, entries []string) ([]string, error) {
+	var out []string
+	for _, entry := range entries {
+		if strings.ContainsAny(entry, "*?[") {
+			hits, err := filepath.Glob(filepath.Join(repoRoot, entry))
+			if err != nil {
+				return nil, err
+			}
+			if len(hits) == 0 {
+				return nil, fmt.Errorf("run-scripts entry matched no script: %s", entry)
+			}
+			slices.Sort(hits)
+			for _, h := range hits {
+				rel, err := filepath.Rel(repoRoot, h)
+				if err != nil {
+					return nil, err
+				}
+				out = append(out, rel)
+			}
+			continue
+		}
+		if _, err := os.Stat(filepath.Join(repoRoot, entry)); err != nil {
+			return nil, fmt.Errorf("run-scripts script not found: %s", entry)
+		}
+		out = append(out, entry)
+	}
+	return out, nil
 }
 
 // classify applies the glob-form ops to git-tracked files under root, bucketing
