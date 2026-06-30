@@ -18,8 +18,10 @@ go install gitlab.com/konradodwrot/go/cruft/get-os-open-files-with@latest
 ```sh
 make test
 make build
-make release-snapshot
 ```
+
+Releases are cut by pushing a `vX.Y.Z` tag; CI runs tests then publishes a
+GitLab release.
 
 ## License
 
