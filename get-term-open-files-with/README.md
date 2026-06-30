@@ -21,8 +21,8 @@ make test
 make build
 ```
 
-Releases are cut by pushing a `vX.Y.Z` tag; CI runs tests then publishes a
-GitLab release.
+Releases are automatic: every push to `main` runs tests, then CI bumps the
+patch version from the highest `vX.Y.Z` tag and publishes a GitLab release.
 
 ## License
 
