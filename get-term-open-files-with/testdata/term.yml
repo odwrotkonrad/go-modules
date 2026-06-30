@@ -1,0 +1,20 @@
+any:
+  - opener: vim
+    types:
+      - programming
+      - markup
+      - data
+      - prose
+vscode:
+  - opener: code -r
+    types:
+      - programming
+      - markup
+      - data
+kitty:
+  - opener: bat
+    types:
+      - data
+  - opener: nvim
+    types:
+      - prose
