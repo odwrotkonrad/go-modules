@@ -1,0 +1,5 @@
+profiles:
+  cli:
+    macos:
+cli/macos:
+  mixin-profiles: [nonexistent]

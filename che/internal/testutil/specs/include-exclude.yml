@@ -1,0 +1,29 @@
+profiles:
+  cli:
+    macos:
+
+base:
+  include:
+    link:
+      - etc/zshrc
+      - etc/zsh/**
+      - HOME/.config/extra/**
+      - HOME/.config/oneoff/**
+    copy:
+      - files:
+          - {source: HOME/.config/zsh/c.host.cp, dest: [~/.config/zsh/c]}
+    run-scripts:
+      - ci/zsh/scripts/installs/10-brew.zsh
+      - ci/zsh/scripts/installs/20-foo.zsh
+    services: [otelcol, grafana]
+
+cli/macos:
+  mixin-profiles: [base]
+  exclude:
+    link:
+      - etc/zsh/**
+    copy:
+      - HOME/.config/zsh/c.host.cp
+    run-scripts:
+      - ci/zsh/scripts/installs/20-foo.zsh
+    services: [graf*]

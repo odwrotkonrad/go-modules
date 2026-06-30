@@ -1,0 +1,23 @@
+profiles:
+  cli:
+    macos:
+  desktop:
+    macos:
+
+base:
+  include:
+    link:
+      - HOME/.config/zsh/**
+      - HOME/.config/git/**
+      - etc/zshrc
+      - etc/zsh/**
+    copy:
+      - files: [HOME/.config/zsh/**, Library/LaunchDaemons/otelcol.plist*]
+    template:
+      - files: [HOME/.config/zsh/**]
+
+cli/macos:
+  mixin-profiles: [base]
+
+desktop/macos:
+  mixin-profiles: [base]

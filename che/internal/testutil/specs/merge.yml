@@ -1,0 +1,41 @@
+profiles:
+  desktop:
+    macos:
+  cli:
+    macos:
+    linux:
+
+base:
+  include:
+    link:
+      - etc/zshrc
+      - HOME/.config/zsh/**
+      - etc/grafana/**
+    copy:
+      - chmod: "0600"
+        files: [Library/LaunchDaemons/**]
+    mkdirs:
+      - files: [HOME/.cache/zsh]
+      - chmod: "2775"
+        files:
+          - {dest: [/var/log/grafana]}
+    run-scripts:
+      - ci/zsh/scripts/installs/10-brew.zsh
+      - ci/zsh/scripts/installs/20-kitty.zsh
+    services: [otelcol, port-exporter, grafana, prometheus]
+
+base-exclude-desktop:
+  exclude:
+    link:
+      - etc/grafana/**
+    mkdirs:
+      - /var/log/grafana
+    run-scripts:
+      - ci/zsh/scripts/installs/20-kitty.zsh
+    services: [grafana, prometheus]
+
+desktop/macos:
+  mixin-profiles: [base]
+
+cli/macos:
+  mixin-profiles: [base, base-exclude-desktop]

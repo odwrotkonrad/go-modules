@@ -1,0 +1,89 @@
+package fsutil
+
+// [>] 🤖🤖
+
+import (
+	"archive/tar"
+	"fmt"
+	"os"
+	"path/filepath"
+	"strings"
+
+	"github.com/dsnet/compress/bzip2"
+)
+
+// TsLayout stamps backup filenames + log lines (one stamp per run).
+const TsLayout = "20060102T150405"
+
+// BackupArchivePath resolves the XDG backups dir + per-run archive filename:
+// $XDG_DATA_HOME/che/backups/<bin>-<sub>-<ts>.tar.bz2 (fallback ~/.local/share).
+func BackupArchivePath(home, bin, sub, ts string) string {
+	base := os.Getenv("XDG_DATA_HOME")
+	if base == "" {
+		base = filepath.Join(home, ".local/share")
+	}
+	name := fmt.Sprintf("%s-%s-%s.tar.bz2", bin, sub, ts)
+	return filepath.Join(base, "che", "backups", name)
+}
+
+// ArchiveDests snapshots each existing dest's contents into a single .tar.bz2
+// at archivePath, entries named by stripped-absolute path. Symlinks followed
+// (linked contents stored, not the link); missing dests, broken links + dirs
+// skipped. Always writes the archive, even empty. Honors DryRun.
+func (f FS) ArchiveDests(archivePath string, dests []string) error {
+	if f.DryRun {
+		f.Log("archive", archivePath)
+		return nil
+	}
+	if err := os.MkdirAll(filepath.Dir(archivePath), 0o755); err != nil {
+		return err
+	}
+	out, err := os.Create(archivePath)
+	if err != nil {
+		return err
+	}
+	defer out.Close()
+	bz, err := bzip2.NewWriter(out, nil)
+	if err != nil {
+		return err
+	}
+	defer bz.Close()
+	tw := tar.NewWriter(bz)
+	defer tw.Close()
+	for _, dest := range dests {
+		if err := archiveDest(tw, dest); err != nil {
+			return err
+		}
+	}
+	f.Log("archive", archivePath)
+	return nil
+}
+
+// archiveDest writes one dest's CONTENTS into tw, following symlinks (the
+// linked file's data, not the link). Missing dests, broken links and dirs are
+// skipped.
+func archiveDest(tw *tar.Writer, dest string) error {
+	fi, err := os.Stat(dest) // [why] follow links: back up contents, not the link
+	if err != nil {
+		return nil // [why] missing dest or broken link: nothing to preserve
+	}
+	if fi.IsDir() {
+		return nil
+	}
+	hdr, err := tar.FileInfoHeader(fi, "")
+	if err != nil {
+		return err
+	}
+	hdr.Name = filepath.ToSlash(strings.TrimPrefix(dest, "/"))
+	if err := tw.WriteHeader(hdr); err != nil {
+		return err
+	}
+	body, err := os.ReadFile(dest)
+	if err != nil {
+		return err
+	}
+	_, err = tw.Write(body)
+	return err
+}
+
+// [<] 🤖🤖

@@ -1,0 +1,259 @@
+package host
+
+// [>] 🤖🤖
+
+import (
+	"os"
+	"path/filepath"
+	"strconv"
+	"strings"
+	"time"
+
+	"gitlab.com/konradodwrot/go/che/internal/fsutil"
+	"gitlab.com/konradodwrot/go/che/internal/spec"
+)
+
+// Bin is che's binary name, carried in per-run backup archive filenames.
+const Bin = "che"
+
+// archiveBefore snapshots every existing dest into one per-run .tar.bz2 under
+// the XDG backups dir before a mutating op runs (sub = op identity).
+func (h Host) archiveBefore(sub string, dests []string) error {
+	ts := time.Now().Format(fsutil.TsLayout)
+	path := fsutil.BackupArchivePath(h.Home, Bin, sub, ts)
+	return h.fs.ArchiveDests(path, dests)
+}
+
+// MkDirs creates repo-tree ancestor dirs (parents first) plus profile extra-dirs.
+func (h Host) MkDirs(dirRels []string, extraDirs []spec.FileItem) error {
+	if err := h.ensureConfigDirs(dirRels); err != nil {
+		return err
+	}
+	for _, item := range extraDirs {
+		dest := h.ToDest(item.Dests[0].Path)
+		if h.dirSettled(dest) {
+			continue
+		}
+		if err := h.mkExtraDir(item, dest); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+// ensureConfigDirs creates repo-tree ancestor dirs (parents first), no spec
+// perms: mode 0 -> mkdir honors umask. Idempotent.
+func (h Host) ensureConfigDirs(dirRels []string) error {
+	for _, rel := range dirRels {
+		dest := h.ToDest(rel)
+		if h.dirSettled(dest) {
+			continue
+		}
+		if err := h.fs.Mkdir(dest, "", 0, false); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+// dirSettled reports whether dest already exists as a dir and may be skipped
+// (DryRunAll forces every dest to report, so it never skips).
+func (h Host) dirSettled(dest string) bool {
+	return !h.DryRunAll() && fsutil.IsDir(dest)
+}
+
+// mkExtraDir creates one extra-dir with -p. Owner applied via chown (not mkdir
+// -u). Mode 0 -> umask. Set-bits (>0777) reapplied via chmod since mkdir -m may
+// drop them.
+func (h Host) mkExtraDir(item spec.FileItem, dest string) error {
+	mode, _ := parseMode(item.Chmod)
+	if err := h.fs.Mkdir(dest, "", mode, true); err != nil {
+		return err
+	}
+	if mode > 0o777 {
+		if err := h.fs.Chmod(fsutil.ModeArg(mode), dest); err != nil {
+			return err
+		}
+	}
+	if owner := ownerSpec(item); owner != "" {
+		return h.fs.Chown(owner, dest)
+	}
+	return nil
+}
+
+// MkLinks symlinks each config into its live dest (ln -fhs), archiving existing
+// dests upfront, skipping links already pointing into the repo.
+func (h Host) MkLinks(links []spec.FileItem, dirRels []string) error {
+	if err := h.ensureConfigDirs(dirRels); err != nil {
+		return err
+	}
+	dests := make([]string, len(links))
+	for i, item := range links {
+		dests[i] = h.ToDest(item.Rel)
+	}
+	if err := h.archiveBefore("link", dests); err != nil {
+		return err
+	}
+	for _, item := range links {
+		src := h.Src(item.Rel)
+		dest := h.ToDest(item.Rel)
+		if h.linkSettled(src, dest) {
+			continue
+		}
+		if err := h.fs.Symlink(src, dest); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+// linkSettled reports whether dest already resolves to src (skippable). DryRunAll
+// forces every dest to report, so it never skips.
+func (h Host) linkSettled(src, dest string) bool {
+	if h.DryRunAll() {
+		return false
+	}
+	destResolved, err := filepath.EvalSymlinks(dest)
+	if err != nil {
+		return false
+	}
+	srcResolved, err := filepath.EvalSymlinks(src)
+	return err == nil && destResolved == srcResolved
+}
+
+// MkCopies copies each *.host.cp to its dest(s) (marker stripped, or explicit
+// dest) when contents differ, archiving existing dests upfront, applying spec
+// perms (else default).
+func (h Host) MkCopies(copies []spec.FileItem, dirRels []string) error {
+	if err := h.ensureConfigDirs(dirRels); err != nil {
+		return err
+	}
+	var dests []string
+	for _, item := range copies {
+		dests = append(dests, h.copyDests(item)...)
+	}
+	if err := h.archiveBefore("copy", dests); err != nil {
+		return err
+	}
+	for _, item := range copies {
+		src := h.Src(item.Rel)
+		mode, _ := parseMode(item.Chmod)
+		owner := ownerSpec(item)
+		for _, dest := range h.copyDests(item) {
+			if !h.DryRunAll() && sameContent(src, dest) {
+				continue
+			}
+			if err := h.fs.Copy(src, dest, mode); err != nil {
+				return err
+			}
+			if owner != "" {
+				if err := h.fs.Chown(owner, dest); err != nil {
+					return err
+				}
+			}
+		}
+	}
+	return nil
+}
+
+// copyDests returns the explicit dests (~/ resolved), else the marker-stripped derived dest.
+func (h Host) copyDests(item spec.FileItem) []string {
+	if len(item.Dests) == 0 {
+		return []string{h.ToDest(strings.TrimSuffix(item.Rel, spec.CpExt))}
+	}
+	out := make([]string, len(item.Dests))
+	for i, d := range item.Dests {
+		out[i] = h.expandHome(d.Path)
+	}
+	return out
+}
+
+// ownerSpec combines owner + owner-group into "owner:group" for fs.Chown ("" -> no chown).
+func ownerSpec(item spec.FileItem) string {
+	switch {
+	case item.Owner != "" && item.OwnerGroup != "":
+		return item.Owner + ":" + item.OwnerGroup
+	case item.Owner != "":
+		return item.Owner
+	default:
+		return ""
+	}
+}
+
+// parseMode parses an octal chmod string ("" -> not set).
+func parseMode(s string) (os.FileMode, bool) {
+	if s == "" {
+		return 0, false
+	}
+	n, err := strconv.ParseUint(s, 8, 32)
+	if err != nil {
+		return 0, false
+	}
+	return os.FileMode(n), true
+}
+
+// expandHome resolves a leading ~/ to the host home.
+func (h Host) expandHome(p string) string {
+	if rest, ok := strings.CutPrefix(p, "~/"); ok {
+		return filepath.Join(h.Home, rest)
+	}
+	return p
+}
+
+func sameContent(a, b string) bool {
+	x, err := os.ReadFile(a)
+	if err != nil {
+		return false
+	}
+	y, err := os.ReadFile(b)
+	if err != nil {
+		return false
+	}
+	return string(x) == string(y)
+}
+
+// PruneBrokenLinks removes broken symlinks in config-set dirs (live dests).
+func (h Host) PruneBrokenLinks(dirRels []string) error {
+	h.fs.Log("prune-links", h.Root)
+	seen := map[string]bool{}
+	for _, rel := range dirRels {
+		dest := h.ToDest(rel)
+		if seen[dest] {
+			continue
+		}
+		seen[dest] = true
+		entries, derr := os.ReadDir(dest)
+		if derr != nil {
+			continue // [why] dir may not exist on host yet
+		}
+		for _, e := range entries {
+			p := filepath.Join(dest, e.Name())
+			if !h.brokenRepoLink(p) {
+				continue
+			}
+			if err := h.fs.Remove(p); err != nil {
+				return err
+			}
+		}
+	}
+	return nil
+}
+
+// brokenRepoLink: chech if p is a symlink into root/ whose target is gone.
+func (h Host) brokenRepoLink(p string) bool {
+	target, err := os.Readlink(p) // [what] non-symlink -> err
+	if err != nil {
+		return false
+	}
+	if !filepath.IsAbs(target) {
+		target = filepath.Join(filepath.Dir(p), target)
+	}
+	target = filepath.Clean(target)
+	if target != h.Root && !strings.HasPrefix(target, h.Root+"/") {
+		return false
+	}
+	_, err = os.Stat(p) // [what] broken
+	return err != nil
+}
+
+// [<] 🤖🤖
