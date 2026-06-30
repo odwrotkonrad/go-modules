@@ -44,9 +44,9 @@ make test     # go test ./...
 make build    # build both binaries into ./dist
 ```
 
-Releases are cut by pushing a `vX.Y.Z` tag; CI runs tests then publishes a
-GitLab release. Consumers install with `go install ...@vX.Y.Z` (compiles on
-the host).
+Releases are automatic: every push to `main` runs tests, then CI bumps the
+patch version from the highest `vX.Y.Z` tag and publishes a GitLab release.
+Consumers install with `go install ...@vX.Y.Z` (compiles on the host).
 
 ## License
 

@@ -1,8 +1,8 @@
 ##[>] 🤖🤖
 workflow:
   rules:
-    - if: $CI_COMMIT_TAG
     - if: $CI_PIPELINE_SOURCE == "merge_request_event"
+    - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
 
 stages:
   - test
@@ -34,10 +34,14 @@ release:
   image: registry.gitlab.com/gitlab-org/release-cli:latest
   needs: [test]
   rules:
-    - if: $CI_COMMIT_TAG
+    - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
   script:
-    - echo "release $CI_COMMIT_TAG"
-  release:
-    tag_name: $CI_COMMIT_TAG
-    description: "render-files $CI_COMMIT_TAG"
+    - NEXT=$(sh ci/next-version.sh)
+    - echo "releasing $NEXT"
+    - |
+      release-cli create \
+        --name "render-files $NEXT" \
+        --tag-name "$NEXT" \
+        --ref "$CI_COMMIT_SHA" \
+        --description "render-files $NEXT"
 ##[<] 🤖🤖
