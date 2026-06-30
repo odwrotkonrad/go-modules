@@ -1,0 +1,14 @@
+profiles:
+  cli:
+    macos:
+
+base:
+  include:
+    run-scripts:
+      - ci/zsh/scripts/installs/*.zsh
+
+cli/macos:
+  mixin-profiles: [base]
+  exclude:
+    run-scripts:
+      - ci/zsh/scripts/installs/20-foo.zsh

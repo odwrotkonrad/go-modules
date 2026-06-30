@@ -48,6 +48,8 @@ var mergeFiles = map[string]string{
 	"root/HOME/.config/zsh/.zshrc":                     "user zshrc\n",
 	"root/etc/grafana/grafana.ini":                     "ini\n",
 	"root/Library/LaunchDaemons/otelcol.plist.host.cp": "plist\n",
+	"ci/zsh/scripts/installs/10-brew.zsh":              "#!/bin/zsh\n",
+	"ci/zsh/scripts/installs/20-kitty.zsh":             "#!/bin/zsh\n",
 }
 
 // find returns a pointer to the first item satisfying pred, or nil.
@@ -200,11 +202,13 @@ func TestMixinProfilesCycle(t *testing.T) {
 // key (glob match, not exact), including rich {source,dest} entries.
 func TestIncludeExcludeSections(t *testing.T) {
 	files := map[string]string{
-		"root/etc/zshrc":                  "z\n",
-		"root/etc/zsh/zshenv":             "e\n", // excluded -> must not link
-		"root/HOME/.config/extra/x":       "x\n",
-		"root/HOME/.config/oneoff/y":      "y\n",
-		"root/HOME/.config/zsh/c.host.cp": "c\n", // rich copy, excluded by glob
+		"root/etc/zshrc":                       "z\n",
+		"root/etc/zsh/zshenv":                  "e\n", // excluded -> must not link
+		"root/HOME/.config/extra/x":            "x\n",
+		"root/HOME/.config/oneoff/y":           "y\n",
+		"root/HOME/.config/zsh/c.host.cp":      "c\n", // rich copy, excluded by glob
+		"ci/zsh/scripts/installs/10-brew.zsh":  "#!/bin/zsh\n",
+		"ci/zsh/scripts/installs/20-foo.zsh":   "#!/bin/zsh\n", // excluded by run-scripts
 	}
 	dir := fixtureRepo(t, "include-exclude", files)
 	res := resolve(t, dir, "cli/macos")
@@ -232,6 +236,27 @@ func TestIncludeExcludeSections(t *testing.T) {
 	}
 	if !slices.Contains(res.Services, "otelcol") {
 		t.Errorf("otelcol service missing: %v", res.Services)
+	}
+}
+
+// TestExcludeScriptGlob: a single-file run-scripts exclude drops that file even
+// when the include is a directory glob ([why] globs expand before exclude).
+func TestExcludeScriptGlob(t *testing.T) {
+	files := map[string]string{
+		"root/.gitkeep":                        "",
+		"ci/zsh/scripts/installs/10-brew.zsh":  "#!/bin/zsh\n",
+		"ci/zsh/scripts/installs/20-foo.zsh":   "#!/bin/zsh\n",
+		"ci/zsh/scripts/installs/30-tmux.zsh":  "#!/bin/zsh\n",
+	}
+	dir := fixtureRepo(t, "exclude-script-glob", files)
+	res := resolve(t, dir, "cli/macos")
+
+	want := []string{
+		"ci/zsh/scripts/installs/10-brew.zsh",
+		"ci/zsh/scripts/installs/30-tmux.zsh",
+	}
+	if !slices.Equal(res.Scripts, want) {
+		t.Errorf("glob include + single-file exclude: got %v, want %v", res.Scripts, want)
 	}
 }
 
