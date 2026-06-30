@@ -4,7 +4,7 @@ GO ?= go
 CC ?= clang
 BIN := che
 
-.PHONY: test build vet install release-snapshot release
+.PHONY: test build vet install
 
 ##[>] Targets [genai-include]
 #[what] run all tests
@@ -22,13 +22,5 @@ vet:
 #[what] install the binary into $GOPATH/bin
 install:
 	CC=$(CC) $(GO) install .
-
-#[what] build a local snapshot release (no publish)
-release-snapshot:
-	goreleaser release --snapshot --clean
-
-#[what] cut a release from the current tag (publish)
-release:
-	goreleaser release --clean
 ##[<] Targets
 ##[<] 🤖🤖

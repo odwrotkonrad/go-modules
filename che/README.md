@@ -39,8 +39,11 @@ Flags:
 ```sh
 make test     # go test ./...
 make build    # build into ./dist
-make release-snapshot
 ```
+
+Releases are cut by pushing a `vX.Y.Z` tag; CI runs tests then publishes a
+GitLab release. Consumers install with `go install ...@vX.Y.Z` (compiles on
+the host).
 
 ## License
 
