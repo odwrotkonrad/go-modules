@@ -29,15 +29,9 @@ install:
 ##[<] Go
 
 ##[>] Release [genai-include]
-#[what] branch to derive the release tag from (stable on DEFAULT_BRANCH, else prerelease)
-export BRANCH
-#[what] commit ref (SHA) the tag points at
-export REF
-#[what] branch treated as the stable release line
-export DEFAULT_BRANCH #[vals] main
-
 #[what] create the release + git tag from BRANCH at REF via release-cli
+#[args] BRANCH REF DEFAULT_BRANCH
 create-tag:
-	@ci/create-tag.zsh
+	@ci/create-tag.zsh $(BRANCH) $(REF) $(DEFAULT_BRANCH)
 ##[<] Release
 ##[<] 🤖🤖

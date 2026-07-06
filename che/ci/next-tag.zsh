@@ -1,16 +1,16 @@
 #!/usr/bin/env zsh
 ##[>] 🤖🤖
 # Compute the next release tag for a branch.
-# Arg $1 = branch name. On the default branch prints the next stable
-# v<major>.<minor>.<patch> (highest vX.Y.Z tag, patch-bumped). On any
-# other branch prints a prerelease v<target>-<branch>.<N>, where <branch>
-# is sanitized to the SemVer prerelease charset [0-9A-Za-z-] and N =
-# highest existing v<target>-<branch>.* counter + 1 (else 1).
-# Prints the tag to stdout.
+# Args: $1 branch (default: current), $2 default branch (default: main).
+# On the default branch prints the next stable v<major>.<minor>.<patch>
+# (highest vX.Y.Z tag, patch-bumped). On any other branch prints a
+# prerelease v<target>-<branch>.<N>, where <branch> is sanitized to the
+# SemVer prerelease charset [0-9A-Za-z-] and N = highest existing
+# v<target>-<branch>.* counter + 1 (else 1). Prints the tag to stdout.
 set -eu
 
-branch="${1:-${BRANCH:-}}"
-default="${DEFAULT_BRANCH:-main}"
+branch="${1:-$(git rev-parse --abbrev-ref HEAD)}"
+default="${2:-main}"
 
 api="${CI_API_V4_URL}/projects/${CI_PROJECT_ID}/repository/tags?per_page=100&order_by=version&sort=desc"
 

@@ -37,14 +37,10 @@ release:
   needs: []
   rules:
     - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
-  variables:
-    BRANCH: $CI_COMMIT_BRANCH
-    REF: $CI_COMMIT_SHA
-    DEFAULT_BRANCH: $CI_DEFAULT_BRANCH
   before_script:
     - apk add --no-cache make zsh
   script:
-    - make create-tag
+    - make create-tag BRANCH="$CI_COMMIT_BRANCH" REF="$CI_COMMIT_SHA" DEFAULT_BRANCH="$CI_DEFAULT_BRANCH"
 
 prerelease:
   stage: release
@@ -54,12 +50,8 @@ prerelease:
     - if: $CI_PIPELINE_SOURCE == "merge_request_event" && $CI_MERGE_REQUEST_TITLE =~ /^Draft:/
       when: never
     - if: $CI_PIPELINE_SOURCE == "merge_request_event"
-  variables:
-    BRANCH: $CI_COMMIT_REF_NAME
-    REF: $CI_COMMIT_SHA
-    DEFAULT_BRANCH: $CI_DEFAULT_BRANCH
   before_script:
     - apk add --no-cache make zsh
   script:
-    - make create-tag
+    - make create-tag BRANCH="$CI_COMMIT_REF_NAME" REF="$CI_COMMIT_SHA" DEFAULT_BRANCH="$CI_DEFAULT_BRANCH"
 ##[<] 🤖🤖
