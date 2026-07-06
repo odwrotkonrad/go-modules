@@ -22,19 +22,27 @@ const (
 	CpExt       = ".host.cp"
 )
 
-// Raw mirrors che.yml. Profiles is the enum tree of declared leaves; other
-// top-level keys are defined blocks: leaf profiles and mixin profiles.
+// Raw mirrors che.yml: every top-level key is a defined profile block.
 type Raw struct {
-	Profiles map[string]any         `yaml:"profiles"`
 	profiles map[string]profileSpec // every defined block, keyed by name
 }
 
-// profileSpec is one block: mixinProfiles composed in order, then include
-// (additive) and exclude (subtractive glob filter, applied last, wins).
+// profileSpec is one block: options self-describe selection (autoDetect,
+// mixinOnly), mixinProfiles composed in order, then include (additive) and
+// exclude (subtractive glob filter, applied last, wins).
 type profileSpec struct {
-	MixinProfiles []string   `yaml:"mixinProfiles"`
-	Include       includeSet `yaml:"include"`
-	Exclude       excludeSet `yaml:"exclude"`
+	Options       ProfileOptions `yaml:"options"`
+	MixinProfiles []string       `yaml:"mixinProfiles"`
+	Include       includeSet     `yaml:"include"`
+	Exclude       excludeSet     `yaml:"exclude"`
+}
+
+// ProfileOptions self-describes how a profile is selected. AutoDetect: run iff
+// name == detected <space>/<os>. MixinOnly: a mixin helper, never run
+// standalone. Both default false -> the lone fallback candidate.
+type ProfileOptions struct {
+	AutoDetect bool `yaml:"autoDetect"`
+	MixinOnly  bool `yaml:"mixinOnly"`
 }
 
 // includeSet is the additive payload: link globs, copy/template/mkdirs entries
@@ -175,8 +183,7 @@ type effective struct {
 	exclude      excludeSet // accumulated exclude globs (applied last, wins)
 }
 
-// Load parses che.yml: the `profiles:` enum plus every other top-level key as a
-// defined block.
+// Load parses che.yml: every top-level key is a defined profile block.
 func Load(path string) (*Raw, error) {
 	b, err := os.ReadFile(path)
 	if err != nil {
@@ -188,12 +195,6 @@ func Load(path string) (*Raw, error) {
 	}
 	s := &Raw{profiles: map[string]profileSpec{}}
 	for key, node := range raw {
-		if key == "profiles" {
-			if err := node.Decode(&s.Profiles); err != nil {
-				return nil, fmt.Errorf("parse profiles enum: %w", err)
-			}
-			continue
-		}
 		var ps profileSpec
 		if err := node.Decode(&ps); err != nil {
 			return nil, fmt.Errorf("parse profile %q: %w", key, err)
@@ -203,14 +204,52 @@ func Load(path string) (*Raw, error) {
 	return s, nil
 }
 
+// SelectProfile picks the one profile to Resolve:
+//  1. forced (CHE_FORCE_PROFILE by name) overrides; must name a defined profile.
+//  2. else a profile with autoDetect and name == detected <space>/<os>.
+//  3. else the lone profile that is neither mixinOnly nor autoDetect.
+//  4. zero or >1 such fallback candidates -> error (none / ambiguous).
+func (r *Raw) SelectProfile(forced, detected string) (string, error) {
+	if forced != "" {
+		if _, ok := r.profiles[forced]; !ok {
+			return "", fmt.Errorf("CHE_FORCE_PROFILE %q is not defined in che.yml (defined: %v)",
+				forced, r.names(func(profileSpec) bool { return true }))
+		}
+		return forced, nil
+	}
+	if ps, ok := r.profiles[detected]; ok && ps.Options.AutoDetect {
+		return detected, nil
+	}
+	fallback := r.names(func(ps profileSpec) bool { return !ps.Options.MixinOnly && !ps.Options.AutoDetect })
+	switch len(fallback) {
+	case 1:
+		return fallback[0], nil
+	case 0:
+		return "", fmt.Errorf("no profile selected: detected %q has no autoDetect match and no fallback profile defined", detected)
+	default:
+		return "", fmt.Errorf("ambiguous profile selection: detected %q has no autoDetect match and multiple fallback profiles (%v)", detected, fallback)
+	}
+}
+
+// names lists defined profile block names matching keep, sorted.
+func (r *Raw) names(keep func(profileSpec) bool) []string {
+	var out []string
+	for name, ps := range r.profiles {
+		if keep(ps) {
+			out = append(out, name)
+		}
+	}
+	return slices.Sorted(slices.Values(out))
+}
+
 // Resolve validates the profile is defined, composes its mixinProfiles and
 // includes, classifies git-tracked files, then applies excludes as a final glob
 // filter. Output is repo-relative.
 func (r *Raw) Resolve(profile, root string) (Resolved, error) {
-	if !r.isDetectable(profile) {
+	if _, ok := r.profiles[profile]; !ok {
 		return Resolved{}, fmt.Errorf(
-			"detected profile %q is not defined in che.yml (defined: %v)",
-			profile, r.detectableLeaves())
+			"profile %q is not defined in che.yml (defined: %v)",
+			profile, r.names(func(ps profileSpec) bool { return !ps.Options.MixinOnly }))
 	}
 	var eff effective
 	if err := r.mergeInto(&eff, profile, nil); err != nil {
@@ -489,44 +528,6 @@ func dirItems(e entry) []FileItem {
 		}
 	}
 	return out
-}
-
-// isDetectable reports whether profile is both declared in the enum and defined.
-func (r *Raw) isDetectable(profile string) bool {
-	_, defined := r.profiles[profile]
-	return defined && r.declared(profile)
-}
-
-// declared walks the profiles enum tree for the "<space>/<os>" leaf.
-func (r *Raw) declared(profile string) bool {
-	space, leaf, ok := strings.Cut(profile, "/")
-	if !ok {
-		return false
-	}
-	m, ok := r.Profiles[space].(map[string]any)
-	if !ok {
-		return false
-	}
-	_, ok = m[leaf]
-	return ok
-}
-
-// detectableLeaves lists the enum leaves that are also defined.
-func (r *Raw) detectableLeaves() []string {
-	var out []string
-	for space, leaves := range r.Profiles {
-		m, ok := leaves.(map[string]any)
-		if !ok {
-			continue
-		}
-		for leaf := range m {
-			name := space + "/" + leaf
-			if _, defined := r.profiles[name]; defined {
-				out = append(out, name)
-			}
-		}
-	}
-	return slices.Sorted(slices.Values(out))
 }
 
 // [<] 🤖🤖

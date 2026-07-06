@@ -1,11 +1,5 @@
-profiles:
-  desktop:
-    macos:
-  cli:
-    macos:
-    linux:
-
 base:
+  options: {mixinOnly: true}
   include:
     link:
       - etc/zshrc
@@ -25,6 +19,7 @@ base:
     services: [otelcol, port-exporter, grafana, prometheus]
 
 base-exclude-desktop:
+  options: {mixinOnly: true}
   exclude:
     link:
       - etc/grafana/**
@@ -35,7 +30,9 @@ base-exclude-desktop:
     services: [grafana, prometheus]
 
 desktop/macos:
+  options: {autoDetect: true}
   mixinProfiles: [base]
 
 cli/macos:
+  options: {autoDetect: true}
   mixinProfiles: [base, base-exclude-desktop]

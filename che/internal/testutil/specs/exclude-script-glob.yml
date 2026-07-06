@@ -1,13 +1,11 @@
-profiles:
-  cli:
-    macos:
-
 base:
+  options: {mixinOnly: true}
   include:
     runScripts:
       - ci/zsh/scripts/installs/*.zsh
 
 cli/macos:
+  options: {autoDetect: true}
   mixinProfiles: [base]
   exclude:
     runScripts:

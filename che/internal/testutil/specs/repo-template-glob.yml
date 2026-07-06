@@ -1,11 +1,9 @@
-profiles:
-  cli:
-    macos:
-
 base:
+  options: {mixinOnly: true}
   include:
     repoTemplate:
       - files: [templates/**/*.repo.tpl]
 
 cli/macos:
+  options: {autoDetect: true}
   mixinProfiles: [base]

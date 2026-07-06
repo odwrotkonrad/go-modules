@@ -1,8 +1,5 @@
-profiles:
-  cli:
-    macos:
-
 base:
+  options: {mixinOnly: true}
   include:
     repoTemplate:
       - files:
@@ -15,4 +12,5 @@ base:
               - {path: AGENTS.md, options: {renderReferencedFiles: true}}
 
 cli/macos:
+  options: {autoDetect: true}
   mixinProfiles: [base]
