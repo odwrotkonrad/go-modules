@@ -7,7 +7,7 @@
 set -eu
 
 dir=$(dirname "$0")
-target=$("$dir/next-version.sh")
+target=$(sh "$dir/next-version.sh")
 
 api="${CI_API_V4_URL}/projects/${CI_PROJECT_ID}/repository/tags?per_page=100&order_by=version&sort=desc"
 
