@@ -30,40 +30,44 @@ func plain(t *testing.T, line string) []string {
 }
 
 func TestMsgFormat(t *testing.T) {
-	m := plain(t, capture(t, func() { Msg("ln", "/etc/zshrc", false) }))
+	m := plain(t, capture(t, func() { Msg("ln", "/etc/zshrc", Off) }))
 	if m[1] != "ln" || m[2] != "" || m[3] != "/etc/zshrc" {
 		t.Errorf("type/subtype/msg = %q/%q/%q, want ln//.../etc/zshrc", m[1], m[2], m[3])
 	}
 }
 
 func TestMsgSubtypedTitle(t *testing.T) {
-	m := plain(t, capture(t, func() { Msg("render(dry-run-render-secrets)", "/x", false) }))
+	m := plain(t, capture(t, func() { Msg("render(dry-run-render-secrets)", "/x", Off) }))
 	if m[1] != "render" || m[2] != "(dry-run-render-secrets)" || m[3] != "/x" {
 		t.Errorf("type/subtype/msg = %q/%q/%q, want render/(dry-run-render-secrets)//x", m[1], m[2], m[3])
 	}
 }
 
 func TestMsgDryRunSubtype(t *testing.T) {
-	m := plain(t, capture(t, func() { Msg("cp", "/x", true) }))
-	if m[1] != "cp" || m[2] != "(dry-run)" || m[3] != "/x" {
-		t.Errorf("dry-run line type/subtype/msg = %q/%q/%q, want cp/(dry-run)//x", m[1], m[2], m[3])
+	m := plain(t, capture(t, func() { Msg("cp", "/x", Delta) }))
+	if m[1] != "cp" || m[2] != "(dry-run=delta)" || m[3] != "/x" {
+		t.Errorf("delta line type/subtype/msg = %q/%q/%q, want cp/(dry-run=delta)//x", m[1], m[2], m[3])
 	}
-	wet := capture(t, func() { Msg("cp", "/x", false) })
+	all := plain(t, capture(t, func() { Msg("cp", "/x", All) }))
+	if all[2] != "(dry-run=all)" {
+		t.Errorf("all line subtype = %q, want (dry-run=all)", all[2])
+	}
+	wet := capture(t, func() { Msg("cp", "/x", Off) })
 	if strings.Contains(wet, "dry-run") {
 		t.Errorf("non-dry-run line %q must not carry a dry-run subtype", wet)
 	}
 }
 
 func TestMsgDryRunCombinesSubtype(t *testing.T) {
-	m := plain(t, capture(t, func() { Msg("render(dry-run-render-secrets)", "/x", true) }))
-	if m[2] != "(dry-run-render-secrets,dry-run)" {
-		t.Errorf("dry-run subtype = %q, want comma-joined (dry-run-render-secrets,dry-run)", m[2])
+	m := plain(t, capture(t, func() { Msg("render(dry-run-render-secrets)", "/x", Delta) }))
+	if m[2] != "(dry-run-render-secrets,dry-run=delta)" {
+		t.Errorf("dry-run subtype = %q, want comma-joined (dry-run-render-secrets,dry-run=delta)", m[2])
 	}
 }
 
 // TestBoldEmitted guards that the type is wrapped in SGR bold, escapes intact.
 func TestBoldEmitted(t *testing.T) {
-	out := capture(t, func() { Msg("ln", "/x", false) })
+	out := capture(t, func() { Msg("ln", "/x", Off) })
 	if !strings.Contains(out, "\x1b[1mln\x1b[") {
 		t.Errorf("output %q must bold the type", out)
 	}

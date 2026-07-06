@@ -11,6 +11,7 @@ import (
 	"strings"
 
 	"gitlab.com/konradodwrot/go/che/internal/fsutil"
+	"gitlab.com/konradodwrot/go/che/internal/log"
 )
 
 // DryRunMode selects how a dry run reports: off (real run), delta (only dests
@@ -41,7 +42,19 @@ func New(repoRoot, home, profile string, mode DryRunMode) Host {
 		Home:     home,
 		Profile:  profile,
 		mode:     mode,
-		fs:       fsutil.FS{Home: home, DryRun: mode != DryRunOff},
+		fs:       fsutil.FS{Home: home, Mode: mode.log()},
+	}
+}
+
+// log maps a DryRunMode to the log-layer dry-run mode (subtype rendering).
+func (m DryRunMode) log() log.DryRun {
+	switch m {
+	case DryRunDelta:
+		return log.Delta
+	case DryRunAll:
+		return log.All
+	default:
+		return log.Off
 	}
 }
 

@@ -32,8 +32,13 @@ func (h Host) RenderTemplates(templates []spec.FileItem) error {
 		return err
 	}
 	if h.DryRun() { // [why] dry-run logs dests only: no gomplate render, no @-include resolve
-		for _, dest := range dests {
-			h.fs.Log("render", dest)
+		for _, item := range keep {
+			for _, dest := range h.templateDests(item) {
+				h.fs.Log("render(create)", dest)
+				if err := h.fixPerms("render", dest, item); err != nil {
+					return err
+				}
+			}
 		}
 		return nil
 	}

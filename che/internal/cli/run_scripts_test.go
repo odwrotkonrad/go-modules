@@ -12,7 +12,7 @@ import (
 func TestRunScriptsCmd(t *testing.T) {
 	setupDryRun(t)
 	out := testutil.RunDry(t, RunScriptsCmd, true)
-	testutil.WantLines(t, out, "run-scripts(dry-run): "+theHost.RepoRoot+"/install/unit")
+	testutil.WantLines(t, out, "run-scripts(dry-run=delta): "+theHost.RepoRoot+"/install/unit")
 }
 
 // a NAME arg narrows the script list; an unmatched NAME errors.
@@ -24,7 +24,7 @@ func TestRunScriptsCmdFilter(t *testing.T) {
 	if err != nil {
 		t.Fatalf("RunScriptsCmd errored: %v", err)
 	}
-	testutil.WantLines(t, out, "run-scripts(dry-run): "+theHost.RepoRoot+"/install/unit")
+	testutil.WantLines(t, out, "run-scripts(dry-run=delta): "+theHost.RepoRoot+"/install/unit")
 
 	if _, err := testutil.CaptureStdout(t, func() error {
 		return RunScriptsCmd.RunE(RunScriptsCmd, []string{"__nope__"})

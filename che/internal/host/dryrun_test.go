@@ -139,39 +139,39 @@ func TestDryRunPasses(t *testing.T) {
 		run     func(Host, spec.Resolved) error
 		mustLog string // a verb the dry-run output must contain
 	}{
-		{"link", func(h Host, r spec.Resolved) error { return h.MkLinks(r.Links, r.Dirs) }, "ln(dry-run)"},
-		{"copy", func(h Host, r spec.Resolved) error { return h.MkCopies(r.Copies, r.Dirs) }, "cp(dry-run)"},
-		{"render-templates", func(h Host, r spec.Resolved) error { return h.RenderTemplates(r.Templates) }, "render(dry-run)"},
-		{"mk-dirs", func(h Host, r spec.Resolved) error { return h.MkDirs(r.Dirs, r.ExtraDirs) }, "mkdir(dry-run)"},
-		{"prune-links", func(h Host, r spec.Resolved) error { return h.PruneBrokenLinks(r.Dirs) }, "prune-links(dry-run)"},
+		{"link", func(h Host, r spec.Resolved) error { return h.MkLinks(r.Links, r.Dirs) }, "ln(create,dry-run=delta)"},
+		{"copy", func(h Host, r spec.Resolved) error { return h.MkCopies(r.Copies, r.Dirs) }, "cp(create,dry-run=delta)"},
+		{"render-templates", func(h Host, r spec.Resolved) error { return h.RenderTemplates(r.Templates) }, "render(create,dry-run=delta)"},
+		{"mk-dirs", func(h Host, r spec.Resolved) error { return h.MkDirs(r.Dirs, r.ExtraDirs) }, "mkdir(create,dry-run=delta)"},
+		{"prune-links", func(h Host, r spec.Resolved) error { return h.PruneBrokenLinks(r.Dirs) }, "prune-links(dry-run=delta)"},
 		{"run-scripts", func(h Host, r spec.Resolved) error {
 			scripts, err := h.ResolveScripts(r.Scripts)
 			if err != nil {
 				return err
 			}
 			return h.RunScripts(scripts)
-		}, "run-scripts(dry-run)"},
+		}, "run-scripts(dry-run=delta)"},
 		{"services bootout", func(h Host, r spec.Resolved) error {
 			svcs, err := h.ResolveServices(r.Services)
 			if err != nil {
 				return err
 			}
 			return h.Bootout(svcs)
-		}, "bootout(dry-run)"},
+		}, "bootout(dry-run=delta)"},
 		{"services bootin", func(h Host, r spec.Resolved) error {
 			svcs, err := h.ResolveServices(r.Services)
 			if err != nil {
 				return err
 			}
 			return h.Bootin(svcs)
-		}, "bootstrap(dry-run)"},
+		}, "bootstrap(dry-run=delta)"},
 		{"services ensure", func(h Host, r spec.Resolved) error {
 			svcs, err := h.ResolveServices(r.Services)
 			if err != nil {
 				return err
 			}
 			return h.Ensure(svcs)
-		}, "ensure(dry-run)"},
+		}, "ensure(dry-run=delta)"},
 	}
 	for _, c := range cases {
 		t.Run(c.name, func(t *testing.T) {
@@ -187,7 +187,7 @@ func TestDryRunPasses(t *testing.T) {
 				t.Errorf("%s dry-run printed no %q action:\n%s", c.name, c.mustLog, out)
 			}
 			for line := range strings.SplitSeq(strings.TrimSpace(out), "\n") {
-				if line != "" && !strings.Contains(line, "(dry-run)") {
+				if line != "" && !strings.Contains(line, "dry-run=delta") {
 					t.Errorf("%s printed a non-dry-run line: %q", c.name, line)
 				}
 			}

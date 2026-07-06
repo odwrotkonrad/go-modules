@@ -116,7 +116,7 @@ func MockRepoEnv(t *testing.T) string {
 }
 
 // RunDry runs a subcommand's RunE (caller already built dry-run state), captures stdout,
-// asserts every printed line carries the (dry-run) scope. dryRunLines=false skips that
+// asserts every printed line carries the dry-run=delta scope. dryRunLines=false skips that
 // check (e.g. detect, prints bare profile).
 func RunDry(t *testing.T, cmd *cobra.Command, dryRunLines bool) string {
 	t.Helper()
@@ -126,7 +126,7 @@ func RunDry(t *testing.T, cmd *cobra.Command, dryRunLines bool) string {
 	}
 	if dryRunLines {
 		for line := range strings.SplitSeq(strings.TrimSpace(out), "\n") {
-			if line != "" && !strings.Contains(line, "(dry-run)") {
+			if line != "" && !strings.Contains(line, "dry-run=delta") {
 				t.Errorf("non-dry-run line: %q\n--- got ---\n%s", line, out)
 			}
 		}

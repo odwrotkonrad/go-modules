@@ -13,10 +13,10 @@ func TestCopyCmd(t *testing.T) {
 	home := setupDryRun(t)
 	out := testutil.RunDry(t, CopyCmd, true)
 	testutil.WantLines(t, out,
-		"cp(dry-run): "+home+"/.config/zsh/c",
-		"archive(dry-run): "+home+"/.local/share/che/backups/che-copy-",
-		"cp(dry-run): /Library/LaunchDaemons/otelcol.plist",
-		"chown(dry-run): root:wheel /Library/LaunchDaemons/otelcol.plist",
+		"cp(create,dry-run=delta): "+home+"/.config/zsh/c",
+		"archive(dry-run=delta): "+home+"/.local/share/che/backups/che-copy-",
+		"cp(create,dry-run=delta): /Library/LaunchDaemons/otelcol.plist",
+		"cp(chown,dry-run=delta): root:wheel /Library/LaunchDaemons/otelcol.plist",
 	)
 }
 

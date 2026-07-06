@@ -31,7 +31,7 @@ func BackupArchivePath(home, bin, sub, ts string) string {
 // (linked contents stored, not the link); missing dests, broken links + dirs
 // skipped. Always writes the archive, even empty. Honors DryRun.
 func (f FS) ArchiveDests(archivePath string, dests []string) error {
-	if f.DryRun {
+	if f.dry() {
 		f.Log("archive", archivePath)
 		return nil
 	}
