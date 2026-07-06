@@ -89,6 +89,7 @@ func CheRepo(t *testing.T) (string, string) {
 		"root/HOME/.config/zsh/.zshrc":                     "user zshrc\n",
 		"root/HOME/.config/zsh/c.host.cp":                  "copyme\n",
 		"root/HOME/.config/zsh/t.host.tpl":                 "plain template\n",
+		"templates/r.repo.tpl":                             "repo body\n",
 		"root/Library/LaunchDaemons/otelcol.plist.host.cp": "<plist/>\n",
 		"install/unit":                                     "#!/bin/sh\necho ran\n",
 	})

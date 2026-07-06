@@ -202,13 +202,13 @@ func TestMixinProfilesCycle(t *testing.T) {
 // key (glob match, not exact), including rich {source,dest} entries.
 func TestIncludeExcludeSections(t *testing.T) {
 	files := map[string]string{
-		"root/etc/zshrc":                       "z\n",
-		"root/etc/zsh/zshenv":                  "e\n", // excluded -> must not link
-		"root/HOME/.config/extra/x":            "x\n",
-		"root/HOME/.config/oneoff/y":           "y\n",
-		"root/HOME/.config/zsh/c.host.cp":      "c\n", // rich copy, excluded by glob
-		"ci/zsh/scripts/installs/10-brew.zsh":  "#!/bin/zsh\n",
-		"ci/zsh/scripts/installs/20-foo.zsh":   "#!/bin/zsh\n", // excluded by run-scripts
+		"root/etc/zshrc":                      "z\n",
+		"root/etc/zsh/zshenv":                 "e\n", // excluded -> must not link
+		"root/HOME/.config/extra/x":           "x\n",
+		"root/HOME/.config/oneoff/y":          "y\n",
+		"root/HOME/.config/zsh/c.host.cp":     "c\n", // rich copy, excluded by glob
+		"ci/zsh/scripts/installs/10-brew.zsh": "#!/bin/zsh\n",
+		"ci/zsh/scripts/installs/20-foo.zsh":  "#!/bin/zsh\n", // excluded by run-scripts
 	}
 	dir := fixtureRepo(t, "include-exclude", files)
 	res := resolve(t, dir, "cli/macos")
@@ -243,10 +243,10 @@ func TestIncludeExcludeSections(t *testing.T) {
 // when the include is a directory glob ([why] globs expand before exclude).
 func TestExcludeScriptGlob(t *testing.T) {
 	files := map[string]string{
-		"root/.gitkeep":                        "",
-		"ci/zsh/scripts/installs/10-brew.zsh":  "#!/bin/zsh\n",
-		"ci/zsh/scripts/installs/20-foo.zsh":   "#!/bin/zsh\n",
-		"ci/zsh/scripts/installs/30-tmux.zsh":  "#!/bin/zsh\n",
+		"root/.gitkeep":                       "",
+		"ci/zsh/scripts/installs/10-brew.zsh": "#!/bin/zsh\n",
+		"ci/zsh/scripts/installs/20-foo.zsh":  "#!/bin/zsh\n",
+		"ci/zsh/scripts/installs/30-tmux.zsh": "#!/bin/zsh\n",
 	}
 	dir := fixtureRepo(t, "exclude-script-glob", files)
 	res := resolve(t, dir, "cli/macos")
@@ -262,6 +262,37 @@ func TestExcludeScriptGlob(t *testing.T) {
 
 func TestMixinProfilesUndefined(t *testing.T) {
 	resolveErr(t, "undefined-include", "cli/macos")
+}
+
+// TestRepoTemplateResolve: repo-template entries resolve to rich FileItems
+// carrying source, repo-relative dests, and per-dest options.
+func TestRepoTemplateResolve(t *testing.T) {
+	dir := fixtureRepo(t, "repo-template", map[string]string{"root/.gitkeep": ""})
+	res := resolve(t, dir, "cli/macos")
+
+	if len(res.RepoTemplates) != 2 {
+		t.Fatalf("RepoTemplates = %d, want 2", len(res.RepoTemplates))
+	}
+	env := res.RepoTemplates[0]
+	if env.Rel != "templates/1-env/local.env.repo.tpl" {
+		t.Errorf("env entry = %+v", env)
+	}
+	if len(env.Dests) != 1 || env.Dests[0].Path != ".env" || env.Dests[0].Options.WriteType != "mergeUpsert" {
+		t.Errorf("env dest = %+v", env.Dests)
+	}
+	agents := res.RepoTemplates[1]
+	if len(agents.Dests) != 2 || agents.Dests[0].Path != "CLAUDE.md" {
+		t.Errorf("agents dests = %+v", agents.Dests)
+	}
+	if !agents.Dests[1].Options.RenderReferencedFiles {
+		t.Errorf("AGENTS.md dest should set options.renderReferencedFiles")
+	}
+}
+
+// TestRepoTemplateGlobError: a glob-form repo-template entry is rejected
+// ([why] repo dests must be explicit).
+func TestRepoTemplateGlobError(t *testing.T) {
+	resolveErr(t, "repo-template-glob", "cli/macos")
 }
 
 // [<] 🤖🤖

@@ -13,11 +13,13 @@ import (
 	"gopkg.in/yaml.v3"
 
 	"gitlab.com/konradodwrot/go/che/internal/fsutil"
+	"gitlab.com/konradodwrot/go/render-files/render"
 )
 
 const (
-	TmplExt = ".host.tpl"
-	CpExt   = ".host.cp"
+	TmplExt     = ".host.tpl"
+	RepoTmplExt = ".repo.tpl"
+	CpExt       = ".host.cp"
 )
 
 // Raw mirrors che.yml. Profiles is the enum tree of declared leaves; other
@@ -27,10 +29,10 @@ type Raw struct {
 	profiles map[string]profileSpec // every defined block, keyed by name
 }
 
-// profileSpec is one block: mixin-profiles composed in order, then include
+// profileSpec is one block: mixinProfiles composed in order, then include
 // (additive) and exclude (subtractive glob filter, applied last, wins).
 type profileSpec struct {
-	MixinProfiles []string   `yaml:"mixin-profiles"`
+	MixinProfiles []string   `yaml:"mixinProfiles"`
 	Include       includeSet `yaml:"include"`
 	Exclude       excludeSet `yaml:"exclude"`
 }
@@ -38,30 +40,32 @@ type profileSpec struct {
 // includeSet is the additive payload: link globs, copy/template/mkdirs entries
 // (glob-string OR rich object), script globs, service names.
 type includeSet struct {
-	Link     []string `yaml:"link"`
-	Copy     []entry  `yaml:"copy"`
-	Template []entry  `yaml:"template"`
-	Mkdirs   []entry  `yaml:"mkdirs"`
-	Scripts  []string `yaml:"run-scripts"`
-	Services []string `yaml:"services"`
+	Link         []string `yaml:"link"`
+	Copy         []entry  `yaml:"copy"`
+	Template     []entry  `yaml:"template"`
+	RepoTemplate []entry  `yaml:"repoTemplate"`
+	Mkdirs       []entry  `yaml:"mkdirs"`
+	Scripts      []string `yaml:"runScripts"`
+	Services     []string `yaml:"services"`
 }
 
 // excludeSet is the subtractive payload: every key a flat glob-string list, a
 // match drops the item.
 type excludeSet struct {
-	Link     []string `yaml:"link"`
-	Copy     []string `yaml:"copy"`
-	Template []string `yaml:"template"`
-	Mkdirs   []string `yaml:"mkdirs"`
-	Scripts  []string `yaml:"run-scripts"`
-	Services []string `yaml:"services"`
+	Link         []string `yaml:"link"`
+	Copy         []string `yaml:"copy"`
+	Template     []string `yaml:"template"`
+	RepoTemplate []string `yaml:"repoTemplate"`
+	Mkdirs       []string `yaml:"mkdirs"`
+	Scripts      []string `yaml:"runScripts"`
+	Services     []string `yaml:"services"`
 }
 
-// DestSpec is one dest path plus per-dest template option: a scalar path, or a
-// mapping carrying the render option.
+// DestSpec is one dest path plus its per-dest render options (render-files'
+// canonical type): a scalar path, or a mapping carrying `options`.
 type DestSpec struct {
-	Path                  string `yaml:"path"`
-	RenderReferencedFiles bool   `yaml:"render-referenced-files"`
+	Path    string         `yaml:"path"`
+	Options render.Options `yaml:"options"`
 }
 
 func (d *DestSpec) UnmarshalYAML(value *yaml.Node) error {
@@ -76,7 +80,7 @@ func (d *DestSpec) UnmarshalYAML(value *yaml.Node) error {
 // Perms is shared ownership/mode: empty fields mean "use the code default".
 type Perms struct {
 	Owner      string `yaml:"owner"`
-	OwnerGroup string `yaml:"owner-group"`
+	OwnerGroup string `yaml:"ownerGroup"`
 	Chmod      string `yaml:"chmod"`
 }
 
@@ -105,7 +109,8 @@ func (f *fileSpec) UnmarshalYAML(value *yaml.Node) error {
 }
 
 // FileItem is one resolved file: repo-relative source (under root/), explicit
-// dests (nil -> derived in host), optional perms.
+// dests (nil -> derived in host), optional perms. Per-dest render options live
+// on each DestSpec.
 type FileItem struct {
 	Rel   string
 	Dests []DestSpec
@@ -114,13 +119,14 @@ type FileItem struct {
 
 // Resolved is the classified, repo-relative selection the ops consume.
 type Resolved struct {
-	Links     []FileItem // link op: regular files minus templates/copies/.gitkeep
-	Copies    []FileItem // copy op: *.host.cp
-	Templates []FileItem // render op: *.host.tpl
-	Dirs      []string   // every ancestor dir of links+copies+templates, plus mkdirs
-	ExtraDirs []FileItem // mkdirs only (live dest entries), one per path, carrying perms
-	Services  []string   // service names
-	Scripts   []string   // script entries in spec order
+	Links         []FileItem // link op: regular files minus templates/copies/.gitkeep
+	Copies        []FileItem // copy op: *.host.cp
+	Templates     []FileItem // host render op: *.host.tpl
+	RepoTemplates []FileItem // repo render op: *.repo.tpl -> repo-relative dests
+	Dirs          []string   // every ancestor dir of links+copies+templates, plus mkdirs
+	ExtraDirs     []FileItem // mkdirs only (live dest entries), one per path, carrying perms
+	Services      []string   // service names
+	Scripts       []string   // script entries in spec order
 }
 
 // globSet is an ordered list of op globs, each carrying its group's perms
@@ -157,15 +163,16 @@ func globMatch(glob, rel string) bool {
 // Each op's globs carry their group's perms; classify stamps matched files
 // with them (last match wins).
 type effective struct {
-	linkGlobs globSet    // link-op globs (repo-relative under root/)
-	copyGlobs globSet    // copy-op globs
-	tmplGlobs globSet    // template-op globs
-	richCopy  []FileItem // rich-form copy entries
-	richTmpl  []FileItem // rich-form template entries
-	dirs      []FileItem // mkdirs: glob forms expanded to one item per path, rich carry perms
-	scripts   []string   // script paths (order = run order)
-	services  []string   // service names
-	exclude   excludeSet // accumulated exclude globs (applied last, wins)
+	linkGlobs    globSet    // link-op globs (repo-relative under root/)
+	copyGlobs    globSet    // copy-op globs
+	tmplGlobs    globSet    // template-op globs
+	richCopy     []FileItem // rich-form copy entries
+	richTmpl     []FileItem // rich-form template entries
+	richRepoTmpl []FileItem // rich-form repo-template entries (rich-only)
+	dirs         []FileItem // mkdirs: glob forms expanded to one item per path, rich carry perms
+	scripts      []string   // script paths (order = run order)
+	services     []string   // service names
+	exclude      excludeSet // accumulated exclude globs (applied last, wins)
 }
 
 // Load parses che.yml: the `profiles:` enum plus every other top-level key as a
@@ -196,7 +203,7 @@ func Load(path string) (*Raw, error) {
 	return s, nil
 }
 
-// Resolve validates the profile is defined, composes its mixin-profiles and
+// Resolve validates the profile is defined, composes its mixinProfiles and
 // includes, classifies git-tracked files, then applies excludes as a final glob
 // filter. Output is repo-relative.
 func (r *Raw) Resolve(profile, root string) (Resolved, error) {
@@ -214,11 +221,12 @@ func (r *Raw) Resolve(profile, root string) (Resolved, error) {
 		return Resolved{}, err
 	}
 	res := Resolved{
-		ExtraDirs: eff.dirs,
-		Scripts:   scripts,
-		Services:  fsutil.ExpandAll(eff.services),
-		Copies:    eff.richCopy,
-		Templates: eff.richTmpl,
+		ExtraDirs:     eff.dirs,
+		Scripts:       scripts,
+		Services:      fsutil.ExpandAll(eff.services),
+		Copies:        eff.richCopy,
+		Templates:     eff.richTmpl,
+		RepoTemplates: eff.richRepoTmpl,
 	}
 	if err := classify(root, eff, &res); err != nil {
 		return Resolved{}, err
@@ -264,6 +272,9 @@ func expandScripts(repoRoot string, entries []string) ([]string, error) {
 // them into Links/Copies/Templates plus ancestor Dirs. Glob copy/template files
 // inherit the matching glob's perms.
 func classify(root string, eff effective, res *Resolved) error {
+	if _, err := os.Stat(root); os.IsNotExist(err) {
+		return nil // no root/ subtree: repo-only project (repo-template selection only)
+	}
 	tracked, err := fsutil.TrackedFiles(root)
 	if err != nil {
 		return err
@@ -339,6 +350,7 @@ func applyExcludes(ex excludeSet, res *Resolved) {
 	link := fsutil.ExpandAll(ex.Link)
 	copyG := fsutil.ExpandAll(ex.Copy)
 	tmplG := fsutil.ExpandAll(ex.Template)
+	repoTmplG := fsutil.ExpandAll(ex.RepoTemplate)
 	dirG := fsutil.ExpandAll(ex.Mkdirs)
 	instG := fsutil.ExpandAll(ex.Scripts)
 	svcG := fsutil.ExpandAll(ex.Services)
@@ -346,6 +358,7 @@ func applyExcludes(ex excludeSet, res *Resolved) {
 	res.Links = dropFiles(res.Links, link)
 	res.Copies = dropFiles(res.Copies, copyG)
 	res.Templates = dropFiles(res.Templates, tmplG)
+	res.RepoTemplates = dropFiles(res.RepoTemplates, repoTmplG)
 	res.ExtraDirs = dropFiles(res.ExtraDirs, dirG)
 	res.Scripts = dropStrings(res.Scripts, instG)
 	res.Services = dropStrings(res.Services, svcG)
@@ -381,16 +394,16 @@ func dropStrings(xs, globs []string) []string {
 	return slices.DeleteFunc(xs, func(x string) bool { return matchAny(globs, x) })
 }
 
-// mergeInto composes name into eff: mixin-profiles depth-first, then this
+// mergeInto composes name into eff: mixinProfiles depth-first, then this
 // profile's include sections (additive). Excludes are handled separately
 // (applyExcludes). seen catches cycles.
 func (r *Raw) mergeInto(eff *effective, name string, seen []string) error {
 	if slices.Contains(seen, name) {
-		return fmt.Errorf("mixin-profiles cycle: %v -> %s", seen, name)
+		return fmt.Errorf("mixinProfiles cycle: %v -> %s", seen, name)
 	}
 	ps, ok := r.profiles[name]
 	if !ok {
-		return fmt.Errorf("mixin-profiles names undefined profile %q (from %v)", name, seen)
+		return fmt.Errorf("mixinProfiles names undefined profile %q (from %v)", name, seen)
 	}
 	child := append(slices.Clone(seen), name)
 	for _, m := range ps.MixinProfiles {
@@ -404,6 +417,9 @@ func (r *Raw) mergeInto(eff *effective, name string, seen []string) error {
 	}
 	splitEntries(in.Copy, &eff.copyGlobs, &eff.richCopy)
 	splitEntries(in.Template, &eff.tmplGlobs, &eff.richTmpl)
+	if err := splitRepoTemplates(in.RepoTemplate, &eff.richRepoTmpl); err != nil {
+		return err
+	}
 	for _, e := range in.Mkdirs {
 		eff.dirs = append(eff.dirs, dirItems(e)...)
 	}
@@ -418,6 +434,7 @@ func (ex *excludeSet) append(o excludeSet) {
 	ex.Link = append(ex.Link, o.Link...)
 	ex.Copy = append(ex.Copy, o.Copy...)
 	ex.Template = append(ex.Template, o.Template...)
+	ex.RepoTemplate = append(ex.RepoTemplate, o.RepoTemplate...)
 	ex.Mkdirs = append(ex.Mkdirs, o.Mkdirs...)
 	ex.Scripts = append(ex.Scripts, o.Scripts...)
 	ex.Services = append(ex.Services, o.Services...)
@@ -435,6 +452,25 @@ func splitEntries(entries []entry, globs *globSet, rich *[]FileItem) {
 			*rich = append(*rich, FileItem{Rel: f.Source, Dests: f.Dest, Perms: e.Perms})
 		}
 	}
+}
+
+// splitRepoTemplates walks each repo-template perm-group's Files: rich-only
+// ({source, dest with per-dest options}), routing to repo-relative dests. A glob item is
+// an error ([why] repo dests must be explicit, never derived).
+func splitRepoTemplates(entries []entry, rich *[]FileItem) error {
+	for _, e := range entries {
+		for _, f := range e.Files {
+			if f.glob != "" {
+				return fmt.Errorf("repo-template entry must be {source, dest}, got glob %q", f.glob)
+			}
+			*rich = append(*rich, FileItem{
+				Rel:   f.Source,
+				Dests: f.Dest,
+				Perms: e.Perms,
+			})
+		}
+	}
+	return nil
 }
 
 // dirItems expands each mkdirs perm-group item into one FileItem per

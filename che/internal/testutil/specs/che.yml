@@ -12,23 +12,27 @@ base:
     copy:
       - files: [HOME/.config/zsh/**]
       - owner: root
-        owner-group: wheel
+        ownerGroup: wheel
         chmod: "0644"
         files:
           - {source: Library/LaunchDaemons/otelcol.plist.host.cp, dest: [/Library/LaunchDaemons/otelcol.plist]}
     template:
       - files: [HOME/.config/zsh/**]
+    repoTemplate:
+      - files:
+          - source: templates/r.repo.tpl
+            dest: [docs/r.md]
     mkdirs:
       - files: [HOME/.cache/zsh]
       - chmod: "2775"
         files:
           - {dest: [/var/log/che-test-setgid]}
-    run-scripts:
+    runScripts:
       - install/unit
     services: [otelcol]
 
 cli/macos:
-  mixin-profiles: [base]
+  mixinProfiles: [base]
 
 desktop/macos:
-  mixin-profiles: [base]
+  mixinProfiles: [base]

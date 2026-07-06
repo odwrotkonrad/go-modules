@@ -1,0 +1,18 @@
+profiles:
+  cli:
+    macos:
+
+base:
+  include:
+    repoTemplate:
+      - files:
+          - source: templates/1-env/local.env.repo.tpl
+            dest:
+              - {path: .env, options: {writeType: mergeUpsert}}
+          - source: templates/3-agents/AGENTS.md.repo.tpl
+            dest:
+              - CLAUDE.md
+              - {path: AGENTS.md, options: {renderReferencedFiles: true}}
+
+cli/macos:
+  mixinProfiles: [base]
