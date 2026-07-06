@@ -9,51 +9,51 @@
 # v<target>-<branch>.* counter + 1 (else 1). Prints the tag to stdout.
 set -eu
 
-branch="${1:-$(git rev-parse --abbrev-ref HEAD)}"
-default="${2:-main}"
+BRANCH="${1:-$(git rev-parse --abbrev-ref HEAD)}"
+DEFAULT="${2:-main}"
 
-api="${CI_API_V4_URL}/projects/${CI_PROJECT_ID}/repository/tags?per_page=100&order_by=version&sort=desc"
+API="${CI_API_V4_URL}/projects/${CI_PROJECT_ID}/repository/tags?per_page=100&order_by=version&sort=desc"
 
 fetch() {
   wget -qO- --header="JOB-TOKEN: ${CI_JOB_TOKEN}" "$1"
 }
 
 # next stable target from highest vX.Y.Z tag (rc tags excluded by the grep)
-latest=$(
-  fetch "$api" \
+LATEST=$(
+  fetch "$API" \
     | grep -oE '"name":"v[0-9]+\.[0-9]+\.[0-9]+"' \
     | sed -E 's/.*"v([0-9]+\.[0-9]+\.[0-9]+)"/\1/' \
     | sort -t. -k1,1n -k2,2n -k3,3n \
     | tail -1
 )
 
-if [[ -z "$latest" ]]; then
-  target="v0.0.1"
+if [[ -z "$LATEST" ]]; then
+  TARGET="v0.0.1"
 else
-  major=${latest%%.*}
-  rest=${latest#*.}
-  minor=${rest%%.*}
-  patch=${rest#*.}
-  target="v${major}.${minor}.$((patch + 1))"
+  MAJOR=${LATEST%%.*}
+  REST=${LATEST#*.}
+  MINOR=${REST%%.*}
+  PATCH=${REST#*.}
+  TARGET="v${MAJOR}.${MINOR}.$((PATCH + 1))"
 fi
 
-if [[ "$branch" == "$default" ]]; then
-  echo "$target"
+if [[ "$BRANCH" == "$DEFAULT" ]]; then
+  echo "$TARGET"
   exit 0
 fi
 
 # prerelease: sanitize branch to SemVer charset, bump v<target>-<branch>.<N>
-slug=$(echo "$branch" | sed -E 's/[^0-9A-Za-z-]+/-/g; s/^-+//; s/-+$//')
-pre="${target}-${slug}"
+SLUG=$(echo "$BRANCH" | sed -E 's/[^0-9A-Za-z-]+/-/g; s/^-+//; s/-+$//')
+PRE="${TARGET}-${SLUG}"
 
-esc=$(echo "$pre" | sed 's/\./\\./g')
-max=$(
-  fetch "$api" \
-    | grep -oE "\"name\":\"${esc}\.[0-9]+\"" \
+ESC=$(echo "$PRE" | sed 's/\./\\./g')
+MAX=$(
+  fetch "$API" \
+    | grep -oE "\"name\":\"${ESC}\.[0-9]+\"" \
     | sed -E 's/.*\.([0-9]+)"/\1/' \
     | sort -n \
     | tail -1
 )
 
-echo "${pre}.$(( ${max:-0} + 1 ))"
+echo "${PRE}.$(( ${MAX:-0} + 1 ))"
 ##[<] 🤖🤖

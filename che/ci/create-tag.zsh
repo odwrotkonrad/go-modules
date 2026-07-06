@@ -7,23 +7,23 @@
 # a prerelease description.
 set -eu
 
-branch="${1:-$(git rev-parse --abbrev-ref HEAD)}"
-ref="${2:-$(git rev-parse HEAD)}"
-default="${3:-main}"
+BRANCH="${1:-$(git rev-parse --abbrev-ref HEAD)}"
+REF="${2:-$(git rev-parse HEAD)}"
+DEFAULT="${3:-main}"
 
-dir="${0:a:h}"
-tag=$("$dir/next-tag.zsh" "$branch" "$default")
+ROOT=$(git rev-parse --show-toplevel)
+TAG=$("$ROOT/ci/next-tag.zsh" "$BRANCH" "$DEFAULT")
 
-if [[ "$tag" == *-* ]]; then
-  desc="che prerelease $tag ($branch)"
+if [[ "$TAG" == *-* ]]; then
+  DESC="che prerelease $TAG ($BRANCH)"
 else
-  desc="che $tag"
+  DESC="che $TAG"
 fi
 
-echo "tagging $tag at $ref"
+echo "tagging $TAG at $REF"
 release-cli create \
-  --name "che $tag" \
-  --tag-name "$tag" \
-  --ref "$ref" \
-  --description "$desc"
+  --name "che $TAG" \
+  --tag-name "$TAG" \
+  --ref "$REF" \
+  --description "$DESC"
 ##[<] 🤖🤖
