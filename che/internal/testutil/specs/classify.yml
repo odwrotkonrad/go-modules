@@ -17,7 +17,7 @@ base:
       - files: [HOME/.config/zsh/**]
 
 cli/macos:
-  mixin-profiles: [base]
+  mixinProfiles: [base]
 
 desktop/macos:
-  mixin-profiles: [base]
+  mixinProfiles: [base]

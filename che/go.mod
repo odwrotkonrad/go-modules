@@ -3,12 +3,11 @@ module gitlab.com/konradodwrot/go/che
 go 1.26.3
 
 require (
-	github.com/1password/onepassword-sdk-go v0.4.0
 	github.com/dsnet/compress v0.0.1
 	github.com/fatih/color v1.18.0
 	github.com/go-git/go-git/v5 v5.19.1
-	github.com/hairyhenderson/gomplate/v4 v4.3.3
 	github.com/spf13/cobra v1.10.2
+	gitlab.com/konradodwrot/go/render-files v0.0.4
 	gopkg.in/yaml.v3 v3.0.1
 )
 
@@ -23,6 +22,7 @@ require (
 	cloud.google.com/go/storage v1.51.0 // indirect
 	cuelang.org/go v0.13.2 // indirect
 	dario.cat/mergo v1.0.1 // indirect
+	github.com/1password/onepassword-sdk-go v0.4.0 // indirect
 	github.com/Azure/azure-sdk-for-go/sdk/azcore v1.18.0 // indirect
 	github.com/Azure/azure-sdk-for-go/sdk/azidentity v1.9.0 // indirect
 	github.com/Azure/azure-sdk-for-go/sdk/internal v1.11.1 // indirect
@@ -91,6 +91,7 @@ require (
 	github.com/gosimple/unidecode v1.0.1 // indirect
 	github.com/hack-pad/hackpadfs v0.2.4 // indirect
 	github.com/hairyhenderson/go-fsimpl v0.3.1 // indirect
+	github.com/hairyhenderson/gomplate/v4 v4.3.3 // indirect
 	github.com/hairyhenderson/toml v0.4.2-0.20210923231440-40456b8e66cf // indirect
 	github.com/hairyhenderson/xignore v0.3.3-0.20230403012150-95fe86932830 // indirect
 	github.com/hairyhenderson/yaml v0.0.0-20220618171115-2d35fca545ce // indirect
@@ -127,6 +128,7 @@ require (
 	github.com/kylelemons/godebug v1.1.0 // indirect
 	github.com/mattn/go-colorable v0.1.14 // indirect
 	github.com/mattn/go-isatty v0.0.20 // indirect
+	github.com/mattn/go-pointer v0.0.1 // indirect
 	github.com/mitchellh/go-homedir v1.1.0 // indirect
 	github.com/mitchellh/mapstructure v1.5.0 // indirect
 	github.com/pelletier/go-toml/v2 v2.2.4 // indirect
@@ -141,6 +143,8 @@ require (
 	github.com/spiffe/go-spiffe/v2 v2.5.0 // indirect
 	github.com/tetratelabs/wabin v0.0.0-20230304001439-f6f874872834 // indirect
 	github.com/tetratelabs/wazero v1.11.0 // indirect
+	github.com/tree-sitter-grammars/tree-sitter-make v1.1.1 // indirect
+	github.com/tree-sitter/go-tree-sitter v0.24.0 // indirect
 	github.com/ugorji/go/codec v1.3.0 // indirect
 	github.com/xanzy/ssh-agent v0.3.3 // indirect
 	github.com/zeebo/errs v1.4.0 // indirect

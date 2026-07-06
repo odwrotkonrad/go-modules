@@ -19,7 +19,7 @@ base:
       - chmod: "2775"
         files:
           - {dest: [/var/log/grafana]}
-    run-scripts:
+    runScripts:
       - ci/zsh/scripts/installs/10-brew.zsh
       - ci/zsh/scripts/installs/20-kitty.zsh
     services: [otelcol, port-exporter, grafana, prometheus]
@@ -30,12 +30,12 @@ base-exclude-desktop:
       - etc/grafana/**
     mkdirs:
       - /var/log/grafana
-    run-scripts:
+    runScripts:
       - ci/zsh/scripts/installs/20-kitty.zsh
     services: [grafana, prometheus]
 
 desktop/macos:
-  mixin-profiles: [base]
+  mixinProfiles: [base]
 
 cli/macos:
-  mixin-profiles: [base, base-exclude-desktop]
+  mixinProfiles: [base, base-exclude-desktop]

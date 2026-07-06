@@ -4,11 +4,11 @@ profiles:
 
 base:
   include:
-    run-scripts:
+    runScripts:
       - ci/zsh/scripts/installs/*.zsh
 
 cli/macos:
-  mixin-profiles: [base]
+  mixinProfiles: [base]
   exclude:
-    run-scripts:
+    runScripts:
       - ci/zsh/scripts/installs/20-foo.zsh

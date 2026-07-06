@@ -1,0 +1,11 @@
+profiles:
+  cli:
+    macos:
+
+base:
+  include:
+    repoTemplate:
+      - files: [templates/**/*.repo.tpl]
+
+cli/macos:
+  mixinProfiles: [base]

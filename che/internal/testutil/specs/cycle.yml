@@ -2,8 +2,8 @@ profiles:
   cli:
     macos:
 a:
-  mixin-profiles: [b]
+  mixinProfiles: [b]
 b:
-  mixin-profiles: [a]
+  mixinProfiles: [a]
 cli/macos:
-  mixin-profiles: [a]
+  mixinProfiles: [a]

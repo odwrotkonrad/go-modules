@@ -3,12 +3,11 @@ package host
 // [>] 🤖🤖
 
 import (
-	"bytes"
 	"os"
 	"strings"
 
-	"gitlab.com/konradodwrot/go/che/internal/render"
 	"gitlab.com/konradodwrot/go/che/internal/spec"
+	"gitlab.com/konradodwrot/go/render-files/render"
 )
 
 // RenderTemplates renders each *.host.tpl in the resolved set onto the host.
@@ -19,7 +18,7 @@ func (h Host) RenderTemplates(templates []spec.FileItem) error {
 	var keep []spec.FileItem
 	var dests []string
 	for _, item := range templates {
-		if skipSecret && h.hasSecretRef(item) {
+		if skipSecret && srcHasSecretRef(h.Src(item.Rel)) {
 			for _, dest := range h.templateDests(item) {
 				h.fs.Log("render(dry-run-render-secrets)", dest)
 			}
@@ -50,10 +49,11 @@ func (h Host) RenderTemplates(templates []spec.FileItem) error {
 	return nil
 }
 
-// hasSecretRef reports whether item's template source carries an op:// secret
-// reference (a render-time vault fetch). Unreadable source -> false (render proceeds, errors there).
-func (h Host) hasSecretRef(item spec.FileItem) bool {
-	src, err := os.ReadFile(h.Src(item.Rel))
+// srcHasSecretRef reports whether the template source at path carries an op://
+// secret reference (a render-time vault fetch). Unreadable source -> false
+// (render proceeds, errors there).
+func srcHasSecretRef(path string) bool {
+	src, err := os.ReadFile(path)
 	if err != nil {
 		return false
 	}
@@ -79,7 +79,7 @@ func (h Host) renderTemplate(item spec.FileItem) error {
 	if err != nil {
 		return err
 	}
-	body, err := render.Exec(tmplPath, src)
+	body, err := render.Exec(tmplPath, src, h.RepoRoot)
 	if err != nil {
 		return err
 	}
@@ -89,15 +89,14 @@ func (h Host) renderTemplate(item spec.FileItem) error {
 	}
 	for _, d := range item.Dests {
 		dest := h.expandHome(d.Path)
-		var out bytes.Buffer
-		out.WriteString(render.Header(dest, tmplPath))
-		out.WriteByte('\n')
-		if d.RenderReferencedFiles {
-			out.Write(render.ResolveAtIncludes(h.RepoRoot, body))
-		} else {
-			out.Write(body)
-		}
-		if err := h.placeFile(dest, out.Bytes(), item); err != nil {
+		out := render.Compose(render.Composition{
+			Body:       body,
+			Opts:       d.Options,
+			HeaderDest: dest,
+			TmplName:   tmplPath,
+			RepoRoot:   h.RepoRoot,
+		})
+		if err := h.placeFile(dest, out, item); err != nil {
 			return err
 		}
 	}
