@@ -10,16 +10,6 @@ COMMANDS := test build vet install create-tag
 
 .PHONY: $(COMMANDS)
 
-##[>] Environment Variables [genai-include]
-#[what] branch to derive the release tag from (stable on DEFAULT_BRANCH, else prerelease)
-export BRANCH
-#[what] commit ref (SHA) the tag points at
-export REF
-#[what] branch treated as the stable release line
-#[vals] main
-export DEFAULT_BRANCH
-##[<] Environment Variables
-
 ##[>] Go [genai-include]
 #[what] run all tests
 test:
@@ -39,6 +29,13 @@ install:
 ##[<] Go
 
 ##[>] Release [genai-include]
+#[what] branch to derive the release tag from (stable on DEFAULT_BRANCH, else prerelease)
+export BRANCH
+#[what] commit ref (SHA) the tag points at
+export REF
+#[what] branch treated as the stable release line
+export DEFAULT_BRANCH #[vals] main
+
 #[what] create the release + git tag from BRANCH at REF via release-cli
 create-tag:
 	@ci/create-tag.zsh
