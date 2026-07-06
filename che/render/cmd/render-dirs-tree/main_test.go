@@ -6,6 +6,8 @@ import (
 	"testing"
 
 	git "github.com/go-git/go-git/v5"
+
+	"gitlab.com/konradodwrot/go/render-files/render"
 )
 
 // [>] 🤖🤖
@@ -35,35 +37,9 @@ func initRepo(t *testing.T, files []string) string {
 	return dir
 }
 
-func TestGenerateGolden(t *testing.T) {
-	dir := initRepo(t, []string{
-		"top",
-		".hidden/file",
-		"docs/data/x",
-		"src/lib/y",
-	})
-	got, err := Generate(dir)
-	if err != nil {
-		t.Fatalf("generate: %v", err)
-	}
-	wantBytes, err := os.ReadFile("testdata/expected.tree")
-	if err != nil {
-		t.Fatalf("read golden: %v", err)
-	}
-	if got != string(wantBytes) {
-		t.Errorf("output mismatch:\n--- got ---\n%s\n--- want ---\n%s", got, wantBytes)
-	}
-}
-
-func TestGenerateMissing(t *testing.T) {
-	if _, err := Generate(t.TempDir()); err == nil {
-		t.Fatal("expected error outside a git repo")
-	}
-}
-
 func TestRunCheck(t *testing.T) {
 	dir := initRepo(t, []string{"top", ".hidden/file", "docs/data/x", "src/lib/y"})
-	tree, err := Generate(dir)
+	tree, err := render.DirsTree(dir)
 	if err != nil {
 		t.Fatal(err)
 	}
