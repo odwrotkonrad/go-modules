@@ -1,4 +1,4 @@
-#!/bin/sh
+#!/usr/bin/env zsh
 ##[>] 🤖🤖
 # Compute the next release tag for a branch.
 # Arg $1 = branch name. On the default branch prints the next stable
@@ -10,7 +10,7 @@
 set -eu
 
 branch="${1:-}"
-default="${CI_DEFAULT_BRANCH:-main}"
+default="${DEFAULT_BRANCH:-main}"
 
 api="${CI_API_V4_URL}/projects/${CI_PROJECT_ID}/repository/tags?per_page=100&order_by=version&sort=desc"
 
@@ -27,16 +27,17 @@ latest=$(
     | tail -1
 )
 
-if [ -z "$latest" ]; then
+if [[ -z "$latest" ]]; then
   target="v0.0.1"
 else
-  major=$(echo "$latest" | cut -d. -f1)
-  minor=$(echo "$latest" | cut -d. -f2)
-  patch=$(echo "$latest" | cut -d. -f3)
+  major=${latest%%.*}
+  rest=${latest#*.}
+  minor=${rest%%.*}
+  patch=${rest#*.}
   target="v${major}.${minor}.$((patch + 1))"
 fi
 
-if [ "$branch" = "$default" ]; then
+if [[ "$branch" == "$default" ]]; then
   echo "$target"
   exit 0
 fi
