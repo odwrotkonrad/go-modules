@@ -1,12 +1,16 @@
 ##[>] 🤖🤖
-SHELL := /bin/sh
+#[what] Project's Makefile
+SHELL := zsh
+.SHELLFLAGS := -c
 GO ?= go
 CC ?= clang
 BIN := che
 
-.PHONY: test build vet install
+COMMANDS := test build vet install create-tag
 
-##[>] Targets [genai-include]
+.PHONY: $(COMMANDS)
+
+##[>] Go [genai-include]
 #[what] run all tests
 test:
 	CC=$(CC) $(GO) test ./...
@@ -22,5 +26,12 @@ vet:
 #[what] install the binary into $GOPATH/bin
 install:
 	CC=$(CC) $(GO) install .
-##[<] Targets
+##[<] Go
+
+##[>] Release [genai-include]
+#[what] create the release + git tag from BRANCH at REF via release-cli
+#[args] BRANCH REF DEFAULT_BRANCH
+create-tag:
+	@ci/create-tag.zsh $(BRANCH) $(REF) $(DEFAULT_BRANCH)
+##[<] Release
 ##[<] 🤖🤖
