@@ -190,7 +190,7 @@ func TestResolveUndefinedFails(t *testing.T) {
 	dir := fixtureRepo(t, "merge", mergeFiles)
 	s, _ := Load(filepath.Join(dir, "che.yml"))
 	if _, err := s.Resolve("cli/linux", filepath.Join(dir, "root")); err == nil {
-		t.Fatal("expected error for declared-but-undefined profile")
+		t.Fatal("expected error for undefined profile")
 	}
 }
 
@@ -294,5 +294,79 @@ func TestRepoTemplateResolve(t *testing.T) {
 func TestRepoTemplateGlobError(t *testing.T) {
 	resolveErr(t, "repo-template-glob", "cli/macos")
 }
+
+// loadSpec loads a fixture's Raw for SelectProfile assertions.
+func loadSpec(t *testing.T, spec string) *Raw {
+	t.Helper()
+	dir := fixtureRepo(t, spec, map[string]string{"root/.gitkeep": ""})
+	s, err := Load(filepath.Join(dir, "che.yml"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	return s
+}
+
+// selectOK asserts SelectProfile(forced, detected) returns want.
+func selectOK(t *testing.T, s *Raw, forced, detected, want string) {
+	t.Helper()
+	got, err := s.SelectProfile(forced, detected)
+	if err != nil {
+		t.Fatalf("SelectProfile(%q,%q) errored: %v", forced, detected, err)
+	}
+	if got != want {
+		t.Errorf("SelectProfile(%q,%q) = %q, want %q", forced, detected, got, want)
+	}
+}
+
+// selectErr asserts SelectProfile(forced, detected) fails.
+func selectErr(t *testing.T, s *Raw, forced, detected string) {
+	t.Helper()
+	if got, err := s.SelectProfile(forced, detected); err == nil {
+		t.Fatalf("SelectProfile(%q,%q) = %q, want error", forced, detected, got)
+	}
+}
+
+// TestSelectProfileAutoDetect: a detected name matching an autoDetect profile runs.
+func TestSelectProfileAutoDetect(t *testing.T) {
+	s := loadSpec(t, "che")
+	selectOK(t, s, "", "cli/macos", "cli/macos")
+	selectOK(t, s, "", "desktop/macos", "desktop/macos")
+}
+
+// TestSelectProfileForce: CHE_FORCE_PROFILE by name overrides detection.
+func TestSelectProfileForce(t *testing.T) {
+	s := loadSpec(t, "che")
+	selectOK(t, s, "desktop/macos", "cli/macos", "desktop/macos")
+}
+
+// TestSelectProfileForceUndefined: forcing an undefined name errors.
+func TestSelectProfileForceUndefined(t *testing.T) {
+	s := loadSpec(t, "che")
+	selectErr(t, s, "cli/linux", "cli/macos")
+}
+
+// TestSelectProfileMixinOnlyNeverSelected: a mixinOnly helper is never the
+// autoDetect match nor the fallback.
+func TestSelectProfileMixinOnlyNeverSelected(t *testing.T) {
+	s := loadSpec(t, "che")
+	selectErr(t, s, "", "base") // no autoDetect match, >1 fallback (cli/macos, desktop/macos are autoDetect, so 0 fallback)
+}
+
+// TestSelectProfileLoneFallback: the single non-mixin non-autoDetect profile is
+// auto-selected when detection has no match.
+func TestSelectProfileLoneFallback(t *testing.T) {
+	s := loadSpec(t, "repo")
+	selectOK(t, s, "", "cli/linux", "repo")
+	selectOK(t, s, "", "desktop/macos", "repo")
+}
+
+// TestSelectProfileAmbiguousFallback: >1 non-mixin non-autoDetect profile with
+// no autoDetect match errors.
+func TestSelectProfileAmbiguousFallback(t *testing.T) {
+	s := loadSpec(t, "ambiguous")
+	selectErr(t, s, "", "cli/linux")
+}
+
+// [<] 🤖🤖
 
 // [<] 🤖🤖

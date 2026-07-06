@@ -63,11 +63,6 @@ func build() error {
 	if err != nil {
 		return err
 	}
-	// CHE_FORCE_PROFILE overrides detection (test/VM hook).
-	profile := os.Getenv("CHE_FORCE_PROFILE")
-	if profile == "" {
-		profile = fsutil.DetectProfile()
-	}
 	if dryRunMode == "" {
 		dryRunMode = os.Getenv("CHE_DRY_RUN")
 	}
@@ -75,11 +70,19 @@ func build() error {
 	if !ok {
 		return fmt.Errorf("invalid --dry-run mode %q: want delta or all", dryRunMode)
 	}
-	h := host.New(repoRoot, home, profile, mode)
 	sp, err := spec.Load(filepath.Join(repoRoot, "che.yml"))
 	if err != nil {
 		return err
 	}
+	// CHE_FORCE_PROFILE (by name) overrides detection (test/VM hook); else
+	// autoDetect match; else the lone non-mixin fallback.
+	forced := os.Getenv("CHE_FORCE_PROFILE")
+	detected := fsutil.DetectProfile()
+	profile, err := sp.SelectProfile(forced, detected)
+	if err != nil {
+		return err
+	}
+	h := host.New(repoRoot, home, profile, mode)
 	res, err := sp.Resolve(profile, h.Root)
 	if err != nil {
 		return err

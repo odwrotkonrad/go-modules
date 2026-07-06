@@ -1,9 +1,9 @@
-profiles:
-  cli:
-    macos:
 a:
+  options: {mixinOnly: true}
   mixinProfiles: [b]
 b:
+  options: {mixinOnly: true}
   mixinProfiles: [a]
 cli/macos:
+  options: {autoDetect: true}
   mixinProfiles: [a]
