@@ -46,4 +46,20 @@ release:
         --tag-name "$NEXT" \
         --ref "$CI_COMMIT_SHA" \
         --description "che $NEXT"
+
+prerelease:
+  stage: release
+  image: registry.gitlab.com/gitlab-org/release-cli:latest
+  needs: [test]
+  rules:
+    - if: $CI_PIPELINE_SOURCE == "merge_request_event"
+  script:
+    - NEXT=$(sh ci/next-prerelease.sh)
+    - echo "prereleasing $NEXT"
+    - |
+      release-cli create \
+        --name "che $NEXT" \
+        --tag-name "$NEXT" \
+        --ref "$CI_COMMIT_SHA" \
+        --description "che prerelease $NEXT ($CI_COMMIT_REF_NAME)"
 ##[<] 🤖🤖
