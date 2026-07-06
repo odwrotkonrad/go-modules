@@ -94,13 +94,13 @@ func (s Service) loaded() bool {
 func (h Host) Bootout(services []Service) error {
 	for _, s := range services {
 		if h.DryRun() {
-			log.Msg("bootout", s.target(), true)
+			log.Msg("bootout", s.target(), h.mode.log())
 			continue
 		}
 		if !s.loaded() {
 			continue
 		}
-		log.Msg("bootout", s.target(), false)
+		log.Msg("bootout", s.target(), log.Off)
 		_ = s.lctl("bootout", s.target()).Run() // async, ignore exit
 		s.waitGone()
 	}
@@ -111,7 +111,7 @@ func (h Host) Bootout(services []Service) error {
 func (s Service) waitGone() {
 	for i := 0; s.loaded(); i++ {
 		if i >= 50 {
-			log.Msg("warn", s.target()+" still present after bootout", false)
+			log.Msg("warn", s.target()+" still present after bootout", log.Off)
 			return
 		}
 		time.Sleep(100 * time.Millisecond)
@@ -122,10 +122,10 @@ func (s Service) waitGone() {
 func (h Host) Bootin(services []Service) error {
 	for _, s := range services {
 		if h.DryRun() {
-			log.Msg("bootstrap", s.target(), true)
+			log.Msg("bootstrap", s.target(), h.mode.log())
 			continue
 		}
-		log.Msg("bootstrap", s.target(), false)
+		log.Msg("bootstrap", s.target(), log.Off)
 		c := s.lctl("bootstrap", s.Domain, s.Plist)
 		c.Stdout, c.Stderr = os.Stdout, os.Stderr
 		if err := c.Run(); err != nil {
@@ -139,15 +139,15 @@ func (h Host) Bootin(services []Service) error {
 // Errors if any is missing. No mutation.
 func (h Host) Ensure(services []Service) error {
 	if h.DryRun() {
-		log.Msg("settle", fmt.Sprintf("%ds before pid check", settleSeconds), true)
+		log.Msg("settle", fmt.Sprintf("%ds before pid check", settleSeconds), h.mode.log())
 		for _, s := range services {
 			if s.LongRunning {
-				log.Msg("ensure", s.target(), true)
+				log.Msg("ensure", s.target(), h.mode.log())
 			}
 		}
 		return nil
 	}
-	log.Msg("settle", fmt.Sprintf("%ds before pid check", settleSeconds), false)
+	log.Msg("settle", fmt.Sprintf("%ds before pid check", settleSeconds), log.Off)
 	time.Sleep(settleSeconds * time.Second)
 	missing := 0
 	for _, s := range services {
@@ -155,9 +155,9 @@ func (h Host) Ensure(services []Service) error {
 			continue
 		}
 		if pid, ok := s.pid(); ok {
-			log.Msg("running", fmt.Sprintf("%s (pid %d)", s.target(), pid), false)
+			log.Msg("running", fmt.Sprintf("%s (pid %d)", s.target(), pid), log.Off)
 		} else {
-			log.Msg("error", s.target()+" has no running process", false)
+			log.Msg("error", s.target()+" has no running process", log.Off)
 			missing++
 		}
 	}

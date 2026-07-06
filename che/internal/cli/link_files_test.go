@@ -13,10 +13,10 @@ func TestLinkCmd(t *testing.T) {
 	home := setupDryRun(t)
 	out := testutil.RunDry(t, LinkCmd, true)
 	testutil.WantLines(t, out,
-		"mkdir(dry-run): "+home+"/.config/zsh",
-		"ln(dry-run): "+home+"/.config/zsh/.zshrc",
-		"archive(dry-run): "+home+"/.local/share/che/backups/che-link-",
-		"ln(dry-run): /etc/zshrc",
+		"mkdir(create,dry-run=delta): "+home+"/.config/zsh",
+		"ln(create,dry-run=delta): "+home+"/.config/zsh/.zshrc",
+		"archive(dry-run=delta): "+home+"/.local/share/che/backups/che-link-",
+		"ln(create,dry-run=delta): /etc/zshrc",
 	)
 }
 

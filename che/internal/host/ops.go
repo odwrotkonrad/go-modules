@@ -3,10 +3,13 @@ package host
 // [>] 🤖🤖
 
 import (
+	"bytes"
 	"os"
+	"os/user"
 	"path/filepath"
 	"strconv"
 	"strings"
+	"syscall"
 	"time"
 
 	"gitlab.com/konradodwrot/go/che/internal/fsutil"
@@ -32,6 +35,9 @@ func (h Host) MkDirs(dirRels []string, extraDirs []spec.FileItem) error {
 	for _, item := range extraDirs {
 		dest := h.ToDest(item.Dests[0].Path)
 		if h.dirSettled(dest) {
+			if err := h.fixPerms("mkdir", dest, item); err != nil {
+				return err
+			}
 			continue
 		}
 		if err := h.mkExtraDir(item, dest); err != nil {
@@ -71,14 +77,108 @@ func (h Host) mkExtraDir(item spec.FileItem, dest string) error {
 		return err
 	}
 	if mode > 0o777 {
-		if err := h.fs.Chmod(fsutil.ModeArg(mode), dest); err != nil {
+		if err := h.fs.Chmod("mkdir(chmod)", fsutil.ModeArg(mode), dest); err != nil {
 			return err
 		}
 	}
 	if owner := ownerSpec(item); owner != "" {
-		return h.fs.Chown(owner, dest)
+		return h.fs.Chown("mkdir(chown)", owner, dest)
 	}
 	return nil
+}
+
+// fixPerms applies spec mode/owner to an existing dest when they drift, labeling
+// the fixes with the owning op ("<op>(chmod)" / "<op>(chown)"). In DryRunDelta
+// these lines report the drift; in DryRunOff they correct it. A settled dest
+// (no drift) emits nothing. DryRunAll never reaches here (dests are re-created).
+func (h Host) fixPerms(op, dest string, item spec.FileItem) error {
+	needChmod, needChown := h.permsDrift(dest, item)
+	if needChmod {
+		mode, _ := parseMode(item.Chmod)
+		if err := h.fs.Chmod(op+"(chmod)", fsutil.ModeArg(mode), dest); err != nil {
+			return err
+		}
+	}
+	if needChown {
+		if err := h.fs.Chown(op+"(chown)", ownerSpec(item), dest); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+// permsDrift reports whether dest's live mode/owner differ from the spec. Only
+// spec-set fields are enforced (empty Chmod/owner -> no drift). Missing dest ->
+// no drift (the create path handles it).
+func (h Host) permsDrift(dest string, item spec.FileItem) (needChmod, needChown bool) {
+	fi, err := os.Lstat(dest)
+	if err != nil {
+		return false, false
+	}
+	if mode, ok := parseMode(item.Chmod); ok {
+		mask := modeMask(mode)
+		needChmod = mode&mask != unixMode(fi.Mode())&mask
+	}
+	if owner := ownerSpec(item); owner != "" {
+		needChown = ownerDrift(fi, owner)
+	}
+	return needChmod, needChown
+}
+
+// modeMask is the raw-unix bit set the spec controls: perm bits always, plus
+// setuid/setgid/sticky when the spec mode carries them (>0777, matching mkExtraDir).
+func modeMask(mode os.FileMode) os.FileMode {
+	if mode > 0o777 {
+		return 0o7777
+	}
+	return 0o777
+}
+
+// unixMode maps an os.FileMode's Go-encoded special bits (ModeSetuid/Setgid/
+// Sticky live in high bits, not 0o7000) down to raw-unix perm+special bits, so
+// it compares equal to a parseMode octal like 0o2775. Perm bits pass through.
+func unixMode(m os.FileMode) os.FileMode {
+	u := m.Perm()
+	if m&os.ModeSetuid != 0 {
+		u |= 0o4000
+	}
+	if m&os.ModeSetgid != 0 {
+		u |= 0o2000
+	}
+	if m&os.ModeSticky != 0 {
+		u |= 0o1000
+	}
+	return u
+}
+
+// ownerDrift reports whether fi's live uid/gid differ from the "owner[:group]"
+// spec. Unresolvable spec names or a missing Stat_t -> no drift (can't compare).
+func ownerDrift(fi os.FileInfo, owner string) bool {
+	st, ok := fi.Sys().(*syscall.Stat_t)
+	if !ok {
+		return false
+	}
+	name, group, _ := strings.Cut(owner, ":")
+	uid, uidOK := lookupID(name, user.Lookup, func(u *user.User) string { return u.Uid })
+	gid, gidOK := lookupID(group, user.LookupGroup, func(g *user.Group) string { return g.Gid })
+	return (uidOK && uid != st.Uid) || (gidOK && gid != st.Gid)
+}
+
+// lookupID resolves name to a numeric id via lookup+idOf ("" name -> not set).
+// Unresolvable name -> not set (ok=false), so the caller treats it as no drift.
+func lookupID[T any](name string, lookup func(string) (T, error), idOf func(T) string) (uint32, bool) {
+	if name == "" {
+		return 0, false
+	}
+	rec, err := lookup(name)
+	if err != nil {
+		return 0, false
+	}
+	id, err := strconv.ParseUint(idOf(rec), 10, 32)
+	if err != nil {
+		return 0, false
+	}
+	return uint32(id), true
 }
 
 // MkLinks symlinks each config into its live dest (ln -fhs), archiving existing
@@ -141,13 +241,16 @@ func (h Host) MkCopies(copies []spec.FileItem, dirRels []string) error {
 		owner := ownerSpec(item)
 		for _, dest := range h.copyDests(item) {
 			if !h.DryRunAll() && sameContent(src, dest) {
+				if err := h.fixPerms("cp", dest, item); err != nil {
+					return err
+				}
 				continue
 			}
 			if err := h.fs.Copy(src, dest, mode); err != nil {
 				return err
 			}
 			if owner != "" {
-				if err := h.fs.Chown(owner, dest); err != nil {
+				if err := h.fs.Chown("cp(chown)", owner, dest); err != nil {
 					return err
 				}
 			}
@@ -170,14 +273,13 @@ func (h Host) copyDests(item spec.FileItem) []string {
 
 // ownerSpec combines owner + owner-group into "owner:group" for fs.Chown ("" -> no chown).
 func ownerSpec(item spec.FileItem) string {
-	switch {
-	case item.Owner != "" && item.OwnerGroup != "":
-		return item.Owner + ":" + item.OwnerGroup
-	case item.Owner != "":
-		return item.Owner
-	default:
+	if item.Owner == "" {
 		return ""
 	}
+	if item.OwnerGroup == "" {
+		return item.Owner
+	}
+	return item.Owner + ":" + item.OwnerGroup
 }
 
 // parseMode parses an octal chmod string ("" -> not set).
@@ -209,7 +311,7 @@ func sameContent(a, b string) bool {
 	if err != nil {
 		return false
 	}
-	return string(x) == string(y)
+	return bytes.Equal(x, y)
 }
 
 // PruneBrokenLinks removes broken symlinks in config-set dirs (live dests).

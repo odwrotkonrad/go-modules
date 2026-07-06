@@ -11,9 +11,9 @@ import (
 // each services subcommand resolves profile services (fixture: one, otelcol, a system daemon) then dispatches. dry-run logs the full target.
 func TestServicesSubcommands(t *testing.T) {
 	cases := map[string]string{
-		"bootout": "bootout(dry-run): system/otelcol",
-		"bootin":  "bootstrap(dry-run): system/otelcol",
-		"ensure":  "ensure(dry-run): system/otelcol",
+		"bootout": "bootout(dry-run=delta): system/otelcol",
+		"bootin":  "bootstrap(dry-run=delta): system/otelcol",
+		"ensure":  "ensure(dry-run=delta): system/otelcol",
 	}
 	for name, want := range cases {
 		t.Run(name, func(t *testing.T) {
