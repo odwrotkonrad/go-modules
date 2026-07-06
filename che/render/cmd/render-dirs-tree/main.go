@@ -5,6 +5,7 @@ import (
 	"os"
 
 	"gitlab.com/konradodwrot/go/render-files/checkcmd"
+	"gitlab.com/konradodwrot/go/render-files/render"
 )
 
 const usage = `usage: render-dirs-tree
@@ -21,7 +22,7 @@ var tool = checkcmd.Tool{
 	Usage:    usage,
 	Label:    "render-dirs-tree",
 	CheckArg: ".",
-	Generate: func(string) (string, error) { return Generate(".") },
+	Generate: func(string) (string, error) { return render.DirsTree(".") },
 }
 
 func main() {
