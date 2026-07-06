@@ -45,15 +45,16 @@ Releases are automatic: every push to `main` runs tests, then CI bumps the
 patch version from the highest `vX.Y.Z` tag and publishes a GitLab release.
 Consumers install with `go install ...@vX.Y.Z` (compiles on the host).
 
-Every MR pipeline publishes a prerelease tag `v<next>-rc.<N>` pointing at the
-branch commit. Test branch code with:
+Every MR pipeline publishes a prerelease tag `v<next>-<branch>.<N>` pointing at
+the branch commit (`<branch>` sanitized to the SemVer charset). Test branch
+code with:
 
 ```sh
-go install gitlab.com/konradodwrot/go/che@v<next>-rc.<N>
+go install gitlab.com/konradodwrot/go/che@v<next>-<branch>.<N>
 ```
 
-`-rc.<N>` is a SemVer prerelease, so `@latest` still resolves to the latest
-stable tag — prereleases are opt-in by explicit tag.
+`-<branch>.<N>` is a SemVer prerelease, so `@latest` still resolves to the
+latest stable tag — prereleases are opt-in by explicit tag.
 
 ## License
 

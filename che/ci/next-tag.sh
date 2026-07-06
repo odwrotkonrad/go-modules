@@ -3,8 +3,10 @@
 # Compute the next release tag for a branch.
 # Arg $1 = branch name. On the default branch prints the next stable
 # v<major>.<minor>.<patch> (highest vX.Y.Z tag, patch-bumped). On any
-# other branch prints a prerelease v<target>-rc.<N> where N = highest
-# existing v<target>-rc.* counter + 1 (else 1). Prints the tag to stdout.
+# other branch prints a prerelease v<target>-<branch>.<N>, where <branch>
+# is sanitized to the SemVer prerelease charset [0-9A-Za-z-] and N =
+# highest existing v<target>-<branch>.* counter + 1 (else 1).
+# Prints the tag to stdout.
 set -eu
 
 branch="${1:-}"
@@ -39,15 +41,18 @@ if [ "$branch" = "$default" ]; then
   exit 0
 fi
 
-# prerelease: bump the highest v<target>-rc.<N> counter
-esc=$(echo "$target" | sed 's/\./\\./g')
+# prerelease: sanitize branch to SemVer charset, bump v<target>-<branch>.<N>
+slug=$(echo "$branch" | sed -E 's/[^0-9A-Za-z-]+/-/g; s/^-+//; s/-+$//')
+pre="${target}-${slug}"
+
+esc=$(echo "$pre" | sed 's/\./\\./g')
 max=$(
   fetch "$api" \
-    | grep -oE "\"name\":\"${esc}-rc\.[0-9]+\"" \
-    | sed -E 's/.*-rc\.([0-9]+)"/\1/' \
+    | grep -oE "\"name\":\"${esc}\.[0-9]+\"" \
+    | sed -E 's/.*\.([0-9]+)"/\1/' \
     | sort -n \
     | tail -1
 )
 
-echo "${target}-rc.$(( ${max:-0} + 1 ))"
+echo "${pre}.$(( ${max:-0} + 1 ))"
 ##[<] 🤖🤖
