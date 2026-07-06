@@ -3,6 +3,7 @@ package host
 // [>] 🤖🤖
 
 import (
+	"bytes"
 	"os"
 	"os/user"
 	"path/filepath"
@@ -160,7 +161,7 @@ func ownerDrift(fi os.FileInfo, owner string) bool {
 	name, group, _ := strings.Cut(owner, ":")
 	uid, uidOK := lookupID(name, user.Lookup, func(u *user.User) string { return u.Uid })
 	gid, gidOK := lookupID(group, user.LookupGroup, func(g *user.Group) string { return g.Gid })
-	return uidOK && uid != st.Uid || gidOK && gid != st.Gid
+	return (uidOK && uid != st.Uid) || (gidOK && gid != st.Gid)
 }
 
 // lookupID resolves name to a numeric id via lookup+idOf ("" name -> not set).
@@ -272,14 +273,13 @@ func (h Host) copyDests(item spec.FileItem) []string {
 
 // ownerSpec combines owner + owner-group into "owner:group" for fs.Chown ("" -> no chown).
 func ownerSpec(item spec.FileItem) string {
-	switch {
-	case item.Owner != "" && item.OwnerGroup != "":
-		return item.Owner + ":" + item.OwnerGroup
-	case item.Owner != "":
-		return item.Owner
-	default:
+	if item.Owner == "" {
 		return ""
 	}
+	if item.OwnerGroup == "" {
+		return item.Owner
+	}
+	return item.Owner + ":" + item.OwnerGroup
 }
 
 // parseMode parses an octal chmod string ("" -> not set).
@@ -311,7 +311,7 @@ func sameContent(a, b string) bool {
 	if err != nil {
 		return false
 	}
-	return string(x) == string(y)
+	return bytes.Equal(x, y)
 }
 
 // PruneBrokenLinks removes broken symlinks in config-set dirs (live dests).
