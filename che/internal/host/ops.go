@@ -116,7 +116,7 @@ func (h Host) permsDrift(dest string, item spec.FileItem) (needChmod, needChown 
 	}
 	if mode, ok := parseMode(item.Chmod); ok {
 		mask := modeMask(mode)
-		needChmod = mode&mask != fi.Mode()&mask
+		needChmod = mode&mask != unixMode(fi.Mode())&mask
 	}
 	if owner := ownerSpec(item); owner != "" {
 		needChown = ownerDrift(fi, owner)
@@ -124,13 +124,30 @@ func (h Host) permsDrift(dest string, item spec.FileItem) (needChmod, needChown 
 	return needChmod, needChown
 }
 
-// modeMask is the bit set the spec controls: perm bits always, plus
+// modeMask is the raw-unix bit set the spec controls: perm bits always, plus
 // setuid/setgid/sticky when the spec mode carries them (>0777, matching mkExtraDir).
 func modeMask(mode os.FileMode) os.FileMode {
 	if mode > 0o777 {
-		return os.ModePerm | os.ModeSetuid | os.ModeSetgid | os.ModeSticky
+		return 0o7777
 	}
-	return os.ModePerm
+	return 0o777
+}
+
+// unixMode maps an os.FileMode's Go-encoded special bits (ModeSetuid/Setgid/
+// Sticky live in high bits, not 0o7000) down to raw-unix perm+special bits, so
+// it compares equal to a parseMode octal like 0o2775. Perm bits pass through.
+func unixMode(m os.FileMode) os.FileMode {
+	u := m.Perm()
+	if m&os.ModeSetuid != 0 {
+		u |= 0o4000
+	}
+	if m&os.ModeSetgid != 0 {
+		u |= 0o2000
+	}
+	if m&os.ModeSticky != 0 {
+		u |= 0o1000
+	}
+	return u
 }
 
 // ownerDrift reports whether fi's live uid/gid differ from the "owner[:group]"
