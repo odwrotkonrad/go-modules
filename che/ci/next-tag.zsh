@@ -9,7 +9,7 @@
 # Prints the tag to stdout.
 set -eu
 
-branch="${1:-}"
+branch="${1:-${BRANCH:-}}"
 default="${DEFAULT_BRANCH:-main}"
 
 api="${CI_API_V4_URL}/projects/${CI_PROJECT_ID}/repository/tags?per_page=100&order_by=version&sort=desc"

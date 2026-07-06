@@ -1,13 +1,13 @@
 #!/usr/bin/env zsh
 ##[>] 🤖🤖
 # Create a GitLab release + git tag for a branch's commit.
-# Arg $1 = branch name, arg $2 = commit ref (SHA) to tag.
+# Env BRANCH = branch name, REF = commit ref (SHA) to tag.
 # Computes the tag via next-tag.zsh, then calls release-cli. A tag
 # containing '-' is a prerelease and gets a prerelease description.
 set -eu
 
-branch="${1:?branch required}"
-ref="${2:?ref required}"
+branch="${BRANCH:?BRANCH required}"
+ref="${REF:?REF required}"
 
 dir="${0:a:h}"
 tag=$("$dir/next-tag.zsh" "$branch")

@@ -1,12 +1,26 @@
 ##[>] 🤖🤖
+#[what] Project's Makefile
 SHELL := zsh
+.SHELLFLAGS := -c
 GO ?= go
 CC ?= clang
 BIN := che
 
-.PHONY: test build vet install create-tag
+COMMANDS := test build vet install create-tag
 
-##[>] Targets [genai-include]
+.PHONY: $(COMMANDS)
+
+##[>] Environment Variables [genai-include]
+#[what] branch to derive the release tag from (stable on DEFAULT_BRANCH, else prerelease)
+export BRANCH
+#[what] commit ref (SHA) the tag points at
+export REF
+#[what] branch treated as the stable release line
+#[vals] main
+export DEFAULT_BRANCH
+##[<] Environment Variables
+
+##[>] Go [genai-include]
 #[what] run all tests
 test:
 	CC=$(CC) $(GO) test ./...
@@ -22,9 +36,11 @@ vet:
 #[what] install the binary into $GOPATH/bin
 install:
 	CC=$(CC) $(GO) install .
+##[<] Go
 
-#[what] create the release + git tag for BRANCH at REF via release-cli
+##[>] Release [genai-include]
+#[what] create the release + git tag from BRANCH at REF via release-cli
 create-tag:
-	@ci/create-tag.zsh "$(BRANCH)" "$(REF)"
-##[<] Targets
+	@ci/create-tag.zsh
+##[<] Release
 ##[<] 🤖🤖
