@@ -13,11 +13,7 @@ default="${CI_DEFAULT_BRANCH:-main}"
 api="${CI_API_V4_URL}/projects/${CI_PROJECT_ID}/repository/tags?per_page=100&order_by=version&sort=desc"
 
 fetch() {
-  if command -v curl >/dev/null 2>&1; then
-    curl -fsSL --header "JOB-TOKEN: ${CI_JOB_TOKEN}" "$1"
-  else
-    wget -qO- --header="JOB-TOKEN: ${CI_JOB_TOKEN}" "$1"
-  fi
+  wget -qO- --header="JOB-TOKEN: ${CI_JOB_TOKEN}" "$1"
 }
 
 # next stable target from highest vX.Y.Z tag (rc tags excluded by the grep)
