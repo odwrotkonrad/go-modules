@@ -25,14 +25,6 @@ Terminal open-by-extension behavior belongs in config: one YAML declares openers
 - Per-terminal targets: `any`, `vscode`, `kitty`.
 - Offline after first run: linguist data cached locally.
 
-### How To Use
-
-`go install gitlab.com/konradodwrot/go/cruft/get-term-open-files-with@latest`, run `get-term-open-files-with <target>`, eval the lines in zsh. Development: `make test`, `make build`.
-
-### Future Direction
-
-Tracks the `term-open-files-with.yml` schema and terminal targets as the configs repo grows.
-
 ## Install
 
 ```sh
