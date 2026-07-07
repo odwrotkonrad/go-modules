@@ -3,7 +3,7 @@
 # Create a GitLab release + git tag for a branch's commit.
 # Args: $1 branch (default: current), $2 ref/SHA (default: HEAD),
 # $3 default branch (default: main). Computes the tag via next-tag.zsh,
-# then calls release-cli. A tag containing '-' is a prerelease and gets
+# then calls glab release create. A tag containing '-' is a prerelease and gets
 # a prerelease description.
 set -eu
 
@@ -21,9 +21,8 @@ else
 fi
 
 echo "tagging $TAG at $REF"
-release-cli create \
+glab release create "$TAG" \
   --name "che $TAG" \
-  --tag-name "$TAG" \
   --ref "$REF" \
-  --description "$DESC"
+  --notes "$DESC"
 ##[<] 🤖🤖
