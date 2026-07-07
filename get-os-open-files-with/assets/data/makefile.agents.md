@@ -16,3 +16,8 @@
 `build` build the binary into ./dist
 `vet` go vet all packages
 `install` install the binary into $GOPATH/bin
+
+### Release:
+
+`release-check` validate the goreleaser config
+`release-snapshot` local 4-target snapshot into ./dist, no publish

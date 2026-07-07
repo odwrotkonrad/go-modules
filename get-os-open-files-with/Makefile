@@ -5,7 +5,7 @@ SHELL := zsh
 GO ?= go
 BIN := get-os-open-files-with
 
-COMMANDS := render-templates run-repo-ci-prepare-hooks run-repo-ci-precommit-all test build vet install
+COMMANDS := render-templates run-repo-ci-prepare-hooks run-repo-ci-precommit-all test build vet install release-check release-snapshot
 
 .PHONY: $(COMMANDS)
 
@@ -42,4 +42,14 @@ vet:
 install:
 	$(GO) install .
 ##[<] Go
+
+##[>] Release [genai-include]
+#[what] validate the goreleaser config
+release-check:
+	goreleaser check
+
+#[what] local 4-target snapshot into ./dist, no publish
+release-snapshot:
+	goreleaser release --snapshot --clean
+##[<] Release
 ##[<] 🤖🤖
