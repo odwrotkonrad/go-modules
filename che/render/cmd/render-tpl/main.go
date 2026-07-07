@@ -16,6 +16,8 @@ stdout. Drop-in for 'gomplate -f'. Paths in frontmatter/readBody/renderDirsTree
 resolve against the cwd.
 `
 
+var version = "dev"
+
 func main() {
 	os.Exit(run(os.Args[1:]))
 }
@@ -23,6 +25,10 @@ func main() {
 func run(args []string) int {
 	if len(args) == 1 && (args[0] == "-h" || args[0] == "--help") {
 		fmt.Print(usage)
+		return 0
+	}
+	if len(args) == 1 && (args[0] == "-v" || args[0] == "--version") {
+		fmt.Println("render-tpl version", version)
 		return 0
 	}
 	if len(args) != 2 || args[0] != "-f" {

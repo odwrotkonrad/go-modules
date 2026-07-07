@@ -5,7 +5,7 @@ SHELL := zsh
 GO ?= go
 CC ?= clang
 
-COMMANDS := render-templates run-repo-ci-prepare-hooks run-repo-ci-precommit-all test build vet install
+COMMANDS := render-templates run-repo-ci-prepare-hooks run-repo-ci-precommit-all test build vet install release-check release-darwin release-snapshot
 
 .PHONY: $(COMMANDS)
 
@@ -42,4 +42,19 @@ vet:
 install:
 	CC=$(CC) $(GO) install ./cmd/...
 ##[<] Go
+
+##[>] Release [genai-include]
+#[what] validate both goreleaser configs
+release-check:
+	goreleaser check -f .goreleaser.yaml
+	goreleaser check -f .goreleaser.darwin.yaml
+
+#[what] build the darwin archives (native cc) into ./darwin-dist
+release-darwin:
+	goreleaser release --snapshot --clean -f .goreleaser.darwin.yaml
+
+#[what] local 12-archive snapshot: darwin (native) + linux (zig), no publish
+release-snapshot: release-darwin
+	goreleaser release --snapshot --clean -f .goreleaser.yaml
+##[<] Release
 ##[<] 🤖🤖

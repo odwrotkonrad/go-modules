@@ -16,3 +16,9 @@
 `build` build all binaries into ./dist
 `vet` go vet all packages
 `install` install all binaries into $GOPATH/bin
+
+### Release:
+
+`release-check` validate both goreleaser configs
+`release-darwin` build the darwin archives (native cc) into ./darwin-dist
+`release-snapshot`: `release-darwin` local 12-archive snapshot: darwin (native) + linux (zig), no publish
