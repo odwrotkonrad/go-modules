@@ -19,14 +19,6 @@ che and repo docs generation share one render implementation. This repo is its h
 - Generated docs stay fresh: Makefile docs, directory trees, agent files, README.
 - Drift detection via `--check` modes.
 
-## How To Use
-
-Import the `render` package (as che does), or install the CLIs with `go install gitlab.com/konradodwrot/go/render-files/cmd/<name>@latest` (`render-makefile-doc` needs CGO for tree-sitter). Development: `make test`, `make build`.
-
-## Future Direction
-
-Grows with the conventions rollout: new template funcs (like `remoteFile` for inlining convention docs) land here first, che consumes them by version bump.
-
 # Conventions
 
 - `conventions/purpose/convention.md`: every repo carries `assets/docs-agents/purpose.md` with five headings (what, why, goals, usage, future), included at the top of `AGENTS.md`, `CLAUDE.md`, `README.md`.
@@ -34,7 +26,7 @@ Grows with the conventions rollout: new template funcs (like `remoteFile` for in
 - `conventions/makefile/convention.md`: house Makefile style, `[genai-include]` sectioning that feeds the generated Makefile doc for AI agents.
 - `conventions/templates/convention.md`: generating repo docs with che templates: `templates/1-env|2-data|3-audience`, `che.yml` wiring, `make render-templates`.
 - `conventions/ci/convention.md`: lefthook pre-commit hooks (minimal: docs generation check), re-run in a minimal CI validate job.
-- `conventions/license/convention.md`: every public repo carries `LICENSE` (unmodified MIT, creation-year copyright), private repos carry none.
+- `conventions/license/convention.md`: every public repo carries `LICENSE` (unmodified MIT, creation-year copyright).
 
 Each convention dir carries a runnable `example/`. This repo itself follows all of these conventions.
 
@@ -76,10 +68,25 @@ cmd
   render-dirs-tree
   render-makefile-doc
     testdata
+  render-repo-group-index
   render-tpl
 lib
 render
+  snippets
   testdata
+    dirs-tree
+    repo-group-index
+      group
+        che
+          assets
+            docs-agents
+        tools
+          configs
+            assets
+              docs-agents
+          render-files
+            assets
+              docs-agents
 templates
   2-data
   3-audience

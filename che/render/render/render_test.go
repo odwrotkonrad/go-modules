@@ -229,15 +229,15 @@ func TestRetry(t *testing.T) {
 	})
 }
 
-func TestDirsTreeGolden(t *testing.T) {
+func TestDirsTreeExpected(t *testing.T) {
 	dir := initRepo(t, []string{"top", ".hidden/file", "docs/data/x", "src/lib/y"})
 	got, err := DirsTree(dir)
 	if err != nil {
 		t.Fatalf("DirsTree: %v", err)
 	}
-	want, err := os.ReadFile("testdata/expected.tree")
+	want, err := os.ReadFile("testdata/dirs-tree/expected.tree")
 	if err != nil {
-		t.Fatalf("read golden: %v", err)
+		t.Fatalf("read expected: %v", err)
 	}
 	if got != string(want) {
 		t.Errorf("output mismatch:\n--- got ---\n%s\n--- want ---\n%s", got, want)

@@ -8,10 +8,25 @@ cmd
   render-dirs-tree
   render-makefile-doc
     testdata
+  render-repo-group-index
   render-tpl
 lib
 render
+  snippets
   testdata
+    dirs-tree
+    repo-group-index
+      group
+        che
+          assets
+            docs-agents
+        tools
+          configs
+            assets
+              docs-agents
+          render-files
+            assets
+              docs-agents
 templates
   2-data
   3-audience
