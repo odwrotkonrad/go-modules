@@ -11,27 +11,22 @@ stages:
   - release
 
 variables:
+  CI_IMAGE: registry.gitlab.com/konradodwrot/infra/ci-images/ci-linux:bookworm
   GOMODCACHE: $CI_PROJECT_DIR/.cache/go-mod
   GOCACHE: $CI_PROJECT_DIR/.cache/go-build
   CC: clang
 
 validate-pre-commit-all:
   stage: validate
-  image: golang:1.26-bookworm
+  image: $CI_IMAGE
   rules:
     - if: $CI_PIPELINE_SOURCE == "merge_request_event"
-  before_script:
-    - apt-get update && apt-get install -y --no-install-recommends clang make zsh
-    - go install gitlab.com/konradodwrot/go/che@latest
-    - go install github.com/evilmartians/lefthook@latest
-    - mkdir -p ~/.config/lefthook
-    - '[ -f ~/.config/lefthook/lefthook.yml ] || printf "min_version: 2.1.9\n" > ~/.config/lefthook/lefthook.yml'
   script:
     - make run-repo-ci-precommit-all
     - git diff --exit-code HEAD
 
 test:
-  image: golang:1.26-bookworm
+  image: $CI_IMAGE
   stage: test
   rules:
     - if: $CI_PIPELINE_SOURCE == "merge_request_event"
@@ -42,9 +37,6 @@ test:
       paths:
         - .cache/go-mod
         - .cache/go-build
-  before_script:
-    - apt-get update
-    - apt-get install -y --no-install-recommends clang make zsh
   script:
     - make test
 
@@ -83,7 +75,7 @@ goreleaser-darwin:
 
 goreleaser:
   stage: release
-  image: golang:1.26-bookworm
+  image: $CI_IMAGE
   needs:
     - goreleaser-darwin
   rules:
@@ -97,11 +89,6 @@ goreleaser:
       paths:
         - .cache/go-mod
         - .cache/go-build
-  before_script:
-    - apt-get update && apt-get install -y --no-install-recommends git make xz-utils
-    - "curl -fsSL https://ziglang.org/download/0.16.0/zig-x86_64-linux-0.16.0.tar.xz | tar -xJ -C /usr/local"
-    - "ln -sf /usr/local/zig-x86_64-linux-0.16.0/zig /usr/local/bin/zig"
-    - "curl -fsSL https://github.com/goreleaser/goreleaser/releases/download/v2.16.0/goreleaser_Linux_x86_64.tar.gz | tar -xz -C /usr/local/bin goreleaser"
   script:
     - goreleaser release --clean -f .goreleaser.yaml
 ##[<] 🤖🤖
