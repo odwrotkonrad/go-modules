@@ -6,9 +6,10 @@ GO ?= go
 CC ?= clang
 BIN := che
 
+WRAPPERS :=
 COMMANDS := render-templates run-repo-ci-prepare-hooks run-repo-ci-precommit-all test build vet install create-tag release-check release-darwin release-snapshot
 
-.PHONY: $(COMMANDS)
+.PHONY: $(WRAPPERS) $(COMMANDS)
 
 ##[>] Docs [genai-include]
 #[what] render *.repo.tpl onto the repo (makefile.agents.md, repo-structure.md, CLAUDE.md, AGENTS.md, README.md)
