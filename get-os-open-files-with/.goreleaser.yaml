@@ -49,6 +49,6 @@ changelog:
 
 release:
   gitlab:
-    owner: konradodwrot/go
+    owner: konradodwrot/go/cruft
     name: get-os-open-files-with
 ##[<] 🤖🤖
