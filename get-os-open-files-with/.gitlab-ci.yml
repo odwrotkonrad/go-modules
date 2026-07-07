@@ -5,12 +5,28 @@ workflow:
     - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
 
 stages:
+  - validate
   - test
   - release
 
 variables:
   GOMODCACHE: $CI_PROJECT_DIR/.cache/go-mod
   GOCACHE: $CI_PROJECT_DIR/.cache/go-build
+
+validate-pre-commit-all:
+  stage: validate
+  image: golang:1.26-bookworm
+  rules:
+    - if: $CI_PIPELINE_SOURCE == "merge_request_event"
+  before_script:
+    - apt-get update && apt-get install -y --no-install-recommends clang make zsh
+    - go install gitlab.com/konradodwrot/go/che@latest
+    - go install github.com/evilmartians/lefthook@latest
+    - mkdir -p ~/.config/lefthook
+    - '[ -f ~/.config/lefthook/lefthook.yml ] || printf "min_version: 2.1.9\n" > ~/.config/lefthook/lefthook.yml'
+  script:
+    - make run-repo-ci-precommit-all
+    - git diff --exit-code HEAD
 
 test:
   image: golang:1.26-bookworm
