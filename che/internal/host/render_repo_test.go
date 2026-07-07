@@ -114,7 +114,7 @@ func TestRenderRepoDryRunSkipSecrets(t *testing.T) {
 	root := writeRepo(t, map[string]string{
 		"templates/s.repo.tpl": "TOKEN={{ op \"op://x/y/z\" }}\n",
 	})
-	t.Setenv("CHE_DRY_RUN_RENDER_SECRETS", "1")
+	t.Setenv("CHE_RENDER_TEMPLATES_DRY_RUN_SECRETS", "1")
 	h := New(root, "/home/x", "cli/macos", DryRunOff)
 	item := spec.FileItem{Rel: "templates/s.repo.tpl", Dests: []spec.DestSpec{{Path: "out"}}}
 	if err := h.RenderRepoTemplates([]spec.FileItem{item}); err != nil {

@@ -30,9 +30,7 @@ base-exclude-desktop:
     services: [grafana, prometheus]
 
 desktop/macos:
-  options: {autoDetect: true}
   mixinProfiles: [base]
 
 cli/macos:
-  options: {autoDetect: true}
   mixinProfiles: [base, base-exclude-desktop]

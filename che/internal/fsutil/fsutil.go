@@ -46,15 +46,14 @@ func (f FS) mutate(verb, logArg, dest string, argv ...string) error {
 	return nil
 }
 
-// Mkdir makes one dir with mode. asUser (set, under root): owned by that user.
-// parents adds -p. mkdir builds its own priv-escalated argv, so it runs the
-// command directly rather than through Priv.
-func (f FS) Mkdir(dest, asUser string, mode os.FileMode, parents bool) error {
+// Mkdir makes one dir with mode. parents adds -p. mkdir builds its own
+// priv-escalated argv, so it runs the command directly rather than through Priv.
+func (f FS) Mkdir(dest string, mode os.FileMode, parents bool) error {
 	if f.dry() {
 		f.Log("mkdir(create)", dest)
 		return nil
 	}
-	argv := f.MkdirArgv(dest, asUser, mode, parents)
+	argv := f.MkdirArgv(dest, mode, parents)
 	if err := run(exec.Command(argv[0], argv[1:]...)); err != nil {
 		return err
 	}
@@ -62,24 +61,19 @@ func (f FS) Mkdir(dest, asUser string, mode os.FileMode, parents bool) error {
 	return nil
 }
 
-// MkdirArgv builds a mkdir argv, escalating per dest/asUser: asUser -> sudo -u
-// <user>, root-tree -> sudo unless root, HOME-tree -> direct. parents adds -p.
-// mode 0 -> no -m (mkdir honors umask).
-func (f FS) MkdirArgv(dest, asUser string, mode os.FileMode, parents bool) []string {
+// MkdirArgv builds a mkdir argv, escalating per dest: root-tree -> sudo unless
+// root, HOME-tree -> direct. parents adds -p. mode 0 -> no -m (mkdir honors umask).
+func (f FS) MkdirArgv(dest string, mode os.FileMode, parents bool) []string {
 	base := []string{"mkdir"}
 	if parents {
 		base = append(base, "-p")
 	}
 	base = append(base, modeFlag(mode)...)
 	base = append(base, dest)
-	switch {
-	case asUser != "" && os.Geteuid() == 0:
-		return append([]string{"sudo", "-u", asUser}, base...)
-	case !f.UnderHome(dest) && os.Geteuid() != 0:
+	if !f.UnderHome(dest) && os.Geteuid() != 0 {
 		return append([]string{"sudo"}, base...)
-	default:
-		return base
 	}
+	return base
 }
 
 // Chmod applies explicit mode arg (setgid/sticky bits, not honored by mkdir

@@ -22,7 +22,7 @@ func setupHost(t *testing.T) (Host, spec.Resolved, string) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	res, err := s.Resolve(testutil.CheProfile, h.Root)
+	res, err := s.Resolve([]string{testutil.CheProfile}, h.Root)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -108,7 +108,7 @@ func TestDryRunAllReportsSettledDests(t *testing.T) {
 			if err != nil {
 				t.Fatal(err)
 			}
-			res, err := s.Resolve(testutil.CheProfile, filepath.Join(dir, "root"))
+			res, err := s.Resolve([]string{testutil.CheProfile}, filepath.Join(dir, "root"))
 			if err != nil {
 				t.Fatal(err)
 			}

@@ -5,6 +5,7 @@ package spec
 import (
 	"cmp"
 	"fmt"
+	"maps"
 	"os"
 	"path/filepath"
 	"slices"
@@ -25,9 +26,10 @@ const (
 // Raw mirrors che.yml: every top-level key is a defined profile block.
 type Raw struct {
 	profiles map[string]profileSpec // every defined block, keyed by name
+	order    []string               // profile names in declaration order
 }
 
-// profileSpec is one block: options self-describe selection (autoDetect,
+// profileSpec is one block: options self-describe eligibility (onlyIf,
 // mixinOnly), mixinProfiles composed in order, then include (additive) and
 // exclude (subtractive glob filter, applied last, wins).
 type profileSpec struct {
@@ -37,12 +39,13 @@ type profileSpec struct {
 	Exclude       excludeSet     `yaml:"exclude"`
 }
 
-// ProfileOptions self-describes how a profile is selected. AutoDetect: run iff
-// name == detected <space>/<os>. MixinOnly: a mixin helper, never run
-// standalone. Both default false -> the lone fallback candidate.
+// ProfileOptions self-describes when a profile runs. OnlyIf: predicate
+// expressions (`<source>` or `<source> == <literal>`, sources builtin:*/env:*),
+// eligible iff ALL pass; empty -> always eligible. MixinOnly: a mixin helper,
+// never run standalone.
 type ProfileOptions struct {
-	AutoDetect bool `yaml:"autoDetect"`
-	MixinOnly  bool `yaml:"mixinOnly"`
+	OnlyIf    []string `yaml:"onlyIf"`
+	MixinOnly bool     `yaml:"mixinOnly"`
 }
 
 // includeSet is the additive payload: link globs, copy/template/mkdirs entries
@@ -189,46 +192,77 @@ func Load(path string) (*Raw, error) {
 	if err != nil {
 		return nil, fmt.Errorf("spec not found: %s", path)
 	}
-	var raw map[string]yaml.Node
-	if err := yaml.Unmarshal(b, &raw); err != nil {
+	var doc yaml.Node
+	if err := yaml.Unmarshal(b, &doc); err != nil {
 		return nil, fmt.Errorf("parse %s: %w", path, err)
 	}
 	s := &Raw{profiles: map[string]profileSpec{}}
-	for key, node := range raw {
+	if len(doc.Content) == 0 {
+		return s, nil
+	}
+	m := doc.Content[0]
+	for i := 0; i+1 < len(m.Content); i += 2 {
+		key := m.Content[i].Value
 		var ps profileSpec
-		if err := node.Decode(&ps); err != nil {
+		if err := m.Content[i+1].Decode(&ps); err != nil {
 			return nil, fmt.Errorf("parse profile %q: %w", key, err)
 		}
 		s.profiles[key] = ps
+		s.order = append(s.order, key)
 	}
 	return s, nil
 }
 
-// SelectProfile picks the one profile to Resolve:
-//  1. forced (CHE_FORCE_PROFILE by name) overrides; must name a defined profile.
-//  2. else a profile with autoDetect and name == detected <space>/<os>.
-//  3. else the lone profile that is neither mixinOnly nor autoDetect.
-//  4. zero or >1 such fallback candidates -> error (none / ambiguous).
-func (r *Raw) SelectProfile(forced, detected string) (string, error) {
-	if forced != "" {
-		if _, ok := r.profiles[forced]; !ok {
-			return "", fmt.Errorf("CHE_FORCE_PROFILE %q is not defined in che.yml (defined: %v)",
-				forced, r.names(func(profileSpec) bool { return true }))
+// EligibleProfiles lists the profiles to Resolve, in declaration order:
+//  1. forceOne (CHE_PROFILES_FORCE_ONE by name) -> only that profile, onlyIf
+//     skipped; must name a defined profile.
+//  2. else every non-mixinOnly profile whose onlyIf expressions ALL pass
+//     (forceAll = CHE_PROFILES_FORCE makes every onlyIf pass).
+//  3. zero eligible -> error.
+func (r *Raw) EligibleProfiles(forceOne string, forceAll bool, eval func(expr string) (bool, error)) ([]string, error) {
+	if forceOne != "" {
+		if _, ok := r.profiles[forceOne]; !ok {
+			return nil, fmt.Errorf("CHE_PROFILES_FORCE_ONE %q is not defined in che.yml (defined: %v)",
+				forceOne, slices.Sorted(maps.Keys(r.profiles)))
 		}
-		return forced, nil
+		return []string{forceOne}, nil
 	}
-	if ps, ok := r.profiles[detected]; ok && ps.Options.AutoDetect {
-		return detected, nil
+	var out []string
+	for _, name := range r.order {
+		ps := r.profiles[name]
+		if ps.Options.MixinOnly {
+			continue
+		}
+		ok, err := allPass(name, ps.Options.OnlyIf, forceAll, eval)
+		if err != nil {
+			return nil, err
+		}
+		if ok {
+			out = append(out, name)
+		}
 	}
-	fallback := r.names(func(ps profileSpec) bool { return !ps.Options.MixinOnly && !ps.Options.AutoDetect })
-	switch len(fallback) {
-	case 1:
-		return fallback[0], nil
-	case 0:
-		return "", fmt.Errorf("no profile selected: detected %q has no autoDetect match and no fallback profile defined", detected)
-	default:
-		return "", fmt.Errorf("ambiguous profile selection: detected %q has no autoDetect match and multiple fallback profiles (%v)", detected, fallback)
+	if len(out) == 0 {
+		return nil, fmt.Errorf("no eligible profile: every profile is mixinOnly or failed its onlyIf (candidates: %v; set CHE_PROFILES_FORCE_ONE or CHE_PROFILES_FORCE)",
+			r.names(func(ps profileSpec) bool { return !ps.Options.MixinOnly }))
 	}
+	return out, nil
+}
+
+// allPass reports whether every onlyIf expression of profile name passes.
+func allPass(name string, exprs []string, forceAll bool, eval func(expr string) (bool, error)) (bool, error) {
+	if forceAll {
+		return true, nil
+	}
+	for _, expr := range exprs {
+		ok, err := eval(expr)
+		if err != nil {
+			return false, fmt.Errorf("profile %q onlyIf %q: %w", name, expr, err)
+		}
+		if !ok {
+			return false, nil
+		}
+	}
+	return true, nil
 }
 
 // names lists defined profile block names matching keep, sorted.
@@ -242,18 +276,20 @@ func (r *Raw) names(keep func(profileSpec) bool) []string {
 	return slices.Sorted(slices.Values(out))
 }
 
-// Resolve validates the profile is defined, composes its mixinProfiles and
-// includes, classifies git-tracked files, then applies excludes as a final glob
-// filter. Output is repo-relative.
-func (r *Raw) Resolve(profile, root string) (Resolved, error) {
-	if _, ok := r.profiles[profile]; !ok {
-		return Resolved{}, fmt.Errorf(
-			"profile %q is not defined in che.yml (defined: %v)",
-			profile, r.names(func(ps profileSpec) bool { return !ps.Options.MixinOnly }))
-	}
+// Resolve validates each profile is defined, composes their mixinProfiles and
+// includes into one union (in order), classifies git-tracked files, then
+// applies excludes as a final glob filter. Output is repo-relative.
+func (r *Raw) Resolve(profiles []string, root string) (Resolved, error) {
 	var eff effective
-	if err := r.mergeInto(&eff, profile, nil); err != nil {
-		return Resolved{}, err
+	for _, profile := range profiles {
+		if _, ok := r.profiles[profile]; !ok {
+			return Resolved{}, fmt.Errorf(
+				"profile %q is not defined in che.yml (defined: %v)",
+				profile, r.names(func(ps profileSpec) bool { return !ps.Options.MixinOnly }))
+		}
+		if err := r.mergeInto(&eff, profile, nil); err != nil {
+			return Resolved{}, err
+		}
 	}
 	scripts, err := expandScripts(filepath.Dir(root), fsutil.ExpandAll(eff.scripts))
 	if err != nil {

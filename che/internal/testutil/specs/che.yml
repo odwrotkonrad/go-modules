@@ -27,9 +27,9 @@ base:
     services: [otelcol]
 
 cli/macos:
-  options: {autoDetect: true}
+  options: {onlyIf: ['builtin:isOs == macos', 'builtin:isVirt']}
   mixinProfiles: [base]
 
 desktop/macos:
-  options: {autoDetect: true}
+  options: {onlyIf: ['builtin:isOs == macos', 'builtin:isVirt == false']}
   mixinProfiles: [base]

@@ -5,7 +5,6 @@ base:
       - ci/zsh/scripts/installs/*.zsh
 
 cli/macos:
-  options: {autoDetect: true}
   mixinProfiles: [base]
   exclude:
     runScripts:

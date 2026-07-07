@@ -18,7 +18,7 @@ const repoFileMode = 0o660
 // are shaped by render.Compose per its options. Mirrors RenderTemplates' dry-run
 // + secret skip.
 func (h Host) RenderRepoTemplates(items []spec.FileItem) error {
-	skipSecret := os.Getenv("CHE_DRY_RUN_RENDER_SECRETS") != ""
+	skipSecret := os.Getenv("CHE_RENDER_TEMPLATES_DRY_RUN_SECRETS") != ""
 	var keep []spec.FileItem
 	for _, item := range items {
 		if skipSecret && srcHasSecretRef(filepath.Join(h.RepoRoot, item.Rel)) {

@@ -55,7 +55,7 @@ func (h Host) ensureConfigDirs(dirRels []string) error {
 		if h.dirSettled(dest) {
 			continue
 		}
-		if err := h.fs.Mkdir(dest, "", 0, false); err != nil {
+		if err := h.fs.Mkdir(dest, 0, false); err != nil {
 			return err
 		}
 	}
@@ -73,7 +73,7 @@ func (h Host) dirSettled(dest string) bool {
 // drop them.
 func (h Host) mkExtraDir(item spec.FileItem, dest string) error {
 	mode, _ := parseMode(item.Chmod)
-	if err := h.fs.Mkdir(dest, "", mode, true); err != nil {
+	if err := h.fs.Mkdir(dest, mode, true); err != nil {
 		return err
 	}
 	if mode > 0o777 {
@@ -341,7 +341,7 @@ func (h Host) PruneBrokenLinks(dirRels []string) error {
 	return nil
 }
 
-// brokenRepoLink: chech if p is a symlink into root/ whose target is gone.
+// brokenRepoLink: check if p is a symlink into root/ whose target is gone.
 func (h Host) brokenRepoLink(p string) bool {
 	target, err := os.Readlink(p) // [what] non-symlink -> err
 	if err != nil {

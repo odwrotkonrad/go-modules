@@ -5,5 +5,4 @@ b:
   options: {mixinOnly: true}
   mixinProfiles: [a]
 cli/macos:
-  options: {autoDetect: true}
   mixinProfiles: [a]

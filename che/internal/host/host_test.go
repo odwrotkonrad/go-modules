@@ -45,11 +45,10 @@ func TestSrc(t *testing.T) {
 	}
 }
 
-// TestResolveScripts: spec order kept, glob expands sorted, missing errors.
+// TestResolveScripts: spec order kept, rels mapped to abs, missing errors.
 func TestResolveScripts(t *testing.T) {
 	dir := t.TempDir()
 	scripts := []string{
-		"ci/zsh/scripts/installs/40-brew.zsh",
 		"ci/zsh/scripts/installs/90-kitty.zsh",
 		"ci/zsh/scripts/installs/00-ci-deps.zsh",
 	}
@@ -64,17 +63,13 @@ func TestResolveScripts(t *testing.T) {
 	}
 	h := New(dir, "/Users/x", "cli/macos", DryRunOff)
 
-	// explicit keep spec order, glob expands in place sorted
-	got, err := h.ResolveScripts([]string{
-		"ci/zsh/scripts/installs/90-kitty.zsh",
-		"ci/zsh/scripts/installs/[01]*.zsh",
-	})
+	got, err := h.ResolveScripts(scripts)
 	if err != nil {
 		t.Fatal(err)
 	}
 	want := []string{
-		filepath.Join(dir, "ci/zsh/scripts/installs/90-kitty.zsh"),
-		filepath.Join(dir, "ci/zsh/scripts/installs/00-ci-deps.zsh"),
+		filepath.Join(dir, scripts[0]),
+		filepath.Join(dir, scripts[1]),
 	}
 	if !slices.Equal(got, want) {
 		t.Errorf("ResolveScripts = %v, want %v", got, want)
@@ -82,10 +77,6 @@ func TestResolveScripts(t *testing.T) {
 
 	if _, err := h.ResolveScripts([]string{"ci/zsh/scripts/installs/99-absent.zsh"}); err == nil {
 		t.Error("ResolveScripts must error on a missing script")
-	}
-	// glob matching nothing errors
-	if _, err := h.ResolveScripts([]string{"ci/zsh/scripts/installs/none/*.zsh"}); err == nil {
-		t.Error("ResolveScripts must error when a glob matches no script")
 	}
 }
 
