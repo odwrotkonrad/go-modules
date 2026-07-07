@@ -41,19 +41,16 @@ test:
 
 release:
   stage: release
-  image: registry.gitlab.com/gitlab-org/release-cli:latest
+  image: $CI_IMAGE
   needs: []
   rules:
     - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
+  variables:
+    GITLAB_TOKEN: $CI_JOB_TOKEN
   script:
     - NEXT=$(sh ci/next-version.sh)
     - echo "releasing $NEXT"
-    - |
-      release-cli create \
-        --name "get-term-open-files-with $NEXT" \
-        --tag-name "$NEXT" \
-        --ref "$CI_COMMIT_SHA" \
-        --description "get-term-open-files-with $NEXT"
+    - glab release create "$NEXT" --name "get-term-open-files-with $NEXT" --ref "$CI_COMMIT_SHA" --notes "get-term-open-files-with $NEXT"
 
 goreleaser:
   stage: release
