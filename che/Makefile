@@ -6,9 +6,25 @@ GO ?= go
 CC ?= clang
 BIN := che
 
-COMMANDS := test build vet install create-tag
+COMMANDS := render-templates run-repo-ci-prepare-hooks run-repo-ci-precommit-all test build vet install create-tag release-check release-darwin release-snapshot
 
 .PHONY: $(COMMANDS)
+
+##[>] Docs [genai-include]
+#[what] render *.repo.tpl onto the repo (makefile.agents.md, repo-structure.md, CLAUDE.md, AGENTS.md, README.md)
+render-templates:
+	@che render-templates --repo
+##[<] Docs
+
+##[>] CI [genai-include]
+#[what] install lefthook git hooks
+run-repo-ci-prepare-hooks:
+	@lefthook install --force
+
+#[what] run pre-commit hooks over all files (not just staged)
+run-repo-ci-precommit-all: run-repo-ci-prepare-hooks
+	@lefthook run pre-commit --all-files --force
+##[<] CI
 
 ##[>] Go [genai-include]
 #[what] run all tests
@@ -33,5 +49,18 @@ install:
 #[args] BRANCH REF DEFAULT_BRANCH
 create-tag:
 	@ci/create-tag.zsh $(BRANCH) $(REF) $(DEFAULT_BRANCH)
+
+#[what] validate both goreleaser configs
+release-check:
+	goreleaser check -f .goreleaser.yaml
+	goreleaser check -f .goreleaser.darwin.yaml
+
+#[what] build the darwin archives (native cc) into ./darwin-dist
+release-darwin:
+	goreleaser release --snapshot --clean -f .goreleaser.darwin.yaml
+
+#[what] local 4-target snapshot: darwin (native) + linux (zig), no publish
+release-snapshot: release-darwin
+	goreleaser release --snapshot --clean -f .goreleaser.yaml
 ##[<] Release
 ##[<] 🤖🤖
