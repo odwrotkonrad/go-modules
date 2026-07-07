@@ -568,8 +568,8 @@ github.com/yuin/goldmark v1.2.1/go.mod h1:3hX8gzYuyVAZsxl0MRgGTJEmQBFcNTphYh9dec
 github.com/yuin/goldmark v1.4.13/go.mod h1:6yULJ656Px+3vBD8DxQVa3kxgyrAnzto9xy5taEt/CY=
 github.com/zeebo/errs v1.4.0 h1:XNdoD/RRMKP7HD0UhJnIzUy74ISdGGxURlYG8HSWSfM=
 github.com/zeebo/errs v1.4.0/go.mod h1:sgbWHsvVuTPHcqJJGQ1WhI5KbWlHYz+2+2C/LSEtCw4=
-gitlab.com/konradodwrot/go/render-files v0.0.4 h1:Seu2CzE+dhpjyFeTyIKrX4dkut1j2z8gnNAA+cg5QME=
-gitlab.com/konradodwrot/go/render-files v0.0.4/go.mod h1:Irr+kvQB8Nz4IThxVHwISuJf1TGztqselaHMaSjgQTw=
+gitlab.com/konradodwrot/go/render-files v0.0.5 h1:P8spX2gFFiJh2lg5ycnHNfUdyF79EREskFuBRp1YI8g=
+gitlab.com/konradodwrot/go/render-files v0.0.5/go.mod h1:1bJEfOvTrCxVwpPJePTAEvZutsrUQArs/bf2fhwl8/0=
 go.opencensus.io v0.24.0 h1:y73uSU6J157QMP2kn2r30vwW1A2W2WFwSCGnAVxeaD0=
 go.opencensus.io v0.24.0/go.mod h1:vNK8G9p7aAivkbmorf4v+7Hgx+Zs0yY+0fOtgBfjQKo=
 go.opentelemetry.io/auto/sdk v1.1.0 h1:cH53jehLUN6UFLY71z+NDOiNJqDdPRaXzTel0sJySYA=
