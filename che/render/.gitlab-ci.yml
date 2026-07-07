@@ -44,7 +44,7 @@ test:
         - .cache/go-build
   before_script:
     - apt-get update
-    - apt-get install -y --no-install-recommends clang make
+    - apt-get install -y --no-install-recommends clang make zsh
   script:
     - make test
 
