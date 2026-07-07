@@ -5,10 +5,6 @@ project_name: che
 
 dist: darwin-dist
 
-before:
-  hooks:
-    - go mod tidy
-
 builds:
   - id: che-darwin
     main: .

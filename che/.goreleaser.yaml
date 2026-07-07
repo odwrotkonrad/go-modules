@@ -6,10 +6,6 @@ project_name: che
 gitlab_urls:
   use_job_token: true
 
-before:
-  hooks:
-    - go mod tidy
-
 builds:
   - id: che-linux
     main: .
