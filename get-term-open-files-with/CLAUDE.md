@@ -12,7 +12,7 @@ CLI printing zsh suffix-alias lines for terminal file opening
 - `conventions/makefile/convention.md`: house Makefile style, `[genai-include]` sectioning that feeds the generated Makefile doc for AI agents.
 - `conventions/templates/convention.md`: generating repo docs with che templates: `templates/1-env|2-data|3-audience`, `che.yml` wiring, `make render-templates`.
 - `conventions/ci/convention.md`: lefthook pre-commit hooks (minimal: docs generation check), re-run in a minimal CI validate job.
-- `conventions/license/convention.md`: every public repo carries `LICENSE` (unmodified MIT, creation-year copyright), private repos carry none.
+- `conventions/license/convention.md`: every public repo carries `LICENSE` (unmodified MIT, creation-year copyright).
 
 Each convention dir carries a runnable `example/`. This repo itself follows all of these conventions.
 

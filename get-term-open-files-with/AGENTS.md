@@ -19,14 +19,6 @@ Terminal open-by-extension behavior belongs in config: one YAML declares openers
 - Per-terminal targets: `any`, `vscode`, `kitty`.
 - Offline after first run: linguist data cached locally.
 
-## How To Use
-
-`go install gitlab.com/konradodwrot/go/cruft/get-term-open-files-with@latest`, run `get-term-open-files-with <target>`, eval the lines in zsh. Development: `make test`, `make build`.
-
-## Future Direction
-
-Tracks the `term-open-files-with.yml` schema and terminal targets as the configs repo grows.
-
 # Conventions
 
 - `conventions/purpose/convention.md`: every repo carries `assets/docs-agents/purpose.md` with five headings (what, why, goals, usage, future), included at the top of `AGENTS.md`, `CLAUDE.md`, `README.md`.
@@ -34,7 +26,7 @@ Tracks the `term-open-files-with.yml` schema and terminal targets as the configs
 - `conventions/makefile/convention.md`: house Makefile style, `[genai-include]` sectioning that feeds the generated Makefile doc for AI agents.
 - `conventions/templates/convention.md`: generating repo docs with che templates: `templates/1-env|2-data|3-audience`, `che.yml` wiring, `make render-templates`.
 - `conventions/ci/convention.md`: lefthook pre-commit hooks (minimal: docs generation check), re-run in a minimal CI validate job.
-- `conventions/license/convention.md`: every public repo carries `LICENSE` (unmodified MIT, creation-year copyright), private repos carry none.
+- `conventions/license/convention.md`: every public repo carries `LICENSE` (unmodified MIT, creation-year copyright).
 
 Each convention dir carries a runnable `example/`. This repo itself follows all of these conventions.
 
