@@ -22,10 +22,14 @@ Exit Codes:
 
 const configName = "os-open-files-with.yml"
 
+var version = "dev"
+
 func run(args []string, customDir string) (string, error) {
 	switch {
 	case len(args) == 1 && (args[0] == "--help" || args[0] == "-h"):
 		return usage, nil
+	case len(args) == 1 && (args[0] == "--version" || args[0] == "-v"):
+		return "get-os-open-files-with version " + version, nil
 	case len(args) == 0:
 		node, err := lib.LoadConfigNode(configName, customDir)
 		if err != nil {
