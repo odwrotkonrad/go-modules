@@ -27,6 +27,7 @@ validate-pre-commit-all:
 test:
   image: $CI_IMAGE
   stage: test
+  needs: []
   rules:
     - if: $CI_PIPELINE_SOURCE == "merge_request_event"
   cache:
