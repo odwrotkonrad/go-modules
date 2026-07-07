@@ -42,7 +42,7 @@ test:
         - .cache/go-build
   before_script:
     - apt-get update
-    - apt-get install -y --no-install-recommends make
+    - apt-get install -y --no-install-recommends make zsh
   script:
     - make test
 
