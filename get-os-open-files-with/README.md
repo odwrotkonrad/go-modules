@@ -23,14 +23,6 @@ macOS file associations belong in config, not clicked together in Finder. The YA
 - File-handler associations as code, loaded by che.
 - Deterministic output: config order, system + user deep-merge.
 
-### How To Use
-
-`go install gitlab.com/konradodwrot/go/cruft/get-os-open-files-with@latest`, run `get-os-open-files-with`, pipe the lines to duti. Development: `make test`, `make build`.
-
-### Future Direction
-
-Tracks the `os-open-files-with.yml` schema as the configs repo grows.
-
 ## Install
 
 ```sh
