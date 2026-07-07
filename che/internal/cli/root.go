@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"strings"
 
 	"github.com/spf13/cobra"
 
@@ -31,14 +32,14 @@ var dryRunModes = map[string]host.DryRunMode{
 	"all":   host.DryRunAll,
 }
 
-// RootCmd is che's root command. Resolves the profile (build) before any
-// subcommand runs. Subcommands attached by the command package.
+// RootCmd is che's root command. Resolves the eligible profiles (build) before
+// any subcommand runs. Subcommands attached by the command package.
 var RootCmd = &cobra.Command{
 	Use:     "che",
 	Version: version,
 	Short:   "Spec-driven config loader",
-	Long: `che detects OS+arch+virt -> profile in che.yml, then loads only the
-files/dirs/installs/services that profile selects.`,
+	Long: `che resolves every eligible profile in che.yml (onlyIf predicates), then
+loads the union of files/dirs/installs/services those profiles select.`,
 	SilenceUsage:  true,
 	SilenceErrors: true,
 	PersistentPreRunE: func(cmd *cobra.Command, args []string) error {
@@ -52,8 +53,8 @@ func init() {
 	RootCmd.PersistentFlags().Lookup("dry-run").NoOptDefVal = "delta"
 }
 
-// build detects -> loads spec -> resolves -> wires the host. Run in
-// PersistentPreRunE before any subcommand RunE.
+// build loads spec -> lists eligible profiles -> resolves union -> wires the
+// host. Run in PersistentPreRunE before any subcommand RunE.
 func build() error {
 	repoRoot, err := findRepoRoot()
 	if err != nil {
@@ -74,16 +75,17 @@ func build() error {
 	if err != nil {
 		return err
 	}
-	// CHE_FORCE_PROFILE (by name) overrides detection (test/VM hook); else
-	// autoDetect match; else the lone non-mixin fallback.
-	forced := os.Getenv("CHE_FORCE_PROFILE")
-	detected := fsutil.DetectProfile()
-	profile, err := sp.SelectProfile(forced, detected)
+	// CHE_PROFILES_FORCE_ONE runs only that profile, onlyIf skipped (test/VM
+	// hook); CHE_PROFILES_FORCE (truthy) makes every onlyIf pass; else the
+	// union of every eligible non-mixin profile.
+	forceOne := os.Getenv("CHE_PROFILES_FORCE_ONE")
+	forceAll := os.Getenv("CHE_PROFILES_FORCE") != ""
+	profiles, err := sp.EligibleProfiles(forceOne, forceAll, spec.NewEvaluator().EvalOnlyIf)
 	if err != nil {
 		return err
 	}
-	h := host.New(repoRoot, home, profile, mode)
-	res, err := sp.Resolve(profile, h.Root)
+	h := host.New(repoRoot, home, strings.Join(profiles, ","), mode)
+	res, err := sp.Resolve(profiles, h.Root)
 	if err != nil {
 		return err
 	}

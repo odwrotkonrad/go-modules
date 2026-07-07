@@ -10,15 +10,6 @@ import (
 	"strings"
 )
 
-// DetectProfile -> "<space>/<os>", space = desktop|cli (cli iff virtualized). base has no detection.
-func DetectProfile() string {
-	space := "desktop"
-	if Virtualized() {
-		space = "cli"
-	}
-	return space + "/" + NormalizeOS(runtime.GOOS)
-}
-
 func NormalizeOS(goos string) string {
 	if goos == "darwin" {
 		return "macos"

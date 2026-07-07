@@ -12,9 +12,7 @@ base:
       - files: [HOME/.config/zsh/**]
 
 cli/macos:
-  options: {autoDetect: true}
   mixinProfiles: [base]
 
 desktop/macos:
-  options: {autoDetect: true}
   mixinProfiles: [base]

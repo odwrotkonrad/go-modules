@@ -5,9 +5,7 @@ package host
 import (
 	"fmt"
 	"os"
-	"os/exec"
 	"path/filepath"
-	"slices"
 	"strings"
 
 	"gitlab.com/konradodwrot/go/che/internal/fsutil"
@@ -67,31 +65,16 @@ func (h Host) DryRunAll() bool { return h.mode == DryRunAll }
 // Src maps a repo-relative path (under root/) to its absolute source path.
 func (h Host) Src(rel string) string { return filepath.Join(h.Root, rel) }
 
-// TrackedFiles lists git-tracked files under root/, repo-relative to root.
-func (h Host) TrackedFiles() ([]string, error) { return fsutil.TrackedFiles(h.Root) }
-
-// ResolveScripts expands the scripts list IN SPEC ORDER (no sort). Each entry must
-// resolve to >=1 script ([why] catches typos/renames). Globs expand in place.
-func (h Host) ResolveScripts(scripts []string) ([]string, error) {
-	var out []string
-	for _, entry := range scripts {
-		abs := filepath.Join(h.RepoRoot, entry)
-		if strings.ContainsAny(entry, "*?[") {
-			hits, err := filepath.Glob(abs)
-			if err != nil {
-				return nil, err
-			}
-			if len(hits) == 0 {
-				return nil, fmt.Errorf("run-scripts entry matched no script: %s", entry)
-			}
-			slices.Sort(hits)
-			out = append(out, hits...)
-			continue
-		}
+// ResolveScripts maps spec-resolved script rels (globs already expanded by
+// spec.Resolve) to absolute paths, IN SPEC ORDER, verifying each exists.
+func (h Host) ResolveScripts(rels []string) ([]string, error) {
+	out := make([]string, len(rels))
+	for i, rel := range rels {
+		abs := filepath.Join(h.RepoRoot, rel)
 		if _, err := os.Stat(abs); err != nil {
-			return nil, fmt.Errorf("run-scripts script not found: %s", entry)
+			return nil, fmt.Errorf("run-scripts script not found: %s", rel)
 		}
-		out = append(out, abs)
+		out[i] = abs
 	}
 	return out, nil
 }
@@ -113,16 +96,5 @@ func (h Host) ToDest(rel string) string {
 
 // UnderHome reports whether dest is the user-owned $HOME tree (no sudo needed).
 func (h Host) UnderHome(dest string) bool { return h.fs.UnderHome(dest) }
-
-// InvokingUser: root runs the ops; HOME-tree dirs belong to the invoking user.
-func (h Host) InvokingUser() string {
-	if u := os.Getenv("SUDO_USER"); u != "" {
-		return u
-	}
-	if out, err := exec.Command("stat", "-f", "%Su", h.Home).Output(); err == nil {
-		return strings.TrimSpace(string(out))
-	}
-	return ""
-}
 
 // [<] 🤖🤖

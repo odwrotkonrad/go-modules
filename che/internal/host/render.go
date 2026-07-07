@@ -14,7 +14,7 @@ import (
 // Glob-form items (no explicit dest) render to the derived live path; rich items
 // fan out across their dests, inlining @-includes per RenderReferencedFiles.
 func (h Host) RenderTemplates(templates []spec.FileItem) error {
-	skipSecret := os.Getenv("CHE_DRY_RUN_RENDER_SECRETS") != ""
+	skipSecret := os.Getenv("CHE_RENDER_TEMPLATES_DRY_RUN_SECRETS") != ""
 	var keep []spec.FileItem
 	var dests []string
 	for _, item := range templates {

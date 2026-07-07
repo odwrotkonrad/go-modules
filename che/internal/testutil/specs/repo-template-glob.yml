@@ -5,5 +5,4 @@ base:
       - files: [templates/**/*.repo.tpl]
 
 cli/macos:
-  options: {autoDetect: true}
   mixinProfiles: [base]

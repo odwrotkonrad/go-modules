@@ -1,3 +1,2 @@
 cli/macos:
-  options: {autoDetect: true}
   mixinProfiles: [nonexistent]

@@ -26,7 +26,7 @@ func resolve(t *testing.T, dir, profile string) Resolved {
 	if err != nil {
 		t.Fatal(err)
 	}
-	res, err := s.Resolve(profile, filepath.Join(dir, "root"))
+	res, err := s.Resolve([]string{profile}, filepath.Join(dir, "root"))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -38,7 +38,7 @@ func resolveErr(t *testing.T, spec, profile string) {
 	t.Helper()
 	dir := fixtureRepo(t, spec, map[string]string{"root/.gitkeep": ""})
 	s, _ := Load(filepath.Join(dir, "che.yml"))
-	if _, err := s.Resolve(profile, filepath.Join(dir, "root")); err == nil {
+	if _, err := s.Resolve([]string{profile}, filepath.Join(dir, "root")); err == nil {
 		t.Fatalf("%s/%s: expected error", spec, profile)
 	}
 }
@@ -189,7 +189,7 @@ func hasDir(res Resolved, path string) bool { return findDir(res, path) != nil }
 func TestResolveUndefinedFails(t *testing.T) {
 	dir := fixtureRepo(t, "merge", mergeFiles)
 	s, _ := Load(filepath.Join(dir, "che.yml"))
-	if _, err := s.Resolve("cli/linux", filepath.Join(dir, "root")); err == nil {
+	if _, err := s.Resolve([]string{"cli/linux"}, filepath.Join(dir, "root")); err == nil {
 		t.Fatal("expected error for undefined profile")
 	}
 }
@@ -295,7 +295,7 @@ func TestRepoTemplateGlobError(t *testing.T) {
 	resolveErr(t, "repo-template-glob", "cli/macos")
 }
 
-// loadSpec loads a fixture's Raw for SelectProfile assertions.
+// loadSpec loads a fixture's Raw for EligibleProfiles assertions.
 func loadSpec(t *testing.T, spec string) *Raw {
 	t.Helper()
 	dir := fixtureRepo(t, spec, map[string]string{"root/.gitkeep": ""})
@@ -306,67 +306,87 @@ func loadSpec(t *testing.T, spec string) *Raw {
 	return s
 }
 
-// selectOK asserts SelectProfile(forced, detected) returns want.
-func selectOK(t *testing.T, s *Raw, forced, detected, want string) {
+// osEval fakes the builtin evaluator for a host: os = "macos"|"linux", virt fixed true.
+func osEval(os string) func(string) (bool, error) {
+	return stubEvaluator(os, true).EvalOnlyIf
+}
+
+// eligibleOK asserts EligibleProfiles returns want.
+func eligibleOK(t *testing.T, s *Raw, forceOne string, forceAll bool, eval func(string) (bool, error), want []string) {
 	t.Helper()
-	got, err := s.SelectProfile(forced, detected)
+	got, err := s.EligibleProfiles(forceOne, forceAll, eval)
 	if err != nil {
-		t.Fatalf("SelectProfile(%q,%q) errored: %v", forced, detected, err)
+		t.Fatalf("EligibleProfiles(%q,%v) errored: %v", forceOne, forceAll, err)
 	}
-	if got != want {
-		t.Errorf("SelectProfile(%q,%q) = %q, want %q", forced, detected, got, want)
+	if !slices.Equal(got, want) {
+		t.Errorf("EligibleProfiles(%q,%v) = %v, want %v", forceOne, forceAll, got, want)
 	}
 }
 
-// selectErr asserts SelectProfile(forced, detected) fails.
-func selectErr(t *testing.T, s *Raw, forced, detected string) {
+// eligibleErr asserts EligibleProfiles fails.
+func eligibleErr(t *testing.T, s *Raw, forceOne string, forceAll bool, eval func(string) (bool, error)) {
 	t.Helper()
-	if got, err := s.SelectProfile(forced, detected); err == nil {
-		t.Fatalf("SelectProfile(%q,%q) = %q, want error", forced, detected, got)
+	if got, err := s.EligibleProfiles(forceOne, forceAll, eval); err == nil {
+		t.Fatalf("EligibleProfiles(%q,%v) = %v, want error", forceOne, forceAll, got)
 	}
 }
 
-// TestSelectProfileAutoDetect: a detected name matching an autoDetect profile runs.
-func TestSelectProfileAutoDetect(t *testing.T) {
+// TestEligibleOnlyIf: onlyIf-gated profiles pass iff every expression passes.
+func TestEligibleOnlyIf(t *testing.T) {
 	s := loadSpec(t, "che")
-	selectOK(t, s, "", "cli/macos", "cli/macos")
-	selectOK(t, s, "", "desktop/macos", "desktop/macos")
+	eligibleOK(t, s, "", false, osEval("macos"), []string{"cli/macos"})
+	eligibleErr(t, s, "", false, osEval("linux"))
 }
 
-// TestSelectProfileForce: CHE_FORCE_PROFILE by name overrides detection.
-func TestSelectProfileForce(t *testing.T) {
+// TestEligibleForceOne: CHE_PROFILES_FORCE_ONE runs only that profile, onlyIf skipped.
+func TestEligibleForceOne(t *testing.T) {
 	s := loadSpec(t, "che")
-	selectOK(t, s, "desktop/macos", "cli/macos", "desktop/macos")
+	eligibleOK(t, s, "desktop/macos", false, osEval("linux"), []string{"desktop/macos"})
 }
 
-// TestSelectProfileForceUndefined: forcing an undefined name errors.
-func TestSelectProfileForceUndefined(t *testing.T) {
+// TestEligibleForceOneUndefined: forcing an undefined name errors.
+func TestEligibleForceOneUndefined(t *testing.T) {
 	s := loadSpec(t, "che")
-	selectErr(t, s, "cli/linux", "cli/macos")
+	eligibleErr(t, s, "cli/linux", false, osEval("macos"))
 }
 
-// TestSelectProfileMixinOnlyNeverSelected: a mixinOnly helper is never the
-// autoDetect match nor the fallback.
-func TestSelectProfileMixinOnlyNeverSelected(t *testing.T) {
+// TestEligibleForceAll: CHE_PROFILES_FORCE makes every onlyIf pass; mixinOnly
+// helpers stay out of the list.
+func TestEligibleForceAll(t *testing.T) {
 	s := loadSpec(t, "che")
-	selectErr(t, s, "", "base") // no autoDetect match, >1 fallback (cli/macos, desktop/macos are autoDetect, so 0 fallback)
+	eligibleOK(t, s, "", true, osEval("linux"), []string{"cli/macos", "desktop/macos"})
 }
 
-// TestSelectProfileLoneFallback: the single non-mixin non-autoDetect profile is
-// auto-selected when detection has no match.
-func TestSelectProfileLoneFallback(t *testing.T) {
+// TestEligibleLonePlain: a profile without onlyIf is always eligible.
+func TestEligibleLonePlain(t *testing.T) {
 	s := loadSpec(t, "repo")
-	selectOK(t, s, "", "cli/linux", "repo")
-	selectOK(t, s, "", "desktop/macos", "repo")
+	eligibleOK(t, s, "", false, osEval("linux"), []string{"repo"})
 }
 
-// TestSelectProfileAmbiguousFallback: >1 non-mixin non-autoDetect profile with
-// no autoDetect match errors.
-func TestSelectProfileAmbiguousFallback(t *testing.T) {
+// TestEligibleUnionOrder: multiple plain profiles are all eligible, in
+// declaration order.
+func TestEligibleUnionOrder(t *testing.T) {
 	s := loadSpec(t, "ambiguous")
-	selectErr(t, s, "", "cli/linux")
+	eligibleOK(t, s, "", false, osEval("linux"), []string{"repo", "other"})
 }
 
-// [<] 🤖🤖
+// TestResolveUnion: resolving multiple profiles merges their includes in order.
+func TestResolveUnion(t *testing.T) {
+	dir := fixtureRepo(t, "ambiguous", map[string]string{"root/.gitkeep": ""})
+	s, err := Load(filepath.Join(dir, "che.yml"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	res, err := s.Resolve([]string{"repo", "other"}, filepath.Join(dir, "root"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(res.RepoTemplates) != 2 {
+		t.Fatalf("RepoTemplates = %d, want 2", len(res.RepoTemplates))
+	}
+	if res.RepoTemplates[0].Dests[0].Path != ".env" || res.RepoTemplates[1].Dests[0].Path != ".env2" {
+		t.Errorf("union order = %+v", res.RepoTemplates)
+	}
+}
 
 // [<] 🤖🤖

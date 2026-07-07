@@ -72,7 +72,7 @@ func ExpandBraces(pattern string) []string {
 func splitTopLevel(body string) []string {
 	var parts []string
 	depth, start := 0, 0
-	for i := 0; i < len(body); i++ {
+	for i := range len(body) {
 		switch body[i] {
 		case '{':
 			depth++

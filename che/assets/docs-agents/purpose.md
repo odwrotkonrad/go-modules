@@ -15,10 +15,3 @@ Dotfile loading as shell scripts is fragile, imperative, host-specific. One decl
 - Generated repo docs: `*.repo.tpl` rendering keeps agent files and README fresh.
 - Secrets stay in 1Password: op:// refs resolve only at render time.
 
-## How To Use
-
-`go install gitlab.com/konradodwrot/go/che@latest` (CGO, needs a C compiler). `che detect` prints the resolved profile; `che link|copy|render-templates|mk-dirs|run-scripts|services` load it. `--dry-run` prints mutating actions instead of executing them. Development: `make test`, `make build`.
-
-## Future Direction
-
-Render engine for the conventions rollout: repos inline convention docs via `remoteFile` in their templates. Releases stay automatic: patch bump per main push, prerelease tags per MR.

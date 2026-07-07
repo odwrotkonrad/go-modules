@@ -124,21 +124,21 @@ func TestTrackedFilesMatchesCLI(t *testing.T) {
 }
 
 // TestMkdirArgv: priv escalation depends on euid, assert the euid-independent
-// shape (mkdir + mode + dest tail) and the asUser case at euid 0.
+// shape (mkdir + mode + dest tail).
 func TestMkdirArgv(t *testing.T) {
 	f := FS{Home: "/Users/x"}
-	argv := f.MkdirArgv("/Users/x/.config", "", 0o750, true)
+	argv := f.MkdirArgv("/Users/x/.config", 0o750, true)
 	want := []string{"mkdir", "-p", "-m", "0750", "/Users/x/.config"}
 	if !slices.Equal(argv, want) {
 		t.Errorf("MkdirArgv(home dest) = %v, want %v", argv, want)
 	}
 	// no -p when parents is false
-	argv = f.MkdirArgv("/Users/x/.config", "", 0o750, false)
+	argv = f.MkdirArgv("/Users/x/.config", 0o750, false)
 	if slices.Contains(argv, "-p") {
 		t.Errorf("MkdirArgv(parents=false) included -p: %v", argv)
 	}
 	// no -m when mode is 0 (umask honored)
-	argv = f.MkdirArgv("/Users/x/.config", "", 0, true)
+	argv = f.MkdirArgv("/Users/x/.config", 0, true)
 	if want := []string{"mkdir", "-p", "/Users/x/.config"}; !slices.Equal(argv, want) {
 		t.Errorf("MkdirArgv(zero mode) = %v, want %v", argv, want)
 	}
