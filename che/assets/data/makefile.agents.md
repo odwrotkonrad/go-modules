@@ -20,3 +20,6 @@
 ### Release:
 
 `create-tag`
+`release-check` validate both goreleaser configs
+`release-darwin` build the darwin archives (native cc) into ./darwin-dist
+`release-snapshot`: `release-darwin` local 4-target snapshot: darwin (native) + linux (zig), no publish

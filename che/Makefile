@@ -6,7 +6,7 @@ GO ?= go
 CC ?= clang
 BIN := che
 
-COMMANDS := render-templates run-repo-ci-prepare-hooks run-repo-ci-precommit-all test build vet install create-tag
+COMMANDS := render-templates run-repo-ci-prepare-hooks run-repo-ci-precommit-all test build vet install create-tag release-check release-darwin release-snapshot
 
 .PHONY: $(COMMANDS)
 
@@ -49,5 +49,18 @@ install:
 #[args] BRANCH REF DEFAULT_BRANCH
 create-tag:
 	@ci/create-tag.zsh $(BRANCH) $(REF) $(DEFAULT_BRANCH)
+
+#[what] validate both goreleaser configs
+release-check:
+	goreleaser check -f .goreleaser.yaml
+	goreleaser check -f .goreleaser.darwin.yaml
+
+#[what] build the darwin archives (native cc) into ./darwin-dist
+release-darwin:
+	goreleaser release --snapshot --clean -f .goreleaser.darwin.yaml
+
+#[what] local 4-target snapshot: darwin (native) + linux (zig), no publish
+release-snapshot: release-darwin
+	goreleaser release --snapshot --clean -f .goreleaser.yaml
 ##[<] Release
 ##[<] 🤖🤖

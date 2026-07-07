@@ -1,0 +1,60 @@
+##[>] 🤖🤖
+version: 2
+
+project_name: che
+
+before:
+  hooks:
+    - go mod tidy
+
+builds:
+  - id: che-linux
+    main: .
+    binary: che
+    goos: [linux]
+    goarch: [amd64, arm64]
+    flags:
+      - -trimpath
+    ldflags:
+      - -s -w -X gitlab.com/konradodwrot/go/che/internal/cli.version={{.Version}}
+    env:
+      - CGO_ENABLED=1
+      - 'CC=zig cc -target {{ if eq .Arch "amd64" }}x86_64{{ else }}aarch64{{ end }}-linux-gnu'
+      - 'CXX=zig c++ -target {{ if eq .Arch "amd64" }}x86_64{{ else }}aarch64{{ end }}-linux-gnu'
+
+archives:
+  - id: che
+    ids: [che-linux]
+    formats: [tar.gz]
+    name_template: '{{ .ProjectName }}_{{ .Version }}_{{ .Os }}_{{ .Arch }}'
+
+checksum:
+  name_template: checksums.txt
+  algorithm: sha256
+  extra_files:
+    - glob: darwin-dist/*.tar.gz
+
+changelog:
+  use: git
+  groups:
+    - title: Features
+      regexp: '^.*?feat(\(.+\))?!?:.*$'
+      order: 0
+    - title: Fixes
+      regexp: '^.*?fix(\(.+\))?!?:.*$'
+      order: 1
+    - title: Others
+      order: 999
+  filters:
+    exclude:
+      - '^docs:'
+      - '^test:'
+      - '^chore:'
+
+release:
+  gitlab:
+    owner: konradodwrot/go
+    name: che
+  extra_files:
+    - glob: darwin-dist/*.tar.gz
+##[<] 🤖🤖
