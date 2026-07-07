@@ -35,13 +35,14 @@ var opRetryDelays = []time.Duration{
 func Exec(name string, body []byte, repoRoot string) ([]byte, error) {
 	ctx := context.Background()
 	funcs := template.FuncMap{
-		"op":                opResolver(ctx),
-		"renderDirsTree":    func() (string, error) { return DirsTree(repoRoot) },
-		"renderMakefileDoc": MakefileDoc,
-		"frontmatter":       func(path string) (string, error) { return ReadFrontmatter(repoRoot, path) },
-		"readBody":          func(path string) (string, error) { return ReadBody(repoRoot, path) },
-		"renderMarkdown":    func(path string, opts ...string) (string, error) { return RenderMarkdown(repoRoot, path, opts...) },
-		"remoteFile":        remoteFileResolver(),
+		"op":                   opResolver(ctx),
+		"renderDirsTree":       func() (string, error) { return DirsTree(repoRoot) },
+		"renderRepoGroupIndex": func(dir string) (string, error) { return RepoGroupIndexDir(dir) },
+		"renderMakefileDoc":    MakefileDoc,
+		"frontmatter":          func(path string) (string, error) { return ReadFrontmatter(repoRoot, path) },
+		"readBody":             func(path string) (string, error) { return ReadBody(repoRoot, path) },
+		"renderMarkdown":       func(path string, opts ...string) (string, error) { return RenderMarkdown(repoRoot, path, opts...) },
+		"remoteFile":           remoteFileResolver(),
 	}
 	r := gomplate.NewRenderer(gomplate.RenderOptions{Funcs: funcs, MissingKey: "error"})
 	var buf bytes.Buffer

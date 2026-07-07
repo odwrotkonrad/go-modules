@@ -14,10 +14,3 @@ che and repo docs generation share one render implementation. This repo is its h
 - Generated docs stay fresh: Makefile docs, directory trees, agent files, README.
 - Drift detection via `--check` modes.
 
-## How To Use
-
-Import the `render` package (as che does), or install the CLIs with `go install gitlab.com/konradodwrot/go/render-files/cmd/<name>@latest` (`render-makefile-doc` needs CGO for tree-sitter). Development: `make test`, `make build`.
-
-## Future Direction
-
-Grows with the conventions rollout: new template funcs (like `remoteFile` for inlining convention docs) land here first, che consumes them by version bump.
