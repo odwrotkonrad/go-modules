@@ -2,11 +2,14 @@
 package main
 
 import (
+	"fmt"
 	"os"
 
 	"gitlab.com/konradodwrot/go/render-files/checkcmd"
 	"gitlab.com/konradodwrot/go/render-files/render"
 )
+
+var version = "dev"
 
 const usage = `usage: render-dirs-tree
        render-dirs-tree --check <file>
@@ -26,7 +29,12 @@ var tool = checkcmd.Tool{
 }
 
 func main() {
-	os.Exit(tool.Run(os.Args[1:]))
+	args := os.Args[1:]
+	if len(args) == 1 && (args[0] == "-v" || args[0] == "--version") {
+		fmt.Println("render-dirs-tree version", version)
+		return
+	}
+	os.Exit(tool.Run(args))
 }
 
 //[<] 🤖🤖

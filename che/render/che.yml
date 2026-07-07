@@ -1,0 +1,19 @@
+##[>] 🤖🤖
+repo:
+  include:
+    repoTemplate:
+      - files:
+          - source: templates/2-data/makefile-agents.md.repo.tpl
+            dest:
+              - {path: assets/data/makefile.agents.md}
+          - source: templates/2-data/repo-structure.md.repo.tpl
+            dest:
+              - {path: assets/data/repo-structure.md}
+          - source: templates/3-audience/AGENTS.md.repo.tpl
+            dest:
+              - {path: CLAUDE.md}
+              - {path: AGENTS.md, options: {renderReferencedFiles: true}}
+          - source: templates/3-audience/README.md.repo.tpl
+            dest:
+              - {path: README.md}
+##[<] 🤖🤖
