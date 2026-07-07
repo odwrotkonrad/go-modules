@@ -5,9 +5,10 @@ SHELL := zsh
 GO ?= go
 CC ?= clang
 
+WRAPPERS :=
 COMMANDS := render-templates run-repo-ci-prepare-hooks run-repo-ci-precommit-all test build vet install release-check release-darwin release-snapshot
 
-.PHONY: $(COMMANDS)
+.PHONY: $(WRAPPERS) $(COMMANDS)
 
 ##[>] Docs [genai-include]
 #[what] render *.repo.tpl onto the repo (makefile.agents.md, repo-structure.md, CLAUDE.md, AGENTS.md, README.md)
