@@ -41,6 +41,7 @@ func Exec(name string, body []byte, repoRoot string) ([]byte, error) {
 		"frontmatter":       func(path string) (string, error) { return ReadFrontmatter(repoRoot, path) },
 		"readBody":          func(path string) (string, error) { return ReadBody(repoRoot, path) },
 		"renderMarkdown":    func(path string, opts ...string) (string, error) { return RenderMarkdown(repoRoot, path, opts...) },
+		"remoteFile":        remoteFileResolver(),
 	}
 	r := gomplate.NewRenderer(gomplate.RenderOptions{Funcs: funcs, MissingKey: "error"})
 	var buf bytes.Buffer
