@@ -26,9 +26,14 @@ const configName = "term-open-files-with.yml"
 
 var terminals = map[string]bool{"any": true, "vscode": true, "kitty": true}
 
+var version = "dev"
+
 func run(args []string, customDir, url string) (string, error) {
 	if len(args) == 1 && (args[0] == "--help" || args[0] == "-h") {
 		return usage, nil
+	}
+	if len(args) == 1 && (args[0] == "--version" || args[0] == "-v") {
+		return "get-term-open-files-with version " + version, nil
 	}
 	if len(args) != 1 || !terminals[args[0]] {
 		return "", &lib.CodedError{Code: lib.CodeArgs, Msg: "invalid arguments: " + fmt.Sprint(args)}
