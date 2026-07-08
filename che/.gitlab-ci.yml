@@ -53,14 +53,11 @@ release:
   script:
     - make create-tag BRANCH="$CI_COMMIT_BRANCH" REF="$CI_COMMIT_SHA" DEFAULT_BRANCH="$CI_DEFAULT_BRANCH"
 
-pages:
-  stage: release
+.pages-build:
   image:
     name: squidfunk/mkdocs-material:9
     entrypoint: [""]
   needs: []
-  rules:
-    - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
   script:
     - mkdir -p docs/assets/data
     - cp assets/data/che.schema.json docs/assets/data/
@@ -73,6 +70,27 @@ pages:
   artifacts:
     paths:
       - public
+
+pages:
+  extends: .pages-build
+  stage: release
+  rules:
+    - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
+
+pages-preview:
+  extends: .pages-build
+  stage: test
+  rules:
+    - if: $CI_PIPELINE_SOURCE == "merge_request_event"
+  variables:
+    DOCS_DIR_URLS: "false"
+  environment:
+    name: docs-preview/$CI_MERGE_REQUEST_IID
+    url: https://konradodwrot.gitlab.io/-/go/che/-/jobs/$CI_JOB_ID/artifacts/public/index.html
+  artifacts:
+    paths:
+      - public
+    expire_in: 1 week
 
 goreleaser-darwin:
   stage: release

@@ -3,6 +3,7 @@ site_name: che
 site_url: https://konradodwrot.gitlab.io/go/che/
 repo_url: https://gitlab.com/konradodwrot/go/che
 repo_name: konradodwrot/go/che
+use_directory_urls: !ENV [DOCS_DIR_URLS, true]
 
 theme:
   name: material
