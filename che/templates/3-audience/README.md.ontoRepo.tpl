@@ -33,6 +33,8 @@ Flags:
       --omit-exec-if               treat every execIf predicate as passing; env: CHE_OMIT_EXEC_IF
       --profile string             run only this profile (autoExec skipped, execIf still
                                    enforced); env: CHE_PROFILE
+      --skip-plugins               skip plugins entries, load only the local repo; env:
+                                   CHE_SKIP_PLUGINS
   -v, --version                    version for che
 ```
 

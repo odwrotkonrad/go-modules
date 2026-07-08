@@ -33,7 +33,8 @@ func TestBuildPluginUnits(t *testing.T) {
 	t.Setenv("CHE_OMIT_EXEC_IF", "")
 	t.Setenv("CHE_PROFILE", "")
 	t.Setenv("CHE_DRY_RUN", "")
-	dryRunMode, profileForce = "", ""
+	t.Setenv("CHE_SKIP_PLUGINS", "")
+	dryRunMode, profileForce, skipPlugins = "", "", false
 
 	t.Setenv("PLUGIN_GATE", "1")
 	out, err := testutil.CaptureStdout(t, build)
@@ -109,7 +110,8 @@ func TestBuildPluginUnitEnv(t *testing.T) {
 	t.Setenv("CHE_DRY_RUN", "")
 	t.Setenv("PLUGIN_GATE", "")
 	os.Unsetenv("PLUGIN_GATE")
-	dryRunMode, profileForce = "", ""
+	t.Setenv("CHE_SKIP_PLUGINS", "")
+	dryRunMode, profileForce, skipPlugins = "", "", false
 
 	if err := build(); err != nil {
 		t.Fatalf("build() errored: %v", err)
@@ -142,6 +144,48 @@ func TestBuildPluginUnitEnv(t *testing.T) {
 		t.Error("PLUGIN_GATE leaked into the process env after forEachUnit")
 	}
 	testutil.WantLines(t, out, "execIf(pass): profile gitlabGroup: env:PLUGIN_GATE")
+}
+
+// --skip-plugins (env CHE_SKIP_PLUGINS) drops plugins entries: only the local
+// unit runs, no plugin pull or log line.
+func TestBuildSkipPlugins(t *testing.T) {
+	if os.Geteuid() == 0 {
+		t.Skip("non-root path only; build resolves home from $HOME")
+	}
+	hostRepo := testutil.Repo(t, map[string]string{
+		"che.yml":           "main:\n  options: {autoExec: true}\n  plugins: [\"@file:///nonexistent::main\"]\n  include:\n    runScripts: [scripts/local.zsh]\n",
+		"scripts/local.zsh": "#!/bin/zsh\n",
+	})
+	t.Chdir(hostRepo)
+	t.Setenv("HOME", t.TempDir())
+	t.Setenv("CHE_OMIT_EXEC_IF", "")
+	t.Setenv("CHE_PROFILE", "")
+	t.Setenv("CHE_DRY_RUN", "")
+	dryRunMode, profileForce = "", ""
+
+	for name, set := range map[string]func(){
+		"flag": func() { t.Setenv("CHE_SKIP_PLUGINS", ""); skipPlugins = true },
+		"env":  func() { t.Setenv("CHE_SKIP_PLUGINS", "1"); skipPlugins = false },
+	} {
+		set()
+		if err := build(); err != nil {
+			t.Fatalf("[%s] build() errored: %v", name, err)
+		}
+		if len(pluginRefs) != 0 {
+			t.Fatalf("[%s] pluginRefs = %v, want none", name, pluginRefs)
+		}
+		var ran []unit
+		out, err := testutil.CaptureStdout(t, func() error {
+			return forEachUnit(func(u unit) error { ran = append(ran, u); return nil })
+		})
+		if err != nil {
+			t.Fatalf("[%s] forEachUnit errored: %v\n%s", name, err, out)
+		}
+		if len(ran) != 1 || strings.Contains(out, "plugin") {
+			t.Fatalf("[%s] ran units = %d, want 1 (plugins skipped)\n%s", name, len(ran), out)
+		}
+	}
+	skipPlugins = false
 }
 
 // withEnv shadows an existing var, sets an absent one, restores both after.
