@@ -37,7 +37,7 @@ Each convention dir carries a runnable `example/`. This repo itself follows all 
 
 ### Docs:
 
-`render-templates`: `build` render *.ontoRepo.tpl onto the repo (makefile.agents.md, repo-structure.md, CLAUDE.md, AGENTS.md, README.md); dogfoods this checkout's build
+`render-templates`: `build` render *.ontoRepo.tpl onto the repo (makefile.agents.md, repo-structure.md, CLAUDE.md, AGENTS.md, README.md) with this checkout's build
 
 ### CI:
 

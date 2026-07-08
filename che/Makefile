@@ -12,7 +12,7 @@ COMMANDS := render-templates run-repo-ci-prepare-hooks run-repo-ci-precommit-all
 .PHONY: $(WRAPPERS) $(COMMANDS)
 
 ##[>] Docs [genai-include]
-#[what] render *.ontoRepo.tpl onto the repo (makefile.agents.md, repo-structure.md, CLAUDE.md, AGENTS.md, README.md); dogfoods this checkout's build
+#[what] render *.ontoRepo.tpl onto the repo (makefile.agents.md, repo-structure.md, CLAUDE.md, AGENTS.md, README.md) with this checkout's build
 render-templates: build
 	@dist/$(BIN) render-templates --profile=ontoRepo
 ##[<] Docs
