@@ -40,31 +40,49 @@ func TestBuildPluginUnits(t *testing.T) {
 	if err != nil {
 		t.Fatalf("build() errored: %v\n%s", err, out)
 	}
-	if len(units) != 2 {
-		t.Fatalf("units = %d, want 2\n%s", len(units), out)
+	if len(units) != 1 || strings.Contains(out, "plugin") {
+		t.Fatalf("build() must defer plugins: units = %d\n%s", len(units), out)
+	}
+	var ran []unit
+	out, err = testutil.CaptureStdout(t, func() error {
+		return forEachUnit(func(u unit) error { ran = append(ran, u); return nil })
+	})
+	if err != nil {
+		t.Fatalf("forEachUnit errored: %v\n%s", err, out)
+	}
+	if len(ran) != 2 {
+		t.Fatalf("ran units = %d, want 2\n%s", len(ran), out)
 	}
 	cache := filepath.Join(home, ".local/share/che/plugins")
-	if !strings.HasPrefix(units[1].host.RepoRoot, cache+"/") {
-		t.Errorf("plugin RepoRoot = %q, want under %q", units[1].host.RepoRoot, cache)
+	if !strings.HasPrefix(ran[1].host.RepoRoot, cache+"/") {
+		t.Errorf("plugin RepoRoot = %q, want under %q", ran[1].host.RepoRoot, cache)
 	}
-	if units[1].ref != ref {
-		t.Errorf("plugin ref = %q, want %q", units[1].ref, ref)
+	if ran[1].ref != ref {
+		t.Errorf("plugin ref = %q, want %q", ran[1].ref, ref)
 	}
-	if !slices.Contains(units[1].res.Scripts, "scripts/bootstrap.zsh") {
-		t.Errorf("plugin Scripts = %v, want scripts/bootstrap.zsh", units[1].res.Scripts)
-	}
-	testutil.WantLines(t, out, "execIf: profile gitlabGroup: env:PLUGIN_GATE -> true")
-
-	t.Setenv("PLUGIN_GATE", "")
-	out, err = testutil.CaptureStdout(t, build)
-	if err != nil {
-		t.Fatalf("build() (gate unset) errored: %v\n%s", err, out)
-	}
-	if len(units) != 1 {
-		t.Fatalf("units = %d, want 1 (plugin skipped)\n%s", len(units), out)
+	if !slices.Contains(ran[1].res.Scripts, "scripts/bootstrap.zsh") {
+		t.Errorf("plugin Scripts = %v, want scripts/bootstrap.zsh", ran[1].res.Scripts)
 	}
 	testutil.WantLines(t, out,
-		"execIf: profile gitlabGroup: env:PLUGIN_GATE -> false",
+		"run "+ref,
+		"execIf(pass): profile gitlabGroup: env:PLUGIN_GATE")
+
+	t.Setenv("PLUGIN_GATE", "")
+	if err := build(); err != nil {
+		t.Fatalf("build() (gate unset) errored: %v", err)
+	}
+	ran = nil
+	out, err = testutil.CaptureStdout(t, func() error {
+		return forEachUnit(func(u unit) error { ran = append(ran, u); return nil })
+	})
+	if err != nil {
+		t.Fatalf("forEachUnit (gate unset) errored: %v\n%s", err, out)
+	}
+	if len(ran) != 1 {
+		t.Fatalf("ran units = %d, want 1 (plugin skipped)\n%s", len(ran), out)
+	}
+	testutil.WantLines(t, out,
+		"execIf(reject): profile gitlabGroup: env:PLUGIN_GATE",
 		"skip "+ref+" (execIf failed)")
 }
 
@@ -93,23 +111,37 @@ func TestBuildPluginUnitEnv(t *testing.T) {
 	os.Unsetenv("PLUGIN_GATE")
 	dryRunMode, profileForce = "", ""
 
-	out, err := testutil.CaptureStdout(t, build)
+	if err := build(); err != nil {
+		t.Fatalf("build() errored: %v", err)
+	}
+	var ran []unit
+	var gateInOp string
+	out, err := testutil.CaptureStdout(t, func() error {
+		return forEachUnit(func(u unit) error {
+			ran = append(ran, u)
+			gateInOp = os.Getenv("PLUGIN_GATE")
+			return nil
+		})
+	})
 	if err != nil {
-		t.Fatalf("build() errored: %v\n%s", err, out)
+		t.Fatalf("forEachUnit errored: %v\n%s", err, out)
 	}
-	if len(units) != 2 {
-		t.Fatalf("units = %d, want 2\n%s", len(units), out)
+	if len(ran) != 2 {
+		t.Fatalf("ran units = %d, want 2\n%s", len(ran), out)
 	}
-	if got := units[1].env["PLUGIN_GATE"]; got != "1" {
+	if got := ran[1].env["PLUGIN_GATE"]; got != "1" {
 		t.Errorf("unit env PLUGIN_GATE = %q, want %q", got, "1")
 	}
-	if !slices.Contains(units[1].res.Scripts, "scripts/bootstrap.zsh") {
-		t.Errorf("plugin Scripts = %v, want scripts/bootstrap.zsh", units[1].res.Scripts)
+	if gateInOp != "1" {
+		t.Errorf("PLUGIN_GATE in plugin op = %q, want %q", gateInOp, "1")
+	}
+	if !slices.Contains(ran[1].res.Scripts, "scripts/bootstrap.zsh") {
+		t.Errorf("plugin Scripts = %v, want scripts/bootstrap.zsh", ran[1].res.Scripts)
 	}
 	if _, set := os.LookupEnv("PLUGIN_GATE"); set {
-		t.Error("PLUGIN_GATE leaked into the process env after build()")
+		t.Error("PLUGIN_GATE leaked into the process env after forEachUnit")
 	}
-	testutil.WantLines(t, out, "execIf: profile gitlabGroup: env:PLUGIN_GATE -> true")
+	testutil.WantLines(t, out, "execIf(pass): profile gitlabGroup: env:PLUGIN_GATE")
 }
 
 // withEnv shadows an existing var, sets an absent one, restores both after.

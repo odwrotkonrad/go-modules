@@ -36,18 +36,18 @@ func slug(url string) string {
 // branch only) or updates it to the remote tip (shallow fetch + hard reset:
 // [why] a shallow --ff-only pull fails once the fetched history is truncated;
 // the dir is a managed cache, never edited in place), returning the checkout
-// path. Shells out to system git so the user's ssh config and credential
-// helpers apply.
-func Ensure(home, url string) (string, error) {
+// path. name subtypes the logs. Shells out to system git so the user's ssh
+// config and credential helpers apply.
+func Ensure(home, url, name string) (string, error) {
 	dir := Dir(home, url)
 	if _, err := os.Stat(filepath.Join(dir, ".git")); err != nil {
-		log.Msg("plugin", fmt.Sprintf("clone %s -> %s", url, dir), log.Off)
+		log.Msg("plugin("+name+")", fmt.Sprintf("clone %s -> %s", url, dir), log.Off)
 		if err := git("clone", "--quiet", "--depth", "1", "--single-branch", url, dir); err != nil {
 			return "", fmt.Errorf("plugin clone %s: %w", url, err)
 		}
 		return dir, nil
 	}
-	log.Msg("plugin", fmt.Sprintf("pull %s", dir), log.Off)
+	log.Msg("plugin("+name+")", fmt.Sprintf("pull %s", dir), log.Off)
 	if err := git("-C", dir, "fetch", "--quiet", "--depth", "1"); err != nil {
 		return "", fmt.Errorf("plugin fetch %s: %w", dir, err)
 	}

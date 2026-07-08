@@ -13,28 +13,21 @@ var RunScriptsCmd = &cobra.Command{
 	Use:   "run-scripts [name...]",
 	Short: "run the profile's scripts, optionally filtered by name substring",
 	RunE: func(cmd *cobra.Command, args []string) error {
-		type job struct {
-			u       unit
-			scripts []string
-		}
-		var jobs []job
 		total := 0
-		for _, u := range units {
+		err := forEachUnit(func(u unit) error {
 			scripts, err := u.host.ResolveScripts(u.res.Scripts)
 			if err != nil {
 				return err
 			}
 			scripts = filterScripts(scripts, args)
 			total += len(scripts)
-			jobs = append(jobs, job{u: u, scripts: scripts})
+			return u.host.RunScripts(scripts)
+		})
+		if err != nil {
+			return err
 		}
 		if len(args) > 0 && total == 0 {
 			return fmt.Errorf("no script matches: %v", args)
-		}
-		for _, j := range jobs {
-			if err := j.u.withEnv(func() error { return j.u.host.RunScripts(j.scripts) }); err != nil {
-				return err
-			}
 		}
 		return nil
 	},

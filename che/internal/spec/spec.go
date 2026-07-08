@@ -339,7 +339,11 @@ func allPass(name string, exprs []string, forceAll bool, eval func(expr string) 
 		if err != nil {
 			return false, fmt.Errorf("profile %q execIf %q: %w", name, expr, err)
 		}
-		log.Msg("execIf", fmt.Sprintf("profile %s: %s -> %t", name, expr, ok), log.Off)
+		verdict := "reject"
+		if ok {
+			verdict = "pass"
+		}
+		log.Msg("execIf("+verdict+")", fmt.Sprintf("profile %s: %s", name, expr), log.Off)
 		if !ok {
 			return false, nil
 		}

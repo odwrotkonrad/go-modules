@@ -13,8 +13,14 @@ var DetectCmd = &cobra.Command{
 	Short: "print the eligible profiles (comma-joined) and exit",
 	RunE: func(cmd *cobra.Command, args []string) error {
 		fmt.Println(units[0].host.Profile)
-		for _, u := range units[1:] {
-			fmt.Println(u.ref)
+		for _, p := range pluginRefs {
+			u, ok, err := ensurePlugin(p)
+			if err != nil {
+				return err
+			}
+			if ok {
+				fmt.Println(u.ref)
+			}
 		}
 		return nil
 	},

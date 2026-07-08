@@ -32,7 +32,7 @@ func TestEnsureCloneThenPull(t *testing.T) {
 	home := t.TempDir()
 	url := "file://" + up
 
-	dir, err := Ensure(home, url)
+	dir, err := Ensure(home, url, "p")
 	if err != nil {
 		t.Fatalf("Ensure (clone) errored: %v", err)
 	}
@@ -48,7 +48,7 @@ func TestEnsureCloneThenPull(t *testing.T) {
 
 	testutil.WriteTree(t, up, map[string]string{"extra.txt": "x\n"})
 	testutil.GitRepo(t, up)
-	if _, err := Ensure(home, url); err != nil {
+	if _, err := Ensure(home, url, "p"); err != nil {
 		t.Fatalf("Ensure (pull) errored: %v", err)
 	}
 	if _, err := os.Stat(filepath.Join(dir, "extra.txt")); err != nil {

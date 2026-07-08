@@ -27,19 +27,13 @@ func serviceCmd(use, short string, action func(host.Host, []host.Service) error)
 		Use:   use,
 		Short: short,
 		RunE: func(cmd *cobra.Command, args []string) error {
-			for _, u := range units {
-				err := u.withEnv(func() error {
-					svcs, err := u.host.ResolveServices(u.res.Services)
-					if err != nil {
-						return err
-					}
-					return action(u.host, svcs)
-				})
+			return forEachUnit(func(u unit) error {
+				svcs, err := u.host.ResolveServices(u.res.Services)
 				if err != nil {
 					return err
 				}
-			}
-			return nil
+				return action(u.host, svcs)
+			})
 		},
 	}
 }

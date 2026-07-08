@@ -28,6 +28,51 @@ type unit struct {
 	env  map[string]string
 }
 
+// forEachUnit runs op over every unit: the local repo first, then each plugin
+// grouped (announce, pull, execIf, resolve, op), skipped ones dropped.
+func forEachUnit(op func(unit) error) error {
+	for _, u := range units {
+		if err := u.withEnv(func() error { return op(u) }); err != nil {
+			return err
+		}
+	}
+	for _, p := range pluginRefs {
+		u, ok, err := ensurePlugin(p)
+		if err != nil {
+			return err
+		}
+		if !ok {
+			continue
+		}
+		if err := u.withEnv(func() error { return op(u) }); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+// ensurePlugin returns p's unit, building it on first use (announced) and
+// caching the outcome (ok=false: skipped by execIf).
+func ensurePlugin(p spec.PluginRef) (unit, bool, error) {
+	if u, seen := pluginUnits[p.String()]; seen {
+		if u == nil {
+			return unit{}, false, nil
+		}
+		return *u, true, nil
+	}
+	log.Msg("plugin("+p.Profile+")", fmt.Sprintf("run %s", p), log.Off)
+	u, ok, err := buildPlugin(p, pluginCfg.home, pluginCfg.mode, pluginCfg.forceAll, pluginCfg.eval)
+	if err != nil {
+		return unit{}, false, err
+	}
+	if !ok {
+		pluginUnits[p.String()] = nil
+		return unit{}, false, nil
+	}
+	pluginUnits[p.String()] = &u
+	return u, true, nil
+}
+
 // withEnv runs fn with u.env exported into the process env (host values
 // shadowed), restoring the prior state after. No-op when u.env is empty.
 func (u unit) withEnv(fn func() error) error {
@@ -50,12 +95,21 @@ func (u unit) withEnv(fn func() error) error {
 	return fn()
 }
 
-// Built once in PersistentPreRunE, read by each RunE.
+// Built once in PersistentPreRunE, read by each RunE. Plugin units build
+// lazily (ensurePlugin), after the local unit's ops ran.
 var (
 	dryRunMode   string
 	profileForce string
 	omitExecIf   bool
 	units        []unit
+	pluginRefs   []spec.PluginRef
+	pluginUnits  map[string]*unit
+	pluginCfg    struct {
+		home     string
+		mode     host.DryRunMode
+		forceAll bool
+		eval     func(string) (bool, error)
+	}
 )
 
 // version is injected at build time via -ldflags -X.
@@ -135,15 +189,9 @@ func build() error {
 		return err
 	}
 	units = []unit{{host: h, res: res}}
-	for _, p := range res.Plugins {
-		u, ok, err := buildPlugin(p, home, mode, forceAll, eval)
-		if err != nil {
-			return err
-		}
-		if ok {
-			units = append(units, u)
-		}
-	}
+	pluginRefs = res.Plugins
+	pluginUnits = map[string]*unit{}
+	pluginCfg.home, pluginCfg.mode, pluginCfg.forceAll, pluginCfg.eval = home, mode, forceAll, eval
 	return nil
 }
 
@@ -152,7 +200,7 @@ func build() error {
 // logged) and resolves it anchored at the checkout. Nested plugin refs inside
 // the remote profile are ignored (v1).
 func buildPlugin(p spec.PluginRef, home string, mode host.DryRunMode, forceAll bool, eval func(string) (bool, error)) (unit, bool, error) {
-	checkout, err := plugin.Ensure(home, p.URL)
+	checkout, err := plugin.Ensure(home, p.URL, p.Profile)
 	if err != nil {
 		return unit{}, false, err
 	}
@@ -174,11 +222,11 @@ func buildPlugin(p spec.PluginRef, home string, mode host.DryRunMode, forceAll b
 		return unit{}, false, fmt.Errorf("plugin %s: %w", p, err)
 	}
 	if !pass {
-		log.Msg("plugin", fmt.Sprintf("skip %s (execIf failed)", p), log.Off)
+		log.Msg("plugin("+p.Profile+")", fmt.Sprintf("skip %s (execIf failed)", p), log.Off)
 		return unit{}, false, nil
 	}
 	if len(u.res.Plugins) > 0 {
-		log.Msg("plugin", fmt.Sprintf("%s: nested plugin refs ignored: %v", p, u.res.Plugins), log.Off)
+		log.Msg("plugin("+p.Profile+")", fmt.Sprintf("%s: nested plugin refs ignored: %v", p, u.res.Plugins), log.Off)
 	}
 	return u, true, nil
 }
