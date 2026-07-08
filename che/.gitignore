@@ -2,4 +2,8 @@
 /dist/
 /darwin-dist/
 /.cache/
+/public/
+/docs/index.md
+/docs/license.md
+/docs/assets/
 ##[<] 🤖

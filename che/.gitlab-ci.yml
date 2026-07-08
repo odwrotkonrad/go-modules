@@ -56,18 +56,20 @@ release:
 pages:
   stage: release
   image:
-    name: pandoc/core:3
+    name: squidfunk/mkdocs-material:9
     entrypoint: [""]
   needs: []
   rules:
     - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
   script:
-    - mkdir -p public/docs public/assets/data
-    - cp assets/data/che.schema.json public/assets/data/
-    - cp LICENSE public/
-    - sed 's/\.md)/.html)/g' README.md | pandoc -s -f gfm --metadata title=che -o public/index.html
-    - sed 's/\.md)/.html)/g' docs/spec.md | pandoc -s -f gfm --metadata title="che.yml Reference" -o public/docs/spec.html
-    - sed 's/\.md)/.html)/g' docs/cli.md | pandoc -s -f gfm --metadata title="che CLI" -o public/docs/cli.html
+    - mkdir -p docs/assets/data
+    - cp assets/data/che.schema.json docs/assets/data/
+    - sed -e 's|(docs/spec.md)|(spec.md)|' -e 's|(docs/cli.md)|(cli.md)|' -e 's|(LICENSE)|(license.md)|' README.md > docs/index.md
+    - sed -i 's|(\.\./assets/data/che.schema.json)|(assets/data/che.schema.json)|g' docs/spec.md
+    - printf '# License\n\n```\n' > docs/license.md
+    - cat LICENSE >> docs/license.md
+    - printf '```\n' >> docs/license.md
+    - mkdocs build --site-dir public
   artifacts:
     paths:
       - public
