@@ -12,7 +12,7 @@ import (
 	"strings"
 	"time"
 
-	"gitlab.com/konradodwrot/go/che/internal/log"
+	"gitlab.com/konradodwrot/go-modules/che/internal/log"
 )
 
 // settleSeconds: wait before post-bootstrap pid check, services take time to spawn.

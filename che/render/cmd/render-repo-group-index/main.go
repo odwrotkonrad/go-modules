@@ -5,8 +5,8 @@ import (
 	"fmt"
 	"os"
 
-	"gitlab.com/konradodwrot/go/render-files/checkcmd"
-	"gitlab.com/konradodwrot/go/render-files/render"
+	"gitlab.com/konradodwrot/go-modules/che/render/checkcmd"
+	"gitlab.com/konradodwrot/go-modules/che/render/render"
 )
 
 var version = "dev"

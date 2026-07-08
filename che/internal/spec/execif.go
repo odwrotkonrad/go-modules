@@ -9,7 +9,7 @@ import (
 	"strings"
 	"sync"
 
-	"gitlab.com/konradodwrot/go/che/internal/fsutil"
+	"gitlab.com/konradodwrot/go-modules/che/internal/fsutil"
 )
 
 // Evaluator resolves execIf predicate expressions. Builtins are lazy (resolved

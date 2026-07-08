@@ -12,7 +12,7 @@ import (
 
 	"github.com/spf13/cobra"
 
-	"gitlab.com/konradodwrot/go/che/internal/cli"
+	"gitlab.com/konradodwrot/go-modules/che/internal/cli"
 )
 
 // docgen renders che's reference docs from the Go source: the che.yml JSON
@@ -23,7 +23,7 @@ const (
 	schemaPath   = "assets/data/che.schema.json"
 	cliDocPath   = "docs/cli.md"
 	cliUsagePath = "assets/data/cli-usage.md"
-	schemaID     = "https://gitlab.com/konradodwrot/go/che/-/raw/main/assets/data/che.schema.json"
+	schemaID     = "https://gitlab.com/konradodwrot/go-modules/-/raw/main/che/assets/data/che.schema.json"
 )
 
 func main() {

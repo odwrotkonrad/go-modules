@@ -7,7 +7,7 @@ import (
 	"path/filepath"
 	"testing"
 
-	"gitlab.com/konradodwrot/go/cruft/get-os-open-files-with/lib"
+	"gitlab.com/konradodwrot/go-modules/get-os-open-files-with/lib"
 )
 
 func writeConfig(t *testing.T, raw string) string {

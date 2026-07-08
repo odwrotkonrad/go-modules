@@ -5,7 +5,7 @@ package cli
 import (
 	"github.com/spf13/cobra"
 
-	"gitlab.com/konradodwrot/go/che/internal/host"
+	"gitlab.com/konradodwrot/go-modules/che/internal/host"
 )
 
 var ServicesCmd = &cobra.Command{

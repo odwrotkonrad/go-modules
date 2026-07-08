@@ -1,9 +1,0 @@
-##[>] 🤖
-extends:
-  - ~/.config/lefthook/lefthook.yml
-
-pre-commit:
-  jobs:
-    - name: docsgen
-      run: make render-docs render-templates && git add assets/data/che.schema.json assets/data/cli-usage.md docs/cli.md assets/data/makefile.agents.md assets/data/repo-structure.md CLAUDE.md AGENTS.md README.md
-##[<] 🤖

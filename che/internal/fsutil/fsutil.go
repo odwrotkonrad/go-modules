@@ -12,7 +12,7 @@ import (
 
 	"github.com/go-git/go-git/v5"
 
-	"gitlab.com/konradodwrot/go/che/internal/log"
+	"gitlab.com/konradodwrot/go-modules/che/internal/log"
 )
 
 // FS runs mutating fs ops, honoring Mode (dry-run mode), escalating priv

@@ -9,7 +9,7 @@ Spec at the repo root. Every top-level key defines a profile block. Schema:
 First line of `che.yml`:
 
 ```yaml
-# yaml-language-server: $schema=https://gitlab.com/konradodwrot/go/che/-/raw/main/assets/data/che.schema.json
+# yaml-language-server: $schema=https://gitlab.com/konradodwrot/go-modules/-/raw/main/che/assets/data/che.schema.json
 ```
 
 Pin `main` to `v<X.Y.Z>` to match the installed che: each release tag
@@ -20,7 +20,7 @@ snapshots the schema, also attached as a release asset.
 Every construct in one spec (schema-validated by che's test suite):
 
 ```yaml
-# yaml-language-server: $schema=https://gitlab.com/konradodwrot/go/che/-/raw/main/assets/data/che.schema.json
+# yaml-language-server: $schema=https://gitlab.com/konradodwrot/go-modules/-/raw/main/che/assets/data/che.schema.json
 base:
   include:
     link:

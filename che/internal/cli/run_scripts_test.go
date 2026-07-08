@@ -5,7 +5,7 @@ package cli
 import (
 	"testing"
 
-	"gitlab.com/konradodwrot/go/che/internal/testutil"
+	"gitlab.com/konradodwrot/go-modules/che/internal/testutil"
 )
 
 // run-scripts: dry-run logs each script's abs path, no exec.

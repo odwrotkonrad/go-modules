@@ -6,7 +6,7 @@ import (
 	"fmt"
 	"os"
 
-	"gitlab.com/konradodwrot/go/cruft/get-term-open-files-with/lib"
+	"gitlab.com/konradodwrot/go-modules/get-term-open-files-with/lib"
 )
 
 const usage = `usage: get-term-open-files-with <any|vscode|kitty>

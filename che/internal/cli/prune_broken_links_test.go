@@ -5,7 +5,7 @@ package cli
 import (
 	"testing"
 
-	"gitlab.com/konradodwrot/go/che/internal/testutil"
+	"gitlab.com/konradodwrot/go-modules/che/internal/testutil"
 )
 
 // prune-links: logs scanned root, fresh fixture has nothing to remove.

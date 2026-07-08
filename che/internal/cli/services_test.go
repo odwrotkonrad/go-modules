@@ -5,7 +5,7 @@ package cli
 import (
 	"testing"
 
-	"gitlab.com/konradodwrot/go/che/internal/testutil"
+	"gitlab.com/konradodwrot/go-modules/che/internal/testutil"
 )
 
 // each services subcommand resolves profile services (fixture: one, otelcol, a system daemon) then dispatches. dry-run logs the full target.

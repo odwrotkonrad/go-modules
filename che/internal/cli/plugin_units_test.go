@@ -9,7 +9,7 @@ import (
 	"strings"
 	"testing"
 
-	"gitlab.com/konradodwrot/go/che/internal/testutil"
+	"gitlab.com/konradodwrot/go-modules/che/internal/testutil"
 )
 
 // a plugins `@url::profile` entry resolves into an extra unit anchored at

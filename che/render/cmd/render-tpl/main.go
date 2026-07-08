@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"os"
 
-	"gitlab.com/konradodwrot/go/render-files/render"
+	"gitlab.com/konradodwrot/go-modules/che/render/render"
 )
 
 const usage = `usage: render-tpl -f <template>

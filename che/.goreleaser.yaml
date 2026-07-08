@@ -3,8 +3,8 @@ version: 2
 
 project_name: che
 
-gitlab_urls:
-  use_job_token: true
+snapshot:
+  version_template: '{{ envOrDefault "MODULE_VERSION" "0.0.0-local" }}'
 
 builds:
   - id: che-linux
@@ -15,7 +15,63 @@ builds:
     flags:
       - -trimpath
     ldflags:
-      - -s -w -X gitlab.com/konradodwrot/go/che/internal/cli.version={{.Version}}
+      - -s -w -X gitlab.com/konradodwrot/go-modules/che/internal/cli.version={{.Version}}
+    env:
+      - CGO_ENABLED=1
+      - 'CC=zig cc -target {{ if eq .Arch "amd64" }}x86_64{{ else }}aarch64{{ end }}-linux-gnu'
+      - 'CXX=zig c++ -target {{ if eq .Arch "amd64" }}x86_64{{ else }}aarch64{{ end }}-linux-gnu'
+
+  - id: render-tpl-linux
+    main: ./render/cmd/render-tpl
+    binary: render-tpl
+    goos: [linux]
+    goarch: [amd64, arm64]
+    flags:
+      - -trimpath
+    ldflags:
+      - -s -w -X main.version={{.Version}}
+    env:
+      - CGO_ENABLED=1
+      - 'CC=zig cc -target {{ if eq .Arch "amd64" }}x86_64{{ else }}aarch64{{ end }}-linux-gnu'
+      - 'CXX=zig c++ -target {{ if eq .Arch "amd64" }}x86_64{{ else }}aarch64{{ end }}-linux-gnu'
+
+  - id: render-dirs-tree-linux
+    main: ./render/cmd/render-dirs-tree
+    binary: render-dirs-tree
+    goos: [linux]
+    goarch: [amd64, arm64]
+    flags:
+      - -trimpath
+    ldflags:
+      - -s -w -X main.version={{.Version}}
+    env:
+      - CGO_ENABLED=1
+      - 'CC=zig cc -target {{ if eq .Arch "amd64" }}x86_64{{ else }}aarch64{{ end }}-linux-gnu'
+      - 'CXX=zig c++ -target {{ if eq .Arch "amd64" }}x86_64{{ else }}aarch64{{ end }}-linux-gnu'
+
+  - id: render-makefile-doc-linux
+    main: ./render/cmd/render-makefile-doc
+    binary: render-makefile-doc
+    goos: [linux]
+    goarch: [amd64, arm64]
+    flags:
+      - -trimpath
+    ldflags:
+      - -s -w -X main.version={{.Version}}
+    env:
+      - CGO_ENABLED=1
+      - 'CC=zig cc -target {{ if eq .Arch "amd64" }}x86_64{{ else }}aarch64{{ end }}-linux-gnu'
+      - 'CXX=zig c++ -target {{ if eq .Arch "amd64" }}x86_64{{ else }}aarch64{{ end }}-linux-gnu'
+
+  - id: render-repo-group-index-linux
+    main: ./render/cmd/render-repo-group-index
+    binary: render-repo-group-index
+    goos: [linux]
+    goarch: [amd64, arm64]
+    flags:
+      - -trimpath
+    ldflags:
+      - -s -w -X main.version={{.Version}}
     env:
       - CGO_ENABLED=1
       - 'CC=zig cc -target {{ if eq .Arch "amd64" }}x86_64{{ else }}aarch64{{ end }}-linux-gnu'
@@ -25,7 +81,23 @@ archives:
   - id: che
     ids: [che-linux]
     formats: [tar.gz]
-    name_template: '{{ .ProjectName }}_{{ .Version }}_{{ .Os }}_{{ .Arch }}'
+    name_template: 'che_{{ .Version }}_{{ .Os }}_{{ .Arch }}'
+  - id: render-tpl
+    ids: [render-tpl-linux]
+    formats: [tar.gz]
+    name_template: 'render-tpl_{{ .Version }}_{{ .Os }}_{{ .Arch }}'
+  - id: render-dirs-tree
+    ids: [render-dirs-tree-linux]
+    formats: [tar.gz]
+    name_template: 'render-dirs-tree_{{ .Version }}_{{ .Os }}_{{ .Arch }}'
+  - id: render-makefile-doc
+    ids: [render-makefile-doc-linux]
+    formats: [tar.gz]
+    name_template: 'render-makefile-doc_{{ .Version }}_{{ .Os }}_{{ .Arch }}'
+  - id: render-repo-group-index
+    ids: [render-repo-group-index-linux]
+    formats: [tar.gz]
+    name_template: 'render-repo-group-index_{{ .Version }}_{{ .Os }}_{{ .Arch }}'
 
 checksum:
   name_template: checksums.txt
@@ -34,28 +106,6 @@ checksum:
     - glob: darwin-dist/*.tar.gz
     - glob: assets/data/che.schema.json
 
-changelog:
-  use: git
-  groups:
-    - title: Features
-      regexp: '^.*?feat(\(.+\))?!?:.*$'
-      order: 0
-    - title: Fixes
-      regexp: '^.*?fix(\(.+\))?!?:.*$'
-      order: 1
-    - title: Others
-      order: 999
-  filters:
-    exclude:
-      - '^docs:'
-      - '^test:'
-      - '^chore:'
-
 release:
-  gitlab:
-    owner: konradodwrot/go
-    name: che
-  extra_files:
-    - glob: darwin-dist/*.tar.gz
-    - glob: assets/data/che.schema.json
+  disable: true
 ##[<] 🤖🤖

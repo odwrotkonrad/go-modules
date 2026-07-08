@@ -8,7 +8,7 @@ import (
 	"slices"
 	"testing"
 
-	"gitlab.com/konradodwrot/go/che/internal/testutil"
+	"gitlab.com/konradodwrot/go-modules/che/internal/testutil"
 )
 
 // fixtureRepo commits a git repo from files plus che.yml fixture

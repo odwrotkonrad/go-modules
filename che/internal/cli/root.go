@@ -12,11 +12,11 @@ import (
 
 	"github.com/spf13/cobra"
 
-	"gitlab.com/konradodwrot/go/che/internal/fsutil"
-	"gitlab.com/konradodwrot/go/che/internal/host"
-	"gitlab.com/konradodwrot/go/che/internal/log"
-	"gitlab.com/konradodwrot/go/che/internal/plugin"
-	"gitlab.com/konradodwrot/go/che/internal/spec"
+	"gitlab.com/konradodwrot/go-modules/che/internal/fsutil"
+	"gitlab.com/konradodwrot/go-modules/che/internal/host"
+	"gitlab.com/konradodwrot/go-modules/che/internal/log"
+	"gitlab.com/konradodwrot/go-modules/che/internal/plugin"
+	"gitlab.com/konradodwrot/go-modules/che/internal/spec"
 )
 
 // unit is one loaded repo: units[0] the local repo, the rest plugin checkouts

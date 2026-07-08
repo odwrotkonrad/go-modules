@@ -6,7 +6,7 @@ import (
 	"slices"
 	"testing"
 
-	"gitlab.com/konradodwrot/go/che/internal/cli"
+	"gitlab.com/konradodwrot/go-modules/che/internal/cli"
 )
 
 // cli.Attach wires every subcommand to root.

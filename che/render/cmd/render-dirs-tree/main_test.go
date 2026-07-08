@@ -7,7 +7,7 @@ import (
 
 	git "github.com/go-git/go-git/v5"
 
-	"gitlab.com/konradodwrot/go/render-files/render"
+	"gitlab.com/konradodwrot/go-modules/che/render/render"
 )
 
 // [>] 🤖🤖

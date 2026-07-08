@@ -1,30 +1,14 @@
 ##[>] 🤖🤖
-#[what] Project's Makefile
+#[what] get-term-open-files-with module Makefile
 SHELL := zsh
 .SHELLFLAGS := -c
 GO ?= go
 BIN := get-term-open-files-with
 
 WRAPPERS :=
-COMMANDS := render-templates run-repo-ci-prepare-hooks run-repo-ci-precommit-all test build vet install release-check release-snapshot
+COMMANDS := test build vet install release-check release-snapshot
 
 .PHONY: $(WRAPPERS) $(COMMANDS)
-
-##[>] Docs [genai-include]
-#[what] render *.ontoRepo.tpl onto the repo (makefile.agents.md, repo-structure.md, CLAUDE.md, AGENTS.md, README.md)
-render-templates:
-	@che render-templates
-##[<] Docs
-
-##[>] CI [genai-include]
-#[what] install lefthook git hooks
-run-repo-ci-prepare-hooks:
-	@lefthook install --force
-
-#[what] run pre-commit hooks over all files (not just staged)
-run-repo-ci-precommit-all: run-repo-ci-prepare-hooks
-	@lefthook run pre-commit --all-files --force
-##[<] CI
 
 ##[>] Go [genai-include]
 #[what] run all tests

@@ -5,7 +5,7 @@ package cli
 import (
 	"testing"
 
-	"gitlab.com/konradodwrot/go/che/internal/testutil"
+	"gitlab.com/konradodwrot/go-modules/che/internal/testutil"
 )
 
 // mk-dirs: repo-tree config dirs plus profile extra-dir, under $HOME.

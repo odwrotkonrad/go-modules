@@ -5,7 +5,7 @@ package cli
 import (
 	"testing"
 
-	"gitlab.com/konradodwrot/go/che/internal/testutil"
+	"gitlab.com/konradodwrot/go-modules/che/internal/testutil"
 )
 
 // copy: *.ontoHost.cp into $HOME (marker stripped); archive existing dests, copy, chown root:wheel the daemon plist.

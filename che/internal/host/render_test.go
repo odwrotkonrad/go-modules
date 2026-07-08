@@ -8,8 +8,8 @@ import (
 	"strings"
 	"testing"
 
-	"gitlab.com/konradodwrot/go/che/internal/spec"
-	"gitlab.com/konradodwrot/go/render-files/render"
+	"gitlab.com/konradodwrot/go-modules/che/internal/spec"
+	"gitlab.com/konradodwrot/go-modules/che/render/render"
 )
 
 // writeRepo writes rel->content under a temp repo root, returns the root.

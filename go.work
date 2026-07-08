@@ -1,0 +1,7 @@
+go 1.26.3
+
+use (
+	./che
+	./get-os-open-files-with
+	./get-term-open-files-with
+)

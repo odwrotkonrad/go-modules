@@ -1,5 +1,5 @@
 ##[>] 🤖🤖
-#[what] Project's Makefile
+#[what] che module Makefile
 SHELL := zsh
 .SHELLFLAGS := -c
 GO ?= go
@@ -7,29 +7,15 @@ CC ?= clang
 BIN := che
 
 WRAPPERS :=
-COMMANDS := render-templates render-docs run-repo-ci-prepare-hooks run-repo-ci-precommit-all test build vet install create-tag release-check release-darwin release-snapshot
+COMMANDS := render-docs test build vet install release-check release-darwin release-snapshot
 
 .PHONY: $(WRAPPERS) $(COMMANDS)
 
 ##[>] Docs [genai-include]
-#[what] render *.ontoRepo.tpl onto the repo (makefile.agents.md, repo-structure.md, CLAUDE.md, AGENTS.md, README.md) with this checkout's build
-render-templates: build
-	@dist/$(BIN) render-templates
-
 #[what] generate docs/cli.md + assets/data/{che.schema.json,cli-usage.md} from the Go source
 render-docs:
 	CC=$(CC) $(GO) run ./internal/docgen
 ##[<] Docs
-
-##[>] CI [genai-include]
-#[what] install lefthook git hooks
-run-repo-ci-prepare-hooks:
-	@lefthook install --force
-
-#[what] run pre-commit hooks over all files (not just staged)
-run-repo-ci-precommit-all: run-repo-ci-prepare-hooks
-	@lefthook run pre-commit --all-files --force
-##[<] CI
 
 ##[>] Go [genai-include]
 #[what] run all tests
@@ -50,11 +36,6 @@ install:
 ##[<] Go
 
 ##[>] Release [genai-include]
-#[what] create the release + git tag from BRANCH at REF via release-cli
-#[args] BRANCH REF DEFAULT_BRANCH
-create-tag:
-	@ci/create-tag.zsh $(BRANCH) $(REF) $(DEFAULT_BRANCH)
-
 #[what] validate both goreleaser configs
 release-check:
 	goreleaser check -f .goreleaser.yaml
@@ -64,7 +45,7 @@ release-check:
 release-darwin:
 	goreleaser release --snapshot --clean -f .goreleaser.darwin.yaml
 
-#[what] local 4-target snapshot: darwin (native) + linux (zig), no publish
+#[what] local snapshot of all module binaries: darwin (native) + linux (zig), no publish
 release-snapshot: release-darwin
 	goreleaser release --snapshot --clean -f .goreleaser.yaml
 ##[<] Release

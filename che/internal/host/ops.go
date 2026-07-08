@@ -12,8 +12,8 @@ import (
 	"syscall"
 	"time"
 
-	"gitlab.com/konradodwrot/go/che/internal/fsutil"
-	"gitlab.com/konradodwrot/go/che/internal/spec"
+	"gitlab.com/konradodwrot/go-modules/che/internal/fsutil"
+	"gitlab.com/konradodwrot/go-modules/che/internal/spec"
 )
 
 // Bin is che's binary name, carried in per-run backup archive filenames.

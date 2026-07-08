@@ -55,7 +55,7 @@ func yamlInstance(t *testing.T, b []byte) any {
 // workspace checkout.
 func TestSchemaValidatesRealSpecs(t *testing.T) {
 	sch := compileSchema(t)
-	paths := []string{"../../che.yml"}
+	paths := []string{"../../../che.yml"}
 	fixtures, err := filepath.Glob("../testutil/specs/*.yml")
 	if err != nil {
 		t.Fatal(err)

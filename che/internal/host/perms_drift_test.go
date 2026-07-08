@@ -8,8 +8,8 @@ import (
 	"strings"
 	"testing"
 
-	"gitlab.com/konradodwrot/go/che/internal/spec"
-	"gitlab.com/konradodwrot/go/che/internal/testutil"
+	"gitlab.com/konradodwrot/go-modules/che/internal/spec"
+	"gitlab.com/konradodwrot/go-modules/che/internal/testutil"
 )
 
 // extraDir builds a mkdirs FileItem for an absolute dest carrying chmod.

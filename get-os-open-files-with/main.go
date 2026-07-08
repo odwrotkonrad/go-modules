@@ -6,7 +6,7 @@ import (
 	"fmt"
 	"os"
 
-	"gitlab.com/konradodwrot/go/cruft/get-os-open-files-with/lib"
+	"gitlab.com/konradodwrot/go-modules/get-os-open-files-with/lib"
 )
 
 const usage = `usage: get-os-open-files-with

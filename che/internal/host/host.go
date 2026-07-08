@@ -8,8 +8,8 @@ import (
 	"path/filepath"
 	"strings"
 
-	"gitlab.com/konradodwrot/go/che/internal/fsutil"
-	"gitlab.com/konradodwrot/go/che/internal/log"
+	"gitlab.com/konradodwrot/go-modules/che/internal/fsutil"
+	"gitlab.com/konradodwrot/go-modules/che/internal/log"
 )
 
 // DryRunMode selects how a dry run reports: off (real run), delta (only dests

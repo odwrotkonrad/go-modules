@@ -344,7 +344,7 @@
       "type": "object"
     }
   },
-  "$id": "https://gitlab.com/konradodwrot/go/che/-/raw/main/assets/data/che.schema.json",
+  "$id": "https://gitlab.com/konradodwrot/go-modules/-/raw/main/che/assets/data/che.schema.json",
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "additionalProperties": {
     "$ref": "#/$defs/profile"

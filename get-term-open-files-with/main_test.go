@@ -9,7 +9,7 @@ import (
 	"path/filepath"
 	"testing"
 
-	"gitlab.com/konradodwrot/go/cruft/get-term-open-files-with/lib"
+	"gitlab.com/konradodwrot/go-modules/get-term-open-files-with/lib"
 )
 
 func readTestdata(t *testing.T, name string) []byte {

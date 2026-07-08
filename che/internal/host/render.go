@@ -7,8 +7,8 @@ import (
 	"path/filepath"
 	"strings"
 
-	"gitlab.com/konradodwrot/go/che/internal/spec"
-	"gitlab.com/konradodwrot/go/render-files/render"
+	"gitlab.com/konradodwrot/go-modules/che/internal/spec"
+	"gitlab.com/konradodwrot/go-modules/che/render/render"
 )
 
 // repoFileMode: repo-rendered dests are plain repo files (git-tracked, group-writable).

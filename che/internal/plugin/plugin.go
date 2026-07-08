@@ -10,7 +10,7 @@ import (
 	"path/filepath"
 	"strings"
 
-	"gitlab.com/konradodwrot/go/che/internal/log"
+	"gitlab.com/konradodwrot/go-modules/che/internal/log"
 )
 
 // Dir is the managed cache checkout path for url:

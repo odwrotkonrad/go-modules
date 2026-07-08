@@ -5,7 +5,7 @@ import (
 	"path/filepath"
 	"testing"
 
-	"gitlab.com/konradodwrot/go/render-files/lib"
+	"gitlab.com/konradodwrot/go-modules/che/render/lib"
 )
 
 // [>] 🤖🤖

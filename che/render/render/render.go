@@ -18,7 +18,7 @@ import (
 	git "github.com/go-git/go-git/v5"
 	"github.com/hairyhenderson/gomplate/v4"
 
-	"gitlab.com/konradodwrot/go/render-files/lib"
+	"gitlab.com/konradodwrot/go-modules/che/render/lib"
 )
 
 // opRetryDelays: backoff between op-resolve attempts that hit a vault rate limit.
