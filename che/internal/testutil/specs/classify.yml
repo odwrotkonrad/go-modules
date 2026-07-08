@@ -1,0 +1,19 @@
+base:
+  include:
+    link:
+      - HOME/.config/zsh/**
+      - HOME/.config/git/**
+      - etc/zshrc
+      - etc/zsh/**
+    copy:
+      - files: [HOME/.config/zsh/**, Library/LaunchDaemons/otelcol.plist*]
+    renderTemplates:
+      - files: [root/HOME/.config/zsh/**]
+
+cli/macos:
+  options: {autoExec: true}
+  mixinProfiles: [base]
+
+desktop/macos:
+  options: {autoExec: true}
+  mixinProfiles: [base]

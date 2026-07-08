@@ -1,0 +1,26 @@
+base:
+  include:
+    link:
+      - etc/zshrc
+      - etc/zsh/**
+      - HOME/.config/extra/**
+      - HOME/.config/oneoff/**
+    copy:
+      - files:
+          - {source: HOME/.config/zsh/c.ontoHost.cp, dest: [~/.config/zsh/c]}
+    runScripts:
+      - ci/zsh/scripts/installs/10-brew.zsh
+      - ci/zsh/scripts/installs/20-foo.zsh
+    services: [otelcol, grafana]
+
+cli/macos:
+  options: {autoExec: true}
+  mixinProfiles: [base]
+  exclude:
+    link:
+      - etc/zsh/**
+    copy:
+      - HOME/.config/zsh/c.ontoHost.cp
+    runScripts:
+      - ci/zsh/scripts/installs/20-foo.zsh
+    services: [graf*]

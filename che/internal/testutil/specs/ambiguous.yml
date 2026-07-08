@@ -1,0 +1,16 @@
+repo:
+  options: {autoExec: true}
+  include:
+    renderTemplates:
+      - files:
+          - source: templates/1-env/local.env.ontoRepo.tpl
+            dest:
+              - {path: .env, options: {writeType: mergeUpsert}}
+other:
+  options: {autoExec: true}
+  include:
+    renderTemplates:
+      - files:
+          - source: templates/1-env/local.env.ontoRepo.tpl
+            dest:
+              - {path: .env2, options: {writeType: mergeUpsert}}

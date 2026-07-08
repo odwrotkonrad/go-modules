@@ -1,0 +1,31 @@
+##[>] 🤖🤖
+version: 2
+
+project_name: che
+
+dist: darwin-dist
+
+builds:
+  - id: che-darwin
+    main: .
+    binary: che
+    goos: [darwin]
+    goarch: [amd64, arm64]
+    flags:
+      - -trimpath
+    ldflags:
+      - -s -w -X gitlab.com/konradodwrot/go/che/internal/cli.version={{.Version}}
+    env:
+      - CGO_ENABLED=1
+      - CC=cc
+      - CXX=c++
+
+archives:
+  - id: che
+    ids: [che-darwin]
+    formats: [tar.gz]
+    name_template: '{{ .ProjectName }}_{{ .Version }}_{{ .Os }}_{{ .Arch }}'
+
+release:
+  disable: true
+##[<] 🤖🤖

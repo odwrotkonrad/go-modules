@@ -1,0 +1,11 @@
+base:
+  include:
+    runScripts:
+      - ci/zsh/scripts/installs/*.zsh
+
+cli/macos:
+  options: {autoExec: true}
+  mixinProfiles: [base]
+  exclude:
+    runScripts:
+      - ci/zsh/scripts/installs/20-foo.zsh

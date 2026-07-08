@@ -1,0 +1,7 @@
+a:
+  mixinProfiles: [b]
+b:
+  mixinProfiles: [a]
+cli/macos:
+  options: {autoExec: true}
+  mixinProfiles: [a]
