@@ -361,7 +361,7 @@ func TestEligibleForceOneUndefined(t *testing.T) {
 	eligibleErr(t, s, "cli/linux", false, osEval("macos"))
 }
 
-// TestEligibleForceAll: CHE_EXEC_IF_ALWAYS_TRUE makes every execIf pass;
+// TestEligibleForceAll: CHE_OMIT_EXEC_IF makes every execIf pass;
 // non-autoExec profiles stay out of the list.
 func TestEligibleForceAll(t *testing.T) {
 	s := loadSpec(t, "che")
