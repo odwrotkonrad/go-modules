@@ -89,6 +89,18 @@ func TestComposeMergeUpsert(t *testing.T) {
 	}
 }
 
+func TestComposeRaw(t *testing.T) {
+	got := string(Compose(Composition{
+		Body:       []byte("-----BEGIN OPENSSH PRIVATE KEY-----\nabc\n-----END OPENSSH PRIVATE KEY-----\n"),
+		Opts:       Options{WriteType: WriteTypeRaw},
+		HeaderDest: "/home/ko/.ssh/id_access",
+		TmplName:   "id_access.ontoHost.tpl",
+	}))
+	if got != "-----BEGIN OPENSSH PRIVATE KEY-----\nabc\n-----END OPENSSH PRIVATE KEY-----\n" {
+		t.Errorf("Compose raw = %q", got)
+	}
+}
+
 func TestMergeUpsertEnv(t *testing.T) {
 	rendered := []byte("A=default\nB=default\n# comment\n\n")
 	existing := []byte("B=kept\nC=extra\n")

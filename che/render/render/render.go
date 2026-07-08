@@ -104,7 +104,9 @@ func opResolver(ctx context.Context) func(string) (string, error) {
 // Options are per-dest render options, unmarshaled directly from che.yml's
 // per-dest `options:` mapping. WriteType selects how the rendered body lands:
 // "" (overwrite, default: Header + body) | "mergeUpsert" (env KEY=VALUE union
-// under Existing). RenderReferencedFiles inlines @-includes (overwrite only).
+// under Existing) | "raw" (body verbatim, no autogen header: dests whose format
+// forbids comments, e.g. private keys). RenderReferencedFiles inlines
+// @-includes (overwrite only).
 type Options struct {
 	WriteType             string `yaml:"writeType"`
 	RenderReferencedFiles bool   `yaml:"renderReferencedFiles"`
@@ -112,6 +114,9 @@ type Options struct {
 
 // WriteTypeMergeUpsert is the WriteType that merges env KEY=VALUE under the existing dest.
 const WriteTypeMergeUpsert = "mergeUpsert"
+
+// WriteTypeRaw is the WriteType that writes the rendered body verbatim, no autogen header.
+const WriteTypeRaw = "raw"
 
 // Composition is one dest's inputs for Compose: the rendered Body plus how to
 // shape it into the final file. Existing is the dest's current content (read by
@@ -126,12 +131,16 @@ type Composition struct {
 }
 
 // Compose shapes a rendered Body into the final dest bytes per its options:
-// mergeUpsert merges env KEY=VALUE under Existing (no header); overwrite (default)
-// writes Header + Body, inlining @-includes when RenderReferencedFiles is set.
-// Pure: no file writes (che owns writing).
+// mergeUpsert merges env KEY=VALUE under Existing (no header); raw passes Body
+// through verbatim; overwrite (default) writes Header + Body, inlining
+// @-includes when RenderReferencedFiles is set. Pure: no file writes (che owns
+// writing).
 func Compose(c Composition) []byte {
 	if c.Opts.WriteType == WriteTypeMergeUpsert {
 		return mergeUpsertEnv(c.Existing, c.Body)
+	}
+	if c.Opts.WriteType == WriteTypeRaw {
+		return c.Body
 	}
 	var out bytes.Buffer
 	out.WriteString(header(c.HeaderDest, c.TmplName))

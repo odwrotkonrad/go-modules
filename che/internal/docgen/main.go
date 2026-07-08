@@ -234,8 +234,8 @@ func schema() map[string]any {
 								"additionalProperties": false,
 								"properties": map[string]any{
 									"writeType": map[string]any{
-										"description": "how the rendered body lands: overwrite (default: header + body) | mergeUpsert (env KEY=VALUE union under the existing dest)",
-										"enum":        []any{"", "mergeUpsert"},
+										"description": "how the rendered body lands: overwrite (default: header + body) | mergeUpsert (env KEY=VALUE union under the existing dest) | raw (body verbatim, no autogen header)",
+										"enum":        []any{"", "mergeUpsert", "raw"},
 									},
 									"renderReferencedFiles": map[string]any{
 										"description": "inline @-includes into the rendered body (overwrite only)",
