@@ -8,7 +8,7 @@ require (
 	github.com/go-git/go-git/v5 v5.19.1
 	github.com/santhosh-tekuri/jsonschema/v6 v6.0.2
 	github.com/spf13/cobra v1.10.2
-	gitlab.com/konradodwrot/go/render-files v0.0.5
+	gitlab.com/konradodwrot/go/render-files v0.0.15
 	gopkg.in/yaml.v3 v3.0.1
 )
 
