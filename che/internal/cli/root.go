@@ -4,24 +4,112 @@ package cli
 
 import (
 	"fmt"
+	"maps"
 	"os"
 	"path/filepath"
+	"slices"
 	"strings"
 
 	"github.com/spf13/cobra"
 
 	"gitlab.com/konradodwrot/go/che/internal/fsutil"
 	"gitlab.com/konradodwrot/go/che/internal/host"
+	"gitlab.com/konradodwrot/go/che/internal/log"
+	"gitlab.com/konradodwrot/go/che/internal/plugin"
 	"gitlab.com/konradodwrot/go/che/internal/spec"
 )
 
-// Built once in PersistentPreRunE, read by each RunE.
+// unit is one loaded repo: units[0] the local repo, the rest plugin checkouts
+// (ref carries their @url::profile form, env the entry's exported envs).
+type unit struct {
+	host host.Host
+	res  spec.Resolved
+	ref  string
+	env  map[string]string
+}
+
+// forEachUnit runs op over every unit: the local repo first, then each plugin
+// grouped (announce, pull, execIf, resolve, op), skipped ones dropped.
+func forEachUnit(op func(unit) error) error {
+	for _, u := range units {
+		if err := u.withEnv(func() error { return op(u) }); err != nil {
+			return err
+		}
+	}
+	for _, p := range pluginRefs {
+		u, ok, err := ensurePlugin(p)
+		if err != nil {
+			return err
+		}
+		if !ok {
+			continue
+		}
+		if err := u.withEnv(func() error { return op(u) }); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+// ensurePlugin returns p's unit, building it on first use (announced) and
+// caching the outcome (ok=false: skipped by execIf).
+func ensurePlugin(p spec.PluginRef) (unit, bool, error) {
+	if u, seen := pluginUnits[p.String()]; seen {
+		if u == nil {
+			return unit{}, false, nil
+		}
+		return *u, true, nil
+	}
+	log.Msg("plugin("+p.Profile+")", fmt.Sprintf("run %s", p), log.Off)
+	u, ok, err := buildPlugin(p, pluginCfg.home, pluginCfg.mode, pluginCfg.forceAll, pluginCfg.eval)
+	if err != nil {
+		return unit{}, false, err
+	}
+	if !ok {
+		pluginUnits[p.String()] = nil
+		return unit{}, false, nil
+	}
+	pluginUnits[p.String()] = &u
+	return u, true, nil
+}
+
+// withEnv runs fn with u.env exported into the process env (host values
+// shadowed), restoring the prior state after. No-op when u.env is empty.
+func (u unit) withEnv(fn func() error) error {
+	if len(u.env) == 0 {
+		return fn()
+	}
+	for _, k := range slices.Sorted(maps.Keys(u.env)) {
+		prev, had := os.LookupEnv(k)
+		if err := os.Setenv(k, u.env[k]); err != nil {
+			return err
+		}
+		defer func() {
+			if had {
+				os.Setenv(k, prev)
+			} else {
+				os.Unsetenv(k)
+			}
+		}()
+	}
+	return fn()
+}
+
+// Built once in PersistentPreRunE, read by each RunE. Plugin units build
+// lazily (ensurePlugin), after the local unit's ops ran.
 var (
 	dryRunMode   string
 	profileForce string
 	omitExecIf   bool
-	theHost      host.Host
-	resolved     spec.Resolved
+	units        []unit
+	pluginRefs   []spec.PluginRef
+	pluginUnits  map[string]*unit
+	pluginCfg    struct {
+		home     string
+		mode     host.DryRunMode
+		forceAll bool
+		eval     func(string) (bool, error)
+	}
 )
 
 // version is injected at build time via -ldflags -X.
@@ -90,7 +178,8 @@ func build() error {
 		forceOne = os.Getenv("CHE_PROFILE")
 	}
 	forceAll := omitExecIf || os.Getenv("CHE_OMIT_EXEC_IF") != ""
-	profiles, err := sp.EligibleProfiles(forceOne, forceAll, spec.NewEvaluator().EvalExecIf)
+	eval := spec.NewEvaluator().EvalExecIf
+	profiles, err := sp.EligibleProfiles(forceOne, forceAll, eval)
 	if err != nil {
 		return err
 	}
@@ -99,9 +188,47 @@ func build() error {
 	if err != nil {
 		return err
 	}
-	theHost = h
-	resolved = res
+	units = []unit{{host: h, res: res}}
+	pluginRefs = res.Plugins
+	pluginUnits = map[string]*unit{}
+	pluginCfg.home, pluginCfg.mode, pluginCfg.forceAll, pluginCfg.eval = home, mode, forceAll, eval
 	return nil
+}
+
+// buildPlugin ensures the plugin checkout, loads its spec, then inside the
+// entry's env overlay gates on the remote profile's execIf (fail -> skipped,
+// logged) and resolves it anchored at the checkout. Nested plugin refs inside
+// the remote profile are ignored (v1).
+func buildPlugin(p spec.PluginRef, home string, mode host.DryRunMode, forceAll bool, eval func(string) (bool, error)) (unit, bool, error) {
+	checkout, err := plugin.Ensure(home, p.URL, p.Profile)
+	if err != nil {
+		return unit{}, false, err
+	}
+	psp, err := spec.Load(filepath.Join(checkout, "che.yml"))
+	if err != nil {
+		return unit{}, false, err
+	}
+	u := unit{host: host.New(checkout, home, p.Profile, mode), ref: p.String(), env: p.Env}
+	var pass bool
+	err = u.withEnv(func() error {
+		var err error
+		if pass, err = psp.ExecIfPass(p.Profile, forceAll, eval); err != nil || !pass {
+			return err
+		}
+		u.res, err = psp.Resolve([]string{p.Profile}, u.host.Root)
+		return err
+	})
+	if err != nil {
+		return unit{}, false, fmt.Errorf("plugin %s: %w", p, err)
+	}
+	if !pass {
+		log.Msg("plugin("+p.Profile+")", fmt.Sprintf("skip %s (execIf failed)", p), log.Off)
+		return unit{}, false, nil
+	}
+	if len(u.res.Plugins) > 0 {
+		log.Msg("plugin("+p.Profile+")", fmt.Sprintf("%s: nested plugin refs ignored: %v", p, u.res.Plugins), log.Off)
+	}
+	return u, true, nil
 }
 
 // findRepoRoot resolves repo root from git toplevel of cwd, verifies che.yml

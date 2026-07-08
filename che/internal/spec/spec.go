@@ -14,6 +14,7 @@ import (
 	"gopkg.in/yaml.v3"
 
 	"gitlab.com/konradodwrot/go/che/internal/fsutil"
+	"gitlab.com/konradodwrot/go/che/internal/log"
 	"gitlab.com/konradodwrot/go/render-files/render"
 )
 
@@ -47,12 +48,42 @@ type Raw struct {
 	order    []string               // profile names in declaration order
 }
 
+// PluginRef is one parsed plugins entry: a profile defined in a remote repo,
+// loaded and anchored at its own checkout, optionally with envs exported
+// around everything done for its unit.
+type PluginRef struct {
+	URL     string
+	Profile string
+	Env     map[string]string
+}
+
+// String renders the canonical `@<giturl>::<profile>` form (env not rendered).
+func (p PluginRef) String() string { return "@" + p.URL + "::" + p.Profile }
+
+// pluginEntry is one plugins list item: a bare `@<giturl>::<profile>` string,
+// or a {ref, env} object.
+type pluginEntry struct {
+	Ref string            `yaml:"ref"`
+	Env map[string]string `yaml:"env"`
+}
+
+func (p *pluginEntry) UnmarshalYAML(value *yaml.Node) error {
+	if value.Kind == yaml.ScalarNode {
+		p.Ref = value.Value
+		return nil
+	}
+	type alias pluginEntry
+	return value.Decode((*alias)(p))
+}
+
 // profileSpec is one block: options self-describe eligibility (autoExec,
-// execIf), mixinProfiles composed in order, then include (additive) and
-// exclude (subtractive glob filter, applied last, wins).
+// execIf), mixinProfiles composed in order (local names only), plugins
+// collected as remote-profile refs, then include (additive) and exclude
+// (subtractive glob filter, applied last, wins).
 type profileSpec struct {
 	Options       ProfileOptions `yaml:"options"`
 	MixinProfiles []string       `yaml:"mixinProfiles"`
+	Plugins       []pluginEntry  `yaml:"plugins"`
 	Include       includeSet     `yaml:"include"`
 	Exclude       excludeSet     `yaml:"exclude"`
 }
@@ -148,13 +179,14 @@ type FileItem struct {
 
 // Resolved is the classified, repo-relative selection the ops consume.
 type Resolved struct {
-	Links     []FileItem // link op: regular files minus templates/copies/.gitkeep
-	Copies    []FileItem // copy op: *.ontoHost.cp
-	Templates []FileItem // render op: *.tpl, dest path decides host vs repo
-	Dirs      []string   // every ancestor dir of links+copies+derived-dest templates, plus mkdirs
-	ExtraDirs []FileItem // mkdirs only (live dest entries), one per path, carrying perms
-	Services  []string   // service names
-	Scripts   []string   // script entries in spec order
+	Links     []FileItem  // link op: regular files minus templates/copies/.gitkeep
+	Copies    []FileItem  // copy op: *.ontoHost.cp
+	Templates []FileItem  // render op: *.tpl, dest path decides host vs repo
+	Dirs      []string    // every ancestor dir of links+copies+derived-dest templates, plus mkdirs
+	ExtraDirs []FileItem  // mkdirs only (live dest entries), one per path, carrying perms
+	Services  []string    // service names
+	Scripts   []string    // script entries in spec order
+	Plugins   []PluginRef // profile-level plugins entries, composition order
 }
 
 // globSet is an ordered list of op globs, each carrying its group's perms
@@ -197,9 +229,10 @@ type effective struct {
 	richCopy  []FileItem // rich-form copy entries
 	richTmpl  []FileItem // rich-form render-templates entries (repo-root-relative)
 	dirs      []FileItem // mkdirs: glob forms expanded to one item per path, rich carry perms
-	scripts   []string   // script paths (order = run order)
-	services  []string   // service names
-	exclude   excludeSet // accumulated exclude globs (applied last, wins)
+	scripts   []string    // script paths (order = run order)
+	services  []string    // service names
+	plugins   []PluginRef // profile-level plugin refs (composition order)
+	exclude   excludeSet  // accumulated exclude globs (applied last, wins)
 }
 
 // Load parses che.yml: every top-level key is a defined profile block.
@@ -227,6 +260,17 @@ func Load(path string) (*Raw, error) {
 		s.order = append(s.order, key)
 	}
 	return s, nil
+}
+
+// parsePluginRef parses one `@<giturl>::<profile>` ref: last `::` splits,
+// both parts required.
+func parsePluginRef(entry string) (PluginRef, error) {
+	raw := strings.TrimPrefix(entry, "@")
+	i := strings.LastIndex(raw, "::")
+	if !strings.HasPrefix(entry, "@") || i <= 0 || i+2 >= len(raw) {
+		return PluginRef{}, fmt.Errorf("plugins entry %q: want @<giturl>::<profile>", entry)
+	}
+	return PluginRef{URL: raw[:i], Profile: raw[i+2:]}, nil
 }
 
 // EligibleProfiles lists the profiles to Resolve, in declaration order:
@@ -273,7 +317,19 @@ func (r *Raw) EligibleProfiles(forceOne string, forceAll bool, eval func(expr st
 	return out, nil
 }
 
-// allPass reports whether every execIf expression of profile name passes.
+// ExecIfPass reports whether the named profile's execIf expressions all pass.
+// name must be a defined profile.
+func (r *Raw) ExecIfPass(name string, forceAll bool, eval func(expr string) (bool, error)) (bool, error) {
+	ps, ok := r.profiles[name]
+	if !ok {
+		return false, fmt.Errorf("profile %q is not defined in che.yml (defined: %v)",
+			name, slices.Sorted(maps.Keys(r.profiles)))
+	}
+	return allPass(name, ps.Options.ExecIf, forceAll, eval)
+}
+
+// allPass reports whether every execIf expression of profile name passes,
+// logging each evaluated expression's outcome.
 func allPass(name string, exprs []string, forceAll bool, eval func(expr string) (bool, error)) (bool, error) {
 	if forceAll {
 		return true, nil
@@ -283,6 +339,11 @@ func allPass(name string, exprs []string, forceAll bool, eval func(expr string) 
 		if err != nil {
 			return false, fmt.Errorf("profile %q execIf %q: %w", name, expr, err)
 		}
+		verdict := "reject"
+		if ok {
+			verdict = "pass"
+		}
+		log.Msg("execIf("+verdict+")", fmt.Sprintf("profile %s: %s", name, expr), log.Off)
 		if !ok {
 			return false, nil
 		}
@@ -326,6 +387,7 @@ func (r *Raw) Resolve(profiles []string, root string) (Resolved, error) {
 		Services:  fsutil.ExpandAll(eff.services),
 		Copies:    eff.richCopy,
 		Templates: eff.richTmpl,
+		Plugins:   eff.plugins,
 	}
 	if err := classify(root, eff, &res); err != nil {
 		return Resolved{}, err
@@ -516,6 +578,19 @@ func (r *Raw) mergeInto(eff *effective, name string, seen []string) error {
 	for _, m := range ps.MixinProfiles {
 		if err := r.mergeInto(eff, m, child); err != nil {
 			return err
+		}
+	}
+	for _, pe := range ps.Plugins {
+		ref, err := parsePluginRef(pe.Ref)
+		if err != nil {
+			return fmt.Errorf("profile %q: %w", name, err)
+		}
+		ref.Env = pe.Env
+		dup := slices.ContainsFunc(eff.plugins, func(q PluginRef) bool {
+			return q.URL == ref.URL && q.Profile == ref.Profile
+		})
+		if !dup {
+			eff.plugins = append(eff.plugins, ref)
 		}
 	}
 	in := ps.Include

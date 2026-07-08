@@ -31,8 +31,8 @@ func TestBuildProfileFlag(t *testing.T) {
 	if err := build(); err != nil {
 		t.Fatalf("build() errored: %v", err)
 	}
-	if theHost.Profile != "ontoRepo" {
-		t.Fatalf("Profile = %q, want ontoRepo (--profile forces one)", theHost.Profile)
+	if units[0].host.Profile != "ontoRepo" {
+		t.Fatalf("Profile = %q, want ontoRepo (--profile forces one)", units[0].host.Profile)
 	}
 	profileForce = "nonexistent"
 	if err := build(); err == nil {
@@ -49,7 +49,7 @@ func TestBuildDryRunEnvFallback(t *testing.T) {
 	if err := build(); err != nil {
 		t.Fatalf("build() errored: %v", err)
 	}
-	if !theHost.DryRunAll() {
+	if !units[0].host.DryRunAll() {
 		t.Fatal("DryRunAll() = false, want true (CHE_DRY_RUN=all from env)")
 	}
 }
