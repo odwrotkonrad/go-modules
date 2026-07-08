@@ -19,6 +19,7 @@ import (
 var (
 	dryRunMode   string
 	profileForce string
+	omitExecIf   bool
 	theHost      host.Host
 	resolved     spec.Resolved
 )
@@ -39,7 +40,7 @@ var RootCmd = &cobra.Command{
 	Use:     "che",
 	Version: version,
 	Short:   "Spec-driven config loader",
-	Long: `che resolves every eligible profile in che.yml (onlyIf predicates), then
+	Long: `che resolves every eligible profile in che.yml (execIf predicates), then
 loads the union of files/dirs/installs/services those profiles select.`,
 	SilenceUsage:  true,
 	SilenceErrors: true,
@@ -53,7 +54,9 @@ func init() {
 		"print mutating actions instead of executing them: delta (changed dests) | all (every dest)")
 	RootCmd.PersistentFlags().Lookup("dry-run").NoOptDefVal = "delta"
 	RootCmd.PersistentFlags().StringVar(&profileForce, "profile", "",
-		"run only this profile (onlyIf skipped, mixinOnly allowed)")
+		"run only this profile (autoExec skipped, execIf still enforced); env: CHE_PROFILE")
+	RootCmd.PersistentFlags().BoolVar(&omitExecIf, "omit-exec-if", false,
+		"treat every execIf predicate as passing; env: CHE_OMIT_EXEC_IF")
 }
 
 // build loads spec -> lists eligible profiles -> resolves union -> wires the
@@ -78,11 +81,16 @@ func build() error {
 	if err != nil {
 		return err
 	}
-	// --profile runs only that profile, onlyIf skipped (test/VM hook);
-	// CHE_ONLY_IF_ALWAYS_TRUE (truthy) makes every onlyIf pass; else the
-	// union of every eligible non-mixin profile.
-	forceAll := os.Getenv("CHE_ONLY_IF_ALWAYS_TRUE") != ""
-	profiles, err := sp.EligibleProfiles(profileForce, forceAll, spec.NewEvaluator().EvalOnlyIf)
+	// --profile (env CHE_PROFILE) runs only that profile, autoExec
+	// skipped but execIf still enforced; --omit-exec-if (env
+	// CHE_OMIT_EXEC_IF, truthy) makes every execIf pass; else the union of
+	// every autoExec profile passing execIf. Flags win over envs.
+	forceOne := profileForce
+	if forceOne == "" {
+		forceOne = os.Getenv("CHE_PROFILE")
+	}
+	forceAll := omitExecIf || os.Getenv("CHE_OMIT_EXEC_IF") != ""
+	profiles, err := sp.EligibleProfiles(forceOne, forceAll, spec.NewEvaluator().EvalExecIf)
 	if err != nil {
 		return err
 	}

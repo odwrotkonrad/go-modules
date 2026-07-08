@@ -12,7 +12,7 @@ import (
 	"gitlab.com/konradodwrot/go/che/internal/fsutil"
 )
 
-// Evaluator resolves onlyIf predicate expressions. Builtins are lazy (resolved
+// Evaluator resolves execIf predicate expressions. Builtins are lazy (resolved
 // only when referenced) and cached per run ([why] Virtualized shells out).
 type Evaluator struct {
 	builtins map[string]func() string
@@ -26,10 +26,10 @@ func NewEvaluator() *Evaluator {
 	}}
 }
 
-// EvalOnlyIf evaluates one expression: `<source>` (truthy: builtin iff "true",
+// EvalExecIf evaluates one expression: `<source>` (truthy: builtin iff "true",
 // env iff set non-empty) or `<source> == <literal>` (string compare, builtins
 // render as true/false).
-func (e *Evaluator) EvalOnlyIf(expr string) (bool, error) {
+func (e *Evaluator) EvalExecIf(expr string) (bool, error) {
 	parts := strings.Split(expr, "==")
 	switch len(parts) {
 	case 1:

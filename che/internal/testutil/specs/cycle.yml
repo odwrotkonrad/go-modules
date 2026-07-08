@@ -1,8 +1,7 @@
 a:
-  options: {mixinOnly: true}
   mixinProfiles: [b]
 b:
-  options: {mixinOnly: true}
   mixinProfiles: [a]
 cli/macos:
+  options: {autoExec: true}
   mixinProfiles: [a]

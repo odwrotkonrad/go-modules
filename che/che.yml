@@ -1,6 +1,6 @@
 ##[>] 🤖🤖
 ontoRepo:
-  options: {mixinOnly: true}
+  options: {autoExec: true}
   include:
     renderTemplates:
       - files:
