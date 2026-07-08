@@ -1,6 +1,5 @@
 ##[>] 🤖🤖
 ontoRepo:
-  options: {mixinOnly: true}
   include:
     renderTemplates:
       - files:
