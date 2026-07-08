@@ -6,36 +6,23 @@ Spec-driven dotfile configuration loader.
 
 ## Install
 
+Prebuilt binaries: every [release](https://gitlab.com/konradodwrot/go/che/-/releases)
+attaches `che_<version>_{darwin,linux}_{amd64,arm64}.tar.gz` (plus
+`checksums.txt` and `che.schema.json`). Download, extract, put `che` on
+`PATH`.
+
+From source:
+
 ```sh
 go install gitlab.com/konradodwrot/go/che@latest
 ```
 
-Requires CGO (the 1Password SDK) — a C compiler must be present at build time.
+Requires CGO (the 1Password SDK): a C compiler must be present at build time.
 
 ## Usage
 
 ```
-che [command]
-
-Available Commands:
-  copy             *.ontoHost.cp copy op
-  detect           print the detected profile and exit
-  link             symlink op (configs into system root)
-  mk-dirs          create repo-tree dirs + extra-dirs
-  prune-links      delete broken symlinks
-  render-templates *.tpl render op (dest path decides host vs repo)
-  run-scripts      run the profile's scripts, optionally filtered by name substring
-  services         load/unload/verify the profile's launchd services
-
-Flags:
-      --dry-run string[="delta"]   print mutating actions instead of executing them:
-                                   delta (changed dests) | all (every dest)
-      --omit-exec-if               treat every execIf predicate as passing; env: CHE_OMIT_EXEC_IF
-      --profile string             run only this profile (autoExec skipped, execIf still
-                                   enforced); env: CHE_PROFILE
-      --skip-plugins               skip plugins entries, load only the local repo; env:
-                                   CHE_SKIP_PLUGINS
-  -v, --version                    version for che
+{{ renderMarkdown "assets/data/cli-usage.md" }}
 ```
 
 ## Docs

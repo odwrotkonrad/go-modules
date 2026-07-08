@@ -16,7 +16,7 @@ COMMANDS := render-templates render-docs run-repo-ci-prepare-hooks run-repo-ci-p
 render-templates: build
 	@dist/$(BIN) render-templates
 
-#[what] generate docs/cli.md + assets/data/che.schema.json from the Go source
+#[what] generate docs/cli.md + assets/data/{che.schema.json,cli-usage.md} from the Go source
 render-docs:
 	CC=$(CC) $(GO) run ./internal/docgen
 ##[<] Docs

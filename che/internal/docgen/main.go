@@ -20,17 +20,21 @@ import (
 // Run from the repo root: `go run ./internal/docgen`.
 
 const (
-	schemaPath = "assets/data/che.schema.json"
-	cliDocPath = "docs/cli.md"
-	schemaID   = "https://gitlab.com/konradodwrot/go/che/-/raw/main/assets/data/che.schema.json"
+	schemaPath   = "assets/data/che.schema.json"
+	cliDocPath   = "docs/cli.md"
+	cliUsagePath = "assets/data/cli-usage.md"
+	schemaID     = "https://gitlab.com/konradodwrot/go/che/-/raw/main/assets/data/che.schema.json"
 )
 
 func main() {
 	must(os.MkdirAll("docs", 0o755))
+	root := cli.Attach()
 	must(os.WriteFile(schemaPath, schemaJSON(), 0o644))
-	must(os.WriteFile(cliDocPath, []byte(cliDoc(cli.Attach())), 0o644))
-	fmt.Println("wrote", schemaPath)
-	fmt.Println("wrote", cliDocPath)
+	must(os.WriteFile(cliDocPath, []byte(cliDoc(root)), 0o644))
+	must(os.WriteFile(cliUsagePath, []byte(cliUsage(root)), 0o644))
+	for _, p := range []string{schemaPath, cliDocPath, cliUsagePath} {
+		fmt.Println("wrote", p)
+	}
 }
 
 func must(err error) {
@@ -272,6 +276,38 @@ func cliDoc(root *cobra.Command) string {
 	for _, e := range envVars {
 		fmt.Fprintf(&b, "| `%s` | %s |\n", e[0], e[1])
 	}
+	return b.String()
+}
+
+// cliUsage renders the README usage listing: every command (subcommands
+// indented) with its Short, then the global flags. Included by the README
+// template via renderMarkdown.
+func cliUsage(root *cobra.Command) string {
+	var rows [][2]string
+	var collect func(cmd *cobra.Command, indent string)
+	collect = func(cmd *cobra.Command, indent string) {
+		subs := slices.Clone(cmd.Commands())
+		slices.SortFunc(subs, func(a, c *cobra.Command) int { return strings.Compare(a.Name(), c.Name()) })
+		for _, sub := range subs {
+			if !sub.IsAvailableCommand() {
+				continue
+			}
+			rows = append(rows, [2]string{indent + sub.Name(), sub.Short})
+			collect(sub, indent+"  ")
+		}
+	}
+	collect(root, "  ")
+	width := 0
+	for _, r := range rows {
+		width = max(width, len(r[0]))
+	}
+	var b strings.Builder
+	b.WriteString("che [command]\n\nAvailable Commands:\n")
+	for _, r := range rows {
+		fmt.Fprintf(&b, "%-*s  %s\n", width, r[0], r[1])
+	}
+	b.WriteString("\nFlags:\n")
+	b.WriteString(root.PersistentFlags().FlagUsages())
 	return b.String()
 }
 
