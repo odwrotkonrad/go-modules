@@ -40,6 +40,8 @@ Flags:
 
 ## Docs
 
+Rendered: <https://konradodwrot.gitlab.io/go/che> (GitLab Pages, `main`).
+
 - [docs/spec.md](docs/spec.md): `che.yml` reference (profiles, options, include/exclude, per-dest render options).
 - [docs/cli.md](docs/cli.md): generated CLI reference (commands, flags, env vars).
 - [assets/data/che.schema.json](assets/data/che.schema.json): generated JSON Schema for `che.yml`. Editor validation, first line of `che.yml`:
