@@ -12,7 +12,7 @@ import (
 func TestPruneCmd(t *testing.T) {
 	setupDryRun(t)
 	out := testutil.RunDry(t, PruneCmd, true)
-	testutil.WantLines(t, out, "prune-links(dry-run=delta): "+theHost.Root)
+	testutil.WantLines(t, out, "prune-links(dry-run=delta): "+units[0].host.Root)
 }
 
 // [<] 🤖🤖

@@ -70,6 +70,7 @@ internal
   fsutil
   host
   log
+  plugin
   spec
   testutil
     specs
