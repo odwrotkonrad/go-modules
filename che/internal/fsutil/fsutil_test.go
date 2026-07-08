@@ -102,8 +102,8 @@ func TestTrackedFilesMatchesCLI(t *testing.T) {
 		"root/etc/zsh/zshenv":                        "e\n",
 		"root/HOME/.config/zsh/.zshrc":               "hidden\n",
 		"root/HOME/.config/zsh/.gitkeep":             "",
-		"root/HOME/.config/git/config.host.tpl":      "tpl\n",
-		"root/Library/LaunchDaemons/x.plist.host.cp": "cp\n",
+		"root/HOME/.config/git/config.ontoHost.tpl":      "tpl\n",
+		"root/Library/LaunchDaemons/x.plist.ontoHost.cp": "cp\n",
 	})
 	root := filepath.Join(dir, "root")
 

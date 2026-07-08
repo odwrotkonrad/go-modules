@@ -87,10 +87,10 @@ func CheRepo(t *testing.T) (string, string) {
 		"che.yml":                                          Spec(t, "che"),
 		"root/etc/zshrc":                                   "zshrc\n",
 		"root/HOME/.config/zsh/.zshrc":                     "user zshrc\n",
-		"root/HOME/.config/zsh/c.host.cp":                  "copyme\n",
-		"root/HOME/.config/zsh/t.host.tpl":                 "plain template\n",
-		"templates/r.repo.tpl":                             "repo body\n",
-		"root/Library/LaunchDaemons/otelcol.plist.host.cp": "<plist/>\n",
+		"root/HOME/.config/zsh/c.ontoHost.cp":                  "copyme\n",
+		"root/HOME/.config/zsh/t.ontoHost.tpl":                 "plain template\n",
+		"templates/r.ontoRepo.tpl":                             "repo body\n",
+		"root/Library/LaunchDaemons/otelcol.plist.ontoHost.cp": "<plist/>\n",
 		"install/unit":                                     "#!/bin/sh\necho ran\n",
 	})
 	home := filepath.Join(dir, "home")
@@ -100,9 +100,10 @@ func CheRepo(t *testing.T) (string, string) {
 	return dir, home
 }
 
-// MockRepoEnv builds the mock che repo, chdirs in, exports CHE_PROFILES_FORCE_ONE + HOME
-// so build() resolves against it. Returns HOME (for asserting ~/ dest paths). Skips as
-// root (build resolves $HOME).
+// MockRepoEnv builds the mock che repo, chdirs in, exports HOME +
+// CHE_ONLY_IF_ALWAYS_TRUE so build() resolves against it (the fixture's
+// onlyIf profiles all pass). Returns HOME (for asserting ~/ dest paths).
+// Skips as root (build resolves $HOME).
 func MockRepoEnv(t *testing.T) string {
 	t.Helper()
 	if os.Geteuid() == 0 {
@@ -110,7 +111,7 @@ func MockRepoEnv(t *testing.T) string {
 	}
 	dir, home := CheRepo(t)
 	t.Chdir(dir)
-	t.Setenv("CHE_PROFILES_FORCE_ONE", CheProfile)
+	t.Setenv("CHE_ONLY_IF_ALWAYS_TRUE", "1")
 	t.Setenv("HOME", home)
 	t.Setenv("XDG_DATA_HOME", filepath.Join(home, ".local/share"))
 	return home

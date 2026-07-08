@@ -44,12 +44,12 @@ func resolveErr(t *testing.T, spec, profile string) {
 }
 
 var mergeFiles = map[string]string{
-	"root/etc/zshrc":                                   "zshrc\n",
-	"root/HOME/.config/zsh/.zshrc":                     "user zshrc\n",
-	"root/etc/grafana/grafana.ini":                     "ini\n",
-	"root/Library/LaunchDaemons/otelcol.plist.host.cp": "plist\n",
-	"ci/zsh/scripts/installs/10-brew.zsh":              "#!/bin/zsh\n",
-	"ci/zsh/scripts/installs/20-kitty.zsh":             "#!/bin/zsh\n",
+	"root/etc/zshrc":                                       "zshrc\n",
+	"root/HOME/.config/zsh/.zshrc":                         "user zshrc\n",
+	"root/etc/grafana/grafana.ini":                         "ini\n",
+	"root/Library/LaunchDaemons/otelcol.plist.ontoHost.cp": "plist\n",
+	"ci/zsh/scripts/installs/10-brew.zsh":                  "#!/bin/zsh\n",
+	"ci/zsh/scripts/installs/20-kitty.zsh":                 "#!/bin/zsh\n",
 }
 
 // find returns a pointer to the first item satisfying pred, or nil.
@@ -99,7 +99,7 @@ func TestResolveMerge(t *testing.T) {
 		t.Errorf("host missing grafana link: %v", host.Links)
 	}
 	// glob in a perm-bearing copy group stamps perms on matched files.
-	if c := find(host.Copies, relIs("Library/LaunchDaemons/otelcol.plist.host.cp")); c == nil || c.Chmod != "0600" {
+	if c := find(host.Copies, relIs("Library/LaunchDaemons/otelcol.plist.ontoHost.cp")); c == nil || c.Chmod != "0600" {
 		t.Errorf("perm-group glob did not stamp copy chmod: %+v", c)
 	}
 
@@ -121,15 +121,15 @@ func TestResolveMerge(t *testing.T) {
 
 func TestResolveClassify(t *testing.T) {
 	files := map[string]string{
-		"root/etc/zshrc":                                   "zshrc\n",
-		"root/etc/zsh/zshenv":                              "env\n",
-		"root/HOME/.config/zsh/.zshrc":                     "user zshrc\n",
-		"root/HOME/.config/git/config":                     "[user]\n",
-		"root/HOME/.config/zsh/x.host.cp":                  "copyme\n",
-		"root/HOME/.config/zsh/y.host.tpl":                 "tmpl\n",
-		"root/HOME/.config/zsh/.gitkeep":                   "",
-		"root/etc/grafana/grafana.ini":                     "ini\n",
-		"root/Library/LaunchDaemons/otelcol.plist.host.cp": "plist\n",
+		"root/etc/zshrc":                                       "zshrc\n",
+		"root/etc/zsh/zshenv":                                  "env\n",
+		"root/HOME/.config/zsh/.zshrc":                         "user zshrc\n",
+		"root/HOME/.config/git/config":                         "[user]\n",
+		"root/HOME/.config/zsh/x.ontoHost.cp":                  "copyme\n",
+		"root/HOME/.config/zsh/y.ontoHost.tpl":                 "tmpl\n",
+		"root/HOME/.config/zsh/.gitkeep":                       "",
+		"root/etc/grafana/grafana.ini":                         "ini\n",
+		"root/Library/LaunchDaemons/otelcol.plist.ontoHost.cp": "plist\n",
 	}
 	dir := fixtureRepo(t, "classify", files)
 	cs := resolve(t, dir, "cli/macos")
@@ -143,12 +143,12 @@ func TestResolveClassify(t *testing.T) {
 		t.Errorf("links = %v, want %v", rels(cs.Links), wantLinks)
 	}
 	if !slices.Equal(rels(cs.Copies), []string{
-		"HOME/.config/zsh/x.host.cp",
-		"Library/LaunchDaemons/otelcol.plist.host.cp",
+		"HOME/.config/zsh/x.ontoHost.cp",
+		"Library/LaunchDaemons/otelcol.plist.ontoHost.cp",
 	}) {
 		t.Errorf("copies = %v", rels(cs.Copies))
 	}
-	if !slices.Equal(rels(cs.Templates), []string{"HOME/.config/zsh/y.host.tpl"}) {
+	if !slices.Equal(rels(cs.Templates), []string{"root/HOME/.config/zsh/y.ontoHost.tpl"}) {
 		t.Errorf("templates = %v", rels(cs.Templates))
 	}
 	for _, l := range rels(cs.Links) {
@@ -206,7 +206,7 @@ func TestIncludeExcludeSections(t *testing.T) {
 		"root/etc/zsh/zshenv":                 "e\n", // excluded -> must not link
 		"root/HOME/.config/extra/x":           "x\n",
 		"root/HOME/.config/oneoff/y":          "y\n",
-		"root/HOME/.config/zsh/c.host.cp":     "c\n", // rich copy, excluded by glob
+		"root/HOME/.config/zsh/c.ontoHost.cp": "c\n", // rich copy, excluded by glob
 		"ci/zsh/scripts/installs/10-brew.zsh": "#!/bin/zsh\n",
 		"ci/zsh/scripts/installs/20-foo.zsh":  "#!/bin/zsh\n", // excluded by run-scripts
 	}
@@ -222,7 +222,7 @@ func TestIncludeExcludeSections(t *testing.T) {
 	if hasLink(res, "etc/zsh/zshenv") {
 		t.Errorf("exclude.link glob not applied: %v", rels(res.Links))
 	}
-	if find(res.Copies, relIs("HOME/.config/zsh/c.host.cp")) != nil {
+	if find(res.Copies, relIs("HOME/.config/zsh/c.ontoHost.cp")) != nil {
 		t.Errorf("exclude.copy glob did not drop rich entry: %v", rels(res.Copies))
 	}
 	if !slices.Contains(res.Scripts, "ci/zsh/scripts/installs/10-brew.zsh") {
@@ -264,23 +264,23 @@ func TestMixinProfilesUndefined(t *testing.T) {
 	resolveErr(t, "undefined-include", "cli/macos")
 }
 
-// TestRepoTemplateResolve: repo-template entries resolve to rich FileItems
+// TestRepoTemplateResolve: rich renderTemplates entries resolve to FileItems
 // carrying source, repo-relative dests, and per-dest options.
 func TestRepoTemplateResolve(t *testing.T) {
 	dir := fixtureRepo(t, "repo-template", map[string]string{"root/.gitkeep": ""})
 	res := resolve(t, dir, "cli/macos")
 
-	if len(res.RepoTemplates) != 2 {
-		t.Fatalf("RepoTemplates = %d, want 2", len(res.RepoTemplates))
+	if len(res.Templates) != 2 {
+		t.Fatalf("Templates = %d, want 2", len(res.Templates))
 	}
-	env := res.RepoTemplates[0]
-	if env.Rel != "templates/1-env/local.env.repo.tpl" {
+	env := res.Templates[0]
+	if env.Rel != "templates/1-env/local.env.ontoRepo.tpl" {
 		t.Errorf("env entry = %+v", env)
 	}
 	if len(env.Dests) != 1 || env.Dests[0].Path != ".env" || env.Dests[0].Options.WriteType != "mergeUpsert" {
 		t.Errorf("env dest = %+v", env.Dests)
 	}
-	agents := res.RepoTemplates[1]
+	agents := res.Templates[1]
 	if len(agents.Dests) != 2 || agents.Dests[0].Path != "CLAUDE.md" {
 		t.Errorf("agents dests = %+v", agents.Dests)
 	}
@@ -289,8 +289,8 @@ func TestRepoTemplateResolve(t *testing.T) {
 	}
 }
 
-// TestRepoTemplateGlobError: a glob-form repo-template entry is rejected
-// ([why] repo dests must be explicit).
+// TestRepoTemplateGlobError: a non-root/-prefixed renderTemplates glob is
+// rejected ([why] derived dests exist only for root/ sources).
 func TestRepoTemplateGlobError(t *testing.T) {
 	resolveErr(t, "repo-template-glob", "cli/macos")
 }
@@ -338,10 +338,17 @@ func TestEligibleOnlyIf(t *testing.T) {
 	eligibleErr(t, s, "", false, osEval("linux"))
 }
 
-// TestEligibleForceOne: CHE_PROFILES_FORCE_ONE runs only that profile, onlyIf skipped.
+// TestEligibleForceOne: --profile runs only that profile, onlyIf skipped.
 func TestEligibleForceOne(t *testing.T) {
 	s := loadSpec(t, "che")
 	eligibleOK(t, s, "desktop/macos", false, osEval("linux"), []string{"desktop/macos"})
+}
+
+// TestEligibleForceOneMixinOnly: force-one may name a mixinOnly profile
+// ([why] --profile=ontoRepo targets the repo-docs mixin directly).
+func TestEligibleForceOneMixinOnly(t *testing.T) {
+	s := loadSpec(t, "che")
+	eligibleOK(t, s, "base", false, osEval("linux"), []string{"base"})
 }
 
 // TestEligibleForceOneUndefined: forcing an undefined name errors.
@@ -350,8 +357,8 @@ func TestEligibleForceOneUndefined(t *testing.T) {
 	eligibleErr(t, s, "cli/linux", false, osEval("macos"))
 }
 
-// TestEligibleForceAll: CHE_PROFILES_FORCE makes every onlyIf pass; mixinOnly
-// helpers stay out of the list.
+// TestEligibleForceAll: CHE_ONLY_IF_ALWAYS_TRUE makes every onlyIf pass;
+// mixinOnly helpers stay out of the list.
 func TestEligibleForceAll(t *testing.T) {
 	s := loadSpec(t, "che")
 	eligibleOK(t, s, "", true, osEval("linux"), []string{"cli/macos", "desktop/macos"})
@@ -381,11 +388,11 @@ func TestResolveUnion(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if len(res.RepoTemplates) != 2 {
-		t.Fatalf("RepoTemplates = %d, want 2", len(res.RepoTemplates))
+	if len(res.Templates) != 2 {
+		t.Fatalf("Templates = %d, want 2", len(res.Templates))
 	}
-	if res.RepoTemplates[0].Dests[0].Path != ".env" || res.RepoTemplates[1].Dests[0].Path != ".env2" {
-		t.Errorf("union order = %+v", res.RepoTemplates)
+	if res.Templates[0].Dests[0].Path != ".env" || res.Templates[1].Dests[0].Path != ".env2" {
+		t.Errorf("union order = %+v", res.Templates)
 	}
 }
 

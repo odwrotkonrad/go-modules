@@ -8,8 +8,8 @@ base:
       - etc/zsh/**
     copy:
       - files: [HOME/.config/zsh/**, Library/LaunchDaemons/otelcol.plist*]
-    template:
-      - files: [HOME/.config/zsh/**]
+    renderTemplates:
+      - files: [root/HOME/.config/zsh/**]
 
 cli/macos:
   mixinProfiles: [base]

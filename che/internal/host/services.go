@@ -32,7 +32,7 @@ func (s Service) target() string { return s.Domain + "/" + s.Name }
 // plistSource is one candidate template path under root/.
 type plistSource struct {
 	rel    string // repo-relative under root/, with marker
-	marker string // ".host.cp" or ".host.tpl"
+	marker string // ".ontoHost.cp" or ".ontoHost.tpl"
 	system bool   // LaunchDaemons -> system, LaunchAgents -> gui
 }
 
@@ -63,9 +63,9 @@ func (h Host) ResolveServices(names []string) ([]Service, error) {
 // locate finds name's plist in the three known dirs (first hit).
 func (h Host) locate(name string) (plistSource, bool) {
 	cands := []plistSource{
-		{"Library/LaunchDaemons/" + name + ".plist.host.cp", ".host.cp", true},
-		{"Library/LaunchAgents/" + name + ".plist.host.tpl", ".host.tpl", false},
-		{"HOME/Library/LaunchAgents/" + name + ".plist.host.tpl", ".host.tpl", false},
+		{"Library/LaunchDaemons/" + name + ".plist.ontoHost.cp", ".ontoHost.cp", true},
+		{"Library/LaunchAgents/" + name + ".plist.ontoHost.tpl", ".ontoHost.tpl", false},
+		{"HOME/Library/LaunchAgents/" + name + ".plist.ontoHost.tpl", ".ontoHost.tpl", false},
 	}
 	for _, c := range cands {
 		if _, err := os.Stat(filepath.Join(h.Root, c.rel)); err == nil {

@@ -14,9 +14,9 @@ func fixtureHost(t *testing.T) Host {
 	t.Helper()
 	dir := t.TempDir()
 	testutil.WriteTree(t, dir, map[string]string{
-		"root/Library/LaunchDaemons/otelcol.plist.host.cp":                   "<plist/>\n",
-		"root/Library/LaunchAgents/gitlab-runner.plist.host.tpl":             "<plist/>\n",
-		"root/HOME/Library/LaunchAgents/load-defaults-config.plist.host.tpl": "<plist/>\n",
+		"root/Library/LaunchDaemons/otelcol.plist.ontoHost.cp":                   "<plist/>\n",
+		"root/Library/LaunchAgents/gitlab-runner.plist.ontoHost.tpl":             "<plist/>\n",
+		"root/HOME/Library/LaunchAgents/load-defaults-config.plist.ontoHost.tpl": "<plist/>\n",
 	})
 	return New(dir, "/Users/x", "desktop/macos", DryRunOff)
 }

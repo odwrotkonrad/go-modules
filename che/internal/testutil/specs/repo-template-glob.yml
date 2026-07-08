@@ -1,8 +1,8 @@
 base:
   options: {mixinOnly: true}
   include:
-    repoTemplate:
-      - files: [templates/**/*.repo.tpl]
+    renderTemplates:
+      - files: [templates/**/*.ontoRepo.tpl]
 
 cli/macos:
   mixinProfiles: [base]

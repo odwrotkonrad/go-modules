@@ -10,12 +10,11 @@ base:
         ownerGroup: wheel
         chmod: "0644"
         files:
-          - {source: Library/LaunchDaemons/otelcol.plist.host.cp, dest: [/Library/LaunchDaemons/otelcol.plist]}
-    template:
-      - files: [HOME/.config/zsh/**]
-    repoTemplate:
+          - {source: Library/LaunchDaemons/otelcol.plist.ontoHost.cp, dest: [/Library/LaunchDaemons/otelcol.plist]}
+    renderTemplates:
+      - files: [root/HOME/.config/zsh/**]
       - files:
-          - source: templates/r.repo.tpl
+          - source: templates/r.ontoRepo.tpl
             dest: [docs/r.md]
     mkdirs:
       - files: [HOME/.cache/zsh]
