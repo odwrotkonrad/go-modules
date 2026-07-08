@@ -1,0 +1,113 @@
+##[>] 🤖🤖
+version: 2
+
+project_name: render-files
+
+gitlab_urls:
+  use_job_token: true
+
+builds:
+  - id: render-dirs-tree-linux
+    main: ./cmd/render-dirs-tree
+    binary: render-dirs-tree
+    goos: [linux]
+    goarch: [amd64, arm64]
+    flags:
+      - -trimpath
+    ldflags:
+      - -s -w -X main.version={{.Version}}
+    env:
+      - CGO_ENABLED=1
+      - 'CC=zig cc -target {{ if eq .Arch "amd64" }}x86_64{{ else }}aarch64{{ end }}-linux-gnu'
+      - 'CXX=zig c++ -target {{ if eq .Arch "amd64" }}x86_64{{ else }}aarch64{{ end }}-linux-gnu'
+
+  - id: render-makefile-doc-linux
+    main: ./cmd/render-makefile-doc
+    binary: render-makefile-doc
+    goos: [linux]
+    goarch: [amd64, arm64]
+    flags:
+      - -trimpath
+    ldflags:
+      - -s -w -X main.version={{.Version}}
+    env:
+      - CGO_ENABLED=1
+      - 'CC=zig cc -target {{ if eq .Arch "amd64" }}x86_64{{ else }}aarch64{{ end }}-linux-gnu'
+      - 'CXX=zig c++ -target {{ if eq .Arch "amd64" }}x86_64{{ else }}aarch64{{ end }}-linux-gnu'
+
+  - id: render-tpl-linux
+    main: ./cmd/render-tpl
+    binary: render-tpl
+    goos: [linux]
+    goarch: [amd64, arm64]
+    flags:
+      - -trimpath
+    ldflags:
+      - -s -w -X main.version={{.Version}}
+    env:
+      - CGO_ENABLED=1
+      - 'CC=zig cc -target {{ if eq .Arch "amd64" }}x86_64{{ else }}aarch64{{ end }}-linux-gnu'
+      - 'CXX=zig c++ -target {{ if eq .Arch "amd64" }}x86_64{{ else }}aarch64{{ end }}-linux-gnu'
+
+  - id: render-repo-group-index-linux
+    main: ./cmd/render-repo-group-index
+    binary: render-repo-group-index
+    goos: [linux]
+    goarch: [amd64, arm64]
+    flags:
+      - -trimpath
+    ldflags:
+      - -s -w -X main.version={{.Version}}
+    env:
+      - CGO_ENABLED=1
+      - 'CC=zig cc -target {{ if eq .Arch "amd64" }}x86_64{{ else }}aarch64{{ end }}-linux-gnu'
+      - 'CXX=zig c++ -target {{ if eq .Arch "amd64" }}x86_64{{ else }}aarch64{{ end }}-linux-gnu'
+
+archives:
+  - id: render-dirs-tree
+    ids: [render-dirs-tree-linux]
+    formats: [tar.gz]
+    name_template: 'render-dirs-tree_{{ .Version }}_{{ .Os }}_{{ .Arch }}'
+  - id: render-makefile-doc
+    ids: [render-makefile-doc-linux]
+    formats: [tar.gz]
+    name_template: 'render-makefile-doc_{{ .Version }}_{{ .Os }}_{{ .Arch }}'
+  - id: render-tpl
+    ids: [render-tpl-linux]
+    formats: [tar.gz]
+    name_template: 'render-tpl_{{ .Version }}_{{ .Os }}_{{ .Arch }}'
+  - id: render-repo-group-index
+    ids: [render-repo-group-index-linux]
+    formats: [tar.gz]
+    name_template: 'render-repo-group-index_{{ .Version }}_{{ .Os }}_{{ .Arch }}'
+
+checksum:
+  name_template: checksums.txt
+  algorithm: sha256
+  extra_files:
+    - glob: darwin-dist/*.tar.gz
+
+changelog:
+  use: git
+  groups:
+    - title: Features
+      regexp: '^.*?feat(\(.+\))?!?:.*$'
+      order: 0
+    - title: Fixes
+      regexp: '^.*?fix(\(.+\))?!?:.*$'
+      order: 1
+    - title: Others
+      order: 999
+  filters:
+    exclude:
+      - '^docs:'
+      - '^test:'
+      - '^chore:'
+
+release:
+  gitlab:
+    owner: konradodwrot/go
+    name: render-files
+  extra_files:
+    - glob: darwin-dist/*.tar.gz
+##[<] 🤖🤖

@@ -1,0 +1,65 @@
+# render-files
+
+Shared render engine and doc-rendering CLIs for repo documentation.
+
+{{ renderMarkdown "assets/docs-agents/purpose.md" "normalize-headings" }}
+
+## Binaries
+
+### `render-tpl`
+
+```
+render-tpl -f <template>
+```
+
+Render `<template>` with the shared engine (gomplate built-ins, op:// secrets,
+`remoteFile`, frontmatter/readBody, native generators) to stdout. Drop-in for
+`gomplate -f`.
+
+### `render-makefile-doc`
+
+```
+render-makefile-doc <makefile-path>
+render-makefile-doc --check <doc-file>
+```
+
+Emit `makefile.agents.md` from a Makefile's `[genai-include]` sections (stdout).
+`--check` regenerates from `./Makefile` and diffs against `<doc-file>`: exit 0
+match, 22 differ (unified diff on stderr).
+
+### `render-dirs-tree`
+
+```
+render-dirs-tree
+render-dirs-tree --check <file>
+```
+
+Print the plain directory tree of the cwd repo's tracked files (stdout): read
+tracked paths from the git index, drop each file leaf, nest and sort the
+remaining dirs. `--check` regenerates and diffs against `<file>`.
+
+## Install
+
+```sh
+go install gitlab.com/konradodwrot/go/render-files/cmd/render-tpl@latest
+go install gitlab.com/konradodwrot/go/render-files/cmd/render-makefile-doc@latest
+go install gitlab.com/konradodwrot/go/render-files/cmd/render-dirs-tree@latest
+```
+
+`render-makefile-doc` requires CGO (tree-sitter) — a C compiler must be present
+at build time.
+
+## Develop
+
+```sh
+make test     # go test ./...
+make build    # build all binaries into ./dist
+```
+
+Releases are automatic: every push to `main` runs tests, then CI bumps the
+patch version from the highest `vX.Y.Z` tag and publishes a GitLab release.
+Consumers install with `go install ...@vX.Y.Z` (compiles on the host).
+
+## License
+
+MIT — see [LICENSE](LICENSE).
