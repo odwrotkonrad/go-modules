@@ -1,2 +1,3 @@
 cli/macos:
+  options: {autoExec: true}
   mixinProfiles: [nonexistent]

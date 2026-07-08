@@ -23,16 +23,20 @@ func setupDryRun(t *testing.T) string {
 	return home
 }
 
-// --profile forces one profile, onlyIf skipped, mixinOnly allowed.
+// --profile forces one defined profile, execIf skipped, autoExec irrelevant.
 func TestBuildProfileFlag(t *testing.T) {
 	testutil.MockRepoEnv(t)
-	profileForce = "base"
+	profileForce = "ontoRepo"
 	t.Cleanup(func() { profileForce = "" })
 	if err := build(); err != nil {
 		t.Fatalf("build() errored: %v", err)
 	}
-	if theHost.Profile != "base" {
-		t.Fatalf("Profile = %q, want base (--profile forces one)", theHost.Profile)
+	if theHost.Profile != "ontoRepo" {
+		t.Fatalf("Profile = %q, want ontoRepo (--profile forces one)", theHost.Profile)
+	}
+	profileForce = "nonexistent"
+	if err := build(); err == nil {
+		t.Fatal("build() with undefined --profile should error")
 	}
 }
 

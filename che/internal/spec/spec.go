@@ -47,8 +47,8 @@ type Raw struct {
 	order    []string               // profile names in declaration order
 }
 
-// profileSpec is one block: options self-describe eligibility (onlyIf,
-// mixinOnly), mixinProfiles composed in order, then include (additive) and
+// profileSpec is one block: options self-describe eligibility (autoExec,
+// execIf), mixinProfiles composed in order, then include (additive) and
 // exclude (subtractive glob filter, applied last, wins).
 type profileSpec struct {
 	Options       ProfileOptions `yaml:"options"`
@@ -57,13 +57,14 @@ type profileSpec struct {
 	Exclude       excludeSet     `yaml:"exclude"`
 }
 
-// ProfileOptions self-describes when a profile runs. OnlyIf: predicate
-// expressions (`<source>` or `<source> == <literal>`, sources builtin:*/env:*),
-// eligible iff ALL pass; empty -> always eligible. MixinOnly: a mixin helper,
-// never run standalone.
+// ProfileOptions self-describes when a profile runs. AutoExec (default
+// false): opt in to bare-che runs; without it a profile runs only when named
+// via --profile or composed via mixinProfiles. ExecIf: predicate expressions
+// (`<source>` or `<source> == <literal>`, sources builtin:*/env:*),
+// autoExec-eligible iff ALL pass; empty -> always.
 type ProfileOptions struct {
-	OnlyIf    []string `yaml:"onlyIf"`
-	MixinOnly bool     `yaml:"mixinOnly"`
+	ExecIf   []string `yaml:"execIf"`
+	AutoExec bool     `yaml:"autoExec"`
 }
 
 // includeSet is the additive payload: link globs, copy/template/mkdirs entries
@@ -229,10 +230,11 @@ func Load(path string) (*Raw, error) {
 }
 
 // EligibleProfiles lists the profiles to Resolve, in declaration order:
-//  1. forceOne (--profile by name) -> only that profile, onlyIf skipped,
-//     mixinOnly allowed; must name a defined profile.
-//  2. else every non-mixinOnly profile whose onlyIf expressions ALL pass
-//     (forceAll = CHE_ONLY_IF_ALWAYS_TRUE makes every onlyIf pass).
+//  1. forceOne (--profile by name) -> only that profile, execIf skipped;
+//     must name a defined profile.
+//  2. else every autoExec profile whose execIf expressions ALL pass
+//     (forceAll = CHE_EXEC_IF_ALWAYS_TRUE makes every execIf pass; it does
+//     not lift autoExec).
 //  3. zero eligible -> error.
 func (r *Raw) EligibleProfiles(forceOne string, forceAll bool, eval func(expr string) (bool, error)) ([]string, error) {
 	if forceOne != "" {
@@ -245,10 +247,10 @@ func (r *Raw) EligibleProfiles(forceOne string, forceAll bool, eval func(expr st
 	var out []string
 	for _, name := range r.order {
 		ps := r.profiles[name]
-		if ps.Options.MixinOnly {
+		if !ps.Options.AutoExec {
 			continue
 		}
-		ok, err := allPass(name, ps.Options.OnlyIf, forceAll, eval)
+		ok, err := allPass(name, ps.Options.ExecIf, forceAll, eval)
 		if err != nil {
 			return nil, err
 		}
@@ -257,13 +259,13 @@ func (r *Raw) EligibleProfiles(forceOne string, forceAll bool, eval func(expr st
 		}
 	}
 	if len(out) == 0 {
-		return nil, fmt.Errorf("no eligible profile: every profile is mixinOnly or failed its onlyIf (candidates: %v; use --profile or CHE_ONLY_IF_ALWAYS_TRUE)",
-			r.names(func(ps profileSpec) bool { return !ps.Options.MixinOnly }))
+		return nil, fmt.Errorf("no eligible profile: no autoExec profile passed its execIf (candidates: %v; use --profile or CHE_EXEC_IF_ALWAYS_TRUE)",
+			r.names(func(ps profileSpec) bool { return ps.Options.AutoExec }))
 	}
 	return out, nil
 }
 
-// allPass reports whether every onlyIf expression of profile name passes.
+// allPass reports whether every execIf expression of profile name passes.
 func allPass(name string, exprs []string, forceAll bool, eval func(expr string) (bool, error)) (bool, error) {
 	if forceAll {
 		return true, nil
@@ -271,7 +273,7 @@ func allPass(name string, exprs []string, forceAll bool, eval func(expr string) 
 	for _, expr := range exprs {
 		ok, err := eval(expr)
 		if err != nil {
-			return false, fmt.Errorf("profile %q onlyIf %q: %w", name, expr, err)
+			return false, fmt.Errorf("profile %q execIf %q: %w", name, expr, err)
 		}
 		if !ok {
 			return false, nil
@@ -300,7 +302,7 @@ func (r *Raw) Resolve(profiles []string, root string) (Resolved, error) {
 		if _, ok := r.profiles[profile]; !ok {
 			return Resolved{}, fmt.Errorf(
 				"profile %q is not defined in che.yml (defined: %v)",
-				profile, r.names(func(ps profileSpec) bool { return !ps.Options.MixinOnly }))
+				profile, r.names(func(profileSpec) bool { return true }))
 		}
 		if err := r.mergeInto(&eff, profile, nil); err != nil {
 			return Resolved{}, err

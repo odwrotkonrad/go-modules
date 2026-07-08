@@ -308,7 +308,7 @@ func loadSpec(t *testing.T, spec string) *Raw {
 
 // osEval fakes the builtin evaluator for a host: os = "macos"|"linux", virt fixed true.
 func osEval(os string) func(string) (bool, error) {
-	return stubEvaluator(os, true).EvalOnlyIf
+	return stubEvaluator(os, true).EvalExecIf
 }
 
 // eligibleOK asserts EligibleProfiles returns want.
@@ -331,24 +331,25 @@ func eligibleErr(t *testing.T, s *Raw, forceOne string, forceAll bool, eval func
 	}
 }
 
-// TestEligibleOnlyIf: onlyIf-gated profiles pass iff every expression passes.
-func TestEligibleOnlyIf(t *testing.T) {
+// TestEligibleExecIf: execIf-gated profiles pass iff every expression passes.
+func TestEligibleExecIf(t *testing.T) {
 	s := loadSpec(t, "che")
 	eligibleOK(t, s, "", false, osEval("macos"), []string{"cli/macos"})
 	eligibleErr(t, s, "", false, osEval("linux"))
 }
 
-// TestEligibleForceOne: --profile runs only that profile, onlyIf skipped.
+// TestEligibleForceOne: --profile runs only that profile, execIf skipped.
 func TestEligibleForceOne(t *testing.T) {
 	s := loadSpec(t, "che")
 	eligibleOK(t, s, "desktop/macos", false, osEval("linux"), []string{"desktop/macos"})
 }
 
-// TestEligibleForceOneMixinOnly: force-one may name a mixinOnly profile
-// ([why] --profile=ontoRepo targets the repo-docs mixin directly).
-func TestEligibleForceOneMixinOnly(t *testing.T) {
+// TestEligibleForceOneNonAutoExec: force-one may name any defined profile,
+// autoExec or not (base and ontoRepo are non-autoExec).
+func TestEligibleForceOneNonAutoExec(t *testing.T) {
 	s := loadSpec(t, "che")
 	eligibleOK(t, s, "base", false, osEval("linux"), []string{"base"})
+	eligibleOK(t, s, "ontoRepo", false, osEval("linux"), []string{"ontoRepo"})
 }
 
 // TestEligibleForceOneUndefined: forcing an undefined name errors.
@@ -357,14 +358,14 @@ func TestEligibleForceOneUndefined(t *testing.T) {
 	eligibleErr(t, s, "cli/linux", false, osEval("macos"))
 }
 
-// TestEligibleForceAll: CHE_ONLY_IF_ALWAYS_TRUE makes every onlyIf pass;
-// mixinOnly helpers stay out of the list.
+// TestEligibleForceAll: CHE_EXEC_IF_ALWAYS_TRUE makes every execIf pass;
+// non-autoExec profiles stay out of the list.
 func TestEligibleForceAll(t *testing.T) {
 	s := loadSpec(t, "che")
 	eligibleOK(t, s, "", true, osEval("linux"), []string{"cli/macos", "desktop/macos"})
 }
 
-// TestEligibleLonePlain: a profile without onlyIf is always eligible.
+// TestEligibleLonePlain: a profile without execIf is always eligible.
 func TestEligibleLonePlain(t *testing.T) {
 	s := loadSpec(t, "repo")
 	eligibleOK(t, s, "", false, osEval("linux"), []string{"repo"})

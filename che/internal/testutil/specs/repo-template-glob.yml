@@ -1,8 +1,8 @@
 base:
-  options: {mixinOnly: true}
   include:
     renderTemplates:
       - files: [templates/**/*.ontoRepo.tpl]
 
 cli/macos:
+  options: {autoExec: true}
   mixinProfiles: [base]

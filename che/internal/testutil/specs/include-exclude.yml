@@ -1,5 +1,4 @@
 base:
-  options: {mixinOnly: true}
   include:
     link:
       - etc/zshrc
@@ -15,6 +14,7 @@ base:
     services: [otelcol, grafana]
 
 cli/macos:
+  options: {autoExec: true}
   mixinProfiles: [base]
   exclude:
     link:

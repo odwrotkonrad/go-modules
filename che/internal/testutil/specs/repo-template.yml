@@ -1,5 +1,4 @@
 base:
-  options: {mixinOnly: true}
   include:
     renderTemplates:
       - files:
@@ -12,4 +11,5 @@ base:
               - {path: AGENTS.md, options: {renderReferencedFiles: true}}
 
 cli/macos:
+  options: {autoExec: true}
   mixinProfiles: [base]

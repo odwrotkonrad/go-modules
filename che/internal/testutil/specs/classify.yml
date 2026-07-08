@@ -1,5 +1,4 @@
 base:
-  options: {mixinOnly: true}
   include:
     link:
       - HOME/.config/zsh/**
@@ -12,7 +11,9 @@ base:
       - files: [root/HOME/.config/zsh/**]
 
 cli/macos:
+  options: {autoExec: true}
   mixinProfiles: [base]
 
 desktop/macos:
+  options: {autoExec: true}
   mixinProfiles: [base]

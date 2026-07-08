@@ -39,7 +39,7 @@ var RootCmd = &cobra.Command{
 	Use:     "che",
 	Version: version,
 	Short:   "Spec-driven config loader",
-	Long: `che resolves every eligible profile in che.yml (onlyIf predicates), then
+	Long: `che resolves every eligible profile in che.yml (execIf predicates), then
 loads the union of files/dirs/installs/services those profiles select.`,
 	SilenceUsage:  true,
 	SilenceErrors: true,
@@ -53,7 +53,7 @@ func init() {
 		"print mutating actions instead of executing them: delta (changed dests) | all (every dest)")
 	RootCmd.PersistentFlags().Lookup("dry-run").NoOptDefVal = "delta"
 	RootCmd.PersistentFlags().StringVar(&profileForce, "profile", "",
-		"run only this profile (onlyIf skipped, mixinOnly allowed)")
+		"run only this profile (execIf and autoExec skipped)")
 }
 
 // build loads spec -> lists eligible profiles -> resolves union -> wires the
@@ -78,11 +78,11 @@ func build() error {
 	if err != nil {
 		return err
 	}
-	// --profile runs only that profile, onlyIf skipped (test/VM hook);
-	// CHE_ONLY_IF_ALWAYS_TRUE (truthy) makes every onlyIf pass; else the
+	// --profile runs only that profile, execIf skipped (test/VM hook);
+	// CHE_EXEC_IF_ALWAYS_TRUE (truthy) makes every execIf pass; else the
 	// union of every eligible non-mixin profile.
-	forceAll := os.Getenv("CHE_ONLY_IF_ALWAYS_TRUE") != ""
-	profiles, err := sp.EligibleProfiles(profileForce, forceAll, spec.NewEvaluator().EvalOnlyIf)
+	forceAll := os.Getenv("CHE_EXEC_IF_ALWAYS_TRUE") != ""
+	profiles, err := sp.EligibleProfiles(profileForce, forceAll, spec.NewEvaluator().EvalExecIf)
 	if err != nil {
 		return err
 	}

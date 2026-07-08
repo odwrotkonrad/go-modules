@@ -1,5 +1,4 @@
 base:
-  options: {mixinOnly: true}
   include:
     link:
       - HOME/.config/zsh/**
@@ -13,9 +12,6 @@ base:
           - {source: Library/LaunchDaemons/otelcol.plist.ontoHost.cp, dest: [/Library/LaunchDaemons/otelcol.plist]}
     renderTemplates:
       - files: [root/HOME/.config/zsh/**]
-      - files:
-          - source: templates/r.ontoRepo.tpl
-            dest: [docs/r.md]
     mkdirs:
       - files: [HOME/.cache/zsh]
       - chmod: "2775"
@@ -26,9 +22,16 @@ base:
     services: [otelcol]
 
 cli/macos:
-  options: {onlyIf: ['builtin:isOs == macos', 'builtin:isVirt']}
+  options: {autoExec: true, execIf: ['builtin:isOs == macos', 'builtin:isVirt']}
   mixinProfiles: [base]
 
 desktop/macos:
-  options: {onlyIf: ['builtin:isOs == macos', 'builtin:isVirt == false']}
+  options: {autoExec: true, execIf: ['builtin:isOs == macos', 'builtin:isVirt == false']}
   mixinProfiles: [base]
+
+ontoRepo:
+  include:
+    renderTemplates:
+      - files:
+          - source: templates/r.ontoRepo.tpl
+            dest: [docs/r.md]

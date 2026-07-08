@@ -46,7 +46,7 @@ Available Commands:
 Flags:
       --dry-run string[="delta"]   print mutating actions instead of executing them:
                                    delta (changed dests) | all (every dest)
-      --profile string             run only this profile (onlyIf skipped, mixinOnly allowed)
+      --profile string             run only this profile (execIf and autoExec skipped)
   -v, --version                    version for che
 ```
 

@@ -14,7 +14,7 @@ func stubEvaluator(os string, virt bool) *Evaluator {
 	}}
 }
 
-func TestEvalOnlyIf(t *testing.T) {
+func TestEvalExecIf(t *testing.T) {
 	t.Setenv("CHE_TEST_SET", "grp")
 	t.Setenv("CHE_TEST_EMPTY", "")
 	e := stubEvaluator("macos", false)
@@ -35,18 +35,18 @@ func TestEvalOnlyIf(t *testing.T) {
 		{"builtin:isVirt == false", true},
 	}
 	for _, c := range cases {
-		got, err := e.EvalOnlyIf(c.expr)
+		got, err := e.EvalExecIf(c.expr)
 		if err != nil {
-			t.Errorf("EvalOnlyIf(%q) errored: %v", c.expr, err)
+			t.Errorf("EvalExecIf(%q) errored: %v", c.expr, err)
 			continue
 		}
 		if got != c.want {
-			t.Errorf("EvalOnlyIf(%q) = %v, want %v", c.expr, got, c.want)
+			t.Errorf("EvalExecIf(%q) = %v, want %v", c.expr, got, c.want)
 		}
 	}
 }
 
-func TestEvalOnlyIfErrors(t *testing.T) {
+func TestEvalExecIfErrors(t *testing.T) {
 	e := stubEvaluator("macos", false)
 	for _, expr := range []string{
 		"builtin:isWindows",
@@ -54,8 +54,8 @@ func TestEvalOnlyIfErrors(t *testing.T) {
 		"GITLAB_GROUP",
 		"a == b == c",
 	} {
-		if got, err := e.EvalOnlyIf(expr); err == nil {
-			t.Errorf("EvalOnlyIf(%q) = %v, want error", expr, got)
+		if got, err := e.EvalExecIf(expr); err == nil {
+			t.Errorf("EvalExecIf(%q) = %v, want error", expr, got)
 		}
 	}
 }
