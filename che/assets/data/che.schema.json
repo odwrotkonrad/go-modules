@@ -18,10 +18,11 @@
                   "type": "boolean"
                 },
                 "writeType": {
-                  "description": "how the rendered body lands: overwrite (default: header + body) | mergeUpsert (env KEY=VALUE union under the existing dest)",
+                  "description": "how the rendered body lands: overwrite (default: header + body) | mergeUpsert (env KEY=VALUE union under the existing dest) | raw (body verbatim, no autogen header)",
                   "enum": [
                     "",
-                    "mergeUpsert"
+                    "mergeUpsert",
+                    "raw"
                   ]
                 }
               },
