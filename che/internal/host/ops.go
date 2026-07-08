@@ -221,7 +221,7 @@ func (h Host) linkSettled(src, dest string) bool {
 	return err == nil && destResolved == srcResolved
 }
 
-// MkCopies copies each *.host.cp to its dest(s) (marker stripped, or explicit
+// MkCopies copies each *.ontoHost.cp to its dest(s) (marker stripped, or explicit
 // dest) when contents differ, archiving existing dests upfront, applying spec
 // perms (else default).
 func (h Host) MkCopies(copies []spec.FileItem, dirRels []string) error {

@@ -22,6 +22,19 @@ func setupDryRun(t *testing.T) string {
 	return home
 }
 
+// --profile wins over CHE_PROFILES_FORCE_ONE and may name a mixinOnly profile.
+func TestBuildProfileFlag(t *testing.T) {
+	testutil.MockRepoEnv(t)
+	profileForce = "base"
+	t.Cleanup(func() { profileForce = "" })
+	if err := build(); err != nil {
+		t.Fatalf("build() errored: %v", err)
+	}
+	if theHost.Profile != "base" {
+		t.Fatalf("Profile = %q, want base (--profile wins over env)", theHost.Profile)
+	}
+}
+
 // build() reads CHE_DRY_RUN from env when the flag is unset.
 func TestBuildDryRunEnvFallback(t *testing.T) {
 	testutil.MockRepoEnv(t)

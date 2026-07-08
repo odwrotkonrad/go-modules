@@ -1,7 +1,7 @@
 repo:
   include:
-    repoTemplate:
+    renderTemplates:
       - files:
-          - source: templates/1-env/local.env.repo.tpl
+          - source: templates/1-env/local.env.ontoRepo.tpl
             dest:
               - {path: .env, options: {writeType: mergeUpsert}}

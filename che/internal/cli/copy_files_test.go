@@ -8,7 +8,7 @@ import (
 	"gitlab.com/konradodwrot/go/che/internal/testutil"
 )
 
-// copy: *.host.cp into $HOME (marker stripped); archive existing dests, copy, chown root:wheel the daemon plist.
+// copy: *.ontoHost.cp into $HOME (marker stripped); archive existing dests, copy, chown root:wheel the daemon plist.
 func TestCopyCmd(t *testing.T) {
 	home := setupDryRun(t)
 	out := testutil.RunDry(t, CopyCmd, true)

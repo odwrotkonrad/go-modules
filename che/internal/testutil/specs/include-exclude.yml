@@ -8,7 +8,7 @@ base:
       - HOME/.config/oneoff/**
     copy:
       - files:
-          - {source: HOME/.config/zsh/c.host.cp, dest: [~/.config/zsh/c]}
+          - {source: HOME/.config/zsh/c.ontoHost.cp, dest: [~/.config/zsh/c]}
     runScripts:
       - ci/zsh/scripts/installs/10-brew.zsh
       - ci/zsh/scripts/installs/20-foo.zsh
@@ -20,7 +20,7 @@ cli/macos:
     link:
       - etc/zsh/**
     copy:
-      - HOME/.config/zsh/c.host.cp
+      - HOME/.config/zsh/c.ontoHost.cp
     runScripts:
       - ci/zsh/scripts/installs/20-foo.zsh
     services: [graf*]

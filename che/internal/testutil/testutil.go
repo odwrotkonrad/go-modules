@@ -87,10 +87,10 @@ func CheRepo(t *testing.T) (string, string) {
 		"che.yml":                                          Spec(t, "che"),
 		"root/etc/zshrc":                                   "zshrc\n",
 		"root/HOME/.config/zsh/.zshrc":                     "user zshrc\n",
-		"root/HOME/.config/zsh/c.host.cp":                  "copyme\n",
-		"root/HOME/.config/zsh/t.host.tpl":                 "plain template\n",
-		"templates/r.repo.tpl":                             "repo body\n",
-		"root/Library/LaunchDaemons/otelcol.plist.host.cp": "<plist/>\n",
+		"root/HOME/.config/zsh/c.ontoHost.cp":                  "copyme\n",
+		"root/HOME/.config/zsh/t.ontoHost.tpl":                 "plain template\n",
+		"templates/r.ontoRepo.tpl":                             "repo body\n",
+		"root/Library/LaunchDaemons/otelcol.plist.ontoHost.cp": "<plist/>\n",
 		"install/unit":                                     "#!/bin/sh\necho ran\n",
 	})
 	home := filepath.Join(dir, "home")
