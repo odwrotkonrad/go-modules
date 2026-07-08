@@ -7,7 +7,7 @@ CC ?= clang
 BIN := che
 
 WRAPPERS :=
-COMMANDS := render-templates run-repo-ci-prepare-hooks run-repo-ci-precommit-all test build vet install create-tag release-check release-darwin release-snapshot
+COMMANDS := render-templates render-docs run-repo-ci-prepare-hooks run-repo-ci-precommit-all test build vet install create-tag release-check release-darwin release-snapshot
 
 .PHONY: $(WRAPPERS) $(COMMANDS)
 
@@ -15,6 +15,10 @@ COMMANDS := render-templates run-repo-ci-prepare-hooks run-repo-ci-precommit-all
 #[what] render *.ontoRepo.tpl onto the repo (makefile.agents.md, repo-structure.md, CLAUDE.md, AGENTS.md, README.md) with this checkout's build
 render-templates: build
 	@dist/$(BIN) render-templates
+
+#[what] generate docs/cli.md + assets/data/che.schema.json from the Go source
+render-docs:
+	CC=$(CC) $(GO) run ./internal/docgen
 ##[<] Docs
 
 ##[>] CI [genai-include]

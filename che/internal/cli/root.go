@@ -101,6 +101,7 @@ var (
 	dryRunMode   string
 	profileForce string
 	omitExecIf   bool
+	skipPlugins  bool
 	units        []unit
 	pluginRefs   []spec.PluginRef
 	pluginUnits  map[string]*unit
@@ -145,6 +146,24 @@ func init() {
 		"run only this profile (autoExec skipped, execIf still enforced); env: CHE_PROFILE")
 	RootCmd.PersistentFlags().BoolVar(&omitExecIf, "omit-exec-if", false,
 		"treat every execIf predicate as passing; env: CHE_OMIT_EXEC_IF")
+	RootCmd.PersistentFlags().BoolVar(&skipPlugins, "skip-plugins", false,
+		"skip plugins entries, load only the local repo; env: CHE_SKIP_PLUGINS")
+}
+
+// Attach wires every subcommand onto RootCmd and returns it: the single
+// command-tree source for main and docgen.
+func Attach() *cobra.Command {
+	RootCmd.AddCommand(
+		LinkCmd,
+		CopyCmd,
+		RenderCmd,
+		DirsCmd,
+		PruneCmd,
+		RunScriptsCmd,
+		DetectCmd,
+		ServicesCmd,
+	)
+	return RootCmd
 }
 
 // build loads spec -> lists eligible profiles -> resolves union -> wires the
@@ -172,7 +191,9 @@ func build() error {
 	// --profile (env CHE_PROFILE) runs only that profile, autoExec
 	// skipped but execIf still enforced; --omit-exec-if (env
 	// CHE_OMIT_EXEC_IF, truthy) makes every execIf pass; else the union of
-	// every autoExec profile passing execIf. Flags win over envs.
+	// every autoExec profile passing execIf. --skip-plugins (env
+	// CHE_SKIP_PLUGINS, truthy) drops plugins entries, local repo only.
+	// Flags win over envs.
 	forceOne := profileForce
 	if forceOne == "" {
 		forceOne = os.Getenv("CHE_PROFILE")
@@ -190,6 +211,9 @@ func build() error {
 	}
 	units = []unit{{host: h, res: res}}
 	pluginRefs = res.Plugins
+	if skipPlugins || os.Getenv("CHE_SKIP_PLUGINS") != "" {
+		pluginRefs = nil
+	}
 	pluginUnits = map[string]*unit{}
 	pluginCfg.home, pluginCfg.mode, pluginCfg.forceAll, pluginCfg.eval = home, mode, forceAll, eval
 	return nil

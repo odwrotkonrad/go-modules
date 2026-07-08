@@ -9,10 +9,10 @@ import (
 	"gitlab.com/konradodwrot/go/che/internal/cli"
 )
 
-// init() wires every subcommand to root.
+// cli.Attach wires every subcommand to root.
 func TestSubcommandsWired(t *testing.T) {
 	var got []string
-	for _, c := range cli.RootCmd.Commands() {
+	for _, c := range cli.Attach().Commands() {
 		got = append(got, c.Name())
 	}
 	for _, want := range []string{

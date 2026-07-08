@@ -53,6 +53,25 @@ release:
   script:
     - make create-tag BRANCH="$CI_COMMIT_BRANCH" REF="$CI_COMMIT_SHA" DEFAULT_BRANCH="$CI_DEFAULT_BRANCH"
 
+pages:
+  stage: release
+  image:
+    name: pandoc/core:3
+    entrypoint: [""]
+  needs: []
+  rules:
+    - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
+  script:
+    - mkdir -p public/docs public/assets/data
+    - cp assets/data/che.schema.json public/assets/data/
+    - cp LICENSE public/
+    - sed 's/\.md)/.html)/g' README.md | pandoc -s -f gfm --metadata title=che -o public/index.html
+    - sed 's/\.md)/.html)/g' docs/spec.md | pandoc -s -f gfm --metadata title="che.yml Reference" -o public/docs/spec.html
+    - sed 's/\.md)/.html)/g' docs/cli.md | pandoc -s -f gfm --metadata title="che CLI" -o public/docs/cli.html
+  artifacts:
+    paths:
+      - public
+
 goreleaser-darwin:
   stage: release
   needs: []
