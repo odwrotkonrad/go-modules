@@ -30,7 +30,9 @@ Available Commands:
 Flags:
       --dry-run string[="delta"]   print mutating actions instead of executing them:
                                    delta (changed dests) | all (every dest)
-      --profile string             run only this profile (execIf and autoExec skipped)
+      --omit-exec-if               treat every execIf predicate as passing; env: CHE_OMIT_EXEC_IF
+      --profile string             run only this profile (autoExec skipped, execIf still
+                                   enforced); env: CHE_FORCE_PROFILE
   -v, --version                    version for che
 ```
 

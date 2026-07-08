@@ -338,10 +338,13 @@ func TestEligibleExecIf(t *testing.T) {
 	eligibleErr(t, s, "", false, osEval("linux"))
 }
 
-// TestEligibleForceOne: --profile runs only that profile, execIf skipped.
+// TestEligibleForceOne: --profile runs only that profile; its execIf is
+// still enforced, --omit-exec-if (forceAll) lifts it.
 func TestEligibleForceOne(t *testing.T) {
 	s := loadSpec(t, "che")
-	eligibleOK(t, s, "desktop/macos", false, osEval("linux"), []string{"desktop/macos"})
+	eligibleErr(t, s, "desktop/macos", false, osEval("linux"))
+	eligibleOK(t, s, "desktop/macos", true, osEval("linux"), []string{"desktop/macos"})
+	eligibleOK(t, s, "desktop/macos", false, stubEvaluator("macos", false).EvalExecIf, []string{"desktop/macos"})
 }
 
 // TestEligibleForceOneNonAutoExec: force-one may name any defined profile,

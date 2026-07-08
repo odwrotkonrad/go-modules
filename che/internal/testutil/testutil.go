@@ -101,7 +101,7 @@ func CheRepo(t *testing.T) (string, string) {
 }
 
 // MockRepoEnv builds the mock che repo, chdirs in, exports HOME +
-// CHE_EXEC_IF_ALWAYS_TRUE so build() resolves against it (the fixture's
+// CHE_OMIT_EXEC_IF so build() resolves against it (the fixture's
 // execIf profiles all pass). Returns HOME (for asserting ~/ dest paths).
 // Skips as root (build resolves $HOME).
 func MockRepoEnv(t *testing.T) string {
@@ -111,7 +111,7 @@ func MockRepoEnv(t *testing.T) string {
 	}
 	dir, home := CheRepo(t)
 	t.Chdir(dir)
-	t.Setenv("CHE_EXEC_IF_ALWAYS_TRUE", "1")
+	t.Setenv("CHE_OMIT_EXEC_IF", "1")
 	t.Setenv("HOME", home)
 	t.Setenv("XDG_DATA_HOME", filepath.Join(home, ".local/share"))
 	return home
