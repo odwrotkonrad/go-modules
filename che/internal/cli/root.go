@@ -54,7 +54,7 @@ func init() {
 		"print mutating actions instead of executing them: delta (changed dests) | all (every dest)")
 	RootCmd.PersistentFlags().Lookup("dry-run").NoOptDefVal = "delta"
 	RootCmd.PersistentFlags().StringVar(&profileForce, "profile", "",
-		"run only this profile (autoExec skipped, execIf still enforced); env: CHE_FORCE_PROFILE")
+		"run only this profile (autoExec skipped, execIf still enforced); env: CHE_PROFILE")
 	RootCmd.PersistentFlags().BoolVar(&omitExecIf, "omit-exec-if", false,
 		"treat every execIf predicate as passing; env: CHE_OMIT_EXEC_IF")
 }
@@ -81,13 +81,13 @@ func build() error {
 	if err != nil {
 		return err
 	}
-	// --profile (env CHE_FORCE_PROFILE) runs only that profile, autoExec
+	// --profile (env CHE_PROFILE) runs only that profile, autoExec
 	// skipped but execIf still enforced; --omit-exec-if (env
 	// CHE_OMIT_EXEC_IF, truthy) makes every execIf pass; else the union of
 	// every autoExec profile passing execIf. Flags win over envs.
 	forceOne := profileForce
 	if forceOne == "" {
-		forceOne = os.Getenv("CHE_FORCE_PROFILE")
+		forceOne = os.Getenv("CHE_PROFILE")
 	}
 	forceAll := omitExecIf || os.Getenv("CHE_OMIT_EXEC_IF") != ""
 	profiles, err := sp.EligibleProfiles(forceOne, forceAll, spec.NewEvaluator().EvalExecIf)
