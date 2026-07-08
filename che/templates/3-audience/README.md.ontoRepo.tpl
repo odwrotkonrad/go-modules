@@ -38,6 +38,19 @@ Flags:
   -v, --version                    version for che
 ```
 
+## Docs
+
+- [docs/spec.md](docs/spec.md): `che.yml` reference (profiles, options, include/exclude, per-dest render options).
+- [docs/cli.md](docs/cli.md): generated CLI reference (commands, flags, env vars).
+- [assets/data/che.schema.json](assets/data/che.schema.json): generated JSON Schema for `che.yml`. Editor validation, first line of `che.yml`:
+
+```yaml
+# yaml-language-server: $schema=https://gitlab.com/konradodwrot/go/che/-/raw/main/assets/data/che.schema.json
+```
+
+Pin `main` to `v<X.Y.Z>` to match the installed che (each release tag
+snapshots the schema; it is also attached as a release asset).
+
 ## Develop
 
 ```sh

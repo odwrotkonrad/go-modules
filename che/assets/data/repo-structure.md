@@ -3,8 +3,10 @@ assets
   data
   docs-agents
 ci
+docs
 internal
   cli
+  docgen
   fsutil
   host
   log

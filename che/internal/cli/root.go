@@ -150,6 +150,22 @@ func init() {
 		"skip plugins entries, load only the local repo; env: CHE_SKIP_PLUGINS")
 }
 
+// Attach wires every subcommand onto RootCmd and returns it: the single
+// command-tree source for main and docgen.
+func Attach() *cobra.Command {
+	RootCmd.AddCommand(
+		LinkCmd,
+		CopyCmd,
+		RenderCmd,
+		DirsCmd,
+		PruneCmd,
+		RunScriptsCmd,
+		DetectCmd,
+		ServicesCmd,
+	)
+	return RootCmd
+}
+
 // build loads spec -> lists eligible profiles -> resolves union -> wires the
 // host. Run in PersistentPreRunE before any subcommand RunE.
 func build() error {

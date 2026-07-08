@@ -4,6 +4,7 @@
 ### Docs:
 
 `render-templates`: `build` render *.ontoRepo.tpl onto the repo (makefile.agents.md, repo-structure.md, CLAUDE.md, AGENTS.md, README.md) with this checkout's build
+`render-docs` generate docs/cli.md + assets/data/che.schema.json from the Go source
 
 ### CI:
 

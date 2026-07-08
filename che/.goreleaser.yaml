@@ -32,6 +32,7 @@ checksum:
   algorithm: sha256
   extra_files:
     - glob: darwin-dist/*.tar.gz
+    - glob: assets/data/che.schema.json
 
 changelog:
   use: git
@@ -56,4 +57,5 @@ release:
     name: che
   extra_files:
     - glob: darwin-dist/*.tar.gz
+    - glob: assets/data/che.schema.json
 ##[<] 🤖🤖
