@@ -15,14 +15,15 @@ func setupDryRun(t *testing.T) string {
 	home := testutil.MockRepoEnv(t)
 	t.Setenv("CHE_DRY_RUN", "")
 	dryRunMode = "delta"
-	t.Cleanup(func() { dryRunMode = "" })
+	profileForce = testutil.CheProfile
+	t.Cleanup(func() { dryRunMode, profileForce = "", "" })
 	if err := build(); err != nil {
 		t.Fatalf("build() errored: %v", err)
 	}
 	return home
 }
 
-// --profile wins over CHE_PROFILES_FORCE_ONE and may name a mixinOnly profile.
+// --profile forces one profile, onlyIf skipped, mixinOnly allowed.
 func TestBuildProfileFlag(t *testing.T) {
 	testutil.MockRepoEnv(t)
 	profileForce = "base"
@@ -31,7 +32,7 @@ func TestBuildProfileFlag(t *testing.T) {
 		t.Fatalf("build() errored: %v", err)
 	}
 	if theHost.Profile != "base" {
-		t.Fatalf("Profile = %q, want base (--profile wins over env)", theHost.Profile)
+		t.Fatalf("Profile = %q, want base (--profile forces one)", theHost.Profile)
 	}
 }
 

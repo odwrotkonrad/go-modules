@@ -229,15 +229,15 @@ func Load(path string) (*Raw, error) {
 }
 
 // EligibleProfiles lists the profiles to Resolve, in declaration order:
-//  1. forceOne (CHE_PROFILES_FORCE_ONE by name) -> only that profile, onlyIf
-//     skipped; must name a defined profile.
+//  1. forceOne (--profile by name) -> only that profile, onlyIf skipped,
+//     mixinOnly allowed; must name a defined profile.
 //  2. else every non-mixinOnly profile whose onlyIf expressions ALL pass
-//     (forceAll = CHE_PROFILES_FORCE makes every onlyIf pass).
+//     (forceAll = CHE_ONLY_IF_ALWAYS_TRUE makes every onlyIf pass).
 //  3. zero eligible -> error.
 func (r *Raw) EligibleProfiles(forceOne string, forceAll bool, eval func(expr string) (bool, error)) ([]string, error) {
 	if forceOne != "" {
 		if _, ok := r.profiles[forceOne]; !ok {
-			return nil, fmt.Errorf("CHE_PROFILES_FORCE_ONE %q is not defined in che.yml (defined: %v)",
+			return nil, fmt.Errorf("--profile %q is not defined in che.yml (defined: %v)",
 				forceOne, slices.Sorted(maps.Keys(r.profiles)))
 		}
 		return []string{forceOne}, nil
@@ -257,7 +257,7 @@ func (r *Raw) EligibleProfiles(forceOne string, forceAll bool, eval func(expr st
 		}
 	}
 	if len(out) == 0 {
-		return nil, fmt.Errorf("no eligible profile: every profile is mixinOnly or failed its onlyIf (candidates: %v; set CHE_PROFILES_FORCE_ONE or CHE_PROFILES_FORCE)",
+		return nil, fmt.Errorf("no eligible profile: every profile is mixinOnly or failed its onlyIf (candidates: %v; use --profile or CHE_ONLY_IF_ALWAYS_TRUE)",
 			r.names(func(ps profileSpec) bool { return !ps.Options.MixinOnly }))
 	}
 	return out, nil

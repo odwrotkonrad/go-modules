@@ -47,8 +47,10 @@ func (h Host) RenderTemplates(templates []spec.FileItem) error {
 			}
 		}
 	}
-	if err := h.archiveBefore("render", hostDests); err != nil {
-		return err
+	if len(hostDests) > 0 { // [why] repo-only renders leave no empty backup archives
+		if err := h.archiveBefore("render", hostDests); err != nil {
+			return err
+		}
 	}
 	if h.DryRun() { // [why] dry-run logs dests only: no gomplate render, no @-include resolve
 		for _, item := range keep {

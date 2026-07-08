@@ -338,7 +338,7 @@ func TestEligibleOnlyIf(t *testing.T) {
 	eligibleErr(t, s, "", false, osEval("linux"))
 }
 
-// TestEligibleForceOne: CHE_PROFILES_FORCE_ONE runs only that profile, onlyIf skipped.
+// TestEligibleForceOne: --profile runs only that profile, onlyIf skipped.
 func TestEligibleForceOne(t *testing.T) {
 	s := loadSpec(t, "che")
 	eligibleOK(t, s, "desktop/macos", false, osEval("linux"), []string{"desktop/macos"})
@@ -357,8 +357,8 @@ func TestEligibleForceOneUndefined(t *testing.T) {
 	eligibleErr(t, s, "cli/linux", false, osEval("macos"))
 }
 
-// TestEligibleForceAll: CHE_PROFILES_FORCE makes every onlyIf pass; mixinOnly
-// helpers stay out of the list.
+// TestEligibleForceAll: CHE_ONLY_IF_ALWAYS_TRUE makes every onlyIf pass;
+// mixinOnly helpers stay out of the list.
 func TestEligibleForceAll(t *testing.T) {
 	s := loadSpec(t, "che")
 	eligibleOK(t, s, "", true, osEval("linux"), []string{"cli/macos", "desktop/macos"})

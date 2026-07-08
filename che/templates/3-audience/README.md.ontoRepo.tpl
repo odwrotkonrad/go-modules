@@ -18,18 +18,19 @@ Requires CGO (the 1Password SDK) — a C compiler must be present at build time.
 che [command]
 
 Available Commands:
-  copy             *.host.cp copy op
+  copy             *.ontoHost.cp copy op
   detect           print the detected profile and exit
   link             symlink op (configs into system root)
   mk-dirs          create repo-tree dirs + extra-dirs
   prune-links      delete broken symlinks
-  render-templates *.host.tpl render op
+  render-templates *.tpl render op (dest path decides host vs repo)
   run-scripts      run the profile's scripts, optionally filtered by name substring
   services         load/unload/verify the profile's launchd services
 
 Flags:
       --dry-run string[="delta"]   print mutating actions instead of executing them:
                                    delta (changed dests) | all (every dest)
+      --profile string             run only this profile (onlyIf skipped, mixinOnly allowed)
   -v, --version                    version for che
 ```
 
