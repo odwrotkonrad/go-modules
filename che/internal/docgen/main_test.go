@@ -7,6 +7,7 @@ import (
 	"encoding/json"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 
 	"github.com/santhosh-tekuri/jsonschema/v6"
@@ -77,6 +78,30 @@ func TestSchemaValidatesRealSpecs(t *testing.T) {
 				t.Errorf("schema rejects %s: %v", p, err)
 			}
 		})
+	}
+}
+
+// TestSpecDocExampleValidates keeps docs/spec.md's Full Example schema-valid:
+// the first yaml fence after the Full Example heading must pass.
+func TestSpecDocExampleValidates(t *testing.T) {
+	b, err := os.ReadFile("../../docs/spec.md")
+	if err != nil {
+		t.Fatal(err)
+	}
+	_, rest, ok := strings.Cut(string(b), "## Full Example")
+	if !ok {
+		t.Fatal("docs/spec.md: no Full Example section")
+	}
+	_, rest, ok = strings.Cut(rest, "```yaml\n")
+	if !ok {
+		t.Fatal("docs/spec.md: no yaml fence in Full Example")
+	}
+	example, _, ok := strings.Cut(rest, "```")
+	if !ok {
+		t.Fatal("docs/spec.md: unclosed yaml fence in Full Example")
+	}
+	if err := compileSchema(t).Validate(yamlInstance(t, []byte(example))); err != nil {
+		t.Errorf("schema rejects the Full Example: %v", err)
 	}
 }
 

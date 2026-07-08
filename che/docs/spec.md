@@ -15,6 +15,82 @@ First line of `che.yml`:
 Pin `main` to `v<X.Y.Z>` to match the installed che: each release tag
 snapshots the schema, also attached as a release asset.
 
+## Full Example
+
+Every construct in one spec (schema-validated by che's test suite):
+
+```yaml
+# yaml-language-server: $schema=https://gitlab.com/konradodwrot/go/che/-/raw/main/assets/data/che.schema.json
+base:
+  include:
+    link:
+      - HOME/**
+      - etc/{grafana,prometheus}/**
+    copy:
+      - files: [HOME/**]
+      - owner: root
+        ownerGroup: "0"
+        chmod: "0644"
+        files:
+          - {source: Library/LaunchDaemons/otelcol.plist.ontoHost.cp, dest: [/Library/LaunchDaemons/otelcol.plist]}
+    renderTemplates:
+      - files: [root/HOME/**]
+      - owner: root
+        ownerGroup: "0"
+        chmod: "0440"
+        files:
+          - {source: root/etc/sudoers.d/configs.ontoHost.tpl, dest: [/etc/sudoers.d/configs]}
+    mkdirs:
+      - files:
+          - HOME/.local/{bin,share}
+      - chmod: "2775"
+        files:
+          - {dest: ["/var/log/{grafana,prometheus}"]}
+    runScripts:
+      - ci/zsh/scripts/installs/*.zsh
+    services: [otelcol, grafana, prometheus]
+
+base-exclude-cli:
+  exclude:
+    link:
+      - etc/{grafana,prometheus}/**
+    copy:
+      - Library/LaunchDaemons/otelcol.plist*
+    renderTemplates:
+      - root/etc/sudoers.d/**
+    mkdirs:
+      - /var/log/{grafana,prometheus}
+    runScripts:
+      - ci/zsh/scripts/installs/80-desktop-tools.zsh
+    services: [grafana, prometheus]
+
+desktop/macos:
+  options: {autoExec: true, execIf: ['builtin:isOs == macos', 'builtin:isVirt == false']}
+  mixinProfiles: [base]
+  plugins:
+    - "@git@gitlab.com:group/repo.git::someProfile"
+    - ref: "@https://gitlab.com/group/other.git::otherProfile"
+      env:
+        SOME_VAR: value
+
+cli/linux:
+  options: {autoExec: true, execIf: ['builtin:isOs == linux']}
+  mixinProfiles: [base, base-exclude-cli]
+
+ontoRepo:
+  options: {autoExec: true}
+  include:
+    renderTemplates:
+      - files:
+          - source: templates/1-env/local.env.ontoRepo.tpl
+            dest:
+              - {path: .env, options: {writeType: mergeUpsert}}
+          - source: templates/3-audience/AGENTS.md.ontoRepo.tpl
+            dest:
+              - CLAUDE.md
+              - {path: AGENTS.md, options: {renderReferencedFiles: true}}
+```
+
 ## Profile Block
 
 ```yaml
