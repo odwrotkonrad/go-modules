@@ -42,8 +42,10 @@ func findCmd(t *testing.T, args []string) (*cobra.Command, []string) {
 }
 
 func TestCommands(t *testing.T) {
+	type context struct {
+		Directory string
+	}
 	type in struct {
-		Pwd     string `yaml:"pwd"`
 		Args    []string
 		Profile string
 	}
@@ -53,6 +55,7 @@ func TestCommands(t *testing.T) {
 	}
 	type c struct {
 		Name    string
+		Context context
 		In      in
 		Want    want
 		NotWant testyml.Want `yaml:"notWant"`
@@ -62,7 +65,7 @@ func TestCommands(t *testing.T) {
 		if profile == "" {
 			profile = testutil.CheProfile
 		}
-		home := setupDryRun(t, c.In.Pwd, profile)
+		home := setupDryRun(t, c.Context.Directory, profile)
 		vars := map[string]string{
 			"HOME":    home,
 			"REPO":    units[0].host.RepoRoot,
