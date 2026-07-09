@@ -22,6 +22,11 @@ che
                   LaunchDaemons
                 etc
               templates
+            tree-link-rewrite
+              root
+                HOME
+                  .config
+                    foo
         spec
     docgen
     fsutil
@@ -70,6 +75,12 @@ che
                     zsh
                 etc
                   zsh
+            tree-link-rewrite
+              root
+                HOME
+                  .config
+                    foo
+                etc
             tree-merge
               ci
                 zsh

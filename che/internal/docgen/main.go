@@ -153,7 +153,11 @@ func schema() map[string]any {
 				"type":                 "object",
 				"additionalProperties": false,
 				"properties": map[string]any{
-					"link":            strList("symlink-op globs, repo-relative under root/"),
+					"link": map[string]any{
+						"description": "symlink-op entries, repo-relative under root/: glob string (dest derived 1:1) or {source, dest} sed-style rewrite",
+						"type":        "array",
+						"items":       map[string]any{"$ref": "#/$defs/linkEntry"},
+					},
 					"copy":            fileGroup("#/$defs/fileEntry", "*.ontoHost.cp copy-op perm-groups"),
 					"renderTemplates": fileGroup("#/$defs/fileEntry", "*.tpl render-op perm-groups; sources repo-root-relative, glob and derived-dest forms must be root/-prefixed"),
 					"mkdirs":          fileGroup("#/$defs/dirEntry", "extra-dir perm-groups; each item one dir path (brace-expanded)"),
@@ -172,6 +176,28 @@ func schema() map[string]any {
 					"mkdirs":          strList("drop matching dirs"),
 					"runScripts":      strList("drop matching scripts (resolved file paths)"),
 					"services":        strList("drop matching services"),
+				},
+			},
+			"linkEntry": map[string]any{
+				"oneOf": []any{
+					map[string]any{
+						"description": "glob over git-tracked files under root/ (brace-expanded), dest derived 1:1",
+						"type":        "string",
+					},
+					map[string]any{
+						"description":          "source file or glob with a sed-style dest rewrite",
+						"type":                 "object",
+						"additionalProperties": false,
+						"required":             []any{"source", "dest"},
+						"properties": map[string]any{
+							"source": map[string]any{"description": "file or glob, repo-relative under root/", "type": "string"},
+							"dest": map[string]any{
+								"description": "sed-style rewrite s/<pattern>/<replacement>/[g] (Go regexp, $1 backrefs; g: every match, absent: first only), applied to the repo-relative dest path before host mapping",
+								"type":        "string",
+								"pattern":     "^s/.+/.*/g?$",
+							},
+						},
+					},
 				},
 			},
 			"fileEntry": map[string]any{

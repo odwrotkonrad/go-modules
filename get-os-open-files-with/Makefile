@@ -19,9 +19,9 @@ test:
 #[what] run all tests with coverage, print the per-package and total percentages
 test-cover:
 	$(GO) test -coverprofile=coverage.out -coverpkg=./... ./...
-	$(GO) tool cover -func=coverage.out | tail -1
-	$(GO) run $(GOCOVER_COBERTURA) < coverage.out > coverage.xml
-	sed -i.bak 's|filename="gitlab.com/konradodwrot/go-modules/|filename="|g' coverage.xml && rm coverage.xml.bak
+	@$(GO) run $(GOCOVER_COBERTURA) < coverage.out > coverage.xml
+	@sed -i.bak 's|filename="gitlab.com/konradodwrot/go-modules/|filename="|g' coverage.xml && rm coverage.xml.bak
+	@$(GO) tool cover -func=coverage.out | tail -1
 
 #[what] build the binary into ./dist
 build:

@@ -200,14 +200,14 @@ func (h Host) MkLinks(links []spec.FileItem, dirRels []string) error {
 	errs := []error{h.ensureConfigDirs(dirRels)}
 	dests := make([]string, len(links))
 	for i, item := range links {
-		dests[i] = h.ToDest(item.Rel)
+		dests[i] = h.ToDest(spec.LinkDestRel(item))
 	}
 	if err := h.archiveBefore("link", dests); err != nil {
 		return errors.Join(append(errs, err)...)
 	}
 	for _, item := range links {
 		src := h.Src(item.Rel)
-		dest := h.ToDest(item.Rel)
+		dest := h.ToDest(spec.LinkDestRel(item))
 		if h.linkSettled(src, dest) {
 			continue
 		}

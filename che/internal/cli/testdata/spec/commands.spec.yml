@@ -11,6 +11,20 @@
       archive(dry-run=delta): ${HOME}/.local/share/che/backups/che-link-{{/.*/}}.tar.bz2
       ln(create,dry-run=delta): ${HOME}/.config/zsh/.zshrc
       ln(create,dry-run=delta): /etc/zshrc
+- name: linkShouldRewriteDestPathWithSedRule
+  context:
+    directory: testdata/fixture/commands/tree-link-rewrite
+  in:
+    args: [link]
+  want:
+    stdOut: |
+      mkdir(create,dry-run=delta): ${HOME}/.config
+      mkdir(create,dry-run=delta): ${HOME}/.config/bar
+      archive(dry-run=delta): ${HOME}/.local/share/che/backups/che-link-{{/.*/}}.tar.bz2
+      ln(create,dry-run=delta): ${HOME}/.config/bar/a
+  notWant:
+    stdOut:
+      - ${HOME}/.config/foo
 - name: copyShouldCopyMarkerFilesAndChownDaemonPlist
   context:
     directory: testdata/fixture/commands/tree-che-repo

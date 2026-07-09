@@ -16,28 +16,32 @@ import (
 )
 
 // globSet is an ordered list of op globs, each carrying its group's perms
-// (zero Perms if none). Globs are brace-expanded on add.
+// (zero Perms if none) and an optional link dest rule. Globs are
+// brace-expanded on add.
 type globSet []globPerm
 
 type globPerm struct {
 	glob  string
 	perms Perms
+	rule  *destRule
 }
 
-func (gs *globSet) add(glob string, perms Perms) {
+func (gs *globSet) add(glob string, perms Perms) { gs.addRule(glob, perms, nil) }
+
+func (gs *globSet) addRule(glob string, perms Perms, rule *destRule) {
 	for _, g := range fsutil.ExpandBraces(glob) {
-		*gs = append(*gs, globPerm{glob: g, perms: perms})
+		*gs = append(*gs, globPerm{glob: g, perms: perms, rule: rule})
 	}
 }
 
-// match returns the perms of the last glob matching rel, and whether any did.
-func (gs globSet) match(rel string) (perms Perms, hit bool) {
+// match returns the last globPerm matching rel, and whether any did.
+func (gs globSet) match(rel string) (gp globPerm, hit bool) {
 	for _, g := range gs {
 		if globMatch(g.glob, rel) {
-			perms, hit = g.perms, true
+			gp, hit = g, true
 		}
 	}
-	return perms, hit
+	return gp, hit
 }
 
 // globMatch matches rel against an op glob, ignoring a trailing slash.
@@ -244,13 +248,21 @@ func classify(root string, eff effective, res *Resolved) error {
 }
 
 // hit appends rel (with its matched perms) to items if any glob in gs matches,
-// reporting whether it did.
+// reporting whether it did. A matched link dest rule that changes rel lands as
+// the item's explicit dest.
 func hit(gs globSet, rel string, items *[]FileItem) bool {
-	perms, ok := gs.match(rel)
-	if ok {
-		*items = append(*items, FileItem{Rel: rel, Perms: perms})
+	gp, ok := gs.match(rel)
+	if !ok {
+		return false
 	}
-	return ok
+	it := FileItem{Rel: rel, Perms: gp.perms}
+	if gp.rule != nil {
+		if dest := gp.rule.apply(rel); dest != rel {
+			it.Dests = []DestSpec{{Path: dest}}
+		}
+	}
+	*items = append(*items, it)
+	return true
 }
 
 // richRels is the set of source rels claimed by rich copy/template entries.
@@ -266,6 +278,7 @@ func richRels(eff effective) map[string]bool {
 }
 
 // collectDirs derives every ancestor dir of the file items into res.Dirs.
+// Links contribute their dest rel ([why] rewritten host dirs must exist).
 // Templates contribute only derived-dest (glob-form) items, root/ prefix
 // stripped ([why] rich dests need no pre-created host dirs).
 func collectDirs(res *Resolved) {
@@ -276,12 +289,14 @@ func collectDirs(res *Resolved) {
 			res.Dirs = append(res.Dirs, d)
 		}
 	}
+	for _, it := range res.Links {
+		addRel(LinkDestRel(it))
+	}
 	add := func(items []FileItem) {
 		for _, it := range items {
 			addRel(it.Rel)
 		}
 	}
-	add(res.Links)
 	add(res.Copies)
 	for _, it := range res.Templates {
 		if len(it.Dests) == 0 {
@@ -379,8 +394,19 @@ func (r *Raw) mergeInto(eff *effective, name string, seen []string) error {
 		}
 	}
 	in := ps.Include
-	for _, g := range in.Link {
-		eff.linkGlobs.add(g, Perms{})
+	for _, e := range in.Link {
+		if e.glob != "" {
+			eff.linkGlobs.add(e.glob, Perms{})
+			continue
+		}
+		if e.Source == "" {
+			return fmt.Errorf("profile %q: link entry missing source", name)
+		}
+		rule, err := parseDestRule(e.Dest)
+		if err != nil {
+			return fmt.Errorf("profile %q: %w", name, err)
+		}
+		eff.linkGlobs.addRule(e.Source, Perms{}, rule)
 	}
 	splitEntries(in.Copy, &eff.copyGlobs, &eff.richCopy)
 	if err := splitTemplates(in.RenderTemplates, &eff.tmplGlobs, &eff.richTmpl); err != nil {

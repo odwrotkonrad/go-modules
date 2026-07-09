@@ -64,15 +64,34 @@ type ProfileOptions struct {
 	AutoExec bool     `yaml:"autoExec"`
 }
 
-// includeSet is the additive payload: link globs, copy/template/mkdirs entries
-// (glob-string OR rich object), script globs, service names.
+// includeSet is the additive payload: link entries (glob-string OR
+// {source, dest} rewrite), copy/template/mkdirs entries (glob-string OR rich
+// object), script globs, service names.
 type includeSet struct {
-	Link            []string `yaml:"link"`
-	Copy            []entry  `yaml:"copy"`
-	RenderTemplates []entry  `yaml:"renderTemplates"`
-	Mkdirs          []entry  `yaml:"mkdirs"`
-	Scripts         []string `yaml:"runScripts"`
-	Services        []string `yaml:"services"`
+	Link            []linkEntry `yaml:"link"`
+	Copy            []entry     `yaml:"copy"`
+	RenderTemplates []entry     `yaml:"renderTemplates"`
+	Mkdirs          []entry     `yaml:"mkdirs"`
+	Scripts         []string    `yaml:"runScripts"`
+	Services        []string    `yaml:"services"`
+}
+
+// linkEntry is one link item: a bare glob string (dest derived 1:1), or a
+// {source, dest} object where dest is a sed-style rewrite rule. glob is set
+// iff the glob form.
+type linkEntry struct {
+	glob   string
+	Source string `yaml:"source"`
+	Dest   string `yaml:"dest"`
+}
+
+func (l *linkEntry) UnmarshalYAML(value *yaml.Node) error {
+	if value.Kind == yaml.ScalarNode {
+		l.glob = value.Value
+		return nil
+	}
+	type alias linkEntry
+	return value.Decode((*alias)(l))
 }
 
 // excludeSet is the subtractive payload: every key a flat glob-string list, a
@@ -141,6 +160,15 @@ type FileItem struct {
 	Rel   string
 	Dests []DestSpec
 	Perms
+}
+
+// LinkDestRel is a link item's repo-relative dest path: the rewritten
+// Dests[0] when a dest rule applied, else the source Rel (1:1).
+func LinkDestRel(it FileItem) string {
+	if len(it.Dests) > 0 {
+		return it.Dests[0].Path
+	}
+	return it.Rel
 }
 
 // Resolved is the classified, repo-relative selection the ops consume.

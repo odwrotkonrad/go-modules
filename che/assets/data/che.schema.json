@@ -180,9 +180,9 @@
           "type": "array"
         },
         "link": {
-          "description": "symlink-op globs, repo-relative under root/",
+          "description": "symlink-op entries, repo-relative under root/: glob string (dest derived 1:1) or {source, dest} sed-style rewrite",
           "items": {
-            "type": "string"
+            "$ref": "#/$defs/linkEntry"
           },
           "type": "array"
         },
@@ -268,6 +268,34 @@
         }
       },
       "type": "object"
+    },
+    "linkEntry": {
+      "oneOf": [
+        {
+          "description": "glob over git-tracked files under root/ (brace-expanded), dest derived 1:1",
+          "type": "string"
+        },
+        {
+          "additionalProperties": false,
+          "description": "source file or glob with a sed-style dest rewrite",
+          "properties": {
+            "dest": {
+              "description": "sed-style rewrite s/\u003cpattern\u003e/\u003creplacement\u003e/[g] (Go regexp, $1 backrefs; g: every match, absent: first only), applied to the repo-relative dest path before host mapping",
+              "pattern": "^s/.+/.*/g?$",
+              "type": "string"
+            },
+            "source": {
+              "description": "file or glob, repo-relative under root/",
+              "type": "string"
+            }
+          },
+          "required": [
+            "source",
+            "dest"
+          ],
+          "type": "object"
+        }
+      ]
     },
     "pluginEntry": {
       "oneOf": [

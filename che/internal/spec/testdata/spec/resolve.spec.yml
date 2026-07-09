@@ -122,6 +122,43 @@
       - {url: "https://gitlab.com/g/r2.git", profile: q, env: {GITLAB_GROUP: konradodwrot}}
   contains:
     services: [svc]
+- name: linkRewriteShouldMapMatchedFilesThroughSedRule
+  in:
+    spec: link-rewrite
+    tree: tree-link-rewrite
+    profiles: [cli/macos]
+  want:
+    links: [HOME/.config/foo/a, HOME/.config/foo/b, etc/zshrc]
+    dests:
+      HOME/.config/foo/a: [HOME/.config/bar/a]
+      HOME/.config/foo/b: [HOME/.config/bar/b]
+      etc/zshrc: []
+- name: linkRewriteShouldContributeRewrittenAncestorDirs
+  in:
+    spec: link-rewrite
+    tree: tree-link-rewrite
+    profiles: [cli/macos]
+  contains:
+    dirs: [HOME/.config/bar]
+  notWant:
+    dirs: [HOME/.config/foo]
+- name: excludeShouldDropLinkByRewrittenDest
+  in:
+    spec: link-rewrite
+    tree: tree-link-rewrite
+    profiles: [exclude-rewritten]
+  contains:
+    links: [HOME/.config/foo/a]
+  notWant:
+    links: [HOME/.config/foo/b]
+- name: linkDestRuleMalformedShouldError
+  in:
+    spec: link-rewrite-bad
+    tree: tree-link-rewrite
+    profiles: [cli/macos]
+  want:
+    error: true
+    stdErr: [link dest]
 - name: plugin_ref_malformed
   in:
     tree: tree-plugin-malformed
