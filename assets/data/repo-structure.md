@@ -28,22 +28,34 @@ che
           resolve
             classify
               root
+                HOME
+                  .config
+                    git
+                    zsh
                 Library
                   LaunchDaemons
                 etc
                   grafana
                   zsh
+            empty
+              root
             exclude-script-glob
               ci
                 zsh
                   scripts
                     installs
+              root
             include-exclude
               ci
                 zsh
                   scripts
                     installs
               root
+                HOME
+                  .config
+                    extra
+                    oneoff
+                    zsh
                 etc
                   zsh
             merge
@@ -52,11 +64,15 @@ che
                   scripts
                     installs
               root
+                HOME
+                  .config
+                    zsh
                 Library
                   LaunchDaemons
                 etc
                   grafana
             plugin-malformed
+              root
         spec
     testutil
       specs
