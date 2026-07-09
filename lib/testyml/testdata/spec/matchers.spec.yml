@@ -1,14 +1,14 @@
 # [>] 🤖🤖
-- name: multiline_scalar
+- name: multiline_literal_block
   in:
-    args: ["line one\nline two\nln(create): /etc/zshrc\n"]
+    args: ["line one (raw)\nline two $x\nln(create): /etc/zshrc\n"]
   want:
     stdOut: |
-      line one
-      line two
-- name: regex_matcher
+      line one (raw)
+      line two $x
+- name: inline_regex_hole
   in:
     args: ["ln(create): /etc/zshrc"]
   want:
-    stdOut: ['^ln\(create\): /etc/\w+$']
+    stdOut: ['ln(create): /etc/{{\w+}}']
 # [<] 🤖🤖

@@ -53,13 +53,16 @@ func TestMatchers(t *testing.T) {
 }
 
 func TestMatch(t *testing.T) {
-	if !Match("ln(create): /etc/zshrc", `ln\(create\)`) {
-		t.Error("fragment matcher failed")
+	if !Match("ln(create): /etc/zshrc", "ln(create)") {
+		t.Error("literal matcher failed")
 	}
-	if !Match("ln(create): /etc/zshrc", `^ln\(create\): /etc/\w+$`) {
-		t.Error("anchored matcher failed")
+	if !Match("ln(create): /etc/zshrc", "ln(create): /etc/{{\\w+}}") {
+		t.Error("hole matcher failed")
 	}
-	if Match("cp: /x", "^ln") {
+	if Match("ln(create): /etc/zshrc", "ln.create.") {
+		t.Error("literal dots must not act as regex")
+	}
+	if Match("cp: /x", "ln(create)") {
 		t.Error("matcher matched wrongly")
 	}
 }

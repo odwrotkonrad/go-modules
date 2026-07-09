@@ -4,53 +4,53 @@
     op: link
   want:
     stdOut:
-      - 'ln\(create,dry-run=delta\)'
+      - 'ln(create,dry-run=delta)'
 - name: copy
   in:
     op: copy
   want:
     stdOut:
-      - 'cp\(create,dry-run=delta\)'
+      - 'cp(create,dry-run=delta)'
 - name: render_templates
   in:
     op: render-templates
   want:
     stdOut:
-      - 'render\(create,dry-run=delta\)'
+      - 'render(create,dry-run=delta)'
 - name: mk_dirs
   in:
     op: mk-dirs
   want:
     stdOut:
-      - 'mkdir\(create,dry-run=delta\)'
+      - 'mkdir(create,dry-run=delta)'
 - name: prune_links
   in:
     op: prune-links
   want:
     stdOut:
-      - 'prune-links\(dry-run=delta\)'
+      - 'prune-links(dry-run=delta)'
 - name: run_scripts
   in:
     op: run-scripts
   want:
     stdOut:
-      - 'run-scripts\(dry-run=delta\)'
+      - 'run-scripts(dry-run=delta)'
 - name: services_bootout
   in:
     op: services-bootout
   want:
     stdOut:
-      - 'bootout\(dry-run=delta\)'
+      - 'bootout(dry-run=delta)'
 - name: services_bootin
   in:
     op: services-bootin
   want:
     stdOut:
-      - 'bootstrap\(dry-run=delta\)'
+      - 'bootstrap(dry-run=delta)'
 - name: services_ensure
   in:
     op: services-ensure
   want:
     stdOut:
-      - 'ensure\(dry-run=delta\)'
+      - 'ensure(dry-run=delta)'
 # [<] 🤖🤖
