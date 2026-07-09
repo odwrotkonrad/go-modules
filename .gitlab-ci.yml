@@ -30,7 +30,13 @@ validate-pre-commit-all:
   stage: test
   needs: []
   script:
-    - make -C $MODULE test
+    - make -C $MODULE test-cover
+  coverage: '/total:\s+\(statements\)\s+\d+\.\d+%/'
+  artifacts:
+    reports:
+      coverage_report:
+        coverage_format: cobertura
+        path: $MODULE/coverage.xml
 
 test-che:
   extends: .test-module

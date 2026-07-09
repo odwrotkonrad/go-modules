@@ -5,7 +5,7 @@ SHELL := zsh
 MODULES := che get-os-open-files-with get-term-open-files-with lib
 
 WRAPPERS :=
-COMMANDS := render-templates render-docs run-repo-ci-prepare-hooks run-repo-ci-precommit-all test build vet install create-tag publish release-check release-snapshot
+COMMANDS := render-templates render-docs run-repo-ci-prepare-hooks run-repo-ci-precommit-all test test-cover build vet install create-tag publish release-check release-snapshot
 
 .PHONY: $(WRAPPERS) $(COMMANDS)
 
@@ -34,6 +34,10 @@ run-repo-ci-precommit-all: run-repo-ci-prepare-hooks
 #[what] run all tests in every module
 test:
 	@for m in $(MODULES); do $(MAKE) -C $$m test || exit 1; done
+
+#[what] run every module's tests with coverage, print each module's total percentage
+test-cover:
+	@for m in $(MODULES); do $(MAKE) -C $$m test-cover || exit 1; done
 
 #[what] build every module's binaries into <module>/dist
 build:

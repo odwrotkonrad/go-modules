@@ -14,6 +14,7 @@
 ### Go:
 
 `test` run all tests in every module
+`test-cover` run every module's tests with coverage, print each module's total percentage
 `build` build every module's binaries into <module>/dist
 `vet` go vet every module
 `install` install every module's binaries into $GOPATH/bin
@@ -34,6 +35,7 @@
 ### Go:
 
 `test` run all tests
+`test-cover` run all tests with coverage, print the per-package and total percentages
 `build` build the binary into ./dist via go build
 `vet` go vet all packages
 `install` install the binary into $GOPATH/bin
@@ -49,6 +51,7 @@
 ### Go:
 
 `test` run all tests
+`test-cover` run all tests with coverage, print the per-package and total percentages
 `build` build the binary into ./dist
 `vet` go vet all packages
 `install` install the binary into $GOPATH/bin
@@ -63,6 +66,7 @@
 ### Go:
 
 `test` run all tests
+`test-cover` run all tests with coverage, print the per-package and total percentages
 `build` build the binary into ./dist
 `vet` go vet all packages
 `install` install the binary into $GOPATH/bin
@@ -77,6 +81,7 @@
 ### Go:
 
 `test` run all tests
+`test-cover` run all tests with coverage, print the per-package and total percentages
 `build` compile all packages (library, no binaries)
 `vet` go vet all packages
 `install` no-op: library module, nothing to install

@@ -3,9 +3,10 @@
 SHELL := zsh
 .SHELLFLAGS := -c
 GO ?= go
+GOCOVER_COBERTURA ?= github.com/t-yuki/gocover-cobertura@v0.0.0-20180217150009-aaee18c8195c
 
 WRAPPERS :=
-COMMANDS := test build vet install release-check release-snapshot
+COMMANDS := test test-cover build vet install release-check release-snapshot
 
 .PHONY: $(WRAPPERS) $(COMMANDS)
 
@@ -13,6 +14,12 @@ COMMANDS := test build vet install release-check release-snapshot
 #[what] run all tests
 test:
 	$(GO) test ./...
+
+#[what] run all tests with coverage, print the per-package and total percentages
+test-cover:
+	$(GO) test -coverprofile=coverage.out -coverpkg=./... ./...
+	$(GO) tool cover -func=coverage.out | tail -1
+	$(GO) run $(GOCOVER_COBERTURA) < coverage.out > coverage.xml
 
 #[what] compile all packages (library, no binaries)
 build:
