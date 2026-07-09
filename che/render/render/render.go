@@ -52,8 +52,8 @@ func Exec(name string, body []byte, repoRoot string) ([]byte, error) {
 	return buf.Bytes(), nil
 }
 
-// isRateLimit: 1Password SDK surfaces vault rate limiting only in the error text.
-func isRateLimit(err error) bool {
+// isRateLimitErr: 1Password SDK surfaces vault rate limiting only in the error text.
+func isRateLimitErr(err error) bool {
 	return err != nil && strings.Contains(err.Error(), "rate limit exceeded")
 }
 
@@ -91,7 +91,7 @@ func opResolver(ctx context.Context) func(string) (string, error) {
 			}
 			client = c
 		}
-		secret, err := retry(opRetryDelays, time.Sleep, isRateLimit, func() (string, error) {
+		secret, err := retry(opRetryDelays, time.Sleep, isRateLimitErr, func() (string, error) {
 			return client.Secrets().Resolve(ctx, ref)
 		})
 		if err != nil {
@@ -182,7 +182,7 @@ func resolveAtIncludes(repoRoot string, body []byte) []byte {
 	var out bytes.Buffer
 	for line := range strings.Lines(string(body)) {
 		line = strings.TrimSuffix(line, "\n")
-		if isAtInclude(line) {
+		if isAtIncludeLine(line) {
 			path := strings.TrimPrefix(line, "@")
 			if rest, ok := strings.CutPrefix(path, "~/"); ok {
 				path = "root/HOME/" + rest
@@ -199,13 +199,13 @@ func resolveAtIncludes(repoRoot string, body []byte) []byte {
 	return out.Bytes()
 }
 
-// HasSecretRef: body contains an op:// secret reference (a render-time vault fetch).
-func HasSecretRef(body []byte) bool {
+// IsSecretRefPresent: body contains an op:// secret reference (a render-time vault fetch).
+func IsSecretRefPresent(body []byte) bool {
 	return bytes.Contains(body, []byte("op://"))
 }
 
-// isAtInclude: line is exactly '@<no-space>', no whitespace.
-func isAtInclude(line string) bool {
+// isAtIncludeLine: line is exactly '@<no-space>', no whitespace.
+func isAtIncludeLine(line string) bool {
 	if !strings.HasPrefix(line, "@") || len(line) < 2 {
 		return false
 	}

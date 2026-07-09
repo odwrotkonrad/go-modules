@@ -13,6 +13,7 @@ import (
 
 	"github.com/spf13/cobra"
 
+	"gitlab.com/konradodwrot/go-modules/che/internal/config"
 	"gitlab.com/konradodwrot/go-modules/che/internal/fsutil"
 	"gitlab.com/konradodwrot/go-modules/che/internal/host"
 	"gitlab.com/konradodwrot/go-modules/che/internal/log"
@@ -106,8 +107,7 @@ func (u unit) withEnv(fn func() error) error {
 type pluginConfig struct {
 	repoRoot string
 	home     string
-	mode     host.DryRunMode
-	forceAll bool
+	cfg      config.Config
 	eval     func(string) (bool, error)
 }
 
@@ -129,11 +129,14 @@ var (
 // version is injected at build time via -ldflags -X.
 var version = "dev"
 
-// dryRunModes maps the --dry-run flag value to a host.DryRunMode.
-var dryRunModes = map[string]host.DryRunMode{
-	"":      host.DryRunOff,
-	"delta": host.DryRunDelta,
-	"all":   host.DryRunAll,
+// newHost builds each unit's Host; tests override it to inject a mock fs.
+var newHost = host.New
+
+// dryRunModes maps the --dry-run flag value to a config.DryRunMode.
+var dryRunModes = map[string]config.DryRunMode{
+	"":      config.DryRunOff,
+	"delta": config.DryRunDelta,
+	"all":   config.DryRunAll,
 }
 
 // RootCmd is che's root command. Resolves the eligible profiles (build) before
@@ -187,7 +190,8 @@ func Attach() *cobra.Command {
 // build loads spec -> lists eligible profiles -> resolves union -> wires the
 // host. Run in PersistentPreRunE before any subcommand RunE.
 func build() error {
-	if dir := orEnv(dirFlag, "CHE_DIR"); dir != "" {
+	dir := orEnv(dirFlag, "CHE_DIR")
+	if dir != "" {
 		if err := os.Chdir(dir); err != nil {
 			return fmt.Errorf("-C: %w", err)
 		}
@@ -216,26 +220,32 @@ func build() error {
 	// CHE_SKIP_PLUGINS, truthy) drops plugins entries, local repo only.
 	// --debug (env CHE_DEBUG, truthy) prints debug-level lines.
 	// Flags win over envs.
-	log.SetDebug(boolOrEnv(debugFlag, "CHE_DEBUG"))
-	forceOne := orEnv(profileForce, "CHE_PROFILE")
-	forceAll := boolOrEnv(skipExecIf, "CHE_SKIP_EXEC_IF")
+	cfg := config.Config{
+		Dir:         dir,
+		DryRun:      mode,
+		Profile:     orEnv(profileForce, "CHE_PROFILE"),
+		SkipExecIf:  boolOrEnv(skipExecIf, "CHE_SKIP_EXEC_IF"),
+		SkipPlugins: boolOrEnv(skipPlugins, "CHE_SKIP_PLUGINS"),
+		Debug:       boolOrEnv(debugFlag, "CHE_DEBUG"),
+	}
+	log.SetDebug(cfg.Debug)
 	eval := spec.NewEvaluator().EvalExecIf
-	profiles, err := sp.EligibleProfiles(forceOne, forceAll, eval)
+	profiles, err := sp.EligibleProfiles(cfg.Profile, cfg.SkipExecIf, eval)
 	if err != nil {
 		return err
 	}
-	h := host.New(repoRoot, home, strings.Join(profiles, ","), mode)
+	h := newHost(repoRoot, home, strings.Join(profiles, ","), cfg)
 	res, err := sp.Resolve(profiles, h.Root)
 	if err != nil {
 		return err
 	}
 	units = []unit{{host: h, res: res}}
 	pluginRefs = res.Plugins
-	if boolOrEnv(skipPlugins, "CHE_SKIP_PLUGINS") {
+	if cfg.SkipPlugins {
 		pluginRefs = nil
 	}
 	pluginUnits = map[string]*unit{}
-	pluginCfg = pluginConfig{repoRoot: repoRoot, home: home, mode: mode, forceAll: forceAll, eval: eval}
+	pluginCfg = pluginConfig{repoRoot: repoRoot, home: home, cfg: cfg, eval: eval}
 	return nil
 }
 
@@ -264,12 +274,12 @@ func buildPlugin(p spec.PluginRef) (unit, bool, error) {
 	if err != nil {
 		return unit{}, false, err
 	}
-	h := host.New(checkout, pluginCfg.home, p.Profile, pluginCfg.mode).WithLogSub("profile=" + p.Profile)
+	h := newHost(checkout, pluginCfg.home, p.Profile, pluginCfg.cfg).WithLogSub("profile=" + p.Profile)
 	u := unit{host: h, ref: p.String(), env: p.Env}
 	var pass bool
 	err = u.withEnv(func() error {
 		var err error
-		if pass, err = psp.ExecIfPass(p.Profile, pluginCfg.forceAll, pluginCfg.eval); err != nil || !pass {
+		if pass, err = psp.ExecIfPass(p.Profile, pluginCfg.cfg.SkipExecIf, pluginCfg.eval); err != nil || !pass {
 			return err
 		}
 		u.res, err = psp.Resolve([]string{p.Profile}, u.host.Root)

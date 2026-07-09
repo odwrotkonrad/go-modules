@@ -3,10 +3,16 @@ package cli
 // [>] 🤖🤖
 
 import (
+	"errors"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
+	"time"
 
+	"gitlab.com/konradodwrot/go-modules/che/internal/config"
+	"gitlab.com/konradodwrot/go-modules/che/internal/execx"
+	"gitlab.com/konradodwrot/go-modules/che/internal/host"
 	"gitlab.com/konradodwrot/go-modules/che/internal/testutil"
 	"gitlab.com/konradodwrot/go-modules/lib/testyml"
 )
@@ -45,19 +51,52 @@ func repoEnv(t *testing.T, pwd string) string {
 	return home
 }
 
-// setupDryRun wires the mock che repo, flips dry-run on (reset on cleanup), and
-// runs build() so each command test starts from resolved state. Returns HOME.
-func setupDryRun(t *testing.T, pwd, profile string) string {
+// setupMock wires the mock che repo with dry-run off, injects a record-only
+// MockFS into every built Host plus a launchd-modeling mock executor, and runs
+// build() so each command test starts from resolved state. Returns HOME plus
+// both mocks.
+func setupMock(t *testing.T, pwd, profile string) (string, *testutil.MockFS, *execx.Mock) {
 	t.Helper()
 	home := repoEnv(t, pwd)
 	t.Setenv("CHE_DRY_RUN", "")
-	dryRunMode = "delta"
+	dryRunMode = ""
 	profileForce = profile
 	t.Cleanup(func() { dryRunMode, profileForce = "", "" })
+
+	mock := &testutil.MockFS{}
+	prevHost := newHost
+	newHost = func(repoRoot, home, profile string, cfg config.Config) host.Host {
+		return host.New(repoRoot, home, profile, cfg).WithFS(mock)
+	}
+	t.Cleanup(func() { newHost = prevHost })
+
+	exe := &execx.Mock{}
+	loaded := true
+	exe.Stub = func(argv []string) ([]byte, error) {
+		cmd := strings.Join(argv, " ")
+		switch {
+		case strings.Contains(cmd, "launchctl bootout"):
+			loaded = false
+		case strings.Contains(cmd, "launchctl bootstrap"):
+			loaded = true
+		case strings.Contains(cmd, "launchctl print"):
+			if !loaded {
+				return nil, errors.New("stub: not loaded")
+			}
+			return []byte("\tpid = 4242\n"), nil
+		}
+		return nil, nil
+	}
+	execx.Swap(t, exe)
+
+	prevSleep := host.Sleep
+	host.Sleep = func(time.Duration) {}
+	t.Cleanup(func() { host.Sleep = prevSleep })
+
 	if err := build(); err != nil {
 		t.Fatalf("build() errored: %v", err)
 	}
-	return home
+	return home, mock, exe
 }
 
 // --profile forces one defined profile, execIf skipped, autoExec irrelevant.
@@ -86,7 +125,7 @@ func TestBuildDryRunEnvFallback(t *testing.T) {
 	if err := build(); err != nil {
 		t.Fatalf("build() errored: %v", err)
 	}
-	if !units[0].host.DryRunAll() {
+	if !units[0].host.IsOptionEqualTo(config.OptionDryRun, config.DryRunAll) {
 		t.Fatal("DryRunAll() = false, want true (CHE_DRY_RUN=all from env)")
 	}
 }

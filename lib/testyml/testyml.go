@@ -54,25 +54,25 @@ func compileMatcher(matcher string) *regexp.Regexp {
 	return regexp.MustCompile(b.String())
 }
 
-func Match(s, matcher string) bool {
+func IsMatch(s, matcher string) bool {
 	return compileMatcher(matcher).MatchString(s)
 }
 
 func MustMatch(t *testing.T, s, matcher string) {
 	t.Helper()
-	if !Match(s, matcher) {
+	if !IsMatch(s, matcher) {
 		t.Errorf("output missing %q:\n--- got ---\n%s", matcher, s)
 	}
 }
 
 func MustNotMatch(t *testing.T, s, matcher string) {
 	t.Helper()
-	if Match(s, matcher) {
+	if IsMatch(s, matcher) {
 		t.Errorf("output unexpectedly matches %q:\n--- got ---\n%s", matcher, s)
 	}
 }
 
-func (w Want) WantsError() bool { return w.Error || w.ExitCode != 0 || len(w.StdErr) > 0 }
+func (w Want) IsErrorWanted() bool { return w.Error || w.ExitCode != 0 || len(w.StdErr) > 0 }
 
 func (w Want) CheckErr(t *testing.T, err error) {
 	t.Helper()
@@ -80,7 +80,7 @@ func (w Want) CheckErr(t *testing.T, err error) {
 		t.Fatalf("succeeded, want error %+v", w)
 	}
 	for _, f := range w.StdErr {
-		if !Match(err.Error(), f) {
+		if !IsMatch(err.Error(), f) {
 			t.Errorf("error %q missing %q", err.Error(), f)
 		}
 	}

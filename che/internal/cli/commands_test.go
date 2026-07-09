@@ -42,6 +42,18 @@ func findCmd(t *testing.T, args []string) (*cobra.Command, []string) {
 	return cmd, args[1:]
 }
 
+// joinLines renders recorded calls one per line, newline-terminated like
+// stdout, so block matchers assert order across both.
+func joinLines(calls []string) string {
+	if len(calls) == 0 {
+		return ""
+	}
+	return strings.Join(calls, "\n") + "\n"
+}
+
+// TestCommands runs each subcommand with dry-run off against a record-only
+// MockFS and a mock command executor: fs mutations, executed commands and log
+// lines assert without touching the host.
 func TestCommands(t *testing.T) {
 	type context struct {
 		Directory string
@@ -52,21 +64,22 @@ func TestCommands(t *testing.T) {
 	}
 	type want struct {
 		testyml.Want `yaml:",inline"`
-		DryRunLines  *bool `yaml:"dryRunLines"`
+		FsCalls      testyml.Matchers `yaml:"fsCalls"`
+		Cmds         testyml.Matchers `yaml:"cmds"`
 	}
 	type c struct {
 		Name    string
 		Context context
 		In      in
 		Want    want
-		NotWant testyml.Want `yaml:"notWant"`
+		NotWant want `yaml:"notWant"`
 	}
 	testyml.Run(t, td, "testdata/spec/commands.spec.yml", func(t *testing.T, c c) {
 		profile := c.In.Profile
 		if profile == "" {
 			profile = testutil.CheProfile
 		}
-		home := setupDryRun(t, c.Context.Directory, profile)
+		home, mock, exe := setupMock(t, c.Context.Directory, profile)
 		vars := map[string]string{
 			"HOME":    home,
 			"REPO":    units[0].host.RepoRoot,
@@ -75,26 +88,27 @@ func TestCommands(t *testing.T) {
 		}
 		cmd, rest := findCmd(t, c.In.Args)
 		out, err := testutil.CaptureStdout(t, func() error { return cmd.RunE(cmd, rest) })
-		if c.Want.WantsError() {
+		if c.Want.IsErrorWanted() {
 			c.Want.CheckErr(t, err)
-			return
+		} else if err != nil {
+			t.Fatalf("%v errored: %v\n%s", c.In.Args, err, out)
 		}
-		if err != nil {
-			t.Fatalf("%v errored: %v", c.In.Args, err)
+		got := map[string]string{
+			"stdOut":  testutil.StripStamps(testutil.StripANSI(out)),
+			"fsCalls": joinLines(mock.Calls()),
+			"cmds":    joinLines(exe.Calls()),
 		}
-		if c.Want.DryRunLines == nil || *c.Want.DryRunLines {
-			for line := range strings.SplitSeq(strings.TrimSpace(out), "\n") {
-				if line != "" && !strings.Contains(line, "dry-run=delta") {
-					t.Errorf("non-dry-run line: %q\n--- got ---\n%s", line, out)
-				}
+		for name, ms := range map[string][2]testyml.Matchers{
+			"stdOut":  {c.Want.StdOut, c.NotWant.StdOut},
+			"fsCalls": {c.Want.FsCalls, c.NotWant.FsCalls},
+			"cmds":    {c.Want.Cmds, c.NotWant.Cmds},
+		} {
+			for _, f := range ms[0] {
+				testyml.MustMatch(t, got[name], testyml.Expand(f, vars))
 			}
-		}
-		stripped := testutil.StripStamps(testutil.StripANSI(out))
-		for _, f := range c.Want.StdOut {
-			testyml.MustMatch(t, stripped, testyml.Expand(f, vars))
-		}
-		for _, f := range c.NotWant.StdOut {
-			testyml.MustNotMatch(t, stripped, testyml.Expand(f, vars))
+			for _, f := range ms[1] {
+				testyml.MustNotMatch(t, got[name], testyml.Expand(f, vars))
+			}
 		}
 	})
 }

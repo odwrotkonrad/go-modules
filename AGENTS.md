@@ -239,7 +239,9 @@ che
                   .config
                     foo
         spec
+    config
     docgen
+    execx
     fsutil
       testdata
         spec

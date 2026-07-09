@@ -220,7 +220,7 @@ func TestResolve(t *testing.T) {
 			t.Fatal(err)
 		}
 		res, err := s.Resolve(c.In.Profiles, filepath.Join(dir, "root"))
-		if c.Want != nil && c.Want.WantsError() {
+		if c.Want != nil && c.Want.IsErrorWanted() {
 			c.Want.CheckErr(t, err)
 			return
 		}

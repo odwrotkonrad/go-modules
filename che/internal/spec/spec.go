@@ -22,8 +22,8 @@ const (
 // only: the dest path decides host vs repo).
 var tmplExts = []string{".ontoHost.tpl", ".ontoRepo.tpl", ".tpl"}
 
-// IsTmpl reports whether rel is a template source (any accepted suffix).
-func IsTmpl(rel string) bool { return strings.HasSuffix(rel, TmplExt) }
+// IsTmplSrc reports whether rel is a template source (any accepted suffix).
+func IsTmplSrc(rel string) bool { return strings.HasSuffix(rel, TmplExt) }
 
 // TrimTmplExt strips the template suffix from rel (longest match first),
 // yielding the derived dest path.

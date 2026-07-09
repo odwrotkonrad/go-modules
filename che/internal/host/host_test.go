@@ -7,6 +7,8 @@ import (
 	"path/filepath"
 	"slices"
 	"testing"
+
+	"gitlab.com/konradodwrot/go-modules/che/internal/config"
 )
 
 func TestToDest(t *testing.T) {
@@ -39,7 +41,7 @@ func TestPrepend(t *testing.T) {
 }
 
 func TestSrc(t *testing.T) {
-	h := New("/repo", "/Users/x", "cli/macos", DryRunOff)
+	h := New("/repo", "/Users/x", "cli/macos", config.Config{})
 	if got := h.Src("etc/zshrc"); got != "/repo/root/etc/zshrc" {
 		t.Errorf("Src = %q, want /repo/root/etc/zshrc", got)
 	}
@@ -61,7 +63,7 @@ func TestResolveScripts(t *testing.T) {
 			t.Fatal(err)
 		}
 	}
-	h := New(dir, "/Users/x", "cli/macos", DryRunOff)
+	h := New(dir, "/Users/x", "cli/macos", config.Config{})
 
 	got, err := h.ResolveScripts(scripts)
 	if err != nil {

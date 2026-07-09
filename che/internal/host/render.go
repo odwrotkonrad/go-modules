@@ -36,9 +36,9 @@ func (h Host) RenderTemplates(templates []spec.FileItem, skipSecrets bool) error
 	var keep []spec.FileItem
 	var hostDests []string
 	for _, item := range templates {
-		if skipSecrets && srcHasSecretRef(filepath.Join(h.RepoRoot, item.Rel)) {
+		if skipSecrets && isSecretRefInSrc(filepath.Join(h.RepoRoot, item.Rel)) {
 			for _, d := range h.templateDests(item) {
-				h.fs.Log("render(skip-secrets)", d.path)
+				h.log("render(skip-secrets)", d.path)
 			}
 			continue
 		}
@@ -55,10 +55,10 @@ func (h Host) RenderTemplates(templates []spec.FileItem, skipSecrets bool) error
 		}
 	}
 	var errs []error
-	if h.DryRun() { // [why] dry-run logs dests only: no gomplate render, no @-include resolve
+	if h.IsDryRun() { // [why] dry-run logs dests only: no gomplate render, no @-include resolve
 		for _, item := range keep {
 			for _, d := range h.templateDests(item) {
-				h.fs.Log("render(create)", d.path)
+				h.log("render(create)", d.path)
 				if d.host {
 					if err := h.fixPerms("render", d.path, item); err != nil {
 						errs = append(errs, h.failItem("render", d.path, err))
@@ -76,15 +76,15 @@ func (h Host) RenderTemplates(templates []spec.FileItem, skipSecrets bool) error
 	return errors.Join(errs...)
 }
 
-// srcHasSecretRef reports whether the template source at path carries an op://
+// isSecretRefInSrc reports whether the template source at path carries an op://
 // secret reference (a render-time vault fetch). Unreadable source -> false
 // (render proceeds, errors there).
-func srcHasSecretRef(path string) bool {
+func isSecretRefInSrc(path string) bool {
 	src, err := os.ReadFile(path)
 	if err != nil {
 		return false
 	}
-	return render.HasSecretRef(src)
+	return render.IsSecretRefPresent(src)
 }
 
 // templateDests resolves an item's dests: derived host path (no explicit dest,
@@ -135,7 +135,10 @@ func (h Host) renderTemplate(item spec.FileItem) error {
 			}
 			continue
 		}
-		h.fs.Log("render(create)", d.path)
+		h.log("render(create)", d.path)
+		if err := os.MkdirAll(filepath.Dir(d.path), 0o755); err != nil {
+			return err
+		}
 		if err := os.WriteFile(d.path, out, repoFileMode); err != nil {
 			return err
 		}
@@ -146,7 +149,9 @@ func (h Host) renderTemplate(item spec.FileItem) error {
 // placeFile installs body with spec perms (mode 0 -> install default, no chown).
 func (h Host) placeFile(dest string, body []byte, item spec.FileItem) error {
 	mode, _ := parseMode(item.Chmod)
-	return h.fs.Install(dest, body, mode, ownerSpec(item))
+	return h.mutate("render(create)", dest, func() error {
+		return h.fs.Install(dest, body, mode, ownerSpec(item))
+	})
 }
 
 // [<] 🤖🤖

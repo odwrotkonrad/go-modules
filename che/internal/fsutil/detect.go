@@ -4,10 +4,11 @@ package fsutil
 
 import (
 	"os"
-	"os/exec"
 	"os/user"
 	"runtime"
 	"strings"
+
+	"gitlab.com/konradodwrot/go-modules/che/internal/execx"
 )
 
 func NormalizeOS(goos string) string {
@@ -17,14 +18,14 @@ func NormalizeOS(goos string) string {
 	return goos
 }
 
-// Virtualized: mac via kern.hv_vmm_present==1 (Apple VZ guest); linux via systemd-detect-virt / container markers.
-func Virtualized() bool {
+// IsVirtualized: mac via kern.hv_vmm_present==1 (Apple VZ guest); linux via systemd-detect-virt / container markers.
+func IsVirtualized() bool {
 	switch runtime.GOOS {
 	case "darwin":
-		out, err := exec.Command("sysctl", "-n", "kern.hv_vmm_present").Output()
+		out, err := execx.Default.Output(execx.Cmd{Argv: []string{"sysctl", "-n", "kern.hv_vmm_present"}})
 		return err == nil && strings.TrimSpace(string(out)) == "1"
 	case "linux":
-		if exec.Command("systemd-detect-virt", "-q").Run() == nil {
+		if execx.Default.Exec(execx.Cmd{Argv: []string{"systemd-detect-virt", "-q"}}) == nil {
 			return true
 		}
 		if _, err := os.Stat("/.dockerenv"); err == nil {

@@ -71,9 +71,9 @@ func TestUnderHome(t *testing.T) {
 		Want bool
 	}
 	f := FS{Home: "/Users/x"}
-	testyml.Run(t, td, "testdata/spec/under_home.spec.yml", func(t *testing.T, c c) {
-		if got := f.UnderHome(c.In.Args[0]); got != c.Want {
-			t.Errorf("UnderHome(%q) = %v, want %v", c.In.Args[0], got, c.Want)
+	testyml.Run(t, td, "testdata/spec/is_under_home.spec.yml", func(t *testing.T, c c) {
+		if got := f.IsUnderHome(c.In.Args[0]); got != c.Want {
+			t.Errorf("IsUnderHome(%q) = %v, want %v", c.In.Args[0], got, c.Want)
 		}
 	})
 }

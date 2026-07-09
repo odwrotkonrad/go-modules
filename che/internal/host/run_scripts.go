@@ -5,9 +5,10 @@ package host
 import (
 	"fmt"
 	"os"
-	"os/exec"
 	"path/filepath"
 	"strings"
+
+	"gitlab.com/konradodwrot/go-modules/che/internal/execx"
 )
 
 // scriptResult pairs a script with its run status.
@@ -24,15 +25,13 @@ func (h Host) RunScripts(scripts []string) error {
 	var results []scriptResult
 	var failed []string
 	for _, script := range scripts {
-		h.fs.Log("run-scripts", script)
-		if h.DryRun() {
+		h.log("run-scripts", script)
+		if h.IsDryRun() {
 			continue
 		}
-		c := exec.Command(script)
-		c.Env = env
-		c.Stdout, c.Stderr = os.Stdout, os.Stderr
-		if err := c.Run(); err != nil {
-			h.fs.Log("run-scripts(fail)", fmt.Sprintf("%s: %v", script, err))
+		c := execx.Cmd{Argv: []string{script}, Env: env, Stdout: os.Stdout, Stderr: os.Stderr}
+		if err := execx.Default.Exec(c); err != nil {
+			h.log("run-scripts(fail)", fmt.Sprintf("%s: %v", script, err))
 			results = append(results, scriptResult{script, "fail"})
 			failed = append(failed, script)
 		} else {
@@ -41,7 +40,7 @@ func (h Host) RunScripts(scripts []string) error {
 	}
 
 	for _, r := range results {
-		h.fs.Log("run-scripts(report)", fmt.Sprintf("%s %s", r.status, r.script))
+		h.log("run-scripts(report)", fmt.Sprintf("%s %s", r.status, r.script))
 	}
 
 	if len(failed) > 0 {

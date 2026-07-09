@@ -4,7 +4,8 @@ package checkcmd
 import (
 	"fmt"
 	"os"
-	"os/exec"
+
+	"gitlab.com/konradodwrot/go-modules/che/internal/execx"
 )
 
 type Tool struct {
@@ -74,9 +75,11 @@ func diff(want, got, wantLabel, gotLabel string) string {
 	gf.WriteString(got)
 	wf.Close()
 	gf.Close()
-	out, _ := exec.Command("diff", "-u",
+	out, _ := execx.Default.Output(execx.Cmd{Argv: []string{
+		"diff", "-u",
 		"--label", wantLabel, "--label", gotLabel,
-		wf.Name(), gf.Name()).Output()
+		wf.Name(), gf.Name(),
+	}})
 	return string(out)
 }
 

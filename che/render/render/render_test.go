@@ -58,8 +58,8 @@ func TestIsAtInclude(t *testing.T) {
 		Want bool
 	}
 	testyml.Run(t, td, "testdata/spec/is_at_include.spec.yml", func(t *testing.T, c c) {
-		if got := isAtInclude(c.In.Args[0]); got != c.Want {
-			t.Errorf("isAtInclude(%q) = %v, want %v", c.In.Args[0], got, c.Want)
+		if got := isAtIncludeLine(c.In.Args[0]); got != c.Want {
+			t.Errorf("isAtIncludeLine(%q) = %v, want %v", c.In.Args[0], got, c.Want)
 		}
 	})
 }
@@ -177,7 +177,7 @@ func TestRenderMarkdown(t *testing.T) {
 		root := t.TempDir()
 		testyml.CopyDir(t, td, "testdata/fixture/render_markdown/tree-docs", root)
 		got, err := RenderMarkdown(root, c.In.Args[0], c.In.Args[1:]...)
-		if c.Want.WantsError() {
+		if c.Want.IsErrorWanted() {
 			c.Want.CheckErr(t, err)
 			return
 		}
@@ -208,8 +208,8 @@ func TestIsRateLimit(t *testing.T) {
 		nil: false,
 	}
 	for err, want := range cases {
-		if got := isRateLimit(err); got != want {
-			t.Errorf("isRateLimit(%v) = %v, want %v", err, got, want)
+		if got := isRateLimitErr(err); got != want {
+			t.Errorf("isRateLimitErr(%v) = %v, want %v", err, got, want)
 		}
 	}
 }
@@ -221,7 +221,7 @@ func TestRetry(t *testing.T) {
 	t.Run("succeeds first try, no sleep", func(t *testing.T) {
 		slept := 0
 		calls := 0
-		v, err := retry(delays, func(time.Duration) { slept++ }, isRateLimit,
+		v, err := retry(delays, func(time.Duration) { slept++ }, isRateLimitErr,
 			func() (string, error) { calls++; return "ok", nil })
 		if v != "ok" || err != nil || calls != 1 || slept != 0 {
 			t.Errorf("v=%q err=%v calls=%d slept=%d", v, err, calls, slept)
@@ -231,7 +231,7 @@ func TestRetry(t *testing.T) {
 	t.Run("retries rate limit then succeeds", func(t *testing.T) {
 		slept := 0
 		calls := 0
-		v, err := retry(delays, func(time.Duration) { slept++ }, isRateLimit,
+		v, err := retry(delays, func(time.Duration) { slept++ }, isRateLimitErr,
 			func() (string, error) {
 				calls++
 				if calls < 3 {
@@ -246,7 +246,7 @@ func TestRetry(t *testing.T) {
 
 	t.Run("exhausts retries, returns last error", func(t *testing.T) {
 		calls := 0
-		_, err := retry(delays, func(time.Duration) {}, isRateLimit,
+		_, err := retry(delays, func(time.Duration) {}, isRateLimitErr,
 			func() (string, error) { calls++; return "", rateLimit })
 		if !errors.Is(err, rateLimit) || calls != len(delays)+1 {
 			t.Errorf("err=%v calls=%d, want %d", err, calls, len(delays)+1)
@@ -256,7 +256,7 @@ func TestRetry(t *testing.T) {
 	t.Run("non-retryable error fails immediately", func(t *testing.T) {
 		other := errors.New("bad ref")
 		calls := 0
-		_, err := retry(delays, func(time.Duration) {}, isRateLimit,
+		_, err := retry(delays, func(time.Duration) {}, isRateLimitErr,
 			func() (string, error) { calls++; return "", other })
 		if !errors.Is(err, other) || calls != 1 {
 			t.Errorf("err=%v calls=%d, want 1", err, calls)

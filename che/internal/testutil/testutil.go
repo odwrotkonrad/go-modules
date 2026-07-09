@@ -13,8 +13,6 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/spf13/cobra"
-
 	"gitlab.com/konradodwrot/go-modules/lib/testyml"
 )
 
@@ -105,25 +103,6 @@ func CheRepo(t *testing.T) (string, string) {
 		t.Fatal(err)
 	}
 	return dir, home
-}
-
-// RunDry runs a subcommand's RunE (caller already built dry-run state), captures stdout,
-// asserts every printed line carries the dry-run=delta scope. dryRunLines=false skips that
-// check (e.g. detect, prints bare profile).
-func RunDry(t *testing.T, cmd *cobra.Command, dryRunLines bool) string {
-	t.Helper()
-	out, err := CaptureStdout(t, func() error { return cmd.RunE(cmd, nil) })
-	if err != nil {
-		t.Fatalf("%s errored: %v", cmd.Name(), err)
-	}
-	if dryRunLines {
-		for line := range strings.SplitSeq(strings.TrimSpace(out), "\n") {
-			if line != "" && !strings.Contains(line, "dry-run=delta") {
-				t.Errorf("non-dry-run line: %q\n--- got ---\n%s", line, out)
-			}
-		}
-	}
-	return out
 }
 
 // WantLines asserts every fragment appears in out (order-independent, style-agnostic).

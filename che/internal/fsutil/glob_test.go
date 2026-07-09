@@ -18,9 +18,9 @@ func TestMatchGlob(t *testing.T) {
 		In   in
 		Want bool
 	}
-	testyml.Run(t, td, "testdata/spec/match_glob.spec.yml", func(t *testing.T, c c) {
-		if got := MatchGlob(c.In.Args[0], c.In.Args[1]); got != c.Want {
-			t.Errorf("MatchGlob(%v) = %v, want %v", c.In.Args, got, c.Want)
+	testyml.Run(t, td, "testdata/spec/is_glob_match.spec.yml", func(t *testing.T, c c) {
+		if got := IsGlobMatch(c.In.Args[0], c.In.Args[1]); got != c.Want {
+			t.Errorf("IsGlobMatch(%v) = %v, want %v", c.In.Args, got, c.Want)
 		}
 	})
 }

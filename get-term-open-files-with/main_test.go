@@ -46,7 +46,7 @@ func configDir(t *testing.T, raw []byte) string {
 
 func checkCoded(t *testing.T, w testyml.Want, err error) bool {
 	t.Helper()
-	if !w.WantsError() {
+	if !w.IsErrorWanted() {
 		if err != nil {
 			t.Fatalf("unexpected error: %v", err)
 		}

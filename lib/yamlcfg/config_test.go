@@ -73,7 +73,7 @@ func TestLoadConfig(t *testing.T) {
 			}
 		}
 		node, err := LoadConfigNode("cfg.yml", userDir)
-		if c.Want.WantsError() {
+		if c.Want.IsErrorWanted() {
 			c.Want.CheckErr(t, err)
 			if got := Code(err); c.Want.ExitCode != 0 && got != c.Want.ExitCode {
 				t.Fatalf("Code = %d (%v), want %d", got, err, c.Want.ExitCode)

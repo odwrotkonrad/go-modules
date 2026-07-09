@@ -37,16 +37,16 @@ func (gs *globSet) addRule(glob string, perms Perms, rule *destRule) {
 // match returns the last globPerm matching rel, and whether any did.
 func (gs globSet) match(rel string) (gp globPerm, hit bool) {
 	for _, g := range gs {
-		if globMatch(g.glob, rel) {
+		if isGlobMatch(g.glob, rel) {
 			gp, hit = g, true
 		}
 	}
 	return gp, hit
 }
 
-// globMatch matches rel against an op glob, ignoring a trailing slash.
-func globMatch(glob, rel string) bool {
-	return fsutil.MatchGlob(strings.TrimSuffix(glob, "/"), rel)
+// isGlobMatch matches rel against an op glob, ignoring a trailing slash.
+func isGlobMatch(glob, rel string) bool {
+	return fsutil.IsGlobMatch(strings.TrimSuffix(glob, "/"), rel)
 }
 
 // effective is the composed additive selection before classification + exclude.
@@ -236,7 +236,7 @@ func classify(root string, eff effective, res *Resolved) error {
 			continue
 		}
 		switch {
-		case IsTmpl(rel) && hit(eff.tmplGlobs, RootPrefix+rel, &res.Templates):
+		case IsTmplSrc(rel) && hit(eff.tmplGlobs, RootPrefix+rel, &res.Templates):
 		case strings.HasSuffix(rel, CpExt) && hit(eff.copyGlobs, rel, &res.Copies):
 		case filepath.Base(rel) == ".gitkeep":
 			// excluded from every op
@@ -311,8 +311,8 @@ func collectDirs(res *Resolved) {
 
 func byRel(a, b FileItem) int { return cmp.Compare(a.Rel, b.Rel) }
 
-func matchAny(globs []string, rel string) bool {
-	return slices.ContainsFunc(globs, func(g string) bool { return globMatch(g, rel) })
+func isAnyGlobMatch(globs []string, rel string) bool {
+	return slices.ContainsFunc(globs, func(g string) bool { return isGlobMatch(g, rel) })
 }
 
 // applyExcludes drops items matching any exclude glob across all keys. Excludes
@@ -343,11 +343,11 @@ func dropFiles(items []FileItem, globs []string) []FileItem {
 		return items
 	}
 	return slices.DeleteFunc(items, func(it FileItem) bool {
-		if matchAny(globs, it.Rel) {
+		if isAnyGlobMatch(globs, it.Rel) {
 			return true
 		}
 		for _, d := range it.Dests {
-			if matchAny(globs, d.Path) {
+			if isAnyGlobMatch(globs, d.Path) {
 				return true
 			}
 		}
@@ -360,7 +360,7 @@ func dropStrings(xs, globs []string) []string {
 	if len(globs) == 0 {
 		return xs
 	}
-	return slices.DeleteFunc(xs, func(x string) bool { return matchAny(globs, x) })
+	return slices.DeleteFunc(xs, func(x string) bool { return isAnyGlobMatch(globs, x) })
 }
 
 // mergeInto composes name into eff: mixinProfiles depth-first, then this

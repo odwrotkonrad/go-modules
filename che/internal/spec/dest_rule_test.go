@@ -24,7 +24,7 @@ func TestDestRule(t *testing.T) {
 	}
 	testyml.Run(t, td, "testdata/spec/dest_rule.spec.yml", func(t *testing.T, c c) {
 		rule, err := parseDestRule(c.In.Rule)
-		if c.Want.WantsError() {
+		if c.Want.IsErrorWanted() {
 			c.Want.CheckErr(t, err)
 			return
 		}

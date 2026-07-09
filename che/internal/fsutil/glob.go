@@ -7,20 +7,20 @@ import (
 	"strings"
 )
 
-// MatchGlob matches path against pattern. ** spans separators, * one segment, prefix may end in * (suffix glob).
-func MatchGlob(pattern, path string) bool {
+// IsGlobMatch matches path against pattern. ** spans separators, * one segment, prefix may end in * (suffix glob).
+func IsGlobMatch(pattern, path string) bool {
 	if base, ok := strings.CutSuffix(pattern, "/**"); ok {
 		return path == base || strings.HasPrefix(path, base+"/")
 	}
 	if strings.Contains(pattern, "**") {
-		return doublestar(pattern, path)
+		return isDoublestarMatch(pattern, path)
 	}
 	ok, err := filepath.Match(pattern, path)
 	return err == nil && ok
 }
 
-// doublestar matches an interior **.
-func doublestar(pattern, path string) bool {
+// isDoublestarMatch matches an interior **.
+func isDoublestarMatch(pattern, path string) bool {
 	parts := strings.SplitN(pattern, "**", 2)
 	pre, post := parts[0], strings.TrimPrefix(parts[1], "/")
 	if !strings.HasPrefix(path, pre) {

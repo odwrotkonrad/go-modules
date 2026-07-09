@@ -5,61 +5,43 @@ package fsutil
 import (
 	"fmt"
 	"os"
-	"os/exec"
 	"path/filepath"
 	"runtime"
 	"strings"
 
 	"github.com/go-git/go-git/v5"
 
-	"gitlab.com/konradodwrot/go-modules/che/internal/log"
+	"gitlab.com/konradodwrot/go-modules/che/internal/execx"
 )
 
-// FS runs mutating fs ops, honoring Mode (dry-run mode), escalating priv
-// per-dest (sudo iff dest outside invoking user's Home).
+// FileSystemWriter is the mutating fs surface host ops drive; FS is the real
+// implementation, record-only mocks stand in for tests.
+type FileSystemWriter interface {
+	Mkdir(dest string, mode os.FileMode, parents bool) error
+	Chmod(chmodArg, dest string) error
+	Symlink(target, dest string) error
+	Copy(src, dest string, mode os.FileMode) error
+	Remove(dest string) error
+	Chown(owner, dest string) error
+	Install(dest string, body []byte, mode os.FileMode, owner string) error
+	ArchiveDests(archivePath string, dests []string) error
+}
+
+// FS runs mutating fs ops, escalating priv per-dest (sudo iff dest outside
+// invoking user's Home). Pure execution: no logging, no dry-run gate.
 type FS struct {
 	Home string
-	Mode log.DryRun
-	Sub  string
 }
 
-// dry reports whether this is any dry run (delta or all).
-func (f FS) dry() bool { return f.Mode != log.Off }
-
-// Log emits a 'title: msg' line, folding the dry-run mode plus Sub into the
-// subtype. Title is "type" or "type(subtype)" (see log.MsgSub).
-func (f FS) Log(title, msg string) { log.MsgSub(title, msg, f.Mode, f.Sub) }
-
-// UnderHome reports dest in user-owned Home tree (no sudo).
-func (f FS) UnderHome(dest string) bool {
+// IsUnderHome reports dest in user-owned Home tree (no sudo).
+func (f FS) IsUnderHome(dest string) bool {
 	return dest == f.Home || strings.HasPrefix(dest, f.Home+"/")
-}
-
-// mutate logs (verb: logArg), then unless dry-run runs argv with per-dest priv.
-// One dry-run+log gate for every mutating op.
-func (f FS) mutate(verb, logArg, dest string, argv ...string) error {
-	if !f.dry() {
-		if err := f.Priv(dest, argv...); err != nil {
-			return err
-		}
-	}
-	f.Log(verb, logArg)
-	return nil
 }
 
 // Mkdir makes one dir with mode. parents adds -p. mkdir builds its own
 // priv-escalated argv, so it runs the command directly rather than through Priv.
 func (f FS) Mkdir(dest string, mode os.FileMode, parents bool) error {
-	if f.dry() {
-		f.Log("mkdir(create)", dest)
-		return nil
-	}
-	argv := f.MkdirArgv(dest, mode, parents)
-	if err := run(exec.Command(argv[0], argv[1:]...)); err != nil {
-		return err
-	}
-	f.Log("mkdir(create)", dest)
-	return nil
+	return run(f.MkdirArgv(dest, mode, parents))
 }
 
 // MkdirArgv builds a mkdir argv, escalating per dest: root-tree -> sudo unless
@@ -71,16 +53,15 @@ func (f FS) MkdirArgv(dest string, mode os.FileMode, parents bool) []string {
 	}
 	base = append(base, modeFlag(mode)...)
 	base = append(base, dest)
-	if !f.UnderHome(dest) && os.Geteuid() != 0 {
+	if !f.IsUnderHome(dest) && os.Geteuid() != 0 {
 		return append([]string{"sudo"}, base...)
 	}
 	return base
 }
 
-// Chmod applies explicit mode arg (setgid/sticky bits, not honored by mkdir
-// mode). title is the op-scoped label the caller owns (e.g. "mkdir(chmod)").
-func (f FS) Chmod(title, chmodArg, dest string) error {
-	return f.mutate(title, chmodArg+" "+dest, dest, "chmod", chmodArg, dest)
+// Chmod applies explicit mode arg (setgid/sticky bits, not honored by mkdir mode).
+func (f FS) Chmod(chmodArg, dest string) error {
+	return f.Priv(dest, "chmod", chmodArg, dest)
 }
 
 func (f FS) Symlink(target, dest string) error {
@@ -88,32 +69,27 @@ func (f FS) Symlink(target, dest string) error {
 	if runtime.GOOS == "darwin" {
 		noDeref = "-h"
 	}
-	return f.mutate("ln(create)", dest, dest, "ln", "-fs", noDeref, target, dest)
+	return f.Priv(dest, "ln", "-fs", noDeref, target, dest)
 }
 
 func (f FS) Copy(src, dest string, mode os.FileMode) error {
 	argv := append([]string{"install"}, modeFlag(mode)...)
 	argv = append(argv, src, dest)
-	return f.mutate("cp(create)", dest, dest, argv...)
+	return f.Priv(dest, argv...)
 }
 
 func (f FS) Remove(dest string) error {
-	return f.mutate("rm", dest, dest, "rm", "-f", dest)
+	return f.Priv(dest, "rm", "-f", dest)
 }
 
-// Chown applies owner:group. title is the op-scoped label the caller owns
-// (e.g. "mkdir(chown)").
-func (f FS) Chown(title, owner, dest string) error {
-	return f.mutate(title, owner+" "+dest, dest, "chown", owner, dest)
+// Chown applies owner[:group].
+func (f FS) Chown(owner, dest string) error {
+	return f.Priv(dest, "chown", owner, dest)
 }
 
 // Install writes body to a temp, installs at dest with mode/owner, sudo iff dest
-// outside Home. owner "" -> no -o/-g. Honors dry-run.
+// outside Home. owner "" -> no -o/-g.
 func (f FS) Install(dest string, body []byte, mode os.FileMode, owner string) error {
-	if f.dry() {
-		f.Log("render(create)", dest)
-		return nil
-	}
 	tmp, err := os.CreateTemp("", "che-tmpl-*")
 	if err != nil {
 		return err
@@ -130,20 +106,19 @@ func (f FS) Install(dest string, body []byte, mode os.FileMode, owner string) er
 		argv = append(argv, "-o", o, "-g", g)
 	}
 	argv = append(argv, tmp.Name(), dest)
-	return f.mutate("render(create)", dest, dest, argv...)
+	return f.Priv(dest, argv...)
 }
 
 // Priv runs argv as root unless dest under Home (user-owned).
 func (f FS) Priv(dest string, argv ...string) error {
-	if !f.UnderHome(dest) && os.Geteuid() != 0 {
+	if !f.IsUnderHome(dest) && os.Geteuid() != 0 {
 		argv = append([]string{"sudo"}, argv...)
 	}
-	return run(exec.Command(argv[0], argv[1:]...))
+	return run(argv)
 }
 
-func run(c *exec.Cmd) error {
-	c.Stdout, c.Stderr = os.Stdout, os.Stderr
-	return c.Run()
+func run(argv []string) error {
+	return execx.Default.Exec(execx.Cmd{Argv: argv, Stdout: os.Stdout, Stderr: os.Stderr})
 }
 
 // ModeArg renders an octal mode for install/mkdir/chmod argv.
