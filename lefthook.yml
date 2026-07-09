@@ -7,6 +7,9 @@ pre-commit:
     - name: gofmt
       glob: "*.go"
       run: gofmt -l -w {staged_files} && git add {staged_files}
+    - name: gomodtidy
+      glob: "{go.mod,go.sum,*.go}"
+      run: for m in che get-os-open-files-with get-term-open-files-with lib; do (cd $m && go mod tidy -diff) || exit 1; done
     - name: govet
       glob: "*.go"
       run: make vet
