@@ -32,9 +32,9 @@ func repoEnv(t *testing.T, pwd string) string {
 	if err != nil {
 		t.Fatal(err)
 	}
-	chdirFlag = dir
+	dirFlag = dir
 	t.Cleanup(func() {
-		chdirFlag = ""
+		dirFlag = ""
 		if err := os.Chdir(prev); err != nil {
 			t.Fatal(err)
 		}
