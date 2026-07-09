@@ -120,7 +120,7 @@ func (h Host) renderTemplate(item spec.FileItem) error {
 		return h.placeFile(h.templateDests(item)[0].path, body, item)
 	}
 	for _, d := range h.templateDests(item) {
-		existing, _ := os.ReadFile(d.path) // absent -> nil (mergeUpsert: defaults only)
+		existing, _ := h.readExisting(d) // absent -> nil (mergeUpsert: defaults only)
 		out := render.Compose(render.Composition{
 			Body:       body,
 			Opts:       d.opts,
@@ -144,6 +144,15 @@ func (h Host) renderTemplate(item spec.FileItem) error {
 		}
 	}
 	return nil
+}
+
+// readExisting reads a dest's current content for Compose: host dests through
+// the reader (mockable), repo dests straight from disk.
+func (h Host) readExisting(d tmplDest) ([]byte, error) {
+	if d.host {
+		return h.reader.ReadFile(d.path)
+	}
+	return os.ReadFile(d.path)
 }
 
 // placeFile installs body with spec perms (mode 0 -> install default, no chown).

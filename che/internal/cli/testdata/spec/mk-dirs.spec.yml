@@ -9,7 +9,10 @@
       mkdir(create): ${HOME}/.config
       mkdir(create): ${HOME}/.config/bar
       mkdir(create): ${HOME}/.config/zsh
-      {{/(mkdir\(create\): .*\n)*/}}mkdir(create): ${HOME}/.cache/zsh
+      mkdir(create): /Library
+      mkdir(create): /Library/LaunchDaemons
+      mkdir(create): /etc
+      mkdir(create): ${HOME}/.cache/zsh
       mkdir(create): /var/log/che-test-setgid
       mkdir(chmod): 2775 /var/log/che-test-setgid
 # [<] 🤖

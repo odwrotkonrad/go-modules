@@ -157,7 +157,7 @@ func TestOps(t *testing.T) {
 			t.Fatalf("unknown op %q", c.In.Op)
 		}
 		h, res, dir := setupHost(t, config.Config{})
-		h = h.WithFS(&testutil.MockFS{})
+		h = h.WithFS(&testutil.MockFS{}).WithFSReader(testutil.ScopedReader{Roots: []string{dir}})
 		execx.Swap(t, &execx.Mock{Stub: launchdStub(c.In)})
 		stubSleep(t)
 		if c.In.BrokenLink {

@@ -23,6 +23,7 @@ type Host struct {
 	cfg      config.Config
 	logSub   string
 	fs       fsutil.FileSystemWriter
+	reader   fsutil.FileSystemReader
 }
 
 func New(repoRoot, home, profile string, cfg config.Config) Host {
@@ -33,6 +34,7 @@ func New(repoRoot, home, profile string, cfg config.Config) Host {
 		Profile:  profile,
 		cfg:      cfg,
 		fs:       fsutil.FS{Home: home},
+		reader:   fsutil.OSReader{},
 	}
 }
 
@@ -46,6 +48,13 @@ func (h Host) WithLogSub(s string) Host {
 // WithFS returns a copy whose mutating fs ops run through fs (test injection).
 func (h Host) WithFS(fs fsutil.FileSystemWriter) Host {
 	h.fs = fs
+	return h
+}
+
+// WithFSReader returns a copy whose dest-facing reads (settled checks, prune
+// scans, content diffs) run through r (test injection).
+func (h Host) WithFSReader(r fsutil.FileSystemReader) Host {
+	h.reader = r
 	return h
 }
 

@@ -9,7 +9,10 @@
       mkdir(create): ${HOME}/.config
       mkdir(create): ${HOME}/.config/bar
       mkdir(create): ${HOME}/.config/zsh
-      {{/(mkdir\(create\): .*\n)*/}}archive: ${HOME}/.local/share/che/backups/che-link-{{/.*/}}.tar.bz2
+      mkdir(create): /Library
+      mkdir(create): /Library/LaunchDaemons
+      mkdir(create): /etc
+      archive: ${HOME}/.local/share/che/backups/che-link-{{/.*/}}.tar.bz2
       ln(create): ${HOME}/.config/bar/a
       ln(create): ${HOME}/.config/zsh/.zshrc
       ln(create): /etc/zshrc

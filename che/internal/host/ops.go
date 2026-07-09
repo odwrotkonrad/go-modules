@@ -79,7 +79,11 @@ func (h Host) ensureConfigDirs(dirRels []string) error {
 // isDirSettled reports whether dest already exists as a dir and may be skipped
 // (DryRunAll forces every dest to report, so it never skips).
 func (h Host) isDirSettled(dest string) bool {
-	return !h.IsOptionEqualTo(config.OptionDryRun, config.DryRunAll) && fsutil.IsDir(dest)
+	if h.IsOptionEqualTo(config.OptionDryRun, config.DryRunAll) {
+		return false
+	}
+	fi, err := h.reader.Stat(dest)
+	return err == nil && fi.IsDir()
 }
 
 // mkExtraDir creates one extra-dir with -p. Owner applied via chown (not mkdir
@@ -137,7 +141,7 @@ func (h Host) fixPerms(op, dest string, item spec.FileItem) error {
 // spec-set fields are enforced (empty Chmod/owner -> no drift). Missing dest ->
 // no drift (the create path handles it).
 func (h Host) permsDrift(dest string, item spec.FileItem) (needChmod, needChown bool) {
-	fi, err := os.Lstat(dest)
+	fi, err := h.reader.Lstat(dest)
 	if err != nil {
 		return false, false
 	}
@@ -239,11 +243,11 @@ func (h Host) isLinkSettled(src, dest string) bool {
 	if h.IsOptionEqualTo(config.OptionDryRun, config.DryRunAll) {
 		return false
 	}
-	destResolved, err := filepath.EvalSymlinks(dest)
+	destResolved, err := h.reader.EvalSymlinks(dest)
 	if err != nil {
 		return false
 	}
-	srcResolved, err := filepath.EvalSymlinks(src)
+	srcResolved, err := h.reader.EvalSymlinks(src)
 	return err == nil && destResolved == srcResolved
 }
 
@@ -274,7 +278,7 @@ func (h Host) MkCopies(copies []spec.FileItem, dirRels []string) error {
 // copy with spec mode then chown when an owner is set.
 func (h Host) copyOne(item spec.FileItem, dest string) error {
 	src := h.Src(item.Rel)
-	if !h.IsOptionEqualTo(config.OptionDryRun, config.DryRunAll) && isSameContent(src, dest) {
+	if !h.IsOptionEqualTo(config.OptionDryRun, config.DryRunAll) && h.isSameContent(src, dest) {
 		return h.fixPerms("cp", dest, item)
 	}
 	mode, _ := parseMode(item.Chmod)
@@ -328,12 +332,12 @@ func (h Host) expandHome(p string) string {
 	return fsutil.ExpandHome(p, h.Home)
 }
 
-func isSameContent(a, b string) bool {
-	x, err := os.ReadFile(a)
+func (h Host) isSameContent(a, b string) bool {
+	x, err := h.reader.ReadFile(a)
 	if err != nil {
 		return false
 	}
-	y, err := os.ReadFile(b)
+	y, err := h.reader.ReadFile(b)
 	if err != nil {
 		return false
 	}
@@ -353,7 +357,7 @@ func (h Host) PruneBrokenLinks(dirRels []string) error {
 			continue
 		}
 		seen[dest] = true
-		entries, derr := os.ReadDir(dest)
+		entries, derr := h.reader.ReadDir(dest)
 		if derr != nil {
 			continue // [why] dir may not exist on host yet
 		}
@@ -373,7 +377,7 @@ func (h Host) PruneBrokenLinks(dirRels []string) error {
 
 // isBrokenRepoLink: check if p is a symlink into root/ whose target is gone.
 func (h Host) isBrokenRepoLink(p string) bool {
-	target, err := os.Readlink(p) // [what] non-symlink -> err
+	target, err := h.reader.Readlink(p) // [what] non-symlink -> err
 	if err != nil {
 		return false
 	}
@@ -384,7 +388,7 @@ func (h Host) isBrokenRepoLink(p string) bool {
 	if target != h.Root && !strings.HasPrefix(target, h.Root+"/") {
 		return false
 	}
-	_, err = os.Stat(p) // [what] broken
+	_, err = h.reader.Stat(p) // [what] broken
 	return err != nil
 }
 

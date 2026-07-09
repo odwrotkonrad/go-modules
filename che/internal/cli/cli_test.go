@@ -66,7 +66,8 @@ func setupMock(t *testing.T, pwd, profile string) (string, *testutil.MockFS, *ex
 	mock := &testutil.MockFS{}
 	prevHost := newHost
 	newHost = func(repoRoot, home, profile string, cfg config.Config) host.Host {
-		return host.New(repoRoot, home, profile, cfg).WithFS(mock)
+		reader := testutil.ScopedReader{Roots: []string{repoRoot, home}}
+		return host.New(repoRoot, home, profile, cfg).WithFS(mock).WithFSReader(reader)
 	}
 	t.Cleanup(func() { newHost = prevHost })
 

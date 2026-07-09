@@ -12,14 +12,20 @@
       mkdir(create): ${HOME}/.config
       mkdir(create): ${HOME}/.config/bar
       mkdir(create): ${HOME}/.config/zsh
-      {{/(mkdir\(create\): .*\n)*/}}mkdir(create): ${HOME}/.cache/zsh
+      mkdir(create): /Library
+      mkdir(create): /Library/LaunchDaemons
+      mkdir(create): /etc
+      mkdir(create): ${HOME}/.cache/zsh
       mkdir(create): /var/log/che-test-setgid
       mkdir(chmod): 2775 /var/log/che-test-setgid
       all(run): link
       mkdir(create): ${HOME}/.config
       mkdir(create): ${HOME}/.config/bar
       mkdir(create): ${HOME}/.config/zsh
-      {{/(mkdir\(create\): .*\n)*/}}archive: ${HOME}/.local/share/che/backups/che-link-{{/.*/}}.tar.bz2
+      mkdir(create): /Library
+      mkdir(create): /Library/LaunchDaemons
+      mkdir(create): /etc
+      archive: ${HOME}/.local/share/che/backups/che-link-{{/.*/}}.tar.bz2
       ln(create): ${HOME}/.config/bar/a
       ln(create): ${HOME}/.config/zsh/.zshrc
       ln(create): /etc/zshrc
@@ -27,7 +33,10 @@
       mkdir(create): ${HOME}/.config
       mkdir(create): ${HOME}/.config/bar
       mkdir(create): ${HOME}/.config/zsh
-      {{/(mkdir\(create\): .*\n)*/}}archive: ${HOME}/.local/share/che/backups/che-copy-{{/.*/}}.tar.bz2
+      mkdir(create): /Library
+      mkdir(create): /Library/LaunchDaemons
+      mkdir(create): /etc
+      archive: ${HOME}/.local/share/che/backups/che-copy-{{/.*/}}.tar.bz2
       cp(create): ${HOME}/.config/zsh/c
       cp(create): /Library/LaunchDaemons/otelcol.plist
       cp(chown): root:wheel /Library/LaunchDaemons/otelcol.plist
