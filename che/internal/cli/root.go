@@ -3,6 +3,7 @@ package cli
 // [>] 🤖🤖
 
 import (
+	"errors"
 	"fmt"
 	"maps"
 	"os"
@@ -29,26 +30,33 @@ type unit struct {
 }
 
 // forEachUnit runs op over every unit: the local repo first, then each plugin
-// grouped (announce, pull, execIf, resolve, op), skipped ones dropped.
-func forEachUnit(op func(unit) error) error {
-	for _, u := range units {
+// grouped (announce, pull, execIf, resolve, op), skipped ones dropped. A
+// failing unit does not stop the rest: failures collect (ref-wrapped, "local"
+// for the local repo), report as "<name>(report): fail <ref>: <err>" lines
+// after all units, and join into the returned error.
+func forEachUnit(name string, op func(unit) error) error {
+	var fails []error
+	run := func(ref string, u unit) {
 		if err := u.withEnv(func() error { return op(u) }); err != nil {
-			return err
+			fails = append(fails, fmt.Errorf("%s: %w", ref, err))
 		}
+	}
+	for _, u := range units {
+		run("local", u)
 	}
 	for _, p := range pluginRefs {
 		u, ok, err := ensurePlugin(p)
-		if err != nil {
-			return err
-		}
-		if !ok {
-			continue
-		}
-		if err := u.withEnv(func() error { return op(u) }); err != nil {
-			return err
+		switch {
+		case err != nil:
+			fails = append(fails, fmt.Errorf("%s: %w", p, err))
+		case ok:
+			run(p.String(), u)
 		}
 	}
-	return nil
+	for _, err := range fails {
+		log.Msg(name+"(report)", "fail "+err.Error(), log.Off)
+	}
+	return errors.Join(fails...)
 }
 
 // ensurePlugin returns p's unit, building it on first use (announced) and
@@ -60,8 +68,8 @@ func ensurePlugin(p spec.PluginRef) (unit, bool, error) {
 		}
 		return *u, true, nil
 	}
-	log.Msg("plugin("+p.Profile+")", fmt.Sprintf("run %s", p), log.Off)
-	u, ok, err := buildPlugin(p, pluginCfg.home, pluginCfg.mode, pluginCfg.forceAll, pluginCfg.eval)
+	log.Debug("plugin("+p.Profile+")", fmt.Sprintf("run %s", p), log.Off)
+	u, ok, err := buildPlugin(p)
 	if err != nil {
 		return unit{}, false, err
 	}
@@ -102,10 +110,12 @@ var (
 	profileForce string
 	omitExecIf   bool
 	skipPlugins  bool
+	debugFlag    bool
 	units        []unit
 	pluginRefs   []spec.PluginRef
 	pluginUnits  map[string]*unit
 	pluginCfg    struct {
+		repoRoot string
 		home     string
 		mode     host.DryRunMode
 		forceAll bool
@@ -148,6 +158,8 @@ func init() {
 		"treat every execIf predicate as passing; env: CHE_OMIT_EXEC_IF")
 	RootCmd.PersistentFlags().BoolVar(&skipPlugins, "skip-plugins", false,
 		"skip plugins entries, load only the local repo; env: CHE_SKIP_PLUGINS")
+	RootCmd.PersistentFlags().BoolVar(&debugFlag, "debug", false,
+		"print debug-level lines (plugin announce, clone/pull attempts); env: CHE_DEBUG")
 }
 
 // Attach wires every subcommand onto RootCmd and returns it: the single
@@ -193,7 +205,9 @@ func build() error {
 	// CHE_OMIT_EXEC_IF, truthy) makes every execIf pass; else the union of
 	// every autoExec profile passing execIf. --skip-plugins (env
 	// CHE_SKIP_PLUGINS, truthy) drops plugins entries, local repo only.
+	// --debug (env CHE_DEBUG, truthy) prints debug-level lines.
 	// Flags win over envs.
+	log.SetDebug(debugFlag || os.Getenv("CHE_DEBUG") != "")
 	forceOne := profileForce
 	if forceOne == "" {
 		forceOne = os.Getenv("CHE_PROFILE")
@@ -215,16 +229,17 @@ func build() error {
 		pluginRefs = nil
 	}
 	pluginUnits = map[string]*unit{}
-	pluginCfg.home, pluginCfg.mode, pluginCfg.forceAll, pluginCfg.eval = home, mode, forceAll, eval
+	pluginCfg.repoRoot, pluginCfg.home, pluginCfg.mode, pluginCfg.forceAll, pluginCfg.eval = repoRoot, home, mode, forceAll, eval
 	return nil
 }
 
-// buildPlugin ensures the plugin checkout, loads its spec, then inside the
-// entry's env overlay gates on the remote profile's execIf (fail -> skipped,
-// logged) and resolves it anchored at the checkout. Nested plugin refs inside
-// the remote profile are ignored (v1).
-func buildPlugin(p spec.PluginRef, home string, mode host.DryRunMode, forceAll bool, eval func(string) (bool, error)) (unit, bool, error) {
-	checkout, err := plugin.Ensure(home, p.URL, p.Profile)
+// buildPlugin ensures the plugin checkout (git ref: cache clone/pull; dir ref:
+// resolved local dir), loads its spec, then inside the entry's env overlay
+// gates on the remote profile's execIf (fail -> skipped, logged) and resolves
+// it anchored at the checkout, all against pluginCfg. Nested plugin refs
+// inside the remote profile are ignored (v1).
+func buildPlugin(p spec.PluginRef) (unit, bool, error) {
+	checkout, err := pluginCheckout(p, pluginCfg.repoRoot, pluginCfg.home)
 	if err != nil {
 		return unit{}, false, err
 	}
@@ -232,11 +247,12 @@ func buildPlugin(p spec.PluginRef, home string, mode host.DryRunMode, forceAll b
 	if err != nil {
 		return unit{}, false, err
 	}
-	u := unit{host: host.New(checkout, home, p.Profile, mode), ref: p.String(), env: p.Env}
+	h := host.New(checkout, pluginCfg.home, p.Profile, pluginCfg.mode).WithLogSub("profile=" + p.Profile)
+	u := unit{host: h, ref: p.String(), env: p.Env}
 	var pass bool
 	err = u.withEnv(func() error {
 		var err error
-		if pass, err = psp.ExecIfPass(p.Profile, forceAll, eval); err != nil || !pass {
+		if pass, err = psp.ExecIfPass(p.Profile, pluginCfg.forceAll, pluginCfg.eval); err != nil || !pass {
 			return err
 		}
 		u.res, err = psp.Resolve([]string{p.Profile}, u.host.Root)
@@ -253,6 +269,33 @@ func buildPlugin(p spec.PluginRef, home string, mode host.DryRunMode, forceAll b
 		log.Msg("plugin("+p.Profile+")", fmt.Sprintf("%s: nested plugin refs ignored: %v", p, u.res.Plugins), log.Off)
 	}
 	return u, true, nil
+}
+
+// pluginCheckout resolves p's repo dir: git URL -> managed cache clone/pull,
+// dir path -> resolved local dir (no ensure logs, no git).
+func pluginCheckout(p spec.PluginRef, repoRoot, home string) (string, error) {
+	if !p.IsPath {
+		return plugin.Ensure(home, p.URL, p.Profile)
+	}
+	return resolvePluginDir(p.URL, repoRoot, home)
+}
+
+// resolvePluginDir expands a dir-path plugin ref: $VAR, then ~ -> home, then
+// relative -> joined onto the local repo root (the che.yml dir). The dir must exist.
+func resolvePluginDir(ref, repoRoot, home string) (string, error) {
+	dir := os.ExpandEnv(ref)
+	if rest, ok := strings.CutPrefix(dir, "~/"); ok {
+		dir = filepath.Join(home, rest)
+	} else if dir == "~" {
+		dir = home
+	}
+	if !filepath.IsAbs(dir) {
+		dir = filepath.Join(repoRoot, dir)
+	}
+	if !fsutil.IsDir(dir) {
+		return "", fmt.Errorf("plugin dir not found: %s (from ref %s)", dir, ref)
+	}
+	return dir, nil
 }
 
 // findRepoRoot resolves repo root from git toplevel of cwd, verifies che.yml

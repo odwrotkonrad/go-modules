@@ -14,6 +14,7 @@ Available Commands:
     ensure          settle then verify each long-running service has a live pid
 
 Flags:
+      --debug                      print debug-level lines (plugin announce, clone/pull attempts); env: CHE_DEBUG
       --dry-run string[="delta"]   print mutating actions instead of executing them: delta (changed dests) | all (every dest)
       --omit-exec-if               treat every execIf predicate as passing; env: CHE_OMIT_EXEC_IF
       --profile string             run only this profile (autoExec skipped, execIf still enforced); env: CHE_PROFILE

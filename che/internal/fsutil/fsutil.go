@@ -20,14 +20,15 @@ import (
 type FS struct {
 	Home string
 	Mode log.DryRun
+	Sub  string
 }
 
 // dry reports whether this is any dry run (delta or all).
 func (f FS) dry() bool { return f.Mode != log.Off }
 
-// Log emits a 'title: msg' line, folding the dry-run mode into the subtype.
-// Title is "type" or "type(subtype)" (see log.Msg).
-func (f FS) Log(title, msg string) { log.Msg(title, msg, f.Mode) }
+// Log emits a 'title: msg' line, folding the dry-run mode plus Sub into the
+// subtype. Title is "type" or "type(subtype)" (see log.MsgSub).
+func (f FS) Log(title, msg string) { log.MsgSub(title, msg, f.Mode, f.Sub) }
 
 // UnderHome reports dest in user-owned Home tree (no sudo).
 func (f FS) UnderHome(dest string) bool {

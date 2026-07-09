@@ -48,20 +48,28 @@ type Raw struct {
 	order    []string               // profile names in declaration order
 }
 
-// PluginRef is one parsed plugins entry: a profile defined in a remote repo,
+// PluginRef is one parsed plugins entry: a profile defined in another repo,
 // loaded and anchored at its own checkout, optionally with envs exported
-// around everything done for its unit.
+// around everything done for its unit. IsPath marks a local dir ref (no `@`
+// prefix): URL then holds the dir path (absolute, relative, ~/, $VAR).
 type PluginRef struct {
 	URL     string
 	Profile string
 	Env     map[string]string
+	IsPath  bool
 }
 
-// String renders the canonical `@<giturl>::<profile>` form (env not rendered).
-func (p PluginRef) String() string { return "@" + p.URL + "::" + p.Profile }
+// String renders the canonical entry form (env not rendered):
+// `@<giturl>::<profile>` remote, `<dir>::<profile>` local.
+func (p PluginRef) String() string {
+	if p.IsPath {
+		return p.URL + "::" + p.Profile
+	}
+	return "@" + p.URL + "::" + p.Profile
+}
 
-// pluginEntry is one plugins list item: a bare `@<giturl>::<profile>` string,
-// or a {ref, env} object.
+// pluginEntry is one plugins list item: a bare `@<giturl>::<profile>` /
+// `<dir>::<profile>` string, or a {ref, env} object.
 type pluginEntry struct {
 	Ref string            `yaml:"ref"`
 	Env map[string]string `yaml:"env"`
@@ -223,12 +231,12 @@ func globMatch(glob, rel string) bool {
 // Each op's globs carry their group's perms; classify stamps matched files
 // with them (last match wins).
 type effective struct {
-	linkGlobs globSet    // link-op globs (repo-relative under root/)
-	copyGlobs globSet    // copy-op globs
-	tmplGlobs globSet    // render-templates globs (repo-root-relative, root/-prefixed)
-	richCopy  []FileItem // rich-form copy entries
-	richTmpl  []FileItem // rich-form render-templates entries (repo-root-relative)
-	dirs      []FileItem // mkdirs: glob forms expanded to one item per path, rich carry perms
+	linkGlobs globSet     // link-op globs (repo-relative under root/)
+	copyGlobs globSet     // copy-op globs
+	tmplGlobs globSet     // render-templates globs (repo-root-relative, root/-prefixed)
+	richCopy  []FileItem  // rich-form copy entries
+	richTmpl  []FileItem  // rich-form render-templates entries (repo-root-relative)
+	dirs      []FileItem  // mkdirs: glob forms expanded to one item per path, rich carry perms
 	scripts   []string    // script paths (order = run order)
 	services  []string    // service names
 	plugins   []PluginRef // profile-level plugin refs (composition order)
@@ -262,15 +270,17 @@ func Load(path string) (*Raw, error) {
 	return s, nil
 }
 
-// parsePluginRef parses one `@<giturl>::<profile>` ref: last `::` splits,
-// both parts required.
+// parsePluginRef parses one plugins ref, the `@` prefix deciding the kind:
+// `@<giturl>::<profile>` remote, `<dir>::<profile>` local dir (absolute
+// /path, relative ./path or path, ~/, $VAR). Last `::` splits, both parts
+// required.
 func parsePluginRef(entry string) (PluginRef, error) {
-	raw := strings.TrimPrefix(entry, "@")
+	raw, isURL := strings.CutPrefix(entry, "@")
 	i := strings.LastIndex(raw, "::")
-	if !strings.HasPrefix(entry, "@") || i <= 0 || i+2 >= len(raw) {
-		return PluginRef{}, fmt.Errorf("plugins entry %q: want @<giturl>::<profile>", entry)
+	if i <= 0 || i+2 >= len(raw) {
+		return PluginRef{}, fmt.Errorf("plugins entry %q: want @<giturl>::<profile> or <dir>::<profile>", entry)
 	}
-	return PluginRef{URL: raw[:i], Profile: raw[i+2:]}, nil
+	return PluginRef{URL: raw[:i], Profile: raw[i+2:], IsPath: !isURL}, nil
 }
 
 // EligibleProfiles lists the profiles to Resolve, in declaration order:
@@ -329,7 +339,7 @@ func (r *Raw) ExecIfPass(name string, forceAll bool, eval func(expr string) (boo
 }
 
 // allPass reports whether every execIf expression of profile name passes,
-// logging each evaluated expression's outcome.
+// logging each pass (rejects log at debug level only).
 func allPass(name string, exprs []string, forceAll bool, eval func(expr string) (bool, error)) (bool, error) {
 	if forceAll {
 		return true, nil
@@ -339,14 +349,11 @@ func allPass(name string, exprs []string, forceAll bool, eval func(expr string) 
 		if err != nil {
 			return false, fmt.Errorf("profile %q execIf %q: %w", name, expr, err)
 		}
-		verdict := "reject"
-		if ok {
-			verdict = "pass"
-		}
-		log.Msg("execIf("+verdict+")", fmt.Sprintf("profile %s: %s", name, expr), log.Off)
 		if !ok {
+			log.Debug("execIf(reject)", fmt.Sprintf("profile %s: %s", name, expr), log.Off)
 			return false, nil
 		}
+		log.Msg("execIf(pass)", fmt.Sprintf("profile %s: %s", name, expr), log.Off)
 	}
 	return true, nil
 }
@@ -587,7 +594,7 @@ func (r *Raw) mergeInto(eff *effective, name string, seen []string) error {
 		}
 		ref.Env = pe.Env
 		dup := slices.ContainsFunc(eff.plugins, func(q PluginRef) bool {
-			return q.URL == ref.URL && q.Profile == ref.Profile
+			return q.URL == ref.URL && q.Profile == ref.Profile && q.IsPath == ref.IsPath
 		})
 		if !dup {
 			eff.plugins = append(eff.plugins, ref)

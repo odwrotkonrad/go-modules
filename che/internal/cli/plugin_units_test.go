@@ -3,6 +3,7 @@ package cli
 // [>] 🤖🤖
 
 import (
+	"errors"
 	"os"
 	"path/filepath"
 	"slices"
@@ -37,6 +38,7 @@ func TestBuildPluginUnits(t *testing.T) {
 	dryRunMode, profileForce, skipPlugins = "", "", false
 
 	t.Setenv("PLUGIN_GATE", "1")
+	t.Setenv("CHE_DEBUG", "1")
 	out, err := testutil.CaptureStdout(t, build)
 	if err != nil {
 		t.Fatalf("build() errored: %v\n%s", err, out)
@@ -46,7 +48,7 @@ func TestBuildPluginUnits(t *testing.T) {
 	}
 	var ran []unit
 	out, err = testutil.CaptureStdout(t, func() error {
-		return forEachUnit(func(u unit) error { ran = append(ran, u); return nil })
+		return forEachUnit("test", func(u unit) error { ran = append(ran, u); return nil })
 	})
 	if err != nil {
 		t.Fatalf("forEachUnit errored: %v\n%s", err, out)
@@ -66,15 +68,17 @@ func TestBuildPluginUnits(t *testing.T) {
 	}
 	testutil.WantLines(t, out,
 		"run "+ref,
+		"cloned file://"+pluginRepo,
 		"execIf(pass): profile gitlabGroup: env:PLUGIN_GATE")
 
 	t.Setenv("PLUGIN_GATE", "")
+	t.Setenv("CHE_DEBUG", "")
 	if err := build(); err != nil {
 		t.Fatalf("build() (gate unset) errored: %v", err)
 	}
 	ran = nil
 	out, err = testutil.CaptureStdout(t, func() error {
-		return forEachUnit(func(u unit) error { ran = append(ran, u); return nil })
+		return forEachUnit("test", func(u unit) error { ran = append(ran, u); return nil })
 	})
 	if err != nil {
 		t.Fatalf("forEachUnit (gate unset) errored: %v\n%s", err, out)
@@ -82,9 +86,10 @@ func TestBuildPluginUnits(t *testing.T) {
 	if len(ran) != 1 {
 		t.Fatalf("ran units = %d, want 1 (plugin skipped)\n%s", len(ran), out)
 	}
-	testutil.WantLines(t, out,
-		"execIf(reject): profile gitlabGroup: env:PLUGIN_GATE",
-		"skip "+ref+" (execIf failed)")
+	testutil.WantLines(t, out, "skip "+ref+" (execIf failed)")
+	testutil.NotLine(t, out, "execIf(reject)")
+	testutil.NotLine(t, out, "run "+ref)
+	testutil.NotLine(t, out, "pull ")
 }
 
 // an object-form plugins entry's env gates the remote execIf while the host
@@ -119,7 +124,7 @@ func TestBuildPluginUnitEnv(t *testing.T) {
 	var ran []unit
 	var gateInOp string
 	out, err := testutil.CaptureStdout(t, func() error {
-		return forEachUnit(func(u unit) error {
+		return forEachUnit("test", func(u unit) error {
 			ran = append(ran, u)
 			gateInOp = os.Getenv("PLUGIN_GATE")
 			return nil
@@ -176,7 +181,7 @@ func TestBuildSkipPlugins(t *testing.T) {
 		}
 		var ran []unit
 		out, err := testutil.CaptureStdout(t, func() error {
-			return forEachUnit(func(u unit) error { ran = append(ran, u); return nil })
+			return forEachUnit("test", func(u unit) error { ran = append(ran, u); return nil })
 		})
 		if err != nil {
 			t.Fatalf("[%s] forEachUnit errored: %v\n%s", name, err, out)
@@ -186,6 +191,140 @@ func TestBuildSkipPlugins(t *testing.T) {
 		}
 	}
 	skipPlugins = false
+}
+
+// a dir-path plugins ref (absolute and relative) anchors the unit at the dir
+// itself: no git clone/pull, no cache checkout; its op lines carry the
+// profile= subtype.
+func TestBuildPluginUnitsDirRef(t *testing.T) {
+	if os.Geteuid() == 0 {
+		t.Skip("non-root path only; build resolves home from $HOME")
+	}
+	pluginDir := t.TempDir()
+	testutil.WriteTree(t, pluginDir, map[string]string{
+		"che.yml":               "gitlabGroup:\n  include:\n    runScripts: [scripts/bootstrap.zsh]\n",
+		"scripts/bootstrap.zsh": "#!/bin/zsh\n",
+	})
+	for name, refDir := range map[string]string{
+		"absolute": pluginDir,
+		"relative": "./plugin",
+		"envvar":   "$PLUGIN_DIR_REF",
+	} {
+		t.Run(name, func(t *testing.T) {
+			ref := refDir + "::gitlabGroup"
+			hostRepo := testutil.Repo(t, map[string]string{
+				"che.yml":           "main:\n  options: {autoExec: true}\n  plugins: [\"" + ref + "\"]\n  include:\n    runScripts: [scripts/local.zsh]\n",
+				"scripts/local.zsh": "#!/bin/zsh\n",
+			})
+			if name == "relative" {
+				testutil.WriteTree(t, filepath.Join(hostRepo, "plugin"), map[string]string{
+					"che.yml":               "gitlabGroup:\n  include:\n    runScripts: [scripts/bootstrap.zsh]\n",
+					"scripts/bootstrap.zsh": "#!/bin/zsh\n",
+				})
+			}
+			home := t.TempDir()
+			t.Chdir(hostRepo)
+			t.Setenv("HOME", home)
+			t.Setenv("PLUGIN_DIR_REF", pluginDir)
+			t.Setenv("CHE_OMIT_EXEC_IF", "")
+			t.Setenv("CHE_PROFILE", "")
+			t.Setenv("CHE_DRY_RUN", "")
+			t.Setenv("CHE_SKIP_PLUGINS", "")
+			t.Setenv("CHE_DEBUG", "")
+			dryRunMode, profileForce, skipPlugins = "all", "", false
+			t.Cleanup(func() { dryRunMode = "" })
+
+			if err := build(); err != nil {
+				t.Fatalf("build() errored: %v", err)
+			}
+			var ran []unit
+			out, err := testutil.CaptureStdout(t, func() error {
+				return forEachUnit("run-scripts", func(u unit) error {
+					ran = append(ran, u)
+					scripts, err := u.host.ResolveScripts(u.res.Scripts)
+					if err != nil {
+						return err
+					}
+					return u.host.RunScripts(scripts)
+				})
+			})
+			if err != nil {
+				t.Fatalf("forEachUnit errored: %v\n%s", err, out)
+			}
+			if len(ran) != 2 {
+				t.Fatalf("ran units = %d, want 2\n%s", len(ran), out)
+			}
+			want := pluginDir
+			if name == "relative" {
+				want = filepath.Join(hostRepo, "plugin")
+			}
+			if got, _ := filepath.EvalSymlinks(ran[1].host.RepoRoot); got != mustEval(t, want) {
+				t.Errorf("plugin RepoRoot = %q, want %q", ran[1].host.RepoRoot, want)
+			}
+			testutil.WantLines(t, out,
+				"run-scripts(dry-run=all,profile=gitlabGroup): ",
+				"scripts/bootstrap.zsh")
+			for _, frag := range []string{"clone", "pull"} {
+				testutil.NotLine(t, out, frag)
+			}
+		})
+	}
+}
+
+func mustEval(t *testing.T, p string) string {
+	t.Helper()
+	out, err := filepath.EvalSymlinks(p)
+	if err != nil {
+		t.Fatal(err)
+	}
+	return out
+}
+
+// a failing unit does not stop the rest: both units run, each failure prints a
+// "<name>(report): fail <ref>" line, and forEachUnit returns joined errors.
+func TestForEachUnitContinuesOnError(t *testing.T) {
+	if os.Geteuid() == 0 {
+		t.Skip("non-root path only; build resolves home from $HOME")
+	}
+	pluginDir := t.TempDir()
+	testutil.WriteTree(t, pluginDir, map[string]string{
+		"che.yml":               "gitlabGroup:\n  include:\n    runScripts: [scripts/bootstrap.zsh]\n",
+		"scripts/bootstrap.zsh": "#!/bin/zsh\n",
+	})
+	ref := pluginDir + "::gitlabGroup"
+	hostRepo := testutil.Repo(t, map[string]string{
+		"che.yml":           "main:\n  options: {autoExec: true}\n  plugins: [\"" + ref + "\"]\n  include:\n    runScripts: [scripts/local.zsh]\n",
+		"scripts/local.zsh": "#!/bin/zsh\n",
+	})
+	t.Chdir(hostRepo)
+	t.Setenv("HOME", t.TempDir())
+	t.Setenv("CHE_OMIT_EXEC_IF", "")
+	t.Setenv("CHE_PROFILE", "")
+	t.Setenv("CHE_DRY_RUN", "")
+	t.Setenv("CHE_SKIP_PLUGINS", "")
+	t.Setenv("CHE_DEBUG", "")
+	dryRunMode, profileForce, skipPlugins = "", "", false
+
+	if err := build(); err != nil {
+		t.Fatalf("build() errored: %v", err)
+	}
+	var ran []unit
+	out, err := testutil.CaptureStdout(t, func() error {
+		return forEachUnit("test", func(u unit) error {
+			ran = append(ran, u)
+			if u.ref == "" {
+				return errors.New("local boom")
+			}
+			return nil
+		})
+	})
+	if err == nil || !strings.Contains(err.Error(), "local boom") {
+		t.Fatalf("err = %v, want joined local boom", err)
+	}
+	if len(ran) != 2 {
+		t.Fatalf("ran units = %d, want 2 (continue past local failure)\n%s", len(ran), out)
+	}
+	testutil.WantLines(t, out, "test(report): fail local: local boom")
 }
 
 // withEnv shadows an existing var, sets an absent one, restores both after.

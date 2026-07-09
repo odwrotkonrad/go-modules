@@ -27,7 +27,7 @@ func serviceCmd(use, short string, action func(host.Host, []host.Service) error)
 		Use:   use,
 		Short: short,
 		RunE: func(cmd *cobra.Command, args []string) error {
-			return forEachUnit(func(u unit) error {
+			return forEachUnit(cmd.Name(), func(u unit) error {
 				svcs, err := u.host.ResolveServices(u.res.Services)
 				if err != nil {
 					return err

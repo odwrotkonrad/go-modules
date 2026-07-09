@@ -9,6 +9,9 @@ import (
 	"slices"
 	"strings"
 	"testing"
+
+	"gitlab.com/konradodwrot/go-modules/che/internal/log"
+	"gitlab.com/konradodwrot/go-modules/che/internal/testutil"
 )
 
 // specFile writes body as che.yml in a temp dir, returns the loaded Raw.
@@ -65,9 +68,9 @@ main:
 	}
 }
 
-// a ref missing the @ prefix, ::<profile>, or the url part errors.
+// a ref missing ::<profile> or the url/dir part errors.
 func TestResolvePluginRefMalformed(t *testing.T) {
-	for _, entry := range []string{"@nourl", "@::p", "@url::", "url::p"} {
+	for _, entry := range []string{"@nourl", "nodir", "@::p", "::p", "@url::", "dir::"} {
 		s, dir := specFile(t, "main:\n  plugins: [\""+entry+"\"]\n")
 		if _, err := s.Resolve([]string{"main"}, filepath.Join(dir, "root")); err == nil {
 			t.Errorf("Resolve with plugins entry %q: expected error", entry)
@@ -85,26 +88,71 @@ func TestMixinPluginRefUndefined(t *testing.T) {
 	}
 }
 
-// String renders the canonical entry form.
+// String round-trips the canonical entry forms (remote @-prefixed, dir bare).
 func TestPluginRefString(t *testing.T) {
-	ref := PluginRef{URL: "git@gitlab.com:g/r.git", Profile: "p"}
-	if got := ref.String(); got != "@git@gitlab.com:g/r.git::p" {
-		t.Errorf("String() = %q", got)
+	for _, entry := range []string{"@git@gitlab.com:g/r.git::p", "./rel::p", "/abs/dir::p"} {
+		ref, err := parsePluginRef(entry)
+		if err != nil {
+			t.Fatalf("parsePluginRef(%q) errored: %v", entry, err)
+		}
+		if got := ref.String(); got != entry {
+			t.Errorf("String() = %q, want %q", got, entry)
+		}
+	}
+}
+
+// the @ prefix decides the ref kind: bare -> local dir path, @ -> remote git.
+func TestPluginRefIsPath(t *testing.T) {
+	cases := map[string]bool{
+		"/abs/dir::p":                      true,
+		"./rel::p":                         true,
+		"rel/dir::p":                       true,
+		"~/x::p":                           true,
+		"$HOME/x::p":                       true,
+		"@https://gitlab.com/g/r.git::p":   false,
+		"@ssh://git@gitlab.com/g/r.git::p": false,
+		"@git@gitlab.com:g/r.git::p":       false,
+		"@file:///tmp/x::p":                false,
+	}
+	for entry, want := range cases {
+		ref, err := parsePluginRef(entry)
+		if err != nil {
+			t.Fatalf("parsePluginRef(%q) errored: %v", entry, err)
+		}
+		if ref.IsPath != want {
+			t.Errorf("parsePluginRef(%q).IsPath = %v, want %v", entry, ref.IsPath, want)
+		}
 	}
 }
 
 // ExecIfPass gates on the named profile's execIf; undefined profile errors.
+// A pass logs at normal level, a reject only at debug level.
 func TestExecIfPass(t *testing.T) {
 	s, _ := specFile(t, "p:\n  options:\n    execIf: ['env:X']\n")
 	eval := NewEvaluator().EvalExecIf
 	t.Setenv("X", "")
-	if ok, err := s.ExecIfPass("p", false, eval); err != nil || ok {
-		t.Errorf("unset env: pass = %v, err = %v, want false, nil", ok, err)
-	}
+	out, _ := testutil.CaptureStdout(t, func() error {
+		if ok, err := s.ExecIfPass("p", false, eval); err != nil || ok {
+			t.Errorf("unset env: pass = %v, err = %v, want false, nil", ok, err)
+		}
+		return nil
+	})
+	testutil.NotLine(t, out, "execIf(reject)")
+	log.SetDebug(true)
+	t.Cleanup(func() { log.SetDebug(false) })
+	out, _ = testutil.CaptureStdout(t, func() error {
+		_, err := s.ExecIfPass("p", false, eval)
+		return err
+	})
+	testutil.WantLines(t, out, "execIf(reject): profile p: env:X")
 	t.Setenv("X", "1")
-	if ok, err := s.ExecIfPass("p", false, eval); err != nil || !ok {
-		t.Errorf("set env: pass = %v, err = %v, want true, nil", ok, err)
-	}
+	out, _ = testutil.CaptureStdout(t, func() error {
+		if ok, err := s.ExecIfPass("p", false, eval); err != nil || !ok {
+			t.Errorf("set env: pass = %v, err = %v, want true, nil", ok, err)
+		}
+		return nil
+	})
+	testutil.WantLines(t, out, "execIf(pass): profile p: env:X")
 	if _, err := s.ExecIfPass("nope", false, eval); err == nil {
 		t.Error("undefined profile: expected error")
 	}

@@ -8,7 +8,7 @@ var RenderCmd = &cobra.Command{
 	Use:   "render-templates",
 	Short: "render *.tpl sources; each dest path decides target (relative -> repo, ~/ or absolute -> host)",
 	RunE: func(cmd *cobra.Command, args []string) error {
-		return forEachUnit(func(u unit) error { return u.host.RenderTemplates(u.res.Templates) })
+		return forEachUnit(cmd.Name(), func(u unit) error { return u.host.RenderTemplates(u.res.Templates) })
 	},
 }
 

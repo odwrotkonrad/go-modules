@@ -4,6 +4,7 @@ package host
 
 import (
 	"bytes"
+	"errors"
 	"os"
 	"os/user"
 	"path/filepath"
@@ -27,39 +28,50 @@ func (h Host) archiveBefore(sub string, dests []string) error {
 	return h.fs.ArchiveDests(path, dests)
 }
 
-// MkDirs creates repo-tree ancestor dirs (parents first) plus profile extra-dirs.
+// failItem logs "<op>(fail): <dest>: <err>" and returns err, the per-item
+// continue-on-error hook: ops collect these and errors.Join at the end.
+func (h Host) failItem(op, dest string, err error) error {
+	h.fs.Log(op+"(fail)", dest+": "+err.Error())
+	return err
+}
+
+// MkDirs creates repo-tree ancestor dirs (parents first) plus profile
+// extra-dirs. A failing dir is logged and the rest still run; failures join
+// into the returned error.
 func (h Host) MkDirs(dirRels []string, extraDirs []spec.FileItem) error {
-	if err := h.ensureConfigDirs(dirRels); err != nil {
-		return err
-	}
+	errs := []error{h.ensureConfigDirs(dirRels)}
 	for _, item := range extraDirs {
 		dest := h.ToDest(item.Dests[0].Path)
-		if h.dirSettled(dest) {
-			if err := h.fixPerms("mkdir", dest, item); err != nil {
-				return err
-			}
-			continue
-		}
-		if err := h.mkExtraDir(item, dest); err != nil {
-			return err
+		if err := h.upsertExtraDir(item, dest); err != nil {
+			errs = append(errs, h.failItem("mkdir", dest, err))
 		}
 	}
-	return nil
+	return errors.Join(errs...)
+}
+
+// upsertExtraDir settles one extra-dir: existing dest -> perms drift fix only,
+// else create with spec perms.
+func (h Host) upsertExtraDir(item spec.FileItem, dest string) error {
+	if h.dirSettled(dest) {
+		return h.fixPerms("mkdir", dest, item)
+	}
+	return h.mkExtraDir(item, dest)
 }
 
 // ensureConfigDirs creates repo-tree ancestor dirs (parents first), no spec
-// perms: mode 0 -> mkdir honors umask. Idempotent.
+// perms: mode 0 -> mkdir honors umask. Idempotent; failures collect per dir.
 func (h Host) ensureConfigDirs(dirRels []string) error {
+	var errs []error
 	for _, rel := range dirRels {
 		dest := h.ToDest(rel)
 		if h.dirSettled(dest) {
 			continue
 		}
 		if err := h.fs.Mkdir(dest, 0, false); err != nil {
-			return err
+			errs = append(errs, h.failItem("mkdir", dest, err))
 		}
 	}
-	return nil
+	return errors.Join(errs...)
 }
 
 // dirSettled reports whether dest already exists as a dir and may be skipped
@@ -182,17 +194,16 @@ func lookupID[T any](name string, lookup func(string) (T, error), idOf func(T) s
 }
 
 // MkLinks symlinks each config into its live dest (ln -fhs), archiving existing
-// dests upfront, skipping links already pointing into the repo.
+// dests upfront, skipping links already pointing into the repo. A failing link
+// is logged and the rest still run; failures join into the returned error.
 func (h Host) MkLinks(links []spec.FileItem, dirRels []string) error {
-	if err := h.ensureConfigDirs(dirRels); err != nil {
-		return err
-	}
+	errs := []error{h.ensureConfigDirs(dirRels)}
 	dests := make([]string, len(links))
 	for i, item := range links {
 		dests[i] = h.ToDest(item.Rel)
 	}
 	if err := h.archiveBefore("link", dests); err != nil {
-		return err
+		return errors.Join(append(errs, err)...)
 	}
 	for _, item := range links {
 		src := h.Src(item.Rel)
@@ -201,10 +212,10 @@ func (h Host) MkLinks(links []spec.FileItem, dirRels []string) error {
 			continue
 		}
 		if err := h.fs.Symlink(src, dest); err != nil {
-			return err
+			errs = append(errs, h.failItem("ln", dest, err))
 		}
 	}
-	return nil
+	return errors.Join(errs...)
 }
 
 // linkSettled reports whether dest already resolves to src (skippable). DryRunAll
@@ -223,38 +234,40 @@ func (h Host) linkSettled(src, dest string) bool {
 
 // MkCopies copies each *.ontoHost.cp to its dest(s) (marker stripped, or explicit
 // dest) when contents differ, archiving existing dests upfront, applying spec
-// perms (else default).
+// perms (else default). A failing dest is logged and the rest still run;
+// failures join into the returned error.
 func (h Host) MkCopies(copies []spec.FileItem, dirRels []string) error {
-	if err := h.ensureConfigDirs(dirRels); err != nil {
-		return err
-	}
+	errs := []error{h.ensureConfigDirs(dirRels)}
 	var dests []string
 	for _, item := range copies {
 		dests = append(dests, h.copyDests(item)...)
 	}
 	if err := h.archiveBefore("copy", dests); err != nil {
-		return err
+		return errors.Join(append(errs, err)...)
 	}
 	for _, item := range copies {
-		src := h.Src(item.Rel)
-		mode, _ := parseMode(item.Chmod)
-		owner := ownerSpec(item)
 		for _, dest := range h.copyDests(item) {
-			if !h.DryRunAll() && sameContent(src, dest) {
-				if err := h.fixPerms("cp", dest, item); err != nil {
-					return err
-				}
-				continue
-			}
-			if err := h.fs.Copy(src, dest, mode); err != nil {
-				return err
-			}
-			if owner != "" {
-				if err := h.fs.Chown("cp(chown)", owner, dest); err != nil {
-					return err
-				}
+			if err := h.copyOne(item, dest); err != nil {
+				errs = append(errs, h.failItem("cp", dest, err))
 			}
 		}
+	}
+	return errors.Join(errs...)
+}
+
+// copyOne settles one copy dest: same content -> perms drift fix only, else
+// copy with spec mode then chown when an owner is set.
+func (h Host) copyOne(item spec.FileItem, dest string) error {
+	src := h.Src(item.Rel)
+	if !h.DryRunAll() && sameContent(src, dest) {
+		return h.fixPerms("cp", dest, item)
+	}
+	mode, _ := parseMode(item.Chmod)
+	if err := h.fs.Copy(src, dest, mode); err != nil {
+		return err
+	}
+	if owner := ownerSpec(item); owner != "" {
+		return h.fs.Chown("cp(chown)", owner, dest)
 	}
 	return nil
 }
@@ -314,9 +327,12 @@ func sameContent(a, b string) bool {
 	return bytes.Equal(x, y)
 }
 
-// PruneBrokenLinks removes broken symlinks in config-set dirs (live dests).
+// PruneBrokenLinks removes broken symlinks in config-set dirs (live dests). A
+// failing removal is logged and the rest still run; failures join into the
+// returned error.
 func (h Host) PruneBrokenLinks(dirRels []string) error {
 	h.fs.Log("prune-links", h.Root)
+	var errs []error
 	seen := map[string]bool{}
 	for _, rel := range dirRels {
 		dest := h.ToDest(rel)
@@ -334,11 +350,11 @@ func (h Host) PruneBrokenLinks(dirRels []string) error {
 				continue
 			}
 			if err := h.fs.Remove(p); err != nil {
-				return err
+				errs = append(errs, h.failItem("prune-links", p, err))
 			}
 		}
 	}
-	return nil
+	return errors.Join(errs...)
 }
 
 // brokenRepoLink: check if p is a symlink into root/ whose target is gone.

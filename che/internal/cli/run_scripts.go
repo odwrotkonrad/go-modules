@@ -14,7 +14,7 @@ var RunScriptsCmd = &cobra.Command{
 	Short: "run the profile's scripts, optionally filtered by name substring",
 	RunE: func(cmd *cobra.Command, args []string) error {
 		total := 0
-		err := forEachUnit(func(u unit) error {
+		err := forEachUnit(cmd.Name(), func(u unit) error {
 			scripts, err := u.host.ResolveScripts(u.res.Scripts)
 			if err != nil {
 				return err

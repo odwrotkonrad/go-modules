@@ -272,8 +272,8 @@
     "pluginEntry": {
       "oneOf": [
         {
-          "description": "`@\u003cgiturl\u003e::\u003cprofile\u003e` plugin ref",
-          "pattern": "^@.+::.+$",
+          "description": "`@\u003cgiturl\u003e::\u003cprofile\u003e` (remote) or `\u003cdir\u003e::\u003cprofile\u003e` (local dir) plugin ref",
+          "pattern": "^.+::.+$",
           "type": "string"
         },
         {
@@ -287,8 +287,8 @@
               "type": "object"
             },
             "ref": {
-              "description": "`@\u003cgiturl\u003e::\u003cprofile\u003e` plugin ref",
-              "pattern": "^@.+::.+$",
+              "description": "`@\u003cgiturl\u003e::\u003cprofile\u003e` (remote) or `\u003cdir\u003e::\u003cprofile\u003e` (local dir) plugin ref",
+              "pattern": "^.+::.+$",
               "type": "string"
             }
           },
@@ -335,7 +335,7 @@
           "type": "object"
         },
         "plugins": {
-          "description": "remote profiles loaded at their own checkout: `@\u003cgiturl\u003e::\u003cprofile\u003e` string, or {ref, env}",
+          "description": "profiles loaded at their own checkout: `@\u003cgiturl\u003e::\u003cprofile\u003e` (remote) or `\u003cdir\u003e::\u003cprofile\u003e` (local dir) string, or {ref, env}",
           "items": {
             "$ref": "#/$defs/pluginEntry"
           },

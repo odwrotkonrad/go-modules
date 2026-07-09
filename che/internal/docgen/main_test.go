@@ -119,10 +119,10 @@ p:
             dest:
               - {path: a.md, options: {writeType: bogus}}
 `,
-		"plugin ref without @": `
+		"plugin ref without ::profile": `
 p:
   plugins:
-    - git@gitlab.com:x/y.git::prof
+    - ./plugin
 `,
 		"unknown profile key": `
 p:
