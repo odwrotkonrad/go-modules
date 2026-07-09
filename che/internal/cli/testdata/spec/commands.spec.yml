@@ -1,5 +1,5 @@
 # [>] 🤖🤖
-- name: link
+- name: link_should_symlink_repo_files_onto_home_and_system
   context:
     directory: testdata/fixture/commands/tree-che-repo
   in:
@@ -11,7 +11,7 @@
       archive(dry-run=delta): ${HOME}/.local/share/che/backups/che-link-{{/.*/}}.tar.bz2
       ln(create,dry-run=delta): ${HOME}/.config/zsh/.zshrc
       ln(create,dry-run=delta): /etc/zshrc
-- name: copy
+- name: copy_should_copy_marker_files_and_chown_daemon_plist
   context:
     directory: testdata/fixture/commands/tree-che-repo
   in:
@@ -24,7 +24,7 @@
       cp(create,dry-run=delta): ${HOME}/.config/zsh/c
       cp(create,dry-run=delta): /Library/LaunchDaemons/otelcol.plist
       cp(chown,dry-run=delta): root:wheel /Library/LaunchDaemons/otelcol.plist
-- name: render_host_profile
+- name: render_templates_should_render_only_host_dests_for_host_profile
   context:
     directory: testdata/fixture/commands/tree-che-repo
   in:
@@ -36,7 +36,7 @@
   notWant:
     stdOut:
       - docs/r.md
-- name: render_onto_repo
+- name: render_templates_should_render_only_repo_dests_for_onto_repo_profile
   context:
     directory: testdata/fixture/commands/tree-che-repo
   in:
@@ -48,7 +48,7 @@
   notWant:
     stdOut:
       - ${HOME}/.config/zsh/t
-- name: mk_dirs
+- name: mk_dirs_should_create_config_dirs_and_reapply_setgid_chmod
   context:
     directory: testdata/fixture/commands/tree-che-repo
   in:
@@ -60,7 +60,7 @@
       mkdir(create,dry-run=delta): ${HOME}/.cache/zsh
       mkdir(create,dry-run=delta): /var/log/che-test-setgid
       mkdir(chmod,dry-run=delta): 2775 /var/log/che-test-setgid
-- name: prune_links
+- name: prune_links_should_scan_root_and_remove_nothing_on_fresh_tree
   context:
     directory: testdata/fixture/commands/tree-che-repo
   in:
@@ -68,7 +68,7 @@
   want:
     stdOut: |
       prune-links(dry-run=delta): ${ROOT}
-- name: run_scripts
+- name: run_scripts_should_list_each_script_in_dry_run
   context:
     directory: testdata/fixture/commands/tree-che-repo
   in:
@@ -76,7 +76,7 @@
   want:
     stdOut: |
       run-scripts(dry-run=delta): ${REPO}/install/unit
-- name: run_scripts_filter
+- name: run_scripts_should_narrow_to_matching_name
   context:
     directory: testdata/fixture/commands/tree-che-repo
   in:
@@ -84,14 +84,14 @@
   want:
     stdOut: |
       run-scripts(dry-run=delta): ${REPO}/install/unit
-- name: run_scripts_filter_miss
+- name: run_scripts_should_error_when_name_matches_nothing
   context:
     directory: testdata/fixture/commands/tree-che-repo
   in:
     args: [run-scripts, __nope__]
   want:
     error: true
-- name: services_bootout
+- name: services_bootout_should_target_system_domain_service
   context:
     directory: testdata/fixture/commands/tree-che-repo
   in:
@@ -99,7 +99,7 @@
   want:
     stdOut: |
       bootout(dry-run=delta): system/otelcol
-- name: services_bootin
+- name: services_bootin_should_bootstrap_system_domain_service
   context:
     directory: testdata/fixture/commands/tree-che-repo
   in:
@@ -107,7 +107,7 @@
   want:
     stdOut: |
       bootstrap(dry-run=delta): system/otelcol
-- name: services_ensure
+- name: services_ensure_should_settle_then_check_pid
   context:
     directory: testdata/fixture/commands/tree-che-repo
   in:
@@ -116,7 +116,7 @@
     stdOut: |
       settle(dry-run=delta): 15s before pid check
       ensure(dry-run=delta): system/otelcol
-- name: detect
+- name: detect_should_print_only_the_resolved_profile
   context:
     directory: testdata/fixture/commands/tree-che-repo
   in:
