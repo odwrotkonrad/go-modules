@@ -22,19 +22,23 @@ func noSystem(t *testing.T) {
 	t.Cleanup(func() { SystemDir = prev })
 }
 
-func codeOf(err error) int {
-	var ce *CodedError
-	if errors.As(err, &ce) {
-		return ce.Code
+func TestCode(t *testing.T) {
+	if got := Code(nil); got != 0 {
+		t.Errorf("nil: got %d", got)
 	}
-	return -1
+	if got := Code(&CodedError{Code: 13, Msg: "x"}); got != 13 {
+		t.Errorf("coded: got %d", got)
+	}
+	if got := Code(errors.New("plain")); got != 1 {
+		t.Errorf("plain: got %d", got)
+	}
 }
 
 func TestLoadConfigMissing(t *testing.T) {
 	noSystem(t)
 	var out map[string]string
 	err := LoadConfig("nope.yml", t.TempDir(), &out)
-	if codeOf(err) != CodeFileNotFound {
+	if Code(err) != CodeFileNotFound {
 		t.Fatalf("got %v", err)
 	}
 }
@@ -45,7 +49,7 @@ func TestLoadConfigInvalid(t *testing.T) {
 	writeFile(t, dir, "cfg.yml", "a: [unclosed\n")
 	var out map[string]string
 	err := LoadConfig("cfg.yml", dir, &out)
-	if codeOf(err) != CodeConfig {
+	if Code(err) != CodeConfig {
 		t.Fatalf("got %v", err)
 	}
 }

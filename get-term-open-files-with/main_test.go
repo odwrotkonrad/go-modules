@@ -2,7 +2,6 @@
 package main
 
 import (
-	"errors"
 	"net/http"
 	"net/http/httptest"
 	"os"
@@ -40,14 +39,6 @@ func configDir(t *testing.T, raw []byte) string {
 		t.Fatal(err)
 	}
 	return dir
-}
-
-func codeOf(err error) int {
-	var ce *yamlcfg.CodedError
-	if errors.As(err, &ce) {
-		return ce.Code
-	}
-	return -1
 }
 
 func TestPositive(t *testing.T) {
@@ -108,7 +99,7 @@ func TestArgErrors(t *testing.T) {
 			seedCache(t)
 			dir := configDir(t, readTestdata(t, "term.yml"))
 			_, err := run(c.args, dir, lib.LanguagesURL)
-			if codeOf(err) != 11 {
+			if yamlcfg.Code(err) != 11 {
 				t.Fatalf("got %v", err)
 			}
 		})
@@ -121,7 +112,7 @@ func TestConfigErrors(t *testing.T) {
 		yamlcfg.SystemDir = filepath.Join(t.TempDir(), "no-system")
 		dir := t.TempDir()
 		_, err := run([]string{"any"}, dir, lib.LanguagesURL)
-		if codeOf(err) != 13 {
+		if yamlcfg.Code(err) != 13 {
 			t.Fatalf("got %v", err)
 		}
 	})
@@ -129,7 +120,7 @@ func TestConfigErrors(t *testing.T) {
 		seedCache(t)
 		dir := configDir(t, []byte("any: [unclosed\n"))
 		_, err := run([]string{"any"}, dir, lib.LanguagesURL)
-		if codeOf(err) != 12 {
+		if yamlcfg.Code(err) != 12 {
 			t.Fatalf("got %v", err)
 		}
 	})
@@ -164,7 +155,7 @@ func TestFetchFailureExit14(t *testing.T) {
 	defer srv.Close()
 	dir := configDir(t, readTestdata(t, "term.yml"))
 	_, err := run([]string{"any"}, dir, srv.URL)
-	if codeOf(err) != 14 {
+	if yamlcfg.Code(err) != 14 {
 		t.Fatalf("got %v", err)
 	}
 }

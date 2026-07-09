@@ -2,12 +2,18 @@
 package climain
 
 import (
-	"errors"
 	"fmt"
 	"os"
 
 	"gitlab.com/konradodwrot/go-modules/lib/yamlcfg"
 )
+
+func Run(name, version, usage string, run func(args []string) (string, error)) {
+	if out, done := HelpVersion(os.Args[1:], usage, name, version); done {
+		Exit(out, nil)
+	}
+	Exit(run(os.Args[1:]))
+}
 
 func HelpVersion(args []string, usage, name, version string) (out string, done bool) {
 	if len(args) != 1 {
@@ -28,18 +34,7 @@ func Exit(out string, err error) {
 	} else {
 		fmt.Println(out)
 	}
-	os.Exit(exitCode(err))
-}
-
-func exitCode(err error) int {
-	if err == nil {
-		return 0
-	}
-	var ce *yamlcfg.CodedError
-	if errors.As(err, &ce) {
-		return ce.Code
-	}
-	return 1
+	os.Exit(yamlcfg.Code(err))
 }
 
 //[<] 🤖🤖

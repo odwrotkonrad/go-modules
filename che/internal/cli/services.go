@@ -23,19 +23,13 @@ func init() {
 
 // serviceCmd builds a launchd subcommand: resolve profile services, run action over them.
 func serviceCmd(use, short string, action func(host.Host, []host.Service) error) *cobra.Command {
-	return &cobra.Command{
-		Use:   use,
-		Short: short,
-		RunE: func(cmd *cobra.Command, args []string) error {
-			return forEachUnit(cmd.Name(), func(u unit) error {
-				svcs, err := u.host.ResolveServices(u.res.Services)
-				if err != nil {
-					return err
-				}
-				return action(u.host, svcs)
-			})
-		},
-	}
+	return unitCmd(use, short, func(u unit) error {
+		svcs, err := u.host.ResolveServices(u.res.Services)
+		if err != nil {
+			return err
+		}
+		return action(u.host, svcs)
+	})
 }
 
 // [<] 🤖🤖

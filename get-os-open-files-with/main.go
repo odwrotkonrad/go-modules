@@ -3,7 +3,6 @@ package main
 
 import (
 	"fmt"
-	"os"
 
 	"gitlab.com/konradodwrot/go-modules/get-os-open-files-with/lib"
 	"gitlab.com/konradodwrot/go-modules/lib/climain"
@@ -37,11 +36,9 @@ func run(args []string, customDir string) (string, error) {
 }
 
 func main() {
-	if out, done := climain.HelpVersion(os.Args[1:], usage, "get-os-open-files-with", version); done {
-		climain.Exit(out, nil)
-	}
-	out, err := run(os.Args[1:], "")
-	climain.Exit(out, err)
+	climain.Run("get-os-open-files-with", version, usage, func(args []string) (string, error) {
+		return run(args, "")
+	})
 }
 
 //[<] 🤖🤖

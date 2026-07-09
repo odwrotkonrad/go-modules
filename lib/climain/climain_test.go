@@ -1,12 +1,7 @@
 // [>] 🤖🤖
 package climain
 
-import (
-	"errors"
-	"testing"
-
-	"gitlab.com/konradodwrot/go-modules/lib/yamlcfg"
-)
+import "testing"
 
 func TestHelpVersion(t *testing.T) {
 	cases := []struct {
@@ -30,18 +25,6 @@ func TestHelpVersion(t *testing.T) {
 				t.Fatalf("got (%q, %v) want (%q, %v)", out, done, c.out, c.done)
 			}
 		})
-	}
-}
-
-func TestExitCode(t *testing.T) {
-	if got := exitCode(nil); got != 0 {
-		t.Errorf("nil: got %d", got)
-	}
-	if got := exitCode(&yamlcfg.CodedError{Code: 13, Msg: "x"}); got != 13 {
-		t.Errorf("coded: got %d", got)
-	}
-	if got := exitCode(errors.New("plain")); got != 1 {
-		t.Errorf("plain: got %d", got)
 	}
 }
 

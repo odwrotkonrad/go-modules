@@ -2,6 +2,7 @@
 package yamlcfg
 
 import (
+	"errors"
 	"os"
 	"path/filepath"
 
@@ -21,6 +22,17 @@ type CodedError struct {
 }
 
 func (e *CodedError) Error() string { return e.Msg }
+
+func Code(err error) int {
+	if err == nil {
+		return 0
+	}
+	var ce *CodedError
+	if errors.As(err, &ce) {
+		return ce.Code
+	}
+	return 1
+}
 
 var SystemDir = "/etc/custom"
 

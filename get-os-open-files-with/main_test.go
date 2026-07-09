@@ -2,7 +2,6 @@
 package main
 
 import (
-	"errors"
 	"os"
 	"path/filepath"
 	"testing"
@@ -19,14 +18,6 @@ func writeConfig(t *testing.T, raw string) string {
 		t.Fatal(err)
 	}
 	return dir
-}
-
-func codeOf(err error) int {
-	var ce *yamlcfg.CodedError
-	if errors.As(err, &ce) {
-		return ce.Code
-	}
-	return -1
 }
 
 func TestPositive(t *testing.T) {
@@ -71,14 +62,14 @@ func TestErrors(t *testing.T) {
 	t.Run("too_many_args", func(t *testing.T) {
 		dir := writeConfig(t, "{}\n")
 		_, err := run([]string{"one", "two"}, dir)
-		if codeOf(err) != 11 {
+		if yamlcfg.Code(err) != 11 {
 			t.Fatalf("got %v", err)
 		}
 	})
 	t.Run("three_args", func(t *testing.T) {
 		dir := writeConfig(t, "{}\n")
 		_, err := run([]string{"one", "two", "three"}, dir)
-		if codeOf(err) != 11 {
+		if yamlcfg.Code(err) != 11 {
 			t.Fatalf("got %v", err)
 		}
 	})
@@ -86,21 +77,21 @@ func TestErrors(t *testing.T) {
 		yamlcfg.SystemDir = filepath.Join(t.TempDir(), "no-system")
 		dir := t.TempDir()
 		_, err := run(nil, dir)
-		if codeOf(err) != 13 {
+		if yamlcfg.Code(err) != 13 {
 			t.Fatalf("got %v", err)
 		}
 	})
 	t.Run("invalid_config_syntax", func(t *testing.T) {
 		dir := writeConfig(t, "handlers: [unclosed\n")
 		_, err := run(nil, dir)
-		if codeOf(err) != 12 {
+		if yamlcfg.Code(err) != 12 {
 			t.Fatalf("got %v", err)
 		}
 	})
 	t.Run("invalid_config_null_roles", func(t *testing.T) {
 		dir := writeConfig(t, "com.example.Editor: null\n")
 		_, err := run(nil, dir)
-		if codeOf(err) != 12 {
+		if yamlcfg.Code(err) != 12 {
 			t.Fatalf("got %v", err)
 		}
 	})
