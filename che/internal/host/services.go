@@ -108,6 +108,7 @@ func (h Host) Bootout(services []Service) error {
 		h.log("bootout", s.target())
 		_ = execx.Default.Exec(s.lctl("bootout", s.target())) // async, ignore exit
 		s.waitGone()
+		h.log("bootout(done)", s.target())
 	}
 	return nil
 }
@@ -140,7 +141,9 @@ func (h Host) Bootin(services []Service) error {
 			err = fmt.Errorf("bootstrap %s: %w", s.target(), err)
 			h.log("bootstrap(fail)", err.Error())
 			errs = append(errs, err)
+			continue
 		}
+		h.log("bootstrap(done)", s.target())
 	}
 	return errors.Join(errs...)
 }

@@ -5,6 +5,7 @@ package host
 import (
 	"embed"
 	"errors"
+	"io/fs"
 	"os"
 	"path/filepath"
 	"strings"
@@ -122,15 +123,6 @@ func stubSleep(t *testing.T) {
 	t.Cleanup(func() { Sleep = prev })
 }
 
-// joinLines renders recorded calls one per line, newline-terminated like
-// stdout, so block matchers assert order across both.
-func joinLines(calls []string) string {
-	if len(calls) == 0 {
-		return ""
-	}
-	return strings.Join(calls, "\n") + "\n"
-}
-
 // seedBrokenLink plants a symlink under HOME pointing at a missing root/ file.
 func seedBrokenLink(t *testing.T, h Host) string {
 	t.Helper()
@@ -146,30 +138,27 @@ func seedBrokenLink(t *testing.T, h Host) string {
 }
 
 // TestOps runs each op with dry-run off against a record-only MockFS and a
-// mock command executor: fs mutations, executed commands and log lines assert
-// without touching the host.
+// mock command executor: log lines assert the behavior, nothing touches the
+// host.
 func TestOps(t *testing.T) {
-	type want struct {
-		testyml.Want `yaml:",inline"`
-		FsCalls      testyml.Matchers `yaml:"fsCalls"`
-		Cmds         testyml.Matchers `yaml:"cmds"`
-	}
 	type c struct {
 		Name    string
 		In      opsIn
-		Want    want
-		NotWant want `yaml:"notWant"`
+		Want    testyml.Want
+		NotWant testyml.Want `yaml:"notWant"`
 	}
-	testyml.Run(t, td, "testdata/spec/ops.spec.yml", func(t *testing.T, c c) {
+	specs, err := fs.Glob(td, "testdata/spec/*.spec.yml")
+	if err != nil || len(specs) == 0 {
+		t.Fatalf("glob spec files: %v (%d found)", err, len(specs))
+	}
+	run := func(t *testing.T, c c) {
 		run, ok := ops[c.In.Op]
 		if !ok {
 			t.Fatalf("unknown op %q", c.In.Op)
 		}
 		h, res, dir := setupHost(t, config.Config{})
-		mock := &testutil.MockFS{}
-		h = h.WithFS(mock)
-		exe := &execx.Mock{Stub: launchdStub(c.In)}
-		execx.Swap(t, exe)
+		h = h.WithFS(&testutil.MockFS{})
+		execx.Swap(t, &execx.Mock{Stub: launchdStub(c.In)})
 		stubSleep(t)
 		if c.In.BrokenLink {
 			seedBrokenLink(t, h)
@@ -181,24 +170,17 @@ func TestOps(t *testing.T) {
 			t.Fatalf("%s errored: %v\n%s", c.In.Op, err, out)
 		}
 		vars := map[string]string{"HOME": h.Home, "REPO": dir, "ROOT": h.Root}
-		got := map[string]string{
-			"stdOut":  testutil.StripStamps(testutil.StripANSI(out)),
-			"fsCalls": joinLines(mock.Calls()),
-			"cmds":    joinLines(exe.Calls()),
+		stripped := testutil.StripStamps(testutil.StripANSI(out))
+		for _, f := range c.Want.StdOut {
+			testyml.MustMatch(t, stripped, testyml.Expand(f, vars))
 		}
-		for name, ms := range map[string][2]testyml.Matchers{
-			"stdOut":  {c.Want.StdOut, c.NotWant.StdOut},
-			"fsCalls": {c.Want.FsCalls, c.NotWant.FsCalls},
-			"cmds":    {c.Want.Cmds, c.NotWant.Cmds},
-		} {
-			for _, f := range ms[0] {
-				testyml.MustMatch(t, got[name], testyml.Expand(f, vars))
-			}
-			for _, f := range ms[1] {
-				testyml.MustNotMatch(t, got[name], testyml.Expand(f, vars))
-			}
+		for _, f := range c.NotWant.StdOut {
+			testyml.MustNotMatch(t, stripped, testyml.Expand(f, vars))
 		}
-	})
+	}
+	for _, spec := range specs {
+		testyml.Run(t, td, spec, run)
+	}
 }
 
 // [<] 🤖🤖🤖

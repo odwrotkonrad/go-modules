@@ -47,8 +47,8 @@ type Raw struct {
 // collected as remote-profile refs, then include (additive) and exclude
 // (subtractive glob filter, applied last, wins).
 type profileSpec struct {
-	Options       ProfileOptions `yaml:"options"`
-	MixinProfiles []string       `yaml:"mixinProfiles"`
+	Options       ProfileOptions `yaml:"options" jsonschema_description:"when the profile runs: autoExec opts in to bare-che runs, execIf predicates must ALL pass"`
+	MixinProfiles []string       `yaml:"mixinProfiles" jsonschema_description:"local profile names composed depth-first, in order"`
 	Plugins       []pluginEntry  `yaml:"plugins"`
 	Include       includeSet     `yaml:"include"`
 	Exclude       excludeSet     `yaml:"exclude"`
@@ -61,19 +61,20 @@ type profileSpec struct {
 // autoExec-eligible iff ALL pass; empty -> always.
 type ProfileOptions struct {
 	ExecIf   []string `yaml:"execIf"`
-	AutoExec bool     `yaml:"autoExec"`
+	AutoExec bool     `yaml:"autoExec" jsonschema_description:"run on bare che (default false: runs only via --profile or mixinProfiles)"`
 }
 
 // includeSet is the additive payload: link entries (glob-string OR
-// {source, dest} rewrite), copy/template/mkdirs entries (glob-string OR rich
-// object), script globs, service names.
+// {source, dest} rewrite), copy/template entries (glob-string OR rich
+// object), mkdirs entries (path-string OR {dest}), script globs, service
+// names.
 type includeSet struct {
-	Link            []linkEntry `yaml:"link"`
-	Copy            []entry     `yaml:"copy"`
-	RenderTemplates []entry     `yaml:"renderTemplates"`
-	Mkdirs          []entry     `yaml:"mkdirs"`
-	Scripts         []string    `yaml:"runScripts"`
-	Services        []string    `yaml:"services"`
+	Link            []linkEntry `yaml:"link" jsonschema_description:"symlink-op entries, repo-relative under root/: glob string (dest derived 1:1) or {source, dest} sed-style rewrite"`
+	Copy            []entry     `yaml:"copy" jsonschema_description:"*.ontoHost.cp copy-op perm-groups"`
+	RenderTemplates []entry     `yaml:"renderTemplates" jsonschema_description:"*.tpl render-op perm-groups; sources repo-root-relative, glob and derived-dest forms must be root/-prefixed"`
+	Mkdirs          []dirGroup  `yaml:"mkdirs" jsonschema_description:"extra-dir perm-groups; each item one dir path (brace-expanded)"`
+	Scripts         []string    `yaml:"runScripts" jsonschema_description:"script paths or globs, repo-relative, run in spec order"`
+	Services        []string    `yaml:"services" jsonschema_description:"launchd service names"`
 }
 
 // linkEntry is one link item: a bare glob string (dest derived 1:1), or a
@@ -97,12 +98,12 @@ func (l *linkEntry) UnmarshalYAML(value *yaml.Node) error {
 // excludeSet is the subtractive payload: every key a flat glob-string list, a
 // match drops the item.
 type excludeSet struct {
-	Link            []string `yaml:"link"`
-	Copy            []string `yaml:"copy"`
-	RenderTemplates []string `yaml:"renderTemplates"`
-	Mkdirs          []string `yaml:"mkdirs"`
-	Scripts         []string `yaml:"runScripts"`
-	Services        []string `yaml:"services"`
+	Link            []string `yaml:"link" jsonschema_description:"drop matching link items"`
+	Copy            []string `yaml:"copy" jsonschema_description:"drop matching copy items (source or dest)"`
+	RenderTemplates []string `yaml:"renderTemplates" jsonschema_description:"drop matching template items (source or dest)"`
+	Mkdirs          []string `yaml:"mkdirs" jsonschema_description:"drop matching dirs"`
+	Scripts         []string `yaml:"runScripts" jsonschema_description:"drop matching scripts (resolved file paths)"`
+	Services        []string `yaml:"services" jsonschema_description:"drop matching services"`
 }
 
 // DestSpec is one dest path plus its per-dest render options (render-files'
@@ -123,16 +124,39 @@ func (d *DestSpec) UnmarshalYAML(value *yaml.Node) error {
 
 // Perms is shared ownership/mode: empty fields mean "use the code default".
 type Perms struct {
-	Owner      string `yaml:"owner"`
-	OwnerGroup string `yaml:"ownerGroup"`
-	Chmod      string `yaml:"chmod"`
+	Owner      string `yaml:"owner" jsonschema_description:"dest owner user; empty: code default"`
+	OwnerGroup string `yaml:"ownerGroup" jsonschema_description:"dest owner group; empty: code default"`
+	Chmod      string `yaml:"chmod" jsonschema:"pattern=^[0-7]{3\\,4}$" jsonschema_description:"dest mode, octal string"`
 }
 
-// entry is a copy/template/mkdirs perm-group: optional perms cascading to every
+// entry is a copy/template perm-group: optional perms cascading to every
 // item in Files (globs included).
 type entry struct {
 	Perms `yaml:",inline"`
-	Files []fileSpec `yaml:"files"`
+	Files []fileSpec `yaml:"files" jsonschema:"required" jsonschema_description:"the group's items, each inheriting the group's perms"`
+}
+
+// dirGroup is a mkdirs perm-group: optional perms cascading to every item in
+// Files (globs included).
+type dirGroup struct {
+	Perms `yaml:",inline"`
+	Files []dirSpec `yaml:"files" jsonschema:"required" jsonschema_description:"the group's items, each inheriting the group's perms"`
+}
+
+// dirSpec is one item in a mkdirs perm-group's Files list: a bare dir path
+// string, or a {dest} object. glob is set iff the path form.
+type dirSpec struct {
+	glob string
+	Dest []DestSpec `yaml:"dest"`
+}
+
+func (d *dirSpec) UnmarshalYAML(value *yaml.Node) error {
+	if value.Kind == yaml.ScalarNode {
+		d.glob = value.Value
+		return nil
+	}
+	type alias dirSpec
+	return value.Decode((*alias)(d))
 }
 
 // fileSpec is one item in a perm-group's Files list: a bare glob string, or a

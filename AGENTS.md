@@ -223,21 +223,24 @@ che
       testdata
         fixture
           commands
-            tree-che-repo
-              install
-              root
-                HOME
-                  .config
-                    zsh
-                Library
-                  LaunchDaemons
-                etc
-              templates
-            tree-link-rewrite
-              root
-                HOME
-                  .config
-                    foo
+            all
+              sample-tree-only-links
+                root
+                  HOME
+                    .config
+                      foo
+            common
+              sample-tree
+                install
+                root
+                  HOME
+                    .config
+                      foo
+                      zsh
+                  Library
+                    LaunchDaemons
+                  etc
+                templates
         spec
     config
     docgen

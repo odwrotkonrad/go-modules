@@ -3,6 +3,7 @@ base:
     link:
       - HOME/.config/zsh/**
       - etc/zshrc
+      - {source: HOME/.config/foo/**, dest: s/foo/bar/}
     copy:
       - files: [HOME/.config/zsh/**]
       - owner: root

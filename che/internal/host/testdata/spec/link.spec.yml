@@ -1,0 +1,12 @@
+# [>] 🤖
+- name: linkShouldSymlinkRepoFilesOntoHomeAndSystem
+  in:
+    op: link
+  want:
+    stdOut: |
+      mkdir(create): ${HOME}/.config
+      mkdir(create): ${HOME}/.config/zsh
+      {{/(mkdir\(create\): .*\n)*/}}archive: {{/.*/}}che-link-{{/.*/}}.tar.bz2
+      ln(create): ${HOME}/.config/zsh/.zshrc
+      ln(create): /etc/zshrc
+# [<] 🤖

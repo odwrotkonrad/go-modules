@@ -17,6 +17,7 @@ import (
 	onepassword "github.com/1password/onepassword-sdk-go"
 	git "github.com/go-git/go-git/v5"
 	"github.com/hairyhenderson/gomplate/v4"
+	"github.com/invopop/jsonschema"
 
 	"gitlab.com/konradodwrot/go-modules/che/render/lib"
 )
@@ -110,6 +111,26 @@ func opResolver(ctx context.Context) func(string) (string, error) {
 type Options struct {
 	WriteType             string `yaml:"writeType"`
 	RenderReferencedFiles bool   `yaml:"renderReferencedFiles"`
+}
+
+// JSONSchema is Options' che.yml JSON Schema fragment, mirroring the yaml
+// mapping above (writeType enum from the WriteType* consts).
+func (Options) JSONSchema() *jsonschema.Schema {
+	s := &jsonschema.Schema{
+		Description:          "per-dest render options",
+		Type:                 "object",
+		AdditionalProperties: jsonschema.FalseSchema,
+		Properties:           jsonschema.NewProperties(),
+	}
+	s.Properties.Set("writeType", &jsonschema.Schema{
+		Description: "how the rendered body lands: overwrite (default: header + body) | mergeUpsert (env KEY=VALUE union under the existing dest) | raw (body verbatim, no autogen header)",
+		Enum:        []any{"", WriteTypeMergeUpsert, WriteTypeRaw},
+	})
+	s.Properties.Set("renderReferencedFiles", &jsonschema.Schema{
+		Description: "inline @-includes into the rendered body (overwrite only)",
+		Type:        "boolean",
+	})
+	return s
 }
 
 // WriteTypeMergeUpsert is the WriteType that merges env KEY=VALUE under the existing dest.

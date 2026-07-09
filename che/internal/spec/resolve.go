@@ -470,7 +470,7 @@ func splitTemplates(entries []entry, globs *globSet, rich *[]FileItem) error {
 
 // dirItems expands each mkdirs perm-group item into one FileItem per
 // brace-expanded dest path, carrying the group's perms (path in Dests[0]).
-func dirItems(e entry) []FileItem {
+func dirItems(e dirGroup) []FileItem {
 	var out []FileItem
 	for _, f := range e.Files {
 		paths := f.Dest

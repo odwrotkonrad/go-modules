@@ -1,0 +1,53 @@
+# [>] 🤖
+- name: servicesBootoutShouldUnloadLoadedService
+  in:
+    op: services-bootout
+  want:
+    stdOut: |
+      bootout: system/otelcol
+      bootout(done): system/otelcol
+- name: servicesBootoutShouldSkipUnloadedService
+  in:
+    op: services-bootout
+    notLoaded: true
+  notWant:
+    stdOut:
+      - bootout
+- name: servicesBootinShouldBootstrapFromPlist
+  in:
+    op: services-bootin
+  want:
+    stdOut: |
+      bootstrap: system/otelcol
+      bootstrap(done): system/otelcol
+- name: servicesBootinShouldReportFailedBootstrap
+  in:
+    op: services-bootin
+    failCmds: [bootstrap]
+  want:
+    error: true
+    stdErr:
+      - 'bootstrap system/otelcol: '
+    stdOut:
+      - 'bootstrap(fail): bootstrap system/otelcol: '
+  notWant:
+    stdOut:
+      - 'bootstrap(done)'
+- name: servicesEnsureShouldSettleThenReportRunningPid
+  in:
+    op: services-ensure
+  want:
+    stdOut: |
+      settle: 15s before pid check
+      running: system/otelcol (pid 4242)
+- name: servicesEnsureShouldErrorWhenPidMissing
+  in:
+    op: services-ensure
+    noPid: true
+  want:
+    error: true
+    stdErr:
+      - 'service(s) have no running process'
+    stdOut:
+      - 'error: system/otelcol has no running process'
+# [<] 🤖

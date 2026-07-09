@@ -1,0 +1,12 @@
+# [>] 🤖
+- name: mkDirsShouldCreateConfigDirsAndReapplySetgidChmod
+  in:
+    op: mk-dirs
+  want:
+    stdOut: |
+      mkdir(create): ${HOME}/.config
+      mkdir(create): ${HOME}/.config/zsh
+      {{/(mkdir\(create\): .*\n)*/}}mkdir(create): ${HOME}/.cache/zsh
+      mkdir(create): /var/log/che-test-setgid
+      mkdir(chmod): 2775 /var/log/che-test-setgid
+# [<] 🤖

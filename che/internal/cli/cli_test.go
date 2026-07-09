@@ -17,7 +17,7 @@ import (
 	"gitlab.com/konradodwrot/go-modules/lib/testyml"
 )
 
-const cheRepoPwd = "testdata/fixture/commands/tree-che-repo"
+const cheRepoPwd = "testdata/fixture/commands/common/sample-tree"
 
 // repoEnv materializes the pwd fixture as a committed git repo with an on-disk
 // HOME, chdirs in, exports HOME + CHE_SKIP_EXEC_IF so build() resolves against
