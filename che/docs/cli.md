@@ -8,12 +8,12 @@ loads the union of files/dirs/installs/services those profiles select.
 
 | Option | Env | Values | Description |
 | --- | --- | --- | --- |
-| `--debug` | `CHE_DEBUG` | truthy | print debug-level lines (plugin announce, clone/pull attempts) |
+| `--debug` | `CHE_DEBUG` | `bool` | print debug-level lines (plugin announce, clone/pull attempts) |
 | `-C`, `--directory` | `CHE_DIR` | `string` | change into this directory before resolving the repo |
 | `--dry-run` | `CHE_DRY_RUN` | `delta (changed dests, bare-flag default)` \| `all (every dest)` | print mutating actions instead of executing them |
 | `--profile` | `CHE_PROFILE` | `string` | run only this profile (autoExec skipped, execIf still enforced) |
-| `--skip-exec-if` | `CHE_SKIP_EXEC_IF` | truthy | treat every execIf predicate as passing |
-| `--skip-plugins` | `CHE_SKIP_PLUGINS` | truthy | skip plugins entries, load only the local repo |
+| `--skip-exec-if` | `CHE_SKIP_EXEC_IF` | `bool` | treat every execIf predicate as passing |
+| `--skip-plugins` | `CHE_SKIP_PLUGINS` | `bool` | skip plugins entries, load only the local repo |
 
 ## Commands
 
@@ -47,7 +47,7 @@ render *.tpl sources; each dest path decides target (relative -> repo, ~/ or abs
 
 | Option | Env | Values | Description |
 | --- | --- | --- | --- |
-| `--skip-secrets` | `CHE_RENDER_TEMPLATES_SKIP_SECRETS` | truthy | skip sources carrying op:// secret refs (logged, dests untouched) |
+| `--skip-secrets` | `CHE_RENDER_TEMPLATES_SKIP_SECRETS` | `bool` | skip sources carrying op:// secret refs (logged, dests untouched) |
 
 ### `$ che run-scripts`
 

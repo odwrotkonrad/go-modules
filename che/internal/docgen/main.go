@@ -280,8 +280,8 @@ func schema() map[string]any {
 
 // optionsTable renders a FlagSet as an Option|Env|Values|Description table.
 // Each flag's usage string may carry "; values: <...>" and "; env: <...>"
-// segments feeding those columns (values default: bool -> truthy, else the
-// flag's value type; flag wins over env).
+// segments feeding those columns (values default: the flag's value type;
+// flag wins over env).
 func optionsTable(fs *pflag.FlagSet) string {
 	var b strings.Builder
 	b.WriteString("| Option | Env | Values | Description |\n| --- | --- | --- | --- |\n")
@@ -297,9 +297,6 @@ func optionsTable(fs *pflag.FlagSet) string {
 		}
 		if values == "" {
 			values = "`" + f.Value.Type() + "`"
-			if f.Value.Type() == "bool" {
-				values = "truthy"
-			}
 		}
 		opt := "`--" + f.Name + "`"
 		if f.Shorthand != "" {
