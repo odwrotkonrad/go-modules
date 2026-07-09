@@ -21,6 +21,115 @@ loads the union of files/dirs/installs/services those profiles select.
 
 run every op the profile selects, in order.
 
+### `$ che completion`
+
+Generate the autocompletion script for the specified shell.
+
+Generate the autocompletion script for che for the specified shell.
+See each sub-command's help for details on how to use the generated script.
+
+
+### `$ che completion bash`
+
+Generate the autocompletion script for bash.
+
+Generate the autocompletion script for the bash shell.
+
+This script depends on the 'bash-completion' package.
+If it is not installed already, you can install it via your OS's package manager.
+
+To load completions in your current shell session:
+
+	source <(che completion bash)
+
+To load completions for every new session, execute once:
+
+#### Linux:
+
+	che completion bash > /etc/bash_completion.d/che
+
+#### macOS:
+
+	che completion bash > $(brew --prefix)/etc/bash_completion.d/che
+
+You will need to start a new shell for this setup to take effect.
+
+
+| Option | Env | Values | Description |
+| --- | --- | --- | --- |
+| `--no-descriptions` |  | `bool` | disable completion descriptions |
+
+### `$ che completion fish`
+
+Generate the autocompletion script for fish.
+
+Generate the autocompletion script for the fish shell.
+
+To load completions in your current shell session:
+
+	che completion fish | source
+
+To load completions for every new session, execute once:
+
+	che completion fish > ~/.config/fish/completions/che.fish
+
+You will need to start a new shell for this setup to take effect.
+
+
+| Option | Env | Values | Description |
+| --- | --- | --- | --- |
+| `--no-descriptions` |  | `bool` | disable completion descriptions |
+
+### `$ che completion powershell`
+
+Generate the autocompletion script for powershell.
+
+Generate the autocompletion script for powershell.
+
+To load completions in your current shell session:
+
+	che completion powershell | Out-String | Invoke-Expression
+
+To load completions for every new session, add the output of the above command
+to your powershell profile.
+
+
+| Option | Env | Values | Description |
+| --- | --- | --- | --- |
+| `--no-descriptions` |  | `bool` | disable completion descriptions |
+
+### `$ che completion zsh`
+
+Generate the autocompletion script for zsh.
+
+Generate the autocompletion script for the zsh shell.
+
+If shell completion is not already enabled in your environment you will need
+to enable it.  You can execute the following once:
+
+	echo "autoload -U compinit; compinit" >> ~/.zshrc
+
+To load completions in your current shell session:
+
+	source <(che completion zsh)
+
+To load completions for every new session, execute once:
+
+#### Linux:
+
+	che completion zsh > "${fpath[1]}/_che"
+
+#### macOS:
+
+	che completion zsh > $(brew --prefix)/share/zsh/site-functions/_che
+
+You will need to start a new shell for this setup to take effect.
+
+
+| Option | Env | Values | Description |
+| --- | --- | --- | --- |
+| `--no-descriptions` |  | `bool` | disable completion descriptions |
+
 ### `$ che copy`
 
 *.ontoHost.cp copy op.

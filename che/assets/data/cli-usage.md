@@ -2,6 +2,11 @@ che [command]
 
 Available Commands:
   all               run every op the profile selects, in order
+  completion        Generate the autocompletion script for the specified shell
+    bash            Generate the autocompletion script for bash
+    fish            Generate the autocompletion script for fish
+    powershell      Generate the autocompletion script for powershell
+    zsh             Generate the autocompletion script for zsh
   copy              *.ontoHost.cp copy op
   detect            print the eligible profiles (comma-joined) and exit
   link              symlink op (configs into system root)
