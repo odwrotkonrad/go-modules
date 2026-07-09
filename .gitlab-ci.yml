@@ -164,6 +164,7 @@ release-lib:
     - cat LICENSE >> che/docs/license.md
     - printf '```\n' >> che/docs/license.md
     - cd che && mkdocs build --site-dir ../public
+    - echo "docs preview -> https://konradodwrot.gitlab.io/-/go-modules/-/jobs/$CI_JOB_ID/artifacts/public/index.html"
   artifacts:
     paths:
       - public
