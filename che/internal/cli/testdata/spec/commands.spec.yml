@@ -1,98 +1,116 @@
 # [>] 🤖🤖
 - name: link
   in:
-    cmd: link
+    args: [link]
   want:
     stdOut:
-      - "mkdir(create,dry-run=delta): ${HOME}/.config/zsh"
-      - "ln(create,dry-run=delta): ${HOME}/.config/zsh/.zshrc"
-      - "archive(dry-run=delta): ${HOME}/.local/share/che/backups/che-link-"
-      - "ln(create,dry-run=delta): /etc/zshrc"
+      - |
+        mkdir\(create,dry-run=delta\): ${HOME}/.config
+        mkdir\(create,dry-run=delta\): ${HOME}/.config/zsh
+      - 'archive\(dry-run=delta\): .*/\.local/share/che/backups/che-link-.*\.tar\.bz2'
+      - |
+        ln\(create,dry-run=delta\): ${HOME}/.config/zsh/.zshrc
+        ln\(create,dry-run=delta\): /etc/zshrc
 - name: copy
   in:
-    cmd: copy
+    args: [copy]
   want:
     stdOut:
-      - "cp(create,dry-run=delta): ${HOME}/.config/zsh/c"
-      - "archive(dry-run=delta): ${HOME}/.local/share/che/backups/che-copy-"
-      - "cp(create,dry-run=delta): /Library/LaunchDaemons/otelcol.plist"
-      - "cp(chown,dry-run=delta): root:wheel /Library/LaunchDaemons/otelcol.plist"
+      - |
+        mkdir\(create,dry-run=delta\): ${HOME}/.config
+        mkdir\(create,dry-run=delta\): ${HOME}/.config/zsh
+      - 'archive\(dry-run=delta\): .*/\.local/share/che/backups/che-copy-.*\.tar\.bz2'
+      - |
+        cp\(create,dry-run=delta\): ${HOME}/.config/zsh/c
+        cp\(create,dry-run=delta\): /Library/LaunchDaemons/otelcol.plist
+        cp\(chown,dry-run=delta\): root:wheel /Library/LaunchDaemons/otelcol.plist
 - name: render_host_profile
   in:
-    cmd: render-templates
+    args: [render-templates]
   want:
     stdOut:
-      - "render(create,dry-run=delta): ${HOME}/.config/zsh/t"
+      - 'archive\(dry-run=delta\): .*/\.local/share/che/backups/che-render-.*\.tar\.bz2'
+      - |
+        render\(create,dry-run=delta\): ${HOME}/.config/zsh/t
   notWant:
     stdOut:
       - docs/r.md
 - name: render_onto_repo
   in:
-    cmd: render-templates
+    args: [render-templates]
     profile: ontoRepo
   want:
     stdOut:
-      - "render(create,dry-run=delta): "
-      - docs/r.md
+      - |
+        render\(create,dry-run=delta\): ${REPO}/docs/r.md
   notWant:
     stdOut:
       - ${HOME}/.config/zsh/t
 - name: mk_dirs
   in:
-    cmd: mk-dirs
+    args: [mk-dirs]
   want:
     stdOut:
-      - "mkdir(create,dry-run=delta): ${HOME}/.config/zsh"
-      - "mkdir(create,dry-run=delta): ${HOME}/.cache/zsh"
-      - "mkdir(create,dry-run=delta): /var/log/che-test-setgid"
-      - "mkdir(chmod,dry-run=delta): 2775 /var/log/che-test-setgid"
+      - |
+        mkdir\(create,dry-run=delta\): ${HOME}/.config
+        mkdir\(create,dry-run=delta\): ${HOME}/.config/zsh
+        mkdir\(create,dry-run=delta\): ${HOME}/.cache/zsh
+        mkdir\(create,dry-run=delta\): /var/log/che-test-setgid
+        mkdir\(chmod,dry-run=delta\): 2775 /var/log/che-test-setgid
 - name: prune_links
   in:
-    cmd: prune-links
+    args: [prune-links]
   want:
     stdOut:
-      - "prune-links(dry-run=delta): ${ROOT}"
+      - |
+        prune-links\(dry-run=delta\): ${ROOT}
 - name: run_scripts
   in:
-    cmd: run-scripts
+    args: [run-scripts]
   want:
     stdOut:
-      - "run-scripts(dry-run=delta): ${REPO}/install/unit"
+      - |
+        run-scripts\(dry-run=delta\): ${REPO}/install/unit
 - name: run_scripts_filter
   in:
-    cmd: run-scripts
-    args: [unit]
+    args: [run-scripts, unit]
   want:
     stdOut:
-      - "run-scripts(dry-run=delta): ${REPO}/install/unit"
+      - |
+        run-scripts\(dry-run=delta\): ${REPO}/install/unit
 - name: run_scripts_filter_miss
   in:
-    cmd: run-scripts
-    args: [__nope__]
+    args: [run-scripts, __nope__]
   want:
     error: true
 - name: services_bootout
   in:
-    cmd: services bootout
+    args: [services, bootout]
   want:
     stdOut:
-      - "bootout(dry-run=delta): system/otelcol"
+      - |
+        bootout\(dry-run=delta\): system/otelcol
 - name: services_bootin
   in:
-    cmd: services bootin
+    args: [services, bootin]
   want:
     stdOut:
-      - "bootstrap(dry-run=delta): system/otelcol"
+      - |
+        bootstrap\(dry-run=delta\): system/otelcol
 - name: services_ensure
   in:
-    cmd: services ensure
+    args: [services, ensure]
   want:
     stdOut:
-      - "ensure(dry-run=delta): system/otelcol"
+      - |
+        settle\(dry-run=delta\): 15s before pid check
+        ensure\(dry-run=delta\): system/otelcol
 - name: detect
   in:
-    cmd: detect
+    args: [detect]
   want:
     dryRunLines: false
-    stdOut: ["${PROFILE}"]
+    stdOut:
+      - |
+        ${PROFILE}
 # [<] 🤖🤖

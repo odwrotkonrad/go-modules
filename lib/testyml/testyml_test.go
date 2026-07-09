@@ -53,14 +53,14 @@ func TestMatchers(t *testing.T) {
 }
 
 func TestMatch(t *testing.T) {
-	if !Match("ln(create): /etc/zshrc", "ln(create)") {
-		t.Error("substring matcher failed")
+	if !Match("ln(create): /etc/zshrc", `ln\(create\)`) {
+		t.Error("fragment matcher failed")
 	}
-	if !Match("ln(create): /etc/zshrc", `re:^ln\(create\): /etc/\w+$`) {
-		t.Error("regex matcher failed")
+	if !Match("ln(create): /etc/zshrc", `^ln\(create\): /etc/\w+$`) {
+		t.Error("anchored matcher failed")
 	}
-	if Match("cp: /x", "re:^ln") {
-		t.Error("regex matcher matched wrongly")
+	if Match("cp: /x", "^ln") {
+		t.Error("matcher matched wrongly")
 	}
 }
 

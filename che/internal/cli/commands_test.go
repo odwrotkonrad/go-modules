@@ -16,15 +16,14 @@ import (
 //go:embed all:testdata
 var td embed.FS
 
-func findCmd(t *testing.T, name string) *cobra.Command {
+func findCmd(t *testing.T, args []string) (*cobra.Command, []string) {
 	t.Helper()
-	fields := strings.Fields(name)
-	if fields[0] == "services" {
-		sub, _, err := ServicesCmd.Find(fields[1:])
+	if args[0] == "services" {
+		sub, rest, err := ServicesCmd.Find(args[1:])
 		if err != nil || sub == ServicesCmd {
-			t.Fatalf("services subcommand %q not found: %v", name, err)
+			t.Fatalf("services subcommand %v not found: %v", args, err)
 		}
-		return sub
+		return sub, rest
 	}
 	byName := map[string]*cobra.Command{
 		"link":             LinkCmd,
@@ -35,16 +34,15 @@ func findCmd(t *testing.T, name string) *cobra.Command {
 		"run-scripts":      RunScriptsCmd,
 		"detect":           DetectCmd,
 	}
-	cmd, ok := byName[fields[0]]
+	cmd, ok := byName[args[0]]
 	if !ok {
-		t.Fatalf("unknown command %q", name)
+		t.Fatalf("unknown command %v", args)
 	}
-	return cmd
+	return cmd, args[1:]
 }
 
 func TestCommands(t *testing.T) {
 	type in struct {
-		Cmd     string
 		Args    []string
 		Profile string
 	}
@@ -70,14 +68,14 @@ func TestCommands(t *testing.T) {
 			"ROOT":    units[0].host.Root,
 			"PROFILE": profile,
 		}
-		cmd := findCmd(t, c.In.Cmd)
-		out, err := testutil.CaptureStdout(t, func() error { return cmd.RunE(cmd, c.In.Args) })
+		cmd, rest := findCmd(t, c.In.Args)
+		out, err := testutil.CaptureStdout(t, func() error { return cmd.RunE(cmd, rest) })
 		if c.Want.WantsError() {
 			c.Want.CheckErr(t, err)
 			return
 		}
 		if err != nil {
-			t.Fatalf("%s errored: %v", c.In.Cmd, err)
+			t.Fatalf("%v errored: %v", c.In.Args, err)
 		}
 		if c.Want.DryRunLines == nil || *c.Want.DryRunLines {
 			for line := range strings.SplitSeq(strings.TrimSpace(out), "\n") {
@@ -86,7 +84,7 @@ func TestCommands(t *testing.T) {
 				}
 			}
 		}
-		stripped := testutil.StripANSI(out)
+		stripped := testutil.StripStamps(testutil.StripANSI(out))
 		for _, f := range c.Want.StdOut {
 			testyml.MustMatch(t, stripped, testyml.Expand(f, vars))
 		}

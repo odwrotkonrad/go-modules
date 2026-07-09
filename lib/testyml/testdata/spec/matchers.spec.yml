@@ -10,5 +10,5 @@
   in:
     args: ["ln(create): /etc/zshrc"]
   want:
-    stdOut: ['re:^ln\(create\): /etc/\w+$']
+    stdOut: ['^ln\(create\): /etc/\w+$']
 # [<] 🤖🤖

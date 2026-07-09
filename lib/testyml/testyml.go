@@ -41,10 +41,7 @@ func (m *Matchers) UnmarshalYAML(node *yaml.Node) error {
 }
 
 func Match(s, matcher string) bool {
-	if re, ok := strings.CutPrefix(matcher, "re:"); ok {
-		return regexp.MustCompile(re).MatchString(s)
-	}
-	return strings.Contains(s, matcher)
+	return regexp.MustCompile(matcher).MatchString(s)
 }
 
 func MustMatch(t *testing.T, s, matcher string) {

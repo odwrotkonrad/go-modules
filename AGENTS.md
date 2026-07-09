@@ -287,6 +287,17 @@ che
         spec
     testutil
       specs
+      trees
+        tree-che-repo
+          install
+          root
+            HOME
+              .config
+                zsh
+            Library
+              LaunchDaemons
+            etc
+          templates
   render
     checkcmd
       testdata
