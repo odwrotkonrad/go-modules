@@ -48,26 +48,28 @@ type Raw struct {
 	order    []string               // profile names in declaration order
 }
 
-// PluginRef is one parsed plugins entry: a profile defined in a remote repo,
+// PluginRef is one parsed plugins entry: a profile defined in another repo,
 // loaded and anchored at its own checkout, optionally with envs exported
-// around everything done for its unit.
+// around everything done for its unit. IsPath marks a local dir ref (no `@`
+// prefix): URL then holds the dir path (absolute, relative, ~/, $VAR).
 type PluginRef struct {
 	URL     string
 	Profile string
 	Env     map[string]string
+	IsPath  bool
 }
 
-// String renders the canonical `@<ref>::<profile>` form (env not rendered).
-func (p PluginRef) String() string { return "@" + p.URL + "::" + p.Profile }
-
-// IsPath reports whether the ref is a directory path (relative, absolute, ~/,
-// $VAR) rather than a git URL (scheme:// or git@ prefixed).
-func (p PluginRef) IsPath() bool {
-	return !strings.Contains(p.URL, "://") && !strings.HasPrefix(p.URL, "git@")
+// String renders the canonical entry form (env not rendered):
+// `@<giturl>::<profile>` remote, `<dir>::<profile>` local.
+func (p PluginRef) String() string {
+	if p.IsPath {
+		return p.URL + "::" + p.Profile
+	}
+	return "@" + p.URL + "::" + p.Profile
 }
 
-// pluginEntry is one plugins list item: a bare `@<giturl>::<profile>` string,
-// or a {ref, env} object.
+// pluginEntry is one plugins list item: a bare `@<giturl>::<profile>` /
+// `<dir>::<profile>` string, or a {ref, env} object.
 type pluginEntry struct {
 	Ref string            `yaml:"ref"`
 	Env map[string]string `yaml:"env"`
@@ -268,15 +270,17 @@ func Load(path string) (*Raw, error) {
 	return s, nil
 }
 
-// parsePluginRef parses one `@<giturl-or-dir>::<profile>` ref: last `::`
-// splits, both parts required.
+// parsePluginRef parses one plugins ref, the `@` prefix deciding the kind:
+// `@<giturl>::<profile>` remote, `<dir>::<profile>` local dir (absolute
+// /path, relative ./path or path, ~/, $VAR). Last `::` splits, both parts
+// required.
 func parsePluginRef(entry string) (PluginRef, error) {
-	raw := strings.TrimPrefix(entry, "@")
+	raw, isURL := strings.CutPrefix(entry, "@")
 	i := strings.LastIndex(raw, "::")
-	if !strings.HasPrefix(entry, "@") || i <= 0 || i+2 >= len(raw) {
-		return PluginRef{}, fmt.Errorf("plugins entry %q: want @<giturl-or-dir>::<profile>", entry)
+	if i <= 0 || i+2 >= len(raw) {
+		return PluginRef{}, fmt.Errorf("plugins entry %q: want @<giturl>::<profile> or <dir>::<profile>", entry)
 	}
-	return PluginRef{URL: raw[:i], Profile: raw[i+2:]}, nil
+	return PluginRef{URL: raw[:i], Profile: raw[i+2:], IsPath: !isURL}, nil
 }
 
 // EligibleProfiles lists the profiles to Resolve, in declaration order:
@@ -590,7 +594,7 @@ func (r *Raw) mergeInto(eff *effective, name string, seen []string) error {
 		}
 		ref.Env = pe.Env
 		dup := slices.ContainsFunc(eff.plugins, func(q PluginRef) bool {
-			return q.URL == ref.URL && q.Profile == ref.Profile
+			return q.URL == ref.URL && q.Profile == ref.Profile && q.IsPath == ref.IsPath
 		})
 		if !dup {
 			eff.plugins = append(eff.plugins, ref)

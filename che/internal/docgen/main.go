@@ -114,7 +114,7 @@ func schema() map[string]any {
 					},
 					"mixinProfiles": strList("local profile names composed depth-first, in order"),
 					"plugins": map[string]any{
-						"description": "remote profiles loaded at their own checkout: `@<giturl>::<profile>` string, or {ref, env}",
+						"description": "profiles loaded at their own checkout: `@<giturl>::<profile>` (remote) or `<dir>::<profile>` (local dir) string, or {ref, env}",
 						"type":        "array",
 						"items":       map[string]any{"$ref": "#/$defs/pluginEntry"},
 					},
@@ -125,9 +125,9 @@ func schema() map[string]any {
 			"pluginEntry": map[string]any{
 				"oneOf": []any{
 					map[string]any{
-						"description": "`@<giturl>::<profile>` plugin ref",
+						"description": "`@<giturl>::<profile>` (remote) or `<dir>::<profile>` (local dir) plugin ref",
 						"type":        "string",
-						"pattern":     "^@.+::.+$",
+						"pattern":     "^.+::.+$",
 					},
 					map[string]any{
 						"type":                 "object",
@@ -135,9 +135,9 @@ func schema() map[string]any {
 						"required":             []any{"ref"},
 						"properties": map[string]any{
 							"ref": map[string]any{
-								"description": "`@<giturl>::<profile>` plugin ref",
+								"description": "`@<giturl>::<profile>` (remote) or `<dir>::<profile>` (local dir) plugin ref",
 								"type":        "string",
-								"pattern":     "^@.+::.+$",
+								"pattern":     "^.+::.+$",
 							},
 							"env": map[string]any{
 								"description":          "envs exported around everything done for the plugin's unit",

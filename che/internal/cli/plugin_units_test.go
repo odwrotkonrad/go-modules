@@ -211,7 +211,7 @@ func TestBuildPluginUnitsDirRef(t *testing.T) {
 		"envvar":   "$PLUGIN_DIR_REF",
 	} {
 		t.Run(name, func(t *testing.T) {
-			ref := "@" + refDir + "::gitlabGroup"
+			ref := refDir + "::gitlabGroup"
 			hostRepo := testutil.Repo(t, map[string]string{
 				"che.yml":           "main:\n  options: {autoExec: true}\n  plugins: [\"" + ref + "\"]\n  include:\n    runScripts: [scripts/local.zsh]\n",
 				"scripts/local.zsh": "#!/bin/zsh\n",
@@ -291,7 +291,7 @@ func TestForEachUnitContinuesOnError(t *testing.T) {
 		"che.yml":               "gitlabGroup:\n  include:\n    runScripts: [scripts/bootstrap.zsh]\n",
 		"scripts/bootstrap.zsh": "#!/bin/zsh\n",
 	})
-	ref := "@" + pluginDir + "::gitlabGroup"
+	ref := pluginDir + "::gitlabGroup"
 	hostRepo := testutil.Repo(t, map[string]string{
 		"che.yml":           "main:\n  options: {autoExec: true}\n  plugins: [\"" + ref + "\"]\n  include:\n    runScripts: [scripts/local.zsh]\n",
 		"scripts/local.zsh": "#!/bin/zsh\n",

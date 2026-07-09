@@ -123,19 +123,25 @@ Local profile names, composed depth-first, in order, before this profile's
 
 ### plugins
 
-Remote profiles, loaded and anchored at their own checkout:
+Profiles from other repos, loaded and anchored at their own checkout:
 
 ```yaml
 plugins:
   - "@git@gitlab.com:group/repo.git::profile"
+  - "~/projects/repo::profile"
   - ref: "@git@gitlab.com:group/repo.git::profile"
     env:
       SOME_VAR: value
 ```
 
-`ref`: `@<giturl>::<profile>` (last `::` splits). `env`: exported around the
-plugin's unit. Duplicates load once. Nested plugin refs ignored.
-`--skip-plugins` (env `CHE_SKIP_PLUGINS`): drop all.
+`ref` (last `::` splits), the `@` prefix deciding the kind:
+
+- `@<giturl>::<profile>`: remote, cloned/pulled into a managed cache checkout.
+- `<dir>::<profile>`: local dir used in place (no git). `$VAR` and `~` expand;
+  a relative path (`./path`, `path`) resolves against the local repo root.
+
+`env`: exported around the plugin's unit. Duplicates load once. Nested plugin
+refs ignored. `--skip-plugins` (env `CHE_SKIP_PLUGINS`): drop all.
 
 ## include
 

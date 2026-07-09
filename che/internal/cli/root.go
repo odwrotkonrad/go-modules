@@ -274,7 +274,7 @@ func buildPlugin(p spec.PluginRef) (unit, bool, error) {
 // pluginCheckout resolves p's repo dir: git URL -> managed cache clone/pull,
 // dir path -> resolved local dir (no ensure logs, no git).
 func pluginCheckout(p spec.PluginRef, repoRoot, home string) (string, error) {
-	if !p.IsPath() {
+	if !p.IsPath {
 		return plugin.Ensure(home, p.URL, p.Profile)
 	}
 	return resolvePluginDir(p.URL, repoRoot, home)
