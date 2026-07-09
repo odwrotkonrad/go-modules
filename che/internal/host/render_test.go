@@ -9,6 +9,7 @@ import (
 	"testing"
 
 	"gitlab.com/konradodwrot/go-modules/che/internal/spec"
+	"gitlab.com/konradodwrot/go-modules/che/internal/testutil"
 	"gitlab.com/konradodwrot/go-modules/che/render/render"
 )
 
@@ -163,6 +164,32 @@ func TestRenderRepoMultiDestAtInclude(t *testing.T) {
 	}
 	if !strings.Contains(agents, "INLINED") || strings.Contains(agents, "@inc.md") {
 		t.Errorf("AGENTS.md should inline @-include, got %q", agents)
+	}
+}
+
+// TestRenderContinuesOnError: a failing template logs render(fail), the next
+// item still renders, and the op returns the failure.
+func TestRenderContinuesOnError(t *testing.T) {
+	root := writeRepo(t, map[string]string{
+		"templates/ok.ontoRepo.tpl": "fine\n",
+	})
+	h := New(root, "/home/x", "cli/macos", DryRunOff)
+	items := []spec.FileItem{
+		{Rel: "templates/missing.ontoRepo.tpl", Dests: []spec.DestSpec{{Path: "bad.md"}}},
+		{Rel: "templates/ok.ontoRepo.tpl", Dests: []spec.DestSpec{{Path: "ok.md"}}},
+	}
+	out, err := testutil.CaptureStdout(t, func() error { return h.RenderTemplates(items) })
+	if err == nil {
+		t.Fatal("RenderTemplates must return the collected failure")
+	}
+	testutil.WantLines(t, out,
+		"render(fail): templates/missing.ontoRepo.tpl: ",
+		"render(create): "+filepath.Join(root, "ok.md"))
+	if got := readDest(t, root, "ok.md"); !strings.Contains(got, "fine") {
+		t.Errorf("second template not rendered after first failed: %q", got)
+	}
+	if _, serr := os.Stat(filepath.Join(root, "bad.md")); !os.IsNotExist(serr) {
+		t.Error("failed template unexpectedly produced bad.md")
 	}
 }
 

@@ -3,6 +3,7 @@ package host
 // [>] 🤖🤖
 
 import (
+	"errors"
 	"os"
 	"path/filepath"
 	"strings"
@@ -28,7 +29,8 @@ type tmplDest struct {
 // repo-root-relative. Glob-form items (no explicit dest) render raw to the
 // derived host path; rich items fan out across their dests through
 // render.Compose, host dests placed with spec perms, repo dests written as
-// plain repo files.
+// plain repo files. A failing item is logged and the rest still render;
+// failures join into the returned error.
 func (h Host) RenderTemplates(templates []spec.FileItem) error {
 	skipSecret := os.Getenv("CHE_RENDER_TEMPLATES_DRY_RUN_SECRETS") != ""
 	var keep []spec.FileItem
@@ -52,25 +54,26 @@ func (h Host) RenderTemplates(templates []spec.FileItem) error {
 			return err
 		}
 	}
+	var errs []error
 	if h.DryRun() { // [why] dry-run logs dests only: no gomplate render, no @-include resolve
 		for _, item := range keep {
 			for _, d := range h.templateDests(item) {
 				h.fs.Log("render(create)", d.path)
 				if d.host {
 					if err := h.fixPerms("render", d.path, item); err != nil {
-						return err
+						errs = append(errs, h.failItem("render", d.path, err))
 					}
 				}
 			}
 		}
-		return nil
+		return errors.Join(errs...)
 	}
 	for _, item := range keep {
 		if err := h.renderTemplate(item); err != nil {
-			return err
+			errs = append(errs, h.failItem("render", item.Rel, err))
 		}
 	}
-	return nil
+	return errors.Join(errs...)
 }
 
 // srcHasSecretRef reports whether the template source at path carries an op://

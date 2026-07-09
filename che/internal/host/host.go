@@ -44,6 +44,13 @@ func New(repoRoot, home, profile string, mode DryRunMode) Host {
 	}
 }
 
+// WithLogSub returns a copy whose op log lines carry s as a trailing subtype
+// word (e.g. "profile=<name>").
+func (h Host) WithLogSub(s string) Host {
+	h.fs.Sub = s
+	return h
+}
+
 // log maps a DryRunMode to the log-layer dry-run mode (subtype rendering).
 func (m DryRunMode) log() log.DryRun {
 	switch m {

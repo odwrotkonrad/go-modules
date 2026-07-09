@@ -3,6 +3,7 @@ package host
 // [>] 🤖🤖
 
 import (
+	"errors"
 	"fmt"
 	"os"
 	"os/exec"
@@ -119,7 +120,10 @@ func (s Service) waitGone() {
 }
 
 // Bootin bootstraps each service fresh from its plist. Does NOT auto-bootout.
+// A failing bootstrap is logged and the rest still run; failures join into the
+// returned error.
 func (h Host) Bootin(services []Service) error {
+	var errs []error
 	for _, s := range services {
 		if h.DryRun() {
 			log.Msg("bootstrap", s.target(), h.mode.log())
@@ -129,10 +133,12 @@ func (h Host) Bootin(services []Service) error {
 		c := s.lctl("bootstrap", s.Domain, s.Plist)
 		c.Stdout, c.Stderr = os.Stdout, os.Stderr
 		if err := c.Run(); err != nil {
-			return fmt.Errorf("bootstrap %s: %w", s.target(), err)
+			err = fmt.Errorf("bootstrap %s: %w", s.target(), err)
+			log.Msg("bootstrap(fail)", err.Error(), log.Off)
+			errs = append(errs, err)
 		}
 	}
-	return nil
+	return errors.Join(errs...)
 }
 
 // Ensure settles, then verifies each long-running service has a live pid.

@@ -9,6 +9,9 @@ import (
 	"slices"
 	"strings"
 	"testing"
+
+	"gitlab.com/konradodwrot/go-modules/che/internal/log"
+	"gitlab.com/konradodwrot/go-modules/che/internal/testutil"
 )
 
 // specFile writes body as che.yml in a temp dir, returns the loaded Raw.
@@ -93,18 +96,54 @@ func TestPluginRefString(t *testing.T) {
 	}
 }
 
+// IsPath classifies dir-path refs vs git URLs.
+func TestPluginRefIsPath(t *testing.T) {
+	cases := map[string]bool{
+		"/abs/dir":                     true,
+		"./rel":                        true,
+		"rel/dir":                      true,
+		"~/x":                          true,
+		"$HOME/x":                      true,
+		"https://gitlab.com/g/r.git":   false,
+		"ssh://git@gitlab.com/g/r.git": false,
+		"git@gitlab.com:g/r.git":       false,
+		"file:///tmp/x":                false,
+	}
+	for url, want := range cases {
+		if got := (PluginRef{URL: url}).IsPath(); got != want {
+			t.Errorf("IsPath(%q) = %v, want %v", url, got, want)
+		}
+	}
+}
+
 // ExecIfPass gates on the named profile's execIf; undefined profile errors.
+// A pass logs at normal level, a reject only at debug level.
 func TestExecIfPass(t *testing.T) {
 	s, _ := specFile(t, "p:\n  options:\n    execIf: ['env:X']\n")
 	eval := NewEvaluator().EvalExecIf
 	t.Setenv("X", "")
-	if ok, err := s.ExecIfPass("p", false, eval); err != nil || ok {
-		t.Errorf("unset env: pass = %v, err = %v, want false, nil", ok, err)
-	}
+	out, _ := testutil.CaptureStdout(t, func() error {
+		if ok, err := s.ExecIfPass("p", false, eval); err != nil || ok {
+			t.Errorf("unset env: pass = %v, err = %v, want false, nil", ok, err)
+		}
+		return nil
+	})
+	testutil.NotLine(t, out, "execIf(reject)")
+	log.SetDebug(true)
+	t.Cleanup(func() { log.SetDebug(false) })
+	out, _ = testutil.CaptureStdout(t, func() error {
+		_, err := s.ExecIfPass("p", false, eval)
+		return err
+	})
+	testutil.WantLines(t, out, "execIf(reject): profile p: env:X")
 	t.Setenv("X", "1")
-	if ok, err := s.ExecIfPass("p", false, eval); err != nil || !ok {
-		t.Errorf("set env: pass = %v, err = %v, want true, nil", ok, err)
-	}
+	out, _ = testutil.CaptureStdout(t, func() error {
+		if ok, err := s.ExecIfPass("p", false, eval); err != nil || !ok {
+			t.Errorf("set env: pass = %v, err = %v, want true, nil", ok, err)
+		}
+		return nil
+	})
+	testutil.WantLines(t, out, "execIf(pass): profile p: env:X")
 	if _, err := s.ExecIfPass("nope", false, eval); err == nil {
 		t.Error("undefined profile: expected error")
 	}

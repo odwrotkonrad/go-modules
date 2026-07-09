@@ -57,8 +57,14 @@ type PluginRef struct {
 	Env     map[string]string
 }
 
-// String renders the canonical `@<giturl>::<profile>` form (env not rendered).
+// String renders the canonical `@<ref>::<profile>` form (env not rendered).
 func (p PluginRef) String() string { return "@" + p.URL + "::" + p.Profile }
+
+// IsPath reports whether the ref is a directory path (relative, absolute, ~/,
+// $VAR) rather than a git URL (scheme:// or git@ prefixed).
+func (p PluginRef) IsPath() bool {
+	return !strings.Contains(p.URL, "://") && !strings.HasPrefix(p.URL, "git@")
+}
 
 // pluginEntry is one plugins list item: a bare `@<giturl>::<profile>` string,
 // or a {ref, env} object.
@@ -262,13 +268,13 @@ func Load(path string) (*Raw, error) {
 	return s, nil
 }
 
-// parsePluginRef parses one `@<giturl>::<profile>` ref: last `::` splits,
-// both parts required.
+// parsePluginRef parses one `@<giturl-or-dir>::<profile>` ref: last `::`
+// splits, both parts required.
 func parsePluginRef(entry string) (PluginRef, error) {
 	raw := strings.TrimPrefix(entry, "@")
 	i := strings.LastIndex(raw, "::")
 	if !strings.HasPrefix(entry, "@") || i <= 0 || i+2 >= len(raw) {
-		return PluginRef{}, fmt.Errorf("plugins entry %q: want @<giturl>::<profile>", entry)
+		return PluginRef{}, fmt.Errorf("plugins entry %q: want @<giturl-or-dir>::<profile>", entry)
 	}
 	return PluginRef{URL: raw[:i], Profile: raw[i+2:]}, nil
 }
@@ -329,7 +335,7 @@ func (r *Raw) ExecIfPass(name string, forceAll bool, eval func(expr string) (boo
 }
 
 // allPass reports whether every execIf expression of profile name passes,
-// logging each evaluated expression's outcome.
+// logging each pass (rejects log at debug level only).
 func allPass(name string, exprs []string, forceAll bool, eval func(expr string) (bool, error)) (bool, error) {
 	if forceAll {
 		return true, nil
@@ -339,14 +345,11 @@ func allPass(name string, exprs []string, forceAll bool, eval func(expr string) 
 		if err != nil {
 			return false, fmt.Errorf("profile %q execIf %q: %w", name, expr, err)
 		}
-		verdict := "reject"
-		if ok {
-			verdict = "pass"
-		}
-		log.Msg("execIf("+verdict+")", fmt.Sprintf("profile %s: %s", name, expr), log.Off)
 		if !ok {
+			log.Debug("execIf(reject)", fmt.Sprintf("profile %s: %s", name, expr), log.Off)
 			return false, nil
 		}
+		log.Msg("execIf(pass)", fmt.Sprintf("profile %s: %s", name, expr), log.Off)
 	}
 	return true, nil
 }

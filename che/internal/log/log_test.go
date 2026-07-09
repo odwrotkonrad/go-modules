@@ -65,6 +65,36 @@ func TestMsgDryRunCombinesSubtype(t *testing.T) {
 	}
 }
 
+// MsgSub appends the extra subtype after the dry-run one.
+func TestMsgSubAppended(t *testing.T) {
+	m := plain(t, capture(t, func() { MsgSub("run-scripts", "/x", All, "profile=gitlabGroup") }))
+	if m[1] != "run-scripts" || m[2] != "(dry-run=all,profile=gitlabGroup)" {
+		t.Errorf("type/subtype = %q/%q, want run-scripts/(dry-run=all,profile=gitlabGroup)", m[1], m[2])
+	}
+	off := plain(t, capture(t, func() { MsgSub("mkdir(create)", "/x", Off, "profile=p") }))
+	if off[2] != "(create,profile=p)" {
+		t.Errorf("subtype = %q, want (create,profile=p)", off[2])
+	}
+	bare := plain(t, capture(t, func() { MsgSub("ln", "/x", Off, "") }))
+	if bare[2] != "" {
+		t.Errorf("empty sub subtype = %q, want none", bare[2])
+	}
+}
+
+// Debug is silent by default, prints like Msg once enabled.
+func TestDebugGate(t *testing.T) {
+	t.Cleanup(func() { SetDebug(false) })
+	SetDebug(false)
+	if out := capture(t, func() { Debug("plugin(p)", "run x", Off) }); out != "" {
+		t.Errorf("Debug with gate off printed %q, want nothing", out)
+	}
+	SetDebug(true)
+	m := plain(t, capture(t, func() { Debug("plugin(p)", "run x", Off) }))
+	if m[1] != "plugin" || m[2] != "(p)" || m[3] != "run x" {
+		t.Errorf("type/subtype/msg = %q/%q/%q, want plugin/(p)/run x", m[1], m[2], m[3])
+	}
+}
+
 // TestBoldEmitted guards that the type is wrapped in SGR bold, escapes intact.
 func TestBoldEmitted(t *testing.T) {
 	out := capture(t, func() { Msg("ln", "/x", Off) })
