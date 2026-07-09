@@ -28,6 +28,7 @@ test-cover:
 	CC=$(CC) $(GO) test -coverprofile=coverage.out -coverpkg=./... ./...
 	$(GO) tool cover -func=coverage.out | tail -1
 	$(GO) run $(GOCOVER_COBERTURA) < coverage.out > coverage.xml
+	sed -i.bak 's|filename="gitlab.com/konradodwrot/go-modules/|filename="|g' coverage.xml && rm coverage.xml.bak
 
 #[what] build the binary into ./dist via go build
 build:
