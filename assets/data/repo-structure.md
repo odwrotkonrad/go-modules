@@ -10,6 +10,18 @@ che
   internal
     cli
       testdata
+        fixture
+          commands
+            tree-che-repo
+              install
+              root
+                HOME
+                  .config
+                    zsh
+                Library
+                  LaunchDaemons
+                etc
+              templates
         spec
     docgen
     fsutil

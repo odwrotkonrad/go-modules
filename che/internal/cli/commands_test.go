@@ -43,8 +43,7 @@ func findCmd(t *testing.T, args []string) (*cobra.Command, []string) {
 
 func TestCommands(t *testing.T) {
 	type in struct {
-		Spec    string
-		Tree    string
+		Pwd     string `yaml:"pwd"`
 		Args    []string
 		Profile string
 	}
@@ -63,7 +62,7 @@ func TestCommands(t *testing.T) {
 		if profile == "" {
 			profile = testutil.CheProfile
 		}
-		home := setupDryRun(t, c.In.Spec, c.In.Tree, profile)
+		home := setupDryRun(t, c.In.Pwd, profile)
 		vars := map[string]string{
 			"HOME":    home,
 			"REPO":    units[0].host.RepoRoot,

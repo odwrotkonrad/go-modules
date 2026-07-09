@@ -1,0 +1,37 @@
+base:
+  include:
+    link:
+      - HOME/.config/zsh/**
+      - etc/zshrc
+    copy:
+      - files: [HOME/.config/zsh/**]
+      - owner: root
+        ownerGroup: wheel
+        chmod: "0644"
+        files:
+          - {source: Library/LaunchDaemons/otelcol.plist.ontoHost.cp, dest: [/Library/LaunchDaemons/otelcol.plist]}
+    renderTemplates:
+      - files: [root/HOME/.config/zsh/**]
+    mkdirs:
+      - files: [HOME/.cache/zsh]
+      - chmod: "2775"
+        files:
+          - {dest: [/var/log/che-test-setgid]}
+    runScripts:
+      - install/unit
+    services: [otelcol]
+
+cli/macos:
+  options: {autoExec: true, execIf: ['builtin:isOs == macos', 'builtin:isVirt']}
+  mixinProfiles: [base]
+
+desktop/macos:
+  options: {autoExec: true, execIf: ['builtin:isOs == macos', 'builtin:isVirt == false']}
+  mixinProfiles: [base]
+
+ontoRepo:
+  include:
+    renderTemplates:
+      - files:
+          - source: templates/r.ontoRepo.tpl
+            dest: [docs/r.md]

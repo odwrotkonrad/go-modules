@@ -1,8 +1,7 @@
 # [>] 🤖🤖
 - name: link
   in:
-    spec: che
-    tree: tree-che-repo
+    pwd: testdata/fixture/commands/tree-che-repo
     args: [link]
   want:
     stdOut: |
@@ -13,8 +12,7 @@
       ln(create,dry-run=delta): /etc/zshrc
 - name: copy
   in:
-    spec: che
-    tree: tree-che-repo
+    pwd: testdata/fixture/commands/tree-che-repo
     args: [copy]
   want:
     stdOut: |
@@ -26,8 +24,7 @@
       cp(chown,dry-run=delta): root:wheel /Library/LaunchDaemons/otelcol.plist
 - name: render_host_profile
   in:
-    spec: che
-    tree: tree-che-repo
+    pwd: testdata/fixture/commands/tree-che-repo
     args: [render-templates]
   want:
     stdOut: |
@@ -38,8 +35,7 @@
       - docs/r.md
 - name: render_onto_repo
   in:
-    spec: che
-    tree: tree-che-repo
+    pwd: testdata/fixture/commands/tree-che-repo
     args: [render-templates]
     profile: ontoRepo
   want:
@@ -50,8 +46,7 @@
       - ${HOME}/.config/zsh/t
 - name: mk_dirs
   in:
-    spec: che
-    tree: tree-che-repo
+    pwd: testdata/fixture/commands/tree-che-repo
     args: [mk-dirs]
   want:
     stdOut: |
@@ -62,55 +57,48 @@
       mkdir(chmod,dry-run=delta): 2775 /var/log/che-test-setgid
 - name: prune_links
   in:
-    spec: che
-    tree: tree-che-repo
+    pwd: testdata/fixture/commands/tree-che-repo
     args: [prune-links]
   want:
     stdOut: |
       prune-links(dry-run=delta): ${ROOT}
 - name: run_scripts
   in:
-    spec: che
-    tree: tree-che-repo
+    pwd: testdata/fixture/commands/tree-che-repo
     args: [run-scripts]
   want:
     stdOut: |
       run-scripts(dry-run=delta): ${REPO}/install/unit
 - name: run_scripts_filter
   in:
-    spec: che
-    tree: tree-che-repo
+    pwd: testdata/fixture/commands/tree-che-repo
     args: [run-scripts, unit]
   want:
     stdOut: |
       run-scripts(dry-run=delta): ${REPO}/install/unit
 - name: run_scripts_filter_miss
   in:
-    spec: che
-    tree: tree-che-repo
+    pwd: testdata/fixture/commands/tree-che-repo
     args: [run-scripts, __nope__]
   want:
     error: true
 - name: services_bootout
   in:
-    spec: che
-    tree: tree-che-repo
+    pwd: testdata/fixture/commands/tree-che-repo
     args: [services, bootout]
   want:
     stdOut: |
       bootout(dry-run=delta): system/otelcol
 - name: services_bootin
   in:
-    spec: che
-    tree: tree-che-repo
+    pwd: testdata/fixture/commands/tree-che-repo
     args: [services, bootin]
   want:
     stdOut: |
       bootstrap(dry-run=delta): system/otelcol
 - name: services_ensure
   in:
-    spec: che
-    tree: tree-che-repo
+    pwd: testdata/fixture/commands/tree-che-repo
     args: [services, ensure]
   want:
     stdOut: |
@@ -118,8 +106,7 @@
       ensure(dry-run=delta): system/otelcol
 - name: detect
   in:
-    spec: che
-    tree: tree-che-repo
+    pwd: testdata/fixture/commands/tree-che-repo
     args: [detect]
   want:
     dryRunLines: false

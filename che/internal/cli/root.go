@@ -114,6 +114,7 @@ type pluginConfig struct {
 // Built once in PersistentPreRunE, read by each RunE. Plugin units build
 // lazily (ensurePlugin), after the local unit's ops ran.
 var (
+	chdirFlag    string
 	dryRunMode   string
 	profileForce string
 	omitExecIf   bool
@@ -151,6 +152,8 @@ loads the union of files/dirs/installs/services those profiles select.`,
 }
 
 func init() {
+	RootCmd.PersistentFlags().StringVar(&chdirFlag, "chdir", "",
+		"change into this directory before resolving the repo; env: CHE_CHDIR")
 	RootCmd.PersistentFlags().StringVar(&dryRunMode, "dry-run", "",
 		"print mutating actions instead of executing them: delta (changed dests) | all (every dest)")
 	RootCmd.PersistentFlags().Lookup("dry-run").NoOptDefVal = "delta"
@@ -183,6 +186,11 @@ func Attach() *cobra.Command {
 // build loads spec -> lists eligible profiles -> resolves union -> wires the
 // host. Run in PersistentPreRunE before any subcommand RunE.
 func build() error {
+	if dir := orEnv(chdirFlag, "CHE_CHDIR"); dir != "" {
+		if err := os.Chdir(dir); err != nil {
+			return fmt.Errorf("--chdir: %w", err)
+		}
+	}
 	repoRoot, err := findRepoRoot()
 	if err != nil {
 		return err

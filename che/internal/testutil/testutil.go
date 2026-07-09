@@ -92,48 +92,19 @@ func Repo(t *testing.T, files map[string]string) string {
 // CheProfile is the profile specs/che.yml resolves under.
 const CheProfile = "cli/macos"
 
-// TreeRepo materializes the named tree fixture (testutil/trees/<tree>) plus the
-// named che.yml spec fixture as a committed git repo with an on-disk HOME.
-// Returns (repoDir, homeDir).
-func TreeRepo(t *testing.T, spec, tree string) (string, string) {
+// CheRepo materializes the mock che repo (specs/che.yml + trees/tree-che-repo
+// covering every op) plus an on-disk HOME. Returns (repoDir, homeDir).
+func CheRepo(t *testing.T) (string, string) {
 	t.Helper()
 	dir := t.TempDir()
-	testyml.CopyDir(t, treesFS, "trees/"+tree, dir)
-	WriteTree(t, dir, map[string]string{"che.yml": Spec(t, spec)})
+	testyml.CopyDir(t, treesFS, "trees/tree-che-repo", dir)
+	WriteTree(t, dir, map[string]string{"che.yml": Spec(t, "che")})
 	GitRepo(t, dir)
 	home := filepath.Join(dir, "home")
 	if err := os.MkdirAll(home, 0o755); err != nil {
 		t.Fatal(err)
 	}
 	return dir, home
-}
-
-// CheRepo builds the default mock che repo (specs/che.yml + trees/tree-che-repo).
-func CheRepo(t *testing.T) (string, string) {
-	t.Helper()
-	return TreeRepo(t, "che", "tree-che-repo")
-}
-
-// RepoEnv materializes the named spec + tree fixtures, chdirs in, exports HOME +
-// CHE_OMIT_EXEC_IF so build() resolves against it. Returns HOME (for asserting
-// ~/ dest paths). Skips as root (build resolves $HOME).
-func RepoEnv(t *testing.T, spec, tree string) string {
-	t.Helper()
-	if os.Geteuid() == 0 {
-		t.Skip("non-root path only; build resolves home from $HOME")
-	}
-	dir, home := TreeRepo(t, spec, tree)
-	t.Chdir(dir)
-	t.Setenv("CHE_OMIT_EXEC_IF", "1")
-	t.Setenv("HOME", home)
-	t.Setenv("XDG_DATA_HOME", filepath.Join(home, ".local/share"))
-	return home
-}
-
-// MockRepoEnv is RepoEnv with the default mock che repo fixtures.
-func MockRepoEnv(t *testing.T) string {
-	t.Helper()
-	return RepoEnv(t, "che", "tree-che-repo")
 }
 
 // RunDry runs a subcommand's RunE (caller already built dry-run state), captures stdout,
