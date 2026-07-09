@@ -1,0 +1,57 @@
+# [>] 🤖🤖
+- name: uidAndGidMatchNoDrift
+  in:
+    uid: 501
+    gid: 20
+    owner: "ko:staff"
+    users: {ko: 501}
+    groups: {staff: 20}
+  want: false
+- name: uidDiffersDrift
+  in:
+    uid: 502
+    gid: 20
+    owner: "ko:staff"
+    users: {ko: 501}
+    groups: {staff: 20}
+  want: true
+- name: gidDiffersDrift
+  in:
+    uid: 501
+    gid: 0
+    owner: "ko:staff"
+    users: {ko: 501}
+    groups: {staff: 20}
+  want: true
+- name: unresolvableNamesNoDrift
+  in:
+    uid: 501
+    gid: 20
+    owner: "ghost:phantom"
+    users: {ko: 501}
+    groups: {staff: 20}
+  want: false
+- name: bareOwnerChecksUidOnly
+  in:
+    uid: 501
+    gid: 999
+    owner: ko
+    users: {ko: 501}
+    groups: {staff: 20}
+  want: false
+- name: bareOwnerUidDrift
+  in:
+    uid: 0
+    gid: 20
+    owner: ko
+    users: {ko: 501}
+    groups: {staff: 20}
+  want: true
+- name: sysNotStatTNoDrift
+  in:
+    noStat: true
+    owner: "ko:staff"
+    users: {ko: 501}
+    groups: {staff: 20}
+  want: false
+# [<] 🤖🤖

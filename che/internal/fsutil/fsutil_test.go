@@ -7,11 +7,13 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"runtime"
 	"slices"
 	"strconv"
 	"strings"
 	"testing"
 
+	"gitlab.com/konradodwrot/go-modules/che/internal/execx"
 	"gitlab.com/konradodwrot/go-modules/che/internal/testutil"
 	"gitlab.com/konradodwrot/go-modules/lib/testyml"
 )
@@ -163,6 +165,75 @@ func TestMkdirArgv(t *testing.T) {
 	testyml.Run(t, td, "testdata/spec/mkdir_argv.spec.yml", func(t *testing.T, c c) {
 		if got := f.MkdirArgv(c.In.Args[0], octal(t, c.In.Args[1]), c.In.Parents); !slices.Equal(got, c.Want) {
 			t.Errorf("MkdirArgv(%v, %v) = %v, want %v", c.In.Args, c.In.Parents, got, c.Want)
+		}
+	})
+}
+
+// TestFSOps runs each mutating FS op against a mock executor: recorded argv
+// asserts the command shape (sudo escalation, flags), nothing touches the host.
+func TestFSOps(t *testing.T) {
+	type in struct {
+		Op      string
+		Args    []string
+		Parents bool
+		Body    string
+	}
+	type want struct {
+		Argv string
+		Body string
+	}
+	type c struct {
+		Name string
+		In   in
+		Want want
+	}
+	testyml.Run(t, td, "testdata/spec/fs_ops.spec.yml", func(t *testing.T, c c) {
+		if strings.HasPrefix(c.Want.Argv, "sudo ") && os.Geteuid() == 0 {
+			t.Skip("sudo prefix absent when running as root")
+		}
+		var body []byte
+		m := &execx.Mock{Stub: func(argv []string) ([]byte, error) {
+			if c.In.Op == "install" && len(argv) >= 2 {
+				body, _ = os.ReadFile(argv[len(argv)-2])
+			}
+			return nil, nil
+		}}
+		execx.Swap(t, m)
+		f := FS{Home: "/Users/x"}
+		a := c.In.Args
+		var err error
+		switch c.In.Op {
+		case "mkdir":
+			err = f.Mkdir(a[0], octal(t, a[1]), c.In.Parents)
+		case "symlink":
+			err = f.Symlink(a[0], a[1])
+		case "copy":
+			err = f.Copy(a[0], a[1], octal(t, a[2]))
+		case "remove":
+			err = f.Remove(a[0])
+		case "chown":
+			err = f.Chown(a[0], a[1])
+		case "chmod":
+			err = f.Chmod(a[0], a[1])
+		case "install":
+			err = f.Install(a[0], []byte(c.In.Body), octal(t, a[1]), a[2])
+		default:
+			t.Fatalf("unknown op %q", c.In.Op)
+		}
+		if err != nil {
+			t.Fatal(err)
+		}
+		calls := m.Calls()
+		if len(calls) != 1 {
+			t.Fatalf("calls = %v, want exactly 1", calls)
+		}
+		noDeref := "-n"
+		if runtime.GOOS == "darwin" {
+			noDeref = "-h"
+		}
+		testyml.MustMatch(t, calls[0], testyml.Expand(c.Want.Argv, map[string]string{"NODEREF": noDeref}))
+		if c.Want.Body != "" && string(body) != c.Want.Body {
+			t.Errorf("install body = %q, want %q", body, c.Want.Body)
 		}
 	})
 }

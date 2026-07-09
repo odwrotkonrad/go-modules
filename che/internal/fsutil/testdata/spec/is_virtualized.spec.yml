@@ -1,0 +1,54 @@
+# [>] 🤖🤖
+- name: darwinVmmPresent
+  in:
+    goos: darwin
+    execOut: "1"
+  want: true
+- name: darwinVmmAbsent
+  in:
+    goos: darwin
+    execOut: "0"
+  want: false
+- name: darwinSysctlFails
+  in:
+    goos: darwin
+    execFail: true
+  want: false
+- name: linuxSystemdDetectsVirt
+  in:
+    goos: linux
+  want: true
+- name: linuxDockerenvMarker
+  in:
+    goos: linux
+    execFail: true
+    files: {"/.dockerenv": ""}
+  want: true
+- name: linuxCgroupDocker
+  in:
+    goos: linux
+    execFail: true
+    files: {"/proc/1/cgroup": "0::/docker/abc\n"}
+  want: true
+- name: linuxCgroupContainerd
+  in:
+    goos: linux
+    execFail: true
+    files: {"/proc/1/cgroup": "0::/containerd/abc\n"}
+  want: true
+- name: linuxCgroupClean
+  in:
+    goos: linux
+    execFail: true
+    files: {"/proc/1/cgroup": "0::/init.scope\n"}
+  want: false
+- name: linuxNoMarkers
+  in:
+    goos: linux
+    execFail: true
+  want: false
+- name: otherGoosNever
+  in:
+    goos: windows
+  want: false
+# [<] 🤖🤖

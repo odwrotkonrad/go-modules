@@ -1,0 +1,41 @@
+# [>] 🤖🤖
+- name: dirEqual
+  in: {config: {dir: /repo}, option: directory, val: /repo}
+  want: {equal: true}
+- name: dirNotEqual
+  in: {config: {dir: /repo}, option: directory, val: /other}
+  want: {equal: false}
+- name: dryRunEqual
+  in: {config: {dryRun: 1}, option: dry-run, val: 1}
+  want: {equal: true}
+- name: dryRunNotEqual
+  in: {config: {dryRun: 1}, option: dry-run, val: 2}
+  want: {equal: false}
+- name: profileEqual
+  in: {config: {profile: cli/macos}, option: profile, val: cli/macos}
+  want: {equal: true}
+- name: profileNotEqual
+  in: {config: {profile: cli/macos}, option: profile, val: desktop/macos}
+  want: {equal: false}
+- name: skipExecIfEqual
+  in: {config: {skipExecIf: true}, option: skip-exec-if, val: true}
+  want: {equal: true}
+- name: skipExecIfNotEqual
+  in: {config: {skipExecIf: true}, option: skip-exec-if, val: false}
+  want: {equal: false}
+- name: skipPluginsEqual
+  in: {config: {skipPlugins: true}, option: skip-plugins, val: true}
+  want: {equal: true}
+- name: skipPluginsNotEqual
+  in: {config: {skipPlugins: false}, option: skip-plugins, val: true}
+  want: {equal: false}
+- name: debugEqual
+  in: {config: {debug: true}, option: debug, val: true}
+  want: {equal: true}
+- name: debugNotEqual
+  in: {config: {debug: true}, option: debug, val: false}
+  want: {equal: false}
+- name: unknownOptionPanics
+  in: {option: bogus, val: x}
+  want: {panic: true}
+# [<] 🤖🤖

@@ -32,6 +32,8 @@ che
                 templates
         spec
     config
+      testdata
+        spec
     docgen
     execx
     fsutil
@@ -40,6 +42,7 @@ che
     host
       testdata
         spec
+          unit
     log
       testdata
         spec

@@ -73,6 +73,11 @@
     args: [GITLAB_GROUP]
   want:
     error: true
+- name: unknown_source_eq
+  in:
+    args: [host:isOs == macos]
+  want:
+    error: true
 - name: double_eq
   in:
     args: [a == b == c]

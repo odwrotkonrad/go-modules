@@ -9,6 +9,7 @@ import (
 	"testing"
 
 	"gitlab.com/konradodwrot/go-modules/che/internal/config"
+	"gitlab.com/konradodwrot/go-modules/lib/testyml"
 )
 
 func TestToDest(t *testing.T) {
@@ -80,6 +81,23 @@ func TestResolveScripts(t *testing.T) {
 	if _, err := h.ResolveScripts([]string{"ci/zsh/scripts/installs/99-absent.zsh"}); err == nil {
 		t.Error("ResolveScripts must error on a missing script")
 	}
+}
+
+func TestHostIsUnderHome(t *testing.T) {
+	type in struct {
+		Args []string
+	}
+	type c struct {
+		Name string
+		In   in
+		Want bool
+	}
+	h := Host{Home: "/Users/x"}
+	testyml.Run(t, td, "testdata/spec/unit/is_under_home.spec.yml", func(t *testing.T, c c) {
+		if got := h.IsUnderHome(c.In.Args[0]); got != c.Want {
+			t.Errorf("IsUnderHome(%q) = %v, want %v", c.In.Args[0], got, c.Want)
+		}
+	})
 }
 
 // [<] 🤖🤖

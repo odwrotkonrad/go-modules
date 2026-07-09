@@ -1,0 +1,14 @@
+# [>] 🤖🤖
+- name: knownUser
+  in:
+    user: ko
+    users: {ko: /Users/ko}
+  want:
+    value: /Users/ko
+- name: unknownUser
+  in:
+    user: ghost
+    users: {ko: /Users/ko}
+  want:
+    error: true
+# [<] 🤖🤖

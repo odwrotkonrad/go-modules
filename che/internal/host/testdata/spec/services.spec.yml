@@ -13,6 +13,25 @@
   notWant:
     stdOut:
       - bootout
+- name: servicesBootoutShouldPollUntilGone
+  in:
+    op: services-bootout
+    stubbornPrints: 3
+  want:
+    stdOut: |
+      bootout: system/otelcol
+      bootout(done): system/otelcol
+  notWant:
+    stdOut:
+      - 'still present after bootout'
+- name: servicesBootoutShouldWarnWhenStuckPast50Polls
+  in:
+    op: services-bootout
+    stubbornPrints: 60
+  want:
+    stdOut:
+      - 'warn: system/otelcol still present after bootout'
+      - 'bootout(done): system/otelcol'
 - name: servicesBootinShouldBootstrapFromPlist
   in:
     op: services-bootin

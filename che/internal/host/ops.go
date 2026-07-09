@@ -189,8 +189,8 @@ func isOwnerDrifted(fi os.FileInfo, owner string) bool {
 		return false
 	}
 	name, group, _ := strings.Cut(owner, ":")
-	uid, uidOK := lookupID(name, user.Lookup, func(u *user.User) string { return u.Uid })
-	gid, gidOK := lookupID(group, user.LookupGroup, func(g *user.Group) string { return g.Gid })
+	uid, uidOK := lookupID(name, fsutil.UserLookup, func(u *user.User) string { return u.Uid })
+	gid, gidOK := lookupID(group, fsutil.GroupLookup, func(g *user.Group) string { return g.Gid })
 	return (uidOK && uid != st.Uid) || (gidOK && gid != st.Gid)
 }
 

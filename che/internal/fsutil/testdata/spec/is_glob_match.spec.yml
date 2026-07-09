@@ -43,4 +43,20 @@
   in:
     args: [etc/otelcol/**, etc/otelcol/config.yml]
   want: true
+- name: interior_doublestar_nested
+  in:
+    args: [root/**/foo.txt, root/a/b/foo.txt]
+  want: true
+- name: interior_doublestar_prefix_miss
+  in:
+    args: [root/**/foo.txt, other/a/foo.txt]
+  want: false
+- name: interior_doublestar_tail_miss
+  in:
+    args: [root/**/*.md, root/a/b.txt]
+  want: false
+- name: doublestar_empty_post
+  in:
+    args: [root**, rootabc/x]
+  want: true
 # [<] 🤖🤖

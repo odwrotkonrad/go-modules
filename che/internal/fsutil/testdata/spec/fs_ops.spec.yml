@@ -1,0 +1,94 @@
+# [>] 🤖🤖
+- name: mkdirUnderHomeWithParents
+  in:
+    op: mkdir
+    args: [/Users/x/.config/foo, "0755"]
+    parents: true
+  want:
+    argv: mkdir -p -m 0755 /Users/x/.config/foo
+- name: mkdirOutsideHomeSudo
+  in:
+    op: mkdir
+    args: [/etc/foo, "0"]
+    parents: false
+  want:
+    argv: sudo mkdir /etc/foo
+- name: symlinkUnderHome
+  in:
+    op: symlink
+    args: [/repo/root/HOME/.config/foo, /Users/x/.config/foo]
+  want:
+    argv: ln -fs ${NODEREF} /repo/root/HOME/.config/foo /Users/x/.config/foo
+- name: symlinkOutsideHomeSudo
+  in:
+    op: symlink
+    args: [/repo/root/etc/zshrc, /etc/zshrc]
+  want:
+    argv: sudo ln -fs ${NODEREF} /repo/root/etc/zshrc /etc/zshrc
+- name: copyUnderHome
+  in:
+    op: copy
+    args: [/repo/root/HOME/.config/foo/f, /Users/x/.config/foo/f, "0644"]
+  want:
+    argv: install -m 0644 /repo/root/HOME/.config/foo/f /Users/x/.config/foo/f
+- name: copyOutsideHomeSudo
+  in:
+    op: copy
+    args: [/repo/root/etc/grafana/g.ini, /etc/grafana/g.ini, "0"]
+  want:
+    argv: sudo install /repo/root/etc/grafana/g.ini /etc/grafana/g.ini
+- name: removeUnderHome
+  in:
+    op: remove
+    args: [/Users/x/.config/foo/dead]
+  want:
+    argv: rm -f /Users/x/.config/foo/dead
+- name: removeOutsideHomeSudo
+  in:
+    op: remove
+    args: [/etc/stale]
+  want:
+    argv: sudo rm -f /etc/stale
+- name: chownUnderHome
+  in:
+    op: chown
+    args: ["ko:staff", /Users/x/.config/foo]
+  want:
+    argv: chown ko:staff /Users/x/.config/foo
+- name: chownOutsideHomeSudo
+  in:
+    op: chown
+    args: [root, /etc/foo]
+  want:
+    argv: sudo chown root /etc/foo
+- name: chmodSpecialBitsOutsideHomeSudo
+  in:
+    op: chmod
+    args: ["2775", /etc/foo]
+  want:
+    argv: sudo chmod 2775 /etc/foo
+- name: installOwnerSet
+  in:
+    op: install
+    args: [/Users/x/.config/foo/rendered, "0600", "ko:staff"]
+    body: "SECRET\n"
+  want:
+    argv: install -m 0600 -o ko -g staff {{/\S+/}} /Users/x/.config/foo/rendered
+    body: "SECRET\n"
+- name: installNoOwner
+  in:
+    op: install
+    args: [/Users/x/.config/foo/rendered, "0644", ""]
+    body: "hello\n"
+  want:
+    argv: install -m 0644 {{/\S+/}} /Users/x/.config/foo/rendered
+    body: "hello\n"
+- name: installOutsideHomeSudo
+  in:
+    op: install
+    args: [/etc/rendered, "0", ""]
+    body: "x\n"
+  want:
+    argv: sudo install {{/\S+/}} /etc/rendered
+    body: "x\n"
+# [<] 🤖🤖

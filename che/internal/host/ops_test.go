@@ -77,19 +77,22 @@ var ops = map[string]func(Host, spec.Resolved) error{
 
 // opsIn is one case's input: the op to run plus stub knobs (failCmds fails
 // matching executor commands, notLoaded/noPid drive the launchctl print stub,
+// stubbornPrints keeps a booted-out service reporting present for N polls,
 // brokenLink seeds a broken repo symlink under HOME).
 type opsIn struct {
-	Op         string
-	BrokenLink bool     `yaml:"brokenLink"`
-	FailCmds   []string `yaml:"failCmds"`
-	NotLoaded  bool     `yaml:"notLoaded"`
-	NoPid      bool     `yaml:"noPid"`
+	Op             string
+	BrokenLink     bool     `yaml:"brokenLink"`
+	FailCmds       []string `yaml:"failCmds"`
+	NotLoaded      bool     `yaml:"notLoaded"`
+	NoPid          bool     `yaml:"noPid"`
+	StubbornPrints int      `yaml:"stubbornPrints"`
 }
 
 // launchdStub models launchd state across the executor calls of one case:
 // bootout unloads, bootstrap loads, print reports per loaded/noPid.
 func launchdStub(in opsIn) func([]string) ([]byte, error) {
 	loaded := !in.NotLoaded
+	stubborn := in.StubbornPrints
 	return func(argv []string) ([]byte, error) {
 		cmd := strings.Join(argv, " ")
 		for _, f := range in.FailCmds {
@@ -104,6 +107,10 @@ func launchdStub(in opsIn) func([]string) ([]byte, error) {
 			loaded = true
 		case strings.Contains(cmd, "launchctl print"):
 			if !loaded {
+				if stubborn > 0 {
+					stubborn--
+					return []byte("state = running\n"), nil
+				}
 				return nil, errors.New("stub: not loaded")
 			}
 			if in.NoPid {

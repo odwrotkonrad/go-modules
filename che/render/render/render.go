@@ -72,28 +72,53 @@ func retry[T any](delays []time.Duration, sleep func(time.Duration), shouldRetry
 	return v, err
 }
 
+// secretResolver resolves one op:// ref to its secret value.
+type secretResolver interface {
+	Resolve(ctx context.Context, ref string) (string, error)
+}
+
+// sdkResolver adapts the 1Password SDK client to secretResolver.
+type sdkResolver struct{ client *onepassword.Client }
+
+func (r sdkResolver) Resolve(ctx context.Context, ref string) (string, error) {
+	return r.client.Secrets().Resolve(ctx, ref)
+}
+
+// newSecretResolver constructs the real 1Password client; tests swap in a mock
+// so the SDK never runs.
+var newSecretResolver = func(ctx context.Context, token string) (secretResolver, error) {
+	client, err := onepassword.NewClient(ctx,
+		onepassword.WithServiceAccountToken(token),
+		onepassword.WithIntegrationInfo("che", "1.0.0"),
+	)
+	if err != nil {
+		return nil, err
+	}
+	return sdkResolver{client}, nil
+}
+
+// opSleep paces op-resolve retries; tests stub it to a no-op.
+var opSleep = time.Sleep
+
 // opResolver returns an op(ref) template func that lazily inits one 1Password client
 // (OP_SERVICE_ACCOUNT_TOKEN) on first use and reuses it for the render's references.
 // Resolves retry on vault rate-limit errors.
 func opResolver(ctx context.Context) func(string) (string, error) {
-	var client *onepassword.Client
+	var client secretResolver
 	return func(ref string) (string, error) {
 		if client == nil {
 			token := os.Getenv("OP_SERVICE_ACCOUNT_TOKEN")
 			if token == "" {
 				return "", fmt.Errorf("op %q: OP_SERVICE_ACCOUNT_TOKEN unset", ref)
 			}
-			c, err := onepassword.NewClient(ctx,
-				onepassword.WithServiceAccountToken(token),
-				onepassword.WithIntegrationInfo("che", "1.0.0"),
-			)
+			c, err := newSecretResolver(ctx, token)
 			if err != nil {
 				return "", fmt.Errorf("op client: %w", err)
 			}
 			client = c
 		}
-		secret, err := retry(opRetryDelays, time.Sleep, isRateLimitErr, func() (string, error) {
-			return client.Secrets().Resolve(ctx, ref)
+		secret, err := retry(opRetryDelays, opSleep, isRateLimitErr, func() (string, error) {
+			return client.Resolve(ctx, ref)
 		})
 		if err != nil {
 			return "", fmt.Errorf("op resolve %q: %w", ref, err)

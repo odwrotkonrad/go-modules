@@ -279,6 +279,20 @@ func TestDirsTreeExpected(t *testing.T) {
 	}
 }
 
+func TestMakefileDoc(t *testing.T) {
+	got, err := MakefileDoc("../cmd/render-makefile-doc/testdata/Makefile")
+	if err != nil {
+		t.Fatalf("MakefileDoc: %v", err)
+	}
+	want, err := os.ReadFile("../cmd/render-makefile-doc/testdata/expected.md")
+	if err != nil {
+		t.Fatalf("read golden: %v", err)
+	}
+	if got != string(want) {
+		t.Errorf("output mismatch:\n--- got ---\n%s\n--- want ---\n%s", got, want)
+	}
+}
+
 func TestDirsTreeMissing(t *testing.T) {
 	if _, err := DirsTree(t.TempDir()); err == nil {
 		t.Fatal("expected error outside a git repo")
