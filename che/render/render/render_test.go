@@ -16,7 +16,7 @@ import (
 	"gitlab.com/konradodwrot/go-modules/lib/testyml"
 )
 
-//go:embed all:testdata/spec all:testdata/fixture/frontmatter all:testdata/fixture/markdown
+//go:embed all:testdata/spec all:testdata/fixture/split_frontmatter all:testdata/fixture/render_markdown
 var td embed.FS
 
 func TestHeader(t *testing.T) {
@@ -175,7 +175,7 @@ func TestRenderMarkdown(t *testing.T) {
 	}
 	testyml.Run(t, td, "testdata/spec/render_markdown.spec.yml", func(t *testing.T, c c) {
 		root := t.TempDir()
-		testyml.CopyDir(t, td, "testdata/fixture/markdown", root)
+		testyml.CopyDir(t, td, "testdata/fixture/render_markdown/tree-docs", root)
 		got, err := RenderMarkdown(root, c.In.Args[0], c.In.Args[1:]...)
 		if c.Want.WantsError() {
 			c.Want.CheckErr(t, err)

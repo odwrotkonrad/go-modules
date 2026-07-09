@@ -26,7 +26,7 @@ che
       testdata
         fixture
           resolve
-            classify
+            tree-classify
               root
                 HOME
                   .config
@@ -37,15 +37,15 @@ che
                 etc
                   grafana
                   zsh
-            empty
+            tree-empty
               root
-            exclude-script-glob
+            tree-exclude-script-glob
               ci
                 zsh
                   scripts
                     installs
               root
-            include-exclude
+            tree-include-exclude
               ci
                 zsh
                   scripts
@@ -58,7 +58,7 @@ che
                     zsh
                 etc
                   zsh
-            merge
+            tree-merge
               ci
                 zsh
                   scripts
@@ -71,7 +71,7 @@ che
                   LaunchDaemons
                 etc
                   grafana
-            plugin-malformed
+            tree-plugin-malformed
               root
         spec
     testutil
@@ -89,8 +89,8 @@ che
         testdata
           fixture
             run
-              read_body
-              renders
+              tree-read_body
+              tree-renders
           spec
     lib
       testdata
@@ -100,8 +100,8 @@ che
       testdata
         fixture
           dirs-tree
-          frontmatter
-          markdown
+          render_markdown
+            tree-docs
           repo-group-index
             group
               che
@@ -114,6 +114,7 @@ che
                 render-files
                   assets
                     docs-agents
+          split_frontmatter
         spec
 ci
 get-os-open-files-with
@@ -122,7 +123,7 @@ get-os-open-files-with
   lib
   testdata
     fixture
-      render
+      run
     spec
 get-term-open-files-with
   assets
@@ -143,7 +144,7 @@ lib
     testdata
       fixture
         common
-          tree
+          tree-nested
             dir
       spec
   yamlcfg

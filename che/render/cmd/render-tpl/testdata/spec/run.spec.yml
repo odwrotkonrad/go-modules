@@ -1,14 +1,14 @@
 # [>] 🤖🤖
 - name: renders_env
   in:
-    tree: renders
+    tree: tree-renders
     env: {WHO: there}
     args: [-f, "${DIR}/t.tmpl.md"]
   want:
     exitCode: 0
 - name: read_body_relative_cwd
   in:
-    tree: read_body
+    tree: tree-read_body
     args: [-f, t.tmpl.md]
   want:
     exitCode: 0

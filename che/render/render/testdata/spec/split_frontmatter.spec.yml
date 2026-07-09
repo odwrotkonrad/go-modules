@@ -1,14 +1,14 @@
 # [>] 🤖🤖
 - name: with_frontmatter
   in:
-    args: [testdata/fixture/frontmatter/doc.md]
+    args: [testdata/fixture/split_frontmatter/doc.md]
   want:
-    frontFile: testdata/fixture/frontmatter/doc.front.expected.md
-    bodyFile: testdata/fixture/frontmatter/doc.body.expected.md
+    frontFile: testdata/fixture/split_frontmatter/doc.front.expected.md
+    bodyFile: testdata/fixture/split_frontmatter/doc.body.expected.md
 - name: no_frontmatter
   in:
-    args: [testdata/fixture/frontmatter/plain.md]
+    args: [testdata/fixture/split_frontmatter/plain.md]
   want:
-    frontFile: testdata/fixture/frontmatter/plain.front.expected.md
-    bodyFile: testdata/fixture/frontmatter/plain.body.expected.md
+    frontFile: testdata/fixture/split_frontmatter/plain.front.expected.md
+    bodyFile: testdata/fixture/split_frontmatter/plain.body.expected.md
 # [<] 🤖🤖

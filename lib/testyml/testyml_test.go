@@ -80,7 +80,7 @@ func TestReadFileExpected(t *testing.T) {
 
 func TestCopyDir(t *testing.T) {
 	dest := t.TempDir()
-	CopyDir(t, td, "testdata/fixture/common/tree", dest)
+	CopyDir(t, td, "testdata/fixture/common/tree-nested", dest)
 	for rel, want := range map[string]string{"top.txt": "top\n", "dir/inner.txt": "inner\n"} {
 		b, err := os.ReadFile(filepath.Join(dest, rel))
 		if err != nil || string(b) != want {

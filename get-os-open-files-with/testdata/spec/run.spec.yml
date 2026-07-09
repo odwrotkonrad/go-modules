@@ -1,53 +1,53 @@
 # [>] 🤖🤖
 - name: single_app_single_role
   in:
-    config: testdata/fixture/render/single_app_single_role.yml
+    config: testdata/fixture/run/single_app_single_role.yml
   want:
-    filesOut: testdata/fixture/render/single_app_single_role.expected.txt
+    filesOut: testdata/fixture/run/single_app_single_role.expected.txt
 - name: one_app_multiple_roles
   in:
-    config: testdata/fixture/render/one_app_multiple_roles.yml
+    config: testdata/fixture/run/one_app_multiple_roles.yml
   want:
-    filesOut: testdata/fixture/render/one_app_multiple_roles.expected.txt
+    filesOut: testdata/fixture/run/one_app_multiple_roles.expected.txt
 - name: multiple_apps
   in:
-    config: testdata/fixture/render/multiple_apps.yml
+    config: testdata/fixture/run/multiple_apps.yml
   want:
-    filesOut: testdata/fixture/render/multiple_apps.expected.txt
+    filesOut: testdata/fixture/run/multiple_apps.expected.txt
 - name: empty_config
   in:
-    config: testdata/fixture/render/empty_config.yml
+    config: testdata/fixture/run/empty_config.yml
   want:
-    filesOut: testdata/fixture/render/empty.expected.txt
+    filesOut: testdata/fixture/run/empty.expected.txt
 - name: app_with_empty_role_list
   in:
-    config: testdata/fixture/render/app_with_empty_role_list.yml
+    config: testdata/fixture/run/app_with_empty_role_list.yml
   want:
-    filesOut: testdata/fixture/render/empty.expected.txt
+    filesOut: testdata/fixture/run/empty.expected.txt
 - name: missing_config
   in:
   want:
     exitCode: 13
 - name: invalid_config_syntax
   in:
-    config: testdata/fixture/render/invalid_syntax.yml
+    config: testdata/fixture/run/invalid_syntax.yml
   want:
     exitCode: 12
     stdErr: [invalid config]
 - name: invalid_config_null_roles
   in:
-    config: testdata/fixture/render/invalid_null_roles.yml
+    config: testdata/fixture/run/invalid_null_roles.yml
   want:
     exitCode: 12
 - name: too_many_args
   in:
-    config: testdata/fixture/render/empty_config.yml
+    config: testdata/fixture/run/empty_config.yml
     args: [one, two]
   want:
     exitCode: 11
 - name: three_args
   in:
-    config: testdata/fixture/render/empty_config.yml
+    config: testdata/fixture/run/empty_config.yml
     args: [one, two, three]
   want:
     exitCode: 11
