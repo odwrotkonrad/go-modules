@@ -1,17 +1,17 @@
 # [>] 🤖🤖
-- name: vals
+- name: valsCommentShouldParseValsLabel
   in:
     args: ["#[vals] delta|all"]
   want:
     vals: delta|all
     ok: true
-- name: what_not_vals
+- name: valsCommentShouldRejectWhatLabel
   in:
     args: ["#[what] not vals"]
   want:
     vals: ""
     ok: false
-- name: why_not_vals
+- name: valsCommentShouldRejectWhyLabel
   in:
     args: ["#[why] nope"]
   want:

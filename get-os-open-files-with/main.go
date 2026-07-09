@@ -2,8 +2,6 @@
 package main
 
 import (
-	"fmt"
-
 	"gitlab.com/konradodwrot/go-modules/get-os-open-files-with/lib"
 	"gitlab.com/konradodwrot/go-modules/lib/climain"
 	"gitlab.com/konradodwrot/go-modules/lib/yamlcfg"
@@ -26,7 +24,7 @@ var version = "dev"
 
 func run(args []string, customDir string) (string, error) {
 	if len(args) != 0 {
-		return "", &yamlcfg.CodedError{Code: yamlcfg.CodeArgs, Msg: "invalid arguments: " + fmt.Sprint(args)}
+		return "", yamlcfg.ArgsError(args)
 	}
 	node, err := yamlcfg.LoadConfigNode(configName, customDir)
 	if err != nil {

@@ -1,25 +1,25 @@
 # [>] 🤖🤖
-- name: tilde_path
+- name: isAtIncludeShouldAcceptTildePath
   in:
     args: ["@~/.config/x"]
   want: true
-- name: relative_path
+- name: isAtIncludeShouldAcceptRelativePath
   in:
     args: ["@path/to/file"]
   want: true
-- name: space_after_at
+- name: isAtIncludeShouldRejectSpaceAfterAt
   in:
     args: ["@ has space"]
   want: false
-- name: at_mid_line
+- name: isAtIncludeShouldRejectMidLineAt
   in:
     args: ["text @middle"]
   want: false
-- name: plain_text
+- name: isAtIncludeShouldRejectPlainText
   in:
     args: [plain]
   want: false
-- name: bare_at
+- name: isAtIncludeShouldRejectBareAt
   in:
     args: ["@"]
   want: false

@@ -1,17 +1,17 @@
 # [>] 🤖🤖
-- name: home_itself
+- name: isUnderHomeShouldAcceptHomeItself
   in:
     args: [/Users/x]
   want: true
-- name: home_child
+- name: isUnderHomeShouldAcceptDirectChild
   in:
     args: [/Users/x/.config/zsh]
   want: true
-- name: prefix_but_not_subtree
+- name: isUnderHomeShouldRejectPrefixOnlySibling
   in:
     args: [/Users/xyz]
   want: false
-- name: outside_home
+- name: isUnderHomeShouldRejectPathOutsideHome
   in:
     args: [/etc/zshrc]
   want: false

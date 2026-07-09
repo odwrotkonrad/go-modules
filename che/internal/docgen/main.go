@@ -103,12 +103,7 @@ func cliUsage(root *cobra.Command) string {
 	var rows [][2]string
 	var collect func(cmd *cobra.Command, indent string)
 	collect = func(cmd *cobra.Command, indent string) {
-		subs := slices.Clone(cmd.Commands())
-		slices.SortFunc(subs, func(a, c *cobra.Command) int { return strings.Compare(a.Name(), c.Name()) })
-		for _, sub := range subs {
-			if !sub.IsAvailableCommand() {
-				continue
-			}
+		for _, sub := range sortedSubs(cmd) {
 			rows = append(rows, [2]string{indent + sub.Name(), sub.Short})
 			collect(sub, indent+"  ")
 		}
@@ -128,13 +123,16 @@ func cliUsage(root *cobra.Command) string {
 	return b.String()
 }
 
-func walkCommands(cmd *cobra.Command, b *strings.Builder) {
+// sortedSubs lists cmd's available subcommands, name-sorted.
+func sortedSubs(cmd *cobra.Command) []*cobra.Command {
 	subs := slices.Clone(cmd.Commands())
-	slices.SortFunc(subs, func(a, c *cobra.Command) int { return strings.Compare(a.Name(), c.Name()) })
-	for _, sub := range subs {
-		if !sub.IsAvailableCommand() {
-			continue
-		}
+	subs = slices.DeleteFunc(subs, func(c *cobra.Command) bool { return !c.IsAvailableCommand() })
+	slices.SortFunc(subs, func(a, b *cobra.Command) int { return strings.Compare(a.Name(), b.Name()) })
+	return subs
+}
+
+func walkCommands(cmd *cobra.Command, b *strings.Builder) {
+	for _, sub := range sortedSubs(cmd) {
 		fmt.Fprintf(b, "\n### `$ %s`\n\n%s.\n", sub.CommandPath(), strings.TrimSuffix(sub.Short, "."))
 		if sub.Long != "" {
 			fmt.Fprintf(b, "\n%s\n", sub.Long)

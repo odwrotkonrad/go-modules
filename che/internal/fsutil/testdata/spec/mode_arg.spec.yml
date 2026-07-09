@@ -1,17 +1,17 @@
 # [>] 🤖🤖
-- name: rw_r_r
+- name: modeArgShouldKeep0644
   in:
     args: ["0644"]
   want: "0644"
-- name: rw_only
+- name: modeArgShouldKeep0600
   in:
     args: ["0600"]
   want: "0600"
-- name: rwx_rx_rx
+- name: modeArgShouldKeep0755
   in:
     args: ["0755"]
   want: "0755"
-- name: setgid
+- name: modeArgShouldKeepSetgid2775
   in:
     args: ["2775"]
   want: "2775"

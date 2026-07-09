@@ -1,5 +1,5 @@
 # [>] 🤖🤖
-- name: plain_title
+- name: msgShouldSplitPlainTitleIntoTypeAndText
   in:
     title: ln
     msg: /etc/zshrc
@@ -8,7 +8,7 @@
     type: ln
     subtype: ""
     text: /etc/zshrc
-- name: subtyped_title
+- name: msgShouldExtractParenthesizedSubtype
   in:
     title: render(skip-secrets)
     msg: /x
@@ -17,7 +17,7 @@
     type: render
     subtype: (skip-secrets)
     text: /x
-- name: dry_run_delta_subtype
+- name: msgShouldAppendDryRunDeltaSubtype
   in:
     title: cp
     msg: /x
@@ -26,7 +26,7 @@
     type: cp
     subtype: (dry-run=delta)
     text: /x
-- name: dry_run_all_subtype
+- name: msgShouldAppendDryRunAllSubtype
   in:
     title: cp
     msg: /x
@@ -35,7 +35,7 @@
     type: cp
     subtype: (dry-run=all)
     text: /x
-- name: dry_run_combines_subtype
+- name: msgShouldCombineTitleSubtypeWithDryRun
   in:
     title: render(skip-secrets)
     msg: /x
@@ -44,7 +44,7 @@
     type: render
     subtype: (skip-secrets,dry-run=delta)
     text: /x
-- name: msgsub_appended_after_dry_run
+- name: msgSubShouldAppendSubAfterDryRun
   in:
     fn: msgSub
     title: run-scripts
@@ -55,7 +55,7 @@
     type: run-scripts
     subtype: (dry-run=all,profile=gitlabGroup)
     text: /x
-- name: msgsub_appended_after_title_subtype
+- name: msgSubShouldAppendSubAfterTitleSubtype
   in:
     fn: msgSub
     title: mkdir(create)
@@ -66,7 +66,7 @@
     type: mkdir
     subtype: (create,profile=p)
     text: /x
-- name: msgsub_empty_sub
+- name: msgSubShouldIgnoreEmptySub
   in:
     fn: msgSub
     title: ln
@@ -77,7 +77,7 @@
     type: ln
     subtype: ""
     text: /x
-- name: debug_prints_like_msg
+- name: debugShouldPrintLikeMsg
   in:
     fn: debug
     title: plugin(p)

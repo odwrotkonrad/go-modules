@@ -1,51 +1,68 @@
 # [>] 🤖🤖
-- name: single_app_single_role
+- name: runShouldPrintSingleAppSingleRoleLine
   in:
     config: testdata/fixture/run/single_app_single_role.yml
   want:
     filesOut: testdata/fixture/run/single_app_single_role.expected.txt
-- name: one_app_multiple_roles
+- name: runShouldPrintLinePerRoleForOneApp
   in:
     config: testdata/fixture/run/one_app_multiple_roles.yml
   want:
     filesOut: testdata/fixture/run/one_app_multiple_roles.expected.txt
-- name: multiple_apps
+- name: runShouldPrintMultipleAppsInConfigOrder
   in:
     config: testdata/fixture/run/multiple_apps.yml
   want:
     filesOut: testdata/fixture/run/multiple_apps.expected.txt
-- name: empty_config
+- name: runShouldPrintNothingForEmptyMapping
   in:
     config: testdata/fixture/run/empty_config.yml
   want:
     filesOut: testdata/fixture/run/empty.expected.txt
-- name: app_with_empty_role_list
+- name: runShouldPrintNothingForAppWithEmptyRoles
   in:
     config: testdata/fixture/run/app_with_empty_role_list.yml
   want:
     filesOut: testdata/fixture/run/empty.expected.txt
-- name: missing_config
+- name: runShouldPrintNothingForNullConfig
+  in:
+    config: testdata/fixture/run/null_config.yml
+  want:
+    filesOut: testdata/fixture/run/empty.expected.txt
+- name: runShouldExit12WhenTopLevelNotMapping
+  in:
+    config: testdata/fixture/run/top_level_list.yml
+  want:
+    exitCode: 12
+    stdErr: [top level must be a mapping]
+- name: runShouldExit12WhenUtisNotList
+  in:
+    config: testdata/fixture/run/utis_not_list.yml
+  want:
+    exitCode: 12
+    stdErr: [must be a list]
+- name: runShouldExit13WhenConfigMissing
   in:
   want:
     exitCode: 13
-- name: invalid_config_syntax
+- name: runShouldExit12OnInvalidYamlSyntax
   in:
     config: testdata/fixture/run/invalid_syntax.yml
   want:
     exitCode: 12
     stdErr: [invalid config]
-- name: invalid_config_null_roles
+- name: runShouldExit12WhenRolesNull
   in:
     config: testdata/fixture/run/invalid_null_roles.yml
   want:
     exitCode: 12
-- name: too_many_args
+- name: runShouldExit11OnTwoArgs
   in:
     config: testdata/fixture/run/empty_config.yml
     args: [one, two]
   want:
     exitCode: 11
-- name: three_args
+- name: runShouldExit11OnThreeArgs
   in:
     config: testdata/fixture/run/empty_config.yml
     args: [one, two, three]

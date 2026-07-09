@@ -1,15 +1,15 @@
 # [>] 🤖🤖
-- name: all_opts
+- name: renderMarkdownShouldApplyAllTransforms
   in:
     args: [p.md, remove-frontmatter, strip-comments, normalize-headings]
   want:
     filesOut: testdata/fixture/render_markdown/all_opts.expected.md
-- name: keep_frontmatter
+- name: renderMarkdownShouldKeepFrontmatterWhenNotRemoved
   in:
     args: [p.md, strip-comments]
   want:
     filesOut: testdata/fixture/render_markdown/keep_frontmatter.expected.md
-- name: unknown_opt
+- name: renderMarkdownShouldErrorOnUnknownOption
   in:
     args: [p.md, bogus]
   want:

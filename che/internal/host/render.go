@@ -33,17 +33,22 @@ type tmplDest struct {
 // (logged, dests untouched). A failing item is logged and the rest still
 // render; failures join into the returned error.
 func (h Host) RenderTemplates(templates []spec.FileItem, skipSecrets bool) error {
-	var keep []spec.FileItem
+	type tmplItem struct {
+		item  spec.FileItem
+		dests []tmplDest
+	}
+	var keep []tmplItem
 	var hostDests []string
 	for _, item := range templates {
+		dests := h.templateDests(item)
 		if skipSecrets && isSecretRefInSrc(filepath.Join(h.RepoRoot, item.Rel)) {
-			for _, d := range h.templateDests(item) {
+			for _, d := range dests {
 				h.log("render(skip-secrets)", d.path)
 			}
 			continue
 		}
-		keep = append(keep, item)
-		for _, d := range h.templateDests(item) {
+		keep = append(keep, tmplItem{item, dests})
+		for _, d := range dests {
 			if d.host {
 				hostDests = append(hostDests, d.path)
 			}
@@ -56,11 +61,11 @@ func (h Host) RenderTemplates(templates []spec.FileItem, skipSecrets bool) error
 	}
 	var errs []error
 	if h.IsDryRun() { // [why] dry-run logs dests only: no gomplate render, no @-include resolve
-		for _, item := range keep {
-			for _, d := range h.templateDests(item) {
+		for _, t := range keep {
+			for _, d := range t.dests {
 				h.log("render(create)", d.path)
 				if d.host {
-					if err := h.fixPerms("render", d.path, item); err != nil {
+					if err := h.fixPerms("render", d.path, t.item); err != nil {
 						errs = append(errs, h.failItem("render", d.path, err))
 					}
 				}
@@ -68,9 +73,9 @@ func (h Host) RenderTemplates(templates []spec.FileItem, skipSecrets bool) error
 		}
 		return errors.Join(errs...)
 	}
-	for _, item := range keep {
-		if err := h.renderTemplate(item); err != nil {
-			errs = append(errs, h.failItem("render", item.Rel, err))
+	for _, t := range keep {
+		if err := h.renderTemplate(t.item, t.dests); err != nil {
+			errs = append(errs, h.failItem("render", t.item.Rel, err))
 		}
 	}
 	return errors.Join(errs...)
@@ -106,7 +111,7 @@ func (h Host) templateDests(item spec.FileItem) []tmplDest {
 	return out
 }
 
-func (h Host) renderTemplate(item spec.FileItem) error {
+func (h Host) renderTemplate(item spec.FileItem, dests []tmplDest) error {
 	tmplPath := filepath.Join(h.RepoRoot, item.Rel)
 	src, err := os.ReadFile(tmplPath)
 	if err != nil {
@@ -117,9 +122,9 @@ func (h Host) renderTemplate(item spec.FileItem) error {
 		return err
 	}
 	if len(item.Dests) == 0 { // derived host dest: raw body, no Compose header
-		return h.placeFile(h.templateDests(item)[0].path, body, item)
+		return h.placeFile(dests[0].path, body, item)
 	}
-	for _, d := range h.templateDests(item) {
+	for _, d := range dests {
 		existing, _ := h.readExisting(d) // absent -> nil (mergeUpsert: defaults only)
 		out := render.Compose(render.Composition{
 			Body:       body,

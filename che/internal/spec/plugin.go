@@ -37,12 +37,8 @@ type pluginEntry struct {
 }
 
 func (p *pluginEntry) UnmarshalYAML(value *yaml.Node) error {
-	if value.Kind == yaml.ScalarNode {
-		p.Ref = value.Value
-		return nil
-	}
 	type alias pluginEntry
-	return value.Decode((*alias)(p))
+	return decodeScalarOr(value, &p.Ref, (*alias)(p))
 }
 
 // parsePluginRef parses one plugins ref, the `@` prefix deciding the kind:

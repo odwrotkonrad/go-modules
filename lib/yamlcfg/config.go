@@ -2,7 +2,10 @@
 package yamlcfg
 
 import (
+	"cmp"
 	"errors"
+	"fmt"
+	"iter"
 	"os"
 	"path/filepath"
 
@@ -27,11 +30,20 @@ func Code(err error) int {
 	if err == nil {
 		return 0
 	}
-	var ce *CodedError
-	if errors.As(err, &ce) {
+	if ce, ok := errors.AsType[*CodedError](err); ok {
 		return ce.Code
 	}
 	return 1
+}
+
+// ArgsError is the CodeArgs error for an invalid argv.
+func ArgsError(args []string) *CodedError {
+	return &CodedError{CodeArgs, "invalid arguments: " + fmt.Sprint(args)}
+}
+
+// invalidConfig is the CodeConfig error for a broken config at path.
+func invalidConfig(path string, err error) *CodedError {
+	return &CodedError{CodeConfig, "invalid config: " + path + ": " + err.Error()}
 }
 
 var SystemDir = "/etc/custom"
@@ -41,11 +53,19 @@ func customPaths(name, customDir string) []string {
 	if customDir != "" {
 		return []string{system, filepath.Join(customDir, name)}
 	}
-	xdg := os.Getenv("XDG_CONFIG_HOME")
-	if xdg == "" {
-		xdg = filepath.Join(os.Getenv("HOME"), ".config")
-	}
+	xdg := cmp.Or(os.Getenv("XDG_CONFIG_HOME"), filepath.Join(os.Getenv("HOME"), ".config"))
 	return []string{system, filepath.Join(xdg, "custom", name)}
+}
+
+// MapPairs iterates a mapping node's key/value pairs.
+func MapPairs(n *yaml.Node) iter.Seq2[*yaml.Node, *yaml.Node] {
+	return func(yield func(*yaml.Node, *yaml.Node) bool) {
+		for i := 0; i+1 < len(n.Content); i += 2 {
+			if !yield(n.Content[i], n.Content[i+1]) {
+				return
+			}
+		}
+	}
 }
 
 func unwrap(n *yaml.Node) *yaml.Node {
@@ -62,9 +82,7 @@ func mergeNodes(base, over *yaml.Node) *yaml.Node {
 	if base.Kind != yaml.MappingNode || over.Kind != yaml.MappingNode {
 		return over
 	}
-	for i := 0; i+1 < len(over.Content); i += 2 {
-		key := over.Content[i]
-		val := over.Content[i+1]
+	for key, val := range MapPairs(over) {
 		found := false
 		for j := 0; j+1 < len(base.Content); j += 2 {
 			if base.Content[j].Value == key.Value {
@@ -95,11 +113,11 @@ func LoadConfigNode(name, customDir string) (*yaml.Node, error) {
 	for _, p := range existing {
 		data, err := os.ReadFile(p)
 		if err != nil {
-			return nil, &CodedError{CodeConfig, "invalid config: " + p + ": " + err.Error()}
+			return nil, invalidConfig(p, err)
 		}
 		var node yaml.Node
 		if err := yaml.Unmarshal(data, &node); err != nil {
-			return nil, &CodedError{CodeConfig, "invalid config: " + p + ": " + err.Error()}
+			return nil, invalidConfig(p, err)
 		}
 		if len(node.Content) == 0 {
 			continue
@@ -117,9 +135,8 @@ func LoadConfig(name, customDir string, out any) error {
 	if node == nil {
 		return nil
 	}
-	paths := customPaths(name, customDir)
 	if err := node.Decode(out); err != nil {
-		return &CodedError{CodeConfig, "invalid config: " + paths[0] + ": " + err.Error()}
+		return invalidConfig(customPaths(name, customDir)[0], err)
 	}
 	return nil
 }

@@ -6,6 +6,7 @@ import (
 	"errors"
 	"io/fs"
 	"os"
+	"strconv"
 	"testing"
 
 	"gitlab.com/konradodwrot/go-modules/che/internal/execx"
@@ -16,7 +17,7 @@ import (
 func stubEvaluator(os string, virt bool) *Evaluator {
 	return &Evaluator{builtins: map[string]func() string{
 		"isOs":   func() string { return os },
-		"isVirt": func() string { return boolStr(virt) },
+		"isVirt": func() string { return strconv.FormatBool(virt) },
 	}}
 }
 

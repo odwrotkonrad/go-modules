@@ -1,15 +1,15 @@
 # [>] 🤖🤖
-- name: home_dest_with_parents
+- name: mkdirArgvShouldIncludeParentsFlagWhenRequested
   in:
     args: [/Users/x/.config, "0750"]
     parents: true
   want: [mkdir, -p, -m, "0750", /Users/x/.config]
-- name: no_parents
+- name: mkdirArgvShouldOmitParentsFlagWhenNotRequested
   in:
     args: [/Users/x/.config, "0750"]
     parents: false
   want: [mkdir, -m, "0750", /Users/x/.config]
-- name: zero_mode_honors_umask
+- name: mkdirArgvShouldOmitModeFlagForZeroMode
   in:
     args: [/Users/x/.config, "0"]
     parents: true

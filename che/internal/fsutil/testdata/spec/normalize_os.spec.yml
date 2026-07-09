@@ -1,9 +1,9 @@
 # [>] 🤖🤖
-- name: darwin
+- name: normalizeOsShouldMapDarwinToMacos
   in:
     args: [darwin]
   want: macos
-- name: linux
+- name: normalizeOsShouldKeepLinux
   in:
     args: [linux]
   want: linux

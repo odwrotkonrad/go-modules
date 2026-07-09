@@ -100,10 +100,7 @@ func (h Host) mkExtraDir(item spec.FileItem, dest string) error {
 			return err
 		}
 	}
-	if owner := ownerSpec(item); owner != "" {
-		return h.chown("mkdir(chown)", owner, dest)
-	}
-	return nil
+	return h.chownIfSet("mkdir(chown)", item, dest)
 }
 
 // chmod applies an explicit mode arg under the op-scoped title (e.g. "mkdir(chmod)").
@@ -115,6 +112,14 @@ func (h Host) chmod(title string, mode os.FileMode, dest string) error {
 // chown applies owner[:group] under the op-scoped title (e.g. "mkdir(chown)").
 func (h Host) chown(title, owner, dest string) error {
 	return h.mutate(title, owner+" "+dest, func() error { return h.fs.Chown(owner, dest) })
+}
+
+// chownIfSet applies the item's spec owner when one is set, else no-op.
+func (h Host) chownIfSet(title string, item spec.FileItem, dest string) error {
+	if owner := ownerSpec(item); owner != "" {
+		return h.chown(title, owner, dest)
+	}
+	return nil
 }
 
 // fixPerms applies spec mode/owner to an existing dest when they drift, labeling
@@ -286,10 +291,7 @@ func (h Host) copyOne(item spec.FileItem, dest string) error {
 	if err != nil {
 		return err
 	}
-	if owner := ownerSpec(item); owner != "" {
-		return h.chown("cp(chown)", owner, dest)
-	}
-	return nil
+	return h.chownIfSet("cp(chown)", item, dest)
 }
 
 // copyDests returns the explicit dests (~/ resolved), else the marker-stripped derived dest.
@@ -385,7 +387,7 @@ func (h Host) isBrokenRepoLink(p string) bool {
 		target = filepath.Join(filepath.Dir(p), target)
 	}
 	target = filepath.Clean(target)
-	if target != h.Root && !strings.HasPrefix(target, h.Root+"/") {
+	if !fsutil.IsUnder(target, h.Root) {
 		return false
 	}
 	_, err = h.reader.Stat(p) // [what] broken

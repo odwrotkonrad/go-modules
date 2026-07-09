@@ -87,12 +87,19 @@ type linkEntry struct {
 }
 
 func (l *linkEntry) UnmarshalYAML(value *yaml.Node) error {
+	type alias linkEntry
+	return decodeScalarOr(value, &l.glob, (*alias)(l))
+}
+
+// decodeScalarOr implements the scalar-or-object union form shared by every
+// spec entry type: a scalar node's value lands in scalar, anything else
+// decodes into obj (an alias type, sidestepping UnmarshalYAML recursion).
+func decodeScalarOr[T any](value *yaml.Node, scalar *string, obj *T) error {
 	if value.Kind == yaml.ScalarNode {
-		l.glob = value.Value
+		*scalar = value.Value
 		return nil
 	}
-	type alias linkEntry
-	return value.Decode((*alias)(l))
+	return value.Decode(obj)
 }
 
 // excludeSet is the subtractive payload: every key a flat glob-string list, a
@@ -114,12 +121,8 @@ type DestSpec struct {
 }
 
 func (d *DestSpec) UnmarshalYAML(value *yaml.Node) error {
-	if value.Kind == yaml.ScalarNode {
-		d.Path = value.Value
-		return nil
-	}
 	type alias DestSpec
-	return value.Decode((*alias)(d))
+	return decodeScalarOr(value, &d.Path, (*alias)(d))
 }
 
 // Perms is shared ownership/mode: empty fields mean "use the code default".
@@ -151,12 +154,8 @@ type dirSpec struct {
 }
 
 func (d *dirSpec) UnmarshalYAML(value *yaml.Node) error {
-	if value.Kind == yaml.ScalarNode {
-		d.glob = value.Value
-		return nil
-	}
 	type alias dirSpec
-	return value.Decode((*alias)(d))
+	return decodeScalarOr(value, &d.glob, (*alias)(d))
 }
 
 // fileSpec is one item in a perm-group's Files list: a bare glob string, or a
@@ -168,12 +167,8 @@ type fileSpec struct {
 }
 
 func (f *fileSpec) UnmarshalYAML(value *yaml.Node) error {
-	if value.Kind == yaml.ScalarNode {
-		f.glob = value.Value
-		return nil
-	}
 	type alias fileSpec
-	return value.Decode((*alias)(f))
+	return decodeScalarOr(value, &f.glob, (*alias)(f))
 }
 
 // FileItem is one resolved file: repo-relative source (templates:

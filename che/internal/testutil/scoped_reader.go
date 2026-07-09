@@ -6,6 +6,7 @@ import (
 	"io/fs"
 	"os"
 	"path/filepath"
+	"slices"
 	"strings"
 )
 
@@ -18,12 +19,9 @@ type ScopedReader struct {
 }
 
 func (r ScopedReader) in(path string) bool {
-	for _, root := range r.Roots {
-		if path == root || strings.HasPrefix(path, root+"/") {
-			return true
-		}
-	}
-	return false
+	return slices.ContainsFunc(r.Roots, func(root string) bool {
+		return path == root || strings.HasPrefix(path, root+"/")
+	})
 }
 
 func (r ScopedReader) Stat(path string) (os.FileInfo, error) {

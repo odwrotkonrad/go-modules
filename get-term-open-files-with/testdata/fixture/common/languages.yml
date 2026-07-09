@@ -25,3 +25,5 @@ Text:
 reStructuredText:
   type: prose
   extensions: [".rst"]
+Typeless:
+  extensions: [".xyz"]

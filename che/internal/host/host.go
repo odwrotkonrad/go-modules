@@ -128,7 +128,7 @@ func (h Host) ToDest(rel string) string {
 
 // IsUnderHome reports whether dest is the user-owned $HOME tree (no sudo needed).
 func (h Host) IsUnderHome(dest string) bool {
-	return dest == h.Home || strings.HasPrefix(dest, h.Home+"/")
+	return fsutil.IsUnder(dest, h.Home)
 }
 
 // [<] 🤖🤖

@@ -1,93 +1,93 @@
 # [>] 🤖🤖
-- name: remote_scp
+- name: parsePluginRefShouldParseScpRemote
   in:
     args: ["@git@gitlab.com:g/r.git::p"]
   want:
     url: git@gitlab.com:g/r.git
     profile: p
     isPath: false
-- name: remote_https
+- name: parsePluginRefShouldParseHttpsRemote
   in:
     args: ["@https://gitlab.com/g/r.git::p"]
   want:
     url: https://gitlab.com/g/r.git
     profile: p
     isPath: false
-- name: remote_ssh
+- name: parsePluginRefShouldParseSshRemote
   in:
     args: ["@ssh://git@gitlab.com/g/r.git::p"]
   want:
     url: ssh://git@gitlab.com/g/r.git
     profile: p
     isPath: false
-- name: remote_file
+- name: parsePluginRefShouldParseFileUrlRemote
   in:
     args: ["@file:///tmp/x::p"]
   want:
     url: file:///tmp/x
     profile: p
     isPath: false
-- name: dir_abs
+- name: parsePluginRefShouldParseAbsoluteDirAsPath
   in:
     args: [/abs/dir::p]
   want:
     url: /abs/dir
     profile: p
     isPath: true
-- name: dir_rel_dot
+- name: parsePluginRefShouldParseDotRelativeDirAsPath
   in:
     args: [./rel::p]
   want:
     url: ./rel
     profile: p
     isPath: true
-- name: dir_rel_bare
+- name: parsePluginRefShouldParseBareRelativeDirAsPath
   in:
     args: [rel/dir::p]
   want:
     url: rel/dir
     profile: p
     isPath: true
-- name: dir_tilde
+- name: parsePluginRefShouldParseTildeDirAsPath
   in:
     args: [~/x::p]
   want:
     url: ~/x
     profile: p
     isPath: true
-- name: dir_env_var
+- name: parsePluginRefShouldParseEnvVarDirAsPath
   in:
     args: [$HOME/x::p]
   want:
     url: $HOME/x
     profile: p
     isPath: true
-- name: ref_missing_profile
+- name: parsePluginRefShouldErrorOnRemoteWithoutProfile
   in:
     args: ["@nourl"]
   want:
     error: true
-- name: dir_missing_profile
+- name: parsePluginRefShouldErrorOnDirWithoutProfile
   in:
     args: [nodir]
   want:
     error: true
-- name: ref_empty_url
+- name: parsePluginRefShouldErrorOnEmptyRemoteUrl
   in:
     args: ["@::p"]
   want:
     error: true
-- name: dir_empty_path
+- name: parsePluginRefShouldErrorOnEmptyDirPath
   in:
     args: ["::p"]
   want:
     error: true
-- name: ref_empty_profile
+- name: parsePluginRefShouldErrorOnEmptyRemoteProfile
   in:
     args: ["@url::"]
   want:
     error: true
-- name: dir_empty_profile
+- name: parsePluginRefShouldErrorOnEmptyDirProfile
   in:
     args: ["dir::"]
   want:

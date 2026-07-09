@@ -1,5 +1,5 @@
 # [>] 🤖🤖
-- name: merge_desktop
+- name: resolveShouldMergeMixinsForDesktopProfile
   in:
     spec: merge
     tree: tree-merge
@@ -13,7 +13,7 @@
   contains:
     extraDirs: [/var/log/grafana, HOME/.cache/zsh]
     links: [etc/grafana/grafana.ini]
-- name: merge_cli_excludes_desktop
+- name: resolveShouldExcludeDesktopEntriesForCliProfile
   in:
     spec: merge
     tree: tree-merge
@@ -24,7 +24,7 @@
   notWant:
     extraDirs: [/var/log/grafana]
     links: [etc/grafana/grafana.ini]
-- name: classify
+- name: resolveShouldClassifyTreeIntoLinksCopiesTemplates
   in:
     spec: classify
     tree: tree-classify
@@ -41,21 +41,21 @@
     templates: [root/HOME/.config/zsh/y.ontoHost.tpl]
   contains:
     dirs: [HOME, HOME/.config/zsh]
-- name: undefined_profile
+- name: resolveShouldErrorOnUndefinedProfile
   in:
     spec: merge
     tree: tree-merge
     profiles: [cli/linux]
   want:
     error: true
-- name: mixin_cycle
+- name: resolveShouldErrorOnMixinCycle
   in:
     spec: cycle
     tree: tree-empty
     profiles: [cli/macos]
   want:
     error: true
-- name: include_exclude_sections
+- name: resolveShouldApplyIncludeAndExcludeSections
   in:
     spec: include-exclude
     tree: tree-include-exclude
@@ -69,21 +69,21 @@
     copies: [HOME/.config/zsh/c.ontoHost.cp]
     scripts: [ci/zsh/scripts/installs/20-foo.zsh]
     services: [grafana]
-- name: exclude_script_glob
+- name: resolveShouldExcludeScriptsMatchingGlob
   in:
     spec: exclude-script-glob
     tree: tree-exclude-script-glob
     profiles: [cli/macos]
   want:
     scripts: [ci/zsh/scripts/installs/10-brew.zsh, ci/zsh/scripts/installs/30-tmux.zsh]
-- name: mixin_undefined
+- name: resolveShouldErrorOnUndefinedMixin
   in:
     spec: undefined-include
     tree: tree-empty
     profiles: [cli/macos]
   want:
     error: true
-- name: repo_template_rich_entries
+- name: resolveShouldParseRichRepoTemplateEntries
   in:
     spec: repo-template
     tree: tree-empty
@@ -96,14 +96,14 @@
     templateOpts:
       - [{writeType: mergeUpsert}]
       - [{}, {renderReferencedFiles: true}]
-- name: repo_template_glob_error
+- name: resolveShouldErrorOnRepoTemplateGlob
   in:
     spec: repo-template-glob
     tree: tree-empty
     profiles: [cli/macos]
   want:
     error: true
-- name: resolve_union_order
+- name: resolveShouldUnionProfilesInGivenOrder
   in:
     spec: ambiguous
     tree: tree-empty
@@ -111,7 +111,7 @@
   want:
     templates: [templates/1-env/local.env.ontoRepo.tpl, templates/1-env/local.env.ontoRepo.tpl]
     templateDests: [[.env], [.env2]]
-- name: plugin_refs_collect_deduped
+- name: resolveShouldCollectAndDedupePluginRefs
   in:
     spec: plugins
     tree: tree-empty
@@ -159,13 +159,13 @@
   want:
     error: true
     stdErr: [link dest]
-- name: plugin_ref_malformed
+- name: resolveShouldErrorOnMalformedPluginRef
   in:
     tree: tree-plugin-malformed
     profiles: [main]
   want:
     error: true
-- name: mixin_plugin_ref_undefined
+- name: resolveShouldErrorOnUndefinedMixinPluginRef
   in:
     spec: mixin-plugin-ref
     tree: tree-empty

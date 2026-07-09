@@ -1,33 +1,33 @@
 # [>] 🤖🤖
-- name: genai_include_label
+- name: sectionOpenShouldParseGenaiIncludeLabel
   in:
     args: ["##[>] Onto Host [genai-include]"]
   want:
     label: Onto Host
     depth: 0
     ok: true
-- name: genai_include_parens_marks
+- name: sectionOpenShouldKeepParensAndStripMarks
   in:
     args: ["##[>] Onto Repo (CI) [genai-include] 🤖🤖"]
   want:
     label: Onto Repo (CI)
     depth: 0
     ok: true
-- name: nested_depth
+- name: sectionOpenShouldComputeNestedDepth
   in:
     args: ["###[>] VM"]
   want:
     label: VM
     depth: 1
     ok: true
-- name: marks_only
+- name: sectionOpenShouldStripTrailingMarks
   in:
     args: ["##[>] go 🤖🤖"]
   want:
     label: go
     depth: 0
     ok: true
-- name: what_comment_not_section
+- name: sectionOpenShouldRejectWhatComment
   in:
     args: ["#[what] not a section"]
   want:

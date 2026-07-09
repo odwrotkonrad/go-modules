@@ -55,9 +55,22 @@ type FS struct {
 	Home string
 }
 
+// IsUnder reports path inside the root tree (root itself included).
+func IsUnder(path, root string) bool {
+	return path == root || strings.HasPrefix(path, root+"/")
+}
+
 // IsUnderHome reports dest in user-owned Home tree (no sudo).
 func (f FS) IsUnderHome(dest string) bool {
-	return dest == f.Home || strings.HasPrefix(dest, f.Home+"/")
+	return IsUnder(dest, f.Home)
+}
+
+// escalate prefixes sudo unless dest is user-owned (under Home) or already root.
+func (f FS) escalate(dest string, argv []string) []string {
+	if !f.IsUnderHome(dest) && os.Geteuid() != 0 {
+		return append([]string{"sudo"}, argv...)
+	}
+	return argv
 }
 
 // Mkdir makes one dir with mode. parents adds -p. mkdir builds its own
@@ -69,16 +82,13 @@ func (f FS) Mkdir(dest string, mode os.FileMode, parents bool) error {
 // MkdirArgv builds a mkdir argv, escalating per dest: root-tree -> sudo unless
 // root, HOME-tree -> direct. parents adds -p. mode 0 -> no -m (mkdir honors umask).
 func (f FS) MkdirArgv(dest string, mode os.FileMode, parents bool) []string {
-	base := []string{"mkdir"}
+	argv := []string{"mkdir"}
 	if parents {
-		base = append(base, "-p")
+		argv = append(argv, "-p")
 	}
-	base = append(base, modeFlag(mode)...)
-	base = append(base, dest)
-	if !f.IsUnderHome(dest) && os.Geteuid() != 0 {
-		return append([]string{"sudo"}, base...)
-	}
-	return base
+	argv = append(argv, modeFlag(mode)...)
+	argv = append(argv, dest)
+	return f.escalate(dest, argv)
 }
 
 // Chmod applies explicit mode arg (setgid/sticky bits, not honored by mkdir mode).
@@ -133,10 +143,7 @@ func (f FS) Install(dest string, body []byte, mode os.FileMode, owner string) er
 
 // Priv runs argv as root unless dest under Home (user-owned).
 func (f FS) Priv(dest string, argv ...string) error {
-	if !f.IsUnderHome(dest) && os.Geteuid() != 0 {
-		argv = append([]string{"sudo"}, argv...)
-	}
-	return run(argv)
+	return run(f.escalate(dest, argv))
 }
 
 func run(argv []string) error {

@@ -1,17 +1,17 @@
 # [>] 🤖🤖
-- name: no_braces
+- name: expandBracesShouldReturnBracelessPathUnchanged
   in:
     args: [no/braces/here]
   want: [no/braces/here]
-- name: single_group
+- name: expandBracesShouldExpandSingleGroup
   in:
     args: ["x/{a,b}/y"]
   want: [x/a/y, x/b/y]
-- name: two_groups
+- name: expandBracesShouldExpandCartesianProductOfTwoGroups
   in:
     args: ["{a,b}/{c,d}"]
   want: [a/c, a/d, b/c, b/d]
-- name: nested_group
+- name: expandBracesShouldFlattenNestedGroups
   in:
     args: ["x/{a,{b,c}}/y"]
   want: [x/a/y, x/b/y, x/c/y]

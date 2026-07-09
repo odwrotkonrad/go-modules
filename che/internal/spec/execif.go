@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"os"
 	"runtime"
+	"strconv"
 	"strings"
 	"sync"
 
@@ -22,7 +23,7 @@ type Evaluator struct {
 func NewEvaluator() *Evaluator {
 	return &Evaluator{builtins: map[string]func() string{
 		"isOs":   sync.OnceValue(func() string { return fsutil.NormalizeOS(runtime.GOOS) }),
-		"isVirt": sync.OnceValue(func() string { return boolStr(fsutil.IsVirtualized()) }),
+		"isVirt": sync.OnceValue(func() string { return strconv.FormatBool(fsutil.IsVirtualized()) }),
 	}}
 }
 
@@ -62,13 +63,6 @@ func (e *Evaluator) resolve(src string) (string, bool, error) {
 	default:
 		return "", false, fmt.Errorf("unknown source %q: want builtin:<name> or env:<NAME>", src)
 	}
-}
-
-func boolStr(b bool) string {
-	if b {
-		return "true"
-	}
-	return "false"
 }
 
 // [<] 🤖🤖

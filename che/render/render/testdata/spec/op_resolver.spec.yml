@@ -1,5 +1,5 @@
 # [>] 🤖🤖
-- name: tokenUnsetErrors
+- name: opResolverShouldErrorWhenTokenUnset
   in:
     ref: op://vault/item/field
     token: ""
@@ -8,7 +8,7 @@
     stdErr: ['OP_SERVICE_ACCOUNT_TOKEN unset']
     calls: 0
     factoryCalls: 0
-- name: clientInitErrorSurfaced
+- name: opResolverShouldSurfaceClientInitError
   in:
     ref: op://vault/item/field
     token: tok
@@ -18,7 +18,7 @@
     stdErr: ['op client']
     calls: 0
     factoryCalls: 1
-- name: resolveOk
+- name: opResolverShouldResolveSecret
   in:
     ref: op://vault/item/field
     token: tok
@@ -27,7 +27,7 @@
     value: s3cret
     calls: 1
     factoryCalls: 1
-- name: rateLimitRetriedThenOk
+- name: opResolverShouldRetryRateLimitThenResolve
   in:
     ref: op://vault/item/field
     token: tok
@@ -38,7 +38,7 @@
     value: s3cret
     calls: 2
     factoryCalls: 1
-- name: nonRetryableSurfaced
+- name: opResolverShouldSurfaceNonRetryableError
   in:
     ref: op://vault/item/field
     token: tok
@@ -49,7 +49,7 @@
     stdErr: ['op resolve "op://vault/item/field"', 'secret not found']
     calls: 1
     factoryCalls: 1
-- name: clientReusedAcrossRefs
+- name: opResolverShouldReuseClientAcrossRefs
   in:
     ref: op://vault/item/field
     token: tok

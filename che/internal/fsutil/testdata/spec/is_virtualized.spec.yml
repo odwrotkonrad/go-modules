@@ -1,53 +1,53 @@
 # [>] 🤖🤖
-- name: darwinVmmPresent
+- name: isVirtualizedShouldDetectDarwinVmmPresent
   in:
     goos: darwin
     execOut: "1"
   want: true
-- name: darwinVmmAbsent
+- name: isVirtualizedShouldReportFalseWhenDarwinVmmAbsent
   in:
     goos: darwin
     execOut: "0"
   want: false
-- name: darwinSysctlFails
+- name: isVirtualizedShouldReportFalseWhenDarwinSysctlFails
   in:
     goos: darwin
     execFail: true
   want: false
-- name: linuxSystemdDetectsVirt
+- name: isVirtualizedShouldTrustLinuxSystemdDetectVirt
   in:
     goos: linux
   want: true
-- name: linuxDockerenvMarker
+- name: isVirtualizedShouldDetectLinuxDockerenvMarker
   in:
     goos: linux
     execFail: true
     files: {"/.dockerenv": ""}
   want: true
-- name: linuxCgroupDocker
+- name: isVirtualizedShouldDetectDockerCgroup
   in:
     goos: linux
     execFail: true
     files: {"/proc/1/cgroup": "0::/docker/abc\n"}
   want: true
-- name: linuxCgroupContainerd
+- name: isVirtualizedShouldDetectContainerdCgroup
   in:
     goos: linux
     execFail: true
     files: {"/proc/1/cgroup": "0::/containerd/abc\n"}
   want: true
-- name: linuxCgroupClean
+- name: isVirtualizedShouldReportFalseOnCleanCgroup
   in:
     goos: linux
     execFail: true
     files: {"/proc/1/cgroup": "0::/init.scope\n"}
   want: false
-- name: linuxNoMarkers
+- name: isVirtualizedShouldReportFalseWithoutLinuxMarkers
   in:
     goos: linux
     execFail: true
   want: false
-- name: otherGoosNever
+- name: isVirtualizedShouldReportFalseOnOtherGoos
   in:
     goos: windows
   want: false

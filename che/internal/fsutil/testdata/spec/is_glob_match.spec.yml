@@ -1,61 +1,61 @@
 # [>] 🤖🤖
-- name: subtree_glob_direct_child
+- name: isGlobMatchShouldMatchDirectChildUnderSubtreeGlob
   in:
     args: [HOME/.config/zsh/**, HOME/.config/zsh/.zshrc]
   want: true
-- name: subtree_glob_nested
+- name: isGlobMatchShouldMatchNestedPathUnderSubtreeGlob
   in:
     args: [HOME/.config/zsh/**, HOME/.config/zsh/zshrc.d/auto.d/80-tools.zsh]
   want: true
-- name: subtree_glob_matches_root
+- name: isGlobMatchShouldMatchSubtreeGlobRootItself
   in:
     args: [HOME/.config/zsh/**, HOME/.config/zsh]
   want: true
-- name: subtree_glob_sibling_dir
+- name: isGlobMatchShouldRejectSiblingDirOfSubtreeGlob
   in:
     args: [HOME/.config/zsh/**, HOME/.config/git/config]
   want: false
-- name: subtree_glob_prefix_sibling
+- name: isGlobMatchShouldRejectPrefixOnlySiblingOfSubtreeGlob
   in:
     args: [HOME/.config/zsh/**, HOME/.config/zshenv]
   want: false
-- name: exact_match
+- name: isGlobMatchShouldMatchExactPath
   in:
     args: [etc/zshrc, etc/zshrc]
   want: true
-- name: exact_no_subtree
+- name: isGlobMatchShouldRejectSubtreeUnderExactPath
   in:
     args: [etc/zshrc, etc/zshrc.d/auto.d/x]
   want: false
-- name: star_suffix_exact
+- name: isGlobMatchShouldMatchStarSuffixBareStem
   in:
     args: [Library/LaunchDaemons/otelcol.plist*, Library/LaunchDaemons/otelcol.plist]
   want: true
-- name: star_suffix_marker
+- name: isGlobMatchShouldMatchStarSuffixWithMarkerSuffix
   in:
     args: [Library/LaunchDaemons/otelcol.plist*, Library/LaunchDaemons/otelcol.plist.ontoHost.cp]
   want: true
-- name: star_suffix_other_file
+- name: isGlobMatchShouldRejectStarSuffixOtherFile
   in:
     args: [Library/LaunchDaemons/otelcol.plist*, Library/LaunchDaemons/grafana.plist]
   want: false
-- name: subtree_glob_file
+- name: isGlobMatchShouldMatchFileUnderSubtreeGlob
   in:
     args: [etc/otelcol/**, etc/otelcol/config.yml]
   want: true
-- name: interior_doublestar_nested
+- name: isGlobMatchShouldMatchNestedPathThroughInteriorDoublestar
   in:
     args: [root/**/foo.txt, root/a/b/foo.txt]
   want: true
-- name: interior_doublestar_prefix_miss
+- name: isGlobMatchShouldRejectInteriorDoublestarPrefixMiss
   in:
     args: [root/**/foo.txt, other/a/foo.txt]
   want: false
-- name: interior_doublestar_tail_miss
+- name: isGlobMatchShouldRejectInteriorDoublestarTailMiss
   in:
     args: [root/**/*.md, root/a/b.txt]
   want: false
-- name: doublestar_empty_post
+- name: isGlobMatchShouldMatchDoublestarWithEmptyTail
   in:
     args: [root**, rootabc/x]
   want: true

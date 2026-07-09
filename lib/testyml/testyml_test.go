@@ -31,14 +31,15 @@ func TestRun(t *testing.T) {
 			t.Errorf("sum(%v) = %d, want %d", c.In.Args, sum, c.Want)
 		}
 	})
-	if !ran["add"] || !ran["negatives"] {
+	if !ran["runShouldDecodeCaseAndInvokeCallback"] || !ran["runShouldDecodeNegativeValues"] {
 		t.Errorf("ran = %v, want both cases", ran)
 	}
 }
 
 func TestMatchers(t *testing.T) {
 	type in struct {
-		Args []string
+		Args    []string
+		NoMatch []string `yaml:"noMatch"`
 	}
 	type c struct {
 		Name string
@@ -49,6 +50,23 @@ func TestMatchers(t *testing.T) {
 		for _, m := range c.Want.StdOut {
 			MustMatch(t, c.In.Args[0], m)
 		}
+		for _, m := range c.In.NoMatch {
+			MustNotMatch(t, c.In.Args[0], m)
+		}
+	})
+}
+
+func TestCheckCode(t *testing.T) {
+	type in struct {
+		Code int
+	}
+	type c struct {
+		Name string
+		In   in
+		Want Want
+	}
+	Run(t, td, "testdata/spec/check_code.spec.yml", func(t *testing.T, c c) {
+		c.Want.CheckCode(t, c.In.Code)
 	})
 }
 

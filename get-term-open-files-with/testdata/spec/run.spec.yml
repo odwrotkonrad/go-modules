@@ -1,64 +1,70 @@
 # [>] 🤖🤖
-- name: any_uses_base_opener
+- name: runShouldUseAnyOpenerForAnyTerminal
   in:
     config: testdata/fixture/run/term.yml
     args: [any]
   want:
     filesOut: testdata/fixture/run/any.expected.txt
-- name: vscode_overrides_any_keeps_prose
+- name: runShouldOverrideAnyWithVscodeKeepingProse
   in:
     config: testdata/fixture/run/term.yml
     args: [vscode]
   want:
     filesOut: testdata/fixture/run/vscode.expected.txt
-- name: kitty_partial_override
+- name: runShouldPartiallyOverrideAnyForKitty
   in:
     config: testdata/fixture/run/term.yml
     args: [kitty]
   want:
     filesOut: testdata/fixture/run/kitty.expected.txt
-- name: last_opener_wins
+- name: runShouldLetLastOpenerWin
   in:
     config: testdata/fixture/run/last_opener.yml
     args: [vscode]
   want:
     filesOut: testdata/fixture/run/last_opener.expected.txt
-- name: no_args
+- name: runShouldSkipRulesWithEmptyOpener
+  in:
+    config: testdata/fixture/run/empty_opener.yml
+    args: [any]
+  want:
+    filesOut: testdata/fixture/run/empty_opener.expected.txt
+- name: runShouldExit11WithoutArgs
   in:
     config: testdata/fixture/run/term.yml
     args: []
   want:
     exitCode: 11
-- name: two_args
+- name: runShouldExit11OnTwoArgs
   in:
     config: testdata/fixture/run/term.yml
     args: [any, vscode]
   want:
     exitCode: 11
-- name: three_args
+- name: runShouldExit11OnThreeArgs
   in:
     config: testdata/fixture/run/term.yml
     args: [any, vscode, kitty]
   want:
     exitCode: 11
-- name: unknown_terminal
+- name: runShouldExit11OnUnknownTerminal
   in:
     config: testdata/fixture/run/term.yml
     args: [alacritty]
   want:
     exitCode: 11
-- name: case_sensitive
+- name: runShouldExit11OnWrongCaseTerminal
   in:
     config: testdata/fixture/run/term.yml
     args: [Any]
   want:
     exitCode: 11
-- name: missing_config
+- name: runShouldExit13WhenConfigMissing
   in:
     args: [any]
   want:
     exitCode: 13
-- name: invalid_config
+- name: runShouldExit12OnInvalidConfig
   in:
     config: testdata/fixture/run/invalid.yml
     args: [any]

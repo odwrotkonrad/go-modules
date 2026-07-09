@@ -10,7 +10,7 @@ import (
 // IsGlobMatch matches path against pattern. ** spans separators, * one segment, prefix may end in * (suffix glob).
 func IsGlobMatch(pattern, path string) bool {
 	if base, ok := strings.CutSuffix(pattern, "/**"); ok {
-		return path == base || strings.HasPrefix(path, base+"/")
+		return IsUnder(path, base)
 	}
 	if strings.Contains(pattern, "**") {
 		return isDoublestarMatch(pattern, path)

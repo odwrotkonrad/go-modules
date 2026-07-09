@@ -1,41 +1,41 @@
 # [>] 🤖🤖
-- name: dirEqual
+- name: isOptionEqualToShouldMatchEqualDirectory
   in: {config: {dir: /repo}, option: directory, val: /repo}
   want: {equal: true}
-- name: dirNotEqual
+- name: isOptionEqualToShouldRejectDifferentDirectory
   in: {config: {dir: /repo}, option: directory, val: /other}
   want: {equal: false}
-- name: dryRunEqual
+- name: isOptionEqualToShouldMatchEqualDryRun
   in: {config: {dryRun: 1}, option: dry-run, val: 1}
   want: {equal: true}
-- name: dryRunNotEqual
+- name: isOptionEqualToShouldRejectDifferentDryRun
   in: {config: {dryRun: 1}, option: dry-run, val: 2}
   want: {equal: false}
-- name: profileEqual
+- name: isOptionEqualToShouldMatchEqualProfile
   in: {config: {profile: cli/macos}, option: profile, val: cli/macos}
   want: {equal: true}
-- name: profileNotEqual
+- name: isOptionEqualToShouldRejectDifferentProfile
   in: {config: {profile: cli/macos}, option: profile, val: desktop/macos}
   want: {equal: false}
-- name: skipExecIfEqual
+- name: isOptionEqualToShouldMatchEqualSkipExecIf
   in: {config: {skipExecIf: true}, option: skip-exec-if, val: true}
   want: {equal: true}
-- name: skipExecIfNotEqual
+- name: isOptionEqualToShouldRejectDifferentSkipExecIf
   in: {config: {skipExecIf: true}, option: skip-exec-if, val: false}
   want: {equal: false}
-- name: skipPluginsEqual
+- name: isOptionEqualToShouldMatchEqualSkipPlugins
   in: {config: {skipPlugins: true}, option: skip-plugins, val: true}
   want: {equal: true}
-- name: skipPluginsNotEqual
+- name: isOptionEqualToShouldRejectDifferentSkipPlugins
   in: {config: {skipPlugins: false}, option: skip-plugins, val: true}
   want: {equal: false}
-- name: debugEqual
+- name: isOptionEqualToShouldMatchEqualDebug
   in: {config: {debug: true}, option: debug, val: true}
   want: {equal: true}
-- name: debugNotEqual
+- name: isOptionEqualToShouldRejectDifferentDebug
   in: {config: {debug: true}, option: debug, val: false}
   want: {equal: false}
-- name: unknownOptionPanics
+- name: isOptionEqualToShouldPanicOnUnknownOption
   in: {option: bogus, val: x}
   want: {panic: true}
 # [<] 🤖🤖

@@ -1,43 +1,43 @@
 # [>] 🤖🤖
-- name: help_short
+- name: toolRunShouldPrintHelpForShortFlag
   in:
     args: ["-h"]
   want:
     exitCode: 0
-- name: help_long
+- name: toolRunShouldPrintHelpForLongFlag
   in:
     args: ["--help"]
   want:
     exitCode: 0
-- name: no_arg_emit
+- name: toolRunShouldEmitWithoutArgs
   in:
     args: []
   want:
     exitCode: 0
-- name: no_arg_rejects_positional
+- name: toolRunShouldRejectUnexpectedPositional
   in:
     args: ["x"]
   want:
     exitCode: 11
-- name: needs_arg_emit
+- name: toolRunShouldEmitWithRequiredArg
   in:
     needsArg: true
     args: ["x"]
   want:
     exitCode: 0
-- name: needs_arg_rejects_empty
+- name: toolRunShouldRejectMissingRequiredArg
   in:
     needsArg: true
     args: []
   want:
     exitCode: 11
-- name: needs_arg_rejects_flag
+- name: toolRunShouldRejectFlagAsRequiredArg
   in:
     needsArg: true
     args: ["-x"]
   want:
     exitCode: 11
-- name: unknown_flag
+- name: toolRunShouldRejectUnknownFlag
   in:
     args: ["--nope", "y"]
   want:

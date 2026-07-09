@@ -2,8 +2,6 @@
 package main
 
 import (
-	"fmt"
-
 	"gitlab.com/konradodwrot/go-modules/get-term-open-files-with/lib"
 	"gitlab.com/konradodwrot/go-modules/lib/climain"
 	"gitlab.com/konradodwrot/go-modules/lib/yamlcfg"
@@ -30,7 +28,7 @@ var version = "dev"
 
 func run(args []string, customDir, url string) (string, error) {
 	if len(args) != 1 || !terminals[args[0]] {
-		return "", &yamlcfg.CodedError{Code: yamlcfg.CodeArgs, Msg: "invalid arguments: " + fmt.Sprint(args)}
+		return "", yamlcfg.ArgsError(args)
 	}
 	terminal := args[0]
 	var sections lib.Sections

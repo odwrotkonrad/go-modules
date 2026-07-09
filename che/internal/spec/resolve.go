@@ -76,8 +76,7 @@ func (r *Raw) EligibleProfiles(forceOne string, forceAll bool, eval func(expr st
 	if forceOne != "" {
 		ps, ok := r.profiles[forceOne]
 		if !ok {
-			return nil, fmt.Errorf("--profile %q is not defined in che.yml (defined: %v)",
-				forceOne, slices.Sorted(maps.Keys(r.profiles)))
+			return nil, r.undefinedProfile(fmt.Sprintf("--profile %q", forceOne))
 		}
 		pass, err := allPass(forceOne, ps.Options.ExecIf, forceAll, eval)
 		if err != nil {
@@ -114,10 +113,15 @@ func (r *Raw) EligibleProfiles(forceOne string, forceAll bool, eval func(expr st
 func (r *Raw) ExecIfPass(name string, forceAll bool, eval func(expr string) (bool, error)) (bool, error) {
 	ps, ok := r.profiles[name]
 	if !ok {
-		return false, fmt.Errorf("profile %q is not defined in che.yml (defined: %v)",
-			name, slices.Sorted(maps.Keys(r.profiles)))
+		return false, r.undefinedProfile(fmt.Sprintf("profile %q", name))
 	}
 	return allPass(name, ps.Options.ExecIf, forceAll, eval)
+}
+
+// undefinedProfile is the shared not-defined error; ref names the offending
+// reference (e.g. `--profile "x"`, `profile "x"`).
+func (r *Raw) undefinedProfile(ref string) error {
+	return fmt.Errorf("%s is not defined in che.yml (defined: %v)", ref, slices.Sorted(maps.Keys(r.profiles)))
 }
 
 // allPass reports whether every execIf expression of profile name passes,
@@ -158,9 +162,7 @@ func (r *Raw) Resolve(profiles []string, root string) (Resolved, error) {
 	var eff effective
 	for _, profile := range profiles {
 		if _, ok := r.profiles[profile]; !ok {
-			return Resolved{}, fmt.Errorf(
-				"profile %q is not defined in che.yml (defined: %v)",
-				profile, r.names(func(profileSpec) bool { return true }))
+			return Resolved{}, r.undefinedProfile(fmt.Sprintf("profile %q", profile))
 		}
 		if err := r.mergeInto(&eff, profile, nil); err != nil {
 			return Resolved{}, err

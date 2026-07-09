@@ -26,18 +26,21 @@ var Default CmdExecutor = Real{}
 
 type Real struct{}
 
-func (Real) Exec(c Cmd) error {
+// command maps a Cmd onto an exec.Cmd, Stdout left unset (Output owns it).
+func (c Cmd) command() *exec.Cmd {
 	cmd := exec.Command(c.Argv[0], c.Argv[1:]...)
-	cmd.Dir, cmd.Env = c.Dir, c.Env
-	cmd.Stdout, cmd.Stderr = c.Stdout, c.Stderr
+	cmd.Dir, cmd.Env, cmd.Stderr = c.Dir, c.Env, c.Stderr
+	return cmd
+}
+
+func (Real) Exec(c Cmd) error {
+	cmd := c.command()
+	cmd.Stdout = c.Stdout
 	return cmd.Run()
 }
 
 func (Real) Output(c Cmd) ([]byte, error) {
-	cmd := exec.Command(c.Argv[0], c.Argv[1:]...)
-	cmd.Dir, cmd.Env = c.Dir, c.Env
-	cmd.Stderr = c.Stderr
-	return cmd.Output()
+	return c.command().Output()
 }
 
 type Mock struct {

@@ -1,5 +1,5 @@
 # [>] 🤖🤖
-- name: uidAndGidMatchNoDrift
+- name: ownerDriftShouldReportNoDriftWhenUidAndGidMatch
   in:
     uid: 501
     gid: 20
@@ -7,7 +7,7 @@
     users: {ko: 501}
     groups: {staff: 20}
   want: false
-- name: uidDiffersDrift
+- name: ownerDriftShouldReportDriftWhenUidDiffers
   in:
     uid: 502
     gid: 20
@@ -15,7 +15,7 @@
     users: {ko: 501}
     groups: {staff: 20}
   want: true
-- name: gidDiffersDrift
+- name: ownerDriftShouldReportDriftWhenGidDiffers
   in:
     uid: 501
     gid: 0
@@ -23,7 +23,7 @@
     users: {ko: 501}
     groups: {staff: 20}
   want: true
-- name: unresolvableNamesNoDrift
+- name: ownerDriftShouldReportNoDriftForUnresolvableNames
   in:
     uid: 501
     gid: 20
@@ -31,7 +31,7 @@
     users: {ko: 501}
     groups: {staff: 20}
   want: false
-- name: bareOwnerChecksUidOnly
+- name: ownerDriftShouldCheckOnlyUidForBareOwner
   in:
     uid: 501
     gid: 999
@@ -39,7 +39,7 @@
     users: {ko: 501}
     groups: {staff: 20}
   want: false
-- name: bareOwnerUidDrift
+- name: ownerDriftShouldReportDriftForBareOwnerUidMismatch
   in:
     uid: 0
     gid: 20
@@ -47,7 +47,7 @@
     users: {ko: 501}
     groups: {staff: 20}
   want: true
-- name: sysNotStatTNoDrift
+- name: ownerDriftShouldReportNoDriftWithoutStatSys
   in:
     noStat: true
     owner: "ko:staff"

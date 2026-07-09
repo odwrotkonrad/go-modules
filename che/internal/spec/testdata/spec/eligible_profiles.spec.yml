@@ -1,19 +1,19 @@
 # [>] 🤖🤖
-- name: execif_pass_macos
+- name: eligibleProfilesShouldSelectProfileWithPassingExecIf
   in:
     spec: che
     os: macos
     virt: true
   want:
     profiles: [cli/macos]
-- name: execif_no_eligible_errors
+- name: eligibleProfilesShouldErrorWhenNoProfileEligible
   in:
     spec: che
     os: linux
     virt: true
   want:
     error: true
-- name: force_one_execif_enforced
+- name: forceOneShouldStillEnforceExecIf
   in:
     spec: che
     os: linux
@@ -21,7 +21,7 @@
     forceOne: desktop/macos
   want:
     error: true
-- name: force_one_force_all_lifts_execif
+- name: forceOneWithForceAllShouldLiftExecIf
   in:
     spec: che
     os: linux
@@ -30,7 +30,7 @@
     forceAll: true
   want:
     profiles: [desktop/macos]
-- name: force_one_execif_passes
+- name: forceOneShouldSelectProfileWhenExecIfPasses
   in:
     spec: che
     os: macos
@@ -38,7 +38,7 @@
     forceOne: desktop/macos
   want:
     profiles: [desktop/macos]
-- name: force_one_non_autoexec_base
+- name: forceOneShouldSelectNonAutoexecBaseProfile
   in:
     spec: che
     os: linux
@@ -46,7 +46,7 @@
     forceOne: base
   want:
     profiles: [base]
-- name: force_one_non_autoexec_ontorepo
+- name: forceOneShouldSelectNonAutoexecOntoRepoProfile
   in:
     spec: che
     os: linux
@@ -54,7 +54,7 @@
     forceOne: ontoRepo
   want:
     profiles: [ontoRepo]
-- name: force_one_undefined
+- name: forceOneShouldErrorOnUndefinedProfile
   in:
     spec: che
     os: macos
@@ -62,7 +62,7 @@
     forceOne: cli/linux
   want:
     error: true
-- name: force_all_autoexec_only
+- name: forceAllShouldSelectAllAutoexecProfiles
   in:
     spec: che
     os: linux
@@ -70,14 +70,14 @@
     forceAll: true
   want:
     profiles: [cli/macos, desktop/macos]
-- name: lone_plain_always_eligible
+- name: eligibleProfilesShouldAlwaysSelectLonePlainProfile
   in:
     spec: repo
     os: linux
     virt: true
   want:
     profiles: [repo]
-- name: union_declaration_order
+- name: eligibleProfilesShouldUnionInDeclarationOrder
   in:
     spec: ambiguous
     os: linux

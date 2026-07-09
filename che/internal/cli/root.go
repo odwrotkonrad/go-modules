@@ -3,6 +3,7 @@ package cli
 // [>] 🤖🤖
 
 import (
+	"cmp"
 	"errors"
 	"fmt"
 	"maps"
@@ -190,7 +191,7 @@ func Attach() *cobra.Command {
 // build loads spec -> lists eligible profiles -> resolves union -> wires the
 // host. Run in PersistentPreRunE before any subcommand RunE.
 func build() error {
-	dir := orEnv(dirFlag, "CHE_DIR")
+	dir := cmp.Or(dirFlag, os.Getenv("CHE_DIR"))
 	if dir != "" {
 		if err := os.Chdir(dir); err != nil {
 			return fmt.Errorf("-C: %w", err)
@@ -204,7 +205,7 @@ func build() error {
 	if err != nil {
 		return err
 	}
-	dryRunMode = orEnv(dryRunMode, "CHE_DRY_RUN")
+	dryRunMode = cmp.Or(dryRunMode, os.Getenv("CHE_DRY_RUN"))
 	mode, ok := dryRunModes[dryRunMode]
 	if !ok {
 		return fmt.Errorf("invalid --dry-run mode %q: want delta or all", dryRunMode)
@@ -223,7 +224,7 @@ func build() error {
 	cfg := config.Config{
 		Dir:         dir,
 		DryRun:      mode,
-		Profile:     orEnv(profileForce, "CHE_PROFILE"),
+		Profile:     cmp.Or(profileForce, os.Getenv("CHE_PROFILE")),
 		SkipExecIf:  boolOrEnv(skipExecIf, "CHE_SKIP_EXEC_IF"),
 		SkipPlugins: boolOrEnv(skipPlugins, "CHE_SKIP_PLUGINS"),
 		Debug:       boolOrEnv(debugFlag, "CHE_DEBUG"),
@@ -247,13 +248,6 @@ func build() error {
 	pluginUnits = map[string]*unit{}
 	pluginCfg = pluginConfig{repoRoot: repoRoot, home: home, cfg: cfg, eval: eval}
 	return nil
-}
-
-func orEnv(v, key string) string {
-	if v != "" {
-		return v
-	}
-	return os.Getenv(key)
 }
 
 func boolOrEnv(flag bool, key string) bool {

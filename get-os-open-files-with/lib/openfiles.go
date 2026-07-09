@@ -9,6 +9,11 @@ import (
 	"gitlab.com/konradodwrot/go-modules/lib/yamlcfg"
 )
 
+// cfgErr is the CodeConfig error for a malformed config shape.
+func cfgErr(msg string) *yamlcfg.CodedError {
+	return &yamlcfg.CodedError{Code: yamlcfg.CodeConfig, Msg: "invalid config: " + msg}
+}
+
 func Render(cfg *yaml.Node) (string, error) {
 	if cfg == nil {
 		return "", nil
@@ -24,20 +29,18 @@ func Render(cfg *yaml.Node) (string, error) {
 		return "", nil
 	}
 	if root.Kind != yaml.MappingNode {
-		return "", &yamlcfg.CodedError{Code: yamlcfg.CodeConfig, Msg: "invalid config: top level must be a mapping"}
+		return "", cfgErr("top level must be a mapping")
 	}
 	var lines []string
-	for i := 0; i+1 < len(root.Content); i += 2 {
-		bundle := root.Content[i].Value
-		roles := root.Content[i+1]
+	for bundleKey, roles := range yamlcfg.MapPairs(root) {
+		bundle := bundleKey.Value
 		if roles.Kind != yaml.MappingNode {
-			return "", &yamlcfg.CodedError{Code: yamlcfg.CodeConfig, Msg: "invalid config: " + bundle + " must be a mapping"}
+			return "", cfgErr(bundle + " must be a mapping")
 		}
-		for j := 0; j+1 < len(roles.Content); j += 2 {
-			role := roles.Content[j].Value
-			utis := roles.Content[j+1]
+		for roleKey, utis := range yamlcfg.MapPairs(roles) {
+			role := roleKey.Value
 			if utis.Kind != yaml.SequenceNode {
-				return "", &yamlcfg.CodedError{Code: yamlcfg.CodeConfig, Msg: "invalid config: " + bundle + "." + role + " must be a list"}
+				return "", cfgErr(bundle + "." + role + " must be a list")
 			}
 			for _, uti := range utis.Content {
 				lines = append(lines, bundle+" "+uti.Value+" "+role)
