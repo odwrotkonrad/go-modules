@@ -8,8 +8,8 @@ workflow:
 stages:
   - validate
   - test
-  - make-docs
   - release
+  - make-docs
 
 variables:
   CI_IMAGE: registry.gitlab.com/konradodwrot/infra/oci-images/ci-linux:latest
@@ -168,9 +168,11 @@ release-lib:
     paths:
       - public
 
-pages:
+pages-publish:
   extends: .pages-build
-  stage: release
+  stage: make-docs
+  pages: true
+  needs: [release-che]
   rules:
     - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
       changes: [che/**/*]
@@ -178,6 +180,7 @@ pages:
 pages-preview:
   extends: .pages-build
   stage: make-docs
+  needs: []
   rules:
     - if: $CI_PIPELINE_SOURCE == "merge_request_event"
       changes: [che/**/*]
@@ -187,6 +190,7 @@ pages-preview:
     name: docs-preview/$CI_MERGE_REQUEST_IID
     url: https://konradodwrot.gitlab.io/-/go-modules/-/jobs/$CI_JOB_ID/artifacts/public/index.html
   artifacts:
+    expose_as: docs preview
     paths:
       - public
     expire_in: 1 week
