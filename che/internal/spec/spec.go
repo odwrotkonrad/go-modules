@@ -229,12 +229,12 @@ func globMatch(glob, rel string) bool {
 // Each op's globs carry their group's perms; classify stamps matched files
 // with them (last match wins).
 type effective struct {
-	linkGlobs globSet    // link-op globs (repo-relative under root/)
-	copyGlobs globSet    // copy-op globs
-	tmplGlobs globSet    // render-templates globs (repo-root-relative, root/-prefixed)
-	richCopy  []FileItem // rich-form copy entries
-	richTmpl  []FileItem // rich-form render-templates entries (repo-root-relative)
-	dirs      []FileItem // mkdirs: glob forms expanded to one item per path, rich carry perms
+	linkGlobs globSet     // link-op globs (repo-relative under root/)
+	copyGlobs globSet     // copy-op globs
+	tmplGlobs globSet     // render-templates globs (repo-root-relative, root/-prefixed)
+	richCopy  []FileItem  // rich-form copy entries
+	richTmpl  []FileItem  // rich-form render-templates entries (repo-root-relative)
+	dirs      []FileItem  // mkdirs: glob forms expanded to one item per path, rich carry perms
 	scripts   []string    // script paths (order = run order)
 	services  []string    // service names
 	plugins   []PluginRef // profile-level plugin refs (composition order)

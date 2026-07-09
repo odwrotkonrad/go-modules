@@ -42,17 +42,20 @@ func (h Host) MkDirs(dirRels []string, extraDirs []spec.FileItem) error {
 	errs := []error{h.ensureConfigDirs(dirRels)}
 	for _, item := range extraDirs {
 		dest := h.ToDest(item.Dests[0].Path)
-		if h.dirSettled(dest) {
-			if err := h.fixPerms("mkdir", dest, item); err != nil {
-				errs = append(errs, h.failItem("mkdir", dest, err))
-			}
-			continue
-		}
-		if err := h.mkExtraDir(item, dest); err != nil {
+		if err := h.upsertExtraDir(item, dest); err != nil {
 			errs = append(errs, h.failItem("mkdir", dest, err))
 		}
 	}
 	return errors.Join(errs...)
+}
+
+// upsertExtraDir settles one extra-dir: existing dest -> perms drift fix only,
+// else create with spec perms.
+func (h Host) upsertExtraDir(item spec.FileItem, dest string) error {
+	if h.dirSettled(dest) {
+		return h.fixPerms("mkdir", dest, item)
+	}
+	return h.mkExtraDir(item, dest)
 }
 
 // ensureConfigDirs creates repo-tree ancestor dirs (parents first), no spec
@@ -243,28 +246,30 @@ func (h Host) MkCopies(copies []spec.FileItem, dirRels []string) error {
 		return errors.Join(append(errs, err)...)
 	}
 	for _, item := range copies {
-		src := h.Src(item.Rel)
-		mode, _ := parseMode(item.Chmod)
-		owner := ownerSpec(item)
 		for _, dest := range h.copyDests(item) {
-			if !h.DryRunAll() && sameContent(src, dest) {
-				if err := h.fixPerms("cp", dest, item); err != nil {
-					errs = append(errs, h.failItem("cp", dest, err))
-				}
-				continue
-			}
-			if err := h.fs.Copy(src, dest, mode); err != nil {
+			if err := h.copyOne(item, dest); err != nil {
 				errs = append(errs, h.failItem("cp", dest, err))
-				continue
-			}
-			if owner != "" {
-				if err := h.fs.Chown("cp(chown)", owner, dest); err != nil {
-					errs = append(errs, h.failItem("cp", dest, err))
-				}
 			}
 		}
 	}
 	return errors.Join(errs...)
+}
+
+// copyOne settles one copy dest: same content -> perms drift fix only, else
+// copy with spec mode then chown when an owner is set.
+func (h Host) copyOne(item spec.FileItem, dest string) error {
+	src := h.Src(item.Rel)
+	if !h.DryRunAll() && sameContent(src, dest) {
+		return h.fixPerms("cp", dest, item)
+	}
+	mode, _ := parseMode(item.Chmod)
+	if err := h.fs.Copy(src, dest, mode); err != nil {
+		return err
+	}
+	if owner := ownerSpec(item); owner != "" {
+		return h.fs.Chown("cp(chown)", owner, dest)
+	}
+	return nil
 }
 
 // copyDests returns the explicit dests (~/ resolved), else the marker-stripped derived dest.

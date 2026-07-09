@@ -29,43 +29,34 @@ type unit struct {
 	env  map[string]string
 }
 
-// unitFail pairs a failed unit's ref ("local" for the local repo) with its error.
-type unitFail struct {
-	ref string
-	err error
-}
-
 // forEachUnit runs op over every unit: the local repo first, then each plugin
 // grouped (announce, pull, execIf, resolve, op), skipped ones dropped. A
-// failing unit does not stop the rest: failures collect, report as
-// "<name>(report): fail <ref>: <err>" lines after all units, and join into the
-// returned error.
+// failing unit does not stop the rest: failures collect (ref-wrapped, "local"
+// for the local repo), report as "<name>(report): fail <ref>: <err>" lines
+// after all units, and join into the returned error.
 func forEachUnit(name string, op func(unit) error) error {
-	var fails []unitFail
-	for _, u := range units {
+	var fails []error
+	run := func(ref string, u unit) {
 		if err := u.withEnv(func() error { return op(u) }); err != nil {
-			fails = append(fails, unitFail{"local", err})
+			fails = append(fails, fmt.Errorf("%s: %w", ref, err))
 		}
+	}
+	for _, u := range units {
+		run("local", u)
 	}
 	for _, p := range pluginRefs {
 		u, ok, err := ensurePlugin(p)
-		if err != nil {
-			fails = append(fails, unitFail{p.String(), err})
-			continue
-		}
-		if !ok {
-			continue
-		}
-		if err := u.withEnv(func() error { return op(u) }); err != nil {
-			fails = append(fails, unitFail{p.String(), err})
+		switch {
+		case err != nil:
+			fails = append(fails, fmt.Errorf("%s: %w", p, err))
+		case ok:
+			run(p.String(), u)
 		}
 	}
-	errs := make([]error, len(fails))
-	for i, f := range fails {
-		log.Msg(name+"(report)", fmt.Sprintf("fail %s: %v", f.ref, f.err), log.Off)
-		errs[i] = f.err
+	for _, err := range fails {
+		log.Msg(name+"(report)", "fail "+err.Error(), log.Off)
 	}
-	return errors.Join(errs...)
+	return errors.Join(fails...)
 }
 
 // ensurePlugin returns p's unit, building it on first use (announced) and
@@ -78,7 +69,7 @@ func ensurePlugin(p spec.PluginRef) (unit, bool, error) {
 		return *u, true, nil
 	}
 	log.Debug("plugin("+p.Profile+")", fmt.Sprintf("run %s", p), log.Off)
-	u, ok, err := buildPlugin(p, pluginCfg.repoRoot, pluginCfg.home, pluginCfg.mode, pluginCfg.forceAll, pluginCfg.eval)
+	u, ok, err := buildPlugin(p)
 	if err != nil {
 		return unit{}, false, err
 	}
@@ -245,10 +236,10 @@ func build() error {
 // buildPlugin ensures the plugin checkout (git ref: cache clone/pull; dir ref:
 // resolved local dir), loads its spec, then inside the entry's env overlay
 // gates on the remote profile's execIf (fail -> skipped, logged) and resolves
-// it anchored at the checkout. Nested plugin refs inside the remote profile
-// are ignored (v1).
-func buildPlugin(p spec.PluginRef, repoRoot, home string, mode host.DryRunMode, forceAll bool, eval func(string) (bool, error)) (unit, bool, error) {
-	checkout, err := pluginCheckout(p, repoRoot, home)
+// it anchored at the checkout, all against pluginCfg. Nested plugin refs
+// inside the remote profile are ignored (v1).
+func buildPlugin(p spec.PluginRef) (unit, bool, error) {
+	checkout, err := pluginCheckout(p, pluginCfg.repoRoot, pluginCfg.home)
 	if err != nil {
 		return unit{}, false, err
 	}
@@ -256,12 +247,12 @@ func buildPlugin(p spec.PluginRef, repoRoot, home string, mode host.DryRunMode, 
 	if err != nil {
 		return unit{}, false, err
 	}
-	h := host.New(checkout, home, p.Profile, mode).WithLogSub("profile=" + p.Profile)
+	h := host.New(checkout, pluginCfg.home, p.Profile, pluginCfg.mode).WithLogSub("profile=" + p.Profile)
 	u := unit{host: h, ref: p.String(), env: p.Env}
 	var pass bool
 	err = u.withEnv(func() error {
 		var err error
-		if pass, err = psp.ExecIfPass(p.Profile, forceAll, eval); err != nil || !pass {
+		if pass, err = psp.ExecIfPass(p.Profile, pluginCfg.forceAll, pluginCfg.eval); err != nil || !pass {
 			return err
 		}
 		u.res, err = psp.Resolve([]string{p.Profile}, u.host.Root)

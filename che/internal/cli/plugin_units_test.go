@@ -313,7 +313,7 @@ func TestForEachUnitContinuesOnError(t *testing.T) {
 		return forEachUnit("test", func(u unit) error {
 			ran = append(ran, u)
 			if u.ref == "" {
-				return errLocalBoom
+				return errors.New("local boom")
 			}
 			return nil
 		})
@@ -326,8 +326,6 @@ func TestForEachUnitContinuesOnError(t *testing.T) {
 	}
 	testutil.WantLines(t, out, "test(report): fail local: local boom")
 }
-
-var errLocalBoom = errors.New("local boom")
 
 // withEnv shadows an existing var, sets an absent one, restores both after.
 func TestUnitWithEnv(t *testing.T) {
