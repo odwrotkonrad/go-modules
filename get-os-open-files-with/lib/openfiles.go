@@ -18,12 +18,9 @@ func Render(cfg *yaml.Node) (string, error) {
 	if cfg == nil {
 		return "", nil
 	}
-	root := cfg
-	if root.Kind == yaml.DocumentNode {
-		if len(root.Content) == 0 {
-			return "", nil
-		}
-		root = root.Content[0]
+	root := yamlcfg.Unwrap(cfg)
+	if root.Kind == yaml.DocumentNode && len(root.Content) == 0 {
+		return "", nil
 	}
 	if root.Kind == yaml.ScalarNode && root.Tag == "!!null" {
 		return "", nil

@@ -16,30 +16,13 @@ import (
 //go:embed all:testdata
 var td embed.FS
 
-func findCmd(t *testing.T, args []string) (*cobra.Command, []string) {
+func findCmd(t *testing.T, root *cobra.Command, args []string) (*cobra.Command, []string) {
 	t.Helper()
-	if args[0] == "services" {
-		sub, rest, err := ServicesCmd.Find(args[1:])
-		if err != nil || sub == ServicesCmd {
-			t.Fatalf("services subcommand %v not found: %v", args, err)
-		}
-		return sub, rest
+	cmd, rest, err := root.Find(args)
+	if err != nil || cmd == root || cmd.RunE == nil {
+		t.Fatalf("command %v not found: %v", args, err)
 	}
-	byName := map[string]*cobra.Command{
-		"all":              AllCmd,
-		"link":             LinkCmd,
-		"copy":             CopyCmd,
-		"render-templates": RenderCmd,
-		"mk-dirs":          DirsCmd,
-		"prune-links":      PruneCmd,
-		"run-scripts":      RunScriptsCmd,
-		"detect":           DetectCmd,
-	}
-	cmd, ok := byName[args[0]]
-	if !ok {
-		t.Fatalf("unknown command %v", args)
-	}
-	return cmd, args[1:]
+	return cmd, rest
 }
 
 // splitProfileArg strips a "--profile <name>" pair from args, returning the
@@ -79,13 +62,13 @@ func TestCommands(t *testing.T) {
 	}
 	run := func(t *testing.T, c c) {
 		args, profile := splitProfileArg(c.In.Args)
-		home, _, _ := setupMock(t, c.Context.Directory, profile)
+		a, root, home := setupMock(t, c.Context.Directory, profile)
 		vars := map[string]string{
 			"HOME": home,
-			"REPO": units[0].host.RepoRoot,
-			"ROOT": units[0].host.Root,
+			"REPO": a.units[0].host.RepoRoot,
+			"ROOT": a.units[0].host.Root,
 		}
-		cmd, rest := findCmd(t, args)
+		cmd, rest := findCmd(t, root, args)
 		out, err := testutil.CaptureStdout(t, func() error { return cmd.RunE(cmd, rest) })
 		if c.Want.IsErrorWanted() {
 			c.Want.CheckErr(t, err)

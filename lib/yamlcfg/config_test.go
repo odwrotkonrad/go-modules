@@ -161,10 +161,10 @@ func TestCustomPathsEnvFallbacks(t *testing.T) {
 
 func TestUnwrapNonDocument(t *testing.T) {
 	n := &yaml.Node{Kind: yaml.ScalarNode}
-	if unwrap(n) != n {
+	if Unwrap(n) != n {
 		t.Error("scalar node not returned as-is")
 	}
-	if unwrap(nil) != nil {
+	if Unwrap(nil) != nil {
 		t.Error("nil not returned as-is")
 	}
 }

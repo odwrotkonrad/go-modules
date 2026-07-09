@@ -10,7 +10,7 @@ import (
 )
 
 func main() {
-	if err := cli.Attach().Execute(); err != nil {
+	if err := cli.New().Root().Execute(); err != nil {
 		fmt.Fprintln(os.Stderr, "che:", err)
 		os.Exit(1)
 	}

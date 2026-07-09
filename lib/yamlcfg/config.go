@@ -68,7 +68,8 @@ func MapPairs(n *yaml.Node) iter.Seq2[*yaml.Node, *yaml.Node] {
 	}
 }
 
-func unwrap(n *yaml.Node) *yaml.Node {
+// Unwrap returns a DocumentNode's root content node, n otherwise.
+func Unwrap(n *yaml.Node) *yaml.Node {
 	if n != nil && n.Kind == yaml.DocumentNode && len(n.Content) > 0 {
 		return n.Content[0]
 	}
@@ -122,7 +123,7 @@ func LoadConfigNode(name, customDir string) (*yaml.Node, error) {
 		if len(node.Content) == 0 {
 			continue
 		}
-		merged = mergeNodes(merged, unwrap(&node))
+		merged = mergeNodes(merged, Unwrap(&node))
 	}
 	return merged, nil
 }

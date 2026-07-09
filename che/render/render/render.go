@@ -15,10 +15,10 @@ import (
 	"time"
 
 	onepassword "github.com/1password/onepassword-sdk-go"
-	git "github.com/go-git/go-git/v5"
 	"github.com/hairyhenderson/gomplate/v4"
 	"github.com/invopop/jsonschema"
 
+	"gitlab.com/konradodwrot/go-modules/che/internal/fsutil"
 	"gitlab.com/konradodwrot/go-modules/che/render/lib"
 )
 
@@ -323,7 +323,7 @@ var mdHeading = regexp.MustCompile(`(?m)^(#{1,5})( )`)
 //	"strip-comments":      drop HTML comments (incl. multi-line).
 //	"normalize-headings":  demote every ATX heading one level (capped at 6).
 func RenderMarkdown(repoRoot, path string, opts ...string) (string, error) {
-	content, err := os.ReadFile(resolveUnder(repoRoot, expandHome(path)))
+	content, err := os.ReadFile(resolveUnder(repoRoot, fsutil.ExpandHome(path, os.Getenv("HOME"))))
 	if err != nil {
 		return "", err
 	}
@@ -343,14 +343,6 @@ func RenderMarkdown(repoRoot, path string, opts ...string) (string, error) {
 	return strings.TrimSpace(body), nil
 }
 
-// expandHome replaces a leading '~/' with $HOME.
-func expandHome(path string) string {
-	if rest, ok := strings.CutPrefix(path, "~/"); ok {
-		return filepath.Join(os.Getenv("HOME"), rest)
-	}
-	return path
-}
-
 // --- native generators ---
 
 type treeNode map[string]treeNode
@@ -358,7 +350,7 @@ type treeNode map[string]treeNode
 // DirsTree prints the plain nested dir tree of repoRoot's git-tracked files:
 // index paths, file leaves dropped, dirs nested + sorted, 2-space indented.
 func DirsTree(repoRoot string) (string, error) {
-	paths, err := trackedFiles(repoRoot)
+	paths, err := fsutil.TrackedFiles(repoRoot)
 	if err != nil {
 		return "", err
 	}
@@ -368,22 +360,6 @@ func DirsTree(repoRoot string) (string, error) {
 // MakefileDoc emits makefile.agents.md from a Makefile's [genai-include] sections.
 func MakefileDoc(path string) (string, error) {
 	return lib.Generate(path)
-}
-
-func trackedFiles(repoPath string) ([]string, error) {
-	repo, err := git.PlainOpenWithOptions(repoPath, &git.PlainOpenOptions{DetectDotGit: true})
-	if err != nil {
-		return nil, fmt.Errorf("not a git repo: %s: %w", repoPath, err)
-	}
-	idx, err := repo.Storer.Index()
-	if err != nil {
-		return nil, fmt.Errorf("read git index at %s: %w", repoPath, err)
-	}
-	files := make([]string, len(idx.Entries))
-	for i, e := range idx.Entries {
-		files[i] = e.Name
-	}
-	return files, nil
 }
 
 func buildTree(paths []string) treeNode {

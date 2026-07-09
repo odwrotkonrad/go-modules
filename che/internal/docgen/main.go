@@ -28,7 +28,7 @@ const (
 
 func main() {
 	must(os.MkdirAll("docs", 0o755))
-	root := cli.Attach()
+	root := cli.New().Root()
 	must(os.WriteFile(schemaPath, schemaJSON(), 0o644))
 	must(os.WriteFile(cliDocPath, []byte(cliDoc(root)), 0o644))
 	must(os.WriteFile(cliUsagePath, []byte(cliUsage(root)), 0o644))

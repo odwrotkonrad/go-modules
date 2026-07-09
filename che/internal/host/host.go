@@ -87,7 +87,7 @@ func logMode(m config.DryRunMode) log.DryRun {
 }
 
 // IsDryRun reports whether this is any dry run (delta or all).
-func (h Host) IsDryRun() bool { return h.cfg.DryRun != config.DryRunOff }
+func (h Host) IsDryRun() bool { return !h.cfg.IsOptionEqualTo(config.OptionDryRun, config.DryRunOff) }
 
 // IsOptionEqualTo reports whether opt's resolved runtime option equals val.
 func (h Host) IsOptionEqualTo(opt config.Option, val any) bool {
@@ -124,11 +124,6 @@ func (h Host) ToDest(rel string) string {
 		return rel // already a live absolute path (make-extra-dirs entries)
 	}
 	return "/" + rel
-}
-
-// IsUnderHome reports whether dest is the user-owned $HOME tree (no sudo needed).
-func (h Host) IsUnderHome(dest string) bool {
-	return fsutil.IsUnder(dest, h.Home)
 }
 
 // [<] 🤖🤖

@@ -210,8 +210,10 @@ func TrackedFiles(root string) ([]string, error) {
 	if err != nil {
 		return nil, fmt.Errorf("read git index under %s: %w", root, err)
 	}
-	root, err = filepath.EvalSymlinks(root)
-	if err != nil {
+	if root, err = filepath.Abs(root); err != nil {
+		return nil, err
+	}
+	if root, err = filepath.EvalSymlinks(root); err != nil {
 		return nil, err
 	}
 	var files []string

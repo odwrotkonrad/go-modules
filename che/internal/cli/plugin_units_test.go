@@ -35,20 +35,20 @@ func TestBuildPluginUnits(t *testing.T) {
 	t.Setenv("CHE_PROFILE", "")
 	t.Setenv("CHE_DRY_RUN", "")
 	t.Setenv("CHE_SKIP_PLUGINS", "")
-	dryRunMode, profileForce, skipPlugins = "", "", false
+	a := New()
 
 	t.Setenv("PLUGIN_GATE", "1")
 	t.Setenv("CHE_DEBUG", "1")
-	out, err := testutil.CaptureStdout(t, build)
+	out, err := testutil.CaptureStdout(t, a.build)
 	if err != nil {
 		t.Fatalf("build() errored: %v\n%s", err, out)
 	}
-	if len(units) != 1 || strings.Contains(out, "plugin") {
-		t.Fatalf("build() must defer plugins: units = %d\n%s", len(units), out)
+	if len(a.units) != 1 || strings.Contains(out, "plugin") {
+		t.Fatalf("build() must defer plugins: units = %d\n%s", len(a.units), out)
 	}
 	var ran []unit
 	out, err = testutil.CaptureStdout(t, func() error {
-		return forEachUnit("test", func(u unit) error { ran = append(ran, u); return nil })
+		return a.forEachUnit("test", func(u unit) error { ran = append(ran, u); return nil })
 	})
 	if err != nil {
 		t.Fatalf("forEachUnit errored: %v\n%s", err, out)
@@ -73,12 +73,12 @@ func TestBuildPluginUnits(t *testing.T) {
 
 	t.Setenv("PLUGIN_GATE", "")
 	t.Setenv("CHE_DEBUG", "")
-	if err := build(); err != nil {
+	if err := a.build(); err != nil {
 		t.Fatalf("build() (gate unset) errored: %v", err)
 	}
 	ran = nil
 	out, err = testutil.CaptureStdout(t, func() error {
-		return forEachUnit("test", func(u unit) error { ran = append(ran, u); return nil })
+		return a.forEachUnit("test", func(u unit) error { ran = append(ran, u); return nil })
 	})
 	if err != nil {
 		t.Fatalf("forEachUnit (gate unset) errored: %v\n%s", err, out)
@@ -116,15 +116,15 @@ func TestBuildPluginUnitEnv(t *testing.T) {
 	t.Setenv("PLUGIN_GATE", "")
 	os.Unsetenv("PLUGIN_GATE")
 	t.Setenv("CHE_SKIP_PLUGINS", "")
-	dryRunMode, profileForce, skipPlugins = "", "", false
+	a := New()
 
-	if err := build(); err != nil {
+	if err := a.build(); err != nil {
 		t.Fatalf("build() errored: %v", err)
 	}
 	var ran []unit
 	var gateInOp string
 	out, err := testutil.CaptureStdout(t, func() error {
-		return forEachUnit("test", func(u unit) error {
+		return a.forEachUnit("test", func(u unit) error {
 			ran = append(ran, u)
 			gateInOp = os.Getenv("PLUGIN_GATE")
 			return nil
@@ -166,22 +166,22 @@ func TestBuildSkipPlugins(t *testing.T) {
 	t.Setenv("CHE_SKIP_EXEC_IF", "")
 	t.Setenv("CHE_PROFILE", "")
 	t.Setenv("CHE_DRY_RUN", "")
-	dryRunMode, profileForce = "", ""
 
+	a := New()
 	for name, set := range map[string]func(){
-		"flag": func() { t.Setenv("CHE_SKIP_PLUGINS", ""); skipPlugins = true },
-		"env":  func() { t.Setenv("CHE_SKIP_PLUGINS", "1"); skipPlugins = false },
+		"flag": func() { t.Setenv("CHE_SKIP_PLUGINS", ""); a.skipPlugins = true },
+		"env":  func() { t.Setenv("CHE_SKIP_PLUGINS", "1"); a.skipPlugins = false },
 	} {
 		set()
-		if err := build(); err != nil {
+		if err := a.build(); err != nil {
 			t.Fatalf("[%s] build() errored: %v", name, err)
 		}
-		if len(pluginRefs) != 0 {
-			t.Fatalf("[%s] pluginRefs = %v, want none", name, pluginRefs)
+		if len(a.pluginRefs) != 0 {
+			t.Fatalf("[%s] pluginRefs = %v, want none", name, a.pluginRefs)
 		}
 		var ran []unit
 		out, err := testutil.CaptureStdout(t, func() error {
-			return forEachUnit("test", func(u unit) error { ran = append(ran, u); return nil })
+			return a.forEachUnit("test", func(u unit) error { ran = append(ran, u); return nil })
 		})
 		if err != nil {
 			t.Fatalf("[%s] forEachUnit errored: %v\n%s", name, err, out)
@@ -190,7 +190,6 @@ func TestBuildSkipPlugins(t *testing.T) {
 			t.Fatalf("[%s] ran units = %d, want 1 (plugins skipped)\n%s", name, len(ran), out)
 		}
 	}
-	skipPlugins = false
 }
 
 // a dir-path plugins ref (absolute and relative) anchors the unit at the dir
@@ -231,15 +230,15 @@ func TestBuildPluginUnitsDirRef(t *testing.T) {
 			t.Setenv("CHE_DRY_RUN", "")
 			t.Setenv("CHE_SKIP_PLUGINS", "")
 			t.Setenv("CHE_DEBUG", "")
-			dryRunMode, profileForce, skipPlugins = "all", "", false
-			t.Cleanup(func() { dryRunMode = "" })
+			a := New()
+			a.dryRunMode = "all"
 
-			if err := build(); err != nil {
+			if err := a.build(); err != nil {
 				t.Fatalf("build() errored: %v", err)
 			}
 			var ran []unit
 			out, err := testutil.CaptureStdout(t, func() error {
-				return forEachUnit("run-scripts", func(u unit) error {
+				return a.forEachUnit("run-scripts", func(u unit) error {
 					ran = append(ran, u)
 					scripts, err := u.host.ResolveScripts(u.res.Scripts)
 					if err != nil {
@@ -303,14 +302,14 @@ func TestForEachUnitContinuesOnError(t *testing.T) {
 	t.Setenv("CHE_DRY_RUN", "")
 	t.Setenv("CHE_SKIP_PLUGINS", "")
 	t.Setenv("CHE_DEBUG", "")
-	dryRunMode, profileForce, skipPlugins = "", "", false
+	a := New()
 
-	if err := build(); err != nil {
+	if err := a.build(); err != nil {
 		t.Fatalf("build() errored: %v", err)
 	}
 	var ran []unit
 	out, err := testutil.CaptureStdout(t, func() error {
-		return forEachUnit("test", func(u unit) error {
+		return a.forEachUnit("test", func(u unit) error {
 			ran = append(ran, u)
 			if u.ref == "" {
 				return errors.New("local boom")
