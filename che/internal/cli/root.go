@@ -152,7 +152,7 @@ loads the union of files/dirs/installs/services those profiles select.`,
 }
 
 func init() {
-	RootCmd.PersistentFlags().StringVarP(&dirFlag, "dir", "C", "",
+	RootCmd.PersistentFlags().StringVarP(&dirFlag, "directory", "C", "",
 		"change into this directory before resolving the repo; env: CHE_DIR")
 	RootCmd.PersistentFlags().StringVar(&dryRunMode, "dry-run", "",
 		"print mutating actions instead of executing them: delta (changed dests) | all (every dest)")
