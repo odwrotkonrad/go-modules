@@ -3,28 +3,45 @@ package fsutil
 // [>] 🤖🤖
 
 import (
+	"embed"
 	"os"
 	"os/exec"
 	"path/filepath"
 	"slices"
+	"strconv"
 	"strings"
 	"testing"
 
 	"gitlab.com/konradodwrot/go-modules/che/internal/testutil"
+	"gitlab.com/konradodwrot/go-modules/lib/testyml"
 )
 
+//go:embed all:testdata
+var td embed.FS
+
+func octal(t *testing.T, s string) os.FileMode {
+	t.Helper()
+	n, err := strconv.ParseUint(s, 8, 32)
+	if err != nil {
+		t.Fatalf("mode %q: %v", s, err)
+	}
+	return os.FileMode(n)
+}
+
 func TestModeArg(t *testing.T) {
-	cases := map[os.FileMode]string{
-		0644:  "0644",
-		0600:  "0600",
-		0755:  "0755",
-		02775: "2775",
+	type in struct {
+		Args []string
 	}
-	for mode, want := range cases {
-		if got := ModeArg(mode); got != want {
-			t.Errorf("ModeArg(%o) = %q, want %q", mode, got, want)
+	type c struct {
+		Name string
+		In   in
+		Want string
+	}
+	testyml.Run(t, td, "testdata/spec/mode_arg.spec.yml", func(t *testing.T, c c) {
+		if got := ModeArg(octal(t, c.In.Args[0])); got != c.Want {
+			t.Errorf("ModeArg(%s) = %q, want %q", c.In.Args[0], got, c.Want)
 		}
-	}
+	})
 }
 
 func TestIsDir(t *testing.T) {
@@ -45,27 +62,36 @@ func TestIsDir(t *testing.T) {
 }
 
 func TestUnderHome(t *testing.T) {
+	type in struct {
+		Args []string
+	}
+	type c struct {
+		Name string
+		In   in
+		Want bool
+	}
 	f := FS{Home: "/Users/x"}
-	cases := map[string]bool{
-		"/Users/x":         true,
-		"/Users/x/.config": true,
-		"/Users/xyz":       false, // prefix-but-not-subtree
-		"/etc/zshrc":       false,
-		"/Users/x/a/b/c":   true,
-	}
-	for dest, want := range cases {
-		if got := f.UnderHome(dest); got != want {
-			t.Errorf("UnderHome(%q) = %v, want %v", dest, got, want)
+	testyml.Run(t, td, "testdata/spec/under_home.spec.yml", func(t *testing.T, c c) {
+		if got := f.UnderHome(c.In.Args[0]); got != c.Want {
+			t.Errorf("UnderHome(%q) = %v, want %v", c.In.Args[0], got, c.Want)
 		}
-	}
+	})
 }
 
 func TestExpandAll(t *testing.T) {
-	got := ExpandAll([]string{"plain", "x/{a,b}/y"})
-	want := []string{"plain", "x/a/y", "x/b/y"}
-	if !slices.Equal(got, want) {
-		t.Errorf("ExpandAll = %v, want %v", got, want)
+	type in struct {
+		Args []string
 	}
+	type c struct {
+		Name string
+		In   in
+		Want []string
+	}
+	testyml.Run(t, td, "testdata/spec/expand_all.spec.yml", func(t *testing.T, c c) {
+		if got := ExpandAll(c.In.Args); !slices.Equal(got, c.Want) {
+			t.Errorf("ExpandAll = %v, want %v", got, c.Want)
+		}
+	})
 }
 
 // TestTrackedFiles: subtree filtering + untracked exclusion.
@@ -123,25 +149,22 @@ func TestTrackedFilesMatchesCLI(t *testing.T) {
 	}
 }
 
-// TestMkdirArgv: priv escalation depends on euid, assert the euid-independent
-// shape (mkdir + mode + dest tail).
 func TestMkdirArgv(t *testing.T) {
+	type in struct {
+		Args    []string
+		Parents bool
+	}
+	type c struct {
+		Name string
+		In   in
+		Want []string
+	}
 	f := FS{Home: "/Users/x"}
-	argv := f.MkdirArgv("/Users/x/.config", 0o750, true)
-	want := []string{"mkdir", "-p", "-m", "0750", "/Users/x/.config"}
-	if !slices.Equal(argv, want) {
-		t.Errorf("MkdirArgv(home dest) = %v, want %v", argv, want)
-	}
-	// no -p when parents is false
-	argv = f.MkdirArgv("/Users/x/.config", 0o750, false)
-	if slices.Contains(argv, "-p") {
-		t.Errorf("MkdirArgv(parents=false) included -p: %v", argv)
-	}
-	// no -m when mode is 0 (umask honored)
-	argv = f.MkdirArgv("/Users/x/.config", 0, true)
-	if want := []string{"mkdir", "-p", "/Users/x/.config"}; !slices.Equal(argv, want) {
-		t.Errorf("MkdirArgv(zero mode) = %v, want %v", argv, want)
-	}
+	testyml.Run(t, td, "testdata/spec/mkdir_argv.spec.yml", func(t *testing.T, c c) {
+		if got := f.MkdirArgv(c.In.Args[0], octal(t, c.In.Args[1]), c.In.Parents); !slices.Equal(got, c.Want) {
+			t.Errorf("MkdirArgv(%v, %v) = %v, want %v", c.In.Args, c.In.Parents, got, c.Want)
+		}
+	})
 }
 
 // [<] 🤖🤖

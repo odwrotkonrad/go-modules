@@ -10,12 +10,12 @@ import (
 
 // setupDryRun wires the mock che repo, flips dry-run on (reset on cleanup), and
 // runs build() so each command test starts from resolved state. Returns HOME.
-func setupDryRun(t *testing.T) string {
+func setupDryRun(t *testing.T, profile string) string {
 	t.Helper()
 	home := testutil.MockRepoEnv(t)
 	t.Setenv("CHE_DRY_RUN", "")
 	dryRunMode = "delta"
-	profileForce = testutil.CheProfile
+	profileForce = profile
 	t.Cleanup(func() { dryRunMode, profileForce = "", "" })
 	if err := build(); err != nil {
 		t.Fatalf("build() errored: %v", err)

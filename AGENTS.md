@@ -215,54 +215,132 @@ che
   docs
   internal
     cli
+      testdata
+        spec
     docgen
     fsutil
+      testdata
+        spec
     host
+      testdata
+        spec
     log
+      testdata
+        spec
     plugin
     spec
+      testdata
+        fixture
+          resolve
+            classify
+              root
+                Library
+                  LaunchDaemons
+                etc
+                  grafana
+                  zsh
+            exclude-script-glob
+              ci
+                zsh
+                  scripts
+                    installs
+            include-exclude
+              ci
+                zsh
+                  scripts
+                    installs
+              root
+                etc
+                  zsh
+            merge
+              ci
+                zsh
+                  scripts
+                    installs
+              root
+                Library
+                  LaunchDaemons
+                etc
+                  grafana
+            plugin-malformed
+        spec
     testutil
       specs
   render
     checkcmd
+      testdata
+        spec
     cmd
       render-dirs-tree
       render-makefile-doc
         testdata
       render-repo-group-index
       render-tpl
+        testdata
+          fixture
+            run
+              read_body
+              renders
+          spec
     lib
+      testdata
+        spec
     render
       snippets
       testdata
-        dirs-tree
-        repo-group-index
-          group
-            che
-              assets
-                docs-agents
-            tools
-              configs
+        fixture
+          dirs-tree
+          frontmatter
+          markdown
+          repo-group-index
+            group
+              che
                 assets
                   docs-agents
-              render-files
-                assets
-                  docs-agents
+              tools
+                configs
+                  assets
+                    docs-agents
+                render-files
+                  assets
+                    docs-agents
+        spec
 ci
 get-os-open-files-with
   assets
     docs-agents
   lib
+  testdata
+    fixture
+      render
+    spec
 get-term-open-files-with
   assets
     docs-agents
   lib
   testdata
+    fixture
+      common
+      run
+    spec
 lib
   assets
     docs-agents
   climain
+    testdata
+      spec
+  testyml
+    testdata
+      fixture
+        common
+          tree
+            dir
+      spec
   yamlcfg
+    testdata
+      fixture
+        load_config
+      spec
 templates
   2-data
   3-audience

@@ -1,0 +1,90 @@
+# [>] 🤖🤖
+- name: plain_title
+  in:
+    title: ln
+    msg: /etc/zshrc
+    mode: off
+  want:
+    type: ln
+    subtype: ""
+    text: /etc/zshrc
+- name: subtyped_title
+  in:
+    title: render(dry-run-render-secrets)
+    msg: /x
+    mode: off
+  want:
+    type: render
+    subtype: (dry-run-render-secrets)
+    text: /x
+- name: dry_run_delta_subtype
+  in:
+    title: cp
+    msg: /x
+    mode: delta
+  want:
+    type: cp
+    subtype: (dry-run=delta)
+    text: /x
+- name: dry_run_all_subtype
+  in:
+    title: cp
+    msg: /x
+    mode: all
+  want:
+    type: cp
+    subtype: (dry-run=all)
+    text: /x
+- name: dry_run_combines_subtype
+  in:
+    title: render(dry-run-render-secrets)
+    msg: /x
+    mode: delta
+  want:
+    type: render
+    subtype: (dry-run-render-secrets,dry-run=delta)
+    text: /x
+- name: msgsub_appended_after_dry_run
+  in:
+    fn: msgSub
+    title: run-scripts
+    msg: /x
+    mode: all
+    sub: profile=gitlabGroup
+  want:
+    type: run-scripts
+    subtype: (dry-run=all,profile=gitlabGroup)
+    text: /x
+- name: msgsub_appended_after_title_subtype
+  in:
+    fn: msgSub
+    title: mkdir(create)
+    msg: /x
+    mode: off
+    sub: profile=p
+  want:
+    type: mkdir
+    subtype: (create,profile=p)
+    text: /x
+- name: msgsub_empty_sub
+  in:
+    fn: msgSub
+    title: ln
+    msg: /x
+    mode: off
+    sub: ""
+  want:
+    type: ln
+    subtype: ""
+    text: /x
+- name: debug_prints_like_msg
+  in:
+    fn: debug
+    title: plugin(p)
+    msg: run x
+    mode: off
+  want:
+    type: plugin
+    subtype: (p)
+    text: run x
+# [<] 🤖🤖

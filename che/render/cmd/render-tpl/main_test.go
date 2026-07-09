@@ -3,41 +3,41 @@ package main
 // [>] 🤖🤖
 
 import (
-	"os"
-	"path/filepath"
+	"embed"
 	"testing"
+
+	"gitlab.com/konradodwrot/go-modules/lib/testyml"
 )
 
-func TestRunRenders(t *testing.T) {
-	dir := t.TempDir()
-	tpl := filepath.Join(dir, "t.tmpl.md")
-	os.WriteFile(tpl, []byte("hi {{ env.Getenv \"WHO\" }}\n"), 0o644)
-	t.Setenv("WHO", "there")
-	if code := run([]string{"-f", tpl}); code != 0 {
-		t.Fatalf("run = %d, want 0", code)
+//go:embed all:testdata
+var td embed.FS
+
+func TestRun(t *testing.T) {
+	type in struct {
+		Tree string
+		Env  map[string]string
+		Args []string
 	}
+	type c struct {
+		Name string
+		In   in
+		Want testyml.Want
+	}
+	testyml.Run(t, td, "testdata/spec/run.spec.yml", func(t *testing.T, c c) {
+		dir := t.TempDir()
+		if c.In.Tree != "" {
+			testyml.CopyDir(t, td, "testdata/fixture/run/"+c.In.Tree, dir)
+		}
+		t.Chdir(dir)
+		for k, v := range c.In.Env {
+			t.Setenv(k, v)
+		}
+		args := make([]string, len(c.In.Args))
+		for i, a := range c.In.Args {
+			args[i] = testyml.Expand(a, map[string]string{"DIR": dir})
+		}
+		c.Want.CheckCode(t, run(args))
+	})
 }
 
-func TestRunReadBody(t *testing.T) {
-	dir := t.TempDir()
-	os.WriteFile(filepath.Join(dir, "d.md"), []byte("---\nk: v\n---\nBODY\n"), 0o644)
-	tpl := filepath.Join(dir, "t.tmpl.md")
-	os.WriteFile(tpl, []byte("{{ readBody \"d.md\" }}"), 0o644)
-	wd, _ := os.Getwd()
-	defer os.Chdir(wd)
-	os.Chdir(dir)
-	if code := run([]string{"-f", tpl}); code != 0 {
-		t.Fatalf("run = %d, want 0", code)
-	}
-}
-
-func TestRunBadArgs(t *testing.T) {
-	if code := run([]string{"nope"}); code != 11 {
-		t.Errorf("bad args = %d, want 11", code)
-	}
-	if code := run([]string{"-f", "/no/such/file"}); code != 13 {
-		t.Errorf("missing file = %d, want 13", code)
-	}
-}
-
-//[<] 🤖🤖
+// [<] 🤖🤖

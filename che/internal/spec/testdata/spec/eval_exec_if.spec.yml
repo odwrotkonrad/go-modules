@@ -1,0 +1,81 @@
+# [>] 🤖🤖
+- name: env_set
+  in:
+    env: {CHE_TEST_SET: grp}
+    args: [env:CHE_TEST_SET]
+  want:
+    value: true
+- name: env_empty
+  in:
+    env: {CHE_TEST_EMPTY: ""}
+    args: [env:CHE_TEST_EMPTY]
+  want:
+    value: false
+- name: env_unset
+  in:
+    args: [env:CHE_TEST_UNSET]
+  want:
+    value: false
+- name: env_eq_match
+  in:
+    env: {CHE_TEST_SET: grp}
+    args: [env:CHE_TEST_SET == grp]
+  want:
+    value: true
+- name: env_eq_mismatch
+  in:
+    env: {CHE_TEST_SET: grp}
+    args: [env:CHE_TEST_SET == other]
+  want:
+    value: false
+- name: env_unset_eq_empty
+  in:
+    args: ["env:CHE_TEST_UNSET == "]
+  want:
+    value: true
+- name: builtin_os_match
+  in:
+    args: [builtin:isOs == macos]
+  want:
+    value: true
+- name: builtin_os_mismatch
+  in:
+    args: [builtin:isOs == linux]
+  want:
+    value: false
+- name: builtin_eq_no_spaces
+  in:
+    args: [builtin:isOs==macos]
+  want:
+    value: true
+- name: builtin_virt_bare
+  in:
+    args: [builtin:isVirt]
+  want:
+    value: false
+- name: builtin_virt_eq_false
+  in:
+    args: [builtin:isVirt == false]
+  want:
+    value: true
+- name: unknown_builtin
+  in:
+    args: [builtin:isWindows]
+  want:
+    error: true
+- name: unknown_scheme
+  in:
+    args: [host:isOs]
+  want:
+    error: true
+- name: bare_word
+  in:
+    args: [GITLAB_GROUP]
+  want:
+    error: true
+- name: double_eq
+  in:
+    args: [a == b == c]
+  want:
+    error: true
+# [<] 🤖🤖

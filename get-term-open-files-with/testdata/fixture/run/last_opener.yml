@@ -1,0 +1,5 @@
+vscode:
+  - opener: code -r
+    types: [data]
+  - opener: code -w
+    types: [data]

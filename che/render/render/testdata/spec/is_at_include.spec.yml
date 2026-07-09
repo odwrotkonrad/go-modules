@@ -1,0 +1,26 @@
+# [>] 🤖🤖
+- name: tilde_path
+  in:
+    args: ["@~/.config/x"]
+  want: true
+- name: relative_path
+  in:
+    args: ["@path/to/file"]
+  want: true
+- name: space_after_at
+  in:
+    args: ["@ has space"]
+  want: false
+- name: at_mid_line
+  in:
+    args: ["text @middle"]
+  want: false
+- name: plain_text
+  in:
+    args: [plain]
+  want: false
+- name: bare_at
+  in:
+    args: ["@"]
+  want: false
+# [<] 🤖🤖

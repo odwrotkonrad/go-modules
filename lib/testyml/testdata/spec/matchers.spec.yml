@@ -1,0 +1,14 @@
+# [>] 🤖🤖
+- name: multiline_scalar
+  in:
+    args: ["line one\nline two\nln(create): /etc/zshrc\n"]
+  want:
+    stdOut: |
+      line one
+      line two
+- name: regex_matcher
+  in:
+    args: ["ln(create): /etc/zshrc"]
+  want:
+    stdOut: ['re:^ln\(create\): /etc/\w+$']
+# [<] 🤖🤖

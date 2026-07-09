@@ -1,0 +1,10 @@
+# [>] 🤖🤖
+- name: darwin
+  in:
+    args: [darwin]
+  want: macos
+- name: linux
+  in:
+    args: [linux]
+  want: linux
+# [<] 🤖🤖

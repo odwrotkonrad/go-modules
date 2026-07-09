@@ -5,47 +5,40 @@ package fsutil
 import (
 	"slices"
 	"testing"
+
+	"gitlab.com/konradodwrot/go-modules/lib/testyml"
 )
 
 func TestMatchGlob(t *testing.T) {
-	cases := []struct {
-		pattern, path string
-		want          bool
-	}{
-		{"HOME/.config/zsh/**", "HOME/.config/zsh/.zshrc", true},
-		{"HOME/.config/zsh/**", "HOME/.config/zsh/zshrc.d/auto.d/80-tools.zsh", true},
-		{"HOME/.config/zsh/**", "HOME/.config/zsh", true},
-		{"HOME/.config/zsh/**", "HOME/.config/git/config", false},
-		{"HOME/.config/zsh/**", "HOME/.config/zshenv", false},
-		{"etc/zshrc", "etc/zshrc", true},
-		{"etc/zshrc", "etc/zshrc.d/auto.d/x", false},
-		{"Library/LaunchDaemons/otelcol.plist*", "Library/LaunchDaemons/otelcol.plist", true},
-		{"Library/LaunchDaemons/otelcol.plist*", "Library/LaunchDaemons/otelcol.plist.ontoHost.cp", true},
-		{"Library/LaunchDaemons/otelcol.plist*", "Library/LaunchDaemons/grafana.plist", false},
-		{"etc/otelcol/**", "etc/otelcol/config.yml", true},
+	type in struct {
+		Args []string
 	}
-	for _, c := range cases {
-		if got := MatchGlob(c.pattern, c.path); got != c.want {
-			t.Errorf("MatchGlob(%q, %q) = %v, want %v", c.pattern, c.path, got, c.want)
+	type c struct {
+		Name string
+		In   in
+		Want bool
+	}
+	testyml.Run(t, td, "testdata/spec/match_glob.spec.yml", func(t *testing.T, c c) {
+		if got := MatchGlob(c.In.Args[0], c.In.Args[1]); got != c.Want {
+			t.Errorf("MatchGlob(%v) = %v, want %v", c.In.Args, got, c.Want)
 		}
-	}
+	})
 }
 
 func TestExpandBraces(t *testing.T) {
-	cases := []struct {
-		in   string
-		want []string
-	}{
-		{"no/braces/here", []string{"no/braces/here"}},
-		{"x/{a,b}/y", []string{"x/a/y", "x/b/y"}},
-		{"{a,b}/{c,d}", []string{"a/c", "a/d", "b/c", "b/d"}},
-		{"x/{a,{b,c}}/y", []string{"x/a/y", "x/b/y", "x/c/y"}},
+	type in struct {
+		Args []string
 	}
-	for _, c := range cases {
-		if got := ExpandBraces(c.in); !slices.Equal(got, c.want) {
-			t.Errorf("ExpandBraces(%q) = %v, want %v", c.in, got, c.want)
+	type c struct {
+		Name string
+		In   in
+		Want []string
+	}
+	testyml.Run(t, td, "testdata/spec/expand_braces.spec.yml", func(t *testing.T, c c) {
+		if got := ExpandBraces(c.In.Args[0]); !slices.Equal(got, c.Want) {
+			t.Errorf("ExpandBraces(%q) = %v, want %v", c.In.Args[0], got, c.Want)
 		}
-	}
+	})
 }
 
 // [<] 🤖🤖

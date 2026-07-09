@@ -1,0 +1,4 @@
+#[>] 🤖🤖
+main:
+  mixinProfiles: ["@git@gitlab.com:g/r.git::p"]
+#[<] 🤖🤖

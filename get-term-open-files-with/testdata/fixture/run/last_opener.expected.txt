@@ -1,0 +1,3 @@
+json=code -w
+yaml=code -w
+yml=code -w

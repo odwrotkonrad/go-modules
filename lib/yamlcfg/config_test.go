@@ -2,104 +2,104 @@
 package yamlcfg
 
 import (
+	"embed"
 	"errors"
 	"os"
 	"path/filepath"
+	"reflect"
 	"testing"
+
+	"gopkg.in/yaml.v3"
+
+	"gitlab.com/konradodwrot/go-modules/lib/testyml"
 )
 
-func writeFile(t *testing.T, dir, name, raw string) {
-	t.Helper()
-	if err := os.WriteFile(filepath.Join(dir, name), []byte(raw), 0644); err != nil {
-		t.Fatal(err)
-	}
-}
+//go:embed all:testdata
+var td embed.FS
 
-func noSystem(t *testing.T) {
+func overrideSystemDir(t *testing.T, dir string) {
 	t.Helper()
 	prev := SystemDir
-	SystemDir = filepath.Join(t.TempDir(), "no-system")
+	SystemDir = dir
 	t.Cleanup(func() { SystemDir = prev })
 }
 
 func TestCode(t *testing.T) {
-	if got := Code(nil); got != 0 {
-		t.Errorf("nil: got %d", got)
+	type in struct {
+		Code  *int
+		Plain string
 	}
-	if got := Code(&CodedError{Code: 13, Msg: "x"}); got != 13 {
-		t.Errorf("coded: got %d", got)
+	type c struct {
+		Name string
+		In   in
+		Want int
 	}
-	if got := Code(errors.New("plain")); got != 1 {
-		t.Errorf("plain: got %d", got)
-	}
-}
-
-func TestLoadConfigMissing(t *testing.T) {
-	noSystem(t)
-	var out map[string]string
-	err := LoadConfig("nope.yml", t.TempDir(), &out)
-	if Code(err) != CodeFileNotFound {
-		t.Fatalf("got %v", err)
-	}
-}
-
-func TestLoadConfigInvalid(t *testing.T) {
-	noSystem(t)
-	dir := t.TempDir()
-	writeFile(t, dir, "cfg.yml", "a: [unclosed\n")
-	var out map[string]string
-	err := LoadConfig("cfg.yml", dir, &out)
-	if Code(err) != CodeConfig {
-		t.Fatalf("got %v", err)
-	}
-}
-
-func TestLoadConfigUserOnly(t *testing.T) {
-	noSystem(t)
-	dir := t.TempDir()
-	writeFile(t, dir, "cfg.yml", "a: 1\nb: 2\n")
-	var out map[string]int
-	if err := LoadConfig("cfg.yml", dir, &out); err != nil {
-		t.Fatal(err)
-	}
-	if out["a"] != 1 || out["b"] != 2 {
-		t.Fatalf("got %v", out)
-	}
-}
-
-func TestLoadConfigDeepMerge(t *testing.T) {
-	prev := SystemDir
-	t.Cleanup(func() { SystemDir = prev })
-	SystemDir = t.TempDir()
-	writeFile(t, SystemDir, "cfg.yml", "top:\n  keep: sys\n  over: sys\nonly: sys\n")
-	dir := t.TempDir()
-	writeFile(t, dir, "cfg.yml", "top:\n  over: user\n  add: user\n")
-	var out struct {
-		Top  map[string]string `yaml:"top"`
-		Only string            `yaml:"only"`
-	}
-	if err := LoadConfig("cfg.yml", dir, &out); err != nil {
-		t.Fatal(err)
-	}
-	want := map[string]string{"keep": "sys", "over": "user", "add": "user"}
-	for k, v := range want {
-		if out.Top[k] != v {
-			t.Errorf("top.%s: got %q want %q", k, out.Top[k], v)
+	testyml.Run(t, td, "testdata/spec/code.spec.yml", func(t *testing.T, c c) {
+		var err error
+		switch {
+		case c.In.Code != nil:
+			err = &CodedError{Code: *c.In.Code, Msg: "x"}
+		case c.In.Plain != "":
+			err = errors.New(c.In.Plain)
 		}
-	}
-	if out.Only != "sys" {
-		t.Errorf("only: got %q", out.Only)
-	}
+		if got := Code(err); got != c.Want {
+			t.Errorf("Code = %d, want %d", got, c.Want)
+		}
+	})
 }
 
-func TestLoadConfigNodeEmptyFiles(t *testing.T) {
-	noSystem(t)
-	dir := t.TempDir()
-	writeFile(t, dir, "cfg.yml", "")
-	node, err := LoadConfigNode("cfg.yml", dir)
-	if err != nil || node != nil {
-		t.Fatalf("got node=%v err=%v", node, err)
+func TestLoadConfig(t *testing.T) {
+	type in struct {
+		System string
+		User   string
 	}
+	type c struct {
+		Name string
+		In   in
+		Want testyml.Want
+	}
+	testyml.Run(t, td, "testdata/spec/load_config.spec.yml", func(t *testing.T, c c) {
+		sysDir := t.TempDir()
+		if c.In.System == "" {
+			sysDir = filepath.Join(sysDir, "no-system")
+		} else if err := os.WriteFile(filepath.Join(sysDir, "cfg.yml"), []byte(testyml.ReadFile(t, td, c.In.System)), 0o644); err != nil {
+			t.Fatal(err)
+		}
+		overrideSystemDir(t, sysDir)
+		userDir := t.TempDir()
+		if c.In.User != "" {
+			if err := os.WriteFile(filepath.Join(userDir, "cfg.yml"), []byte(testyml.ReadFile(t, td, c.In.User)), 0o644); err != nil {
+				t.Fatal(err)
+			}
+		}
+		node, err := LoadConfigNode("cfg.yml", userDir)
+		if c.Want.WantsError() {
+			c.Want.CheckErr(t, err)
+			if got := Code(err); c.Want.ExitCode != 0 && got != c.Want.ExitCode {
+				t.Fatalf("Code = %d (%v), want %d", got, err, c.Want.ExitCode)
+			}
+			return
+		}
+		if err != nil {
+			t.Fatal(err)
+		}
+		if c.Want.FilesOut == "" {
+			if node != nil {
+				t.Fatalf("node = %v, want nil", node)
+			}
+			return
+		}
+		var got, want any
+		if err := node.Decode(&got); err != nil {
+			t.Fatal(err)
+		}
+		if err := yaml.Unmarshal([]byte(testyml.ReadFile(t, td, c.Want.FilesOut)), &want); err != nil {
+			t.Fatal(err)
+		}
+		if !reflect.DeepEqual(got, want) {
+			t.Errorf("decoded = %v, want %v", got, want)
+		}
+	})
 }
 
-//[<] 🤖🤖
+// [<] 🤖🤖

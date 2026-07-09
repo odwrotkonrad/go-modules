@@ -1,0 +1,67 @@
+# [>] 🤖🤖
+- name: any_uses_base_opener
+  in:
+    config: testdata/fixture/run/term.yml
+    args: [any]
+  want:
+    filesOut: testdata/fixture/run/any.expected.txt
+- name: vscode_overrides_any_keeps_prose
+  in:
+    config: testdata/fixture/run/term.yml
+    args: [vscode]
+  want:
+    filesOut: testdata/fixture/run/vscode.expected.txt
+- name: kitty_partial_override
+  in:
+    config: testdata/fixture/run/term.yml
+    args: [kitty]
+  want:
+    filesOut: testdata/fixture/run/kitty.expected.txt
+- name: last_opener_wins
+  in:
+    config: testdata/fixture/run/last_opener.yml
+    args: [vscode]
+  want:
+    filesOut: testdata/fixture/run/last_opener.expected.txt
+- name: no_args
+  in:
+    config: testdata/fixture/run/term.yml
+    args: []
+  want:
+    exitCode: 11
+- name: two_args
+  in:
+    config: testdata/fixture/run/term.yml
+    args: [any, vscode]
+  want:
+    exitCode: 11
+- name: three_args
+  in:
+    config: testdata/fixture/run/term.yml
+    args: [any, vscode, kitty]
+  want:
+    exitCode: 11
+- name: unknown_terminal
+  in:
+    config: testdata/fixture/run/term.yml
+    args: [alacritty]
+  want:
+    exitCode: 11
+- name: case_sensitive
+  in:
+    config: testdata/fixture/run/term.yml
+    args: [Any]
+  want:
+    exitCode: 11
+- name: missing_config
+  in:
+    args: [any]
+  want:
+    exitCode: 13
+- name: invalid_config
+  in:
+    config: testdata/fixture/run/invalid.yml
+    args: [any]
+  want:
+    exitCode: 12
+# [<] 🤖🤖

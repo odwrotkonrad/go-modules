@@ -1,31 +1,35 @@
 // [>] 🤖🤖
 package climain
 
-import "testing"
+import (
+	"embed"
+	"testing"
+
+	"gitlab.com/konradodwrot/go-modules/lib/testyml"
+)
+
+//go:embed all:testdata
+var td embed.FS
 
 func TestHelpVersion(t *testing.T) {
-	cases := []struct {
-		name string
-		args []string
-		out  string
-		done bool
-	}{
-		{"help_long", []string{"--help"}, "usage text", true},
-		{"help_short", []string{"-h"}, "usage text", true},
-		{"version_long", []string{"--version"}, "tool version 1.2.3", true},
-		{"version_short", []string{"-v"}, "tool version 1.2.3", true},
-		{"no_args", nil, "", false},
-		{"other_arg", []string{"any"}, "", false},
-		{"help_plus_extra", []string{"--help", "x"}, "", false},
+	type want struct {
+		Out  string
+		Done bool
 	}
-	for _, c := range cases {
-		t.Run(c.name, func(t *testing.T) {
-			out, done := HelpVersion(c.args, "usage text", "tool", "1.2.3")
-			if done != c.done || out != c.out {
-				t.Fatalf("got (%q, %v) want (%q, %v)", out, done, c.out, c.done)
-			}
-		})
+	type in struct {
+		Args []string
 	}
+	type c struct {
+		Name string
+		In   in
+		Want want
+	}
+	testyml.Run(t, td, "testdata/spec/help_version.spec.yml", func(t *testing.T, c c) {
+		out, done := HelpVersion(c.In.Args, "usage text", "tool", "1.2.3")
+		if done != c.Want.Done || out != c.Want.Out {
+			t.Fatalf("got (%q, %v) want (%q, %v)", out, done, c.Want.Out, c.Want.Done)
+		}
+	})
 }
 
-//[<] 🤖🤖
+// [<] 🤖🤖

@@ -1,0 +1,6 @@
+# [>] 🤖🤖
+- name: mixed_plain_and_braces
+  in:
+    args: [plain, "x/{a,b}/y"]
+  want: [plain, x/a/y, x/b/y]
+# [<] 🤖🤖

@@ -107,14 +107,14 @@ func TestRepoGroupIndexWalk(t *testing.T) {
 	}
 }
 
-// TestRepoGroupIndexExpected: the presentation fixture (testdata/repo-group-index/group:
+// TestRepoGroupIndexExpected: the presentation fixture (testdata/fixture/repo-group-index/group:
 // one repo plus a child group of two repos, each with purpose.md) renders to the
 // checked-in expected indexes. .git markers are stamped at runtime ([why] nested
 // .git dirs cannot be version-controlled).
 func TestRepoGroupIndexExpected(t *testing.T) {
 	dir := filepath.Join(t.TempDir(), "test-group")
 	for _, repo := range []string{"che", "tools/render-files", "tools/configs"} {
-		purpose, err := os.ReadFile(filepath.Join("testdata/repo-group-index/group", repo, purposeRelPath))
+		purpose, err := os.ReadFile(filepath.Join("testdata/fixture/repo-group-index/group", repo, purposeRelPath))
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -125,8 +125,8 @@ func TestRepoGroupIndexExpected(t *testing.T) {
 		t.Fatal(err)
 	}
 	for rel, expected := range map[string]string{
-		".":     "testdata/repo-group-index/index.expected.md",
-		"tools": "testdata/repo-group-index/child-group-index.expected.md",
+		".":     "testdata/fixture/repo-group-index/index.expected.md",
+		"tools": "testdata/fixture/repo-group-index/child-group-index.expected.md",
 	} {
 		want, err := os.ReadFile(expected)
 		if err != nil {

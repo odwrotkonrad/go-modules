@@ -1,0 +1,46 @@
+# [>] 🤖🤖
+- name: subtree_glob_direct_child
+  in:
+    args: [HOME/.config/zsh/**, HOME/.config/zsh/.zshrc]
+  want: true
+- name: subtree_glob_nested
+  in:
+    args: [HOME/.config/zsh/**, HOME/.config/zsh/zshrc.d/auto.d/80-tools.zsh]
+  want: true
+- name: subtree_glob_matches_root
+  in:
+    args: [HOME/.config/zsh/**, HOME/.config/zsh]
+  want: true
+- name: subtree_glob_sibling_dir
+  in:
+    args: [HOME/.config/zsh/**, HOME/.config/git/config]
+  want: false
+- name: subtree_glob_prefix_sibling
+  in:
+    args: [HOME/.config/zsh/**, HOME/.config/zshenv]
+  want: false
+- name: exact_match
+  in:
+    args: [etc/zshrc, etc/zshrc]
+  want: true
+- name: exact_no_subtree
+  in:
+    args: [etc/zshrc, etc/zshrc.d/auto.d/x]
+  want: false
+- name: star_suffix_exact
+  in:
+    args: [Library/LaunchDaemons/otelcol.plist*, Library/LaunchDaemons/otelcol.plist]
+  want: true
+- name: star_suffix_marker
+  in:
+    args: [Library/LaunchDaemons/otelcol.plist*, Library/LaunchDaemons/otelcol.plist.ontoHost.cp]
+  want: true
+- name: star_suffix_other_file
+  in:
+    args: [Library/LaunchDaemons/otelcol.plist*, Library/LaunchDaemons/grafana.plist]
+  want: false
+- name: subtree_glob_file
+  in:
+    args: [etc/otelcol/**, etc/otelcol/config.yml]
+  want: true
+# [<] 🤖🤖

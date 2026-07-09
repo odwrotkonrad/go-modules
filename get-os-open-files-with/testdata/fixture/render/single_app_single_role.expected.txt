@@ -1,0 +1,2 @@
+com.example.Editor public.python-script all
+com.example.Editor public.json all

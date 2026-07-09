@@ -3,6 +3,7 @@ package host
 // [>] 🤖🤖
 
 import (
+	"embed"
 	"os"
 	"path/filepath"
 	"slices"
@@ -11,7 +12,11 @@ import (
 
 	"gitlab.com/konradodwrot/go-modules/che/internal/spec"
 	"gitlab.com/konradodwrot/go-modules/che/internal/testutil"
+	"gitlab.com/konradodwrot/go-modules/lib/testyml"
 )
+
+//go:embed all:testdata
+var td embed.FS
 
 // setupHost: mock che repo, returns dry-run Host, resolved spec, repo dir.
 func setupHost(t *testing.T) (Host, spec.Resolved, string) {
@@ -27,6 +32,76 @@ func setupHost(t *testing.T) (Host, spec.Resolved, string) {
 		t.Fatal(err)
 	}
 	return h, res, dir
+}
+
+var ops = map[string]func(Host, spec.Resolved) error{
+	"link":             func(h Host, r spec.Resolved) error { return h.MkLinks(r.Links, r.Dirs) },
+	"copy":             func(h Host, r spec.Resolved) error { return h.MkCopies(r.Copies, r.Dirs) },
+	"render-templates": func(h Host, r spec.Resolved) error { return h.RenderTemplates(r.Templates) },
+	"mk-dirs":          func(h Host, r spec.Resolved) error { return h.MkDirs(r.Dirs, r.ExtraDirs) },
+	"prune-links":      func(h Host, r spec.Resolved) error { return h.PruneBrokenLinks(r.Dirs) },
+	"run-scripts": func(h Host, r spec.Resolved) error {
+		scripts, err := h.ResolveScripts(r.Scripts)
+		if err != nil {
+			return err
+		}
+		return h.RunScripts(scripts)
+	},
+	"services-bootout": func(h Host, r spec.Resolved) error {
+		svcs, err := h.ResolveServices(r.Services)
+		if err != nil {
+			return err
+		}
+		return h.Bootout(svcs)
+	},
+	"services-bootin": func(h Host, r spec.Resolved) error {
+		svcs, err := h.ResolveServices(r.Services)
+		if err != nil {
+			return err
+		}
+		return h.Bootin(svcs)
+	},
+	"services-ensure": func(h Host, r spec.Resolved) error {
+		svcs, err := h.ResolveServices(r.Services)
+		if err != nil {
+			return err
+		}
+		return h.Ensure(svcs)
+	},
+}
+
+func TestOpsDryRun(t *testing.T) {
+	type in struct {
+		Op string
+	}
+	type c struct {
+		Name    string
+		In      in
+		Want    testyml.Want
+		NotWant testyml.Want `yaml:"notWant"`
+	}
+	testyml.Run(t, td, "testdata/spec/ops.spec.yml", func(t *testing.T, c c) {
+		run, ok := ops[c.In.Op]
+		if !ok {
+			t.Fatalf("unknown op %q", c.In.Op)
+		}
+		h, res, _ := setupHost(t)
+		out, err := testutil.CaptureStdout(t, func() error { return run(h, res) })
+		if c.Want.WantsError() {
+			c.Want.CheckErr(t, err)
+			return
+		}
+		if err != nil {
+			t.Fatalf("%s dry-run errored: %v", c.In.Op, err)
+		}
+		stripped := testutil.StripANSI(out)
+		for _, f := range c.Want.StdOut {
+			testyml.MustMatch(t, stripped, f)
+		}
+		for _, f := range c.NotWant.StdOut {
+			testyml.MustNotMatch(t, stripped, f)
+		}
+	})
 }
 
 // snapshotTree: sorted path + content under dir. [why] prove dry-run mutates nothing.
@@ -132,67 +207,25 @@ func TestDryRunAllReportsSettledDests(t *testing.T) {
 	}
 }
 
-// each op dry-run: prints actions, mutates nothing.
-func TestDryRunPasses(t *testing.T) {
-	cases := []struct {
-		name    string
-		run     func(Host, spec.Resolved) error
-		mustLog string // a verb the dry-run output must contain
-	}{
-		{"link", func(h Host, r spec.Resolved) error { return h.MkLinks(r.Links, r.Dirs) }, "ln(create,dry-run=delta)"},
-		{"copy", func(h Host, r spec.Resolved) error { return h.MkCopies(r.Copies, r.Dirs) }, "cp(create,dry-run=delta)"},
-		{"render-templates", func(h Host, r spec.Resolved) error { return h.RenderTemplates(r.Templates) }, "render(create,dry-run=delta)"},
-		{"mk-dirs", func(h Host, r spec.Resolved) error { return h.MkDirs(r.Dirs, r.ExtraDirs) }, "mkdir(create,dry-run=delta)"},
-		{"prune-links", func(h Host, r spec.Resolved) error { return h.PruneBrokenLinks(r.Dirs) }, "prune-links(dry-run=delta)"},
-		{"run-scripts", func(h Host, r spec.Resolved) error {
-			scripts, err := h.ResolveScripts(r.Scripts)
-			if err != nil {
-				return err
-			}
-			return h.RunScripts(scripts)
-		}, "run-scripts(dry-run=delta)"},
-		{"services bootout", func(h Host, r spec.Resolved) error {
-			svcs, err := h.ResolveServices(r.Services)
-			if err != nil {
-				return err
-			}
-			return h.Bootout(svcs)
-		}, "bootout(dry-run=delta)"},
-		{"services bootin", func(h Host, r spec.Resolved) error {
-			svcs, err := h.ResolveServices(r.Services)
-			if err != nil {
-				return err
-			}
-			return h.Bootin(svcs)
-		}, "bootstrap(dry-run=delta)"},
-		{"services ensure", func(h Host, r spec.Resolved) error {
-			svcs, err := h.ResolveServices(r.Services)
-			if err != nil {
-				return err
-			}
-			return h.Ensure(svcs)
-		}, "ensure(dry-run=delta)"},
-	}
-	for _, c := range cases {
-		t.Run(c.name, func(t *testing.T) {
+// each op dry-run: prints only dry-run lines, mutates nothing.
+func TestDryRunMutatesNothing(t *testing.T) {
+	for name, run := range ops {
+		t.Run(name, func(t *testing.T) {
 			h, res, dir := setupHost(t)
 			before := snapshotTree(t, dir)
 
-			out, err := testutil.CaptureStdout(t, func() error { return c.run(h, res) })
+			out, err := testutil.CaptureStdout(t, func() error { return run(h, res) })
 			if err != nil {
-				t.Fatalf("%s dry-run errored: %v", c.name, err)
+				t.Fatalf("%s dry-run errored: %v", name, err)
 			}
 			out = testutil.StripANSI(out)
-			if !strings.Contains(out, c.mustLog) {
-				t.Errorf("%s dry-run printed no %q action:\n%s", c.name, c.mustLog, out)
-			}
 			for line := range strings.SplitSeq(strings.TrimSpace(out), "\n") {
 				if line != "" && !strings.Contains(line, "dry-run=delta") {
-					t.Errorf("%s printed a non-dry-run line: %q", c.name, line)
+					t.Errorf("%s printed a non-dry-run line: %q", name, line)
 				}
 			}
 			if after := snapshotTree(t, dir); after != before {
-				t.Errorf("%s dry-run mutated the tree:\nBEFORE:\n%s\nAFTER:\n%s", c.name, before, after)
+				t.Errorf("%s dry-run mutated the tree:\nBEFORE:\n%s\nAFTER:\n%s", name, before, after)
 			}
 		})
 	}

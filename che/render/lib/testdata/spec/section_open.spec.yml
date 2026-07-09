@@ -1,0 +1,37 @@
+# [>] 🤖🤖
+- name: genai_include_label
+  in:
+    args: ["##[>] Onto Host [genai-include]"]
+  want:
+    label: Onto Host
+    depth: 0
+    ok: true
+- name: genai_include_parens_marks
+  in:
+    args: ["##[>] Onto Repo (CI) [genai-include] 🤖🤖"]
+  want:
+    label: Onto Repo (CI)
+    depth: 0
+    ok: true
+- name: nested_depth
+  in:
+    args: ["###[>] VM"]
+  want:
+    label: VM
+    depth: 1
+    ok: true
+- name: marks_only
+  in:
+    args: ["##[>] go 🤖🤖"]
+  want:
+    label: go
+    depth: 0
+    ok: true
+- name: what_comment_not_section
+  in:
+    args: ["#[what] not a section"]
+  want:
+    label: ""
+    depth: 0
+    ok: false
+# [<] 🤖🤖

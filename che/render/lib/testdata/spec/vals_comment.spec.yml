@@ -1,0 +1,20 @@
+# [>] 🤖🤖
+- name: vals
+  in:
+    args: ["#[vals] delta|all"]
+  want:
+    vals: delta|all
+    ok: true
+- name: what_not_vals
+  in:
+    args: ["#[what] not vals"]
+  want:
+    vals: ""
+    ok: false
+- name: why_not_vals
+  in:
+    args: ["#[why] nope"]
+  want:
+    vals: ""
+    ok: false
+# [<] 🤖🤖

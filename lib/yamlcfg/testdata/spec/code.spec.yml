@@ -1,0 +1,13 @@
+# [>] 🤖🤖
+- name: nil_error
+  in: {}
+  want: 0
+- name: coded_error
+  in:
+    code: 13
+  want: 13
+- name: plain_error
+  in:
+    plain: plain
+  want: 1
+# [<] 🤖🤖

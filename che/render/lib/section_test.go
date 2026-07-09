@@ -2,46 +2,57 @@ package lib
 
 // [>] 🤖🤖🤖
 
-import "testing"
+import (
+	"embed"
+	"testing"
+
+	"gitlab.com/konradodwrot/go-modules/lib/testyml"
+)
+
+//go:embed all:testdata
+var td embed.FS
 
 func TestSectionOpen(t *testing.T) {
-	cases := []struct {
-		text  string
-		label string
-		depth int
-		ok    bool
-	}{
-		{"##[>] Onto Host [genai-include]", "Onto Host", 0, true},
-		{"##[>] Onto Repo (CI) [genai-include] 🤖🤖", "Onto Repo (CI)", 0, true},
-		{"###[>] VM", "VM", 1, true},
-		{"##[>] go 🤖🤖", "go", 0, true},
-		{"#[what] not a section", "", 0, false},
+	type in struct {
+		Args []string
 	}
-	for _, c := range cases {
-		label, depth, ok := sectionOpen(c.text)
-		if ok != c.ok || label != c.label || (ok && depth != c.depth) {
-			t.Errorf("sectionOpen(%q) = (%q,%d,%v), want (%q,%d,%v)",
-				c.text, label, depth, ok, c.label, c.depth, c.ok)
+	type want struct {
+		Label string
+		Depth int
+		OK    bool `yaml:"ok"`
+	}
+	type c struct {
+		Name string
+		In   in
+		Want want
+	}
+	testyml.Run(t, td, "testdata/spec/section_open.spec.yml", func(t *testing.T, c c) {
+		label, depth, ok := sectionOpen(c.In.Args[0])
+		if ok != c.Want.OK || label != c.Want.Label || (ok && depth != c.Want.Depth) {
+			t.Errorf("sectionOpen(%q) = (%q,%d,%v), want %+v", c.In.Args[0], label, depth, ok, c.Want)
 		}
-	}
+	})
 }
 
 func TestValsComment(t *testing.T) {
-	cases := []struct {
-		text string
-		vals string
-		ok   bool
-	}{
-		{"#[vals] delta|all", "delta|all", true},
-		{"#[what] not vals", "", false},
-		{"#[why] nope", "", false},
+	type in struct {
+		Args []string
 	}
-	for _, c := range cases {
-		vals, ok := valsComment(c.text)
-		if ok != c.ok || vals != c.vals {
-			t.Errorf("valsComment(%q) = (%q,%v), want (%q,%v)", c.text, vals, ok, c.vals, c.ok)
+	type want struct {
+		Vals string
+		OK   bool `yaml:"ok"`
+	}
+	type c struct {
+		Name string
+		In   in
+		Want want
+	}
+	testyml.Run(t, td, "testdata/spec/vals_comment.spec.yml", func(t *testing.T, c c) {
+		vals, ok := valsComment(c.In.Args[0])
+		if ok != c.Want.OK || vals != c.Want.Vals {
+			t.Errorf("valsComment(%q) = (%q,%v), want %+v", c.In.Args[0], vals, ok, c.Want)
 		}
-	}
+	})
 }
 
-//[<] 🤖🤖🤖
+// [<] 🤖🤖🤖

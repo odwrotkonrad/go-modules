@@ -1,0 +1,139 @@
+# [>] 🤖🤖
+- name: merge_desktop
+  in:
+    spec: merge
+    tree: merge
+    profiles: [desktop/macos]
+  want:
+    scripts: [ci/zsh/scripts/installs/10-brew.zsh, ci/zsh/scripts/installs/20-kitty.zsh]
+    services: [otelcol, port-exporter, grafana, prometheus]
+    perms:
+      /var/log/grafana: {chmod: "2775"}
+      Library/LaunchDaemons/otelcol.plist.ontoHost.cp: {chmod: "0600"}
+  contains:
+    extraDirs: [/var/log/grafana, HOME/.cache/zsh]
+    links: [etc/grafana/grafana.ini]
+- name: merge_cli_excludes_desktop
+  in:
+    spec: merge
+    tree: merge
+    profiles: [cli/macos]
+  want:
+    scripts: [ci/zsh/scripts/installs/10-brew.zsh]
+    services: [otelcol, port-exporter]
+  notWant:
+    extraDirs: [/var/log/grafana]
+    links: [etc/grafana/grafana.ini]
+- name: classify
+  in:
+    spec: classify
+    tree: classify
+    profiles: [cli/macos]
+  want:
+    links:
+      - HOME/.config/git/config
+      - HOME/.config/zsh/.zshrc
+      - etc/zsh/zshenv
+      - etc/zshrc
+    copies:
+      - HOME/.config/zsh/x.ontoHost.cp
+      - Library/LaunchDaemons/otelcol.plist.ontoHost.cp
+    templates: [root/HOME/.config/zsh/y.ontoHost.tpl]
+  contains:
+    dirs: [HOME, HOME/.config/zsh]
+- name: undefined_profile
+  in:
+    spec: merge
+    tree: merge
+    profiles: [cli/linux]
+  want:
+    error: true
+- name: mixin_cycle
+  in:
+    spec: cycle
+    tree: empty
+    profiles: [cli/macos]
+  want:
+    error: true
+- name: include_exclude_sections
+  in:
+    spec: include-exclude
+    tree: include-exclude
+    profiles: [cli/macos]
+  contains:
+    links: [HOME/.config/extra/x, etc/zshrc]
+    scripts: [ci/zsh/scripts/installs/10-brew.zsh]
+    services: [otelcol]
+  notWant:
+    links: [etc/zsh/zshenv]
+    copies: [HOME/.config/zsh/c.ontoHost.cp]
+    scripts: [ci/zsh/scripts/installs/20-foo.zsh]
+    services: [grafana]
+- name: exclude_script_glob
+  in:
+    spec: exclude-script-glob
+    tree: exclude-script-glob
+    profiles: [cli/macos]
+  want:
+    scripts: [ci/zsh/scripts/installs/10-brew.zsh, ci/zsh/scripts/installs/30-tmux.zsh]
+- name: mixin_undefined
+  in:
+    spec: undefined-include
+    tree: empty
+    profiles: [cli/macos]
+  want:
+    error: true
+- name: repo_template_rich_entries
+  in:
+    spec: repo-template
+    tree: empty
+    profiles: [cli/macos]
+  want:
+    templates: [templates/1-env/local.env.ontoRepo.tpl, templates/3-agents/AGENTS.md.ontoRepo.tpl]
+    dests:
+      templates/1-env/local.env.ontoRepo.tpl: [.env]
+      templates/3-agents/AGENTS.md.ontoRepo.tpl: [CLAUDE.md, AGENTS.md]
+    templateOpts:
+      - [{writeType: mergeUpsert}]
+      - [{}, {renderReferencedFiles: true}]
+- name: repo_template_glob_error
+  in:
+    spec: repo-template-glob
+    tree: empty
+    profiles: [cli/macos]
+  want:
+    error: true
+- name: resolve_union_order
+  in:
+    spec: ambiguous
+    tree: empty
+    profiles: [repo, other]
+  want:
+    templates: [templates/1-env/local.env.ontoRepo.tpl, templates/1-env/local.env.ontoRepo.tpl]
+    templateDests: [[.env], [.env2]]
+- name: plugin_refs_collect_deduped
+  in:
+    spec: plugins
+    tree: empty
+    profiles: [main]
+  want:
+    plugins:
+      - {url: "git@gitlab.com:g/r.git", profile: p}
+      - {url: "https://gitlab.com/g/r2.git", profile: q, env: {GITLAB_GROUP: konradodwrot}}
+  contains:
+    services: [svc]
+- name: plugin_ref_malformed
+  in:
+    tree: plugin-malformed
+    profiles: [main]
+  want:
+    error: true
+- name: mixin_plugin_ref_undefined
+  in:
+    spec: mixin-plugin-ref
+    tree: empty
+    profiles: [main]
+  want:
+    error: true
+    stdErr: [undefined profile]
+# [<] 🤖🤖

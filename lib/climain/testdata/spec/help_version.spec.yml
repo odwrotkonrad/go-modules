@@ -1,0 +1,44 @@
+# [>] 🤖🤖
+- name: help_long
+  in:
+    args: ["--help"]
+  want:
+    out: usage text
+    done: true
+- name: help_short
+  in:
+    args: ["-h"]
+  want:
+    out: usage text
+    done: true
+- name: version_long
+  in:
+    args: ["--version"]
+  want:
+    out: tool version 1.2.3
+    done: true
+- name: version_short
+  in:
+    args: ["-v"]
+  want:
+    out: tool version 1.2.3
+    done: true
+- name: no_args
+  in:
+    args: []
+  want:
+    out: ""
+    done: false
+- name: other_arg
+  in:
+    args: ["any"]
+  want:
+    out: ""
+    done: false
+- name: help_plus_extra
+  in:
+    args: ["--help", "x"]
+  want:
+    out: ""
+    done: false
+# [<] 🤖🤖

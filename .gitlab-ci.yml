@@ -38,9 +38,9 @@ test-che:
     MODULE: che
   rules:
     - if: $CI_PIPELINE_SOURCE == "merge_request_event"
-      changes: [che/**/*, go.work, .gitlab-ci.yml]
+      changes: [che/**/*, lib/**/*, go.work, .gitlab-ci.yml]
     - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
-      changes: [che/**/*, go.work, .gitlab-ci.yml]
+      changes: [che/**/*, lib/**/*, go.work, .gitlab-ci.yml]
   cache:
     - key:
         files:

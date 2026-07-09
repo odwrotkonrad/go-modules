@@ -1,0 +1,25 @@
+# [>] 🤖🤖
+- name: renders_env
+  in:
+    tree: renders
+    env: {WHO: there}
+    args: [-f, "${DIR}/t.tmpl.md"]
+  want:
+    exitCode: 0
+- name: read_body_relative_cwd
+  in:
+    tree: read_body
+    args: [-f, t.tmpl.md]
+  want:
+    exitCode: 0
+- name: bad_args
+  in:
+    args: [nope]
+  want:
+    exitCode: 11
+- name: missing_file
+  in:
+    args: [-f, /no/such/file]
+  want:
+    exitCode: 13
+# [<] 🤖🤖

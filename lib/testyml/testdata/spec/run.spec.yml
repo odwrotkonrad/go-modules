@@ -1,0 +1,10 @@
+# [>] 🤖🤖
+- name: add
+  in:
+    args: [1, 2]
+  want: 3
+- name: negatives
+  in:
+    args: [-1, -2]
+  want: -3
+# [<] 🤖🤖

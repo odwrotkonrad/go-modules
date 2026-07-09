@@ -1,0 +1,95 @@
+# [>] 🤖🤖
+- name: remote_scp
+  in:
+    args: ["@git@gitlab.com:g/r.git::p"]
+  want:
+    url: git@gitlab.com:g/r.git
+    profile: p
+    isPath: false
+- name: remote_https
+  in:
+    args: ["@https://gitlab.com/g/r.git::p"]
+  want:
+    url: https://gitlab.com/g/r.git
+    profile: p
+    isPath: false
+- name: remote_ssh
+  in:
+    args: ["@ssh://git@gitlab.com/g/r.git::p"]
+  want:
+    url: ssh://git@gitlab.com/g/r.git
+    profile: p
+    isPath: false
+- name: remote_file
+  in:
+    args: ["@file:///tmp/x::p"]
+  want:
+    url: file:///tmp/x
+    profile: p
+    isPath: false
+- name: dir_abs
+  in:
+    args: [/abs/dir::p]
+  want:
+    url: /abs/dir
+    profile: p
+    isPath: true
+- name: dir_rel_dot
+  in:
+    args: [./rel::p]
+  want:
+    url: ./rel
+    profile: p
+    isPath: true
+- name: dir_rel_bare
+  in:
+    args: [rel/dir::p]
+  want:
+    url: rel/dir
+    profile: p
+    isPath: true
+- name: dir_tilde
+  in:
+    args: [~/x::p]
+  want:
+    url: ~/x
+    profile: p
+    isPath: true
+- name: dir_env_var
+  in:
+    args: [$HOME/x::p]
+  want:
+    url: $HOME/x
+    profile: p
+    isPath: true
+- name: ref_missing_profile
+  in:
+    args: ["@nourl"]
+  want:
+    error: true
+- name: dir_missing_profile
+  in:
+    args: [nodir]
+  want:
+    error: true
+- name: ref_empty_url
+  in:
+    args: ["@::p"]
+  want:
+    error: true
+- name: dir_empty_path
+  in:
+    args: ["::p"]
+  want:
+    error: true
+- name: ref_empty_profile
+  in:
+    args: ["@url::"]
+  want:
+    error: true
+- name: dir_empty_profile
+  in:
+    args: ["dir::"]
+  want:
+    error: true
+# [<] 🤖🤖

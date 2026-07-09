@@ -1,0 +1,8 @@
+---
+paths:
+  - x
+---
+
+## Heading
+
+text

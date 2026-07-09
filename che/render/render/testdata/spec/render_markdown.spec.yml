@@ -1,0 +1,17 @@
+# [>] 🤖🤖
+- name: all_opts
+  in:
+    args: [p.md, remove-frontmatter, strip-comments, normalize-headings]
+  want:
+    filesOut: testdata/fixture/markdown/all_opts.expected.md
+- name: keep_frontmatter
+  in:
+    args: [p.md, strip-comments]
+  want:
+    filesOut: testdata/fixture/markdown/keep_frontmatter.expected.md
+- name: unknown_opt
+  in:
+    args: [p.md, bogus]
+  want:
+    error: true
+# [<] 🤖🤖

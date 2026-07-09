@@ -1,0 +1,22 @@
+# [>] 🤖🤖
+- name: home_itself
+  in:
+    args: [/Users/x]
+  want: true
+- name: home_child
+  in:
+    args: [/Users/x/.config]
+  want: true
+- name: prefix_but_not_subtree
+  in:
+    args: [/Users/xyz]
+  want: false
+- name: outside_home
+  in:
+    args: [/etc/zshrc]
+  want: false
+- name: home_deep_child
+  in:
+    args: [/Users/x/a/b/c]
+  want: true
+# [<] 🤖🤖

@@ -1,0 +1,4 @@
+com.a.One:
+  all: [public.json]
+com.b.Two:
+  editor: [public.yaml]

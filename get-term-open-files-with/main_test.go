@@ -2,6 +2,7 @@
 package main
 
 import (
+	"embed"
 	"net/http"
 	"net/http/httptest"
 	"os"
@@ -10,22 +11,22 @@ import (
 
 	"gitlab.com/konradodwrot/go-modules/get-term-open-files-with/lib"
 	"gitlab.com/konradodwrot/go-modules/lib/climain"
+	"gitlab.com/konradodwrot/go-modules/lib/testyml"
 	"gitlab.com/konradodwrot/go-modules/lib/yamlcfg"
 )
 
-func readTestdata(t *testing.T, name string) []byte {
+//go:embed all:testdata
+var td embed.FS
+
+func languagesFixture(t *testing.T) []byte {
 	t.Helper()
-	data, err := os.ReadFile(filepath.Join("testdata", name))
-	if err != nil {
-		t.Fatal(err)
-	}
-	return data
+	return []byte(testyml.ReadFile(t, td, "testdata/fixture/common/languages.yml"))
 }
 
 func seedCache(t *testing.T) {
 	t.Helper()
 	cache := t.TempDir()
-	if err := os.WriteFile(filepath.Join(cache, "languages.yml"), readTestdata(t, "languages.yml"), 0644); err != nil {
+	if err := os.WriteFile(filepath.Join(cache, "languages.yml"), languagesFixture(t), 0644); err != nil {
 		t.Fatal(err)
 	}
 	t.Setenv("LINGUIST_CACHE_DIR", cache)
@@ -35,105 +36,66 @@ func configDir(t *testing.T, raw []byte) string {
 	t.Helper()
 	yamlcfg.SystemDir = filepath.Join(t.TempDir(), "no-system")
 	dir := t.TempDir()
-	if err := os.WriteFile(filepath.Join(dir, configName), raw, 0644); err != nil {
-		t.Fatal(err)
+	if raw != nil {
+		if err := os.WriteFile(filepath.Join(dir, configName), raw, 0644); err != nil {
+			t.Fatal(err)
+		}
 	}
 	return dir
 }
 
-func TestPositive(t *testing.T) {
-	term := readTestdata(t, "term.yml")
-	cases := []struct {
-		name string
-		cfg  []byte
-		arg  string
-		want string
-	}{
-		{
-			"any_uses_base_opener", term, "any",
-			"go=vim\npy=vim\nrb=vim\ncss=vim\nhtml=vim\njson=vim\nyaml=vim\nyml=vim\nrst=vim\ntxt=vim",
-		},
-		{
-			"vscode_overrides_any_keeps_prose", term, "vscode",
-			"go=code -r\npy=code -r\nrb=code -r\ncss=code -r\nhtml=code -r\njson=code -r\nyaml=code -r\nyml=code -r\nrst=vim\ntxt=vim",
-		},
-		{
-			"kitty_partial_override", term, "kitty",
-			"go=vim\npy=vim\nrb=vim\ncss=vim\nhtml=vim\njson=bat\nyaml=bat\nyml=bat\nrst=nvim\ntxt=nvim",
-		},
-		{
-			"last_opener_wins",
-			[]byte("vscode:\n  - opener: code -r\n    types: [data]\n  - opener: code -w\n    types: [data]\n"),
-			"vscode",
-			"json=code -w\nyaml=code -w\nyml=code -w",
-		},
+func checkCoded(t *testing.T, w testyml.Want, err error) bool {
+	t.Helper()
+	if !w.WantsError() {
+		if err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+		return false
 	}
-	for _, c := range cases {
-		t.Run(c.name, func(t *testing.T) {
-			seedCache(t)
-			dir := configDir(t, c.cfg)
-			out, err := run([]string{c.arg}, dir, lib.LanguagesURL)
-			if err != nil {
-				t.Fatalf("unexpected error: %v", err)
-			}
-			if out != c.want {
-				t.Errorf("got:\n%q\nwant:\n%q", out, c.want)
-			}
-		})
+	w.CheckErr(t, err)
+	if got := yamlcfg.Code(err); w.ExitCode != 0 && got != w.ExitCode {
+		t.Fatalf("Code = %d (%v), want %d", got, err, w.ExitCode)
 	}
+	return true
 }
 
-func TestArgErrors(t *testing.T) {
-	cases := []struct {
-		name string
-		args []string
-	}{
-		{"no_args", []string{}},
-		{"two_args", []string{"any", "vscode"}},
-		{"three_args", []string{"any", "vscode", "kitty"}},
-		{"unknown_terminal", []string{"alacritty"}},
-		{"case_sensitive", []string{"Any"}},
+func TestRun(t *testing.T) {
+	type in struct {
+		Config string
+		Args   []string
 	}
-	for _, c := range cases {
-		t.Run(c.name, func(t *testing.T) {
-			seedCache(t)
-			dir := configDir(t, readTestdata(t, "term.yml"))
-			_, err := run(c.args, dir, lib.LanguagesURL)
-			if yamlcfg.Code(err) != 11 {
-				t.Fatalf("got %v", err)
-			}
-		})
+	type c struct {
+		Name string
+		In   in
+		Want testyml.Want
 	}
+	testyml.Run(t, td, "testdata/spec/run.spec.yml", func(t *testing.T, c c) {
+		seedCache(t)
+		var raw []byte
+		if c.In.Config != "" {
+			raw = []byte(testyml.ReadFile(t, td, c.In.Config))
+		}
+		out, err := run(c.In.Args, configDir(t, raw), lib.LanguagesURL)
+		if checkCoded(t, c.Want, err) {
+			return
+		}
+		testyml.EqualExpected(t, td, c.Want.FilesOut, out)
+	})
 }
 
-func TestConfigErrors(t *testing.T) {
-	t.Run("missing_config", func(t *testing.T) {
-		seedCache(t)
-		yamlcfg.SystemDir = filepath.Join(t.TempDir(), "no-system")
-		dir := t.TempDir()
-		_, err := run([]string{"any"}, dir, lib.LanguagesURL)
-		if yamlcfg.Code(err) != 13 {
-			t.Fatalf("got %v", err)
-		}
-	})
-	t.Run("invalid_config", func(t *testing.T) {
-		seedCache(t)
-		dir := configDir(t, []byte("any: [unclosed\n"))
-		_, err := run([]string{"any"}, dir, lib.LanguagesURL)
-		if yamlcfg.Code(err) != 12 {
-			t.Fatalf("got %v", err)
-		}
-	})
+func termFixture(t *testing.T) []byte {
+	t.Helper()
+	return []byte(testyml.ReadFile(t, td, "testdata/fixture/run/term.yml"))
 }
 
 func TestFetchWritesCache(t *testing.T) {
 	cache := t.TempDir()
 	t.Setenv("LINGUIST_CACHE_DIR", cache)
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
-		w.Write(readTestdata(t, "languages.yml"))
+		w.Write(languagesFixture(t))
 	}))
 	defer srv.Close()
-	dir := configDir(t, readTestdata(t, "term.yml"))
+	dir := configDir(t, termFixture(t))
 	out, err := run([]string{"any"}, dir, srv.URL)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
@@ -153,7 +115,7 @@ func TestFetchFailureExit14(t *testing.T) {
 		w.WriteHeader(http.StatusInternalServerError)
 	}))
 	defer srv.Close()
-	dir := configDir(t, readTestdata(t, "term.yml"))
+	dir := configDir(t, termFixture(t))
 	_, err := run([]string{"any"}, dir, srv.URL)
 	if yamlcfg.Code(err) != 14 {
 		t.Fatalf("got %v", err)

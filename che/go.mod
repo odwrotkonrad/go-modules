@@ -13,6 +13,7 @@ require (
 	github.com/spf13/cobra v1.10.2
 	github.com/tree-sitter-grammars/tree-sitter-make v1.1.1
 	github.com/tree-sitter/go-tree-sitter v0.24.0
+	gitlab.com/konradodwrot/go-modules/lib v0.0.1
 	gopkg.in/yaml.v3 v3.0.1
 )
 

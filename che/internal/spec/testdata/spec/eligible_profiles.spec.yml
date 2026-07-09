@@ -1,0 +1,87 @@
+# [>] 🤖🤖
+- name: execif_pass_macos
+  in:
+    spec: che
+    os: macos
+    virt: true
+  want:
+    profiles: [cli/macos]
+- name: execif_no_eligible_errors
+  in:
+    spec: che
+    os: linux
+    virt: true
+  want:
+    error: true
+- name: force_one_execif_enforced
+  in:
+    spec: che
+    os: linux
+    virt: true
+    forceOne: desktop/macos
+  want:
+    error: true
+- name: force_one_force_all_lifts_execif
+  in:
+    spec: che
+    os: linux
+    virt: true
+    forceOne: desktop/macos
+    forceAll: true
+  want:
+    profiles: [desktop/macos]
+- name: force_one_execif_passes
+  in:
+    spec: che
+    os: macos
+    virt: false
+    forceOne: desktop/macos
+  want:
+    profiles: [desktop/macos]
+- name: force_one_non_autoexec_base
+  in:
+    spec: che
+    os: linux
+    virt: true
+    forceOne: base
+  want:
+    profiles: [base]
+- name: force_one_non_autoexec_ontorepo
+  in:
+    spec: che
+    os: linux
+    virt: true
+    forceOne: ontoRepo
+  want:
+    profiles: [ontoRepo]
+- name: force_one_undefined
+  in:
+    spec: che
+    os: macos
+    virt: true
+    forceOne: cli/linux
+  want:
+    error: true
+- name: force_all_autoexec_only
+  in:
+    spec: che
+    os: linux
+    virt: true
+    forceAll: true
+  want:
+    profiles: [cli/macos, desktop/macos]
+- name: lone_plain_always_eligible
+  in:
+    spec: repo
+    os: linux
+    virt: true
+  want:
+    profiles: [repo]
+- name: union_declaration_order
+  in:
+    spec: ambiguous
+    os: linux
+    virt: true
+  want:
+    profiles: [repo, other]
+# [<] 🤖🤖
