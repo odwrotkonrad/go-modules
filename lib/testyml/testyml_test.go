@@ -56,7 +56,7 @@ func TestMatch(t *testing.T) {
 	if !Match("ln(create): /etc/zshrc", "ln(create)") {
 		t.Error("literal matcher failed")
 	}
-	if !Match("ln(create): /etc/zshrc", `ln(create): /etc/{{re"\w+"}}`) {
+	if !Match("ln(create): /etc/zshrc", `ln(create): /etc/{{/\w+/}}`) {
 		t.Error("hole matcher failed")
 	}
 	if Match("ln(create): /etc/zshrc", "ln.create.") {
