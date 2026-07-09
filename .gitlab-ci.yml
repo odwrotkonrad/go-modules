@@ -8,6 +8,7 @@ workflow:
 stages:
   - validate
   - test
+  - make-docs
   - release
 
 variables:
@@ -176,7 +177,7 @@ pages:
 
 pages-preview:
   extends: .pages-build
-  stage: test
+  stage: make-docs
   rules:
     - if: $CI_PIPELINE_SOURCE == "merge_request_event"
       changes: [che/**/*]
