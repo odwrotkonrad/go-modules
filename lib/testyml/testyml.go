@@ -40,7 +40,7 @@ func (m *Matchers) UnmarshalYAML(node *yaml.Node) error {
 	return nil
 }
 
-var holeRe = regexp.MustCompile(`\{\{(.*?)\}\}`)
+var holeRe = regexp.MustCompile(`\{\{re"(.*?)"\}\}`)
 
 func compileMatcher(matcher string) *regexp.Regexp {
 	var b strings.Builder

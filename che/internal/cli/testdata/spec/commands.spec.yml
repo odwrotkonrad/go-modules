@@ -6,7 +6,7 @@
     stdOut: |
       mkdir(create,dry-run=delta): ${HOME}/.config
       mkdir(create,dry-run=delta): ${HOME}/.config/zsh
-      archive(dry-run=delta): ${HOME}/.local/share/che/backups/che-link-{{.*}}.tar.bz2
+      archive(dry-run=delta): ${HOME}/.local/share/che/backups/che-link-{{re".*"}}.tar.bz2
       ln(create,dry-run=delta): ${HOME}/.config/zsh/.zshrc
       ln(create,dry-run=delta): /etc/zshrc
 - name: copy
@@ -16,7 +16,7 @@
     stdOut: |
       mkdir(create,dry-run=delta): ${HOME}/.config
       mkdir(create,dry-run=delta): ${HOME}/.config/zsh
-      archive(dry-run=delta): ${HOME}/.local/share/che/backups/che-copy-{{.*}}.tar.bz2
+      archive(dry-run=delta): ${HOME}/.local/share/che/backups/che-copy-{{re".*"}}.tar.bz2
       cp(create,dry-run=delta): ${HOME}/.config/zsh/c
       cp(create,dry-run=delta): /Library/LaunchDaemons/otelcol.plist
       cp(chown,dry-run=delta): root:wheel /Library/LaunchDaemons/otelcol.plist
@@ -25,7 +25,7 @@
     args: [render-templates]
   want:
     stdOut: |
-      archive(dry-run=delta): ${HOME}/.local/share/che/backups/che-render-{{.*}}.tar.bz2
+      archive(dry-run=delta): ${HOME}/.local/share/che/backups/che-render-{{re".*"}}.tar.bz2
       render(create,dry-run=delta): ${HOME}/.config/zsh/t
   notWant:
     stdOut:
