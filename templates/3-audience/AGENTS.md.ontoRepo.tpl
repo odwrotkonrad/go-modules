@@ -1,6 +1,6 @@
 # go-modules
 
-Go monorepo: che (+ render engine and CLIs), get-os-open-files-with, get-term-open-files-with
+Go monorepo: che (+ render engine and CLIs), get-os-open-files-with, get-term-open-files-with, lib
 
 @assets/docs-agents/purpose.md
 
@@ -21,6 +21,10 @@ Each module has its own `go.mod` (`gitlab.com/konradodwrot/go-modules/<module>`)
 ## get-term-open-files-with
 
 @get-term-open-files-with/assets/docs-agents/purpose.md
+
+## lib
+
+@lib/assets/docs-agents/purpose.md
 
 @assets/data/makefile.agents.md
 

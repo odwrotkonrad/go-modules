@@ -1,0 +1,62 @@
+# [>] 🤖🤖
+- name: opResolverShouldErrorWhenTokenUnset
+  in:
+    ref: op://vault/item/field
+    token: ""
+  want:
+    error: true
+    stdErr: ['OP_SERVICE_ACCOUNT_TOKEN unset']
+    calls: 0
+    factoryCalls: 0
+- name: opResolverShouldSurfaceClientInitError
+  in:
+    ref: op://vault/item/field
+    token: tok
+    clientFail: true
+  want:
+    error: true
+    stdErr: ['op client']
+    calls: 0
+    factoryCalls: 1
+- name: opResolverShouldResolveSecret
+  in:
+    ref: op://vault/item/field
+    token: tok
+    secret: s3cret
+  want:
+    value: s3cret
+    calls: 1
+    factoryCalls: 1
+- name: opResolverShouldRetryRateLimitThenResolve
+  in:
+    ref: op://vault/item/field
+    token: tok
+    secret: s3cret
+    failTimes: 1
+    failMsg: rate limit exceeded
+  want:
+    value: s3cret
+    calls: 2
+    factoryCalls: 1
+- name: opResolverShouldSurfaceNonRetryableError
+  in:
+    ref: op://vault/item/field
+    token: tok
+    failTimes: 1
+    failMsg: secret not found
+  want:
+    error: true
+    stdErr: ['op resolve "op://vault/item/field"', 'secret not found']
+    calls: 1
+    factoryCalls: 1
+- name: opResolverShouldReuseClientAcrossRefs
+  in:
+    ref: op://vault/item/field
+    token: tok
+    secret: s3cret
+    resolveTwice: true
+  want:
+    value: s3cret
+    calls: 2
+    factoryCalls: 1
+# [<] 🤖🤖

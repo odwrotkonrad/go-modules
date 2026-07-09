@@ -9,6 +9,7 @@ stages:
   - validate
   - test
   - release
+  - make-docs
 
 variables:
   CI_IMAGE: registry.gitlab.com/konradodwrot/infra/oci-images/ci-linux:latest
@@ -30,7 +31,13 @@ validate-pre-commit-all:
   stage: test
   needs: []
   script:
-    - make -C $MODULE test
+    - make -C $MODULE test-cover
+  coverage: '/total:\s+\(statements\)\s+\d+\.\d+%/'
+  artifacts:
+    reports:
+      coverage_report:
+        coverage_format: cobertura
+        path: $MODULE/coverage.xml
 
 test-che:
   extends: .test-module
@@ -38,9 +45,9 @@ test-che:
     MODULE: che
   rules:
     - if: $CI_PIPELINE_SOURCE == "merge_request_event"
-      changes: [che/**/*, go.work, .gitlab-ci.yml]
+      changes: [che/**/*, lib/**/*, go.work, .gitlab-ci.yml]
     - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
-      changes: [che/**/*, go.work, .gitlab-ci.yml]
+      changes: [che/**/*, lib/**/*, go.work, .gitlab-ci.yml]
   cache:
     - key:
         files:
@@ -55,9 +62,9 @@ test-get-os-open-files-with:
     MODULE: get-os-open-files-with
   rules:
     - if: $CI_PIPELINE_SOURCE == "merge_request_event"
-      changes: [get-os-open-files-with/**/*, go.work, .gitlab-ci.yml]
+      changes: [get-os-open-files-with/**/*, lib/**/*, go.work, .gitlab-ci.yml]
     - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
-      changes: [get-os-open-files-with/**/*, go.work, .gitlab-ci.yml]
+      changes: [get-os-open-files-with/**/*, lib/**/*, go.work, .gitlab-ci.yml]
   cache:
     - key:
         files:
@@ -72,13 +79,30 @@ test-get-term-open-files-with:
     MODULE: get-term-open-files-with
   rules:
     - if: $CI_PIPELINE_SOURCE == "merge_request_event"
-      changes: [get-term-open-files-with/**/*, go.work, .gitlab-ci.yml]
+      changes: [get-term-open-files-with/**/*, lib/**/*, go.work, .gitlab-ci.yml]
     - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
-      changes: [get-term-open-files-with/**/*, go.work, .gitlab-ci.yml]
+      changes: [get-term-open-files-with/**/*, lib/**/*, go.work, .gitlab-ci.yml]
   cache:
     - key:
         files:
           - get-term-open-files-with/go.sum
+      paths:
+        - .cache/go-mod
+        - .cache/go-build
+
+test-lib:
+  extends: .test-module
+  variables:
+    MODULE: lib
+  rules:
+    - if: $CI_PIPELINE_SOURCE == "merge_request_event"
+      changes: [lib/**/*, go.work, .gitlab-ci.yml]
+    - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
+      changes: [lib/**/*, go.work, .gitlab-ci.yml]
+  cache:
+    - key:
+        files:
+          - lib/go.sum
       paths:
         - .cache/go-mod
         - .cache/go-build
@@ -117,6 +141,14 @@ release-get-term-open-files-with:
     - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
       changes: [get-term-open-files-with/**/*]
 
+release-lib:
+  extends: .release-module
+  variables:
+    MODULE: lib
+  rules:
+    - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
+      changes: [lib/**/*]
+
 .pages-build:
   image:
     name: squidfunk/mkdocs-material:9
@@ -132,20 +164,24 @@ release-get-term-open-files-with:
     - cat LICENSE >> che/docs/license.md
     - printf '```\n' >> che/docs/license.md
     - cd che && mkdocs build --site-dir ../public
+    - echo "docs preview -> https://konradodwrot.gitlab.io/-/go-modules/-/jobs/$CI_JOB_ID/artifacts/public/index.html"
   artifacts:
     paths:
       - public
 
-pages:
+pages-publish:
   extends: .pages-build
-  stage: release
+  stage: make-docs
+  pages: true
+  needs: [release-che]
   rules:
     - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
       changes: [che/**/*]
 
 pages-preview:
   extends: .pages-build
-  stage: test
+  stage: make-docs
+  needs: []
   rules:
     - if: $CI_PIPELINE_SOURCE == "merge_request_event"
       changes: [che/**/*]
@@ -155,6 +191,7 @@ pages-preview:
     name: docs-preview/$CI_MERGE_REQUEST_IID
     url: https://konradodwrot.gitlab.io/-/go-modules/-/jobs/$CI_JOB_ID/artifacts/public/index.html
   artifacts:
+    expose_as: docs preview
     paths:
       - public
     expire_in: 1 week

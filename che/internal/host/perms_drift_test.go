@@ -8,6 +8,7 @@ import (
 	"strings"
 	"testing"
 
+	"gitlab.com/konradodwrot/go-modules/che/internal/config"
 	"gitlab.com/konradodwrot/go-modules/che/internal/spec"
 	"gitlab.com/konradodwrot/go-modules/che/internal/testutil"
 )
@@ -18,7 +19,7 @@ func extraDir(dest, chmod string) spec.FileItem {
 }
 
 // mode drift on an existing extra-dir: delta reports mkdir(chmod), DryRunOff
-// fixes it, a settled dest prints nothing, and dirSettled no longer swallows drift.
+// fixes it, a settled dest prints nothing, and isDirSettled no longer swallows drift.
 func TestPermsDriftChmod(t *testing.T) {
 	_, home := testutil.CheRepo(t)
 	dest := filepath.Join(home, "drift-dir")
@@ -27,7 +28,7 @@ func TestPermsDriftChmod(t *testing.T) {
 	}
 	item := extraDir(dest, "0755")
 
-	delta := New(home, home, testutil.CheProfile, DryRunDelta)
+	delta := New(home, home, testutil.CheProfile, config.Config{DryRun: config.DryRunDelta})
 	deltaOut, err := testutil.CaptureStdout(t, func() error { return delta.MkDirs(nil, []spec.FileItem{item}) })
 	if err != nil {
 		t.Fatal(err)
@@ -40,7 +41,7 @@ func TestPermsDriftChmod(t *testing.T) {
 		t.Errorf("delta mutated mode to %o, want 0700 (dry run)", fi.Mode().Perm())
 	}
 
-	wet := New(home, home, testutil.CheProfile, DryRunOff)
+	wet := New(home, home, testutil.CheProfile, config.Config{})
 	if err := wet.MkDirs(nil, []spec.FileItem{item}); err != nil {
 		t.Fatal(err)
 	}
@@ -86,7 +87,7 @@ func TestPermsDriftSpecialBits(t *testing.T) {
 			item := extraDir(dest, c.chmod)
 
 			// already at spec mode -> delta must report nothing (no drift).
-			delta := New(home, home, testutil.CheProfile, DryRunDelta)
+			delta := New(home, home, testutil.CheProfile, config.Config{DryRun: config.DryRunDelta})
 			out, err := testutil.CaptureStdout(t, func() error { return delta.MkDirs(nil, []spec.FileItem{item}) })
 			if err != nil {
 				t.Fatal(err)
@@ -107,7 +108,7 @@ func TestPermsDriftAddsSetgid(t *testing.T) {
 	}
 	item := extraDir(dest, "2775")
 
-	delta := New(home, home, testutil.CheProfile, DryRunDelta)
+	delta := New(home, home, testutil.CheProfile, config.Config{DryRun: config.DryRunDelta})
 	out, err := testutil.CaptureStdout(t, func() error { return delta.MkDirs(nil, []spec.FileItem{item}) })
 	if err != nil {
 		t.Fatal(err)
@@ -116,7 +117,7 @@ func TestPermsDriftAddsSetgid(t *testing.T) {
 		t.Errorf("delta missing setgid drift line for %s:\n%s", dest, testutil.StripANSI(out))
 	}
 
-	wet := New(home, home, testutil.CheProfile, DryRunOff)
+	wet := New(home, home, testutil.CheProfile, config.Config{})
 	if err := wet.MkDirs(nil, []spec.FileItem{item}); err != nil {
 		t.Fatal(err)
 	}

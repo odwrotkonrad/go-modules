@@ -1,0 +1,17 @@
+##[>] 🤖🤖
+base:
+  include:
+    link:
+      - etc/zshrc
+      - {source: HOME/.config/foo/**, dest: s/foo/bar/}
+
+cli/macos:
+  options: {autoExec: true}
+  mixinProfiles: [base]
+
+exclude-rewritten:
+  mixinProfiles: [base]
+  exclude:
+    link:
+      - HOME/.config/bar/b
+##[<] 🤖🤖

@@ -1,0 +1,25 @@
+# [>] 🤖🤖
+- name: runShouldRenderTemplateWithEnv
+  in:
+    tree: tree-renders
+    env: {WHO: there}
+    args: [-f, "${DIR}/t.tmpl.md"]
+  want:
+    exitCode: 0
+- name: runShouldReadBodyRelativeToCwd
+  in:
+    tree: tree-read_body
+    args: [-f, t.tmpl.md]
+  want:
+    exitCode: 0
+- name: runShouldExit11OnBadArgs
+  in:
+    args: [nope]
+  want:
+    exitCode: 11
+- name: runShouldExit13OnMissingFile
+  in:
+    args: [-f, /no/such/file]
+  want:
+    exitCode: 13
+# [<] 🤖🤖

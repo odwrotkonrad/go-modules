@@ -1,0 +1,3 @@
+json=vim
+yaml=vim
+yml=vim

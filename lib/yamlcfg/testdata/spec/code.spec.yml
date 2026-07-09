@@ -1,0 +1,13 @@
+# [>] 🤖🤖
+- name: codeShouldReturnZeroForNilError
+  in: {}
+  want: 0
+- name: codeShouldReturnCodedErrorCode
+  in:
+    code: 13
+  want: 13
+- name: codeShouldReturnOneForPlainError
+  in:
+    plain: plain
+  want: 1
+# [<] 🤖🤖

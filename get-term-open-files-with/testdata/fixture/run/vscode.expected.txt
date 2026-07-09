@@ -1,0 +1,10 @@
+go=code -r
+py=code -r
+rb=code -r
+css=code -r
+html=code -r
+json=code -r
+yaml=code -r
+yml=code -r
+rst=vim
+txt=vim

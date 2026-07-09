@@ -1,6 +1,7 @@
 che [command]
 
 Available Commands:
+  all               run every op the profile selects, in order
   copy              *.ontoHost.cp copy op
   detect            print the eligible profiles (comma-joined) and exit
   link              symlink op (configs into system root)
@@ -15,7 +16,8 @@ Available Commands:
 
 Flags:
       --debug                      print debug-level lines (plugin announce, clone/pull attempts); env: CHE_DEBUG
-      --dry-run string[="delta"]   print mutating actions instead of executing them: delta (changed dests) | all (every dest)
-      --omit-exec-if               treat every execIf predicate as passing; env: CHE_OMIT_EXEC_IF
+  -C, --directory string           change into this directory before resolving the repo; env: CHE_DIR
+      --dry-run string[="delta"]   print mutating actions instead of executing them; values: delta (changed dests, bare-flag default) | all (every dest); env: CHE_DRY_RUN
       --profile string             run only this profile (autoExec skipped, execIf still enforced); env: CHE_PROFILE
+      --skip-exec-if               treat every execIf predicate as passing; env: CHE_SKIP_EXEC_IF
       --skip-plugins               skip plugins entries, load only the local repo; env: CHE_SKIP_PLUGINS

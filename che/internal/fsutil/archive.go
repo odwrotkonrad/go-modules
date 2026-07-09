@@ -29,12 +29,8 @@ func BackupArchivePath(home, bin, sub, ts string) string {
 // ArchiveDests snapshots each existing dest's contents into a single .tar.bz2
 // at archivePath, entries named by stripped-absolute path. Symlinks followed
 // (linked contents stored, not the link); missing dests, broken links + dirs
-// skipped. Always writes the archive, even empty. Honors DryRun.
+// skipped. Always writes the archive, even empty.
 func (f FS) ArchiveDests(archivePath string, dests []string) error {
-	if f.dry() {
-		f.Log("archive", archivePath)
-		return nil
-	}
 	if err := os.MkdirAll(filepath.Dir(archivePath), 0o755); err != nil {
 		return err
 	}
@@ -55,7 +51,6 @@ func (f FS) ArchiveDests(archivePath string, dests []string) error {
 			return err
 		}
 	}
-	f.Log("archive", archivePath)
 	return nil
 }
 

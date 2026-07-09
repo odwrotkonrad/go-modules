@@ -4,8 +4,10 @@ package main
 import (
 	"fmt"
 	"os"
+	"strings"
 
 	"gitlab.com/konradodwrot/go-modules/che/render/render"
+	"gitlab.com/konradodwrot/go-modules/lib/climain"
 )
 
 const usage = `usage: render-tpl -f <template>
@@ -23,12 +25,8 @@ func main() {
 }
 
 func run(args []string) int {
-	if len(args) == 1 && (args[0] == "-h" || args[0] == "--help") {
-		fmt.Print(usage)
-		return 0
-	}
-	if len(args) == 1 && (args[0] == "-v" || args[0] == "--version") {
-		fmt.Println("render-tpl version", version)
+	if out, done := climain.HelpVersion(args, strings.TrimSuffix(usage, "\n"), "render-tpl", version); done {
+		fmt.Println(out)
 		return 0
 	}
 	if len(args) != 2 || args[0] != "-f" {

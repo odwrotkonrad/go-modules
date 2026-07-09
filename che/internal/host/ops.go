@@ -13,6 +13,7 @@ import (
 	"syscall"
 	"time"
 
+	"gitlab.com/konradodwrot/go-modules/che/internal/config"
 	"gitlab.com/konradodwrot/go-modules/che/internal/fsutil"
 	"gitlab.com/konradodwrot/go-modules/che/internal/spec"
 )
@@ -25,13 +26,13 @@ const Bin = "che"
 func (h Host) archiveBefore(sub string, dests []string) error {
 	ts := time.Now().Format(fsutil.TsLayout)
 	path := fsutil.BackupArchivePath(h.Home, Bin, sub, ts)
-	return h.fs.ArchiveDests(path, dests)
+	return h.mutate("archive", path, func() error { return h.fs.ArchiveDests(path, dests) })
 }
 
 // failItem logs "<op>(fail): <dest>: <err>" and returns err, the per-item
 // continue-on-error hook: ops collect these and errors.Join at the end.
 func (h Host) failItem(op, dest string, err error) error {
-	h.fs.Log(op+"(fail)", dest+": "+err.Error())
+	h.log(op+"(fail)", dest+": "+err.Error())
 	return err
 }
 
@@ -52,7 +53,7 @@ func (h Host) MkDirs(dirRels []string, extraDirs []spec.FileItem) error {
 // upsertExtraDir settles one extra-dir: existing dest -> perms drift fix only,
 // else create with spec perms.
 func (h Host) upsertExtraDir(item spec.FileItem, dest string) error {
-	if h.dirSettled(dest) {
+	if h.isDirSettled(dest) {
 		return h.fixPerms("mkdir", dest, item)
 	}
 	return h.mkExtraDir(item, dest)
@@ -64,20 +65,25 @@ func (h Host) ensureConfigDirs(dirRels []string) error {
 	var errs []error
 	for _, rel := range dirRels {
 		dest := h.ToDest(rel)
-		if h.dirSettled(dest) {
+		if h.isDirSettled(dest) {
 			continue
 		}
-		if err := h.fs.Mkdir(dest, 0, false); err != nil {
+		err := h.mutate("mkdir(create)", dest, func() error { return h.fs.Mkdir(dest, 0, false) })
+		if err != nil {
 			errs = append(errs, h.failItem("mkdir", dest, err))
 		}
 	}
 	return errors.Join(errs...)
 }
 
-// dirSettled reports whether dest already exists as a dir and may be skipped
+// isDirSettled reports whether dest already exists as a dir and may be skipped
 // (DryRunAll forces every dest to report, so it never skips).
-func (h Host) dirSettled(dest string) bool {
-	return !h.DryRunAll() && fsutil.IsDir(dest)
+func (h Host) isDirSettled(dest string) bool {
+	if h.IsOptionEqualTo(config.OptionDryRun, config.DryRunAll) {
+		return false
+	}
+	fi, err := h.reader.Stat(dest)
+	return err == nil && fi.IsDir()
 }
 
 // mkExtraDir creates one extra-dir with -p. Owner applied via chown (not mkdir
@@ -85,16 +91,33 @@ func (h Host) dirSettled(dest string) bool {
 // drop them.
 func (h Host) mkExtraDir(item spec.FileItem, dest string) error {
 	mode, _ := parseMode(item.Chmod)
-	if err := h.fs.Mkdir(dest, mode, true); err != nil {
+	err := h.mutate("mkdir(create)", dest, func() error { return h.fs.Mkdir(dest, mode, true) })
+	if err != nil {
 		return err
 	}
 	if mode > 0o777 {
-		if err := h.fs.Chmod("mkdir(chmod)", fsutil.ModeArg(mode), dest); err != nil {
+		if err := h.chmod("mkdir(chmod)", mode, dest); err != nil {
 			return err
 		}
 	}
+	return h.chownIfSet("mkdir(chown)", item, dest)
+}
+
+// chmod applies an explicit mode arg under the op-scoped title (e.g. "mkdir(chmod)").
+func (h Host) chmod(title string, mode os.FileMode, dest string) error {
+	arg := fsutil.ModeArg(mode)
+	return h.mutate(title, arg+" "+dest, func() error { return h.fs.Chmod(arg, dest) })
+}
+
+// chown applies owner[:group] under the op-scoped title (e.g. "mkdir(chown)").
+func (h Host) chown(title, owner, dest string) error {
+	return h.mutate(title, owner+" "+dest, func() error { return h.fs.Chown(owner, dest) })
+}
+
+// chownIfSet applies the item's spec owner when one is set, else no-op.
+func (h Host) chownIfSet(title string, item spec.FileItem, dest string) error {
 	if owner := ownerSpec(item); owner != "" {
-		return h.fs.Chown("mkdir(chown)", owner, dest)
+		return h.chown(title, owner, dest)
 	}
 	return nil
 }
@@ -107,12 +130,12 @@ func (h Host) fixPerms(op, dest string, item spec.FileItem) error {
 	needChmod, needChown := h.permsDrift(dest, item)
 	if needChmod {
 		mode, _ := parseMode(item.Chmod)
-		if err := h.fs.Chmod(op+"(chmod)", fsutil.ModeArg(mode), dest); err != nil {
+		if err := h.chmod(op+"(chmod)", mode, dest); err != nil {
 			return err
 		}
 	}
 	if needChown {
-		if err := h.fs.Chown(op+"(chown)", ownerSpec(item), dest); err != nil {
+		if err := h.chown(op+"(chown)", ownerSpec(item), dest); err != nil {
 			return err
 		}
 	}
@@ -123,7 +146,7 @@ func (h Host) fixPerms(op, dest string, item spec.FileItem) error {
 // spec-set fields are enforced (empty Chmod/owner -> no drift). Missing dest ->
 // no drift (the create path handles it).
 func (h Host) permsDrift(dest string, item spec.FileItem) (needChmod, needChown bool) {
-	fi, err := os.Lstat(dest)
+	fi, err := h.reader.Lstat(dest)
 	if err != nil {
 		return false, false
 	}
@@ -132,7 +155,7 @@ func (h Host) permsDrift(dest string, item spec.FileItem) (needChmod, needChown 
 		needChmod = mode&mask != unixMode(fi.Mode())&mask
 	}
 	if owner := ownerSpec(item); owner != "" {
-		needChown = ownerDrift(fi, owner)
+		needChown = isOwnerDrifted(fi, owner)
 	}
 	return needChmod, needChown
 }
@@ -163,16 +186,16 @@ func unixMode(m os.FileMode) os.FileMode {
 	return u
 }
 
-// ownerDrift reports whether fi's live uid/gid differ from the "owner[:group]"
+// isOwnerDrifted reports whether fi's live uid/gid differ from the "owner[:group]"
 // spec. Unresolvable spec names or a missing Stat_t -> no drift (can't compare).
-func ownerDrift(fi os.FileInfo, owner string) bool {
+func isOwnerDrifted(fi os.FileInfo, owner string) bool {
 	st, ok := fi.Sys().(*syscall.Stat_t)
 	if !ok {
 		return false
 	}
 	name, group, _ := strings.Cut(owner, ":")
-	uid, uidOK := lookupID(name, user.Lookup, func(u *user.User) string { return u.Uid })
-	gid, gidOK := lookupID(group, user.LookupGroup, func(g *user.Group) string { return g.Gid })
+	uid, uidOK := lookupID(name, fsutil.UserLookup, func(u *user.User) string { return u.Uid })
+	gid, gidOK := lookupID(group, fsutil.GroupLookup, func(g *user.Group) string { return g.Gid })
 	return (uidOK && uid != st.Uid) || (gidOK && gid != st.Gid)
 }
 
@@ -200,35 +223,36 @@ func (h Host) MkLinks(links []spec.FileItem, dirRels []string) error {
 	errs := []error{h.ensureConfigDirs(dirRels)}
 	dests := make([]string, len(links))
 	for i, item := range links {
-		dests[i] = h.ToDest(item.Rel)
+		dests[i] = h.ToDest(spec.LinkDestRel(item))
 	}
 	if err := h.archiveBefore("link", dests); err != nil {
 		return errors.Join(append(errs, err)...)
 	}
 	for _, item := range links {
 		src := h.Src(item.Rel)
-		dest := h.ToDest(item.Rel)
-		if h.linkSettled(src, dest) {
+		dest := h.ToDest(spec.LinkDestRel(item))
+		if h.isLinkSettled(src, dest) {
 			continue
 		}
-		if err := h.fs.Symlink(src, dest); err != nil {
+		err := h.mutate("ln(create)", dest, func() error { return h.fs.Symlink(src, dest) })
+		if err != nil {
 			errs = append(errs, h.failItem("ln", dest, err))
 		}
 	}
 	return errors.Join(errs...)
 }
 
-// linkSettled reports whether dest already resolves to src (skippable). DryRunAll
+// isLinkSettled reports whether dest already resolves to src (skippable). DryRunAll
 // forces every dest to report, so it never skips.
-func (h Host) linkSettled(src, dest string) bool {
-	if h.DryRunAll() {
+func (h Host) isLinkSettled(src, dest string) bool {
+	if h.IsOptionEqualTo(config.OptionDryRun, config.DryRunAll) {
 		return false
 	}
-	destResolved, err := filepath.EvalSymlinks(dest)
+	destResolved, err := h.reader.EvalSymlinks(dest)
 	if err != nil {
 		return false
 	}
-	srcResolved, err := filepath.EvalSymlinks(src)
+	srcResolved, err := h.reader.EvalSymlinks(src)
 	return err == nil && destResolved == srcResolved
 }
 
@@ -259,17 +283,15 @@ func (h Host) MkCopies(copies []spec.FileItem, dirRels []string) error {
 // copy with spec mode then chown when an owner is set.
 func (h Host) copyOne(item spec.FileItem, dest string) error {
 	src := h.Src(item.Rel)
-	if !h.DryRunAll() && sameContent(src, dest) {
+	if !h.IsOptionEqualTo(config.OptionDryRun, config.DryRunAll) && h.isSameContent(src, dest) {
 		return h.fixPerms("cp", dest, item)
 	}
 	mode, _ := parseMode(item.Chmod)
-	if err := h.fs.Copy(src, dest, mode); err != nil {
+	err := h.mutate("cp(create)", dest, func() error { return h.fs.Copy(src, dest, mode) })
+	if err != nil {
 		return err
 	}
-	if owner := ownerSpec(item); owner != "" {
-		return h.fs.Chown("cp(chown)", owner, dest)
-	}
-	return nil
+	return h.chownIfSet("cp(chown)", item, dest)
 }
 
 // copyDests returns the explicit dests (~/ resolved), else the marker-stripped derived dest.
@@ -309,18 +331,15 @@ func parseMode(s string) (os.FileMode, bool) {
 
 // expandHome resolves a leading ~/ to the host home.
 func (h Host) expandHome(p string) string {
-	if rest, ok := strings.CutPrefix(p, "~/"); ok {
-		return filepath.Join(h.Home, rest)
-	}
-	return p
+	return fsutil.ExpandHome(p, h.Home)
 }
 
-func sameContent(a, b string) bool {
-	x, err := os.ReadFile(a)
+func (h Host) isSameContent(a, b string) bool {
+	x, err := h.reader.ReadFile(a)
 	if err != nil {
 		return false
 	}
-	y, err := os.ReadFile(b)
+	y, err := h.reader.ReadFile(b)
 	if err != nil {
 		return false
 	}
@@ -331,7 +350,7 @@ func sameContent(a, b string) bool {
 // failing removal is logged and the rest still run; failures join into the
 // returned error.
 func (h Host) PruneBrokenLinks(dirRels []string) error {
-	h.fs.Log("prune-links", h.Root)
+	h.log("prune-links", h.Root)
 	var errs []error
 	seen := map[string]bool{}
 	for _, rel := range dirRels {
@@ -340,16 +359,17 @@ func (h Host) PruneBrokenLinks(dirRels []string) error {
 			continue
 		}
 		seen[dest] = true
-		entries, derr := os.ReadDir(dest)
+		entries, derr := h.reader.ReadDir(dest)
 		if derr != nil {
 			continue // [why] dir may not exist on host yet
 		}
 		for _, e := range entries {
 			p := filepath.Join(dest, e.Name())
-			if !h.brokenRepoLink(p) {
+			if !h.isBrokenRepoLink(p) {
 				continue
 			}
-			if err := h.fs.Remove(p); err != nil {
+			err := h.mutate("rm", p, func() error { return h.fs.Remove(p) })
+			if err != nil {
 				errs = append(errs, h.failItem("prune-links", p, err))
 			}
 		}
@@ -357,9 +377,9 @@ func (h Host) PruneBrokenLinks(dirRels []string) error {
 	return errors.Join(errs...)
 }
 
-// brokenRepoLink: check if p is a symlink into root/ whose target is gone.
-func (h Host) brokenRepoLink(p string) bool {
-	target, err := os.Readlink(p) // [what] non-symlink -> err
+// isBrokenRepoLink: check if p is a symlink into root/ whose target is gone.
+func (h Host) isBrokenRepoLink(p string) bool {
+	target, err := h.reader.Readlink(p) // [what] non-symlink -> err
 	if err != nil {
 		return false
 	}
@@ -367,10 +387,10 @@ func (h Host) brokenRepoLink(p string) bool {
 		target = filepath.Join(filepath.Dir(p), target)
 	}
 	target = filepath.Clean(target)
-	if target != h.Root && !strings.HasPrefix(target, h.Root+"/") {
+	if !fsutil.IsUnder(target, h.Root) {
 		return false
 	}
-	_, err = os.Stat(p) // [what] broken
+	_, err = h.reader.Stat(p) // [what] broken
 	return err != nil
 }
 

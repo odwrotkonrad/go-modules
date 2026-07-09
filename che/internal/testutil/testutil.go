@@ -13,7 +13,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/spf13/cobra"
+	"gitlab.com/konradodwrot/go-modules/lib/testyml"
 )
 
 // ansiRe matches SGR escape sequences (bold/reset) so assertions stay style-agnostic.
@@ -22,10 +22,21 @@ var ansiRe = regexp.MustCompile(`\x1b\[[0-9;]*m`)
 // StripANSI removes SGR escape sequences, leaving plain text to assert against.
 func StripANSI(s string) string { return ansiRe.ReplaceAllString(s, "") }
 
+// stampRe matches the leading HH:MM:SS.mmm log stamp on each line.
+var stampRe = regexp.MustCompile(`(?m)^\d{2}:\d{2}:\d{2}\.\d{3}: `)
+
+// StripStamps removes per-line log timestamps so adjacent lines assert as one block.
+func StripStamps(s string) string { return stampRe.ReplaceAllString(s, "") }
+
 // specsFS holds the checked-in che.yml fixtures.
 //
 //go:embed specs/*.yml
 var specsFS embed.FS
+
+// treesFS holds the checked-in repo file-tree fixtures.
+//
+//go:embed all:trees
+var treesFS embed.FS
 
 // Spec returns the named che.yml fixture (testutil/specs/<name>.yml).
 func Spec(t *testing.T, name string) string {
@@ -79,61 +90,19 @@ func Repo(t *testing.T, files map[string]string) string {
 // CheProfile is the profile specs/che.yml resolves under.
 const CheProfile = "cli/macos"
 
-// CheRepo builds a committed mock che repo (specs/che.yml + root/ tree covering every op)
-// plus an on-disk HOME. Returns (repoDir, homeDir).
+// CheRepo materializes the mock che repo (specs/che.yml + trees/tree-che-repo
+// covering every op) plus an on-disk HOME. Returns (repoDir, homeDir).
 func CheRepo(t *testing.T) (string, string) {
 	t.Helper()
-	dir := Repo(t, map[string]string{
-		"che.yml":                                          Spec(t, "che"),
-		"root/etc/zshrc":                                   "zshrc\n",
-		"root/HOME/.config/zsh/.zshrc":                     "user zshrc\n",
-		"root/HOME/.config/zsh/c.ontoHost.cp":                  "copyme\n",
-		"root/HOME/.config/zsh/t.ontoHost.tpl":                 "plain template\n",
-		"templates/r.ontoRepo.tpl":                             "repo body\n",
-		"root/Library/LaunchDaemons/otelcol.plist.ontoHost.cp": "<plist/>\n",
-		"install/unit":                                     "#!/bin/sh\necho ran\n",
-	})
+	dir := t.TempDir()
+	testyml.CopyDir(t, treesFS, "trees/tree-che-repo", dir)
+	WriteTree(t, dir, map[string]string{"che.yml": Spec(t, "che")})
+	GitRepo(t, dir)
 	home := filepath.Join(dir, "home")
 	if err := os.MkdirAll(home, 0o755); err != nil {
 		t.Fatal(err)
 	}
 	return dir, home
-}
-
-// MockRepoEnv builds the mock che repo, chdirs in, exports HOME +
-// CHE_OMIT_EXEC_IF so build() resolves against it (the fixture's
-// execIf profiles all pass). Returns HOME (for asserting ~/ dest paths).
-// Skips as root (build resolves $HOME).
-func MockRepoEnv(t *testing.T) string {
-	t.Helper()
-	if os.Geteuid() == 0 {
-		t.Skip("non-root path only; build resolves home from $HOME")
-	}
-	dir, home := CheRepo(t)
-	t.Chdir(dir)
-	t.Setenv("CHE_OMIT_EXEC_IF", "1")
-	t.Setenv("HOME", home)
-	t.Setenv("XDG_DATA_HOME", filepath.Join(home, ".local/share"))
-	return home
-}
-
-// RunDry runs a subcommand's RunE (caller already built dry-run state), captures stdout,
-// asserts every printed line carries the dry-run=delta scope. dryRunLines=false skips that
-// check (e.g. detect, prints bare profile).
-func RunDry(t *testing.T, cmd *cobra.Command, dryRunLines bool) string {
-	t.Helper()
-	out, err := CaptureStdout(t, func() error { return cmd.RunE(cmd, nil) })
-	if err != nil {
-		t.Fatalf("%s errored: %v", cmd.Name(), err)
-	}
-	if dryRunLines {
-		for line := range strings.SplitSeq(strings.TrimSpace(out), "\n") {
-			if line != "" && !strings.Contains(line, "dry-run=delta") {
-				t.Errorf("non-dry-run line: %q\n--- got ---\n%s", line, out)
-			}
-		}
-	}
-	return out
 }
 
 // WantLines asserts every fragment appears in out (order-independent, style-agnostic).

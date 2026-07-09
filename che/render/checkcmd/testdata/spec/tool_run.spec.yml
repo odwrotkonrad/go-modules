@@ -1,0 +1,45 @@
+# [>] 🤖🤖
+- name: toolRunShouldPrintHelpForShortFlag
+  in:
+    args: ["-h"]
+  want:
+    exitCode: 0
+- name: toolRunShouldPrintHelpForLongFlag
+  in:
+    args: ["--help"]
+  want:
+    exitCode: 0
+- name: toolRunShouldEmitWithoutArgs
+  in:
+    args: []
+  want:
+    exitCode: 0
+- name: toolRunShouldRejectUnexpectedPositional
+  in:
+    args: ["x"]
+  want:
+    exitCode: 11
+- name: toolRunShouldEmitWithRequiredArg
+  in:
+    needsArg: true
+    args: ["x"]
+  want:
+    exitCode: 0
+- name: toolRunShouldRejectMissingRequiredArg
+  in:
+    needsArg: true
+    args: []
+  want:
+    exitCode: 11
+- name: toolRunShouldRejectFlagAsRequiredArg
+  in:
+    needsArg: true
+    args: ["-x"]
+  want:
+    exitCode: 11
+- name: toolRunShouldRejectUnknownFlag
+  in:
+    args: ["--nope", "y"]
+  want:
+    exitCode: 11
+# [<] 🤖🤖

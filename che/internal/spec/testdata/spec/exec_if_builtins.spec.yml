@@ -1,0 +1,22 @@
+# [>] 🤖🤖
+- name: isVirtShouldCacheTrueResultAcrossEvals
+  in:
+    args: ["builtin:isVirt"]
+    execOut: "1"
+  want:
+    value: true
+    execCalls: 1
+- name: isVirtShouldBeFalseWhenDetectFails
+  in:
+    args: ["builtin:isVirt"]
+    execFail: true
+  want:
+    value: false
+    execCalls: 1
+- name: isOsShouldNotBeTruthyBare
+  in:
+    args: ["builtin:isOs"]
+  want:
+    value: false
+    execCalls: 0
+# [<] 🤖🤖

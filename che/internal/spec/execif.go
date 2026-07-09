@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"os"
 	"runtime"
+	"strconv"
 	"strings"
 	"sync"
 
@@ -13,7 +14,7 @@ import (
 )
 
 // Evaluator resolves execIf predicate expressions. Builtins are lazy (resolved
-// only when referenced) and cached per run ([why] Virtualized shells out).
+// only when referenced) and cached per run ([why] IsVirtualized shells out).
 type Evaluator struct {
 	builtins map[string]func() string
 }
@@ -22,7 +23,7 @@ type Evaluator struct {
 func NewEvaluator() *Evaluator {
 	return &Evaluator{builtins: map[string]func() string{
 		"isOs":   sync.OnceValue(func() string { return fsutil.NormalizeOS(runtime.GOOS) }),
-		"isVirt": sync.OnceValue(func() string { return boolStr(fsutil.Virtualized()) }),
+		"isVirt": sync.OnceValue(func() string { return strconv.FormatBool(fsutil.IsVirtualized()) }),
 	}}
 }
 
@@ -62,13 +63,6 @@ func (e *Evaluator) resolve(src string) (string, bool, error) {
 	default:
 		return "", false, fmt.Errorf("unknown source %q: want builtin:<name> or env:<NAME>", src)
 	}
-}
-
-func boolStr(b bool) string {
-	if b {
-		return "true"
-	}
-	return "false"
 }
 
 // [<] 🤖🤖

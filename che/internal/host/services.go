@@ -6,13 +6,13 @@ import (
 	"errors"
 	"fmt"
 	"os"
-	"os/exec"
 	"path/filepath"
 	"regexp"
 	"strconv"
 	"strings"
 	"time"
 
+	"gitlab.com/konradodwrot/go-modules/che/internal/execx"
 	"gitlab.com/konradodwrot/go-modules/che/internal/log"
 )
 
@@ -76,46 +76,51 @@ func (h Host) locate(name string) (plistSource, bool) {
 	return plistSource{}, false
 }
 
-// lctl builds a launchctl argv, prefixing sudo iff needed and not already root.
+// Sleep paces the post-bootstrap settle and the bootout-gone poll; tests stub
+// it to a no-op.
+var Sleep = time.Sleep
+
+// lctl builds a launchctl command, prefixing sudo iff needed and not already root.
 // Explicit argv (avoids the zsh empty-runner word-split bug).
-func (s Service) lctl(args ...string) *exec.Cmd {
+func (s Service) lctl(args ...string) execx.Cmd {
 	argv := append([]string{"launchctl"}, args...)
 	if s.Sudo && os.Geteuid() != 0 {
 		argv = append([]string{"sudo"}, argv...)
 	}
-	return exec.Command(argv[0], argv[1:]...)
+	return execx.Cmd{Argv: argv}
 }
 
-// loaded reports whether the service is registered in its domain.
-func (s Service) loaded() bool {
-	return s.lctl("print", s.target()).Run() == nil
+// isLoaded reports whether the service is registered in its launchd domain.
+func (s Service) isLoaded() bool {
+	return execx.Default.Exec(s.lctl("print", s.target())) == nil
 }
 
 // Bootout unloads each loaded service, then polls until it is gone.
 func (h Host) Bootout(services []Service) error {
 	for _, s := range services {
-		if h.DryRun() {
-			log.Msg("bootout", s.target(), h.mode.log())
+		if h.IsDryRun() {
+			h.log("bootout", s.target())
 			continue
 		}
-		if !s.loaded() {
+		if !s.isLoaded() {
 			continue
 		}
-		log.Msg("bootout", s.target(), log.Off)
-		_ = s.lctl("bootout", s.target()).Run() // async, ignore exit
+		h.log("bootout", s.target())
+		_ = execx.Default.Exec(s.lctl("bootout", s.target())) // async, ignore exit
 		s.waitGone()
+		h.log("bootout(done)", s.target())
 	}
 	return nil
 }
 
 // waitGone blocks until the service is gone (bootout is async).
 func (s Service) waitGone() {
-	for i := 0; s.loaded(); i++ {
+	for i := 0; s.isLoaded(); i++ {
 		if i >= 50 {
 			log.Msg("warn", s.target()+" still present after bootout", log.Off)
 			return
 		}
-		time.Sleep(100 * time.Millisecond)
+		Sleep(100 * time.Millisecond)
 	}
 }
 
@@ -125,18 +130,20 @@ func (s Service) waitGone() {
 func (h Host) Bootin(services []Service) error {
 	var errs []error
 	for _, s := range services {
-		if h.DryRun() {
-			log.Msg("bootstrap", s.target(), h.mode.log())
+		if h.IsDryRun() {
+			h.log("bootstrap", s.target())
 			continue
 		}
-		log.Msg("bootstrap", s.target(), log.Off)
+		h.log("bootstrap", s.target())
 		c := s.lctl("bootstrap", s.Domain, s.Plist)
 		c.Stdout, c.Stderr = os.Stdout, os.Stderr
-		if err := c.Run(); err != nil {
+		if err := execx.Default.Exec(c); err != nil {
 			err = fmt.Errorf("bootstrap %s: %w", s.target(), err)
-			log.Msg("bootstrap(fail)", err.Error(), log.Off)
+			h.log("bootstrap(fail)", err.Error())
 			errs = append(errs, err)
+			continue
 		}
+		h.log("bootstrap(done)", s.target())
 	}
 	return errors.Join(errs...)
 }
@@ -144,26 +151,26 @@ func (h Host) Bootin(services []Service) error {
 // Ensure settles, then verifies each long-running service has a live pid.
 // Errors if any is missing. No mutation.
 func (h Host) Ensure(services []Service) error {
-	if h.DryRun() {
-		log.Msg("settle", fmt.Sprintf("%ds before pid check", settleSeconds), h.mode.log())
+	if h.IsDryRun() {
+		h.log("settle", fmt.Sprintf("%ds before pid check", settleSeconds))
 		for _, s := range services {
 			if s.LongRunning {
-				log.Msg("ensure", s.target(), h.mode.log())
+				h.log("ensure", s.target())
 			}
 		}
 		return nil
 	}
-	log.Msg("settle", fmt.Sprintf("%ds before pid check", settleSeconds), log.Off)
-	time.Sleep(settleSeconds * time.Second)
+	h.log("settle", fmt.Sprintf("%ds before pid check", settleSeconds))
+	Sleep(settleSeconds * time.Second)
 	missing := 0
 	for _, s := range services {
 		if !s.LongRunning {
 			continue
 		}
 		if pid, ok := s.pid(); ok {
-			log.Msg("running", fmt.Sprintf("%s (pid %d)", s.target(), pid), log.Off)
+			h.log("running", fmt.Sprintf("%s (pid %d)", s.target(), pid))
 		} else {
-			log.Msg("error", s.target()+" has no running process", log.Off)
+			h.log("error", s.target()+" has no running process")
 			missing++
 		}
 	}
@@ -177,7 +184,7 @@ var pidRe = regexp.MustCompile(`(?m)^\s*pid = ([0-9]+)`)
 
 // pid reads the service's live pid from `launchctl print`, or (0,false) if none.
 func (s Service) pid() (int, bool) {
-	out, err := s.lctl("print", s.target()).Output()
+	out, err := execx.Default.Output(s.lctl("print", s.target()))
 	if err != nil {
 		return 0, false
 	}

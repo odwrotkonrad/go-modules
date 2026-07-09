@@ -15,9 +15,10 @@ import (
 	"time"
 
 	onepassword "github.com/1password/onepassword-sdk-go"
-	git "github.com/go-git/go-git/v5"
 	"github.com/hairyhenderson/gomplate/v4"
+	"github.com/invopop/jsonschema"
 
+	"gitlab.com/konradodwrot/go-modules/che/internal/fsutil"
 	"gitlab.com/konradodwrot/go-modules/che/render/lib"
 )
 
@@ -52,8 +53,8 @@ func Exec(name string, body []byte, repoRoot string) ([]byte, error) {
 	return buf.Bytes(), nil
 }
 
-// isRateLimit: 1Password SDK surfaces vault rate limiting only in the error text.
-func isRateLimit(err error) bool {
+// isRateLimitErr: 1Password SDK surfaces vault rate limiting only in the error text.
+func isRateLimitErr(err error) bool {
 	return err != nil && strings.Contains(err.Error(), "rate limit exceeded")
 }
 
@@ -71,28 +72,53 @@ func retry[T any](delays []time.Duration, sleep func(time.Duration), shouldRetry
 	return v, err
 }
 
+// secretResolver resolves one op:// ref to its secret value.
+type secretResolver interface {
+	Resolve(ctx context.Context, ref string) (string, error)
+}
+
+// sdkResolver adapts the 1Password SDK client to secretResolver.
+type sdkResolver struct{ client *onepassword.Client }
+
+func (r sdkResolver) Resolve(ctx context.Context, ref string) (string, error) {
+	return r.client.Secrets().Resolve(ctx, ref)
+}
+
+// newSecretResolver constructs the real 1Password client; tests swap in a mock
+// so the SDK never runs.
+var newSecretResolver = func(ctx context.Context, token string) (secretResolver, error) {
+	client, err := onepassword.NewClient(ctx,
+		onepassword.WithServiceAccountToken(token),
+		onepassword.WithIntegrationInfo("che", "1.0.0"),
+	)
+	if err != nil {
+		return nil, err
+	}
+	return sdkResolver{client}, nil
+}
+
+// opSleep paces op-resolve retries; tests stub it to a no-op.
+var opSleep = time.Sleep
+
 // opResolver returns an op(ref) template func that lazily inits one 1Password client
 // (OP_SERVICE_ACCOUNT_TOKEN) on first use and reuses it for the render's references.
 // Resolves retry on vault rate-limit errors.
 func opResolver(ctx context.Context) func(string) (string, error) {
-	var client *onepassword.Client
+	var client secretResolver
 	return func(ref string) (string, error) {
 		if client == nil {
 			token := os.Getenv("OP_SERVICE_ACCOUNT_TOKEN")
 			if token == "" {
 				return "", fmt.Errorf("op %q: OP_SERVICE_ACCOUNT_TOKEN unset", ref)
 			}
-			c, err := onepassword.NewClient(ctx,
-				onepassword.WithServiceAccountToken(token),
-				onepassword.WithIntegrationInfo("che", "1.0.0"),
-			)
+			c, err := newSecretResolver(ctx, token)
 			if err != nil {
 				return "", fmt.Errorf("op client: %w", err)
 			}
 			client = c
 		}
-		secret, err := retry(opRetryDelays, time.Sleep, isRateLimit, func() (string, error) {
-			return client.Secrets().Resolve(ctx, ref)
+		secret, err := retry(opRetryDelays, opSleep, isRateLimitErr, func() (string, error) {
+			return client.Resolve(ctx, ref)
 		})
 		if err != nil {
 			return "", fmt.Errorf("op resolve %q: %w", ref, err)
@@ -110,6 +136,26 @@ func opResolver(ctx context.Context) func(string) (string, error) {
 type Options struct {
 	WriteType             string `yaml:"writeType"`
 	RenderReferencedFiles bool   `yaml:"renderReferencedFiles"`
+}
+
+// JSONSchema is Options' che.yml JSON Schema fragment, mirroring the yaml
+// mapping above (writeType enum from the WriteType* consts).
+func (Options) JSONSchema() *jsonschema.Schema {
+	s := &jsonschema.Schema{
+		Description:          "per-dest render options",
+		Type:                 "object",
+		AdditionalProperties: jsonschema.FalseSchema,
+		Properties:           jsonschema.NewProperties(),
+	}
+	s.Properties.Set("writeType", &jsonschema.Schema{
+		Description: "how the rendered body lands: overwrite (default: header + body) | mergeUpsert (env KEY=VALUE union under the existing dest) | raw (body verbatim, no autogen header)",
+		Enum:        []any{"", WriteTypeMergeUpsert, WriteTypeRaw},
+	})
+	s.Properties.Set("renderReferencedFiles", &jsonschema.Schema{
+		Description: "inline @-includes into the rendered body (overwrite only)",
+		Type:        "boolean",
+	})
+	return s
 }
 
 // WriteTypeMergeUpsert is the WriteType that merges env KEY=VALUE under the existing dest.
@@ -182,7 +228,7 @@ func resolveAtIncludes(repoRoot string, body []byte) []byte {
 	var out bytes.Buffer
 	for line := range strings.Lines(string(body)) {
 		line = strings.TrimSuffix(line, "\n")
-		if isAtInclude(line) {
+		if isAtIncludeLine(line) {
 			path := strings.TrimPrefix(line, "@")
 			if rest, ok := strings.CutPrefix(path, "~/"); ok {
 				path = "root/HOME/" + rest
@@ -199,13 +245,13 @@ func resolveAtIncludes(repoRoot string, body []byte) []byte {
 	return out.Bytes()
 }
 
-// HasSecretRef: body contains an op:// secret reference (a render-time vault fetch).
-func HasSecretRef(body []byte) bool {
+// IsSecretRefPresent: body contains an op:// secret reference (a render-time vault fetch).
+func IsSecretRefPresent(body []byte) bool {
 	return bytes.Contains(body, []byte("op://"))
 }
 
-// isAtInclude: line is exactly '@<no-space>', no whitespace.
-func isAtInclude(line string) bool {
+// isAtIncludeLine: line is exactly '@<no-space>', no whitespace.
+func isAtIncludeLine(line string) bool {
 	if !strings.HasPrefix(line, "@") || len(line) < 2 {
 		return false
 	}
@@ -277,7 +323,7 @@ var mdHeading = regexp.MustCompile(`(?m)^(#{1,5})( )`)
 //	"strip-comments":      drop HTML comments (incl. multi-line).
 //	"normalize-headings":  demote every ATX heading one level (capped at 6).
 func RenderMarkdown(repoRoot, path string, opts ...string) (string, error) {
-	content, err := os.ReadFile(resolveUnder(repoRoot, expandHome(path)))
+	content, err := os.ReadFile(resolveUnder(repoRoot, fsutil.ExpandHome(path, os.Getenv("HOME"))))
 	if err != nil {
 		return "", err
 	}
@@ -297,14 +343,6 @@ func RenderMarkdown(repoRoot, path string, opts ...string) (string, error) {
 	return strings.TrimSpace(body), nil
 }
 
-// expandHome replaces a leading '~/' with $HOME.
-func expandHome(path string) string {
-	if rest, ok := strings.CutPrefix(path, "~/"); ok {
-		return filepath.Join(os.Getenv("HOME"), rest)
-	}
-	return path
-}
-
 // --- native generators ---
 
 type treeNode map[string]treeNode
@@ -312,7 +350,7 @@ type treeNode map[string]treeNode
 // DirsTree prints the plain nested dir tree of repoRoot's git-tracked files:
 // index paths, file leaves dropped, dirs nested + sorted, 2-space indented.
 func DirsTree(repoRoot string) (string, error) {
-	paths, err := trackedFiles(repoRoot)
+	paths, err := fsutil.TrackedFiles(repoRoot)
 	if err != nil {
 		return "", err
 	}
@@ -322,22 +360,6 @@ func DirsTree(repoRoot string) (string, error) {
 // MakefileDoc emits makefile.agents.md from a Makefile's [genai-include] sections.
 func MakefileDoc(path string) (string, error) {
 	return lib.Generate(path)
-}
-
-func trackedFiles(repoPath string) ([]string, error) {
-	repo, err := git.PlainOpenWithOptions(repoPath, &git.PlainOpenOptions{DetectDotGit: true})
-	if err != nil {
-		return nil, fmt.Errorf("not a git repo: %s: %w", repoPath, err)
-	}
-	idx, err := repo.Storer.Index()
-	if err != nil {
-		return nil, fmt.Errorf("read git index at %s: %w", repoPath, err)
-	}
-	files := make([]string, len(idx.Entries))
-	for i, e := range idx.Entries {
-		files[i] = e.Name
-	}
-	return files, nil
 }
 
 func buildTree(paths []string) treeNode {

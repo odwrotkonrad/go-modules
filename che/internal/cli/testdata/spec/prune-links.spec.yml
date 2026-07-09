@@ -1,0 +1,13 @@
+# [>] 🤖
+- name: pruneLinksShouldScanRootAndRemoveNothingOnFreshTree
+  context:
+    directory: testdata/fixture/commands/common/sample-tree
+  in:
+    args: [prune-links]
+  want:
+    stdOut: |
+      prune-links: ${ROOT}
+  notWant:
+    stdOut:
+      - 'rm: '
+# [<] 🤖

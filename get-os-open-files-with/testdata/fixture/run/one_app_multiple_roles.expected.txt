@@ -1,0 +1,2 @@
+com.example.Viewer com.adobe.pdf all
+com.example.Viewer com.microsoft.word.doc viewer

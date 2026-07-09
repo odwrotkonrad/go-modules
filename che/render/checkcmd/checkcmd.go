@@ -4,10 +4,15 @@ package checkcmd
 import (
 	"fmt"
 	"os"
-	"os/exec"
+	"strings"
+
+	"gitlab.com/konradodwrot/go-modules/che/internal/execx"
+	"gitlab.com/konradodwrot/go-modules/lib/climain"
 )
 
 type Tool struct {
+	Name     string
+	Version  string
 	Usage    string
 	Label    string
 	NeedsArg bool
@@ -16,10 +21,11 @@ type Tool struct {
 }
 
 func (t Tool) Run(args []string) int {
-	switch {
-	case len(args) == 1 && (args[0] == "-h" || args[0] == "--help"):
-		fmt.Print(t.Usage)
+	if out, done := climain.HelpVersion(args, strings.TrimSuffix(t.Usage, "\n"), t.Name, t.Version); done {
+		fmt.Println(out)
 		return 0
+	}
+	switch {
 	case len(args) == 2 && args[0] == "--check":
 		return t.check(args[1])
 	case t.NeedsArg && len(args) == 1 && args[0] != "" && args[0][0] != '-':
@@ -69,9 +75,11 @@ func diff(want, got, wantLabel, gotLabel string) string {
 	gf.WriteString(got)
 	wf.Close()
 	gf.Close()
-	out, _ := exec.Command("diff", "-u",
+	out, _ := execx.Default.Output(execx.Cmd{Argv: []string{
+		"diff", "-u",
 		"--label", wantLabel, "--label", gotLabel,
-		wf.Name(), gf.Name()).Output()
+		wf.Name(), gf.Name(),
+	}})
 	return string(out)
 }
 

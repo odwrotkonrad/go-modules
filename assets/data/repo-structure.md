@@ -9,49 +9,191 @@ che
   docs
   internal
     cli
+      testdata
+        fixture
+          commands
+            all
+              sample-tree-only-links
+                root
+                  HOME
+                    .config
+                      foo
+            common
+              sample-tree
+                install
+                root
+                  HOME
+                    .config
+                      foo
+                      zsh
+                  Library
+                    LaunchDaemons
+                  etc
+                templates
+        spec
+    config
+      testdata
+        spec
     docgen
+    execx
     fsutil
+      testdata
+        spec
     host
+      testdata
+        spec
+          unit
     log
+      testdata
+        spec
     plugin
     spec
+      testdata
+        fixture
+          resolve
+            tree-classify
+              root
+                HOME
+                  .config
+                    git
+                    zsh
+                Library
+                  LaunchDaemons
+                etc
+                  grafana
+                  zsh
+            tree-empty
+              root
+            tree-exclude-script-glob
+              ci
+                zsh
+                  scripts
+                    installs
+              root
+            tree-include-exclude
+              ci
+                zsh
+                  scripts
+                    installs
+              root
+                HOME
+                  .config
+                    extra
+                    oneoff
+                    zsh
+                etc
+                  zsh
+            tree-link-rewrite
+              root
+                HOME
+                  .config
+                    foo
+                etc
+            tree-merge
+              ci
+                zsh
+                  scripts
+                    installs
+              root
+                HOME
+                  .config
+                    zsh
+                Library
+                  LaunchDaemons
+                etc
+                  grafana
+            tree-plugin-malformed
+              root
+        spec
     testutil
       specs
+      trees
+        tree-che-repo
+          install
+          root
+            HOME
+              .config
+                zsh
+            Library
+              LaunchDaemons
+            etc
+          templates
   render
     checkcmd
+      testdata
+        spec
     cmd
       render-dirs-tree
       render-makefile-doc
         testdata
       render-repo-group-index
       render-tpl
+        testdata
+          fixture
+            run
+              tree-read_body
+              tree-renders
+          spec
     lib
+      testdata
+        spec
     render
       snippets
       testdata
-        dirs-tree
-        repo-group-index
-          group
-            che
-              assets
-                docs-agents
-            tools
-              configs
+        fixture
+          dirs-tree
+          render_markdown
+            tree-docs
+          repo-group-index
+            group
+              che
                 assets
                   docs-agents
-              render-files
-                assets
-                  docs-agents
+              tools
+                configs
+                  assets
+                    docs-agents
+                render-files
+                  assets
+                    docs-agents
+          split_frontmatter
+        spec
 ci
 get-os-open-files-with
   assets
     docs-agents
   lib
+  testdata
+    fixture
+      run
+    spec
 get-term-open-files-with
   assets
     docs-agents
   lib
   testdata
+    fixture
+      common
+      run
+    spec
+lib
+  assets
+    docs-agents
+  climain
+    testdata
+      spec
+  testyml
+    testdata
+      fixture
+        common
+          tree-nested
+            dir
+      spec
+  yamlcfg
+    testdata
+      fixture
+        load_config
+      spec
 templates
   2-data
   3-audience

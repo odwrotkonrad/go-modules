@@ -1,0 +1,20 @@
+# [>] 🤖
+- name: runScriptsShouldExecEachScriptAndReportOk
+  in:
+    op: run-scripts
+  want:
+    stdOut: |
+      run-scripts: ${REPO}/install/unit
+      run-scripts(report): ok ${REPO}/install/unit
+- name: runScriptsShouldReportFailAndReturnError
+  in:
+    op: run-scripts
+    failCmds: [install/unit]
+  want:
+    error: true
+    stdErr:
+      - 'scripts failed: '
+    stdOut: |
+      run-scripts(fail): ${REPO}/install/unit: stub: fail install/unit
+      run-scripts(report): fail ${REPO}/install/unit
+# [<] 🤖

@@ -1,0 +1,10 @@
+go=vim
+py=vim
+rb=vim
+css=vim
+html=vim
+json=vim
+yaml=vim
+yml=vim
+rst=vim
+txt=vim

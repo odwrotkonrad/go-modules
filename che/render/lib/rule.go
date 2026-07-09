@@ -9,7 +9,7 @@ import (
 // [>] 🤖🤖🤖
 func ruleTarget(node *sitter.Node, src []byte, what string) (target, bool) {
 	var name string
-	for i := uint(0); i < node.NamedChildCount(); i++ {
+	for i := range node.NamedChildCount() {
 		child := node.NamedChild(i)
 		if child.Kind() == "targets" {
 			name = strings.TrimSpace(child.Utf8Text(src))
@@ -43,7 +43,7 @@ func paramTarget(node *sitter.Node, src []byte, what, vals string) (target, bool
 // firstWord returns the first descendant "word" node, depth-first. The name sits
 // directly under variable_assignment but nests under a "list" in export_directive.
 func firstWord(node *sitter.Node) *sitter.Node {
-	for i := uint(0); i < node.NamedChildCount(); i++ {
+	for i := range node.NamedChildCount() {
 		child := node.NamedChild(i)
 		if child.Kind() == "word" {
 			return child

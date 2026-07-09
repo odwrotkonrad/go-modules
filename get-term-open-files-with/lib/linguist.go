@@ -2,15 +2,19 @@
 package lib
 
 import (
+	"cmp"
 	"io"
+	"maps"
 	"net/http"
 	"os"
 	"path/filepath"
-	"sort"
+	"slices"
 	"strings"
 	"time"
 
 	"gopkg.in/yaml.v3"
+
+	"gitlab.com/konradodwrot/go-modules/lib/yamlcfg"
 )
 
 const LanguagesURL = "https://raw.githubusercontent.com/github-linguist/linguist/master/lib/linguist/languages.yml"
@@ -19,11 +23,13 @@ func CacheDir() string {
 	if d := os.Getenv("LINGUIST_CACHE_DIR"); d != "" {
 		return d
 	}
-	xdg := os.Getenv("XDG_CACHE_HOME")
-	if xdg == "" {
-		xdg = filepath.Join(os.Getenv("HOME"), ".cache")
-	}
+	xdg := cmp.Or(os.Getenv("XDG_CACHE_HOME"), filepath.Join(os.Getenv("HOME"), ".cache"))
 	return filepath.Join(xdg, "get-term-open-files-with")
+}
+
+// netErr is the CodeNetwork error every fetch/cache failure maps to.
+func netErr(url string) *yamlcfg.CodedError {
+	return &yamlcfg.CodedError{Code: yamlcfg.CodeNetwork, Msg: "network fetch failed: " + url}
 }
 
 func fetchLanguages(url string) ([]byte, error) {
@@ -34,21 +40,21 @@ func fetchLanguages(url string) ([]byte, error) {
 	client := &http.Client{Timeout: 30 * time.Second}
 	res, err := client.Get(url)
 	if err != nil {
-		return nil, &CodedError{CodeNetwork, "network fetch failed: " + url}
+		return nil, netErr(url)
 	}
 	defer res.Body.Close()
 	if res.StatusCode != http.StatusOK {
-		return nil, &CodedError{CodeNetwork, "network fetch failed: " + url}
+		return nil, netErr(url)
 	}
 	body, err := io.ReadAll(res.Body)
 	if err != nil {
-		return nil, &CodedError{CodeNetwork, "network fetch failed: " + url}
+		return nil, netErr(url)
 	}
 	if err := os.MkdirAll(CacheDir(), 0755); err != nil {
-		return nil, &CodedError{CodeNetwork, "network fetch failed: " + url}
+		return nil, netErr(url)
 	}
 	if err := os.WriteFile(cached, body, 0644); err != nil {
-		return nil, &CodedError{CodeNetwork, "network fetch failed: " + url}
+		return nil, netErr(url)
 	}
 	return body, nil
 }
@@ -65,7 +71,7 @@ func TypeExtensions(url string) (map[string][]string, error) {
 	}
 	var langs map[string]language
 	if err := yaml.Unmarshal(data, &langs); err != nil {
-		return nil, &CodedError{CodeConfig, "invalid languages data: " + err.Error()}
+		return nil, &yamlcfg.CodedError{Code: yamlcfg.CodeConfig, Msg: "invalid languages data: " + err.Error()}
 	}
 	sets := map[string]map[string]bool{}
 	for _, lang := range langs {
@@ -83,12 +89,7 @@ func TypeExtensions(url string) (map[string][]string, error) {
 	}
 	out := map[string][]string{}
 	for kind, set := range sets {
-		exts := make([]string, 0, len(set))
-		for ext := range set {
-			exts = append(exts, ext)
-		}
-		sort.Strings(exts)
-		out[kind] = exts
+		out[kind] = slices.Sorted(maps.Keys(set))
 	}
 	return out, nil
 }

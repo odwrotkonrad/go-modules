@@ -1,0 +1,28 @@
+# [>] 🤖🤖
+- name: loadConfigNodeShouldExit13WhenNoConfigExists
+  in: {}
+  want:
+    exitCode: 13
+- name: loadConfigNodeShouldExit12OnInvalidYaml
+  in:
+    user: testdata/fixture/load_config/invalid.yml
+  want:
+    exitCode: 12
+    stdErr: [invalid config]
+- name: loadConfigNodeShouldLoadUserOnlyConfig
+  in:
+    user: testdata/fixture/load_config/user_only.yml
+  want:
+    filesOut: testdata/fixture/load_config/user_only.expected.yml
+- name: loadConfigNodeShouldDeepMergeSystemAndUser
+  in:
+    system: testdata/fixture/load_config/merge_system.yml
+    user: testdata/fixture/load_config/merge_user.yml
+  want:
+    filesOut: testdata/fixture/load_config/merge.expected.yml
+- name: loadConfigNodeShouldReturnNilNodeForEmptyFiles
+  in:
+    user: testdata/fixture/load_config/empty.yml
+  want:
+    exitCode: 0
+# [<] 🤖🤖

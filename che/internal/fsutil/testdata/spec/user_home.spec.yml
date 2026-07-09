@@ -1,0 +1,14 @@
+# [>] 🤖🤖
+- name: userHomeShouldReturnHomeForKnownUser
+  in:
+    user: ko
+    users: {ko: /Users/ko}
+  want:
+    value: /Users/ko
+- name: userHomeShouldErrorForUnknownUser
+  in:
+    user: ghost
+    users: {ko: /Users/ko}
+  want:
+    error: true
+# [<] 🤖🤖

@@ -3,28 +3,47 @@ package fsutil
 // [>] 🤖🤖
 
 import (
+	"embed"
 	"os"
 	"os/exec"
 	"path/filepath"
+	"runtime"
 	"slices"
+	"strconv"
 	"strings"
 	"testing"
 
+	"gitlab.com/konradodwrot/go-modules/che/internal/execx"
 	"gitlab.com/konradodwrot/go-modules/che/internal/testutil"
+	"gitlab.com/konradodwrot/go-modules/lib/testyml"
 )
 
+//go:embed all:testdata
+var td embed.FS
+
+func octal(t *testing.T, s string) os.FileMode {
+	t.Helper()
+	n, err := strconv.ParseUint(s, 8, 32)
+	if err != nil {
+		t.Fatalf("mode %q: %v", s, err)
+	}
+	return os.FileMode(n)
+}
+
 func TestModeArg(t *testing.T) {
-	cases := map[os.FileMode]string{
-		0644:  "0644",
-		0600:  "0600",
-		0755:  "0755",
-		02775: "2775",
+	type in struct {
+		Args []string
 	}
-	for mode, want := range cases {
-		if got := ModeArg(mode); got != want {
-			t.Errorf("ModeArg(%o) = %q, want %q", mode, got, want)
+	type c struct {
+		Name string
+		In   in
+		Want string
+	}
+	testyml.Run(t, td, "testdata/spec/mode_arg.spec.yml", func(t *testing.T, c c) {
+		if got := ModeArg(octal(t, c.In.Args[0])); got != c.Want {
+			t.Errorf("ModeArg(%s) = %q, want %q", c.In.Args[0], got, c.Want)
 		}
-	}
+	})
 }
 
 func TestIsDir(t *testing.T) {
@@ -45,27 +64,36 @@ func TestIsDir(t *testing.T) {
 }
 
 func TestUnderHome(t *testing.T) {
+	type in struct {
+		Args []string
+	}
+	type c struct {
+		Name string
+		In   in
+		Want bool
+	}
 	f := FS{Home: "/Users/x"}
-	cases := map[string]bool{
-		"/Users/x":         true,
-		"/Users/x/.config": true,
-		"/Users/xyz":       false, // prefix-but-not-subtree
-		"/etc/zshrc":       false,
-		"/Users/x/a/b/c":   true,
-	}
-	for dest, want := range cases {
-		if got := f.UnderHome(dest); got != want {
-			t.Errorf("UnderHome(%q) = %v, want %v", dest, got, want)
+	testyml.Run(t, td, "testdata/spec/is_under_home.spec.yml", func(t *testing.T, c c) {
+		if got := f.IsUnderHome(c.In.Args[0]); got != c.Want {
+			t.Errorf("IsUnderHome(%q) = %v, want %v", c.In.Args[0], got, c.Want)
 		}
-	}
+	})
 }
 
 func TestExpandAll(t *testing.T) {
-	got := ExpandAll([]string{"plain", "x/{a,b}/y"})
-	want := []string{"plain", "x/a/y", "x/b/y"}
-	if !slices.Equal(got, want) {
-		t.Errorf("ExpandAll = %v, want %v", got, want)
+	type in struct {
+		Args []string
 	}
+	type c struct {
+		Name string
+		In   in
+		Want []string
+	}
+	testyml.Run(t, td, "testdata/spec/expand_all.spec.yml", func(t *testing.T, c c) {
+		if got := ExpandAll(c.In.Args); !slices.Equal(got, c.Want) {
+			t.Errorf("ExpandAll = %v, want %v", got, c.Want)
+		}
+	})
 }
 
 // TestTrackedFiles: subtree filtering + untracked exclusion.
@@ -97,11 +125,11 @@ func TestTrackedFiles(t *testing.T) {
 // --exclude-standard` on a mock root/ subtree (hidden, .gitkeep, markers, nesting).
 func TestTrackedFilesMatchesCLI(t *testing.T) {
 	dir := testutil.Repo(t, map[string]string{
-		"che.yml":                                    "profiles:\n", // outside root/, excluded
-		"root/etc/zshrc":                             "z\n",
-		"root/etc/zsh/zshenv":                        "e\n",
-		"root/HOME/.config/zsh/.zshrc":               "hidden\n",
-		"root/HOME/.config/zsh/.gitkeep":             "",
+		"che.yml":                                        "profiles:\n", // outside root/, excluded
+		"root/etc/zshrc":                                 "z\n",
+		"root/etc/zsh/zshenv":                            "e\n",
+		"root/HOME/.config/zsh/.zshrc":                   "hidden\n",
+		"root/HOME/.config/zsh/.gitkeep":                 "",
 		"root/HOME/.config/git/config.ontoHost.tpl":      "tpl\n",
 		"root/Library/LaunchDaemons/x.plist.ontoHost.cp": "cp\n",
 	})
@@ -123,25 +151,91 @@ func TestTrackedFilesMatchesCLI(t *testing.T) {
 	}
 }
 
-// TestMkdirArgv: priv escalation depends on euid, assert the euid-independent
-// shape (mkdir + mode + dest tail).
 func TestMkdirArgv(t *testing.T) {
+	type in struct {
+		Args    []string
+		Parents bool
+	}
+	type c struct {
+		Name string
+		In   in
+		Want []string
+	}
 	f := FS{Home: "/Users/x"}
-	argv := f.MkdirArgv("/Users/x/.config", 0o750, true)
-	want := []string{"mkdir", "-p", "-m", "0750", "/Users/x/.config"}
-	if !slices.Equal(argv, want) {
-		t.Errorf("MkdirArgv(home dest) = %v, want %v", argv, want)
+	testyml.Run(t, td, "testdata/spec/mkdir_argv.spec.yml", func(t *testing.T, c c) {
+		if got := f.MkdirArgv(c.In.Args[0], octal(t, c.In.Args[1]), c.In.Parents); !slices.Equal(got, c.Want) {
+			t.Errorf("MkdirArgv(%v, %v) = %v, want %v", c.In.Args, c.In.Parents, got, c.Want)
+		}
+	})
+}
+
+// TestFSOps runs each mutating FS op against a mock executor: recorded argv
+// asserts the command shape (sudo escalation, flags), nothing touches the host.
+func TestFSOps(t *testing.T) {
+	type in struct {
+		Op      string
+		Args    []string
+		Parents bool
+		Body    string
 	}
-	// no -p when parents is false
-	argv = f.MkdirArgv("/Users/x/.config", 0o750, false)
-	if slices.Contains(argv, "-p") {
-		t.Errorf("MkdirArgv(parents=false) included -p: %v", argv)
+	type want struct {
+		Argv string
+		Body string
 	}
-	// no -m when mode is 0 (umask honored)
-	argv = f.MkdirArgv("/Users/x/.config", 0, true)
-	if want := []string{"mkdir", "-p", "/Users/x/.config"}; !slices.Equal(argv, want) {
-		t.Errorf("MkdirArgv(zero mode) = %v, want %v", argv, want)
+	type c struct {
+		Name string
+		In   in
+		Want want
 	}
+	testyml.Run(t, td, "testdata/spec/fs_ops.spec.yml", func(t *testing.T, c c) {
+		if strings.HasPrefix(c.Want.Argv, "sudo ") && os.Geteuid() == 0 {
+			t.Skip("sudo prefix absent when running as root")
+		}
+		var body []byte
+		m := &execx.Mock{Stub: func(argv []string) ([]byte, error) {
+			if c.In.Op == "install" && len(argv) >= 2 {
+				body, _ = os.ReadFile(argv[len(argv)-2])
+			}
+			return nil, nil
+		}}
+		execx.Swap(t, m)
+		f := FS{Home: "/Users/x"}
+		a := c.In.Args
+		var err error
+		switch c.In.Op {
+		case "mkdir":
+			err = f.Mkdir(a[0], octal(t, a[1]), c.In.Parents)
+		case "symlink":
+			err = f.Symlink(a[0], a[1])
+		case "copy":
+			err = f.Copy(a[0], a[1], octal(t, a[2]))
+		case "remove":
+			err = f.Remove(a[0])
+		case "chown":
+			err = f.Chown(a[0], a[1])
+		case "chmod":
+			err = f.Chmod(a[0], a[1])
+		case "install":
+			err = f.Install(a[0], []byte(c.In.Body), octal(t, a[1]), a[2])
+		default:
+			t.Fatalf("unknown op %q", c.In.Op)
+		}
+		if err != nil {
+			t.Fatal(err)
+		}
+		calls := m.Calls()
+		if len(calls) != 1 {
+			t.Fatalf("calls = %v, want exactly 1", calls)
+		}
+		noDeref := "-n"
+		if runtime.GOOS == "darwin" {
+			noDeref = "-h"
+		}
+		testyml.MustMatch(t, calls[0], testyml.Expand(c.Want.Argv, map[string]string{"NODEREF": noDeref}))
+		if c.Want.Body != "" && string(body) != c.Want.Body {
+			t.Errorf("install body = %q, want %q", body, c.Want.Body)
+		}
+	})
 }
 
 // [<] 🤖🤖

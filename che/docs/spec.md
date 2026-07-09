@@ -114,7 +114,7 @@ every eligible profile. `$ che --profile <name>`: exactly one.
   builtin iff `true`, env iff set non-empty) or `<source> == <literal>`
   (string compare). Sources: `builtin:isOs` (`macos`/`linux`),
   `builtin:isVirt` (`true`/`false`), `env:<NAME>`. Empty: always.
-  `--omit-exec-if` (env `CHE_OMIT_EXEC_IF`): all pass.
+  `--skip-exec-if` (env `CHE_SKIP_EXEC_IF`): all pass.
 
 ### mixinProfiles
 
@@ -149,16 +149,25 @@ Additive. Six sections:
 
 ### link
 
-Globs (brace-expanded) over git-tracked files under `root/`, repo-relative
-below it. Matches symlink to the derived host path (`root/HOME/x` -> `~/x`,
-`root/etc/x` -> `/etc/x`). Templates, `*.ontoHost.cp`, `.gitkeep` never link.
+Entries over git-tracked files under `root/`, repo-relative below it. Matches
+symlink to the derived host path (`root/HOME/x` -> `~/x`, `root/etc/x` ->
+`/etc/x`). Templates, `*.ontoHost.cp`, `.gitkeep` never link.
+
+Items: glob string (brace-expanded, dest derived 1:1), or `{source, dest}`
+where `source` is a file or glob and `dest` a sed-style rewrite
+`s/<pattern>/<replacement>/[g]` (Go regexp, `$1` backrefs, `\/` escapes a
+literal slash; `g` rewrites every match, absent: first only) applied to the
+repo-relative dest path before host mapping.
 
 ```yaml
 include:
   link:
     - HOME/**
     - etc/{grafana,prometheus}/**
+    - {source: HOME/.config/foo/**, dest: s/foo/bar/}
 ```
+
+The rewrite entry links `root/HOME/.config/foo/x` to `~/.config/bar/x`.
 
 ### copy
 

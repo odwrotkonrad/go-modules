@@ -3,401 +3,276 @@ package spec
 // [>] 🤖🤖
 
 import (
+	"embed"
 	"maps"
 	"path/filepath"
 	"slices"
 	"testing"
 
 	"gitlab.com/konradodwrot/go-modules/che/internal/testutil"
+	"gitlab.com/konradodwrot/go-modules/lib/testyml"
 )
 
-// fixtureRepo commits a git repo from files plus che.yml fixture
-// (testutil/specs/<spec>.yml), returns dir.
-func fixtureRepo(t *testing.T, spec string, files map[string]string) string {
-	t.Helper()
-	files = maps.Clone(files)
-	files["che.yml"] = testutil.Spec(t, spec)
-	return testutil.Repo(t, files)
+//go:embed all:testdata
+var td embed.FS
+
+type permWant struct {
+	Owner      string `yaml:"owner"`
+	OwnerGroup string `yaml:"ownerGroup"`
+	Chmod      string `yaml:"chmod"`
 }
 
-func resolve(t *testing.T, dir, profile string) Resolved {
-	t.Helper()
-	s, err := Load(filepath.Join(dir, "che.yml"))
-	if err != nil {
-		t.Fatal(err)
-	}
-	res, err := s.Resolve([]string{profile}, filepath.Join(dir, "root"))
-	if err != nil {
-		t.Fatal(err)
-	}
-	return res
+type optWant struct {
+	WriteType             string `yaml:"writeType"`
+	RenderReferencedFiles bool   `yaml:"renderReferencedFiles"`
 }
 
-// resolveErr asserts Resolve(profile) fails for the given spec fixture.
-func resolveErr(t *testing.T, spec, profile string) {
-	t.Helper()
-	dir := fixtureRepo(t, spec, map[string]string{"root/.gitkeep": ""})
-	s, _ := Load(filepath.Join(dir, "che.yml"))
-	if _, err := s.Resolve([]string{profile}, filepath.Join(dir, "root")); err == nil {
-		t.Fatalf("%s/%s: expected error", spec, profile)
-	}
+type pluginWant struct {
+	URL     string            `yaml:"url"`
+	Profile string            `yaml:"profile"`
+	Env     map[string]string `yaml:"env"`
 }
 
-var mergeFiles = map[string]string{
-	"root/etc/zshrc":                                       "zshrc\n",
-	"root/HOME/.config/zsh/.zshrc":                         "user zshrc\n",
-	"root/etc/grafana/grafana.ini":                         "ini\n",
-	"root/Library/LaunchDaemons/otelcol.plist.ontoHost.cp": "plist\n",
-	"ci/zsh/scripts/installs/10-brew.zsh":                  "#!/bin/zsh\n",
-	"ci/zsh/scripts/installs/20-kitty.zsh":                 "#!/bin/zsh\n",
+type wantSet struct {
+	testyml.Want  `yaml:",inline"`
+	Links         []string            `yaml:"links"`
+	Copies        []string            `yaml:"copies"`
+	Templates     []string            `yaml:"templates"`
+	Dirs          []string            `yaml:"dirs"`
+	ExtraDirs     []string            `yaml:"extraDirs"`
+	Scripts       []string            `yaml:"scripts"`
+	Services      []string            `yaml:"services"`
+	Perms         map[string]permWant `yaml:"perms"`
+	Dests         map[string][]string `yaml:"dests"`
+	TemplateDests [][]string          `yaml:"templateDests"`
+	TemplateOpts  [][]optWant         `yaml:"templateOpts"`
+	Plugins       []pluginWant        `yaml:"plugins"`
 }
 
-// find returns a pointer to the first item satisfying pred, or nil.
-func find(items []FileItem, pred func(FileItem) bool) *FileItem {
-	if i := slices.IndexFunc(items, pred); i >= 0 {
-		return &items[i]
-	}
-	return nil
-}
-
-func relIs(rel string) func(FileItem) bool {
-	return func(it FileItem) bool { return it.Rel == rel }
-}
-
-func destIs(path string) func(FileItem) bool {
-	return func(it FileItem) bool { return it.Dests[0].Path == path }
-}
-
-// hasLink reports whether res.Links carries a file with the given rel.
-func hasLink(res Resolved, rel string) bool {
-	return find(res.Links, relIs(rel)) != nil
-}
-
-func TestResolveMerge(t *testing.T) {
-	dir := fixtureRepo(t, "merge", mergeFiles)
-
-	// desktop: base, everything present.
-	host := resolve(t, dir, "desktop/macos")
-	wantScripts := []string{
-		"ci/zsh/scripts/installs/10-brew.zsh",
-		"ci/zsh/scripts/installs/20-kitty.zsh",
-	}
-	if !slices.Equal(host.Scripts, wantScripts) {
-		t.Errorf("host scripts order = %v, want %v", host.Scripts, wantScripts)
-	}
-	if !hasDir(host, "/var/log/grafana") || !hasDir(host, "HOME/.cache/zsh") {
-		t.Errorf("host dirs missing merge: %v", dirPaths(host.ExtraDirs))
-	}
-	if d := findDir(host, "/var/log/grafana"); d == nil || d.Chmod != "2775" {
-		t.Errorf("grafana dir lost spec chmod: %+v", d)
-	}
-	wantServices := []string{"otelcol", "port-exporter", "grafana", "prometheus"}
-	if !slices.Equal(host.Services, wantServices) {
-		t.Errorf("host services = %v, want %v", host.Services, wantServices)
-	}
-	if !hasLink(host, "etc/grafana/grafana.ini") {
-		t.Errorf("host missing grafana link: %v", host.Links)
-	}
-	// glob in a perm-bearing copy group stamps perms on matched files.
-	if c := find(host.Copies, relIs("Library/LaunchDaemons/otelcol.plist.ontoHost.cp")); c == nil || c.Chmod != "0600" {
-		t.Errorf("perm-group glob did not stamp copy chmod: %+v", c)
-	}
-
-	// cli: base minus exclude-desktop.
-	vm := resolve(t, dir, "cli/macos")
-	if !slices.Equal(vm.Scripts, []string{"ci/zsh/scripts/installs/10-brew.zsh"}) {
-		t.Errorf("vm scripts = %v, want brew only", vm.Scripts)
-	}
-	if hasDir(vm, "/var/log/grafana") {
-		t.Errorf("vm must not keep desktop dirs: %v", dirPaths(vm.ExtraDirs))
-	}
-	if !slices.Equal(vm.Services, []string{"otelcol", "port-exporter"}) {
-		t.Errorf("vm services = %v, want desktop excluded: %v", vm.Services, vm.Services)
-	}
-	if hasLink(vm, "etc/grafana/grafana.ini") {
-		t.Errorf("vm kept desktop-only grafana: %v", vm.Links)
-	}
-}
-
-func TestResolveClassify(t *testing.T) {
-	files := map[string]string{
-		"root/etc/zshrc":                                       "zshrc\n",
-		"root/etc/zsh/zshenv":                                  "env\n",
-		"root/HOME/.config/zsh/.zshrc":                         "user zshrc\n",
-		"root/HOME/.config/git/config":                         "[user]\n",
-		"root/HOME/.config/zsh/x.ontoHost.cp":                  "copyme\n",
-		"root/HOME/.config/zsh/y.ontoHost.tpl":                 "tmpl\n",
-		"root/HOME/.config/zsh/.gitkeep":                       "",
-		"root/etc/grafana/grafana.ini":                         "ini\n",
-		"root/Library/LaunchDaemons/otelcol.plist.ontoHost.cp": "plist\n",
-	}
-	dir := fixtureRepo(t, "classify", files)
-	cs := resolve(t, dir, "cli/macos")
-	wantLinks := []string{
-		"HOME/.config/git/config",
-		"HOME/.config/zsh/.zshrc",
-		"etc/zsh/zshenv",
-		"etc/zshrc",
-	}
-	if !slices.Equal(rels(cs.Links), wantLinks) {
-		t.Errorf("links = %v, want %v", rels(cs.Links), wantLinks)
-	}
-	if !slices.Equal(rels(cs.Copies), []string{
-		"HOME/.config/zsh/x.ontoHost.cp",
-		"Library/LaunchDaemons/otelcol.plist.ontoHost.cp",
-	}) {
-		t.Errorf("copies = %v", rels(cs.Copies))
-	}
-	if !slices.Equal(rels(cs.Templates), []string{"root/HOME/.config/zsh/y.ontoHost.tpl"}) {
-		t.Errorf("templates = %v", rels(cs.Templates))
-	}
-	for _, l := range rels(cs.Links) {
-		if filepath.Base(l) == ".gitkeep" {
-			t.Errorf(".gitkeep leaked into links")
-		}
-	}
-	if !slices.Contains(cs.Dirs, "HOME") || !slices.Contains(cs.Dirs, "HOME/.config/zsh") {
-		t.Errorf("dirs missing ancestors: %v", cs.Dirs)
-	}
-}
-
-// rels extracts the Rel of each FileItem.
 func rels(items []FileItem) []string {
-	return mapItems(items, func(it FileItem) string { return it.Rel })
-}
-
-// dirPaths extracts the first dest path of each dir FileItem.
-func dirPaths(items []FileItem) []string {
-	return mapItems(items, func(it FileItem) string { return it.Dests[0].Path })
-}
-
-// mapItems projects each FileItem through fn.
-func mapItems[T any](items []FileItem, fn func(FileItem) T) []T {
-	out := make([]T, len(items))
+	out := make([]string, len(items))
 	for i, it := range items {
-		out[i] = fn(it)
+		out[i] = it.Rel
 	}
 	return out
 }
 
-// findDir returns the dir FileItem with the given dest path, or nil.
-func findDir(res Resolved, path string) *FileItem { return find(res.ExtraDirs, destIs(path)) }
+func dirPaths(items []FileItem) []string {
+	out := make([]string, len(items))
+	for i, it := range items {
+		out[i] = it.Dests[0].Path
+	}
+	return out
+}
 
-// hasDir reports whether res.ExtraDirs carries the given path.
-func hasDir(res Resolved, path string) bool { return findDir(res, path) != nil }
+func destPaths(item FileItem) []string {
+	out := make([]string, len(item.Dests))
+	for i, d := range item.Dests {
+		out[i] = d.Path
+	}
+	return out
+}
 
-func TestResolveUndefinedFails(t *testing.T) {
-	dir := fixtureRepo(t, "merge", mergeFiles)
-	s, _ := Load(filepath.Join(dir, "che.yml"))
-	if _, err := s.Resolve([]string{"cli/linux"}, filepath.Join(dir, "root")); err == nil {
-		t.Fatal("expected error for undefined profile")
+func findItem(res Resolved, key string) *FileItem {
+	for _, items := range [][]FileItem{res.Links, res.Copies, res.Templates} {
+		if i := slices.IndexFunc(items, func(it FileItem) bool { return it.Rel == key }); i >= 0 {
+			return &items[i]
+		}
+	}
+	if i := slices.IndexFunc(res.ExtraDirs, func(it FileItem) bool { return it.Dests[0].Path == key }); i >= 0 {
+		return &res.ExtraDirs[i]
+	}
+	return nil
+}
+
+func projections(res Resolved) map[string][]string {
+	return map[string][]string{
+		"links":     rels(res.Links),
+		"copies":    rels(res.Copies),
+		"templates": rels(res.Templates),
+		"dirs":      res.Dirs,
+		"extraDirs": dirPaths(res.ExtraDirs),
+		"scripts":   res.Scripts,
+		"services":  res.Services,
 	}
 }
 
-func TestMixinProfilesCycle(t *testing.T) {
-	resolveErr(t, "cycle", "cli/macos")
-}
-
-// TestIncludeExcludeSections: exclude wins over explicit include across every
-// key (glob match, not exact), including rich {source,dest} entries.
-func TestIncludeExcludeSections(t *testing.T) {
-	files := map[string]string{
-		"root/etc/zshrc":                      "z\n",
-		"root/etc/zsh/zshenv":                 "e\n", // excluded -> must not link
-		"root/HOME/.config/extra/x":           "x\n",
-		"root/HOME/.config/oneoff/y":          "y\n",
-		"root/HOME/.config/zsh/c.ontoHost.cp": "c\n", // rich copy, excluded by glob
-		"ci/zsh/scripts/installs/10-brew.zsh": "#!/bin/zsh\n",
-		"ci/zsh/scripts/installs/20-foo.zsh":  "#!/bin/zsh\n", // excluded by run-scripts
-	}
-	dir := fixtureRepo(t, "include-exclude", files)
-	res := resolve(t, dir, "cli/macos")
-
-	if !hasLink(res, "HOME/.config/extra/x") {
-		t.Errorf("include.link extra not merged: %v", rels(res.Links))
-	}
-	if !hasLink(res, "etc/zshrc") {
-		t.Errorf("etc/zshrc include missing: %v", rels(res.Links))
-	}
-	if hasLink(res, "etc/zsh/zshenv") {
-		t.Errorf("exclude.link glob not applied: %v", rels(res.Links))
-	}
-	if find(res.Copies, relIs("HOME/.config/zsh/c.ontoHost.cp")) != nil {
-		t.Errorf("exclude.copy glob did not drop rich entry: %v", rels(res.Copies))
-	}
-	if !slices.Contains(res.Scripts, "ci/zsh/scripts/installs/10-brew.zsh") {
-		t.Errorf("include.run-scripts brew missing: %v", res.Scripts)
-	}
-	if slices.Contains(res.Scripts, "ci/zsh/scripts/installs/20-foo.zsh") {
-		t.Errorf("exclude.run-scripts did not remove foo: %v", res.Scripts)
-	}
-	if slices.Contains(res.Services, "grafana") {
-		t.Errorf("exclude.services glob did not remove grafana: %v", res.Services)
-	}
-	if !slices.Contains(res.Services, "otelcol") {
-		t.Errorf("otelcol service missing: %v", res.Services)
+func (w wantSet) lists() map[string][]string {
+	return map[string][]string{
+		"links":     w.Links,
+		"copies":    w.Copies,
+		"templates": w.Templates,
+		"dirs":      w.Dirs,
+		"extraDirs": w.ExtraDirs,
+		"scripts":   w.Scripts,
+		"services":  w.Services,
 	}
 }
 
-// TestExcludeScriptGlob: a single-file run-scripts exclude drops that file even
-// when the include is a directory glob ([why] globs expand before exclude).
-func TestExcludeScriptGlob(t *testing.T) {
-	files := map[string]string{
-		"root/.gitkeep":                       "",
-		"ci/zsh/scripts/installs/10-brew.zsh": "#!/bin/zsh\n",
-		"ci/zsh/scripts/installs/20-foo.zsh":  "#!/bin/zsh\n",
-		"ci/zsh/scripts/installs/30-tmux.zsh": "#!/bin/zsh\n",
-	}
-	dir := fixtureRepo(t, "exclude-script-glob", files)
-	res := resolve(t, dir, "cli/macos")
-
-	want := []string{
-		"ci/zsh/scripts/installs/10-brew.zsh",
-		"ci/zsh/scripts/installs/30-tmux.zsh",
-	}
-	if !slices.Equal(res.Scripts, want) {
-		t.Errorf("glob include + single-file exclude: got %v, want %v", res.Scripts, want)
-	}
-}
-
-func TestMixinProfilesUndefined(t *testing.T) {
-	resolveErr(t, "undefined-include", "cli/macos")
-}
-
-// TestRepoTemplateResolve: rich renderTemplates entries resolve to FileItems
-// carrying source, repo-relative dests, and per-dest options.
-func TestRepoTemplateResolve(t *testing.T) {
-	dir := fixtureRepo(t, "repo-template", map[string]string{"root/.gitkeep": ""})
-	res := resolve(t, dir, "cli/macos")
-
-	if len(res.Templates) != 2 {
-		t.Fatalf("Templates = %d, want 2", len(res.Templates))
-	}
-	env := res.Templates[0]
-	if env.Rel != "templates/1-env/local.env.ontoRepo.tpl" {
-		t.Errorf("env entry = %+v", env)
-	}
-	if len(env.Dests) != 1 || env.Dests[0].Path != ".env" || env.Dests[0].Options.WriteType != "mergeUpsert" {
-		t.Errorf("env dest = %+v", env.Dests)
-	}
-	agents := res.Templates[1]
-	if len(agents.Dests) != 2 || agents.Dests[0].Path != "CLAUDE.md" {
-		t.Errorf("agents dests = %+v", agents.Dests)
-	}
-	if !agents.Dests[1].Options.RenderReferencedFiles {
-		t.Errorf("AGENTS.md dest should set options.renderReferencedFiles")
-	}
-}
-
-// TestRepoTemplateGlobError: a non-root/-prefixed renderTemplates glob is
-// rejected ([why] derived dests exist only for root/ sources).
-func TestRepoTemplateGlobError(t *testing.T) {
-	resolveErr(t, "repo-template-glob", "cli/macos")
-}
-
-// loadSpec loads a fixture's Raw for EligibleProfiles assertions.
-func loadSpec(t *testing.T, spec string) *Raw {
+func assertWant(t *testing.T, res Resolved, w wantSet) {
 	t.Helper()
-	dir := fixtureRepo(t, spec, map[string]string{"root/.gitkeep": ""})
-	s, err := Load(filepath.Join(dir, "che.yml"))
-	if err != nil {
-		t.Fatal(err)
+	got := projections(res)
+	for key, want := range w.lists() {
+		if want == nil {
+			continue
+		}
+		if !slices.Equal(got[key], want) {
+			t.Errorf("%s = %v, want %v", key, got[key], want)
+		}
 	}
-	return s
+	for key, p := range w.Perms {
+		item := findItem(res, key)
+		if item == nil {
+			t.Errorf("perms: %q not resolved", key)
+			continue
+		}
+		if (p.Owner != "" && item.Owner != p.Owner) ||
+			(p.OwnerGroup != "" && item.OwnerGroup != p.OwnerGroup) ||
+			(p.Chmod != "" && item.Chmod != p.Chmod) {
+			t.Errorf("perms[%q] = %+v, want %+v", key, item.Perms, p)
+		}
+	}
+	for key, want := range w.Dests {
+		item := findItem(res, key)
+		if item == nil {
+			t.Errorf("dests: %q not resolved", key)
+			continue
+		}
+		if got := destPaths(*item); !slices.Equal(got, want) {
+			t.Errorf("dests[%q] = %v, want %v", key, got, want)
+		}
+	}
+	for i, want := range w.TemplateDests {
+		if i >= len(res.Templates) {
+			t.Errorf("templateDests[%d]: only %d templates resolved", i, len(res.Templates))
+			continue
+		}
+		if got := destPaths(res.Templates[i]); !slices.Equal(got, want) {
+			t.Errorf("templateDests[%d] = %v, want %v", i, got, want)
+		}
+	}
+	for i, opts := range w.TemplateOpts {
+		if i >= len(res.Templates) {
+			t.Errorf("templateOpts[%d]: only %d templates resolved", i, len(res.Templates))
+			continue
+		}
+		dests := res.Templates[i].Dests
+		if len(opts) != len(dests) {
+			t.Errorf("templateOpts[%d]: %d dests, want %d", i, len(dests), len(opts))
+			continue
+		}
+		for j, o := range opts {
+			if string(dests[j].Options.WriteType) != o.WriteType || dests[j].Options.RenderReferencedFiles != o.RenderReferencedFiles {
+				t.Errorf("templateOpts[%d][%d] = %+v, want %+v", i, j, dests[j].Options, o)
+			}
+		}
+	}
+	if w.Plugins != nil {
+		if len(res.Plugins) != len(w.Plugins) {
+			t.Fatalf("plugins = %v, want %v", res.Plugins, w.Plugins)
+		}
+		for i, p := range w.Plugins {
+			got := res.Plugins[i]
+			if got.URL != p.URL || got.Profile != p.Profile || !maps.Equal(got.Env, p.Env) {
+				t.Errorf("plugins[%d] = %+v, want %+v", i, got, p)
+			}
+		}
+	}
 }
 
-// osEval fakes the builtin evaluator for a host: os = "macos"|"linux", virt fixed true.
-func osEval(os string) func(string) (bool, error) {
-	return stubEvaluator(os, true).EvalExecIf
-}
-
-// eligibleOK asserts EligibleProfiles returns want.
-func eligibleOK(t *testing.T, s *Raw, forceOne string, forceAll bool, eval func(string) (bool, error), want []string) {
+func assertMembership(t *testing.T, res Resolved, w *wantSet, present bool) {
 	t.Helper()
-	got, err := s.EligibleProfiles(forceOne, forceAll, eval)
-	if err != nil {
-		t.Fatalf("EligibleProfiles(%q,%v) errored: %v", forceOne, forceAll, err)
+	if w == nil {
+		return
 	}
-	if !slices.Equal(got, want) {
-		t.Errorf("EligibleProfiles(%q,%v) = %v, want %v", forceOne, forceAll, got, want)
-	}
-}
-
-// eligibleErr asserts EligibleProfiles fails.
-func eligibleErr(t *testing.T, s *Raw, forceOne string, forceAll bool, eval func(string) (bool, error)) {
-	t.Helper()
-	if got, err := s.EligibleProfiles(forceOne, forceAll, eval); err == nil {
-		t.Fatalf("EligibleProfiles(%q,%v) = %v, want error", forceOne, forceAll, got)
+	got := projections(res)
+	for key, entries := range w.lists() {
+		for _, e := range entries {
+			if slices.Contains(got[key], e) != present {
+				t.Errorf("%s: %q present=%v, want present=%v (%v)", key, e, !present, present, got[key])
+			}
+		}
 	}
 }
 
-// TestEligibleExecIf: execIf-gated profiles pass iff every expression passes.
-func TestEligibleExecIf(t *testing.T) {
-	s := loadSpec(t, "che")
-	eligibleOK(t, s, "", false, osEval("macos"), []string{"cli/macos"})
-	eligibleErr(t, s, "", false, osEval("linux"))
-}
-
-// TestEligibleForceOne: --profile runs only that profile; its execIf is
-// still enforced, --omit-exec-if (forceAll) lifts it.
-func TestEligibleForceOne(t *testing.T) {
-	s := loadSpec(t, "che")
-	eligibleErr(t, s, "desktop/macos", false, osEval("linux"))
-	eligibleOK(t, s, "desktop/macos", true, osEval("linux"), []string{"desktop/macos"})
-	eligibleOK(t, s, "desktop/macos", false, stubEvaluator("macos", false).EvalExecIf, []string{"desktop/macos"})
-}
-
-// TestEligibleForceOneNonAutoExec: force-one may name any defined profile,
-// autoExec or not (base and ontoRepo are non-autoExec).
-func TestEligibleForceOneNonAutoExec(t *testing.T) {
-	s := loadSpec(t, "che")
-	eligibleOK(t, s, "base", false, osEval("linux"), []string{"base"})
-	eligibleOK(t, s, "ontoRepo", false, osEval("linux"), []string{"ontoRepo"})
-}
-
-// TestEligibleForceOneUndefined: forcing an undefined name errors.
-func TestEligibleForceOneUndefined(t *testing.T) {
-	s := loadSpec(t, "che")
-	eligibleErr(t, s, "cli/linux", false, osEval("macos"))
-}
-
-// TestEligibleForceAll: CHE_OMIT_EXEC_IF makes every execIf pass;
-// non-autoExec profiles stay out of the list.
-func TestEligibleForceAll(t *testing.T) {
-	s := loadSpec(t, "che")
-	eligibleOK(t, s, "", true, osEval("linux"), []string{"cli/macos", "desktop/macos"})
-}
-
-// TestEligibleLonePlain: a profile without execIf is always eligible.
-func TestEligibleLonePlain(t *testing.T) {
-	s := loadSpec(t, "repo")
-	eligibleOK(t, s, "", false, osEval("linux"), []string{"repo"})
-}
-
-// TestEligibleUnionOrder: multiple plain profiles are all eligible, in
-// declaration order.
-func TestEligibleUnionOrder(t *testing.T) {
-	s := loadSpec(t, "ambiguous")
-	eligibleOK(t, s, "", false, osEval("linux"), []string{"repo", "other"})
-}
-
-// TestResolveUnion: resolving multiple profiles merges their includes in order.
-func TestResolveUnion(t *testing.T) {
-	dir := fixtureRepo(t, "ambiguous", map[string]string{"root/.gitkeep": ""})
-	s, err := Load(filepath.Join(dir, "che.yml"))
-	if err != nil {
-		t.Fatal(err)
+func TestResolve(t *testing.T) {
+	type in struct {
+		Spec     string
+		Tree     string
+		Profiles []string
 	}
-	res, err := s.Resolve([]string{"repo", "other"}, filepath.Join(dir, "root"))
-	if err != nil {
-		t.Fatal(err)
+	type c struct {
+		Name     string
+		In       in
+		Want     *wantSet
+		Contains *wantSet
+		NotWant  *wantSet `yaml:"notWant"`
 	}
-	if len(res.Templates) != 2 {
-		t.Fatalf("Templates = %d, want 2", len(res.Templates))
+	testyml.Run(t, td, "testdata/spec/resolve.spec.yml", func(t *testing.T, c c) {
+		dir := t.TempDir()
+		testyml.CopyDir(t, td, "testdata/fixture/resolve/"+c.In.Tree, dir)
+		if c.In.Spec != "" {
+			testutil.WriteTree(t, dir, map[string]string{"che.yml": testutil.Spec(t, c.In.Spec)})
+		}
+		testutil.GitRepo(t, dir)
+		s, err := Load(filepath.Join(dir, "che.yml"))
+		if err != nil {
+			t.Fatal(err)
+		}
+		res, err := s.Resolve(c.In.Profiles, filepath.Join(dir, "root"))
+		if c.Want != nil && c.Want.IsErrorWanted() {
+			c.Want.CheckErr(t, err)
+			return
+		}
+		if err != nil {
+			t.Fatal(err)
+		}
+		if c.Want != nil {
+			assertWant(t, res, *c.Want)
+		}
+		assertMembership(t, res, c.Contains, true)
+		assertMembership(t, res, c.NotWant, false)
+	})
+}
+
+func TestEligibleProfiles(t *testing.T) {
+	type in struct {
+		Spec     string
+		OS       string `yaml:"os"`
+		Virt     bool
+		ForceOne string `yaml:"forceOne"`
+		ForceAll bool   `yaml:"forceAll"`
 	}
-	if res.Templates[0].Dests[0].Path != ".env" || res.Templates[1].Dests[0].Path != ".env2" {
-		t.Errorf("union order = %+v", res.Templates)
+	type want struct {
+		Profiles []string
+		Error    bool
 	}
+	type c struct {
+		Name string
+		In   in
+		Want want
+	}
+	testyml.Run(t, td, "testdata/spec/eligible_profiles.spec.yml", func(t *testing.T, c c) {
+		dir := t.TempDir()
+		testutil.WriteTree(t, dir, map[string]string{"che.yml": testutil.Spec(t, c.In.Spec)})
+		s, err := Load(filepath.Join(dir, "che.yml"))
+		if err != nil {
+			t.Fatal(err)
+		}
+		got, err := s.EligibleProfiles(c.In.ForceOne, c.In.ForceAll, stubEvaluator(c.In.OS, c.In.Virt).EvalExecIf)
+		if c.Want.Error {
+			if err == nil {
+				t.Fatalf("EligibleProfiles = %v, want error", got)
+			}
+			return
+		}
+		if err != nil {
+			t.Fatal(err)
+		}
+		if !slices.Equal(got, c.Want.Profiles) {
+			t.Errorf("EligibleProfiles = %v, want %v", got, c.Want.Profiles)
+		}
+	})
 }
 
 // [<] 🤖🤖

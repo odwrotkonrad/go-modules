@@ -48,15 +48,15 @@ type groupNode struct {
 	childSubgroups []string
 }
 
-// isRepo: dir holds a .git entry (leaf; recursion stops here).
-func isRepo(dir string) bool {
+// isRepoDir: dir holds a .git entry (leaf; recursion stops here).
+func isRepoDir(dir string) bool {
 	_, err := os.Stat(filepath.Join(dir, ".git"))
 	return err == nil
 }
 
-// hasRepoBelow: dir contains ≥1 repo at any depth (so it is a subgroup).
-func hasRepoBelow(dir string) bool {
-	if isRepo(dir) {
+// isRepoWithin: dir contains ≥1 repo at any depth (so it is a subgroup).
+func isRepoWithin(dir string) bool {
+	if isRepoDir(dir) {
 		return true
 	}
 	entries, err := os.ReadDir(dir)
@@ -64,7 +64,7 @@ func hasRepoBelow(dir string) bool {
 		return false
 	}
 	return slices.ContainsFunc(entries, func(e os.DirEntry) bool {
-		return e.IsDir() && hasRepoBelow(filepath.Join(dir, e.Name()))
+		return e.IsDir() && isRepoWithin(filepath.Join(dir, e.Name()))
 	})
 }
 
@@ -82,9 +82,9 @@ func scanGroup(dir string) (groupNode, error) {
 		}
 		child := filepath.Join(dir, e.Name())
 		switch {
-		case isRepo(child):
+		case isRepoDir(child):
 			node.childRepos = append(node.childRepos, e.Name())
-		case hasRepoBelow(child):
+		case isRepoWithin(child):
 			node.childSubgroups = append(node.childSubgroups, e.Name())
 		}
 	}
@@ -201,7 +201,7 @@ func RepoGroupIndex(workspaceRoot string) (map[string]string, error) {
 	out := map[string]string{}
 	var walk func(dir string) error
 	walk = func(dir string) error {
-		if isRepo(dir) {
+		if isRepoDir(dir) {
 			return nil
 		}
 		node, err := scanGroup(dir)

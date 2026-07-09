@@ -29,21 +29,26 @@ type tmplDest struct {
 // repo-root-relative. Glob-form items (no explicit dest) render raw to the
 // derived host path; rich items fan out across their dests through
 // render.Compose, host dests placed with spec perms, repo dests written as
-// plain repo files. A failing item is logged and the rest still render;
-// failures join into the returned error.
-func (h Host) RenderTemplates(templates []spec.FileItem) error {
-	skipSecret := os.Getenv("CHE_RENDER_TEMPLATES_DRY_RUN_SECRETS") != ""
-	var keep []spec.FileItem
+// plain repo files. skipSecrets drops sources carrying op:// secret refs
+// (logged, dests untouched). A failing item is logged and the rest still
+// render; failures join into the returned error.
+func (h Host) RenderTemplates(templates []spec.FileItem, skipSecrets bool) error {
+	type tmplItem struct {
+		item  spec.FileItem
+		dests []tmplDest
+	}
+	var keep []tmplItem
 	var hostDests []string
 	for _, item := range templates {
-		if skipSecret && srcHasSecretRef(filepath.Join(h.RepoRoot, item.Rel)) {
-			for _, d := range h.templateDests(item) {
-				h.fs.Log("render(dry-run-render-secrets)", d.path)
+		dests := h.templateDests(item)
+		if skipSecrets && isSecretRefInSrc(filepath.Join(h.RepoRoot, item.Rel)) {
+			for _, d := range dests {
+				h.log("render(skip-secrets)", d.path)
 			}
 			continue
 		}
-		keep = append(keep, item)
-		for _, d := range h.templateDests(item) {
+		keep = append(keep, tmplItem{item, dests})
+		for _, d := range dests {
 			if d.host {
 				hostDests = append(hostDests, d.path)
 			}
@@ -55,12 +60,12 @@ func (h Host) RenderTemplates(templates []spec.FileItem) error {
 		}
 	}
 	var errs []error
-	if h.DryRun() { // [why] dry-run logs dests only: no gomplate render, no @-include resolve
-		for _, item := range keep {
-			for _, d := range h.templateDests(item) {
-				h.fs.Log("render(create)", d.path)
+	if h.IsDryRun() { // [why] dry-run logs dests only: no gomplate render, no @-include resolve
+		for _, t := range keep {
+			for _, d := range t.dests {
+				h.log("render(create)", d.path)
 				if d.host {
-					if err := h.fixPerms("render", d.path, item); err != nil {
+					if err := h.fixPerms("render", d.path, t.item); err != nil {
 						errs = append(errs, h.failItem("render", d.path, err))
 					}
 				}
@@ -68,23 +73,23 @@ func (h Host) RenderTemplates(templates []spec.FileItem) error {
 		}
 		return errors.Join(errs...)
 	}
-	for _, item := range keep {
-		if err := h.renderTemplate(item); err != nil {
-			errs = append(errs, h.failItem("render", item.Rel, err))
+	for _, t := range keep {
+		if err := h.renderTemplate(t.item, t.dests); err != nil {
+			errs = append(errs, h.failItem("render", t.item.Rel, err))
 		}
 	}
 	return errors.Join(errs...)
 }
 
-// srcHasSecretRef reports whether the template source at path carries an op://
+// isSecretRefInSrc reports whether the template source at path carries an op://
 // secret reference (a render-time vault fetch). Unreadable source -> false
 // (render proceeds, errors there).
-func srcHasSecretRef(path string) bool {
+func isSecretRefInSrc(path string) bool {
 	src, err := os.ReadFile(path)
 	if err != nil {
 		return false
 	}
-	return render.HasSecretRef(src)
+	return render.IsSecretRefPresent(src)
 }
 
 // templateDests resolves an item's dests: derived host path (no explicit dest,
@@ -106,7 +111,7 @@ func (h Host) templateDests(item spec.FileItem) []tmplDest {
 	return out
 }
 
-func (h Host) renderTemplate(item spec.FileItem) error {
+func (h Host) renderTemplate(item spec.FileItem, dests []tmplDest) error {
 	tmplPath := filepath.Join(h.RepoRoot, item.Rel)
 	src, err := os.ReadFile(tmplPath)
 	if err != nil {
@@ -117,10 +122,10 @@ func (h Host) renderTemplate(item spec.FileItem) error {
 		return err
 	}
 	if len(item.Dests) == 0 { // derived host dest: raw body, no Compose header
-		return h.placeFile(h.templateDests(item)[0].path, body, item)
+		return h.placeFile(dests[0].path, body, item)
 	}
-	for _, d := range h.templateDests(item) {
-		existing, _ := os.ReadFile(d.path) // absent -> nil (mergeUpsert: defaults only)
+	for _, d := range dests {
+		existing, _ := h.readExisting(d) // absent -> nil (mergeUpsert: defaults only)
 		out := render.Compose(render.Composition{
 			Body:       body,
 			Opts:       d.opts,
@@ -135,7 +140,10 @@ func (h Host) renderTemplate(item spec.FileItem) error {
 			}
 			continue
 		}
-		h.fs.Log("render(create)", d.path)
+		h.log("render(create)", d.path)
+		if err := os.MkdirAll(filepath.Dir(d.path), 0o755); err != nil {
+			return err
+		}
 		if err := os.WriteFile(d.path, out, repoFileMode); err != nil {
 			return err
 		}
@@ -143,10 +151,21 @@ func (h Host) renderTemplate(item spec.FileItem) error {
 	return nil
 }
 
+// readExisting reads a dest's current content for Compose: host dests through
+// the reader (mockable), repo dests straight from disk.
+func (h Host) readExisting(d tmplDest) ([]byte, error) {
+	if d.host {
+		return h.reader.ReadFile(d.path)
+	}
+	return os.ReadFile(d.path)
+}
+
 // placeFile installs body with spec perms (mode 0 -> install default, no chown).
 func (h Host) placeFile(dest string, body []byte, item spec.FileItem) error {
 	mode, _ := parseMode(item.Chmod)
-	return h.fs.Install(dest, body, mode, ownerSpec(item))
+	return h.mutate("render(create)", dest, func() error {
+		return h.fs.Install(dest, body, mode, ownerSpec(item))
+	})
 }
 
 // [<] 🤖🤖

@@ -1,356 +1,367 @@
 {
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://gitlab.com/konradodwrot/go-modules/-/raw/main/che/assets/data/che.schema.json",
   "$defs": {
-    "destEntry": {
+    "DestSpec": {
       "oneOf": [
         {
-          "description": "dest path: relative -\u003e repo, ~/ or absolute -\u003e host",
-          "type": "string"
+          "type": "string",
+          "description": "dest path: relative -\u003e repo, ~/ or absolute -\u003e host"
         },
         {
-          "additionalProperties": false,
           "properties": {
+            "path": {
+              "type": "string",
+              "description": "dest path: relative -\u003e repo, ~/ or absolute -\u003e host"
+            },
             "options": {
-              "additionalProperties": false,
-              "description": "per-dest render options",
               "properties": {
-                "renderReferencedFiles": {
-                  "description": "inline @-includes into the rendered body (overwrite only)",
-                  "type": "boolean"
-                },
                 "writeType": {
-                  "description": "how the rendered body lands: overwrite (default: header + body) | mergeUpsert (env KEY=VALUE union under the existing dest) | raw (body verbatim, no autogen header)",
                   "enum": [
                     "",
                     "mergeUpsert",
                     "raw"
-                  ]
+                  ],
+                  "description": "how the rendered body lands: overwrite (default: header + body) | mergeUpsert (env KEY=VALUE union under the existing dest) | raw (body verbatim, no autogen header)"
+                },
+                "renderReferencedFiles": {
+                  "type": "boolean",
+                  "description": "inline @-includes into the rendered body (overwrite only)"
                 }
               },
-              "type": "object"
-            },
-            "path": {
-              "description": "dest path: relative -\u003e repo, ~/ or absolute -\u003e host",
-              "type": "string"
+              "additionalProperties": false,
+              "type": "object",
+              "description": "per-dest render options"
             }
           },
+          "additionalProperties": false,
+          "type": "object",
           "required": [
             "path"
-          ],
-          "type": "object"
+          ]
         }
       ]
     },
-    "dirEntry": {
+    "ProfileOptions": {
+      "properties": {
+        "execIf": {
+          "items": {
+            "type": "string"
+          },
+          "type": "array",
+          "description": "predicate expressions `\u003csource\u003e` or `\u003csource\u003e == \u003cliteral\u003e`, sources builtin:*/env:*; empty: always"
+        },
+        "autoExec": {
+          "type": "boolean",
+          "description": "run on bare che (default false: runs only via --profile or mixinProfiles)"
+        }
+      },
+      "additionalProperties": false,
+      "type": "object"
+    },
+    "dirGroup": {
+      "properties": {
+        "owner": {
+          "type": "string",
+          "description": "dest owner user; empty: code default"
+        },
+        "ownerGroup": {
+          "type": "string",
+          "description": "dest owner group; empty: code default"
+        },
+        "chmod": {
+          "type": "string",
+          "pattern": "^[0-7]{3,4}$",
+          "description": "dest mode, octal string"
+        },
+        "files": {
+          "items": {
+            "$ref": "#/$defs/dirSpec"
+          },
+          "type": "array",
+          "description": "the group's items, each inheriting the group's perms"
+        }
+      },
+      "additionalProperties": false,
+      "type": "object",
+      "required": [
+        "files"
+      ]
+    },
+    "dirSpec": {
       "oneOf": [
         {
-          "description": "dir path (brace-expanded)",
-          "type": "string"
+          "type": "string",
+          "description": "dir path (brace-expanded)"
         },
         {
-          "additionalProperties": false,
           "properties": {
             "dest": {
-              "description": "dir paths (brace-expanded)",
               "items": {
-                "$ref": "#/$defs/destEntry"
+                "$ref": "#/$defs/DestSpec"
               },
-              "type": "array"
+              "type": "array",
+              "description": "dir paths (brace-expanded)"
             }
           },
+          "additionalProperties": false,
+          "type": "object",
           "required": [
             "dest"
-          ],
-          "type": "object"
+          ]
         }
+      ]
+    },
+    "entry": {
+      "properties": {
+        "owner": {
+          "type": "string",
+          "description": "dest owner user; empty: code default"
+        },
+        "ownerGroup": {
+          "type": "string",
+          "description": "dest owner group; empty: code default"
+        },
+        "chmod": {
+          "type": "string",
+          "pattern": "^[0-7]{3,4}$",
+          "description": "dest mode, octal string"
+        },
+        "files": {
+          "items": {
+            "$ref": "#/$defs/fileSpec"
+          },
+          "type": "array",
+          "description": "the group's items, each inheriting the group's perms"
+        }
+      },
+      "additionalProperties": false,
+      "type": "object",
+      "required": [
+        "files"
       ]
     },
     "excludeSet": {
-      "additionalProperties": false,
-      "description": "subtractive glob filter, applied last, wins over every include (rich entries too)",
       "properties": {
-        "copy": {
-          "description": "drop matching copy items (source or dest)",
-          "items": {
-            "type": "string"
-          },
-          "type": "array"
-        },
         "link": {
-          "description": "drop matching link items",
           "items": {
             "type": "string"
           },
-          "type": "array"
+          "type": "array",
+          "description": "drop matching link items"
         },
-        "mkdirs": {
-          "description": "drop matching dirs",
+        "copy": {
           "items": {
             "type": "string"
           },
-          "type": "array"
+          "type": "array",
+          "description": "drop matching copy items (source or dest)"
         },
         "renderTemplates": {
-          "description": "drop matching template items (source or dest)",
           "items": {
             "type": "string"
           },
-          "type": "array"
+          "type": "array",
+          "description": "drop matching template items (source or dest)"
+        },
+        "mkdirs": {
+          "items": {
+            "type": "string"
+          },
+          "type": "array",
+          "description": "drop matching dirs"
         },
         "runScripts": {
-          "description": "drop matching scripts (resolved file paths)",
           "items": {
             "type": "string"
           },
-          "type": "array"
+          "type": "array",
+          "description": "drop matching scripts (resolved file paths)"
         },
         "services": {
-          "description": "drop matching services",
           "items": {
             "type": "string"
           },
-          "type": "array"
+          "type": "array",
+          "description": "drop matching services"
         }
       },
-      "type": "object"
+      "additionalProperties": false,
+      "type": "object",
+      "description": "subtractive glob filter, applied last, wins over every include (rich entries too)"
     },
-    "fileEntry": {
+    "fileSpec": {
       "oneOf": [
         {
-          "description": "glob over git-tracked files (brace-expanded)",
-          "type": "string"
+          "type": "string",
+          "description": "glob over git-tracked files (brace-expanded)"
         },
         {
-          "additionalProperties": false,
-          "description": "one source fanned out to explicit dests",
           "properties": {
-            "dest": {
-              "description": "dest paths: relative -\u003e repo, ~/ or absolute -\u003e host; omitted -\u003e derived from the root/ source path",
-              "items": {
-                "$ref": "#/$defs/destEntry"
-              },
-              "type": "array"
-            },
             "source": {
-              "description": "repo-relative source path",
-              "type": "string"
+              "type": "string",
+              "description": "repo-relative source path"
+            },
+            "dest": {
+              "items": {
+                "$ref": "#/$defs/DestSpec"
+              },
+              "type": "array",
+              "description": "dest paths: relative -\u003e repo, ~/ or absolute -\u003e host; omitted -\u003e derived from the root/ source path"
             }
           },
+          "additionalProperties": false,
+          "type": "object",
           "required": [
             "source"
           ],
-          "type": "object"
+          "description": "one source fanned out to explicit dests"
         }
       ]
     },
     "includeSet": {
-      "additionalProperties": false,
-      "description": "additive payload: link globs, copy/renderTemplates/mkdirs perm-groups, script globs, service names",
       "properties": {
-        "copy": {
-          "description": "*.ontoHost.cp copy-op perm-groups",
-          "items": {
-            "additionalProperties": false,
-            "properties": {
-              "chmod": {
-                "description": "dest mode, octal string",
-                "pattern": "^[0-7]{3,4}$",
-                "type": "string"
-              },
-              "files": {
-                "description": "the group's items, each inheriting the group's perms",
-                "items": {
-                  "$ref": "#/$defs/fileEntry"
-                },
-                "type": "array"
-              },
-              "owner": {
-                "description": "dest owner user; empty: code default",
-                "type": "string"
-              },
-              "ownerGroup": {
-                "description": "dest owner group; empty: code default",
-                "type": "string"
-              }
-            },
-            "required": [
-              "files"
-            ],
-            "type": "object"
-          },
-          "type": "array"
-        },
         "link": {
-          "description": "symlink-op globs, repo-relative under root/",
           "items": {
-            "type": "string"
+            "$ref": "#/$defs/linkEntry"
           },
-          "type": "array"
+          "type": "array",
+          "description": "symlink-op entries, repo-relative under root/: glob string (dest derived 1:1) or {source, dest} sed-style rewrite"
         },
-        "mkdirs": {
-          "description": "extra-dir perm-groups; each item one dir path (brace-expanded)",
+        "copy": {
           "items": {
-            "additionalProperties": false,
-            "properties": {
-              "chmod": {
-                "description": "dest mode, octal string",
-                "pattern": "^[0-7]{3,4}$",
-                "type": "string"
-              },
-              "files": {
-                "description": "the group's items, each inheriting the group's perms",
-                "items": {
-                  "$ref": "#/$defs/dirEntry"
-                },
-                "type": "array"
-              },
-              "owner": {
-                "description": "dest owner user; empty: code default",
-                "type": "string"
-              },
-              "ownerGroup": {
-                "description": "dest owner group; empty: code default",
-                "type": "string"
-              }
-            },
-            "required": [
-              "files"
-            ],
-            "type": "object"
+            "$ref": "#/$defs/entry"
           },
-          "type": "array"
+          "type": "array",
+          "description": "*.ontoHost.cp copy-op perm-groups"
         },
         "renderTemplates": {
-          "description": "*.tpl render-op perm-groups; sources repo-root-relative, glob and derived-dest forms must be root/-prefixed",
           "items": {
-            "additionalProperties": false,
-            "properties": {
-              "chmod": {
-                "description": "dest mode, octal string",
-                "pattern": "^[0-7]{3,4}$",
-                "type": "string"
-              },
-              "files": {
-                "description": "the group's items, each inheriting the group's perms",
-                "items": {
-                  "$ref": "#/$defs/fileEntry"
-                },
-                "type": "array"
-              },
-              "owner": {
-                "description": "dest owner user; empty: code default",
-                "type": "string"
-              },
-              "ownerGroup": {
-                "description": "dest owner group; empty: code default",
-                "type": "string"
-              }
-            },
-            "required": [
-              "files"
-            ],
-            "type": "object"
+            "$ref": "#/$defs/entry"
           },
-          "type": "array"
+          "type": "array",
+          "description": "*.tpl render-op perm-groups; sources repo-root-relative, glob and derived-dest forms must be root/-prefixed"
+        },
+        "mkdirs": {
+          "items": {
+            "$ref": "#/$defs/dirGroup"
+          },
+          "type": "array",
+          "description": "extra-dir perm-groups; each item one dir path (brace-expanded)"
         },
         "runScripts": {
-          "description": "script paths or globs, repo-relative, run in spec order",
           "items": {
             "type": "string"
           },
-          "type": "array"
+          "type": "array",
+          "description": "script paths or globs, repo-relative, run in spec order"
         },
         "services": {
-          "description": "launchd service names",
           "items": {
             "type": "string"
           },
-          "type": "array"
+          "type": "array",
+          "description": "launchd service names"
         }
       },
-      "type": "object"
+      "additionalProperties": false,
+      "type": "object",
+      "description": "additive payload: link globs, copy/renderTemplates/mkdirs perm-groups, script globs, service names"
+    },
+    "linkEntry": {
+      "oneOf": [
+        {
+          "type": "string",
+          "description": "glob over git-tracked files under root/ (brace-expanded), dest derived 1:1"
+        },
+        {
+          "properties": {
+            "source": {
+              "type": "string",
+              "description": "file or glob, repo-relative under root/"
+            },
+            "dest": {
+              "type": "string",
+              "pattern": "^s/.+/.*/g?$",
+              "description": "sed-style rewrite s/\u003cpattern\u003e/\u003creplacement\u003e/[g] (Go regexp, $1 backrefs; g: every match, absent: first only), applied to the repo-relative dest path before host mapping"
+            }
+          },
+          "additionalProperties": false,
+          "type": "object",
+          "required": [
+            "source",
+            "dest"
+          ],
+          "description": "source file or glob with a sed-style dest rewrite"
+        }
+      ]
     },
     "pluginEntry": {
       "oneOf": [
         {
-          "description": "`@\u003cgiturl\u003e::\u003cprofile\u003e` (remote) or `\u003cdir\u003e::\u003cprofile\u003e` (local dir) plugin ref",
+          "type": "string",
           "pattern": "^.+::.+$",
-          "type": "string"
+          "description": "`@\u003cgiturl\u003e::\u003cprofile\u003e` (remote) or `\u003cdir\u003e::\u003cprofile\u003e` (local dir) plugin ref"
         },
         {
-          "additionalProperties": false,
           "properties": {
+            "ref": {
+              "type": "string",
+              "pattern": "^.+::.+$",
+              "description": "`@\u003cgiturl\u003e::\u003cprofile\u003e` (remote) or `\u003cdir\u003e::\u003cprofile\u003e` (local dir) plugin ref"
+            },
             "env": {
               "additionalProperties": {
                 "type": "string"
               },
-              "description": "envs exported around everything done for the plugin's unit",
-              "type": "object"
-            },
-            "ref": {
-              "description": "`@\u003cgiturl\u003e::\u003cprofile\u003e` (remote) or `\u003cdir\u003e::\u003cprofile\u003e` (local dir) plugin ref",
-              "pattern": "^.+::.+$",
-              "type": "string"
+              "type": "object",
+              "description": "envs exported around everything done for the plugin's unit"
             }
           },
+          "additionalProperties": false,
+          "type": "object",
           "required": [
             "ref"
-          ],
-          "type": "object"
+          ]
         }
       ]
     },
-    "profile": {
-      "additionalProperties": false,
-      "description": "one profile block: options self-describe eligibility, mixinProfiles compose in order, plugins pull remote profiles, include adds, exclude filters last and wins",
+    "profileSpec": {
       "properties": {
-        "exclude": {
-          "$ref": "#/$defs/excludeSet"
+        "options": {
+          "$ref": "#/$defs/ProfileOptions",
+          "description": "when the profile runs: autoExec opts in to bare-che runs, execIf predicates must ALL pass"
+        },
+        "mixinProfiles": {
+          "items": {
+            "type": "string"
+          },
+          "type": "array",
+          "description": "local profile names composed depth-first, in order"
+        },
+        "plugins": {
+          "items": {
+            "$ref": "#/$defs/pluginEntry"
+          },
+          "type": "array",
+          "description": "profiles loaded at their own checkout: `@\u003cgiturl\u003e::\u003cprofile\u003e` (remote) or `\u003cdir\u003e::\u003cprofile\u003e` (local dir) string, or {ref, env}"
         },
         "include": {
           "$ref": "#/$defs/includeSet"
         },
-        "mixinProfiles": {
-          "description": "local profile names composed depth-first, in order",
-          "items": {
-            "type": "string"
-          },
-          "type": "array"
-        },
-        "options": {
-          "additionalProperties": false,
-          "description": "when the profile runs: autoExec opts in to bare-che runs, execIf predicates must ALL pass",
-          "properties": {
-            "autoExec": {
-              "description": "run on bare che (default false: runs only via --profile or mixinProfiles)",
-              "type": "boolean"
-            },
-            "execIf": {
-              "description": "predicate expressions `\u003csource\u003e` or `\u003csource\u003e == \u003cliteral\u003e`, sources builtin:*/env:*; empty: always",
-              "items": {
-                "type": "string"
-              },
-              "type": "array"
-            }
-          },
-          "type": "object"
-        },
-        "plugins": {
-          "description": "profiles loaded at their own checkout: `@\u003cgiturl\u003e::\u003cprofile\u003e` (remote) or `\u003cdir\u003e::\u003cprofile\u003e` (local dir) string, or {ref, env}",
-          "items": {
-            "$ref": "#/$defs/pluginEntry"
-          },
-          "type": "array"
+        "exclude": {
+          "$ref": "#/$defs/excludeSet"
         }
       },
-      "type": "object"
+      "additionalProperties": false,
+      "type": "object",
+      "description": "one profile block: options self-describe eligibility, mixinProfiles compose in order, plugins pull remote profiles, include adds, exclude filters last and wins"
     }
   },
-  "$id": "https://gitlab.com/konradodwrot/go-modules/-/raw/main/che/assets/data/che.schema.json",
-  "$schema": "https://json-schema.org/draft/2020-12/schema",
   "additionalProperties": {
-    "$ref": "#/$defs/profile"
+    "$ref": "#/$defs/profileSpec"
   },
-  "description": "che spec: every top-level key defines a profile block",
+  "type": "object",
   "title": "che.yml",
-  "type": "object"
+  "description": "che spec: every top-level key defines a profile block"
 }

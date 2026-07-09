@@ -1,0 +1,62 @@
+# [>] 🤖🤖
+- name: isGlobMatchShouldMatchDirectChildUnderSubtreeGlob
+  in:
+    args: [HOME/.config/zsh/**, HOME/.config/zsh/.zshrc]
+  want: true
+- name: isGlobMatchShouldMatchNestedPathUnderSubtreeGlob
+  in:
+    args: [HOME/.config/zsh/**, HOME/.config/zsh/zshrc.d/auto.d/80-tools.zsh]
+  want: true
+- name: isGlobMatchShouldMatchSubtreeGlobRootItself
+  in:
+    args: [HOME/.config/zsh/**, HOME/.config/zsh]
+  want: true
+- name: isGlobMatchShouldRejectSiblingDirOfSubtreeGlob
+  in:
+    args: [HOME/.config/zsh/**, HOME/.config/git/config]
+  want: false
+- name: isGlobMatchShouldRejectPrefixOnlySiblingOfSubtreeGlob
+  in:
+    args: [HOME/.config/zsh/**, HOME/.config/zshenv]
+  want: false
+- name: isGlobMatchShouldMatchExactPath
+  in:
+    args: [etc/zshrc, etc/zshrc]
+  want: true
+- name: isGlobMatchShouldRejectSubtreeUnderExactPath
+  in:
+    args: [etc/zshrc, etc/zshrc.d/auto.d/x]
+  want: false
+- name: isGlobMatchShouldMatchStarSuffixBareStem
+  in:
+    args: [Library/LaunchDaemons/otelcol.plist*, Library/LaunchDaemons/otelcol.plist]
+  want: true
+- name: isGlobMatchShouldMatchStarSuffixWithMarkerSuffix
+  in:
+    args: [Library/LaunchDaemons/otelcol.plist*, Library/LaunchDaemons/otelcol.plist.ontoHost.cp]
+  want: true
+- name: isGlobMatchShouldRejectStarSuffixOtherFile
+  in:
+    args: [Library/LaunchDaemons/otelcol.plist*, Library/LaunchDaemons/grafana.plist]
+  want: false
+- name: isGlobMatchShouldMatchFileUnderSubtreeGlob
+  in:
+    args: [etc/otelcol/**, etc/otelcol/config.yml]
+  want: true
+- name: isGlobMatchShouldMatchNestedPathThroughInteriorDoublestar
+  in:
+    args: [root/**/foo.txt, root/a/b/foo.txt]
+  want: true
+- name: isGlobMatchShouldRejectInteriorDoublestarPrefixMiss
+  in:
+    args: [root/**/foo.txt, other/a/foo.txt]
+  want: false
+- name: isGlobMatchShouldRejectInteriorDoublestarTailMiss
+  in:
+    args: [root/**/*.md, root/a/b.txt]
+  want: false
+- name: isGlobMatchShouldMatchDoublestarWithEmptyTail
+  in:
+    args: [root**, rootabc/x]
+  want: true
+# [<] 🤖🤖

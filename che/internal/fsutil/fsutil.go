@@ -5,82 +5,95 @@ package fsutil
 import (
 	"fmt"
 	"os"
-	"os/exec"
 	"path/filepath"
 	"runtime"
 	"strings"
 
 	"github.com/go-git/go-git/v5"
 
-	"gitlab.com/konradodwrot/go-modules/che/internal/log"
+	"gitlab.com/konradodwrot/go-modules/che/internal/execx"
 )
 
-// FS runs mutating fs ops, honoring Mode (dry-run mode), escalating priv
-// per-dest (sudo iff dest outside invoking user's Home).
+// FileSystemWriter is the mutating fs surface host ops drive; FS is the real
+// implementation, record-only mocks stand in for tests.
+type FileSystemWriter interface {
+	Mkdir(dest string, mode os.FileMode, parents bool) error
+	Chmod(chmodArg, dest string) error
+	Symlink(target, dest string) error
+	Copy(src, dest string, mode os.FileMode) error
+	Remove(dest string) error
+	Chown(owner, dest string) error
+	Install(dest string, body []byte, mode os.FileMode, owner string) error
+	ArchiveDests(archivePath string, dests []string) error
+}
+
+// FileSystemReader is the read surface host ops consult (settled checks,
+// prune scans, content diffs); OSReader is the real implementation, tests
+// swap in a fixture-scoped mock so live host state never leaks into results.
+type FileSystemReader interface {
+	Stat(path string) (os.FileInfo, error)
+	Lstat(path string) (os.FileInfo, error)
+	ReadDir(path string) ([]os.DirEntry, error)
+	ReadFile(path string) ([]byte, error)
+	Readlink(path string) (string, error)
+	EvalSymlinks(path string) (string, error)
+}
+
+// OSReader reads the live filesystem.
+type OSReader struct{}
+
+func (OSReader) Stat(path string) (os.FileInfo, error)      { return os.Stat(path) }
+func (OSReader) Lstat(path string) (os.FileInfo, error)     { return os.Lstat(path) }
+func (OSReader) ReadDir(path string) ([]os.DirEntry, error) { return os.ReadDir(path) }
+func (OSReader) ReadFile(path string) ([]byte, error)       { return os.ReadFile(path) }
+func (OSReader) Readlink(path string) (string, error)       { return os.Readlink(path) }
+func (OSReader) EvalSymlinks(path string) (string, error)   { return filepath.EvalSymlinks(path) }
+
+// FS runs mutating fs ops, escalating priv per-dest (sudo iff dest outside
+// invoking user's Home). Pure execution: no logging, no dry-run gate.
 type FS struct {
 	Home string
-	Mode log.DryRun
-	Sub  string
 }
 
-// dry reports whether this is any dry run (delta or all).
-func (f FS) dry() bool { return f.Mode != log.Off }
-
-// Log emits a 'title: msg' line, folding the dry-run mode plus Sub into the
-// subtype. Title is "type" or "type(subtype)" (see log.MsgSub).
-func (f FS) Log(title, msg string) { log.MsgSub(title, msg, f.Mode, f.Sub) }
-
-// UnderHome reports dest in user-owned Home tree (no sudo).
-func (f FS) UnderHome(dest string) bool {
-	return dest == f.Home || strings.HasPrefix(dest, f.Home+"/")
+// IsUnder reports path inside the root tree (root itself included).
+func IsUnder(path, root string) bool {
+	return path == root || strings.HasPrefix(path, root+"/")
 }
 
-// mutate logs (verb: logArg), then unless dry-run runs argv with per-dest priv.
-// One dry-run+log gate for every mutating op.
-func (f FS) mutate(verb, logArg, dest string, argv ...string) error {
-	if !f.dry() {
-		if err := f.Priv(dest, argv...); err != nil {
-			return err
-		}
+// IsUnderHome reports dest in user-owned Home tree (no sudo).
+func (f FS) IsUnderHome(dest string) bool {
+	return IsUnder(dest, f.Home)
+}
+
+// escalate prefixes sudo unless dest is user-owned (under Home) or already root.
+func (f FS) escalate(dest string, argv []string) []string {
+	if !f.IsUnderHome(dest) && os.Geteuid() != 0 {
+		return append([]string{"sudo"}, argv...)
 	}
-	f.Log(verb, logArg)
-	return nil
+	return argv
 }
 
 // Mkdir makes one dir with mode. parents adds -p. mkdir builds its own
 // priv-escalated argv, so it runs the command directly rather than through Priv.
 func (f FS) Mkdir(dest string, mode os.FileMode, parents bool) error {
-	if f.dry() {
-		f.Log("mkdir(create)", dest)
-		return nil
-	}
-	argv := f.MkdirArgv(dest, mode, parents)
-	if err := run(exec.Command(argv[0], argv[1:]...)); err != nil {
-		return err
-	}
-	f.Log("mkdir(create)", dest)
-	return nil
+	return run(f.MkdirArgv(dest, mode, parents))
 }
 
 // MkdirArgv builds a mkdir argv, escalating per dest: root-tree -> sudo unless
 // root, HOME-tree -> direct. parents adds -p. mode 0 -> no -m (mkdir honors umask).
 func (f FS) MkdirArgv(dest string, mode os.FileMode, parents bool) []string {
-	base := []string{"mkdir"}
+	argv := []string{"mkdir"}
 	if parents {
-		base = append(base, "-p")
+		argv = append(argv, "-p")
 	}
-	base = append(base, modeFlag(mode)...)
-	base = append(base, dest)
-	if !f.UnderHome(dest) && os.Geteuid() != 0 {
-		return append([]string{"sudo"}, base...)
-	}
-	return base
+	argv = append(argv, modeFlag(mode)...)
+	argv = append(argv, dest)
+	return f.escalate(dest, argv)
 }
 
-// Chmod applies explicit mode arg (setgid/sticky bits, not honored by mkdir
-// mode). title is the op-scoped label the caller owns (e.g. "mkdir(chmod)").
-func (f FS) Chmod(title, chmodArg, dest string) error {
-	return f.mutate(title, chmodArg+" "+dest, dest, "chmod", chmodArg, dest)
+// Chmod applies explicit mode arg (setgid/sticky bits, not honored by mkdir mode).
+func (f FS) Chmod(chmodArg, dest string) error {
+	return f.Priv(dest, "chmod", chmodArg, dest)
 }
 
 func (f FS) Symlink(target, dest string) error {
@@ -88,32 +101,27 @@ func (f FS) Symlink(target, dest string) error {
 	if runtime.GOOS == "darwin" {
 		noDeref = "-h"
 	}
-	return f.mutate("ln(create)", dest, dest, "ln", "-fs", noDeref, target, dest)
+	return f.Priv(dest, "ln", "-fs", noDeref, target, dest)
 }
 
 func (f FS) Copy(src, dest string, mode os.FileMode) error {
 	argv := append([]string{"install"}, modeFlag(mode)...)
 	argv = append(argv, src, dest)
-	return f.mutate("cp(create)", dest, dest, argv...)
+	return f.Priv(dest, argv...)
 }
 
 func (f FS) Remove(dest string) error {
-	return f.mutate("rm", dest, dest, "rm", "-f", dest)
+	return f.Priv(dest, "rm", "-f", dest)
 }
 
-// Chown applies owner:group. title is the op-scoped label the caller owns
-// (e.g. "mkdir(chown)").
-func (f FS) Chown(title, owner, dest string) error {
-	return f.mutate(title, owner+" "+dest, dest, "chown", owner, dest)
+// Chown applies owner[:group].
+func (f FS) Chown(owner, dest string) error {
+	return f.Priv(dest, "chown", owner, dest)
 }
 
 // Install writes body to a temp, installs at dest with mode/owner, sudo iff dest
-// outside Home. owner "" -> no -o/-g. Honors dry-run.
+// outside Home. owner "" -> no -o/-g.
 func (f FS) Install(dest string, body []byte, mode os.FileMode, owner string) error {
-	if f.dry() {
-		f.Log("render(create)", dest)
-		return nil
-	}
 	tmp, err := os.CreateTemp("", "che-tmpl-*")
 	if err != nil {
 		return err
@@ -130,20 +138,16 @@ func (f FS) Install(dest string, body []byte, mode os.FileMode, owner string) er
 		argv = append(argv, "-o", o, "-g", g)
 	}
 	argv = append(argv, tmp.Name(), dest)
-	return f.mutate("render(create)", dest, dest, argv...)
+	return f.Priv(dest, argv...)
 }
 
 // Priv runs argv as root unless dest under Home (user-owned).
 func (f FS) Priv(dest string, argv ...string) error {
-	if !f.UnderHome(dest) && os.Geteuid() != 0 {
-		argv = append([]string{"sudo"}, argv...)
-	}
-	return run(exec.Command(argv[0], argv[1:]...))
+	return run(f.escalate(dest, argv))
 }
 
-func run(c *exec.Cmd) error {
-	c.Stdout, c.Stderr = os.Stdout, os.Stderr
-	return c.Run()
+func run(argv []string) error {
+	return execx.Default.Exec(execx.Cmd{Argv: argv, Stdout: os.Stdout, Stderr: os.Stderr})
 }
 
 // ModeArg renders an octal mode for install/mkdir/chmod argv.
@@ -161,6 +165,14 @@ func modeFlag(m os.FileMode) []string {
 func IsDir(p string) bool {
 	fi, err := os.Stat(p)
 	return err == nil && fi.IsDir()
+}
+
+// ExpandHome resolves a leading ~/ in p to home.
+func ExpandHome(p, home string) string {
+	if rest, ok := strings.CutPrefix(p, "~/"); ok {
+		return filepath.Join(home, rest)
+	}
+	return p
 }
 
 // openRepo opens the git repo containing dir (walking up for .git), returns it
@@ -198,8 +210,10 @@ func TrackedFiles(root string) ([]string, error) {
 	if err != nil {
 		return nil, fmt.Errorf("read git index under %s: %w", root, err)
 	}
-	root, err = filepath.EvalSymlinks(root)
-	if err != nil {
+	if root, err = filepath.Abs(root); err != nil {
+		return nil, err
+	}
+	if root, err = filepath.EvalSymlinks(root); err != nil {
 		return nil, err
 	}
 	var files []string

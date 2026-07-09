@@ -5,14 +5,15 @@ package main
 import (
 	"encoding/json"
 	"fmt"
-	"maps"
 	"os"
 	"slices"
 	"strings"
 
 	"github.com/spf13/cobra"
+	"github.com/spf13/pflag"
 
 	"gitlab.com/konradodwrot/go-modules/che/internal/cli"
+	"gitlab.com/konradodwrot/go-modules/che/internal/spec"
 )
 
 // docgen renders che's reference docs from the Go source: the che.yml JSON
@@ -23,12 +24,11 @@ const (
 	schemaPath   = "assets/data/che.schema.json"
 	cliDocPath   = "docs/cli.md"
 	cliUsagePath = "assets/data/cli-usage.md"
-	schemaID     = "https://gitlab.com/konradodwrot/go-modules/-/raw/main/che/assets/data/che.schema.json"
 )
 
 func main() {
 	must(os.MkdirAll("docs", 0o755))
-	root := cli.Attach()
+	root := cli.New().Root()
 	must(os.WriteFile(schemaPath, schemaJSON(), 0o644))
 	must(os.WriteFile(cliDocPath, []byte(cliDoc(root)), 0o644))
 	must(os.WriteFile(cliUsagePath, []byte(cliUsage(root)), 0o644))
@@ -44,238 +44,55 @@ func must(err error) {
 	}
 }
 
-// schemaJSON marshals the schema deterministically (sorted keys, indented,
-// trailing newline).
+// schemaJSON marshals spec.Schema() deterministically (properties in struct
+// field order, $defs sorted, indented, trailing newline).
 func schemaJSON() []byte {
-	b, err := json.MarshalIndent(schema(), "", "  ")
+	b, err := json.MarshalIndent(spec.Schema(), "", "  ")
 	must(err)
 	return append(b, '\n')
 }
 
-// schema is the JSON Schema (draft 2020-12) for che.yml, mirroring
-// internal/spec's types and their UnmarshalYAML union forms.
-func schema() map[string]any {
-	strList := func(desc string) map[string]any {
-		return map[string]any{
-			"description": desc,
-			"type":        "array",
-			"items":       map[string]any{"type": "string"},
+// optionsTable renders a FlagSet as an Option|Env|Values|Description table.
+// Each flag's usage string may carry "; values: <...>" and "; env: <...>"
+// segments feeding those columns (values default: the flag's value type;
+// flag wins over env).
+func optionsTable(fs *pflag.FlagSet) string {
+	var b strings.Builder
+	b.WriteString("| Option | Env | Values | Description |\n| --- | --- | --- | --- |\n")
+	fs.VisitAll(func(f *pflag.Flag) {
+		desc, env, values := f.Usage, "", ""
+		if i := strings.Index(desc, "; env: "); i >= 0 {
+			env = "`" + desc[i+len("; env: "):] + "`"
+			desc = desc[:i]
 		}
-	}
-	permProps := map[string]any{
-		"owner":      map[string]any{"description": "dest owner user; empty: code default", "type": "string"},
-		"ownerGroup": map[string]any{"description": "dest owner group; empty: code default", "type": "string"},
-		"chmod":      map[string]any{"description": "dest mode, octal string", "type": "string", "pattern": "^[0-7]{3,4}$"},
-	}
-	fileGroup := func(itemsRef, desc string) map[string]any {
-		props := map[string]any{
-			"files": map[string]any{
-				"description": "the group's items, each inheriting the group's perms",
-				"type":        "array",
-				"items":       map[string]any{"$ref": itemsRef},
-			},
+		if i := strings.Index(desc, "; values: "); i >= 0 {
+			values = "`" + strings.ReplaceAll(desc[i+len("; values: "):], " | ", "` \\| `") + "`"
+			desc = desc[:i]
 		}
-		maps.Copy(props, permProps)
-		return map[string]any{
-			"description": desc,
-			"type":        "array",
-			"items": map[string]any{
-				"type":                 "object",
-				"additionalProperties": false,
-				"required":             []any{"files"},
-				"properties":           props,
-			},
+		if values == "" {
+			values = "`" + f.Value.Type() + "`"
 		}
-	}
-	return map[string]any{
-		"$schema":              "https://json-schema.org/draft/2020-12/schema",
-		"$id":                  schemaID,
-		"title":                "che.yml",
-		"description":          "che spec: every top-level key defines a profile block",
-		"type":                 "object",
-		"additionalProperties": map[string]any{"$ref": "#/$defs/profile"},
-		"$defs": map[string]any{
-			"profile": map[string]any{
-				"description":          "one profile block: options self-describe eligibility, mixinProfiles compose in order, plugins pull remote profiles, include adds, exclude filters last and wins",
-				"type":                 "object",
-				"additionalProperties": false,
-				"properties": map[string]any{
-					"options": map[string]any{
-						"description":          "when the profile runs: autoExec opts in to bare-che runs, execIf predicates must ALL pass",
-						"type":                 "object",
-						"additionalProperties": false,
-						"properties": map[string]any{
-							"execIf": strList("predicate expressions `<source>` or `<source> == <literal>`, sources builtin:*/env:*; empty: always"),
-							"autoExec": map[string]any{
-								"description": "run on bare che (default false: runs only via --profile or mixinProfiles)",
-								"type":        "boolean",
-							},
-						},
-					},
-					"mixinProfiles": strList("local profile names composed depth-first, in order"),
-					"plugins": map[string]any{
-						"description": "profiles loaded at their own checkout: `@<giturl>::<profile>` (remote) or `<dir>::<profile>` (local dir) string, or {ref, env}",
-						"type":        "array",
-						"items":       map[string]any{"$ref": "#/$defs/pluginEntry"},
-					},
-					"include": map[string]any{"$ref": "#/$defs/includeSet"},
-					"exclude": map[string]any{"$ref": "#/$defs/excludeSet"},
-				},
-			},
-			"pluginEntry": map[string]any{
-				"oneOf": []any{
-					map[string]any{
-						"description": "`@<giturl>::<profile>` (remote) or `<dir>::<profile>` (local dir) plugin ref",
-						"type":        "string",
-						"pattern":     "^.+::.+$",
-					},
-					map[string]any{
-						"type":                 "object",
-						"additionalProperties": false,
-						"required":             []any{"ref"},
-						"properties": map[string]any{
-							"ref": map[string]any{
-								"description": "`@<giturl>::<profile>` (remote) or `<dir>::<profile>` (local dir) plugin ref",
-								"type":        "string",
-								"pattern":     "^.+::.+$",
-							},
-							"env": map[string]any{
-								"description":          "envs exported around everything done for the plugin's unit",
-								"type":                 "object",
-								"additionalProperties": map[string]any{"type": "string"},
-							},
-						},
-					},
-				},
-			},
-			"includeSet": map[string]any{
-				"description":          "additive payload: link globs, copy/renderTemplates/mkdirs perm-groups, script globs, service names",
-				"type":                 "object",
-				"additionalProperties": false,
-				"properties": map[string]any{
-					"link":            strList("symlink-op globs, repo-relative under root/"),
-					"copy":            fileGroup("#/$defs/fileEntry", "*.ontoHost.cp copy-op perm-groups"),
-					"renderTemplates": fileGroup("#/$defs/fileEntry", "*.tpl render-op perm-groups; sources repo-root-relative, glob and derived-dest forms must be root/-prefixed"),
-					"mkdirs":          fileGroup("#/$defs/dirEntry", "extra-dir perm-groups; each item one dir path (brace-expanded)"),
-					"runScripts":      strList("script paths or globs, repo-relative, run in spec order"),
-					"services":        strList("launchd service names"),
-				},
-			},
-			"excludeSet": map[string]any{
-				"description":          "subtractive glob filter, applied last, wins over every include (rich entries too)",
-				"type":                 "object",
-				"additionalProperties": false,
-				"properties": map[string]any{
-					"link":            strList("drop matching link items"),
-					"copy":            strList("drop matching copy items (source or dest)"),
-					"renderTemplates": strList("drop matching template items (source or dest)"),
-					"mkdirs":          strList("drop matching dirs"),
-					"runScripts":      strList("drop matching scripts (resolved file paths)"),
-					"services":        strList("drop matching services"),
-				},
-			},
-			"fileEntry": map[string]any{
-				"oneOf": []any{
-					map[string]any{
-						"description": "glob over git-tracked files (brace-expanded)",
-						"type":        "string",
-					},
-					map[string]any{
-						"description":          "one source fanned out to explicit dests",
-						"type":                 "object",
-						"additionalProperties": false,
-						"required":             []any{"source"},
-						"properties": map[string]any{
-							"source": map[string]any{"description": "repo-relative source path", "type": "string"},
-							"dest": map[string]any{
-								"description": "dest paths: relative -> repo, ~/ or absolute -> host; omitted -> derived from the root/ source path",
-								"type":        "array",
-								"items":       map[string]any{"$ref": "#/$defs/destEntry"},
-							},
-						},
-					},
-				},
-			},
-			"dirEntry": map[string]any{
-				"oneOf": []any{
-					map[string]any{
-						"description": "dir path (brace-expanded)",
-						"type":        "string",
-					},
-					map[string]any{
-						"type":                 "object",
-						"additionalProperties": false,
-						"required":             []any{"dest"},
-						"properties": map[string]any{
-							"dest": map[string]any{
-								"description": "dir paths (brace-expanded)",
-								"type":        "array",
-								"items":       map[string]any{"$ref": "#/$defs/destEntry"},
-							},
-						},
-					},
-				},
-			},
-			"destEntry": map[string]any{
-				"oneOf": []any{
-					map[string]any{
-						"description": "dest path: relative -> repo, ~/ or absolute -> host",
-						"type":        "string",
-					},
-					map[string]any{
-						"type":                 "object",
-						"additionalProperties": false,
-						"required":             []any{"path"},
-						"properties": map[string]any{
-							"path": map[string]any{"description": "dest path: relative -> repo, ~/ or absolute -> host", "type": "string"},
-							"options": map[string]any{
-								"description":          "per-dest render options",
-								"type":                 "object",
-								"additionalProperties": false,
-								"properties": map[string]any{
-									"writeType": map[string]any{
-										"description": "how the rendered body lands: overwrite (default: header + body) | mergeUpsert (env KEY=VALUE union under the existing dest) | raw (body verbatim, no autogen header)",
-										"enum":        []any{"", "mergeUpsert", "raw"},
-									},
-									"renderReferencedFiles": map[string]any{
-										"description": "inline @-includes into the rendered body (overwrite only)",
-										"type":        "boolean",
-									},
-								},
-							},
-						},
-					},
-				},
-			},
-		},
-	}
+		opt := "`--" + f.Name + "`"
+		if f.Shorthand != "" {
+			opt = "`-" + f.Shorthand + "`, " + opt
+		}
+		fmt.Fprintf(&b, "| %s | %s | %s | %s |\n", opt, env, values, desc)
+	})
+	return b.String()
 }
 
-// envVars is che's environment-variable surface, documented in docs/cli.md.
-var envVars = [][2]string{
-	{"CHE_PROFILE", "as `--profile` (flag wins)"},
-	{"CHE_DRY_RUN", "as `--dry-run` (`delta` or `all`)"},
-	{"CHE_OMIT_EXEC_IF", "truthy: as `--omit-exec-if`"},
-	{"CHE_SKIP_PLUGINS", "truthy: as `--skip-plugins`"},
-	{"CHE_RENDER_TEMPLATES_DRY_RUN_SECRETS", "render-templates: skip sources carrying op:// secret refs (logged, dests untouched)"},
-}
-
-// cliDoc renders the CLI reference: root Long + global flags, every
-// subcommand (depth-first, name-sorted), then the env table.
+// cliDoc renders the CLI reference: root Long + the global options table,
+// then every subcommand (depth-first, name-sorted) with its own table.
 func cliDoc(root *cobra.Command) string {
 	var b strings.Builder
 	b.WriteString("<!-- autogenerated using internal/docgen -->\n")
 	b.WriteString("# che CLI\n\n")
 	b.WriteString(root.Long)
 	b.WriteString("\n\n")
-	b.WriteString("## Global flags\n\n```\n")
-	b.WriteString(root.PersistentFlags().FlagUsages())
-	b.WriteString("```\n\n## Commands\n")
+	b.WriteString("## Global options\n\n")
+	b.WriteString(optionsTable(root.PersistentFlags()))
+	b.WriteString("\n## Commands\n")
 	walkCommands(root, &b)
-	b.WriteString("\n## Environment variables\n\n| Variable | Effect |\n| --- | --- |\n")
-	for _, e := range envVars {
-		fmt.Fprintf(&b, "| `%s` | %s |\n", e[0], e[1])
-	}
 	return b.String()
 }
 
@@ -286,12 +103,7 @@ func cliUsage(root *cobra.Command) string {
 	var rows [][2]string
 	var collect func(cmd *cobra.Command, indent string)
 	collect = func(cmd *cobra.Command, indent string) {
-		subs := slices.Clone(cmd.Commands())
-		slices.SortFunc(subs, func(a, c *cobra.Command) int { return strings.Compare(a.Name(), c.Name()) })
-		for _, sub := range subs {
-			if !sub.IsAvailableCommand() {
-				continue
-			}
+		for _, sub := range sortedSubs(cmd) {
 			rows = append(rows, [2]string{indent + sub.Name(), sub.Short})
 			collect(sub, indent+"  ")
 		}
@@ -311,13 +123,16 @@ func cliUsage(root *cobra.Command) string {
 	return b.String()
 }
 
-func walkCommands(cmd *cobra.Command, b *strings.Builder) {
+// sortedSubs lists cmd's available subcommands, name-sorted.
+func sortedSubs(cmd *cobra.Command) []*cobra.Command {
 	subs := slices.Clone(cmd.Commands())
-	slices.SortFunc(subs, func(a, c *cobra.Command) int { return strings.Compare(a.Name(), c.Name()) })
-	for _, sub := range subs {
-		if !sub.IsAvailableCommand() {
-			continue
-		}
+	subs = slices.DeleteFunc(subs, func(c *cobra.Command) bool { return !c.IsAvailableCommand() })
+	slices.SortFunc(subs, func(a, b *cobra.Command) int { return strings.Compare(a.Name(), b.Name()) })
+	return subs
+}
+
+func walkCommands(cmd *cobra.Command, b *strings.Builder) {
+	for _, sub := range sortedSubs(cmd) {
 		fmt.Fprintf(b, "\n### `$ %s`\n\n%s.\n", sub.CommandPath(), strings.TrimSuffix(sub.Short, "."))
 		if sub.Long != "" {
 			fmt.Fprintf(b, "\n%s\n", sub.Long)
@@ -325,8 +140,8 @@ func walkCommands(cmd *cobra.Command, b *strings.Builder) {
 		if use := strings.TrimSuffix(sub.UseLine(), " [flags]"); use != sub.CommandPath() {
 			fmt.Fprintf(b, "\nUsage: `%s`\n", sub.UseLine())
 		}
-		if fl := sub.NonInheritedFlags().FlagUsages(); fl != "" {
-			fmt.Fprintf(b, "\n```\n%s```\n", fl)
+		if sub.NonInheritedFlags().HasAvailableFlags() {
+			fmt.Fprintf(b, "\n%s", optionsTable(sub.NonInheritedFlags()))
 		}
 		walkCommands(sub, b)
 	}

@@ -1,0 +1,17 @@
+# [>] 🤖🤖
+- name: mkdirArgvShouldIncludeParentsFlagWhenRequested
+  in:
+    args: [/Users/x/.config, "0750"]
+    parents: true
+  want: [mkdir, -p, -m, "0750", /Users/x/.config]
+- name: mkdirArgvShouldOmitParentsFlagWhenNotRequested
+  in:
+    args: [/Users/x/.config, "0750"]
+    parents: false
+  want: [mkdir, -m, "0750", /Users/x/.config]
+- name: mkdirArgvShouldOmitModeFlagForZeroMode
+  in:
+    args: [/Users/x/.config, "0"]
+    parents: true
+  want: [mkdir, -p, /Users/x/.config]
+# [<] 🤖🤖

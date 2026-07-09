@@ -1,0 +1,7 @@
+any:
+  - opener: ""
+    types:
+      - prose
+  - opener: vim
+    types:
+      - data

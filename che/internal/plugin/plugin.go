@@ -6,10 +6,10 @@ package plugin
 import (
 	"fmt"
 	"os"
-	"os/exec"
 	"path/filepath"
 	"strings"
 
+	"gitlab.com/konradodwrot/go-modules/che/internal/execx"
 	"gitlab.com/konradodwrot/go-modules/che/internal/log"
 )
 
@@ -63,16 +63,12 @@ func Ensure(home, url, name string) (string, error) {
 }
 
 func git(args ...string) error {
-	c := exec.Command("git", args...)
-	c.Stderr = os.Stderr
-	return c.Run()
+	return execx.Default.Exec(execx.Cmd{Argv: append([]string{"git"}, args...), Stderr: os.Stderr})
 }
 
 // gitOut runs git, returning its trimmed stdout.
 func gitOut(args ...string) (string, error) {
-	c := exec.Command("git", args...)
-	c.Stderr = os.Stderr
-	out, err := c.Output()
+	out, err := execx.Default.Output(execx.Cmd{Argv: append([]string{"git"}, args...), Stderr: os.Stderr})
 	return strings.TrimSpace(string(out)), err
 }
 

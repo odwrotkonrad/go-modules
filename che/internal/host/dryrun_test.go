@@ -9,25 +9,10 @@ import (
 	"strings"
 	"testing"
 
+	"gitlab.com/konradodwrot/go-modules/che/internal/config"
 	"gitlab.com/konradodwrot/go-modules/che/internal/spec"
 	"gitlab.com/konradodwrot/go-modules/che/internal/testutil"
 )
-
-// setupHost: mock che repo, returns dry-run Host, resolved spec, repo dir.
-func setupHost(t *testing.T) (Host, spec.Resolved, string) {
-	t.Helper()
-	dir, home := testutil.CheRepo(t)
-	h := New(dir, home, testutil.CheProfile, DryRunDelta)
-	s, err := spec.Load(filepath.Join(dir, "che.yml"))
-	if err != nil {
-		t.Fatal(err)
-	}
-	res, err := s.Resolve([]string{testutil.CheProfile}, h.Root)
-	if err != nil {
-		t.Fatal(err)
-	}
-	return h, res, dir
-}
 
 // snapshotTree: sorted path + content under dir. [why] prove dry-run mutates nothing.
 func snapshotTree(t *testing.T, dir string) string {
@@ -113,16 +98,16 @@ func TestDryRunAllReportsSettledDests(t *testing.T) {
 				t.Fatal(err)
 			}
 
-			dest := c.settle(t, New(dir, home, testutil.CheProfile, DryRunDelta), res)
+			dest := c.settle(t, New(dir, home, testutil.CheProfile, config.Config{DryRun: config.DryRunDelta}), res)
 
-			delta := New(dir, home, testutil.CheProfile, DryRunDelta)
+			delta := New(dir, home, testutil.CheProfile, config.Config{DryRun: config.DryRunDelta})
 			deltaOut, err := testutil.CaptureStdout(t, func() error { return c.run(delta, res) })
 			if err != nil {
 				t.Fatal(err)
 			}
 			testutil.NotLine(t, deltaOut, dest)
 
-			all := New(dir, home, testutil.CheProfile, DryRunAll)
+			all := New(dir, home, testutil.CheProfile, config.Config{DryRun: config.DryRunAll})
 			allOut, err := testutil.CaptureStdout(t, func() error { return c.run(all, res) })
 			if err != nil {
 				t.Fatal(err)
@@ -132,68 +117,44 @@ func TestDryRunAllReportsSettledDests(t *testing.T) {
 	}
 }
 
-// each op dry-run: prints actions, mutates nothing.
-func TestDryRunPasses(t *testing.T) {
-	cases := []struct {
-		name    string
-		run     func(Host, spec.Resolved) error
-		mustLog string // a verb the dry-run output must contain
-	}{
-		{"link", func(h Host, r spec.Resolved) error { return h.MkLinks(r.Links, r.Dirs) }, "ln(create,dry-run=delta)"},
-		{"copy", func(h Host, r spec.Resolved) error { return h.MkCopies(r.Copies, r.Dirs) }, "cp(create,dry-run=delta)"},
-		{"render-templates", func(h Host, r spec.Resolved) error { return h.RenderTemplates(r.Templates) }, "render(create,dry-run=delta)"},
-		{"mk-dirs", func(h Host, r spec.Resolved) error { return h.MkDirs(r.Dirs, r.ExtraDirs) }, "mkdir(create,dry-run=delta)"},
-		{"prune-links", func(h Host, r spec.Resolved) error { return h.PruneBrokenLinks(r.Dirs) }, "prune-links(dry-run=delta)"},
-		{"run-scripts", func(h Host, r spec.Resolved) error {
-			scripts, err := h.ResolveScripts(r.Scripts)
-			if err != nil {
-				return err
-			}
-			return h.RunScripts(scripts)
-		}, "run-scripts(dry-run=delta)"},
-		{"services bootout", func(h Host, r spec.Resolved) error {
-			svcs, err := h.ResolveServices(r.Services)
-			if err != nil {
-				return err
-			}
-			return h.Bootout(svcs)
-		}, "bootout(dry-run=delta)"},
-		{"services bootin", func(h Host, r spec.Resolved) error {
-			svcs, err := h.ResolveServices(r.Services)
-			if err != nil {
-				return err
-			}
-			return h.Bootin(svcs)
-		}, "bootstrap(dry-run=delta)"},
-		{"services ensure", func(h Host, r spec.Resolved) error {
-			svcs, err := h.ResolveServices(r.Services)
-			if err != nil {
-				return err
-			}
-			return h.Ensure(svcs)
-		}, "ensure(dry-run=delta)"},
-	}
-	for _, c := range cases {
-		t.Run(c.name, func(t *testing.T) {
-			h, res, dir := setupHost(t)
+// each op dry-run: prints only dry-run lines, mutates nothing.
+func TestDryRunMutatesNothing(t *testing.T) {
+	for name, run := range ops {
+		t.Run(name, func(t *testing.T) {
+			h, res, dir := setupHost(t, config.Config{DryRun: config.DryRunDelta})
 			before := snapshotTree(t, dir)
 
-			out, err := testutil.CaptureStdout(t, func() error { return c.run(h, res) })
+			out, err := testutil.CaptureStdout(t, func() error { return run(h, res) })
 			if err != nil {
-				t.Fatalf("%s dry-run errored: %v", c.name, err)
+				t.Fatalf("%s dry-run errored: %v", name, err)
 			}
 			out = testutil.StripANSI(out)
-			if !strings.Contains(out, c.mustLog) {
-				t.Errorf("%s dry-run printed no %q action:\n%s", c.name, c.mustLog, out)
-			}
 			for line := range strings.SplitSeq(strings.TrimSpace(out), "\n") {
 				if line != "" && !strings.Contains(line, "dry-run=delta") {
-					t.Errorf("%s printed a non-dry-run line: %q", c.name, line)
+					t.Errorf("%s printed a non-dry-run line: %q", name, line)
 				}
 			}
 			if after := snapshotTree(t, dir); after != before {
-				t.Errorf("%s dry-run mutated the tree:\nBEFORE:\n%s\nAFTER:\n%s", c.name, before, after)
+				t.Errorf("%s dry-run mutated the tree:\nBEFORE:\n%s\nAFTER:\n%s", name, before, after)
 			}
+		})
+	}
+}
+
+// dry-run line format: op lines fold the dry-run=<mode> subtype into the title.
+func TestDryRunLineFormat(t *testing.T) {
+	cases := map[string]string{
+		"link":    "ln(create,dry-run=delta): ",
+		"mk-dirs": "mkdir(create,dry-run=delta): ",
+	}
+	for op, frag := range cases {
+		t.Run(op, func(t *testing.T) {
+			h, res, _ := setupHost(t, config.Config{DryRun: config.DryRunDelta})
+			out, err := testutil.CaptureStdout(t, func() error { return ops[op](h, res) })
+			if err != nil {
+				t.Fatal(err)
+			}
+			testutil.WantLines(t, out, frag)
 		})
 	}
 }

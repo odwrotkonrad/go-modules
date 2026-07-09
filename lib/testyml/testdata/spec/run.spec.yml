@@ -1,0 +1,10 @@
+# [>] 🤖🤖
+- name: runShouldDecodeCaseAndInvokeCallback
+  in:
+    args: [1, 2]
+  want: 3
+- name: runShouldDecodeNegativeValues
+  in:
+    args: [-1, -2]
+  want: -3
+# [<] 🤖🤖

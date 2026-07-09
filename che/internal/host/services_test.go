@@ -7,6 +7,7 @@ import (
 	"os"
 	"testing"
 
+	"gitlab.com/konradodwrot/go-modules/che/internal/config"
 	"gitlab.com/konradodwrot/go-modules/che/internal/testutil"
 )
 
@@ -18,7 +19,7 @@ func fixtureHost(t *testing.T) Host {
 		"root/Library/LaunchAgents/gitlab-runner.plist.ontoHost.tpl":             "<plist/>\n",
 		"root/HOME/Library/LaunchAgents/load-defaults-config.plist.ontoHost.tpl": "<plist/>\n",
 	})
-	return New(dir, "/Users/x", "desktop/macos", DryRunOff)
+	return New(dir, "/Users/x", "desktop/macos", config.Config{})
 }
 
 func TestResolveDomains(t *testing.T) {

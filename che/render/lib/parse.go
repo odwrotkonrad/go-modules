@@ -44,6 +44,7 @@ type frame struct {
 	depth   int
 	level   int
 	kept    bool
+	targets []target
 }
 
 func parse(src []byte) ([]section, error) {
@@ -56,12 +57,10 @@ func parse(src []byte) ([]section, error) {
 
 	var out []section
 	var stack []frame
-	var pendingWhat string
-	var pendingVals string
 
-	emit := func(f frame, ts []target) {
-		if f.kept && len(ts) > 0 {
-			out = append(out, section{heading: f.heading, level: f.level, targets: ts})
+	emit := func(f frame) {
+		if f.kept && len(f.targets) > 0 {
+			out = append(out, section{heading: f.heading, level: f.level, targets: f.targets})
 		}
 	}
 
@@ -72,71 +71,56 @@ func parse(src []byte) ([]section, error) {
 		return &stack[len(stack)-1]
 	}
 
-	var buf [][]target // parallel to stack, buffered targets per frame
+	type pendingCmt struct{ what, vals string }
+	var pending pendingCmt
 
-	for i := uint(0); i < root.NamedChildCount(); i++ {
+	for i := range root.NamedChildCount() {
 		node := root.NamedChild(i)
 		text := strings.TrimSpace(node.Utf8Text(src))
+		prev := pending
+		pending = pendingCmt{}
 
 		switch node.Kind() {
 		case "comment":
 			if label, depth, ok := sectionOpen(text); ok {
 				if c := cur(); c != nil {
-					emit(*c, buf[len(buf)-1])
-					buf[len(buf)-1] = nil
+					emit(*c)
+					c.targets = nil
 				}
 				kept := strings.Contains(text, includeTag) || (cur() != nil && cur().kept)
-				level := 3 + depth
 				stack = append(stack, frame{
 					heading: label,
 					depth:   depth,
-					level:   level,
+					level:   3 + depth,
 					kept:    kept,
 				})
-				buf = append(buf, nil)
-				pendingWhat = ""
-				pendingVals = ""
 			} else if depth, ok := sectionClose(text); ok {
 				for len(stack) > 0 && stack[len(stack)-1].depth >= depth {
-					emit(stack[len(stack)-1], buf[len(buf)-1])
+					emit(stack[len(stack)-1])
 					stack = stack[:len(stack)-1]
-					buf = buf[:len(buf)-1]
 				}
-				pendingWhat = ""
-				pendingVals = ""
 			} else if what, ok := whatComment(text); ok {
-				pendingWhat = what
+				pending = pendingCmt{what: what, vals: prev.vals}
 			} else if vals, ok := valsComment(text); ok {
-				pendingVals = vals
-			} else {
-				pendingWhat = ""
-				pendingVals = ""
+				pending = pendingCmt{what: prev.what, vals: vals}
 			}
 		case "rule":
 			if c := cur(); c != nil && c.kept {
-				if t, ok := ruleTarget(node, src, pendingWhat); ok {
-					buf[len(buf)-1] = append(buf[len(buf)-1], t)
+				if t, ok := ruleTarget(node, src, prev.what); ok {
+					c.targets = append(c.targets, t)
 				}
 			}
-			pendingWhat = ""
-			pendingVals = ""
 		case "variable_assignment", "export_directive":
-			if c := cur(); c != nil && c.kept && pendingWhat != "" {
-				if t, ok := paramTarget(node, src, pendingWhat, pendingVals); ok {
-					buf[len(buf)-1] = append(buf[len(buf)-1], t)
+			if c := cur(); c != nil && c.kept && prev.what != "" {
+				if t, ok := paramTarget(node, src, prev.what, prev.vals); ok {
+					c.targets = append(c.targets, t)
 				}
 			}
-			pendingWhat = ""
-			pendingVals = ""
-		default:
-			pendingWhat = ""
-			pendingVals = ""
 		}
 	}
 	for len(stack) > 0 {
-		emit(stack[len(stack)-1], buf[len(buf)-1])
+		emit(stack[len(stack)-1])
 		stack = stack[:len(stack)-1]
-		buf = buf[:len(buf)-1]
 	}
 	return out, nil
 }

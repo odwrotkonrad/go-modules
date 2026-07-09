@@ -8,66 +8,91 @@ import (
 	"path/filepath"
 	"strings"
 
+	"gitlab.com/konradodwrot/go-modules/che/internal/config"
 	"gitlab.com/konradodwrot/go-modules/che/internal/fsutil"
 	"gitlab.com/konradodwrot/go-modules/che/internal/log"
 )
 
-// DryRunMode selects how a dry run reports: off (real run), delta (only dests
-// that would change), all (every dest, as if nothing existed at the destination).
-type DryRunMode int
-
-const (
-	DryRunOff DryRunMode = iota
-	DryRunDelta
-	DryRunAll
-)
-
 // Host is the live system the load ops act on: repo source tree, invoking
-// identity, detected profile, mutating filesystem.
+// identity, detected profile, runtime options, mutating filesystem.
 type Host struct {
 	RepoRoot string // <configs> dir (contains che.yml, ci/, templates/)
 	Root     string // <configs>/root, the load ops' source subtree
 	Home     string
 	Profile  string // "<space>/<os>-<arch>"
-	mode     DryRunMode
-	fs       fsutil.FS
+	cfg      config.Config
+	logSub   string
+	fs       fsutil.FileSystemWriter
+	reader   fsutil.FileSystemReader
 }
 
-func New(repoRoot, home, profile string, mode DryRunMode) Host {
+func New(repoRoot, home, profile string, cfg config.Config) Host {
 	return Host{
 		RepoRoot: repoRoot,
 		Root:     filepath.Join(repoRoot, "root"),
 		Home:     home,
 		Profile:  profile,
-		mode:     mode,
-		fs:       fsutil.FS{Home: home, Mode: mode.log()},
+		cfg:      cfg,
+		fs:       fsutil.FS{Home: home},
+		reader:   fsutil.OSReader{},
 	}
 }
 
 // WithLogSub returns a copy whose op log lines carry s as a trailing subtype
 // word (e.g. "profile=<name>").
 func (h Host) WithLogSub(s string) Host {
-	h.fs.Sub = s
+	h.logSub = s
 	return h
 }
 
-// log maps a DryRunMode to the log-layer dry-run mode (subtype rendering).
-func (m DryRunMode) log() log.DryRun {
+// WithFS returns a copy whose mutating fs ops run through fs (test injection).
+func (h Host) WithFS(fs fsutil.FileSystemWriter) Host {
+	h.fs = fs
+	return h
+}
+
+// WithFSReader returns a copy whose dest-facing reads (settled checks, prune
+// scans, content diffs) run through r (test injection).
+func (h Host) WithFSReader(r fsutil.FileSystemReader) Host {
+	h.reader = r
+	return h
+}
+
+// log emits a 'title: msg' line, folding the dry-run mode plus logSub into the
+// subtype. Title is "type" or "type(subtype)" (see log.MsgSub).
+func (h Host) log(title, msg string) { log.MsgSub(title, msg, logMode(h.cfg.DryRun), h.logSub) }
+
+// mutate is the one dry-run+log gate for every mutating op: dry run logs only
+// (fs untouched); real run executes fn, then logs.
+func (h Host) mutate(title, msg string, fn func() error) error {
+	if !h.IsDryRun() {
+		if err := fn(); err != nil {
+			return err
+		}
+	}
+	h.log(title, msg)
+	return nil
+}
+
+// logMode maps a config.DryRunMode to the log-layer dry-run mode (subtype rendering).
+func logMode(m config.DryRunMode) log.DryRun {
 	switch m {
-	case DryRunDelta:
+	case config.DryRunDelta:
 		return log.Delta
-	case DryRunAll:
+	case config.DryRunAll:
 		return log.All
 	default:
 		return log.Off
 	}
 }
 
-// DryRun reports whether this is any dry run (delta or all).
-func (h Host) DryRun() bool { return h.mode != DryRunOff }
+// IsDryRun reports whether this is any dry run (delta or all).
+func (h Host) IsDryRun() bool { return !h.cfg.IsOptionEqualTo(config.OptionDryRun, config.DryRunOff) }
 
-// DryRunAll reports the full-insert-set dry run, bypassing "already settled" skips.
-func (h Host) DryRunAll() bool { return h.mode == DryRunAll }
+// IsOptionEqualTo reports whether opt's resolved runtime option equals val.
+func (h Host) IsOptionEqualTo(opt config.Option, val any) bool {
+	return h.cfg.IsOptionEqualTo(opt, val)
+}
 
 // Src maps a repo-relative path (under root/) to its absolute source path.
 func (h Host) Src(rel string) string { return filepath.Join(h.Root, rel) }
@@ -100,8 +125,5 @@ func (h Host) ToDest(rel string) string {
 	}
 	return "/" + rel
 }
-
-// UnderHome reports whether dest is the user-owned $HOME tree (no sudo needed).
-func (h Host) UnderHome(dest string) bool { return h.fs.UnderHome(dest) }
 
 // [<] 🤖🤖

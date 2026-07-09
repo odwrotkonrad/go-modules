@@ -2,7 +2,6 @@
 package main
 
 import (
-	"fmt"
 	"os"
 
 	"gitlab.com/konradodwrot/go-modules/che/render/checkcmd"
@@ -22,6 +21,8 @@ exit 0 match, 22 differ (unified diff on stderr).
 `
 
 var tool = checkcmd.Tool{
+	Name:     "render-dirs-tree",
+	Version:  version,
 	Usage:    usage,
 	Label:    "render-dirs-tree",
 	CheckArg: ".",
@@ -29,12 +30,7 @@ var tool = checkcmd.Tool{
 }
 
 func main() {
-	args := os.Args[1:]
-	if len(args) == 1 && (args[0] == "-v" || args[0] == "--version") {
-		fmt.Println("render-dirs-tree version", version)
-		return
-	}
-	os.Exit(tool.Run(args))
+	os.Exit(tool.Run(os.Args[1:]))
 }
 
 //[<] 🤖🤖

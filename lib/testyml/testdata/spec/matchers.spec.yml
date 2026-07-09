@@ -1,0 +1,20 @@
+# [>] 🤖🤖
+- name: mustMatchShouldMatchMultilineLiteralBlock
+  in:
+    args: ["line one (raw)\nline two $x\nln(create): /etc/zshrc\n"]
+  want:
+    stdOut: |
+      line one (raw)
+      line two $x
+- name: mustMatchShouldMatchInlineRegexHole
+  in:
+    args: ["ln(create): /etc/zshrc"]
+  want:
+    stdOut: ['ln(create): /etc/{{/\w+/}}']
+- name: mustNotMatchShouldRejectNonMatchingMatchers
+  in:
+    args: ["cp: /x"]
+    noMatch: ["ln(create)", 'rm: /etc/{{/\w+/}}']
+  want:
+    stdOut: ["cp: /x"]
+# [<] 🤖🤖
