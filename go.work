@@ -4,4 +4,7 @@ use (
 	./che
 	./get-os-open-files-with
 	./get-term-open-files-with
+	./lib
 )
+
+replace gitlab.com/konradodwrot/go-modules/lib v0.0.1 => ./lib

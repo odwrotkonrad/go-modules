@@ -309,10 +309,7 @@ func parseMode(s string) (os.FileMode, bool) {
 
 // expandHome resolves a leading ~/ to the host home.
 func (h Host) expandHome(p string) string {
-	if rest, ok := strings.CutPrefix(p, "~/"); ok {
-		return filepath.Join(h.Home, rest)
-	}
-	return p
+	return fsutil.ExpandHome(p, h.Home)
 }
 
 func sameContent(a, b string) bool {

@@ -8,6 +8,8 @@ import (
 )
 
 type Tool struct {
+	Name     string
+	Version  string
 	Usage    string
 	Label    string
 	NeedsArg bool
@@ -19,6 +21,9 @@ func (t Tool) Run(args []string) int {
 	switch {
 	case len(args) == 1 && (args[0] == "-h" || args[0] == "--help"):
 		fmt.Print(t.Usage)
+		return 0
+	case len(args) == 1 && (args[0] == "-v" || args[0] == "--version"):
+		fmt.Println(t.Name, "version", t.Version)
 		return 0
 	case len(args) == 2 && args[0] == "--check":
 		return t.check(args[1])

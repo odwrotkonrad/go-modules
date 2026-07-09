@@ -163,6 +163,14 @@ func IsDir(p string) bool {
 	return err == nil && fi.IsDir()
 }
 
+// ExpandHome resolves a leading ~/ in p to home.
+func ExpandHome(p, home string) string {
+	if rest, ok := strings.CutPrefix(p, "~/"); ok {
+		return filepath.Join(home, rest)
+	}
+	return p
+}
+
 // openRepo opens the git repo containing dir (walking up for .git), returns it
 // plus worktree root.
 func openRepo(dir string) (*git.Repository, string, error) {

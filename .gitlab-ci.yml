@@ -55,9 +55,9 @@ test-get-os-open-files-with:
     MODULE: get-os-open-files-with
   rules:
     - if: $CI_PIPELINE_SOURCE == "merge_request_event"
-      changes: [get-os-open-files-with/**/*, go.work, .gitlab-ci.yml]
+      changes: [get-os-open-files-with/**/*, lib/**/*, go.work, .gitlab-ci.yml]
     - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
-      changes: [get-os-open-files-with/**/*, go.work, .gitlab-ci.yml]
+      changes: [get-os-open-files-with/**/*, lib/**/*, go.work, .gitlab-ci.yml]
   cache:
     - key:
         files:
@@ -72,13 +72,30 @@ test-get-term-open-files-with:
     MODULE: get-term-open-files-with
   rules:
     - if: $CI_PIPELINE_SOURCE == "merge_request_event"
-      changes: [get-term-open-files-with/**/*, go.work, .gitlab-ci.yml]
+      changes: [get-term-open-files-with/**/*, lib/**/*, go.work, .gitlab-ci.yml]
     - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
-      changes: [get-term-open-files-with/**/*, go.work, .gitlab-ci.yml]
+      changes: [get-term-open-files-with/**/*, lib/**/*, go.work, .gitlab-ci.yml]
   cache:
     - key:
         files:
           - get-term-open-files-with/go.sum
+      paths:
+        - .cache/go-mod
+        - .cache/go-build
+
+test-lib:
+  extends: .test-module
+  variables:
+    MODULE: lib
+  rules:
+    - if: $CI_PIPELINE_SOURCE == "merge_request_event"
+      changes: [lib/**/*, go.work, .gitlab-ci.yml]
+    - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
+      changes: [lib/**/*, go.work, .gitlab-ci.yml]
+  cache:
+    - key:
+        files:
+          - lib/go.sum
       paths:
         - .cache/go-mod
         - .cache/go-build
@@ -116,6 +133,14 @@ release-get-term-open-files-with:
   rules:
     - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
       changes: [get-term-open-files-with/**/*]
+
+release-lib:
+  extends: .release-module
+  variables:
+    MODULE: lib
+  rules:
+    - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
+      changes: [lib/**/*]
 
 .pages-build:
   image:

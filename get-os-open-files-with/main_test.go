@@ -7,12 +7,13 @@ import (
 	"path/filepath"
 	"testing"
 
-	"gitlab.com/konradodwrot/go-modules/get-os-open-files-with/lib"
+	"gitlab.com/konradodwrot/go-modules/lib/climain"
+	"gitlab.com/konradodwrot/go-modules/lib/yamlcfg"
 )
 
 func writeConfig(t *testing.T, raw string) string {
 	t.Helper()
-	lib.SystemDir = filepath.Join(t.TempDir(), "no-system")
+	yamlcfg.SystemDir = filepath.Join(t.TempDir(), "no-system")
 	dir := t.TempDir()
 	if err := os.WriteFile(filepath.Join(dir, configName), []byte(raw), 0644); err != nil {
 		t.Fatal(err)
@@ -21,7 +22,7 @@ func writeConfig(t *testing.T, raw string) string {
 }
 
 func codeOf(err error) int {
-	var ce *lib.CodedError
+	var ce *yamlcfg.CodedError
 	if errors.As(err, &ce) {
 		return ce.Code
 	}
@@ -82,7 +83,7 @@ func TestErrors(t *testing.T) {
 		}
 	})
 	t.Run("missing_config", func(t *testing.T) {
-		lib.SystemDir = filepath.Join(t.TempDir(), "no-system")
+		yamlcfg.SystemDir = filepath.Join(t.TempDir(), "no-system")
 		dir := t.TempDir()
 		_, err := run(nil, dir)
 		if codeOf(err) != 13 {
@@ -107,9 +108,9 @@ func TestErrors(t *testing.T) {
 
 func TestHelp(t *testing.T) {
 	for _, flag := range []string{"--help", "-h"} {
-		out, err := run([]string{flag}, "")
-		if err != nil {
-			t.Fatalf("%s: %v", flag, err)
+		out, done := climain.HelpVersion([]string{flag}, usage, "get-os-open-files-with", version)
+		if !done {
+			t.Fatalf("%s: not handled", flag)
 		}
 		if out != usage {
 			t.Errorf("%s: usage mismatch", flag)

@@ -52,6 +52,11 @@ get-term-open-files-with
     docs-agents
   lib
   testdata
+lib
+  assets
+    docs-agents
+  climain
+  yamlcfg
 templates
   2-data
   3-audience

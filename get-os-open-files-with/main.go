@@ -2,11 +2,12 @@
 package main
 
 import (
-	"errors"
 	"fmt"
 	"os"
 
 	"gitlab.com/konradodwrot/go-modules/get-os-open-files-with/lib"
+	"gitlab.com/konradodwrot/go-modules/lib/climain"
+	"gitlab.com/konradodwrot/go-modules/lib/yamlcfg"
 )
 
 const usage = `usage: get-os-open-files-with
@@ -25,33 +26,22 @@ const configName = "os-open-files-with.yml"
 var version = "dev"
 
 func run(args []string, customDir string) (string, error) {
-	switch {
-	case len(args) == 1 && (args[0] == "--help" || args[0] == "-h"):
-		return usage, nil
-	case len(args) == 1 && (args[0] == "--version" || args[0] == "-v"):
-		return "get-os-open-files-with version " + version, nil
-	case len(args) == 0:
-		node, err := lib.LoadConfigNode(configName, customDir)
-		if err != nil {
-			return "", err
-		}
-		return lib.Render(node)
-	default:
-		return "", &lib.CodedError{Code: lib.CodeArgs, Msg: "invalid arguments: " + fmt.Sprint(args)}
+	if len(args) != 0 {
+		return "", &yamlcfg.CodedError{Code: yamlcfg.CodeArgs, Msg: "invalid arguments: " + fmt.Sprint(args)}
 	}
+	node, err := yamlcfg.LoadConfigNode(configName, customDir)
+	if err != nil {
+		return "", err
+	}
+	return lib.Render(node)
 }
 
 func main() {
-	out, err := run(os.Args[1:], "")
-	if err != nil {
-		fmt.Fprintln(os.Stderr, err.Error())
-		var ce *lib.CodedError
-		if errors.As(err, &ce) {
-			os.Exit(ce.Code)
-		}
-		os.Exit(1)
+	if out, done := climain.HelpVersion(os.Args[1:], usage, "get-os-open-files-with", version); done {
+		climain.Exit(out, nil)
 	}
-	fmt.Println(out)
+	out, err := run(os.Args[1:], "")
+	climain.Exit(out, err)
 }
 
 //[<] 🤖🤖

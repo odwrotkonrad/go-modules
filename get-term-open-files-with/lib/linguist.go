@@ -11,6 +11,8 @@ import (
 	"time"
 
 	"gopkg.in/yaml.v3"
+
+	"gitlab.com/konradodwrot/go-modules/lib/yamlcfg"
 )
 
 const LanguagesURL = "https://raw.githubusercontent.com/github-linguist/linguist/master/lib/linguist/languages.yml"
@@ -34,21 +36,21 @@ func fetchLanguages(url string) ([]byte, error) {
 	client := &http.Client{Timeout: 30 * time.Second}
 	res, err := client.Get(url)
 	if err != nil {
-		return nil, &CodedError{CodeNetwork, "network fetch failed: " + url}
+		return nil, &yamlcfg.CodedError{Code: yamlcfg.CodeNetwork, Msg: "network fetch failed: " + url}
 	}
 	defer res.Body.Close()
 	if res.StatusCode != http.StatusOK {
-		return nil, &CodedError{CodeNetwork, "network fetch failed: " + url}
+		return nil, &yamlcfg.CodedError{Code: yamlcfg.CodeNetwork, Msg: "network fetch failed: " + url}
 	}
 	body, err := io.ReadAll(res.Body)
 	if err != nil {
-		return nil, &CodedError{CodeNetwork, "network fetch failed: " + url}
+		return nil, &yamlcfg.CodedError{Code: yamlcfg.CodeNetwork, Msg: "network fetch failed: " + url}
 	}
 	if err := os.MkdirAll(CacheDir(), 0755); err != nil {
-		return nil, &CodedError{CodeNetwork, "network fetch failed: " + url}
+		return nil, &yamlcfg.CodedError{Code: yamlcfg.CodeNetwork, Msg: "network fetch failed: " + url}
 	}
 	if err := os.WriteFile(cached, body, 0644); err != nil {
-		return nil, &CodedError{CodeNetwork, "network fetch failed: " + url}
+		return nil, &yamlcfg.CodedError{Code: yamlcfg.CodeNetwork, Msg: "network fetch failed: " + url}
 	}
 	return body, nil
 }
@@ -65,7 +67,7 @@ func TypeExtensions(url string) (map[string][]string, error) {
 	}
 	var langs map[string]language
 	if err := yaml.Unmarshal(data, &langs); err != nil {
-		return nil, &CodedError{CodeConfig, "invalid languages data: " + err.Error()}
+		return nil, &yamlcfg.CodedError{Code: yamlcfg.CodeConfig, Msg: "invalid languages data: " + err.Error()}
 	}
 	sets := map[string]map[string]bool{}
 	for _, lang := range langs {

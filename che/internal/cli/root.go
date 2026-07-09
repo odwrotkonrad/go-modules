@@ -103,6 +103,14 @@ func (u unit) withEnv(fn func() error) error {
 	return fn()
 }
 
+type pluginConfig struct {
+	repoRoot string
+	home     string
+	mode     host.DryRunMode
+	forceAll bool
+	eval     func(string) (bool, error)
+}
+
 // Built once in PersistentPreRunE, read by each RunE. Plugin units build
 // lazily (ensurePlugin), after the local unit's ops ran.
 var (
@@ -114,13 +122,7 @@ var (
 	units        []unit
 	pluginRefs   []spec.PluginRef
 	pluginUnits  map[string]*unit
-	pluginCfg    struct {
-		repoRoot string
-		home     string
-		mode     host.DryRunMode
-		forceAll bool
-		eval     func(string) (bool, error)
-	}
+	pluginCfg    pluginConfig
 )
 
 // version is injected at build time via -ldflags -X.
@@ -189,9 +191,7 @@ func build() error {
 	if err != nil {
 		return err
 	}
-	if dryRunMode == "" {
-		dryRunMode = os.Getenv("CHE_DRY_RUN")
-	}
+	dryRunMode = orEnv(dryRunMode, "CHE_DRY_RUN")
 	mode, ok := dryRunModes[dryRunMode]
 	if !ok {
 		return fmt.Errorf("invalid --dry-run mode %q: want delta or all", dryRunMode)
@@ -207,12 +207,9 @@ func build() error {
 	// CHE_SKIP_PLUGINS, truthy) drops plugins entries, local repo only.
 	// --debug (env CHE_DEBUG, truthy) prints debug-level lines.
 	// Flags win over envs.
-	log.SetDebug(debugFlag || os.Getenv("CHE_DEBUG") != "")
-	forceOne := profileForce
-	if forceOne == "" {
-		forceOne = os.Getenv("CHE_PROFILE")
-	}
-	forceAll := omitExecIf || os.Getenv("CHE_OMIT_EXEC_IF") != ""
+	log.SetDebug(boolOrEnv(debugFlag, "CHE_DEBUG"))
+	forceOne := orEnv(profileForce, "CHE_PROFILE")
+	forceAll := boolOrEnv(omitExecIf, "CHE_OMIT_EXEC_IF")
 	eval := spec.NewEvaluator().EvalExecIf
 	profiles, err := sp.EligibleProfiles(forceOne, forceAll, eval)
 	if err != nil {
@@ -225,12 +222,23 @@ func build() error {
 	}
 	units = []unit{{host: h, res: res}}
 	pluginRefs = res.Plugins
-	if skipPlugins || os.Getenv("CHE_SKIP_PLUGINS") != "" {
+	if boolOrEnv(skipPlugins, "CHE_SKIP_PLUGINS") {
 		pluginRefs = nil
 	}
 	pluginUnits = map[string]*unit{}
-	pluginCfg.repoRoot, pluginCfg.home, pluginCfg.mode, pluginCfg.forceAll, pluginCfg.eval = repoRoot, home, mode, forceAll, eval
+	pluginCfg = pluginConfig{repoRoot: repoRoot, home: home, mode: mode, forceAll: forceAll, eval: eval}
 	return nil
+}
+
+func orEnv(v, key string) string {
+	if v != "" {
+		return v
+	}
+	return os.Getenv(key)
+}
+
+func boolOrEnv(flag bool, key string) bool {
+	return flag || os.Getenv(key) != ""
 }
 
 // buildPlugin ensures the plugin checkout (git ref: cache clone/pull; dir ref:
@@ -283,10 +291,8 @@ func pluginCheckout(p spec.PluginRef, repoRoot, home string) (string, error) {
 // resolvePluginDir expands a dir-path plugin ref: $VAR, then ~ -> home, then
 // relative -> joined onto the local repo root (the che.yml dir). The dir must exist.
 func resolvePluginDir(ref, repoRoot, home string) (string, error) {
-	dir := os.ExpandEnv(ref)
-	if rest, ok := strings.CutPrefix(dir, "~/"); ok {
-		dir = filepath.Join(home, rest)
-	} else if dir == "~" {
+	dir := fsutil.ExpandHome(os.ExpandEnv(ref), home)
+	if dir == "~" {
 		dir = home
 	}
 	if !filepath.IsAbs(dir) {

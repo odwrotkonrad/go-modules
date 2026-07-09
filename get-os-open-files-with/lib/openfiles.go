@@ -5,6 +5,8 @@ import (
 	"strings"
 
 	"gopkg.in/yaml.v3"
+
+	"gitlab.com/konradodwrot/go-modules/lib/yamlcfg"
 )
 
 func Render(cfg *yaml.Node) (string, error) {
@@ -22,20 +24,20 @@ func Render(cfg *yaml.Node) (string, error) {
 		return "", nil
 	}
 	if root.Kind != yaml.MappingNode {
-		return "", &CodedError{CodeConfig, "invalid config: top level must be a mapping"}
+		return "", &yamlcfg.CodedError{Code: yamlcfg.CodeConfig, Msg: "invalid config: top level must be a mapping"}
 	}
 	var lines []string
 	for i := 0; i+1 < len(root.Content); i += 2 {
 		bundle := root.Content[i].Value
 		roles := root.Content[i+1]
 		if roles.Kind != yaml.MappingNode {
-			return "", &CodedError{CodeConfig, "invalid config: " + bundle + " must be a mapping"}
+			return "", &yamlcfg.CodedError{Code: yamlcfg.CodeConfig, Msg: "invalid config: " + bundle + " must be a mapping"}
 		}
 		for j := 0; j+1 < len(roles.Content); j += 2 {
 			role := roles.Content[j].Value
 			utis := roles.Content[j+1]
 			if utis.Kind != yaml.SequenceNode {
-				return "", &CodedError{CodeConfig, "invalid config: " + bundle + "." + role + " must be a list"}
+				return "", &yamlcfg.CodedError{Code: yamlcfg.CodeConfig, Msg: "invalid config: " + bundle + "." + role + " must be a list"}
 			}
 			for _, uti := range utis.Content {
 				lines = append(lines, bundle+" "+uti.Value+" "+role)

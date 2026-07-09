@@ -97,11 +97,11 @@ func TestTrackedFiles(t *testing.T) {
 // --exclude-standard` on a mock root/ subtree (hidden, .gitkeep, markers, nesting).
 func TestTrackedFilesMatchesCLI(t *testing.T) {
 	dir := testutil.Repo(t, map[string]string{
-		"che.yml":                                    "profiles:\n", // outside root/, excluded
-		"root/etc/zshrc":                             "z\n",
-		"root/etc/zsh/zshenv":                        "e\n",
-		"root/HOME/.config/zsh/.zshrc":               "hidden\n",
-		"root/HOME/.config/zsh/.gitkeep":             "",
+		"che.yml":                                        "profiles:\n", // outside root/, excluded
+		"root/etc/zshrc":                                 "z\n",
+		"root/etc/zsh/zshenv":                            "e\n",
+		"root/HOME/.config/zsh/.zshrc":                   "hidden\n",
+		"root/HOME/.config/zsh/.gitkeep":                 "",
 		"root/HOME/.config/git/config.ontoHost.tpl":      "tpl\n",
 		"root/Library/LaunchDaemons/x.plist.ontoHost.cp": "cp\n",
 	})

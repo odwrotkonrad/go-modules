@@ -2,7 +2,7 @@
 #[what] Monorepo Makefile: repo-wide targets, fans out to module Makefiles
 SHELL := zsh
 .SHELLFLAGS := -c
-MODULES := che get-os-open-files-with get-term-open-files-with
+MODULES := che get-os-open-files-with get-term-open-files-with lib
 
 WRAPPERS :=
 COMMANDS := render-templates render-docs run-repo-ci-prepare-hooks run-repo-ci-precommit-all test build vet install create-tag publish release-check release-snapshot

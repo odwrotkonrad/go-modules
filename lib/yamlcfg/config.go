@@ -1,5 +1,5 @@
 // [>] 🤖🤖
-package lib
+package yamlcfg
 
 import (
 	"os"

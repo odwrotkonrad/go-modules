@@ -1,6 +1,6 @@
 # go-modules
 
-Go monorepo: `che`, `get-os-open-files-with`, `get-term-open-files-with`.
+Go monorepo: `che`, `get-os-open-files-with`, `get-term-open-files-with`, `lib`.
 
 {{ renderMarkdown "assets/docs-agents/purpose.md" "normalize-headings" }}
 
@@ -11,6 +11,7 @@ Go monorepo: `che`, `get-os-open-files-with`, `get-term-open-files-with`.
 | [che](che/) | Spec-driven dotfile configuration loader, plus the shared render engine and doc-rendering CLIs (`render-tpl`, `render-dirs-tree`, `render-makefile-doc`, `render-repo-group-index`) under `che/render/` |
 | [get-os-open-files-with](get-os-open-files-with/) | CLI printing macOS file-handler association lines for duti |
 | [get-term-open-files-with](get-term-open-files-with/) | CLI printing zsh suffix-alias lines for terminal file opening |
+| [lib](lib/) | Shared library for the CLI modules: `yamlcfg` config loading, `climain` main-shape helpers (no binaries) |
 
 ## Install
 

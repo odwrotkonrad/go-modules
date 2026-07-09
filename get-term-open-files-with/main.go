@@ -2,11 +2,12 @@
 package main
 
 import (
-	"errors"
 	"fmt"
 	"os"
 
 	"gitlab.com/konradodwrot/go-modules/get-term-open-files-with/lib"
+	"gitlab.com/konradodwrot/go-modules/lib/climain"
+	"gitlab.com/konradodwrot/go-modules/lib/yamlcfg"
 )
 
 const usage = `usage: get-term-open-files-with <any|vscode|kitty>
@@ -29,18 +30,12 @@ var terminals = map[string]bool{"any": true, "vscode": true, "kitty": true}
 var version = "dev"
 
 func run(args []string, customDir, url string) (string, error) {
-	if len(args) == 1 && (args[0] == "--help" || args[0] == "-h") {
-		return usage, nil
-	}
-	if len(args) == 1 && (args[0] == "--version" || args[0] == "-v") {
-		return "get-term-open-files-with version " + version, nil
-	}
 	if len(args) != 1 || !terminals[args[0]] {
-		return "", &lib.CodedError{Code: lib.CodeArgs, Msg: "invalid arguments: " + fmt.Sprint(args)}
+		return "", &yamlcfg.CodedError{Code: yamlcfg.CodeArgs, Msg: "invalid arguments: " + fmt.Sprint(args)}
 	}
 	terminal := args[0]
 	var sections lib.Sections
-	if err := lib.LoadConfig(configName, customDir, &sections); err != nil {
+	if err := yamlcfg.LoadConfig(configName, customDir, &sections); err != nil {
 		return "", err
 	}
 	byType, err := lib.TypeExtensions(url)
@@ -51,16 +46,11 @@ func run(args []string, customDir, url string) (string, error) {
 }
 
 func main() {
-	out, err := run(os.Args[1:], "", lib.LanguagesURL)
-	if err != nil {
-		fmt.Fprintln(os.Stderr, err.Error())
-		var ce *lib.CodedError
-		if errors.As(err, &ce) {
-			os.Exit(ce.Code)
-		}
-		os.Exit(1)
+	if out, done := climain.HelpVersion(os.Args[1:], usage, "get-term-open-files-with", version); done {
+		climain.Exit(out, nil)
 	}
-	fmt.Println(out)
+	out, err := run(os.Args[1:], "", lib.LanguagesURL)
+	climain.Exit(out, err)
 }
 
 //[<] 🤖🤖

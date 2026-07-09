@@ -71,3 +71,17 @@
 
 `release-check` validate the goreleaser config
 `release-snapshot` local 4-target snapshot into ./dist, no publish
+
+## `./lib/Makefile`
+
+### Go:
+
+`test` run all tests
+`build` compile all packages (library, no binaries)
+`vet` go vet all packages
+`install` no-op: library module, nothing to install
+
+### Release:
+
+`release-check` no-op: library module, no goreleaser config
+`release-snapshot` no-op: library module, no release artifacts

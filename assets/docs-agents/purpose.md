@@ -2,7 +2,7 @@
 
 ## What It Is
 
-Go monorepo for all user Go modules: `che` (spec-driven dotfile loader, carrying the shared render engine and doc-rendering CLIs as its `render/` package tree), `get-os-open-files-with`, `get-term-open-files-with`. Each module keeps its own `go.mod` and its own release stream via dir-prefixed tags (`<module>/vX.Y.Z`), continuing the version numbering of the former standalone repos.
+Go monorepo for all user Go modules: `che` (spec-driven dotfile loader, carrying the shared render engine and doc-rendering CLIs as its `render/` package tree), `get-os-open-files-with`, `get-term-open-files-with`, `lib` (shared config-loading and CLI-main helpers for the get-* CLIs). Each module keeps its own `go.mod` and its own release stream via dir-prefixed tags (`<module>/vX.Y.Z`), continuing the version numbering of the former standalone repos.
 
 ## Why It Exists
 
