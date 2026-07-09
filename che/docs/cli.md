@@ -4,18 +4,22 @@
 che resolves every eligible profile in che.yml (execIf predicates), then
 loads the union of files/dirs/installs/services those profiles select.
 
-## Global flags
+## Global options
 
-```
-      --debug                      print debug-level lines (plugin announce, clone/pull attempts); env: CHE_DEBUG
-  -C, --directory string           change into this directory before resolving the repo; env: CHE_DIR
-      --dry-run string[="delta"]   print mutating actions instead of executing them: delta (changed dests) | all (every dest)
-      --omit-exec-if               treat every execIf predicate as passing; env: CHE_OMIT_EXEC_IF
-      --profile string             run only this profile (autoExec skipped, execIf still enforced); env: CHE_PROFILE
-      --skip-plugins               skip plugins entries, load only the local repo; env: CHE_SKIP_PLUGINS
-```
+| Option | Env | Values | Description |
+| --- | --- | --- | --- |
+| `--debug` | `CHE_DEBUG` | truthy | print debug-level lines (plugin announce, clone/pull attempts) |
+| `-C`, `--directory` | `CHE_DIR` | `string` | change into this directory before resolving the repo |
+| `--dry-run` | `CHE_DRY_RUN` | `delta (changed dests, bare-flag default)` \| `all (every dest)` | print mutating actions instead of executing them |
+| `--profile` | `CHE_PROFILE` | `string` | run only this profile (autoExec skipped, execIf still enforced) |
+| `--skip-exec-if` | `CHE_SKIP_EXEC_IF` | truthy | treat every execIf predicate as passing |
+| `--skip-plugins` | `CHE_SKIP_PLUGINS` | truthy | skip plugins entries, load only the local repo |
 
 ## Commands
+
+### `$ che all`
+
+run every op the profile selects, in order.
 
 ### `$ che copy`
 
@@ -41,6 +45,10 @@ delete broken symlinks.
 
 render *.tpl sources; each dest path decides target (relative -> repo, ~/ or absolute -> host).
 
+| Option | Env | Values | Description |
+| --- | --- | --- | --- |
+| `--skip-secrets` | `CHE_RENDER_TEMPLATES_SKIP_SECRETS` | truthy | skip sources carrying op:// secret refs (logged, dests untouched) |
+
 ### `$ che run-scripts`
 
 run the profile's scripts, optionally filtered by name substring.
@@ -62,13 +70,3 @@ unload each service (bootout if loaded, wait until gone).
 ### `$ che services ensure`
 
 settle then verify each long-running service has a live pid.
-
-## Environment variables
-
-| Variable | Effect |
-| --- | --- |
-| `CHE_PROFILE` | as `--profile` (flag wins) |
-| `CHE_DRY_RUN` | as `--dry-run` (`delta` or `all`) |
-| `CHE_OMIT_EXEC_IF` | truthy: as `--omit-exec-if` |
-| `CHE_SKIP_PLUGINS` | truthy: as `--skip-plugins` |
-| `CHE_RENDER_TEMPLATES_DRY_RUN_SECRETS` | render-templates: skip sources carrying op:// secret refs (logged, dests untouched) |

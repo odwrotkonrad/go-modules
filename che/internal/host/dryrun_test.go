@@ -37,7 +37,7 @@ func setupHost(t *testing.T) (Host, spec.Resolved, string) {
 var ops = map[string]func(Host, spec.Resolved) error{
 	"link":             func(h Host, r spec.Resolved) error { return h.MkLinks(r.Links, r.Dirs) },
 	"copy":             func(h Host, r spec.Resolved) error { return h.MkCopies(r.Copies, r.Dirs) },
-	"render-templates": func(h Host, r spec.Resolved) error { return h.RenderTemplates(r.Templates) },
+	"render-templates": func(h Host, r spec.Resolved) error { return h.RenderTemplates(r.Templates, false) },
 	"mk-dirs":          func(h Host, r spec.Resolved) error { return h.MkDirs(r.Dirs, r.ExtraDirs) },
 	"prune-links":      func(h Host, r spec.Resolved) error { return h.PruneBrokenLinks(r.Dirs) },
 	"run-scripts": func(h Host, r spec.Resolved) error {

@@ -46,7 +46,7 @@ func TestRenderRepoReplace(t *testing.T) {
 	})
 	h := New(root, "/home/x", "cli/macos", DryRunOff)
 	item := spec.FileItem{Rel: "templates/x.ontoRepo.tpl", Dests: []spec.DestSpec{{Path: "out.md"}}}
-	if err := h.RenderTemplates([]spec.FileItem{item}); err != nil {
+	if err := h.RenderTemplates([]spec.FileItem{item}, false); err != nil {
 		t.Fatal(err)
 	}
 	got := readDest(t, root, "out.md")
@@ -67,7 +67,7 @@ func TestRenderRepoMergeUpsert(t *testing.T) {
 		Rel:   "templates/env.ontoRepo.tpl",
 		Dests: []spec.DestSpec{{Path: ".env", Options: render.Options{WriteType: "mergeUpsert"}}},
 	}
-	if err := h.RenderTemplates([]spec.FileItem{item}); err != nil {
+	if err := h.RenderTemplates([]spec.FileItem{item}, false); err != nil {
 		t.Fatal(err)
 	}
 	got := readDest(t, root, ".env")
@@ -76,7 +76,7 @@ func TestRenderRepoMergeUpsert(t *testing.T) {
 		t.Errorf("merge-upsert output = %q, want %q", got, want)
 	}
 	// stable: re-run yields the same content
-	if err := h.RenderTemplates([]spec.FileItem{item}); err != nil {
+	if err := h.RenderTemplates([]spec.FileItem{item}, false); err != nil {
 		t.Fatal(err)
 	}
 	if again := readDest(t, root, ".env"); again != want {
@@ -103,7 +103,7 @@ func TestRenderHostMergeUpsert(t *testing.T) {
 		Rel:   "root/HOME/env.ontoHost.tpl",
 		Dests: []spec.DestSpec{{Path: "~/.env", Options: render.Options{WriteType: "mergeUpsert"}}},
 	}
-	if err := h.RenderTemplates([]spec.FileItem{item}); err != nil {
+	if err := h.RenderTemplates([]spec.FileItem{item}, false); err != nil {
 		t.Fatal(err)
 	}
 	got, err := os.ReadFile(dest)
@@ -128,7 +128,7 @@ func TestRenderDerivedDest(t *testing.T) {
 	}
 	h := New(root, home, "cli/macos", DryRunOff)
 	item := spec.FileItem{Rel: "root/HOME/.config/zsh/t.ontoHost.tpl"}
-	if err := h.RenderTemplates([]spec.FileItem{item}); err != nil {
+	if err := h.RenderTemplates([]spec.FileItem{item}, false); err != nil {
 		t.Fatal(err)
 	}
 	got, err := os.ReadFile(filepath.Join(home, ".config/zsh/t"))
@@ -154,7 +154,7 @@ func TestRenderRepoMultiDestAtInclude(t *testing.T) {
 			{Path: "AGENTS.md", Options: render.Options{RenderReferencedFiles: true}},
 		},
 	}
-	if err := h.RenderTemplates([]spec.FileItem{item}); err != nil {
+	if err := h.RenderTemplates([]spec.FileItem{item}, false); err != nil {
 		t.Fatal(err)
 	}
 	claude := readDest(t, root, "CLAUDE.md")
@@ -178,7 +178,7 @@ func TestRenderContinuesOnError(t *testing.T) {
 		{Rel: "templates/missing.ontoRepo.tpl", Dests: []spec.DestSpec{{Path: "bad.md"}}},
 		{Rel: "templates/ok.ontoRepo.tpl", Dests: []spec.DestSpec{{Path: "ok.md"}}},
 	}
-	out, err := testutil.CaptureStdout(t, func() error { return h.RenderTemplates(items) })
+	out, err := testutil.CaptureStdout(t, func() error { return h.RenderTemplates(items, false) })
 	if err == nil {
 		t.Fatal("RenderTemplates must return the collected failure")
 	}
@@ -193,15 +193,14 @@ func TestRenderContinuesOnError(t *testing.T) {
 	}
 }
 
-// TestRenderDryRunSkipSecrets: op:// source skipped when the env flag is set.
-func TestRenderDryRunSkipSecrets(t *testing.T) {
+// TestRenderSkipSecrets: op:// source skipped when skipSecrets is set.
+func TestRenderSkipSecrets(t *testing.T) {
 	root := writeRepo(t, map[string]string{
 		"templates/s.ontoRepo.tpl": "TOKEN={{ op \"op://x/y/z\" }}\n",
 	})
-	t.Setenv("CHE_RENDER_TEMPLATES_DRY_RUN_SECRETS", "1")
 	h := New(root, "/home/x", "cli/macos", DryRunOff)
 	item := spec.FileItem{Rel: "templates/s.ontoRepo.tpl", Dests: []spec.DestSpec{{Path: "out"}}}
-	if err := h.RenderTemplates([]spec.FileItem{item}); err != nil {
+	if err := h.RenderTemplates([]spec.FileItem{item}, true); err != nil {
 		t.Fatal(err)
 	}
 	if _, err := os.Stat(filepath.Join(root, "out")); !os.IsNotExist(err) {

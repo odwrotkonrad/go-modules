@@ -29,16 +29,16 @@ type tmplDest struct {
 // repo-root-relative. Glob-form items (no explicit dest) render raw to the
 // derived host path; rich items fan out across their dests through
 // render.Compose, host dests placed with spec perms, repo dests written as
-// plain repo files. A failing item is logged and the rest still render;
-// failures join into the returned error.
-func (h Host) RenderTemplates(templates []spec.FileItem) error {
-	skipSecret := os.Getenv("CHE_RENDER_TEMPLATES_DRY_RUN_SECRETS") != ""
+// plain repo files. skipSecrets drops sources carrying op:// secret refs
+// (logged, dests untouched). A failing item is logged and the rest still
+// render; failures join into the returned error.
+func (h Host) RenderTemplates(templates []spec.FileItem, skipSecrets bool) error {
 	var keep []spec.FileItem
 	var hostDests []string
 	for _, item := range templates {
-		if skipSecret && srcHasSecretRef(filepath.Join(h.RepoRoot, item.Rel)) {
+		if skipSecrets && srcHasSecretRef(filepath.Join(h.RepoRoot, item.Rel)) {
 			for _, d := range h.templateDests(item) {
-				h.fs.Log("render(dry-run-render-secrets)", d.path)
+				h.fs.Log("render(skip-secrets)", d.path)
 			}
 			continue
 		}

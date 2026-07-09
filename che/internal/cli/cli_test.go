@@ -14,7 +14,7 @@ import (
 const cheRepoPwd = "testdata/fixture/commands/tree-che-repo"
 
 // repoEnv materializes the pwd fixture as a committed git repo with an on-disk
-// HOME, chdirs in, exports HOME + CHE_OMIT_EXEC_IF so build() resolves against
+// HOME, chdirs in, exports HOME + CHE_SKIP_EXEC_IF so build() resolves against
 // it. Returns HOME. Skips as root (build resolves $HOME).
 func repoEnv(t *testing.T, pwd string) string {
 	t.Helper()
@@ -39,7 +39,7 @@ func repoEnv(t *testing.T, pwd string) string {
 			t.Fatal(err)
 		}
 	})
-	t.Setenv("CHE_OMIT_EXEC_IF", "1")
+	t.Setenv("CHE_SKIP_EXEC_IF", "1")
 	t.Setenv("HOME", home)
 	t.Setenv("XDG_DATA_HOME", filepath.Join(home, ".local/share"))
 	return home

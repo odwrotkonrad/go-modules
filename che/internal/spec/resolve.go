@@ -68,7 +68,7 @@ type effective struct {
 // EligibleProfiles lists the profiles to Resolve, in declaration order:
 //  1. forceOne (--profile by name) -> only that profile, autoExec skipped;
 //     must name a defined profile whose execIf expressions ALL pass
-//     (forceAll = --omit-exec-if lifts them).
+//     (forceAll = --skip-exec-if lifts them).
 //  2. else every autoExec profile whose execIf expressions ALL pass
 //     (forceAll makes every execIf pass; it does not lift autoExec).
 //  3. zero eligible -> error.
@@ -84,7 +84,7 @@ func (r *Raw) EligibleProfiles(forceOne string, forceAll bool, eval func(expr st
 			return nil, err
 		}
 		if !pass {
-			return nil, fmt.Errorf("--profile %q failed its execIf predicates (pass --omit-exec-if to run it regardless)", forceOne)
+			return nil, fmt.Errorf("--profile %q failed its execIf predicates (pass --skip-exec-if to run it regardless)", forceOne)
 		}
 		return []string{forceOne}, nil
 	}
@@ -103,7 +103,7 @@ func (r *Raw) EligibleProfiles(forceOne string, forceAll bool, eval func(expr st
 		}
 	}
 	if len(out) == 0 {
-		return nil, fmt.Errorf("no eligible profile: no autoExec profile passed its execIf (candidates: %v; use --profile or CHE_OMIT_EXEC_IF)",
+		return nil, fmt.Errorf("no eligible profile: no autoExec profile passed its execIf (candidates: %v; use --profile or CHE_SKIP_EXEC_IF)",
 			r.names(func(ps profileSpec) bool { return ps.Options.AutoExec }))
 	}
 	return out, nil

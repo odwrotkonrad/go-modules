@@ -139,4 +139,72 @@
     dryRunLines: false
     stdOut: |
       ${PROFILE}
+- name: allShouldRunEveryOpSelectedInSpec
+  context:
+    directory: testdata/fixture/commands/tree-che-repo
+  in:
+    args: [all]
+  want:
+    dryRunLines: false
+    stdOut: |
+      all(run): prune-links
+      prune-links(dry-run=delta): ${ROOT}
+      all(run): mk-dirs
+      mkdir(create,dry-run=delta): ${HOME}/.config
+      mkdir(create,dry-run=delta): ${HOME}/.config/zsh
+      mkdir(create,dry-run=delta): ${HOME}/.cache/zsh
+      mkdir(create,dry-run=delta): /var/log/che-test-setgid
+      mkdir(chmod,dry-run=delta): 2775 /var/log/che-test-setgid
+      all(run): link
+      mkdir(create,dry-run=delta): ${HOME}/.config
+      mkdir(create,dry-run=delta): ${HOME}/.config/zsh
+      archive(dry-run=delta): ${HOME}/.local/share/che/backups/che-link-{{/.*/}}.tar.bz2
+      ln(create,dry-run=delta): ${HOME}/.config/zsh/.zshrc
+      ln(create,dry-run=delta): /etc/zshrc
+      all(run): copy
+      mkdir(create,dry-run=delta): ${HOME}/.config
+      mkdir(create,dry-run=delta): ${HOME}/.config/zsh
+      archive(dry-run=delta): ${HOME}/.local/share/che/backups/che-copy-{{/.*/}}.tar.bz2
+      cp(create,dry-run=delta): ${HOME}/.config/zsh/c
+      cp(create,dry-run=delta): /Library/LaunchDaemons/otelcol.plist
+      cp(chown,dry-run=delta): root:wheel /Library/LaunchDaemons/otelcol.plist
+      all(run): render-templates
+      archive(dry-run=delta): ${HOME}/.local/share/che/backups/che-render-{{/.*/}}.tar.bz2
+      render(create,dry-run=delta): ${HOME}/.config/zsh/t
+      all(run): run-scripts
+      run-scripts(dry-run=delta): ${REPO}/install/unit
+      all(run): services bootout
+      bootout(dry-run=delta): system/otelcol
+      all(run): services bootin
+      bootstrap(dry-run=delta): system/otelcol
+      all(run): services ensure
+      settle(dry-run=delta): 15s before pid check
+      ensure(dry-run=delta): system/otelcol
+- name: allShouldSkipOpsWithoutSelection
+  context:
+    directory: testdata/fixture/commands/tree-link-rewrite
+  in:
+    args: [all]
+  want:
+    dryRunLines: false
+    stdOut: |
+      all(run): prune-links
+      prune-links(dry-run=delta): ${ROOT}
+      all(run): mk-dirs
+      mkdir(create,dry-run=delta): ${HOME}/.config
+      mkdir(create,dry-run=delta): ${HOME}/.config/bar
+      all(run): link
+      mkdir(create,dry-run=delta): ${HOME}/.config
+      mkdir(create,dry-run=delta): ${HOME}/.config/bar
+      archive(dry-run=delta): ${HOME}/.local/share/che/backups/che-link-{{/.*/}}.tar.bz2
+      ln(create,dry-run=delta): ${HOME}/.config/bar/a
+  notWant:
+    stdOut:
+      - 'all(run): copy'
+      - 'all(run): render-templates'
+      - 'all(run): run-scripts'
+      - 'all(run): services'
+      - cp(create
+      - render(create
+      - bootout
 # [<] 🤖🤖

@@ -114,7 +114,7 @@ every eligible profile. `$ che --profile <name>`: exactly one.
   builtin iff `true`, env iff set non-empty) or `<source> == <literal>`
   (string compare). Sources: `builtin:isOs` (`macos`/`linux`),
   `builtin:isVirt` (`true`/`false`), `env:<NAME>`. Empty: always.
-  `--omit-exec-if` (env `CHE_OMIT_EXEC_IF`): all pass.
+  `--skip-exec-if` (env `CHE_SKIP_EXEC_IF`): all pass.
 
 ### mixinProfiles
 

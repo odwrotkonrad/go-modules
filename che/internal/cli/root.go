@@ -117,7 +117,7 @@ var (
 	dirFlag      string
 	dryRunMode   string
 	profileForce string
-	omitExecIf   bool
+	skipExecIf   bool
 	skipPlugins  bool
 	debugFlag    bool
 	units        []unit
@@ -155,12 +155,12 @@ func init() {
 	RootCmd.PersistentFlags().StringVarP(&dirFlag, "directory", "C", "",
 		"change into this directory before resolving the repo; env: CHE_DIR")
 	RootCmd.PersistentFlags().StringVar(&dryRunMode, "dry-run", "",
-		"print mutating actions instead of executing them: delta (changed dests) | all (every dest)")
+		"print mutating actions instead of executing them; values: delta (changed dests, bare-flag default) | all (every dest); env: CHE_DRY_RUN")
 	RootCmd.PersistentFlags().Lookup("dry-run").NoOptDefVal = "delta"
 	RootCmd.PersistentFlags().StringVar(&profileForce, "profile", "",
 		"run only this profile (autoExec skipped, execIf still enforced); env: CHE_PROFILE")
-	RootCmd.PersistentFlags().BoolVar(&omitExecIf, "omit-exec-if", false,
-		"treat every execIf predicate as passing; env: CHE_OMIT_EXEC_IF")
+	RootCmd.PersistentFlags().BoolVar(&skipExecIf, "skip-exec-if", false,
+		"treat every execIf predicate as passing; env: CHE_SKIP_EXEC_IF")
 	RootCmd.PersistentFlags().BoolVar(&skipPlugins, "skip-plugins", false,
 		"skip plugins entries, load only the local repo; env: CHE_SKIP_PLUGINS")
 	RootCmd.PersistentFlags().BoolVar(&debugFlag, "debug", false,
@@ -171,6 +171,7 @@ func init() {
 // command-tree source for main and docgen.
 func Attach() *cobra.Command {
 	RootCmd.AddCommand(
+		AllCmd,
 		LinkCmd,
 		CopyCmd,
 		RenderCmd,
@@ -209,15 +210,15 @@ func build() error {
 		return err
 	}
 	// --profile (env CHE_PROFILE) runs only that profile, autoExec
-	// skipped but execIf still enforced; --omit-exec-if (env
-	// CHE_OMIT_EXEC_IF, truthy) makes every execIf pass; else the union of
+	// skipped but execIf still enforced; --skip-exec-if (env
+	// CHE_SKIP_EXEC_IF, truthy) makes every execIf pass; else the union of
 	// every autoExec profile passing execIf. --skip-plugins (env
 	// CHE_SKIP_PLUGINS, truthy) drops plugins entries, local repo only.
 	// --debug (env CHE_DEBUG, truthy) prints debug-level lines.
 	// Flags win over envs.
 	log.SetDebug(boolOrEnv(debugFlag, "CHE_DEBUG"))
 	forceOne := orEnv(profileForce, "CHE_PROFILE")
-	forceAll := boolOrEnv(omitExecIf, "CHE_OMIT_EXEC_IF")
+	forceAll := boolOrEnv(skipExecIf, "CHE_SKIP_EXEC_IF")
 	eval := spec.NewEvaluator().EvalExecIf
 	profiles, err := sp.EligibleProfiles(forceOne, forceAll, eval)
 	if err != nil {

@@ -26,6 +26,7 @@ func findCmd(t *testing.T, args []string) (*cobra.Command, []string) {
 		return sub, rest
 	}
 	byName := map[string]*cobra.Command{
+		"all":              AllCmd,
 		"link":             LinkCmd,
 		"copy":             CopyCmd,
 		"render-templates": RenderCmd,
