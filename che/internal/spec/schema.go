@@ -79,13 +79,18 @@ func (linkEntry) JSONSchema() *jsonschema.Schema {
 func (fileSpec) JSONSchema() *jsonschema.Schema {
 	o := obj("one source fanned out to explicit dests", []string{"source"})
 	o.Properties.Set("source", &jsonschema.Schema{
-		Description: "repo-relative source path",
+		Description: "repo-relative source path, or remote ref @<repo>//<path>[?ref=<ref>] (renderTemplates only, explicit dest required)",
 		Type:        "string",
 	})
 	o.Properties.Set("dest", &jsonschema.Schema{
 		Description: "dest paths: relative -> repo, ~/ or absolute -> host; omitted -> derived from the root/ source path",
 		Type:        "array",
 		Items:       &jsonschema.Schema{Ref: "#/$defs/DestSpec"},
+	})
+	o.Properties.Set("ctx", &jsonschema.Schema{
+		Description:          "renderTemplates only: values exposed as the template's root context (.key)",
+		Type:                 "object",
+		AdditionalProperties: &jsonschema.Schema{Type: "string"},
 	})
 	return &jsonschema.Schema{OneOf: []*jsonschema.Schema{
 		{Description: "glob over git-tracked files (brace-expanded)", Type: "string"},

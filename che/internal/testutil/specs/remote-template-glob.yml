@@ -1,0 +1,8 @@
+base:
+  include:
+    renderTemplates:
+      - files: ["@gitlab.com/acme/tools//snippets/*.md"]
+
+cli/macos:
+  options: {autoExec: true}
+  mixinProfiles: [base]

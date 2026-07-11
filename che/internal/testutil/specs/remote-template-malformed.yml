@@ -1,0 +1,11 @@
+base:
+  include:
+    renderTemplates:
+      - files:
+          - source: "@gitlab.com/acme/tools/snippets/agent.md"
+            dest:
+              - {path: .claude/agents/ro.md}
+
+cli/macos:
+  options: {autoExec: true}
+  mixinProfiles: [base]

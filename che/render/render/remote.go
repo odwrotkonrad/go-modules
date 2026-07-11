@@ -54,6 +54,20 @@ func parseRemoteRef(ref string) (remoteRef, error) {
 	return out, nil
 }
 
+// IsRemoteRef reports whether ref is a remote file reference
+// (<repo>//<path>[?ref=<ref>], go-getter style). Repo-relative source paths
+// never carry `//`.
+func IsRemoteRef(ref string) bool {
+	_, err := parseRemoteRef(ref)
+	return err == nil
+}
+
+// NewRemoteFetcher returns a remote-file fetch func sharing one clone cache
+// across calls: N fetches from the same repo+ref clone once.
+func NewRemoteFetcher() func(string) (string, error) {
+	return remoteFileResolver()
+}
+
 func remoteFileResolver() func(string) (string, error) {
 	clones := map[string]billy.Filesystem{}
 	return func(ref string) (string, error) {

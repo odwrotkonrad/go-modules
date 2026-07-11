@@ -26,7 +26,8 @@ type tmplDest struct {
 }
 
 // RenderTemplates renders each *.tpl in the resolved set. Sources are
-// repo-root-relative. Glob-form items (no explicit dest) render raw to the
+// repo-root-relative or remote refs (@<repo>//<path>, fetched via one shared
+// clone cache per run). Glob-form items (no explicit dest) render raw to the
 // derived host path; rich items fan out across their dests through
 // render.Compose, host dests placed with spec perms, repo dests written as
 // plain repo files. skipSecrets drops sources carrying op:// secret refs
@@ -41,7 +42,7 @@ func (h Host) RenderTemplates(templates []spec.FileItem, skipSecrets bool) error
 	var hostDests []string
 	for _, item := range templates {
 		dests := h.templateDests(item)
-		if skipSecrets && isSecretRefInSrc(filepath.Join(h.RepoRoot, item.Rel)) {
+		if skipSecrets && h.isSecretRefInItem(item) {
 			for _, d := range dests {
 				h.log("render(skip-secrets)", d.path)
 			}
@@ -81,11 +82,22 @@ func (h Host) RenderTemplates(templates []spec.FileItem, skipSecrets bool) error
 	return errors.Join(errs...)
 }
 
-// isSecretRefInSrc reports whether the template source at path carries an op://
-// secret reference (a render-time vault fetch). Unreadable source -> false
-// (render proceeds, errors there).
-func isSecretRefInSrc(path string) bool {
-	src, err := os.ReadFile(path)
+// isSecretRefInItem reports whether the item's template source carries an
+// op:// secret reference (a render-time vault fetch). Remote sources scan
+// fetched content, except under dry-run ([why] dry-run stays offline).
+// Unreadable source -> false (render proceeds, errors there).
+func (h Host) isSecretRefInItem(item spec.FileItem) bool {
+	if spec.IsRemoteSrc(item.Rel) {
+		if h.IsDryRun() {
+			return false
+		}
+		content, err := h.fetcher.Fetch(spec.RemoteSrcRef(item.Rel))
+		if err != nil {
+			return false
+		}
+		return render.IsSecretRefPresent([]byte(content))
+	}
+	src, err := os.ReadFile(filepath.Join(h.RepoRoot, item.Rel))
 	if err != nil {
 		return false
 	}
@@ -112,12 +124,23 @@ func (h Host) templateDests(item spec.FileItem) []tmplDest {
 }
 
 func (h Host) renderTemplate(item spec.FileItem, dests []tmplDest) error {
-	tmplPath := filepath.Join(h.RepoRoot, item.Rel)
-	src, err := os.ReadFile(tmplPath)
-	if err != nil {
-		return err
+	var src []byte
+	tmplPath := item.Rel
+	if spec.IsRemoteSrc(item.Rel) {
+		content, err := h.fetcher.Fetch(spec.RemoteSrcRef(item.Rel))
+		if err != nil {
+			return err
+		}
+		src = []byte(content)
+	} else {
+		tmplPath = filepath.Join(h.RepoRoot, item.Rel)
+		var err error
+		src, err = os.ReadFile(tmplPath)
+		if err != nil {
+			return err
+		}
 	}
-	body, err := render.Exec(tmplPath, src, h.RepoRoot)
+	body, err := render.ExecWithCtx(tmplPath, src, h.RepoRoot, item.Ctx)
 	if err != nil {
 		return err
 	}
