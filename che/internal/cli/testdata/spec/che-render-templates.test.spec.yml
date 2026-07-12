@@ -1,0 +1,25 @@
+# [>] 🤖
+context:
+  command: che render-templates
+  pwd: testdata/fixture/commands/common/sample-tree
+  mockedInterfaces:
+    execx.CmdExecutor: testutil.CmdMockExecutor
+    fsutil.FileSystemWriter: testutil.FileSystemMockWriter
+    fsutil.FileSystemReader: testutil.FileSystemMockReader
+    host.Sleep: testutil.SleepMock
+cases:
+  - name: renderTemplatesShouldRenderOnlyHostDestsForHostProfile
+    expected:
+      stdOut: |
+        archive: ${HOME}/.local/share/che/backups/che-render-{{/.*/}}.tar.bz2
+        render(create): ${HOME}/.config/zsh/t
+  - name: renderTemplatesShouldRenderOnlyRepoDestsForOntoRepoProfile
+    context:
+      command: che render-templates --profile ontoRepo
+    expected:
+      stdOut: |
+        render(create): ${REPO}/docs/r.md
+    notExpected:
+      stdOut:
+        - ${HOME}/.config/zsh/t
+# [<] 🤖

@@ -1,0 +1,24 @@
+# [>] 🤖
+context:
+  command: che prune-links
+  mockedInterfaces:
+    execx.CmdExecutor: testutil.CmdMockExecutor
+    fsutil.FileSystemWriter: testutil.FileSystemMockWriter
+    fsutil.FileSystemReader: testutil.FileSystemMockReader
+    host.Sleep: testutil.SleepMock
+cases:
+  - name: pruneLinksShouldRemoveNothingOnFreshTree
+    expected:
+      stdOut: |
+        prune-links: ${ROOT}
+    notExpected:
+      stdOut:
+        - 'rm: '
+  - name: pruneLinksShouldRemoveBrokenRepoLink
+    input:
+      args: [brokenLink: true]
+    expected:
+      stdOut: |
+        prune-links: ${ROOT}
+        rm: ${HOME}/.config/zsh/dead
+# [<] 🤖

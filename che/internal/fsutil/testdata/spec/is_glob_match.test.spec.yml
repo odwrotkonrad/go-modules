@@ -1,0 +1,90 @@
+# [>] 🤖🤖
+context:
+  function: fsutil.IsGlobMatch
+cases:
+  - name: isGlobMatchShouldMatchDirectChildUnderSubtreeGlob
+    input:
+      args: [pattern: HOME/.config/zsh/**, path: HOME/.config/zsh/.zshrc]
+    expected:
+      output: true
+  - name: isGlobMatchShouldMatchNestedPathUnderSubtreeGlob
+    input:
+      args: [pattern: HOME/.config/zsh/**, path: HOME/.config/zsh/zshrc.d/auto.d/80-tools.zsh]
+    expected:
+      output: true
+  - name: isGlobMatchShouldMatchSubtreeGlobRootItself
+    input:
+      args: [pattern: HOME/.config/zsh/**, path: HOME/.config/zsh]
+    expected:
+      output: true
+  - name: isGlobMatchShouldRejectSiblingDirOfSubtreeGlob
+    input:
+      args: [pattern: HOME/.config/zsh/**, path: HOME/.config/git/config]
+    expected:
+      output: false
+  - name: isGlobMatchShouldRejectPrefixOnlySiblingOfSubtreeGlob
+    input:
+      args: [pattern: HOME/.config/zsh/**, path: HOME/.config/zshenv]
+    expected:
+      output: false
+  - name: isGlobMatchShouldMatchExactPath
+    input:
+      args: [pattern: etc/zshrc, path: etc/zshrc]
+    expected:
+      output: true
+  - name: isGlobMatchShouldRejectSubtreeUnderExactPath
+    input:
+      args: [pattern: etc/zshrc, path: etc/zshrc.d/auto.d/x]
+    expected:
+      output: false
+  - name: isGlobMatchShouldMatchStarSuffixBareStem
+    input:
+      args: [pattern: Library/LaunchDaemons/otelcol.plist*, path: Library/LaunchDaemons/otelcol.plist]
+    expected:
+      output: true
+  - name: isGlobMatchShouldMatchStarSuffixWithMarkerSuffix
+    input:
+      args: [pattern: Library/LaunchDaemons/otelcol.plist*, path: Library/LaunchDaemons/otelcol.plist.ontoHost.cp]
+    expected:
+      output: true
+  - name: isGlobMatchShouldRejectStarSuffixOtherFile
+    input:
+      args: [pattern: Library/LaunchDaemons/otelcol.plist*, path: Library/LaunchDaemons/grafana.plist]
+    expected:
+      output: false
+  - name: isGlobMatchShouldMatchFileUnderSubtreeGlob
+    input:
+      args: [pattern: etc/otelcol/**, path: etc/otelcol/config.yml]
+    expected:
+      output: true
+  - name: isGlobMatchShouldMatchNestedPathThroughInteriorDoublestar
+    input:
+      args: [pattern: root/**/foo.txt, path: root/a/b/foo.txt]
+    expected:
+      output: true
+  - name: isGlobMatchShouldRejectInteriorDoublestarPrefixMiss
+    input:
+      args: [pattern: root/**/foo.txt, path: other/a/foo.txt]
+    expected:
+      output: false
+  - name: isGlobMatchShouldRejectInteriorDoublestarTailMiss
+    input:
+      args: [pattern: root/**/*.md, path: root/a/b.txt]
+    expected:
+      output: false
+  - name: isGlobMatchShouldMatchNestedPathThroughMultiSegmentTail
+    input:
+      args: [pattern: root/**/foo/*.md, path: root/a/b/foo/x.md]
+    expected:
+      output: true
+  - name: isGlobMatchShouldTreatNonSegmentDoublestarAsStar
+    input:
+      args: [pattern: root**, path: rootabc]
+    expected:
+      output: true
+  - name: isGlobMatchShouldRejectSeparatorForNonSegmentDoublestar
+    input:
+      args: [pattern: root**, path: rootabc/x]
+    expected:
+      output: false
+# [<] 🤖🤖

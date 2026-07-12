@@ -1,0 +1,60 @@
+# [>] 🤖🤖
+context:
+  function: spec.Raw.EligibleProfiles
+cases:
+  - name: eligibleProfilesShouldSelectProfileWithPassingExecIf
+    input:
+      args: [spec: che, os: macos, virt: true]
+    expected:
+      output: [cli/macos]
+  - name: eligibleProfilesShouldErrorWhenNoProfileEligible
+    input:
+      args: [spec: che, os: linux, virt: true]
+    expected:
+      errorOutput: ['no eligible profile: no autoExec profile passed its execIf']
+  - name: forceOneShouldStillEnforceExecIf
+    input:
+      args: [spec: che, os: linux, virt: true, forceOne: desktop/macos]
+    expected:
+      errorOutput: ['--profile "desktop/macos" failed its execIf predicates']
+  - name: forceOneWithForceAllShouldLiftExecIf
+    input:
+      args: [spec: che, os: linux, virt: true, forceOne: desktop/macos, forceAll: true]
+    expected:
+      output: [desktop/macos]
+  - name: forceOneShouldSelectProfileWhenExecIfPasses
+    input:
+      args: [spec: che, os: macos, virt: false, forceOne: desktop/macos]
+    expected:
+      output: [desktop/macos]
+  - name: forceOneShouldSelectNonAutoexecBaseProfile
+    input:
+      args: [spec: che, os: linux, virt: true, forceOne: base]
+    expected:
+      output: [base]
+  - name: forceOneShouldSelectNonAutoexecOntoRepoProfile
+    input:
+      args: [spec: che, os: linux, virt: true, forceOne: ontoRepo]
+    expected:
+      output: [ontoRepo]
+  - name: forceOneShouldErrorOnUndefinedProfile
+    input:
+      args: [spec: che, os: macos, virt: true, forceOne: cli/linux]
+    expected:
+      errorOutput: ['--profile "cli/linux" is not defined in che.yml']
+  - name: forceAllShouldSelectAllAutoexecProfiles
+    input:
+      args: [spec: che, os: linux, virt: true, forceOne: "", forceAll: true]
+    expected:
+      output: [cli/macos, desktop/macos]
+  - name: eligibleProfilesShouldAlwaysSelectLonePlainProfile
+    input:
+      args: [spec: repo, os: linux, virt: true]
+    expected:
+      output: [repo]
+  - name: eligibleProfilesShouldUnionInDeclarationOrder
+    input:
+      args: [spec: ambiguous, os: linux, virt: true]
+    expected:
+      output: [repo, other]
+# [<] 🤖🤖

@@ -4,56 +4,44 @@ package render
 
 import (
 	"path/filepath"
-	"strings"
 	"testing"
 	"time"
 
 	git "github.com/go-git/go-git/v5"
 	"github.com/go-git/go-git/v5/plumbing/object"
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
+
+	"gitlab.com/konradodwrot/go-modules/che/internal/testutil"
 )
 
 func TestParseRemoteRef(t *testing.T) {
 	t.Run("bare host path", func(t *testing.T) {
 		got, err := parseRemoteRef("gitlab.com/konradodwrot/conventions//conventions/comments/convention.md")
-		if err != nil {
-			t.Fatal(err)
-		}
-		if got.repoURL != "https://gitlab.com/konradodwrot/conventions.git" {
-			t.Errorf("repoURL = %q", got.repoURL)
-		}
-		if got.sshURL != "ssh://git@gitlab.com/konradodwrot/conventions.git" {
-			t.Errorf("sshURL = %q", got.sshURL)
-		}
-		if got.path != "conventions/comments/convention.md" || got.gitRef != "" {
-			t.Errorf("path = %q, gitRef = %q", got.path, got.gitRef)
-		}
+		require.NoError(t, err)
+		assert.Equal(t, "https://gitlab.com/konradodwrot/conventions.git", got.repoURL)
+		assert.Equal(t, "ssh://git@gitlab.com/konradodwrot/conventions.git", got.sshURL)
+		assert.Equal(t, "conventions/comments/convention.md", got.path)
+		assert.Empty(t, got.gitRef)
 	})
 	t.Run("ref query", func(t *testing.T) {
 		got, err := parseRemoteRef("github.com/foo/bar//docs/x.md?ref=v1.2.3")
-		if err != nil {
-			t.Fatal(err)
-		}
-		if got.gitRef != "v1.2.3" || got.path != "docs/x.md" {
-			t.Errorf("path = %q, gitRef = %q", got.path, got.gitRef)
-		}
+		require.NoError(t, err)
+		assert.Equal(t, "v1.2.3", got.gitRef)
+		assert.Equal(t, "docs/x.md", got.path)
 	})
 	t.Run("explicit scheme kept verbatim", func(t *testing.T) {
 		got, err := parseRemoteRef("file:///tmp/repo//a/b.md?ref=main")
-		if err != nil {
-			t.Fatal(err)
-		}
-		if got.repoURL != "file:///tmp/repo" || got.sshURL != "" {
-			t.Errorf("repoURL = %q, sshURL = %q", got.repoURL, got.sshURL)
-		}
-		if got.path != "a/b.md" || got.gitRef != "main" {
-			t.Errorf("path = %q, gitRef = %q", got.path, got.gitRef)
-		}
+		require.NoError(t, err)
+		assert.Equal(t, "file:///tmp/repo", got.repoURL)
+		assert.Empty(t, got.sshURL)
+		assert.Equal(t, "a/b.md", got.path)
+		assert.Equal(t, "main", got.gitRef)
 	})
 	t.Run("errors", func(t *testing.T) {
 		for _, ref := range []string{"gitlab.com/x/y", "gitlab.com/x/y//", "//a.md", "gitlab.com/x/y//a.md?tag=v1"} {
-			if _, err := parseRemoteRef(ref); err == nil {
-				t.Errorf("parseRemoteRef(%q): want error", ref)
-			}
+			_, err := parseRemoteRef(ref)
+			assert.Errorf(t, err, "parseRemoteRef(%q)", ref)
 		}
 	})
 }
@@ -65,49 +53,31 @@ func TestRemoteFile(t *testing.T) {
 
 	t.Run("default branch", func(t *testing.T) {
 		got, err := resolve(url + "//docs/note.md")
-		if err != nil {
-			t.Fatal(err)
-		}
-		if got != "main content\n" {
-			t.Errorf("content = %q", got)
-		}
+		require.NoError(t, err)
+		assert.Equal(t, "main content\n", got)
 	})
 	t.Run("nested path", func(t *testing.T) {
 		got, err := resolve(url + "//docs/deep/inner.md")
-		if err != nil {
-			t.Fatal(err)
-		}
-		if got != "inner\n" {
-			t.Errorf("content = %q", got)
-		}
+		require.NoError(t, err)
+		assert.Equal(t, "inner\n", got)
 	})
 	t.Run("branch ref", func(t *testing.T) {
 		got, err := resolve(url + "//docs/note.md?ref=feature")
-		if err != nil {
-			t.Fatal(err)
-		}
-		if got != "feature content\n" {
-			t.Errorf("content = %q", got)
-		}
+		require.NoError(t, err)
+		assert.Equal(t, "feature content\n", got)
 	})
 	t.Run("tag ref", func(t *testing.T) {
 		got, err := resolve(url + "//docs/note.md?ref=v1.0.0")
-		if err != nil {
-			t.Fatal(err)
-		}
-		if got != "main content\n" {
-			t.Errorf("content = %q", got)
-		}
+		require.NoError(t, err)
+		assert.Equal(t, "main content\n", got)
 	})
 	t.Run("missing file", func(t *testing.T) {
-		if _, err := resolve(url + "//docs/absent.md"); err == nil {
-			t.Error("want error for missing file")
-		}
+		_, err := resolve(url + "//docs/absent.md")
+		assert.Error(t, err)
 	})
 	t.Run("missing ref", func(t *testing.T) {
-		if _, err := resolve(url + "//docs/note.md?ref=nope"); err == nil {
-			t.Error("want error for missing ref")
-		}
+		_, err := resolve(url + "//docs/note.md?ref=nope")
+		assert.Error(t, err)
 	})
 }
 
@@ -119,9 +89,7 @@ func TestIsRemoteRef(t *testing.T) {
 		"root/HOME/.config/claude/settings.json.ontoHost.tpl": false,
 		"gitlab.com/acme/tools":                               false,
 	} {
-		if got := IsRemoteRef(ref); got != want {
-			t.Errorf("IsRemoteRef(%q) = %v, want %v", ref, got, want)
-		}
+		assert.Equal(t, want, IsRemoteRef(ref), "IsRemoteRef(%q)", ref)
 	}
 }
 
@@ -130,65 +98,44 @@ func TestNewRemoteFetcher(t *testing.T) {
 	fetch := NewRemoteFetcher()
 	for range 2 { // second fetch hits the clone cache
 		got, err := fetch(url + "//docs/note.md")
-		if err != nil {
-			t.Fatal(err)
-		}
-		if got != "main content\n" {
-			t.Errorf("content = %q", got)
-		}
+		require.NoError(t, err)
+		assert.Equal(t, "main content\n", got)
 	}
 }
 
 func TestExecRemoteFile(t *testing.T) {
 	url := "file://" + initRemoteFixture(t)
-	repoRoot := initRepo(t, []string{"x"})
+	repoRoot := testutil.Repo(t, map[string]string{"x": "x"})
 	body := "{{ remoteFile \"" + url + "//docs/note.md\" }}"
 	got, err := Exec("t.tpl", []byte(body), repoRoot)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if !strings.Contains(string(got), "main content") {
-		t.Errorf("Exec remoteFile = %q", got)
-	}
+	require.NoError(t, err)
+	assert.Contains(t, string(got), "main content")
 }
 
 func initRemoteFixture(t *testing.T) string {
 	t.Helper()
 	dir := t.TempDir()
 	repo, err := git.PlainInit(dir, false)
-	if err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(t, err)
 	wt, err := repo.Worktree()
-	if err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(t, err)
 	sig := &object.Signature{Name: "t", Email: "t@t", When: time.Now()}
 	commit := func(path, content string) {
-		writeFile(t, filepath.Join(dir, path), content)
-		if _, err := wt.Add(path); err != nil {
-			t.Fatal(err)
-		}
-		if _, err := wt.Commit("c "+path, &git.CommitOptions{Author: sig}); err != nil {
-			t.Fatal(err)
-		}
+		testutil.WriteFile(t, filepath.Join(dir, path), content)
+		_, err := wt.Add(path)
+		require.NoError(t, err)
+		_, err = wt.Commit("c "+path, &git.CommitOptions{Author: sig})
+		require.NoError(t, err)
 	}
 	commit("docs/note.md", "main content\n")
 	commit("docs/deep/inner.md", "inner\n")
 	head, err := repo.Head()
-	if err != nil {
-		t.Fatal(err)
-	}
-	if _, err := repo.CreateTag("v1.0.0", head.Hash(), nil); err != nil {
-		t.Fatal(err)
-	}
-	if err := wt.Checkout(&git.CheckoutOptions{Branch: "refs/heads/feature", Create: true}); err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(t, err)
+	_, err = repo.CreateTag("v1.0.0", head.Hash(), nil)
+	require.NoError(t, err)
+	require.NoError(t, wt.Checkout(&git.CheckoutOptions{Branch: "refs/heads/feature", Create: true}))
 	commit("docs/note.md", "feature content\n")
-	if err := wt.Checkout(&git.CheckoutOptions{Branch: head.Name()}); err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(t, wt.Checkout(&git.CheckoutOptions{Branch: head.Name()}))
 	return dir
 }
 

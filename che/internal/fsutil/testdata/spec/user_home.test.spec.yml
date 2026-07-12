@@ -1,0 +1,17 @@
+# [>] 🤖🤖
+context:
+  function: fsutil.UserHome
+  mockedInterfaces:
+    fsutil.UserLookup: testutil.UserMockLookup
+cases:
+  - name: userHomeShouldReturnHomeForKnownUser
+    input:
+      args: [user: ko, users: {ko: /Users/ko}]
+    expected:
+      output: /Users/ko
+  - name: userHomeShouldErrorForUnknownUser
+    input:
+      args: [user: ghost, users: {ko: /Users/ko}]
+    expected:
+      errorOutput: [unknown user ghost]
+# [<] 🤖🤖

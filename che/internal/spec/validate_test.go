@@ -7,53 +7,38 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 func TestValidateSchemaAcceptsFixtures(t *testing.T) {
 	paths, err := filepath.Glob("../testutil/specs/*.yml")
-	if err != nil {
-		t.Fatal(err)
-	}
-	if len(paths) == 0 {
-		t.Fatal("no testutil spec fixtures found")
-	}
+	require.NoError(t, err)
+	require.NotEmpty(t, paths, "no testutil spec fixtures found")
 	for _, p := range paths {
 		t.Run(p, func(t *testing.T) {
 			b, err := os.ReadFile(p)
-			if err != nil {
-				t.Fatal(err)
-			}
-			if finds := ValidateSchema(b); len(finds) > 0 {
-				t.Errorf("ValidateSchema(%s) = %v, want none", p, finds)
-			}
+			require.NoError(t, err)
+			assert.Empty(t, ValidateSchema(b))
 		})
 	}
 }
 
 func TestCompiledSchema(t *testing.T) {
 	sch, err := CompiledSchema()
-	if err != nil {
-		t.Fatal(err)
-	}
-	if sch == nil {
-		t.Fatal("CompiledSchema() = nil")
-	}
+	require.NoError(t, err)
+	require.NotNil(t, sch)
 }
 
 func TestValidateSchemaUnparseableYAML(t *testing.T) {
-	if finds := ValidateSchema([]byte("p: [")); finds != nil {
-		t.Errorf("ValidateSchema(unparseable) = %v, want nil (parse errors belong to Load)", finds)
-	}
+	assert.Nil(t, ValidateSchema([]byte("p: [")), "parse errors belong to Load")
 }
 
 func TestValidateSchemaRootViolation(t *testing.T) {
 	finds := ValidateSchema([]byte("- a\n- b\n"))
-	if len(finds) == 0 {
-		t.Fatal("ValidateSchema(list doc) = none, want a root finding")
-	}
-	if !strings.HasPrefix(finds[0], "/: ") {
-		t.Errorf("root finding not anchored at /: %q", finds[0])
-	}
+	require.NotEmpty(t, finds, "want a root finding")
+	assert.True(t, strings.HasPrefix(finds[0], "/: "), "root finding not anchored at /: %q", finds[0])
 }
 
 func TestValidateSchemaFindsViolations(t *testing.T) {
@@ -112,13 +97,8 @@ p:
 	for name, c := range cases {
 		t.Run(name, func(t *testing.T) {
 			finds := ValidateSchema([]byte(c.doc))
-			if len(finds) == 0 {
-				t.Fatalf("ValidateSchema() = none, want a finding mentioning %q", c.want)
-			}
-			joined := strings.Join(finds, "\n")
-			if !strings.Contains(joined, c.want) {
-				t.Errorf("findings do not mention %q:\n%s", c.want, joined)
-			}
+			require.NotEmptyf(t, finds, "want a finding mentioning %q", c.want)
+			assert.Contains(t, strings.Join(finds, "\n"), c.want)
 		})
 	}
 }

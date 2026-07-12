@@ -1,0 +1,28 @@
+# [>] 🤖
+context:
+  pwd: testdata/fixture/commands/common/sample-tree
+  mockedInterfaces:
+    execx.CmdExecutor: testutil.CmdMockExecutor
+    fsutil.FileSystemWriter: testutil.FileSystemMockWriter
+    fsutil.FileSystemReader: testutil.FileSystemMockReader
+    host.Sleep: testutil.SleepMock
+cases:
+  - name: servicesBootoutShouldUnloadLoadedSystemDomainService
+    context: {command: che services bootout}
+    expected:
+      stdOut: |
+        bootout: system/otelcol
+        bootout(done): system/otelcol
+  - name: servicesBootinShouldBootstrapSystemDomainService
+    context: {command: che services bootin}
+    expected:
+      stdOut: |
+        bootstrap: system/otelcol
+        bootstrap(done): system/otelcol
+  - name: servicesEnsureShouldSettleThenReportRunningPid
+    context: {command: che services ensure}
+    expected:
+      stdOut: |
+        settle: 15s before pid check
+        running: system/otelcol (pid 4242)
+# [<] 🤖

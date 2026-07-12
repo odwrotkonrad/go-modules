@@ -1,0 +1,22 @@
+# [>] 🤖🤖
+context:
+  function: testyml.Eq
+cases:
+  - name: eqShouldAssertTypedOutput
+    input:
+      args: [s: abc]
+    expected:
+      output: ABC
+  - name: eqShouldApplyContextEnv
+    context:
+      env: {TESTYML_EQ_ENV: from-env}
+    input:
+      args: [s: $TESTYML_EQ_ENV]
+    expected:
+      output: FROM-ENV
+  - name: eqShouldStopAtWantedError
+    input:
+      args: [s: abc, fail: true]
+    expected:
+      errorOutput: [stub fail]
+# [<] 🤖🤖

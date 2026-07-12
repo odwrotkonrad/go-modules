@@ -9,15 +9,20 @@ import (
 	"slices"
 	"strings"
 	"testing"
+
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
+
+	"gitlab.com/konradodwrot/go-modules/che/internal/testutil"
 )
 
 // mkRepo creates a fake repo under root/rel with a .git marker and, if purpose
 // is non-empty, an assets/docs-agents/purpose.md carrying it.
 func mkRepo(t *testing.T, root, rel, purpose string) {
 	t.Helper()
-	writeFile(t, filepath.Join(root, rel, ".git", "HEAD"), "ref: refs/heads/main\n")
+	testutil.WriteFile(t, filepath.Join(root, rel, ".git", "HEAD"), "ref: refs/heads/main\n")
 	if purpose != "" {
-		writeFile(t, filepath.Join(root, rel, purposeRelPath), purpose)
+		testutil.WriteFile(t, filepath.Join(root, rel, purposeRelPath), purpose)
 	}
 }
 
@@ -44,67 +49,39 @@ func buildWorkspace(t *testing.T) string {
 func TestRepoGroupIndexLeaf(t *testing.T) {
 	root := buildWorkspace(t)
 	got, err := RepoGroupIndexDir(filepath.Join(root, "leaf"))
-	if err != nil {
-		t.Fatal(err)
-	}
-	if !strings.Contains(got, "## Repo: ./alpha") || !strings.Contains(got, "Alpha does things.") {
-		t.Errorf("leaf missing alpha purpose:\n%s", got)
-	}
-	if !strings.Contains(got, "## Repo: ./beta") || !strings.Contains(got, noPurposePlaceholder) {
-		t.Errorf("leaf missing beta placeholder:\n%s", got)
-	}
-	if strings.Contains(got, "Subgroup:") {
-		t.Errorf("leaf should have no subgroup headings:\n%s", got)
-	}
-	if !strings.Contains(got, `This is "leaf" directory with dirs structure containing repositories:`) {
-		t.Errorf("leaf missing pwd line:\n%s", got)
-	}
-	// deterministic order: alpha before beta
-	if strings.Index(got, "## Repo: ./alpha") > strings.Index(got, "## Repo: ./beta") {
-		t.Errorf("repos not sorted:\n%s", got)
-	}
+	require.NoError(t, err)
+	assert.Contains(t, got, "## Repo: ./alpha")
+	assert.Contains(t, got, "Alpha does things.")
+	assert.Contains(t, got, "## Repo: ./beta")
+	assert.Contains(t, got, noPurposePlaceholder, "beta needs the placeholder")
+	assert.NotContains(t, got, "Subgroup:", "leaf must have no subgroup headings")
+	assert.Contains(t, got, `This is "leaf" directory with dirs structure containing repositories:`)
+	assert.Less(t, strings.Index(got, "## Repo: ./alpha"), strings.Index(got, "## Repo: ./beta"), "repos must sort deterministically")
 }
 
 func TestRepoGroupIndexParent(t *testing.T) {
 	root := buildWorkspace(t)
 	got, err := RepoGroupIndexDir(filepath.Join(root, "parent"))
-	if err != nil {
-		t.Fatal(err)
-	}
-	if !strings.Contains(got, "## Repo: ./direct") || !strings.Contains(got, "Direct repo.") {
-		t.Errorf("parent missing direct repo:\n%s", got)
-	}
+	require.NoError(t, err)
+	assert.Contains(t, got, "## Repo: ./direct")
+	assert.Contains(t, got, "Direct repo.")
 	// child subgroup inlined without its own section headings or tree
-	if !strings.Contains(got, "## Subgroup: ./child") || strings.Contains(got, "### Repositories") {
-		t.Errorf("child inline should carry a Subgroup heading, no Repositories heading:\n%s", got)
-	}
-	if !strings.Contains(got, "### Repo: ./child/gamma") || !strings.Contains(got, "Gamma repo.") {
-		t.Errorf("parent missing grandchild repo via child inline:\n%s", got)
-	}
-	if strings.Count(got, "dirs structure") != 1 {
-		t.Errorf("child inline should carry no tree:\n%s", got)
-	}
+	assert.Contains(t, got, "## Subgroup: ./child")
+	assert.NotContains(t, got, "### Repositories", "child inline must carry no Repositories heading")
+	assert.Contains(t, got, "### Repo: ./child/gamma")
+	assert.Contains(t, got, "Gamma repo.")
+	assert.Equal(t, 1, strings.Count(got, "dirs structure"), "child inline must carry no tree")
 }
 
 func TestRepoGroupIndexWalk(t *testing.T) {
 	root := buildWorkspace(t)
 	idx, err := RepoGroupIndex(root)
-	if err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(t, err)
 	for _, want := range []string{"leaf", "parent", filepath.Join("parent", "child")} {
-		if _, ok := idx[want]; !ok {
-			t.Errorf("walk missing subgroup %q; got keys %v", want, slices.Collect(maps.Keys(idx)))
-		}
+		assert.Containsf(t, idx, want, "walk missing subgroup %q; got keys %v", want, slices.Collect(maps.Keys(idx)))
 	}
-	// repos are not subgroups
-	if _, ok := idx[filepath.Join("leaf", "alpha")]; ok {
-		t.Error("repo should not be indexed as a subgroup")
-	}
-	// child index lists gamma directly
-	if !strings.Contains(idx[filepath.Join("parent", "child")], "## Repo: ./gamma") {
-		t.Errorf("child index missing gamma:\n%s", idx[filepath.Join("parent", "child")])
-	}
+	assert.NotContains(t, idx, filepath.Join("leaf", "alpha"), "repos are not subgroups")
+	assert.Contains(t, idx[filepath.Join("parent", "child")], "## Repo: ./gamma", "child index must list gamma directly")
 }
 
 // TestRepoGroupIndexExpected: the presentation fixture (testdata/fixture/repo-group-index/group:
@@ -115,26 +92,18 @@ func TestRepoGroupIndexExpected(t *testing.T) {
 	dir := filepath.Join(t.TempDir(), "test-group")
 	for _, repo := range []string{"che", "tools/render-files", "tools/configs"} {
 		purpose, err := os.ReadFile(filepath.Join("testdata/fixture/repo-group-index/group", repo, purposeRelPath))
-		if err != nil {
-			t.Fatal(err)
-		}
+		require.NoError(t, err)
 		mkRepo(t, dir, repo, string(purpose))
 	}
 	idx, err := RepoGroupIndex(dir)
-	if err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(t, err)
 	for rel, expected := range map[string]string{
 		".":     "testdata/fixture/repo-group-index/index.expected.md",
 		"tools": "testdata/fixture/repo-group-index/child-group-index.expected.md",
 	} {
 		want, err := os.ReadFile(expected)
-		if err != nil {
-			t.Fatal(err)
-		}
-		if idx[rel] != string(want) {
-			t.Errorf("%s index mismatch:\n--- got ---\n%s\n--- want ---\n%s", rel, idx[rel], want)
-		}
+		require.NoError(t, err)
+		assert.Equal(t, string(want), idx[rel], "%s index", rel)
 	}
 }
 

@@ -1,0 +1,15 @@
+# [>] 🤖
+context:
+  command: che detect
+  pwd: testdata/fixture/commands/common/sample-tree
+  mockedInterfaces:
+    execx.CmdExecutor: testutil.CmdMockExecutor
+    fsutil.FileSystemWriter: testutil.FileSystemMockWriter
+    fsutil.FileSystemReader: testutil.FileSystemMockReader
+    host.Sleep: testutil.SleepMock
+cases:
+  - name: detectShouldPrintOnlyTheResolvedProfile
+    expected:
+      stdOut: |
+        cli/macos
+# [<] 🤖

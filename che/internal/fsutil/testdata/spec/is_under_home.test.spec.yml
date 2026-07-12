@@ -1,0 +1,30 @@
+# [>] 🤖🤖
+context:
+  function: fsutil.FS.IsUnderHome
+cases:
+  - name: isUnderHomeShouldAcceptHomeItself
+    input:
+      args: [path: /Users/x]
+    expected:
+      output: true
+  - name: isUnderHomeShouldAcceptDirectChild
+    input:
+      args: [path: /Users/x/.config]
+    expected:
+      output: true
+  - name: isUnderHomeShouldRejectPrefixOnlySibling
+    input:
+      args: [path: /Users/xyz]
+    expected:
+      output: false
+  - name: isUnderHomeShouldRejectPathOutsideHome
+    input:
+      args: [path: /etc/zshrc]
+    expected:
+      output: false
+  - name: isUnderHomeShouldAcceptDeepChild
+    input:
+      args: [path: /Users/x/a/b/c]
+    expected:
+      output: true
+# [<] 🤖🤖

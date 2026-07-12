@@ -1,9 +1,0 @@
-# [>] 🤖
-- name: renderTemplatesShouldRenderAndInstallHostDest
-  in:
-    op: render-templates
-  want:
-    stdOut: |
-      archive: {{/.*/}}che-render-{{/.*/}}.tar.bz2
-      render(create): ${HOME}/.config/zsh/t
-# [<] 🤖

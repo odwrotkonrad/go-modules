@@ -12,46 +12,33 @@ import (
 //go:embed all:testdata
 var td embed.FS
 
+// sectionWant is section_open's expected.output.
+type sectionWant struct {
+	Label string `yaml:"label"`
+	Depth int    `yaml:"depth"`
+	OK    bool   `yaml:"ok"`
+}
+
 func TestSectionOpen(t *testing.T) {
-	type in struct {
-		Args []string
-	}
-	type want struct {
-		Label string
-		Depth int
-		OK    bool `yaml:"ok"`
-	}
-	type c struct {
-		Name string
-		In   in
-		Want want
-	}
-	testyml.Run(t, td, "testdata/spec/section_open.spec.yml", func(t *testing.T, c c) {
-		label, depth, ok := sectionOpen(c.In.Args[0])
-		if ok != c.Want.OK || label != c.Want.Label || (ok && depth != c.Want.Depth) {
-			t.Errorf("sectionOpen(%q) = (%q,%d,%v), want %+v", c.In.Args[0], label, depth, ok, c.Want)
+	testyml.Eq(t, td, "testdata/spec/section_open.test.spec.yml", func(t *testing.T, c testyml.Case[sectionWant]) (sectionWant, error) {
+		label, depth, ok := sectionOpen(c.Input.Args.String(t, 0))
+		if !ok {
+			depth = 0
 		}
+		return sectionWant{Label: label, Depth: depth, OK: ok}, nil
 	})
 }
 
+// valsWant is vals_comment's expected.output.
+type valsWant struct {
+	Vals string `yaml:"vals"`
+	OK   bool   `yaml:"ok"`
+}
+
 func TestValsComment(t *testing.T) {
-	type in struct {
-		Args []string
-	}
-	type want struct {
-		Vals string
-		OK   bool `yaml:"ok"`
-	}
-	type c struct {
-		Name string
-		In   in
-		Want want
-	}
-	testyml.Run(t, td, "testdata/spec/vals_comment.spec.yml", func(t *testing.T, c c) {
-		vals, ok := tagComment(c.In.Args[0], "vals")
-		if ok != c.Want.OK || vals != c.Want.Vals {
-			t.Errorf("tagComment(%q, vals) = (%q,%v), want %+v", c.In.Args[0], vals, ok, c.Want)
-		}
+	testyml.Eq(t, td, "testdata/spec/tag_comment.test.spec.yml", func(t *testing.T, c testyml.Case[valsWant]) (valsWant, error) {
+		vals, ok := tagComment(c.Input.Args.String(t, 0), "vals")
+		return valsWant{Vals: vals, OK: ok}, nil
 	})
 }
 

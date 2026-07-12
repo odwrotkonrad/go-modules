@@ -1,0 +1,25 @@
+# [>] 🤖
+context:
+  command: che run-scripts
+  mockedInterfaces:
+    execx.CmdExecutor: testutil.CmdMockExecutor
+    fsutil.FileSystemWriter: testutil.FileSystemMockWriter
+    fsutil.FileSystemReader: testutil.FileSystemMockReader
+    host.Sleep: testutil.SleepMock
+cases:
+  - name: runScriptsShouldExecEachScriptAndReportOk
+    expected:
+      stdOut: |
+        run-scripts: ${REPO}/install/unit
+        run-scripts(report): ok ${REPO}/install/unit
+  - name: runScriptsShouldReportFailAndReturnError
+    input:
+      args: [failCmds: [install/unit]]
+    expected:
+      exitCode: 1
+      stdErr:
+        - 'scripts failed: '
+      stdOut: |
+        run-scripts(fail): ${REPO}/install/unit: stub: fail install/unit
+        run-scripts(report): fail ${REPO}/install/unit
+# [<] 🤖

@@ -6,67 +6,73 @@ import (
 	"errors"
 	"os"
 	"path/filepath"
-	"slices"
 	"strings"
 	"testing"
 
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
+
+	"gitlab.com/konradodwrot/go-modules/che/internal/execx"
 	"gitlab.com/konradodwrot/go-modules/che/internal/testutil"
 )
 
-func TestBuildPluginValidateSpec(t *testing.T) {
+// pluginEnv anchors a plugin test in hostRepo: skip-if-root, chdir in, temp
+// HOME, every CHE_* knob cleared, executor mocked (plugin git runs through the
+// go-git model, nothing spawns). Returns HOME.
+func pluginEnv(t *testing.T, hostRepo string) string {
+	t.Helper()
 	if os.Geteuid() == 0 {
 		t.Skip("non-root path only; build resolves home from $HOME")
 	}
+	home := t.TempDir()
+	t.Chdir(hostRepo)
+	t.Setenv("HOME", home)
+	for _, k := range []string{
+		"CHE_SKIP_EXEC_IF", "CHE_PROFILE", "CHE_DRY_RUN",
+		"CHE_SKIP_PLUGINS", "CHE_DEBUG", "CHE_VALIDATE_SPEC",
+	} {
+		t.Setenv(k, "")
+	}
+	execx.Swap(t, testutil.NewCmdMockExecutor())
+	return home
+}
+
+// collectUnits runs forEachUnit("test"), collecting the units it visits.
+func collectUnits(t *testing.T, a *CheApp) ([]unit, string, error) {
+	t.Helper()
+	var ran []unit
+	out, err := testutil.CaptureStdout(t, func() error {
+		return a.forEachUnit("test", func(u unit) error { ran = append(ran, u); return nil })
+	})
+	return ran, out, err
+}
+
+func TestBuildPluginValidateSpec(t *testing.T) {
 	pluginRepo := testutil.Repo(t, map[string]string{
 		"che.yml": "p:\n  includes:\n    link: [HOME/**]\n",
 	})
 	hostRepo := testutil.Repo(t, map[string]string{
 		"che.yml": "main:\n  options: {autoExec: true}\n  plugins: [\"" + pluginRepo + "::p\"]\n",
 	})
-	home := t.TempDir()
-	t.Chdir(hostRepo)
-	t.Setenv("HOME", home)
-	t.Setenv("CHE_SKIP_EXEC_IF", "")
-	t.Setenv("CHE_PROFILE", "")
-	t.Setenv("CHE_DRY_RUN", "")
-	t.Setenv("CHE_SKIP_PLUGINS", "")
-	t.Setenv("CHE_DEBUG", "")
+	pluginEnv(t, hostRepo)
 
-	t.Setenv("CHE_VALIDATE_SPEC", "")
 	a := New()
-	if err := a.build(); err != nil {
-		t.Fatalf("build() errored: %v", err)
-	}
-	out, err := testutil.CaptureStdout(t, func() error {
-		return a.forEachUnit("test", func(unit) error { return nil })
-	})
-	if err != nil {
-		t.Fatalf("forEachUnit in warn mode errored: %v\n%s", err, out)
-	}
+	require.NoError(t, a.build())
+	_, out, err := collectUnits(t, a)
+	require.NoErrorf(t, err, "forEachUnit in warn mode\n%s", out)
 	testutil.WantLines(t, out, "validate(che.yml)", "includes")
 
 	t.Setenv("CHE_VALIDATE_SPEC", "error")
 	a = New()
-	if err := a.build(); err != nil {
-		t.Fatalf("build() errored (local che.yml is valid): %v", err)
-	}
-	out, err = testutil.CaptureStdout(t, func() error {
-		return a.forEachUnit("test", func(unit) error { return nil })
-	})
-	if err == nil {
-		t.Fatalf("forEachUnit in error mode should fail on the plugin violation\n%s", out)
-	}
-	if !strings.Contains(err.Error(), "includes") {
-		t.Errorf("error does not name the violating key: %v", err)
-	}
+	require.NoError(t, a.build(), "local che.yml is valid")
+	_, out, err = collectUnits(t, a)
+	require.Errorf(t, err, "forEachUnit in error mode must fail on the plugin violation\n%s", out)
+	assert.Contains(t, err.Error(), "includes", "error must name the violating key")
 }
 
 // a plugins `@url::profile` entry resolves into an extra unit anchored at
 // the cache checkout; a failing remote execIf skips it (after the pull).
 func TestBuildPluginUnits(t *testing.T) {
-	if os.Geteuid() == 0 {
-		t.Skip("non-root path only; build resolves home from $HOME")
-	}
 	pluginRepo := testutil.Repo(t, map[string]string{
 		"che.yml":               "gitlabGroup:\n  options:\n    execIf: ['env:PLUGIN_GATE']\n  include:\n    runScripts: [scripts/bootstrap.zsh]\n",
 		"scripts/bootstrap.zsh": "#!/bin/zsh\n",
@@ -76,44 +82,22 @@ func TestBuildPluginUnits(t *testing.T) {
 		"che.yml":           "main:\n  options: {autoExec: true}\n  plugins: [\"" + ref + "\"]\n  include:\n    runScripts: [scripts/local.zsh]\n",
 		"scripts/local.zsh": "#!/bin/zsh\n",
 	})
-	home := t.TempDir()
-	t.Chdir(hostRepo)
-	t.Setenv("HOME", home)
-	t.Setenv("CHE_SKIP_EXEC_IF", "")
-	t.Setenv("CHE_PROFILE", "")
-	t.Setenv("CHE_DRY_RUN", "")
-	t.Setenv("CHE_SKIP_PLUGINS", "")
+	home := pluginEnv(t, hostRepo)
 	a := New()
 
 	t.Setenv("PLUGIN_GATE", "1")
 	t.Setenv("CHE_DEBUG", "1")
 	out, err := testutil.CaptureStdout(t, a.build)
-	if err != nil {
-		t.Fatalf("build() errored: %v\n%s", err, out)
-	}
-	if len(a.units) != 1 || strings.Contains(out, "plugin") {
-		t.Fatalf("build() must defer plugins: units = %d\n%s", len(a.units), out)
-	}
-	var ran []unit
-	out, err = testutil.CaptureStdout(t, func() error {
-		return a.forEachUnit("test", func(u unit) error { ran = append(ran, u); return nil })
-	})
-	if err != nil {
-		t.Fatalf("forEachUnit errored: %v\n%s", err, out)
-	}
-	if len(ran) != 2 {
-		t.Fatalf("ran units = %d, want 2\n%s", len(ran), out)
-	}
+	require.NoErrorf(t, err, "build()\n%s", out)
+	require.Len(t, a.units, 1, "build() must defer plugins")
+	require.NotContains(t, out, "plugin", "build() must defer plugins")
+	ran, out, err := collectUnits(t, a)
+	require.NoErrorf(t, err, "forEachUnit\n%s", out)
+	require.Lenf(t, ran, 2, "ran units\n%s", out)
 	cache := filepath.Join(home, ".local/share/che/plugins")
-	if !strings.HasPrefix(ran[1].host.RepoRoot, cache+"/") {
-		t.Errorf("plugin RepoRoot = %q, want under %q", ran[1].host.RepoRoot, cache)
-	}
-	if ran[1].ref != ref {
-		t.Errorf("plugin ref = %q, want %q", ran[1].ref, ref)
-	}
-	if !slices.Contains(ran[1].res.Scripts, "scripts/bootstrap.zsh") {
-		t.Errorf("plugin Scripts = %v, want scripts/bootstrap.zsh", ran[1].res.Scripts)
-	}
+	assert.Truef(t, strings.HasPrefix(ran[1].host.RepoRoot, cache+"/"), "plugin RepoRoot = %q, want under %q", ran[1].host.RepoRoot, cache)
+	assert.Equal(t, ref, ran[1].ref)
+	assert.Contains(t, ran[1].res.Scripts, "scripts/bootstrap.zsh")
 	testutil.WantLines(t, out,
 		"run "+ref,
 		"cloned file://"+pluginRepo,
@@ -121,19 +105,10 @@ func TestBuildPluginUnits(t *testing.T) {
 
 	t.Setenv("PLUGIN_GATE", "")
 	t.Setenv("CHE_DEBUG", "")
-	if err := a.build(); err != nil {
-		t.Fatalf("build() (gate unset) errored: %v", err)
-	}
-	ran = nil
-	out, err = testutil.CaptureStdout(t, func() error {
-		return a.forEachUnit("test", func(u unit) error { ran = append(ran, u); return nil })
-	})
-	if err != nil {
-		t.Fatalf("forEachUnit (gate unset) errored: %v\n%s", err, out)
-	}
-	if len(ran) != 1 {
-		t.Fatalf("ran units = %d, want 1 (plugin skipped)\n%s", len(ran), out)
-	}
+	require.NoError(t, a.build(), "build() (gate unset)")
+	ran, out, err = collectUnits(t, a)
+	require.NoErrorf(t, err, "forEachUnit (gate unset)\n%s", out)
+	require.Lenf(t, ran, 1, "plugin must be skipped\n%s", out)
 	testutil.WantLines(t, out, "skip "+ref+" (execIf failed)")
 	testutil.NotLine(t, out, "execIf(reject)")
 	testutil.NotLine(t, out, "run "+ref)
@@ -143,9 +118,6 @@ func TestBuildPluginUnits(t *testing.T) {
 // an object-form plugins entry's env gates the remote execIf while the host
 // env is unset, lands on the unit, and does not leak past build().
 func TestBuildPluginUnitEnv(t *testing.T) {
-	if os.Geteuid() == 0 {
-		t.Skip("non-root path only; build resolves home from $HOME")
-	}
 	pluginRepo := testutil.Repo(t, map[string]string{
 		"che.yml":               "gitlabGroup:\n  options:\n    execIf: ['env:PLUGIN_GATE']\n  include:\n    runScripts: [scripts/bootstrap.zsh]\n",
 		"scripts/bootstrap.zsh": "#!/bin/zsh\n",
@@ -155,20 +127,12 @@ func TestBuildPluginUnitEnv(t *testing.T) {
 		"che.yml":           "main:\n  options: {autoExec: true}\n  plugins:\n    - ref: \"" + ref + "\"\n      env:\n        PLUGIN_GATE: \"1\"\n  include:\n    runScripts: [scripts/local.zsh]\n",
 		"scripts/local.zsh": "#!/bin/zsh\n",
 	})
-	home := t.TempDir()
-	t.Chdir(hostRepo)
-	t.Setenv("HOME", home)
-	t.Setenv("CHE_SKIP_EXEC_IF", "")
-	t.Setenv("CHE_PROFILE", "")
-	t.Setenv("CHE_DRY_RUN", "")
+	pluginEnv(t, hostRepo)
 	t.Setenv("PLUGIN_GATE", "")
 	os.Unsetenv("PLUGIN_GATE")
-	t.Setenv("CHE_SKIP_PLUGINS", "")
 	a := New()
 
-	if err := a.build(); err != nil {
-		t.Fatalf("build() errored: %v", err)
-	}
+	require.NoError(t, a.build())
 	var ran []unit
 	var gateInOp string
 	out, err := testutil.CaptureStdout(t, func() error {
@@ -178,42 +142,24 @@ func TestBuildPluginUnitEnv(t *testing.T) {
 			return nil
 		})
 	})
-	if err != nil {
-		t.Fatalf("forEachUnit errored: %v\n%s", err, out)
-	}
-	if len(ran) != 2 {
-		t.Fatalf("ran units = %d, want 2\n%s", len(ran), out)
-	}
-	if got := ran[1].env["PLUGIN_GATE"]; got != "1" {
-		t.Errorf("unit env PLUGIN_GATE = %q, want %q", got, "1")
-	}
-	if gateInOp != "1" {
-		t.Errorf("PLUGIN_GATE in plugin op = %q, want %q", gateInOp, "1")
-	}
-	if !slices.Contains(ran[1].res.Scripts, "scripts/bootstrap.zsh") {
-		t.Errorf("plugin Scripts = %v, want scripts/bootstrap.zsh", ran[1].res.Scripts)
-	}
-	if _, set := os.LookupEnv("PLUGIN_GATE"); set {
-		t.Error("PLUGIN_GATE leaked into the process env after forEachUnit")
-	}
+	require.NoErrorf(t, err, "forEachUnit\n%s", out)
+	require.Lenf(t, ran, 2, "ran units\n%s", out)
+	assert.Equal(t, "1", ran[1].env["PLUGIN_GATE"], "unit env")
+	assert.Equal(t, "1", gateInOp, "PLUGIN_GATE in plugin op")
+	assert.Contains(t, ran[1].res.Scripts, "scripts/bootstrap.zsh")
+	_, set := os.LookupEnv("PLUGIN_GATE")
+	assert.False(t, set, "PLUGIN_GATE must not leak into the process env after forEachUnit")
 	testutil.WantLines(t, out, "execIf(pass): profile gitlabGroup: env:PLUGIN_GATE")
 }
 
 // --skip-plugins (env CHE_SKIP_PLUGINS) drops plugins entries: only the local
 // unit runs, no plugin pull or log line.
 func TestBuildSkipPlugins(t *testing.T) {
-	if os.Geteuid() == 0 {
-		t.Skip("non-root path only; build resolves home from $HOME")
-	}
 	hostRepo := testutil.Repo(t, map[string]string{
 		"che.yml":           "main:\n  options: {autoExec: true}\n  plugins: [\"@file:///nonexistent::main\"]\n  include:\n    runScripts: [scripts/local.zsh]\n",
 		"scripts/local.zsh": "#!/bin/zsh\n",
 	})
-	t.Chdir(hostRepo)
-	t.Setenv("HOME", t.TempDir())
-	t.Setenv("CHE_SKIP_EXEC_IF", "")
-	t.Setenv("CHE_PROFILE", "")
-	t.Setenv("CHE_DRY_RUN", "")
+	pluginEnv(t, hostRepo)
 
 	a := New()
 	for name, set := range map[string]func(){
@@ -221,22 +167,12 @@ func TestBuildSkipPlugins(t *testing.T) {
 		"env":  func() { t.Setenv("CHE_SKIP_PLUGINS", "1"); a.skipPlugins = false },
 	} {
 		set()
-		if err := a.build(); err != nil {
-			t.Fatalf("[%s] build() errored: %v", name, err)
-		}
-		if len(a.pluginRefs) != 0 {
-			t.Fatalf("[%s] pluginRefs = %v, want none", name, a.pluginRefs)
-		}
-		var ran []unit
-		out, err := testutil.CaptureStdout(t, func() error {
-			return a.forEachUnit("test", func(u unit) error { ran = append(ran, u); return nil })
-		})
-		if err != nil {
-			t.Fatalf("[%s] forEachUnit errored: %v\n%s", name, err, out)
-		}
-		if len(ran) != 1 || strings.Contains(out, "plugin") {
-			t.Fatalf("[%s] ran units = %d, want 1 (plugins skipped)\n%s", name, len(ran), out)
-		}
+		require.NoErrorf(t, a.build(), "[%s] build()", name)
+		require.Emptyf(t, a.pluginRefs, "[%s] pluginRefs", name)
+		ran, out, err := collectUnits(t, a)
+		require.NoErrorf(t, err, "[%s] forEachUnit\n%s", name, out)
+		require.Lenf(t, ran, 1, "[%s] plugins must be skipped\n%s", name, out)
+		require.NotContainsf(t, out, "plugin", "[%s] plugins must be skipped", name)
 	}
 }
 
@@ -244,11 +180,7 @@ func TestBuildSkipPlugins(t *testing.T) {
 // itself: no git clone/pull, no cache checkout; its op lines carry the
 // profile= subtype.
 func TestBuildPluginUnitsDirRef(t *testing.T) {
-	if os.Geteuid() == 0 {
-		t.Skip("non-root path only; build resolves home from $HOME")
-	}
-	pluginDir := t.TempDir()
-	testutil.WriteTree(t, pluginDir, map[string]string{
+	pluginDir := testutil.Tree(t, map[string]string{
 		"che.yml":               "gitlabGroup:\n  include:\n    runScripts: [scripts/bootstrap.zsh]\n",
 		"scripts/bootstrap.zsh": "#!/bin/zsh\n",
 	})
@@ -269,21 +201,12 @@ func TestBuildPluginUnitsDirRef(t *testing.T) {
 					"scripts/bootstrap.zsh": "#!/bin/zsh\n",
 				})
 			}
-			home := t.TempDir()
-			t.Chdir(hostRepo)
-			t.Setenv("HOME", home)
+			pluginEnv(t, hostRepo)
 			t.Setenv("PLUGIN_DIR_REF", pluginDir)
-			t.Setenv("CHE_SKIP_EXEC_IF", "")
-			t.Setenv("CHE_PROFILE", "")
-			t.Setenv("CHE_DRY_RUN", "")
-			t.Setenv("CHE_SKIP_PLUGINS", "")
-			t.Setenv("CHE_DEBUG", "")
 			a := New()
 			a.dryRunMode = "all"
 
-			if err := a.build(); err != nil {
-				t.Fatalf("build() errored: %v", err)
-			}
+			require.NoError(t, a.build())
 			var ran []unit
 			out, err := testutil.CaptureStdout(t, func() error {
 				return a.forEachUnit("run-scripts", func(u unit) error {
@@ -295,19 +218,14 @@ func TestBuildPluginUnitsDirRef(t *testing.T) {
 					return u.host.RunScripts(scripts)
 				})
 			})
-			if err != nil {
-				t.Fatalf("forEachUnit errored: %v\n%s", err, out)
-			}
-			if len(ran) != 2 {
-				t.Fatalf("ran units = %d, want 2\n%s", len(ran), out)
-			}
+			require.NoErrorf(t, err, "forEachUnit\n%s", out)
+			require.Lenf(t, ran, 2, "ran units\n%s", out)
 			want := pluginDir
 			if name == "relative" {
 				want = filepath.Join(hostRepo, "plugin")
 			}
-			if got, _ := filepath.EvalSymlinks(ran[1].host.RepoRoot); got != mustEval(t, want) {
-				t.Errorf("plugin RepoRoot = %q, want %q", ran[1].host.RepoRoot, want)
-			}
+			got, _ := filepath.EvalSymlinks(ran[1].host.RepoRoot)
+			assert.Equal(t, mustEval(t, want), got, "plugin RepoRoot")
 			testutil.WantLines(t, out,
 				"run-scripts(dry-run=all,profile=gitlabGroup): ",
 				"scripts/bootstrap.zsh")
@@ -321,20 +239,14 @@ func TestBuildPluginUnitsDirRef(t *testing.T) {
 func mustEval(t *testing.T, p string) string {
 	t.Helper()
 	out, err := filepath.EvalSymlinks(p)
-	if err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(t, err)
 	return out
 }
 
 // a failing unit does not stop the rest: both units run, each failure prints a
 // "<name>(report): fail <ref>" line, and forEachUnit returns joined errors.
 func TestForEachUnitContinuesOnError(t *testing.T) {
-	if os.Geteuid() == 0 {
-		t.Skip("non-root path only; build resolves home from $HOME")
-	}
-	pluginDir := t.TempDir()
-	testutil.WriteTree(t, pluginDir, map[string]string{
+	pluginDir := testutil.Tree(t, map[string]string{
 		"che.yml":               "gitlabGroup:\n  include:\n    runScripts: [scripts/bootstrap.zsh]\n",
 		"scripts/bootstrap.zsh": "#!/bin/zsh\n",
 	})
@@ -343,18 +255,10 @@ func TestForEachUnitContinuesOnError(t *testing.T) {
 		"che.yml":           "main:\n  options: {autoExec: true}\n  plugins: [\"" + ref + "\"]\n  include:\n    runScripts: [scripts/local.zsh]\n",
 		"scripts/local.zsh": "#!/bin/zsh\n",
 	})
-	t.Chdir(hostRepo)
-	t.Setenv("HOME", t.TempDir())
-	t.Setenv("CHE_SKIP_EXEC_IF", "")
-	t.Setenv("CHE_PROFILE", "")
-	t.Setenv("CHE_DRY_RUN", "")
-	t.Setenv("CHE_SKIP_PLUGINS", "")
-	t.Setenv("CHE_DEBUG", "")
+	pluginEnv(t, hostRepo)
 	a := New()
 
-	if err := a.build(); err != nil {
-		t.Fatalf("build() errored: %v", err)
-	}
+	require.NoError(t, a.build())
 	var ran []unit
 	out, err := testutil.CaptureStdout(t, func() error {
 		return a.forEachUnit("test", func(u unit) error {
@@ -365,12 +269,9 @@ func TestForEachUnitContinuesOnError(t *testing.T) {
 			return nil
 		})
 	})
-	if err == nil || !strings.Contains(err.Error(), "local boom") {
-		t.Fatalf("err = %v, want joined local boom", err)
-	}
-	if len(ran) != 2 {
-		t.Fatalf("ran units = %d, want 2 (continue past local failure)\n%s", len(ran), out)
-	}
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "local boom", "joined errors must carry the local failure")
+	require.Lenf(t, ran, 2, "continue past local failure\n%s", out)
 	testutil.WantLines(t, out, "test(report): fail local: local boom")
 }
 
@@ -381,23 +282,14 @@ func TestUnitWithEnv(t *testing.T) {
 	os.Unsetenv("WITHENV_ABSENT")
 	u := unit{env: map[string]string{"WITHENV_SHADOWED": "plugin", "WITHENV_ABSENT": "x"}}
 	err := u.withEnv(func() error {
-		if got := os.Getenv("WITHENV_SHADOWED"); got != "plugin" {
-			t.Errorf("shadowed = %q, want plugin", got)
-		}
-		if got := os.Getenv("WITHENV_ABSENT"); got != "x" {
-			t.Errorf("absent = %q, want x", got)
-		}
+		assert.Equal(t, "plugin", os.Getenv("WITHENV_SHADOWED"), "shadowed")
+		assert.Equal(t, "x", os.Getenv("WITHENV_ABSENT"), "absent")
 		return nil
 	})
-	if err != nil {
-		t.Fatal(err)
-	}
-	if got := os.Getenv("WITHENV_SHADOWED"); got != "host" {
-		t.Errorf("shadowed after = %q, want host", got)
-	}
-	if _, set := os.LookupEnv("WITHENV_ABSENT"); set {
-		t.Error("absent var not unset after withEnv")
-	}
+	require.NoError(t, err)
+	assert.Equal(t, "host", os.Getenv("WITHENV_SHADOWED"), "shadowed after")
+	_, set := os.LookupEnv("WITHENV_ABSENT")
+	assert.False(t, set, "absent var must be unset after withEnv")
 }
 
 // [<] 🤖🤖

@@ -1,0 +1,58 @@
+# [>] 🤖🤖
+context:
+  function: fsutil.isVirtualized
+  mockedInterfaces:
+    execx.CmdExecutor: testutil.CmdMockExecutor
+    fsutil.FileSystemReader: testutil.FileSystemMockReader
+cases:
+  - name: isVirtualizedShouldDetectDarwinVmmPresent
+    input:
+      args: [goos: darwin, execOut: "1"]
+    expected:
+      output: true
+  - name: isVirtualizedShouldReportFalseWhenDarwinVmmAbsent
+    input:
+      args: [goos: darwin, execOut: "0"]
+    expected:
+      output: false
+  - name: isVirtualizedShouldReportFalseWhenDarwinSysctlFails
+    input:
+      args: [goos: darwin, execOut: "", execFail: true]
+    expected:
+      output: false
+  - name: isVirtualizedShouldTrustLinuxSystemdDetectVirt
+    input:
+      args: [goos: linux]
+    expected:
+      output: true
+  - name: isVirtualizedShouldDetectLinuxDockerenvMarker
+    input:
+      args: [goos: linux, execOut: "", execFail: true, files: {"/.dockerenv": ""}]
+    expected:
+      output: true
+  - name: isVirtualizedShouldDetectDockerCgroup
+    input:
+      args: [goos: linux, execOut: "", execFail: true, files: {"/proc/1/cgroup": "0::/docker/abc\n"}]
+    expected:
+      output: true
+  - name: isVirtualizedShouldDetectContainerdCgroup
+    input:
+      args: [goos: linux, execOut: "", execFail: true, files: {"/proc/1/cgroup": "0::/containerd/abc\n"}]
+    expected:
+      output: true
+  - name: isVirtualizedShouldReportFalseOnCleanCgroup
+    input:
+      args: [goos: linux, execOut: "", execFail: true, files: {"/proc/1/cgroup": "0::/init.scope\n"}]
+    expected:
+      output: false
+  - name: isVirtualizedShouldReportFalseWithoutLinuxMarkers
+    input:
+      args: [goos: linux, execOut: "", execFail: true]
+    expected:
+      output: false
+  - name: isVirtualizedShouldReportFalseOnOtherGoos
+    input:
+      args: [goos: windows]
+    expected:
+      output: false
+# [<] 🤖🤖

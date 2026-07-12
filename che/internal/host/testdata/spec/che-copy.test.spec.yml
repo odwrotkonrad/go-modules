@@ -1,0 +1,17 @@
+# [>] 🤖
+context:
+  command: che copy
+  mockedInterfaces:
+    execx.CmdExecutor: testutil.CmdMockExecutor
+    fsutil.FileSystemWriter: testutil.FileSystemMockWriter
+    fsutil.FileSystemReader: testutil.FileSystemMockReader
+    host.Sleep: testutil.SleepMock
+cases:
+  - name: copyShouldCopyMarkerFilesAndChownDaemonPlist
+    expected:
+      stdOut: |
+        archive: {{/.*/}}che-copy-{{/.*/}}.tar.bz2
+        cp(create): ${HOME}/.config/zsh/c
+        cp(create): /Library/LaunchDaemons/otelcol.plist
+        cp(chown): root:wheel /Library/LaunchDaemons/otelcol.plist
+# [<] 🤖

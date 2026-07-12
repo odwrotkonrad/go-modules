@@ -5,24 +5,23 @@ package lib
 import (
 	"testing"
 
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 	"gopkg.in/yaml.v3"
 )
 
 func TestRenderDocumentNode(t *testing.T) {
-	if out, err := Render(nil); err != nil || out != "" {
-		t.Fatalf("Render(nil) = %q, %v", out, err)
-	}
-	if out, err := Render(&yaml.Node{Kind: yaml.DocumentNode}); err != nil || out != "" {
-		t.Fatalf("Render(empty doc) = %q, %v", out, err)
-	}
+	out, err := Render(nil)
+	require.NoError(t, err)
+	assert.Empty(t, out)
+	out, err = Render(&yaml.Node{Kind: yaml.DocumentNode})
+	require.NoError(t, err)
+	assert.Empty(t, out)
 	var doc yaml.Node
-	if err := yaml.Unmarshal([]byte("app:\n  editor: [pdf]\n"), &doc); err != nil {
-		t.Fatal(err)
-	}
-	out, err := Render(&doc)
-	if err != nil || out != "app pdf editor" {
-		t.Fatalf("Render(doc) = %q, %v", out, err)
-	}
+	require.NoError(t, yaml.Unmarshal([]byte("app:\n  editor: [pdf]\n"), &doc))
+	out, err = Render(&doc)
+	require.NoError(t, err)
+	assert.Equal(t, "app pdf editor", out)
 }
 
 //[<] 🤖🤖

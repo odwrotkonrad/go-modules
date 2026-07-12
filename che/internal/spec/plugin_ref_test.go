@@ -3,75 +3,48 @@ package spec
 // [>] 🤖🤖
 
 import (
-	"os"
 	"path/filepath"
 	"testing"
+
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 
 	"gitlab.com/konradodwrot/go-modules/che/internal/log"
 	"gitlab.com/konradodwrot/go-modules/che/internal/testutil"
 	"gitlab.com/konradodwrot/go-modules/lib/testyml"
 )
 
-func TestParsePluginRef(t *testing.T) {
-	type in struct {
-		Args []string
-	}
-	type want struct {
-		URL     string `yaml:"url"`
-		Profile string
-		IsPath  bool `yaml:"isPath"`
-		Error   bool
-	}
-	type c struct {
-		Name string
-		In   in
-		Want want
-	}
-	testyml.Run(t, td, "testdata/spec/parse_plugin_ref.spec.yml", func(t *testing.T, c c) {
-		entry := c.In.Args[0]
-		ref, err := parsePluginRef(entry)
-		if c.Want.Error {
-			if err == nil {
-				t.Fatalf("parsePluginRef(%q) = %+v, want error", entry, ref)
-			}
-			return
-		}
-		if err != nil {
-			t.Fatalf("parsePluginRef(%q) errored: %v", entry, err)
-		}
-		if ref.URL != c.Want.URL || ref.Profile != c.Want.Profile || ref.IsPath != c.Want.IsPath {
-			t.Errorf("parsePluginRef(%q) = %+v, want %+v", entry, ref, c.Want)
-		}
-		if got := ref.String(); got != entry {
-			t.Errorf("String() = %q, want %q", got, entry)
-		}
-	})
+// refWant is parse_plugin_ref's expected.output.
+type refWant struct {
+	URL     string `yaml:"url"`
+	Profile string `yaml:"profile"`
+	IsPath  bool   `yaml:"isPath"`
 }
 
-// specFile writes body as che.yml in a temp dir, returns the loaded Raw.
-func specFile(t *testing.T, body string) (*Raw, string) {
-	t.Helper()
-	dir := t.TempDir()
-	if err := os.WriteFile(filepath.Join(dir, "che.yml"), []byte(body), 0o644); err != nil {
-		t.Fatal(err)
-	}
-	s, err := Load(filepath.Join(dir, "che.yml"))
-	if err != nil {
-		t.Fatal(err)
-	}
-	return s, dir
+func TestParsePluginRef(t *testing.T) {
+	testyml.Eq(t, td, "testdata/spec/parse_plugin_ref.test.spec.yml", func(t *testing.T, c testyml.Case[refWant]) (refWant, error) {
+		entry := c.Input.Args.String(t, 0)
+		ref, err := parsePluginRef(entry)
+		if err != nil {
+			return refWant{}, err
+		}
+		assert.Equal(t, entry, ref.String(), "String() must round-trip")
+		return refWant{URL: ref.URL, Profile: ref.Profile, IsPath: ref.IsPath}, nil
+	})
 }
 
 // ExecIfPass gates on the named profile's execIf; undefined profile errors.
 // A pass logs at normal level, a reject only at debug level.
 func TestExecIfPass(t *testing.T) {
-	s, _ := specFile(t, "p:\n  options:\n    execIf: ['env:X']\n")
+	dir := testutil.Tree(t, map[string]string{"che.yml": "p:\n  options:\n    execIf: ['env:X']\n"})
+	s, err := Load(filepath.Join(dir, "che.yml"))
+	require.NoError(t, err)
 	eval := NewEvaluator().EvalExecIf
 	t.Setenv("X", "")
 	out, _ := testutil.CaptureStdout(t, func() error {
-		if ok, err := s.ExecIfPass("p", false, eval); err != nil || ok {
-			t.Errorf("unset env: pass = %v, err = %v, want false, nil", ok, err)
-		}
+		ok, err := s.ExecIfPass("p", false, eval)
+		require.NoError(t, err)
+		assert.False(t, ok, "unset env must reject")
 		return nil
 	})
 	testutil.NotLine(t, out, "execIf(reject)")
@@ -84,15 +57,14 @@ func TestExecIfPass(t *testing.T) {
 	testutil.WantLines(t, out, "execIf(reject): profile p: env:X")
 	t.Setenv("X", "1")
 	out, _ = testutil.CaptureStdout(t, func() error {
-		if ok, err := s.ExecIfPass("p", false, eval); err != nil || !ok {
-			t.Errorf("set env: pass = %v, err = %v, want true, nil", ok, err)
-		}
+		ok, err := s.ExecIfPass("p", false, eval)
+		require.NoError(t, err)
+		assert.True(t, ok, "set env must pass")
 		return nil
 	})
 	testutil.WantLines(t, out, "execIf(pass): profile p: env:X")
-	if _, err := s.ExecIfPass("nope", false, eval); err == nil {
-		t.Error("undefined profile: expected error")
-	}
+	_, err = s.ExecIfPass("nope", false, eval)
+	assert.Error(t, err, "undefined profile")
 }
 
 // [<] 🤖🤖

@@ -1,0 +1,21 @@
+# [>] 🤖🤖
+context:
+  function: render.RenderMarkdown
+  pwd: testdata/fixture/render_markdown/tree-docs
+cases:
+  - name: renderMarkdownShouldApplyAllTransforms
+    input:
+      args: [path: p.md, transforms: [remove-frontmatter, strip-comments, normalize-headings]]
+    expected:
+      files: testdata/fixture/render_markdown/all_opts.expected.md
+  - name: renderMarkdownShouldKeepFrontmatterWhenNotRemoved
+    input:
+      args: [path: p.md, transforms: [strip-comments]]
+    expected:
+      files: testdata/fixture/render_markdown/keep_frontmatter.expected.md
+  - name: renderMarkdownShouldErrorOnUnknownOption
+    input:
+      args: [path: p.md, transforms: [bogus]]
+    expected:
+      errorOutput: ['renderMarkdown: unknown opt "bogus"']
+# [<] 🤖🤖

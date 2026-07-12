@@ -1,0 +1,41 @@
+# [>] 🤖🤖
+cases:
+  - name: toolRunShouldPrintHelpForShortFlag
+    context: {command: checkcmd -h}
+    expected:
+      exitCode: 0
+  - name: toolRunShouldPrintHelpForLongFlag
+    context: {command: checkcmd --help}
+    expected:
+      exitCode: 0
+  - name: toolRunShouldEmitWithoutArgs
+    context: {command: checkcmd}
+    expected:
+      exitCode: 0
+  - name: toolRunShouldRejectUnexpectedPositional
+    context: {command: checkcmd x}
+    expected:
+      exitCode: 11
+  - name: toolRunShouldEmitWithRequiredArg
+    context: {command: checkcmd x}
+    input:
+      args: [needsArg: true]
+    expected:
+      exitCode: 0
+  - name: toolRunShouldRejectMissingRequiredArg
+    context: {command: checkcmd}
+    input:
+      args: [needsArg: true]
+    expected:
+      exitCode: 11
+  - name: toolRunShouldRejectFlagAsRequiredArg
+    context: {command: checkcmd -x}
+    input:
+      args: [needsArg: true]
+    expected:
+      exitCode: 11
+  - name: toolRunShouldRejectUnknownFlag
+    context: {command: checkcmd --nope y}
+    expected:
+      exitCode: 11
+# [<] 🤖🤖

@@ -1,68 +1,62 @@
 package main
 
+// [>] 🤖🤖
+
 import (
 	"os"
 	"path/filepath"
 	"testing"
 
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
+
+	"gitlab.com/konradodwrot/go-modules/che/internal/execx"
+	"gitlab.com/konradodwrot/go-modules/che/internal/testutil"
 	"gitlab.com/konradodwrot/go-modules/che/render/lib"
 	"gitlab.com/konradodwrot/go-modules/lib/yamlcfg"
 )
 
-// [>] 🤖🤖
 func TestGenerateGolden(t *testing.T) {
 	got, err := lib.Generate("testdata/Makefile")
-	if err != nil {
-		t.Fatalf("generate: %v", err)
-	}
-	wantBytes, err := os.ReadFile("testdata/expected.md")
-	if err != nil {
-		t.Fatalf("read golden: %v", err)
-	}
-	if got != string(wantBytes) {
-		t.Errorf("output mismatch:\n--- got ---\n%s\n--- want ---\n%s", got, wantBytes)
-	}
+	require.NoError(t, err)
+	want, err := os.ReadFile("testdata/expected.md")
+	require.NoError(t, err)
+	assert.Equal(t, string(want), got)
 }
 
 func TestGenerateMissing(t *testing.T) {
-	if _, err := lib.Generate("testdata/nope.mk"); err == nil {
-		t.Fatal("expected error for missing makefile")
-	}
+	_, err := lib.Generate("testdata/nope.mk")
+	assert.Error(t, err, "missing makefile")
 }
 
+// TestCheck drives --check against a match, a stale doc, and a missing file;
+// the drift diff runs through the mock executor, nothing spawns.
 func TestCheck(t *testing.T) {
-	dir := t.TempDir()
-	mkSrc, _ := os.ReadFile("testdata/Makefile")
-	if err := os.WriteFile(filepath.Join(dir, "Makefile"), mkSrc, 0o644); err != nil {
-		t.Fatal(err)
-	}
+	execx.Swap(t, testutil.NewCmdMockExecutor())
+	mkSrc, err := os.ReadFile("testdata/Makefile")
+	require.NoError(t, err)
 	doc, err := lib.Generate("testdata/Makefile")
-	if err != nil {
-		t.Fatal(err)
-	}
-	good := filepath.Join(dir, "good.md")
-	stale := filepath.Join(dir, "stale.md")
-	os.WriteFile(good, []byte(doc), 0o644)
-	os.WriteFile(stale, []byte("stale\n"), 0o644)
+	require.NoError(t, err)
+	dir := testutil.Tree(t, map[string]string{
+		"Makefile": string(mkSrc),
+		"good.md":  doc,
+		"stale.md": "stale\n",
+	})
 
-	wd, _ := os.Getwd()
-	defer os.Chdir(wd)
-	os.Chdir(dir)
+	t.Chdir(dir)
 
 	cases := map[string]struct {
 		path string
 		want int
 	}{
-		"match":  {good, 0},
-		"differ": {stale, 22},
+		"match":  {filepath.Join(dir, "good.md"), 0},
+		"differ": {filepath.Join(dir, "stale.md"), 22},
 		"absent": {filepath.Join(dir, "absent.md"), 13},
 	}
 	for name, c := range cases {
 		t.Run(name, func(t *testing.T) {
 			_, err := tool.Run([]string{"--check", c.path})
-			if code := yamlcfg.Code(err); code != c.want {
-				t.Errorf("Run(--check %s) = %d, want %d", name, code, c.want)
-			}
+			assert.Equal(t, c.want, yamlcfg.Code(err), "Run(--check %s)", name)
 		})
 	}
 }

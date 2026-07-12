@@ -3,12 +3,14 @@ package host
 // [>] 🤖🤖
 
 import (
-	"os"
 	"path/filepath"
-	"slices"
 	"testing"
 
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
+
 	"gitlab.com/konradodwrot/go-modules/che/internal/config"
+	"gitlab.com/konradodwrot/go-modules/che/internal/testutil"
 )
 
 func TestToDest(t *testing.T) {
@@ -21,65 +23,38 @@ func TestToDest(t *testing.T) {
 		"/var/log/otelcol":                    "/var/log/otelcol",
 	}
 	for in, want := range cases {
-		if got := h.ToDest(in); got != want {
-			t.Errorf("ToDest(%q) = %q, want %q", in, got, want)
-		}
+		assert.Equal(t, want, h.ToDest(in), "ToDest(%q)", in)
 	}
 }
 
 func TestPrepend(t *testing.T) {
-	// existing: value prepended with ':'
-	env := prepend([]string{"PATH=foo", "OTHER=x"}, "PATH", "bar")
-	if !slices.Contains(env, "PATH=bar:foo") {
-		t.Errorf("prepend existing: got %v, want PATH=bar:foo", env)
-	}
-	// absent: appended bare
-	env = prepend([]string{"OTHER=x"}, "PATH", "bar")
-	if !slices.Contains(env, "PATH=bar") {
-		t.Errorf("prepend absent: got %v, want PATH=bar", env)
-	}
+	assert.Contains(t, prepend([]string{"PATH=foo", "OTHER=x"}, "PATH", "bar"), "PATH=bar:foo", "existing: value prepended with ':'")
+	assert.Contains(t, prepend([]string{"OTHER=x"}, "PATH", "bar"), "PATH=bar", "absent: appended bare")
 }
 
 func TestSrc(t *testing.T) {
 	h := New("/repo", "/Users/x", "cli/macos", config.Config{})
-	if got := h.Src("etc/zshrc"); got != "/repo/root/etc/zshrc" {
-		t.Errorf("Src = %q, want /repo/root/etc/zshrc", got)
-	}
+	assert.Equal(t, "/repo/root/etc/zshrc", h.Src("etc/zshrc"))
 }
 
 // TestResolveScripts: spec order kept, rels mapped to abs, missing errors.
 func TestResolveScripts(t *testing.T) {
-	dir := t.TempDir()
 	scripts := []string{
 		"ci/zsh/scripts/installs/90-kitty.zsh",
 		"ci/zsh/scripts/installs/00-ci-deps.zsh",
 	}
-	for _, rel := range scripts {
-		p := filepath.Join(dir, rel)
-		if err := os.MkdirAll(filepath.Dir(p), 0o755); err != nil {
-			t.Fatal(err)
-		}
-		if err := os.WriteFile(p, []byte("#!/bin/sh\n"), 0o755); err != nil {
-			t.Fatal(err)
-		}
-	}
+	dir := testutil.Tree(t, map[string]string{
+		scripts[0]: "#!/bin/sh\n",
+		scripts[1]: "#!/bin/sh\n",
+	})
 	h := New(dir, "/Users/x", "cli/macos", config.Config{})
 
 	got, err := h.ResolveScripts(scripts)
-	if err != nil {
-		t.Fatal(err)
-	}
-	want := []string{
-		filepath.Join(dir, scripts[0]),
-		filepath.Join(dir, scripts[1]),
-	}
-	if !slices.Equal(got, want) {
-		t.Errorf("ResolveScripts = %v, want %v", got, want)
-	}
+	require.NoError(t, err)
+	assert.Equal(t, []string{filepath.Join(dir, scripts[0]), filepath.Join(dir, scripts[1])}, got)
 
-	if _, err := h.ResolveScripts([]string{"ci/zsh/scripts/installs/99-absent.zsh"}); err == nil {
-		t.Error("ResolveScripts must error on a missing script")
-	}
+	_, err = h.ResolveScripts([]string{"ci/zsh/scripts/installs/99-absent.zsh"})
+	assert.Error(t, err, "missing script must error")
 }
 
 // [<] 🤖🤖

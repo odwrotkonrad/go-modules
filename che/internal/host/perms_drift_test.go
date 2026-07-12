@@ -8,6 +8,9 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
+
 	"gitlab.com/konradodwrot/go-modules/che/internal/config"
 	"gitlab.com/konradodwrot/go-modules/che/internal/spec"
 	"gitlab.com/konradodwrot/go-modules/che/internal/testutil"
@@ -23,39 +26,24 @@ func extraDir(dest, chmod string) spec.FileItem {
 func TestPermsDriftChmod(t *testing.T) {
 	_, home := testutil.CheRepo(t)
 	dest := filepath.Join(home, "drift-dir")
-	if err := os.Mkdir(dest, 0o700); err != nil { // wrong mode vs spec 0755
-		t.Fatal(err)
-	}
+	require.NoError(t, os.Mkdir(dest, 0o700)) // wrong mode vs spec 0755
 	item := extraDir(dest, "0755")
 
 	delta := New(home, home, testutil.CheProfile, config.Config{DryRun: config.DryRun.Delta})
 	deltaOut, err := testutil.CaptureStdout(t, func() error { return delta.MkDirs(nil, []spec.FileItem{item}) })
-	if err != nil {
-		t.Fatal(err)
-	}
-	deltaOut = testutil.StripANSI(deltaOut)
-	if !strings.Contains(deltaOut, "mkdir(chmod,dry-run=delta): 0755 "+dest) {
-		t.Errorf("delta missing chmod drift line for %s:\n%s", dest, deltaOut)
-	}
-	if fi, _ := os.Stat(dest); fi.Mode().Perm() != 0o700 {
-		t.Errorf("delta mutated mode to %o, want 0700 (dry run)", fi.Mode().Perm())
-	}
+	require.NoError(t, err)
+	assert.Contains(t, testutil.StripANSI(deltaOut), "mkdir(chmod,dry-run=delta): 0755 "+dest)
+	fi, _ := os.Stat(dest)
+	assert.Equal(t, os.FileMode(0o700), fi.Mode().Perm(), "delta must not mutate (dry run)")
 
 	wet := New(home, home, testutil.CheProfile, config.Config{})
-	if err := wet.MkDirs(nil, []spec.FileItem{item}); err != nil {
-		t.Fatal(err)
-	}
-	if fi, _ := os.Stat(dest); fi.Mode().Perm() != 0o755 {
-		t.Errorf("wet run left mode %o, want 0755 (fixed)", fi.Mode().Perm())
-	}
+	require.NoError(t, wet.MkDirs(nil, []spec.FileItem{item}))
+	fi, _ = os.Stat(dest)
+	assert.Equal(t, os.FileMode(0o755), fi.Mode().Perm(), "wet run must fix the mode")
 
 	settledOut, err := testutil.CaptureStdout(t, func() error { return delta.MkDirs(nil, []spec.FileItem{item}) })
-	if err != nil {
-		t.Fatal(err)
-	}
-	if s := strings.TrimSpace(testutil.StripANSI(settledOut)); s != "" {
-		t.Errorf("settled dest printed:\n%s", s)
-	}
+	require.NoError(t, err)
+	assert.Empty(t, strings.TrimSpace(testutil.StripANSI(settledOut)), "settled dest must print nothing")
 }
 
 // setgid (and other >0777 special bits) must round-trip: a dir already at the
@@ -68,33 +56,23 @@ func TestPermsDriftSpecialBits(t *testing.T) {
 		chmod   string
 		mkMode  os.FileMode // mode the dir is created with
 		setBits os.FileMode // extra bits to chmod on after mkdir (mkdir mode drops them)
-		perm    os.FileMode // expected perm bits after a wet fix
-		special os.FileMode // expected special bits after a wet fix
 	}{
-		{"setgid-settled", "2775", 0o775, os.ModeSetgid, 0o775, os.ModeSetgid},
-		{"sticky-settled", "1777", 0o777, os.ModeSticky, 0o777, os.ModeSticky},
+		{"setgid-settled", "2775", 0o775, os.ModeSetgid},
+		{"sticky-settled", "1777", 0o777, os.ModeSticky},
 	}
 	for _, c := range cases {
 		t.Run(c.name, func(t *testing.T) {
 			_, home := testutil.CheRepo(t)
 			dest := filepath.Join(home, "special-dir")
-			if err := os.Mkdir(dest, c.mkMode); err != nil {
-				t.Fatal(err)
-			}
-			if err := os.Chmod(dest, c.mkMode|c.setBits); err != nil {
-				t.Fatal(err)
-			}
+			require.NoError(t, os.Mkdir(dest, c.mkMode))
+			require.NoError(t, os.Chmod(dest, c.mkMode|c.setBits))
 			item := extraDir(dest, c.chmod)
 
 			// already at spec mode -> delta must report nothing (no drift).
 			delta := New(home, home, testutil.CheProfile, config.Config{DryRun: config.DryRun.Delta})
 			out, err := testutil.CaptureStdout(t, func() error { return delta.MkDirs(nil, []spec.FileItem{item}) })
-			if err != nil {
-				t.Fatal(err)
-			}
-			if s := strings.TrimSpace(testutil.StripANSI(out)); s != "" {
-				t.Errorf("settled %s dest reported drift:\n%s", c.name, s)
-			}
+			require.NoError(t, err)
+			assert.Empty(t, strings.TrimSpace(testutil.StripANSI(out)), "settled %s dest must report no drift", c.name)
 		})
 	}
 }
@@ -103,36 +81,23 @@ func TestPermsDriftSpecialBits(t *testing.T) {
 func TestPermsDriftAddsSetgid(t *testing.T) {
 	_, home := testutil.CheRepo(t)
 	dest := filepath.Join(home, "setgid-dir")
-	if err := os.Mkdir(dest, 0o775); err != nil { // no setgid vs spec 2775
-		t.Fatal(err)
-	}
+	require.NoError(t, os.Mkdir(dest, 0o775)) // no setgid vs spec 2775
 	item := extraDir(dest, "2775")
 
 	delta := New(home, home, testutil.CheProfile, config.Config{DryRun: config.DryRun.Delta})
 	out, err := testutil.CaptureStdout(t, func() error { return delta.MkDirs(nil, []spec.FileItem{item}) })
-	if err != nil {
-		t.Fatal(err)
-	}
-	if !strings.Contains(testutil.StripANSI(out), "mkdir(chmod,dry-run=delta): 2775 "+dest) {
-		t.Errorf("delta missing setgid drift line for %s:\n%s", dest, testutil.StripANSI(out))
-	}
+	require.NoError(t, err)
+	assert.Contains(t, testutil.StripANSI(out), "mkdir(chmod,dry-run=delta): 2775 "+dest)
 
 	wet := New(home, home, testutil.CheProfile, config.Config{})
-	if err := wet.MkDirs(nil, []spec.FileItem{item}); err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(t, wet.MkDirs(nil, []spec.FileItem{item}))
 	fi, _ := os.Stat(dest)
-	if fi.Mode().Perm() != 0o775 || fi.Mode()&os.ModeSetgid == 0 {
-		t.Errorf("wet run left mode %v, want 0775 with setgid", fi.Mode())
-	}
+	assert.Equal(t, os.FileMode(0o775), fi.Mode().Perm())
+	assert.NotZero(t, fi.Mode()&os.ModeSetgid, "wet run must add setgid")
 
 	settled, err := testutil.CaptureStdout(t, func() error { return delta.MkDirs(nil, []spec.FileItem{item}) })
-	if err != nil {
-		t.Fatal(err)
-	}
-	if s := strings.TrimSpace(testutil.StripANSI(settled)); s != "" {
-		t.Errorf("settled dest printed after fix:\n%s", s)
-	}
+	require.NoError(t, err)
+	assert.Empty(t, strings.TrimSpace(testutil.StripANSI(settled)), "settled dest must print nothing after fix")
 }
 
 // [<] 🤖🤖

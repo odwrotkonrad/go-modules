@@ -1,0 +1,32 @@
+# [>] 🤖
+context:
+  command: che run-scripts
+  pwd: testdata/fixture/commands/common/sample-tree
+  mockedInterfaces:
+    execx.CmdExecutor: testutil.CmdMockExecutor
+    fsutil.FileSystemWriter: testutil.FileSystemMockWriter
+    fsutil.FileSystemReader: testutil.FileSystemMockReader
+    host.Sleep: testutil.SleepMock
+cases:
+  - name: runScriptsShouldExecEachScriptAndReportOk
+    expected:
+      stdOut: |
+        run-scripts: ${REPO}/install/unit
+        run-scripts(report): ok ${REPO}/install/unit
+  - name: runScriptsShouldNarrowToMatchingName
+    context:
+      command: che run-scripts unit
+    expected:
+      stdOut: |
+        run-scripts: ${REPO}/install/unit
+  - name: runScriptsShouldErrorWhenNameMatchesNothing
+    context:
+      command: che run-scripts nonExistingScript
+    expected:
+      exitCode: 1
+      stdErr:
+        - 'no script matches: [nonExistingScript]'
+    notExpected:
+      stdOut:
+        - 'run-scripts: '
+# [<] 🤖

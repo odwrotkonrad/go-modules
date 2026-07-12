@@ -3,14 +3,14 @@ package spec
 // [>] 🤖🤖
 
 import (
-	"errors"
-	"io/fs"
-	"os"
 	"strconv"
 	"testing"
 
-	"gitlab.com/konradodwrot/go-modules/che/internal/execx"
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
+
 	"gitlab.com/konradodwrot/go-modules/che/internal/fsutil"
+	"gitlab.com/konradodwrot/go-modules/che/internal/testutil"
 	"gitlab.com/konradodwrot/go-modules/lib/testyml"
 )
 
@@ -22,94 +22,35 @@ func stubEvaluator(os string, virt bool) *Evaluator {
 }
 
 func TestEvalExecIf(t *testing.T) {
-	type in struct {
-		Env  map[string]string
-		Args []string
-	}
-	type want struct {
-		Value bool
-		Error bool
-	}
-	type c struct {
-		Name string
-		In   in
-		Want want
-	}
 	e := stubEvaluator("macos", false)
-	testyml.Run(t, td, "testdata/spec/eval_exec_if.spec.yml", func(t *testing.T, c c) {
-		for k, v := range c.In.Env {
-			t.Setenv(k, v)
-		}
-		expr := c.In.Args[0]
-		got, err := e.EvalExecIf(expr)
-		if c.Want.Error {
-			if err == nil {
-				t.Fatalf("EvalExecIf(%q) = %v, want error", expr, got)
-			}
-			return
-		}
-		if err != nil {
-			t.Fatalf("EvalExecIf(%q) errored: %v", expr, err)
-		}
-		if got != c.Want.Value {
-			t.Errorf("EvalExecIf(%q) = %v, want %v", expr, got, c.Want.Value)
-		}
+	testyml.Eq(t, td, "testdata/spec/eval_exec_if.test.spec.yml", func(t *testing.T, c testyml.Case[bool]) (bool, error) {
+		return e.EvalExecIf(c.Input.Args.String(t, 0))
 	})
 }
 
-// failReader is a fsutil.FileSystemReader whose every read fails, so live
-// container markers (/.dockerenv, /proc/1/cgroup) never leak into results.
-type failReader struct{}
+// builtinsWant is exec_if_builtins' expected.output: the eval result plus the
+// executor call count (isVirt must cache: one exec across two evals).
+type builtinsWant struct {
+	Value     bool `yaml:"value"`
+	ExecCalls int  `yaml:"execCalls"`
+}
 
-func (failReader) Stat(string) (os.FileInfo, error)      { return nil, fs.ErrNotExist }
-func (failReader) Lstat(string) (os.FileInfo, error)     { return nil, fs.ErrNotExist }
-func (failReader) ReadDir(string) ([]os.DirEntry, error) { return nil, fs.ErrNotExist }
-func (failReader) ReadFile(string) ([]byte, error)       { return nil, fs.ErrNotExist }
-func (failReader) Readlink(string) (string, error)       { return "", fs.ErrNotExist }
-func (failReader) EvalSymlinks(string) (string, error)   { return "", fs.ErrNotExist }
-
-// TestNewEvaluatorBuiltins drives the real NewEvaluator wiring against a mock
-// executor: isVirt resolves from the mocked detect command and caches (one
-// exec across two evals).
+// TestNewEvaluatorBuiltins drives the real NewEvaluator wiring against the
+// mock executor and a deny-all reader, so live container markers never leak in.
 func TestNewEvaluatorBuiltins(t *testing.T) {
-	type in struct {
-		Args     []string
-		ExecOut  string `yaml:"execOut"`
-		ExecFail bool   `yaml:"execFail"`
-	}
-	type want struct {
-		Value     bool
-		ExecCalls int `yaml:"execCalls"`
-	}
-	type c struct {
-		Name string
-		In   in
-		Want want
-	}
-	testyml.Run(t, td, "testdata/spec/exec_if_builtins.spec.yml", func(t *testing.T, c c) {
-		m := &execx.Mock{Stub: func(argv []string) ([]byte, error) {
-			if c.In.ExecFail {
-				return nil, errors.New("stub: detect fail")
-			}
-			return []byte(c.In.ExecOut), nil
-		}}
-		execx.Swap(t, m)
-		prev := fsutil.DetectReader
-		fsutil.DetectReader = failReader{}
-		t.Cleanup(func() { fsutil.DetectReader = prev })
+	testyml.Run(t, td, "testdata/spec/new_evaluator.test.spec.yml", func(t *testing.T, c testyml.Case[builtinsWant]) {
+		m := testutil.ApplyMocks(t, c.Context.MockedInterfaces)
+		m.Exec.Out = c.Input.Args.String(t, 1)
+		m.Exec.Fail = c.Input.Args.Bool(t, 2)
+		testyml.Swap(t, &fsutil.DetectReader, fsutil.FileSystemReader(m.Reader))
 		e := NewEvaluator()
+		expr := c.Input.Args.String(t, 0)
 		for range 2 {
-			got, err := e.EvalExecIf(c.In.Args[0])
-			if err != nil {
-				t.Fatalf("EvalExecIf(%q) errored: %v", c.In.Args[0], err)
-			}
-			if got != c.Want.Value {
-				t.Errorf("EvalExecIf(%q) = %v, want %v", c.In.Args[0], got, c.Want.Value)
-			}
+			got, err := e.EvalExecIf(expr)
+			require.NoErrorf(t, err, "EvalExecIf(%q)", expr)
+			assert.Equal(t, c.Expected.Output.Value, got, "EvalExecIf(%q)", expr)
 		}
-		if len(m.Calls()) != c.Want.ExecCalls {
-			t.Errorf("exec calls = %v, want %d (builtin must cache)", m.Calls(), c.Want.ExecCalls)
-		}
+		assert.Len(t, m.Exec.Calls(), c.Expected.Output.ExecCalls, "builtin must cache")
 	})
 }
 

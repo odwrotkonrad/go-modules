@@ -1,0 +1,20 @@
+# [>] 🤖🤖
+context:
+  function: lib.tagComment
+cases:
+  - name: valsCommentShouldParseValsLabel
+    input:
+      args: [line: "#[vals] delta|all"]
+    expected:
+      output: {vals: delta|all, ok: true}
+  - name: valsCommentShouldRejectWhatLabel
+    input:
+      args: [line: "#[what] not vals"]
+    expected:
+      output: {vals: "", ok: false}
+  - name: valsCommentShouldRejectWhyLabel
+    input:
+      args: [line: "#[why] nope"]
+    expected:
+      output: {vals: "", ok: false}
+# [<] 🤖🤖

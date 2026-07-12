@@ -1,0 +1,43 @@
+# [>] 🤖🤖
+context:
+  function: render.opResolver
+  env: {OP_SERVICE_ACCOUNT_TOKEN: tok}
+  mockedInterfaces:
+    render.secretResolver: render.SecretMockResolver
+cases:
+  - name: opResolverShouldErrorWhenTokenUnset
+    context:
+      env: {OP_SERVICE_ACCOUNT_TOKEN: ""}
+    input:
+      args: [ref: op://vault/item/field]
+    expected:
+      errorOutput: ['OP_SERVICE_ACCOUNT_TOKEN unset']
+      output: {calls: 0, factoryCalls: 0}
+  - name: opResolverShouldSurfaceClientInitError
+    input:
+      args: [ref: op://vault/item/field, secret: "", failTimes: 0, failMsg: "", clientFail: true]
+    expected:
+      errorOutput: ['op client']
+      output: {calls: 0, factoryCalls: 1}
+  - name: opResolverShouldResolveSecret
+    input:
+      args: [ref: op://vault/item/field, secret: s3cret]
+    expected:
+      output: {value: s3cret, calls: 1, factoryCalls: 1}
+  - name: opResolverShouldRetryRateLimitThenResolve
+    input:
+      args: [ref: op://vault/item/field, secret: s3cret, failTimes: 1, failMsg: rate limit exceeded]
+    expected:
+      output: {value: s3cret, calls: 2, factoryCalls: 1}
+  - name: opResolverShouldSurfaceNonRetryableError
+    input:
+      args: [ref: op://vault/item/field, secret: "", failTimes: 1, failMsg: secret not found]
+    expected:
+      errorOutput: ['op resolve "op://vault/item/field"', 'secret not found']
+      output: {calls: 1, factoryCalls: 1}
+  - name: opResolverShouldReuseClientAcrossRefs
+    input:
+      args: [ref: op://vault/item/field, secret: s3cret, failTimes: 0, failMsg: "", clientFail: false, resolveTwice: true]
+    expected:
+      output: {value: s3cret, calls: 2, factoryCalls: 1}
+# [<] 🤖🤖

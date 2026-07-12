@@ -1,0 +1,50 @@
+# [>] 🤖🤖
+context:
+  function: spec.parseDestRule
+cases:
+  - name: sedShouldRewriteFirstMatchWithoutGFlag
+    input:
+      args: [rule: s/o/0/, path: HOME/.config/foo/oo]
+    expected:
+      output: HOME/.c0nfig/foo/oo
+  - name: sedGlobalShouldRewriteEveryMatch
+    input:
+      args: [rule: s/o/0/g, path: HOME/.config/foo/oo]
+    expected:
+      output: HOME/.c0nfig/f00/00
+  - name: sedShouldSupportCaptureGroups
+    input:
+      args: [rule: s/(foo)/x$1/, path: HOME/foo/a]
+    expected:
+      output: HOME/xfoo/a
+  - name: sedWithEscapedSlashShouldParse
+    input:
+      args: [rule: s/foo\/bar/baz/, path: HOME/foo/bar/a]
+    expected:
+      output: HOME/baz/a
+  - name: sedWithoutMatchShouldKeepPathUnchanged
+    input:
+      args: [rule: s/zzz/x/, path: HOME/foo/a]
+    expected:
+      output: HOME/foo/a
+  - name: oneToOneValueShouldError
+    input:
+      args: [rule: "1:1", path: HOME/foo/a]
+    expected:
+      errorOutput: [link dest]
+  - name: emptyRuleShouldError
+    input:
+      args: [rule: "", path: HOME/foo/a]
+    expected:
+      errorOutput: [link dest]
+  - name: malformedRuleShouldError
+    input:
+      args: [rule: s/foo/bar, path: HOME/foo/a]
+    expected:
+      errorOutput: [link dest]
+  - name: invalidRegexShouldError
+    input:
+      args: [rule: "s/[/x/", path: HOME/foo/a]
+    expected:
+      errorOutput: [link dest]
+# [<] 🤖🤖

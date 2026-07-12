@@ -1,0 +1,26 @@
+# [>] 🤖🤖
+cases:
+  - name: runShouldRenderTemplateWithEnv
+    context:
+      command: render-tpl -f ${DIR}/t.tmpl.md
+      pwd: testdata/fixture/run/tree-renders
+      env: {WHO: there}
+    expected:
+      exitCode: 0
+  - name: runShouldReadBodyRelativeToCwd
+    context:
+      command: render-tpl -f t.tmpl.md
+      pwd: testdata/fixture/run/tree-read_body
+    expected:
+      exitCode: 0
+  - name: runShouldExit11OnBadArgs
+    context:
+      command: render-tpl nope
+    expected:
+      exitCode: 11
+  - name: runShouldExit13OnMissingFile
+    context:
+      command: render-tpl -f /no/such/file
+    expected:
+      exitCode: 13
+# [<] 🤖🤖

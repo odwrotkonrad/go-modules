@@ -3,8 +3,9 @@ package main
 // [>] 🤖
 
 import (
-	"slices"
 	"testing"
+
+	"github.com/stretchr/testify/assert"
 
 	"gitlab.com/konradodwrot/go-modules/che/internal/cli"
 )
@@ -19,9 +20,7 @@ func TestSubcommandsWired(t *testing.T) {
 		"link", "copy", "render-templates", "mk-dirs",
 		"prune-links", "run-scripts", "detect", "services",
 	} {
-		if !slices.Contains(got, want) {
-			t.Errorf("subcommand %q not wired to RootCmd; have %v", want, got)
-		}
+		assert.Contains(t, got, want, "subcommand not wired to RootCmd")
 	}
 }
 

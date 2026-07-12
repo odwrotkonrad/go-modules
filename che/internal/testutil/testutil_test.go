@@ -6,17 +6,20 @@ import (
 	"os"
 	"path/filepath"
 	"testing"
+
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 func TestRepoWritesAndCommits(t *testing.T) {
 	dir := Repo(t, map[string]string{"a.txt": "hi\n", "sub/b.txt": "yo\n"})
 
-	if b, err := os.ReadFile(filepath.Join(dir, "sub/b.txt")); err != nil || string(b) != "yo\n" {
-		t.Errorf("WriteTree: sub/b.txt = %q, %v", b, err)
-	}
-	if fi, err := os.Stat(filepath.Join(dir, ".git")); err != nil || !fi.IsDir() {
-		t.Error("Repo did not produce a git repo (.git missing)")
-	}
+	b, err := os.ReadFile(filepath.Join(dir, "sub/b.txt"))
+	require.NoError(t, err)
+	assert.Equal(t, "yo\n", string(b))
+	fi, err := os.Stat(filepath.Join(dir, ".git"))
+	require.NoError(t, err, "Repo did not produce a git repo (.git missing)")
+	assert.True(t, fi.IsDir())
 }
 
 func TestCaptureStdout(t *testing.T) {
@@ -24,12 +27,8 @@ func TestCaptureStdout(t *testing.T) {
 		os.Stdout.WriteString("hello")
 		return nil
 	})
-	if err != nil {
-		t.Fatal(err)
-	}
-	if out != "hello" {
-		t.Errorf("CaptureStdout = %q, want hello", out)
-	}
+	require.NoError(t, err)
+	assert.Equal(t, "hello", out)
 }
 
 // [<] 🤖

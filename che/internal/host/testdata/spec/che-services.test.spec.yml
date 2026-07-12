@@ -1,0 +1,76 @@
+# [>] 🤖
+context:
+  mockedInterfaces:
+    execx.CmdExecutor: testutil.CmdMockExecutor
+    fsutil.FileSystemWriter: testutil.FileSystemMockWriter
+    fsutil.FileSystemReader: testutil.FileSystemMockReader
+    host.Sleep: testutil.SleepMock
+cases:
+  - name: servicesBootoutShouldUnloadLoadedService
+    context: {command: che services bootout}
+    expected:
+      stdOut: |
+        bootout: system/otelcol
+        bootout(done): system/otelcol
+  - name: servicesBootoutShouldSkipUnloadedService
+    context: {command: che services bootout}
+    input:
+      args: [notLoaded: true]
+    notExpected:
+      stdOut:
+        - bootout
+  - name: servicesBootoutShouldPollUntilGone
+    context: {command: che services bootout}
+    input:
+      args: [stubbornPrints: 3]
+    expected:
+      stdOut: |
+        bootout: system/otelcol
+        bootout(done): system/otelcol
+    notExpected:
+      stdOut:
+        - 'still present after bootout'
+  - name: servicesBootoutShouldWarnWhenStuckPast50Polls
+    context: {command: che services bootout}
+    input:
+      args: [stubbornPrints: 60]
+    expected:
+      stdOut:
+        - 'warn: system/otelcol still present after bootout'
+        - 'bootout(done): system/otelcol'
+  - name: servicesBootinShouldBootstrapFromPlist
+    context: {command: che services bootin}
+    expected:
+      stdOut: |
+        bootstrap: system/otelcol
+        bootstrap(done): system/otelcol
+  - name: servicesBootinShouldReportFailedBootstrap
+    context: {command: che services bootin}
+    input:
+      args: [failCmds: [bootstrap]]
+    expected:
+      exitCode: 1
+      stdErr:
+        - 'bootstrap system/otelcol: '
+      stdOut:
+        - 'bootstrap(fail): bootstrap system/otelcol: '
+    notExpected:
+      stdOut:
+        - 'bootstrap(done)'
+  - name: servicesEnsureShouldSettleThenReportRunningPid
+    context: {command: che services ensure}
+    expected:
+      stdOut: |
+        settle: 15s before pid check
+        running: system/otelcol (pid 4242)
+  - name: servicesEnsureShouldErrorWhenPidMissing
+    context: {command: che services ensure}
+    input:
+      args: [noPid: true]
+    expected:
+      exitCode: 1
+      stdErr:
+        - 'service(s) have no running process'
+      stdOut:
+        - 'error: system/otelcol has no running process'
+# [<] 🤖

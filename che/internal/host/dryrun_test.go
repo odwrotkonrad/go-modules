@@ -9,6 +9,8 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/stretchr/testify/require"
+
 	"gitlab.com/konradodwrot/go-modules/che/internal/config"
 	"gitlab.com/konradodwrot/go-modules/che/internal/spec"
 	"gitlab.com/konradodwrot/go-modules/che/internal/testutil"
@@ -35,9 +37,7 @@ func snapshotTree(t *testing.T, dir string) string {
 		}
 		return nil
 	})
-	if err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(t, err)
 	slices.Sort(lines)
 	return strings.Join(lines, "\n")
 }
@@ -56,12 +56,8 @@ func TestDryRunAllReportsSettledDests(t *testing.T) {
 			func(t *testing.T, h Host, r spec.Resolved) string {
 				item := r.Links[0]
 				dest := h.ToDest(item.Rel)
-				if err := os.MkdirAll(filepath.Dir(dest), 0o755); err != nil {
-					t.Fatal(err)
-				}
-				if err := os.Symlink(h.Src(item.Rel), dest); err != nil {
-					t.Fatal(err)
-				}
+				require.NoError(t, os.MkdirAll(filepath.Dir(dest), 0o755))
+				require.NoError(t, os.Symlink(h.Src(item.Rel), dest))
 				return dest
 			},
 			func(h Host, r spec.Resolved) error { return h.MkLinks(r.Links, r.Dirs) },
@@ -72,15 +68,9 @@ func TestDryRunAllReportsSettledDests(t *testing.T) {
 				item := r.Copies[0]
 				dest := h.copyDests(item)[0]
 				src, err := os.ReadFile(h.Src(item.Rel))
-				if err != nil {
-					t.Fatal(err)
-				}
-				if err := os.MkdirAll(filepath.Dir(dest), 0o755); err != nil {
-					t.Fatal(err)
-				}
-				if err := os.WriteFile(dest, src, 0o644); err != nil {
-					t.Fatal(err)
-				}
+				require.NoError(t, err)
+				require.NoError(t, os.MkdirAll(filepath.Dir(dest), 0o755))
+				require.NoError(t, os.WriteFile(dest, src, 0o644))
 				return dest
 			},
 			func(h Host, r spec.Resolved) error { return h.MkCopies(r.Copies, r.Dirs) },
@@ -90,28 +80,20 @@ func TestDryRunAllReportsSettledDests(t *testing.T) {
 		t.Run(c.name, func(t *testing.T) {
 			dir, home := testutil.CheRepo(t)
 			s, err := spec.Load(filepath.Join(dir, "che.yml"))
-			if err != nil {
-				t.Fatal(err)
-			}
+			require.NoError(t, err)
 			res, err := s.Resolve([]string{testutil.CheProfile}, filepath.Join(dir, "root"))
-			if err != nil {
-				t.Fatal(err)
-			}
+			require.NoError(t, err)
 
 			dest := c.settle(t, New(dir, home, testutil.CheProfile, config.Config{DryRun: config.DryRun.Delta}), res)
 
 			delta := New(dir, home, testutil.CheProfile, config.Config{DryRun: config.DryRun.Delta})
 			deltaOut, err := testutil.CaptureStdout(t, func() error { return c.run(delta, res) })
-			if err != nil {
-				t.Fatal(err)
-			}
+			require.NoError(t, err)
 			testutil.NotLine(t, deltaOut, dest)
 
 			all := New(dir, home, testutil.CheProfile, config.Config{DryRun: config.DryRun.All})
 			allOut, err := testutil.CaptureStdout(t, func() error { return c.run(all, res) })
-			if err != nil {
-				t.Fatal(err)
-			}
+			require.NoError(t, err)
 			testutil.WantLines(t, allOut, dest)
 		})
 	}
@@ -125,9 +107,7 @@ func TestDryRunMutatesNothing(t *testing.T) {
 			before := snapshotTree(t, dir)
 
 			out, err := testutil.CaptureStdout(t, func() error { return run(h, res) })
-			if err != nil {
-				t.Fatalf("%s dry-run errored: %v", name, err)
-			}
+			require.NoErrorf(t, err, "%s dry-run", name)
 			out = testutil.StripANSI(out)
 			for line := range strings.SplitSeq(strings.TrimSpace(out), "\n") {
 				if line != "" && !strings.Contains(line, "dry-run=delta") {
@@ -151,9 +131,7 @@ func TestDryRunLineFormat(t *testing.T) {
 		t.Run(op, func(t *testing.T) {
 			h, res, _ := setupHost(t, config.Config{DryRun: config.DryRun.Delta})
 			out, err := testutil.CaptureStdout(t, func() error { return ops[op](h, res) })
-			if err != nil {
-				t.Fatal(err)
-			}
+			require.NoError(t, err)
 			testutil.WantLines(t, out, frag)
 		})
 	}
