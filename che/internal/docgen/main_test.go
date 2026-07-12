@@ -3,47 +3,28 @@ package main
 // [>] 🤖🤖
 
 import (
-	"bytes"
-	"encoding/json"
 	"os"
 	"path/filepath"
 	"strings"
 	"testing"
 
 	"github.com/santhosh-tekuri/jsonschema/v6"
-	"gopkg.in/yaml.v3"
+
+	"gitlab.com/konradodwrot/go-modules/che/internal/spec"
 )
 
 func compileSchema(t *testing.T) *jsonschema.Schema {
 	t.Helper()
-	doc, err := jsonschema.UnmarshalJSON(bytes.NewReader(schemaJSON()))
-	if err != nil {
-		t.Fatal(err)
-	}
-	c := jsonschema.NewCompiler()
-	if err := c.AddResource("che.schema.json", doc); err != nil {
-		t.Fatal(err)
-	}
-	sch, err := c.Compile("che.schema.json")
+	sch, err := spec.CompiledSchema()
 	if err != nil {
 		t.Fatal(err)
 	}
 	return sch
 }
 
-// yamlInstance decodes YAML then round-trips through JSON, yielding the value
-// shape jsonschema validates.
 func yamlInstance(t *testing.T, b []byte) any {
 	t.Helper()
-	var v any
-	if err := yaml.Unmarshal(b, &v); err != nil {
-		t.Fatal(err)
-	}
-	j, err := json.Marshal(v)
-	if err != nil {
-		t.Fatal(err)
-	}
-	inst, err := jsonschema.UnmarshalJSON(bytes.NewReader(j))
+	inst, err := spec.YAMLInstance(b)
 	if err != nil {
 		t.Fatal(err)
 	}

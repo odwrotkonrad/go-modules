@@ -15,6 +15,13 @@ First line of `che.yml`:
 Pin `main` to `v<X.Y.Z>` to match the installed che: each release tag
 snapshots the schema, also attached as a release asset.
 
+## Load Validation
+
+che validates every loaded che.yml (local repo, plugin checkouts) against this
+schema. Violations (unknown keys, wrong values, missing required fields) log
+as warnings by default. `--validate-schema error` (env
+`CHE_VALIDATE_SCHEMA=error`) aborts the run instead.
+
 ## Full Example
 
 Every construct in one spec (schema-validated by che's test suite):

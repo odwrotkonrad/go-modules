@@ -6,14 +6,15 @@ loads the union of files/dirs/installs/services those profiles select.
 
 ## Global options
 
-| Option | Env | Values | Description |
-| --- | --- | --- | --- |
-| `--debug` | `CHE_DEBUG` | `bool` | print debug-level lines (plugin announce, clone/pull attempts) |
-| `-C`, `--directory` | `CHE_DIR` | `string` | change into this directory before resolving the repo |
-| `--dry-run` | `CHE_DRY_RUN` | `delta (changed dests, bare-flag default)` \| `all (every dest)` | print mutating actions instead of executing them |
-| `--profile` | `CHE_PROFILE` | `string` | run only this profile (autoExec skipped, execIf still enforced) |
-| `--skip-exec-if` | `CHE_SKIP_EXEC_IF` | `bool` | treat every execIf predicate as passing |
-| `--skip-plugins` | `CHE_SKIP_PLUGINS` | `bool` | skip plugins entries, load only the local repo |
+| Option | Env | Values | Default | Description |
+| --- | --- | --- | --- | --- |
+| `--debug` | `CHE_DEBUG` | `bool` | `false` | print debug-level lines (plugin announce, clone/pull attempts) |
+| `-C`, `--directory` | `CHE_DIR` | `string` |  | change into this directory before resolving the repo |
+| `--dry-run` | `CHE_DRY_RUN` | `delta (changed dests, bare-flag default)` \| `all (every dest)` | `off` | print mutating actions instead of executing them |
+| `--profile` | `CHE_PROFILE` | `string` |  | run only this profile (autoExec skipped, execIf still enforced) |
+| `--skip-exec-if` | `CHE_SKIP_EXEC_IF` | `bool` | `false` | treat every execIf predicate as passing |
+| `--skip-plugins` | `CHE_SKIP_PLUGINS` | `bool` | `false` | skip plugins entries, load only the local repo |
+| `--validate-schema` | `CHE_VALIDATE_SCHEMA` | `warn (log violations)` \| `error (abort on violations)` | `warn` | validate each loaded che.yml against its JSON Schema |
 
 ## Commands
 
@@ -55,9 +56,9 @@ To load completions for every new session, execute once:
 You will need to start a new shell for this setup to take effect.
 
 
-| Option | Env | Values | Description |
-| --- | --- | --- | --- |
-| `--no-descriptions` |  | `bool` | disable completion descriptions |
+| Option | Env | Values | Default | Description |
+| --- | --- | --- | --- | --- |
+| `--no-descriptions` |  | `bool` | `false` | disable completion descriptions |
 
 ### `$ che completion fish`
 
@@ -76,9 +77,9 @@ To load completions for every new session, execute once:
 You will need to start a new shell for this setup to take effect.
 
 
-| Option | Env | Values | Description |
-| --- | --- | --- | --- |
-| `--no-descriptions` |  | `bool` | disable completion descriptions |
+| Option | Env | Values | Default | Description |
+| --- | --- | --- | --- | --- |
+| `--no-descriptions` |  | `bool` | `false` | disable completion descriptions |
 
 ### `$ che completion powershell`
 
@@ -94,9 +95,9 @@ To load completions for every new session, add the output of the above command
 to your powershell profile.
 
 
-| Option | Env | Values | Description |
-| --- | --- | --- | --- |
-| `--no-descriptions` |  | `bool` | disable completion descriptions |
+| Option | Env | Values | Default | Description |
+| --- | --- | --- | --- | --- |
+| `--no-descriptions` |  | `bool` | `false` | disable completion descriptions |
 
 ### `$ che completion zsh`
 
@@ -126,9 +127,9 @@ To load completions for every new session, execute once:
 You will need to start a new shell for this setup to take effect.
 
 
-| Option | Env | Values | Description |
-| --- | --- | --- | --- |
-| `--no-descriptions` |  | `bool` | disable completion descriptions |
+| Option | Env | Values | Default | Description |
+| --- | --- | --- | --- | --- |
+| `--no-descriptions` |  | `bool` | `false` | disable completion descriptions |
 
 ### `$ che copy`
 
@@ -154,9 +155,9 @@ delete broken symlinks.
 
 render *.tpl sources; each dest path decides target (relative -> repo, ~/ or absolute -> host).
 
-| Option | Env | Values | Description |
-| --- | --- | --- | --- |
-| `--skip-secrets` | `CHE_RENDER_TEMPLATES_SKIP_SECRETS` | `bool` | skip sources carrying op:// secret refs (logged, dests untouched) |
+| Option | Env | Values | Default | Description |
+| --- | --- | --- | --- | --- |
+| `--skip-secrets` | `CHE_RENDER_TEMPLATES_SKIP_SECRETS` | `bool` | `false` | skip sources carrying op:// secret refs (logged, dests untouched) |
 
 ### `$ che run-scripts`
 
