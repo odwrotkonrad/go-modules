@@ -30,7 +30,7 @@ test-cover:
 	@sed -i.bak 's|filename="gitlab.com/konradodwrot/go-modules/|filename="|g' coverage.xml && rm coverage.xml.bak
 	@$(GO) tool cover -func=coverage.out | tail -1
 
-#[what] build the binary into ./dist via go build
+#[what] build the binary into ./dist
 build:
 	CC=$(CC) $(GO) build -v -o dist/$(BIN) .
 

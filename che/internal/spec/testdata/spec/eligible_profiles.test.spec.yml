@@ -2,57 +2,57 @@
 context:
   function: spec.Raw.EligibleProfiles
 cases:
-  - name: eligibleProfilesShouldSelectProfileWithPassingExecIf
+  - name: ShouldSelectProfileWithPassingExecIf
     input:
       args: [spec: che, os: macos, virt: true]
     expected:
       output: [cli/macos]
-  - name: eligibleProfilesShouldErrorWhenNoProfileEligible
+  - name: ShouldErrorWhenNoProfileEligible
     input:
       args: [spec: che, os: linux, virt: true]
     expected:
       errorOutput: ['no eligible profile: no autoExec profile passed its execIf']
-  - name: forceOneShouldStillEnforceExecIf
+  - name: ShouldStillEnforceExecIfWhenForcingOneProfile
     input:
       args: [spec: che, os: linux, virt: true, forceOne: desktop/macos]
     expected:
       errorOutput: ['--profile "desktop/macos" failed its execIf predicates']
-  - name: forceOneWithForceAllShouldLiftExecIf
+  - name: ShouldLiftExecIfWhenForcingOneWithForceAll
     input:
       args: [spec: che, os: linux, virt: true, forceOne: desktop/macos, forceAll: true]
     expected:
       output: [desktop/macos]
-  - name: forceOneShouldSelectProfileWhenExecIfPasses
+  - name: ShouldSelectForcedProfileWhenExecIfPasses
     input:
       args: [spec: che, os: macos, virt: false, forceOne: desktop/macos]
     expected:
       output: [desktop/macos]
-  - name: forceOneShouldSelectNonAutoexecBaseProfile
+  - name: ShouldSelectForcedNonAutoexecBaseProfile
     input:
       args: [spec: che, os: linux, virt: true, forceOne: base]
     expected:
       output: [base]
-  - name: forceOneShouldSelectNonAutoexecOntoRepoProfile
+  - name: ShouldSelectForcedNonAutoexecOntoRepoProfile
     input:
       args: [spec: che, os: linux, virt: true, forceOne: ontoRepo]
     expected:
       output: [ontoRepo]
-  - name: forceOneShouldErrorOnUndefinedProfile
+  - name: ShouldErrorOnUndefinedForcedProfile
     input:
       args: [spec: che, os: macos, virt: true, forceOne: cli/linux]
     expected:
       errorOutput: ['--profile "cli/linux" is not defined in che.yml']
-  - name: forceAllShouldSelectAllAutoexecProfiles
+  - name: ShouldSelectAllAutoexecProfilesWithForceAll
     input:
       args: [spec: che, os: linux, virt: true, forceOne: "", forceAll: true]
     expected:
       output: [cli/macos, desktop/macos]
-  - name: eligibleProfilesShouldAlwaysSelectLonePlainProfile
+  - name: ShouldAlwaysSelectLonePlainProfile
     input:
       args: [spec: repo, os: linux, virt: true]
     expected:
       output: [repo]
-  - name: eligibleProfilesShouldUnionInDeclarationOrder
+  - name: ShouldUnionInDeclarationOrder
     input:
       args: [spec: ambiguous, os: linux, virt: true]
     expected:

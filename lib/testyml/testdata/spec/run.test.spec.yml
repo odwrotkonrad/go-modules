@@ -2,17 +2,17 @@
 context:
   function: testyml.Run
 cases:
-  - name: runShouldDecodeCaseAndInvokeCallback
+  - name: ShouldDecodeCaseAndInvokeCallback
     input:
       args: [1, 2]
     expected:
       output: 3
-  - name: runShouldDecodeNegativeValues
+  - name: ShouldDecodeNegativeValues
     input:
       args: [-1, -2]
     expected:
       output: -3
-  - name: runShouldDecodeNamedArgs
+  - name: ShouldDecodeNamedArgs
     input:
       args: [first: 2, second: 5]
     expected:

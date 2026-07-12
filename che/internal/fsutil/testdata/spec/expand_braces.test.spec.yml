@@ -2,22 +2,22 @@
 context:
   function: fsutil.ExpandBraces
 cases:
-  - name: expandBracesShouldReturnBracelessPathUnchanged
+  - name: ShouldReturnBracelessPathUnchanged
     input:
       args: [path: no/braces/here]
     expected:
       output: [no/braces/here]
-  - name: expandBracesShouldExpandSingleGroup
+  - name: ShouldExpandSingleGroup
     input:
       args: [path: "x/{a,b}/y"]
     expected:
       output: [x/a/y, x/b/y]
-  - name: expandBracesShouldExpandCartesianProductOfTwoGroups
+  - name: ShouldExpandCartesianProductOfTwoGroups
     input:
       args: [path: "{a,b}/{c,d}"]
     expected:
       output: [a/c, a/d, b/c, b/d]
-  - name: expandBracesShouldFlattenNestedGroups
+  - name: ShouldFlattenNestedGroups
     input:
       args: [path: "x/{a,{b,c}}/y"]
     expected:

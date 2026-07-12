@@ -8,12 +8,12 @@ context:
     fsutil.FileSystemReader: testutil.FileSystemMockReader
     host.Sleep: testutil.SleepMock
 cases:
-  - name: renderTemplatesShouldRenderOnlyHostDestsForHostProfile
+  - name: ShouldRenderOnlyHostDestsForHostProfile
     expected:
       stdOut: |
         archive: ${HOME}/.local/share/che/backups/che-render-{{/.*/}}.tar.bz2
         render(create): ${HOME}/.config/zsh/t
-  - name: renderTemplatesShouldRenderOnlyRepoDestsForOntoRepoProfile
+  - name: ShouldRenderOnlyRepoDestsForOntoRepoProfile
     context:
       command: che render-templates --profile ontoRepo
     expected:

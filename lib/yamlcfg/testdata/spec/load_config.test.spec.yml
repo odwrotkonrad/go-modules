@@ -2,23 +2,23 @@
 context:
   function: yamlcfg.LoadConfig
 cases:
-  - name: loadConfigShouldDecodeIntoTypedMap
+  - name: ShouldDecodeIntoTypedMap
     input:
       args: [user: testdata/fixture/load_config/user_only.yml]
     expected:
       files: testdata/fixture/load_config/user_only.expected.yml
-  - name: loadConfigShouldExit12OnTypeMismatch
+  - name: ShouldExit12OnTypeMismatch
     input:
       args: [user: testdata/fixture/load_config/decode_mismatch.yml]
     expected:
       exitCode: 12
       errorOutput: [invalid config]
-  - name: loadConfigShouldLeaveOutputUntouchedForEmptyConfig
+  - name: ShouldLeaveOutputUntouchedForEmptyConfig
     input:
       args: [user: testdata/fixture/load_config/empty.yml]
     expected:
       exitCode: 0
-  - name: loadConfigShouldExit13WhenConfigMissing
+  - name: ShouldExit13WhenConfigMissing
     input:
       args: []
     expected:

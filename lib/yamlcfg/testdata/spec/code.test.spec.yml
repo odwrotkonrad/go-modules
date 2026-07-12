@@ -2,17 +2,17 @@
 context:
   function: yamlcfg.Code
 cases:
-  - name: codeShouldReturnZeroForNilError
+  - name: ShouldReturnZeroForNilError
     input:
       args: []
     expected:
       output: 0
-  - name: codeShouldReturnCodedErrorCode
+  - name: ShouldReturnCodedErrorCode
     input:
       args: [code: 13]
     expected:
       output: 13
-  - name: codeShouldReturnOneForPlainError
+  - name: ShouldReturnOneForPlainError
     input:
       args: [plain: plain]
     expected:

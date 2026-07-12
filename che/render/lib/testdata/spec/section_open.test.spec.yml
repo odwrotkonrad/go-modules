@@ -2,27 +2,27 @@
 context:
   function: lib.sectionOpen
 cases:
-  - name: sectionOpenShouldParseGenaiIncludeLabel
+  - name: ShouldParseGenaiIncludeLabel
     input:
       args: [line: "##[>] Onto Host [genai-include]"]
     expected:
       output: {label: Onto Host, depth: 0, ok: true}
-  - name: sectionOpenShouldKeepParensAndStripMarks
+  - name: ShouldKeepParensAndStripMarks
     input:
       args: [line: "##[>] Onto Repo (CI) [genai-include] 🤖🤖"]
     expected:
       output: {label: Onto Repo (CI), depth: 0, ok: true}
-  - name: sectionOpenShouldComputeNestedDepth
+  - name: ShouldComputeNestedDepth
     input:
       args: [line: "###[>] VM"]
     expected:
       output: {label: VM, depth: 1, ok: true}
-  - name: sectionOpenShouldStripTrailingMarks
+  - name: ShouldStripTrailingMarks
     input:
       args: [line: "##[>] go 🤖🤖"]
     expected:
       output: {label: go, depth: 0, ok: true}
-  - name: sectionOpenShouldRejectWhatComment
+  - name: ShouldRejectWhatComment
     input:
       args: [line: "#[what] not a section"]
     expected:

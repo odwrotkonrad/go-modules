@@ -8,7 +8,7 @@ context:
     fsutil.FileSystemReader: testutil.FileSystemMockReader
     host.Sleep: testutil.SleepMock
 cases:
-  - name: pruneLinksShouldScanRootAndRemoveNothingOnFreshTree
+  - name: ShouldScanRootAndRemoveNothingOnFreshTree
     expected:
       stdOut: |
         prune-links: ${ROOT}

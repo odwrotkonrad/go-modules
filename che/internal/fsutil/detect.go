@@ -17,11 +17,11 @@ func NormalizeOS(goos string) string {
 	return goos
 }
 
-// DetectReader is the fs read surface virtualization detection consults;
+// DetectReader is the fs read surface virtualization detection consults,
 // tests swap in a mock so live host markers never leak into results.
 var DetectReader FileSystemReader = OSReader{}
 
-// UserLookup and GroupLookup resolve passwd/group records; tests swap in
+// UserLookup and GroupLookup resolve passwd/group records, tests swap in
 // map-backed fakes so the live user db never leaks into results.
 var (
 	UserLookup  = user.Lookup

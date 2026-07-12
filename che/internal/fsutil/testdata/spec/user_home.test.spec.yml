@@ -4,12 +4,12 @@ context:
   mockedInterfaces:
     fsutil.UserLookup: testutil.UserMockLookup
 cases:
-  - name: userHomeShouldReturnHomeForKnownUser
+  - name: ShouldReturnHomeForKnownUser
     input:
       args: [user: ko, users: {ko: /Users/ko}]
     expected:
       output: /Users/ko
-  - name: userHomeShouldErrorForUnknownUser
+  - name: ShouldErrorForUnknownUser
     input:
       args: [user: ghost, users: {ko: /Users/ko}]
     expected:

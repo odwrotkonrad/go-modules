@@ -104,8 +104,8 @@ func seedBrokenLink(t *testing.T, h Host) string {
 	return dead
 }
 
-// TestOps runs each op with dry-run off against the record-only writer and
-// mock executor: log lines assert the behavior, nothing touches the host.
+// TestOps: dry-run off, record-only writer + mock executor, log lines assert
+// the behavior.
 func TestOps(t *testing.T) {
 	specs, err := fs.Glob(td, "testdata/spec/*.test.spec.yml")
 	require.NoError(t, err)

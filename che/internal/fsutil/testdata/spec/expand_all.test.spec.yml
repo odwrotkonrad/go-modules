@@ -2,7 +2,7 @@
 context:
   function: fsutil.ExpandAll
 cases:
-  - name: expandAllShouldKeepPlainAndExpandBracedPaths
+  - name: ShouldKeepPlainAndExpandBracedPaths
     input:
       args: [paths: [plain, "x/{a,b}/y"]]
     expected:

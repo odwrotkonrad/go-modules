@@ -2,78 +2,78 @@
 context:
   command: get-term-open-files-with any
 cases:
-  - name: runShouldUseAnyOpenerForAnyTerminal
+  - name: ShouldUseAnyOpenerForAnyTerminal
     input:
       args: [config: testdata/fixture/run/term.yml]
     expected:
       files: testdata/fixture/run/any.expected.txt
-  - name: runShouldOverrideAnyWithVscodeKeepingProse
+  - name: ShouldOverrideAnyWithVscodeKeepingProse
     context:
       command: get-term-open-files-with vscode
     input:
       args: [config: testdata/fixture/run/term.yml]
     expected:
       files: testdata/fixture/run/vscode.expected.txt
-  - name: runShouldPartiallyOverrideAnyForKitty
+  - name: ShouldPartiallyOverrideAnyForKitty
     context:
       command: get-term-open-files-with kitty
     input:
       args: [config: testdata/fixture/run/term.yml]
     expected:
       files: testdata/fixture/run/kitty.expected.txt
-  - name: runShouldLetLastOpenerWin
+  - name: ShouldLetLastOpenerWin
     context:
       command: get-term-open-files-with vscode
     input:
       args: [config: testdata/fixture/run/last_opener.yml]
     expected:
       files: testdata/fixture/run/last_opener.expected.txt
-  - name: runShouldSkipRulesWithEmptyOpener
+  - name: ShouldSkipRulesWithEmptyOpener
     input:
       args: [config: testdata/fixture/run/empty_opener.yml]
     expected:
       files: testdata/fixture/run/empty_opener.expected.txt
-  - name: runShouldExit11WithoutArgs
+  - name: ShouldExit11WithoutArgs
     context:
       command: get-term-open-files-with
     input:
       args: [config: testdata/fixture/run/term.yml]
     expected:
       exitCode: 11
-  - name: runShouldExit11OnTwoArgs
+  - name: ShouldExit11OnTwoArgs
     context:
       command: get-term-open-files-with any vscode
     input:
       args: [config: testdata/fixture/run/term.yml]
     expected:
       exitCode: 11
-  - name: runShouldExit11OnThreeArgs
+  - name: ShouldExit11OnThreeArgs
     context:
       command: get-term-open-files-with any vscode kitty
     input:
       args: [config: testdata/fixture/run/term.yml]
     expected:
       exitCode: 11
-  - name: runShouldExit11OnUnknownTerminal
+  - name: ShouldExit11OnUnknownTerminal
     context:
       command: get-term-open-files-with alacritty
     input:
       args: [config: testdata/fixture/run/term.yml]
     expected:
       exitCode: 11
-  - name: runShouldExit11OnWrongCaseTerminal
+  - name: ShouldExit11OnWrongCaseTerminal
     context:
       command: get-term-open-files-with Any
     input:
       args: [config: testdata/fixture/run/term.yml]
     expected:
       exitCode: 11
-  - name: runShouldExit13WhenConfigMissing
+  - name: ShouldExit13WhenConfigMissing
     input:
       args: []
     expected:
       exitCode: 13
-  - name: runShouldExit12OnInvalidConfig
+  - name: ShouldExit12OnInvalidConfig
     input:
       args: [config: testdata/fixture/run/invalid.yml]
     expected:

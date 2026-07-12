@@ -3,13 +3,13 @@
 
 ### Docs:
 
-`render-templates` render *.ontoRepo.tpl onto the repo (makefile.agents.md, repo-structure.md, CLAUDE.md, AGENTS.md, README.md) with this checkout's che build
+`render-templates` render *.ontoRepo.tpl onto the repo with this checkout's che build
 `render-docs` generate che docs (docs/cli.md, che.schema.json, cli-usage.md) from the Go source
 
 ### CI:
 
 `run-repo-ci-prepare-hooks` install lefthook git hooks
-`run-repo-ci-precommit-all`: `run-repo-ci-prepare-hooks` run pre-commit hooks over all files (not just staged)
+`run-repo-ci-precommit-all`: `run-repo-ci-prepare-hooks` run pre-commit hooks over all files
 
 ### Go:
 
@@ -37,7 +37,7 @@
 
 `test` run all tests
 `test-cover` run all tests with coverage, print the per-package and total percentages
-`build` build the binary into ./dist via go build
+`build` build the binary into ./dist
 `lint` golangci-lint all packages
 `vet` go vet all packages
 `install` install the binary into $GOPATH/bin

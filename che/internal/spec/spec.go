@@ -36,8 +36,7 @@ func IsRemoteSrc(source string) bool { return strings.HasPrefix(source, RemoteSr
 // RemoteSrcRef strips the remote marker, yielding the fetchable ref.
 func RemoteSrcRef(source string) string { return strings.TrimPrefix(source, RemoteSrcPrefix) }
 
-// TrimTmplExt strips the template suffix from rel (longest match first),
-// yielding the derived dest path.
+// TrimTmplExt strips the template suffix (longest first), yielding the derived dest.
 func TrimTmplExt(rel string) string {
 	for _, ext := range tmplExts {
 		if trimmed, ok := strings.CutSuffix(rel, ext); ok {
@@ -53,10 +52,6 @@ type Raw struct {
 	order    []string               // profile names in declaration order
 }
 
-// profileSpec is one block: options self-describe eligibility (autoExec,
-// execIf), mixinProfiles composed in order (local names only), plugins
-// collected as remote-profile refs, then include (additive) and exclude
-// (subtractive glob filter, applied last, wins).
 type profileSpec struct {
 	Options       ProfileOptions `yaml:"options" jsonschema_description:"when the profile runs: autoExec opts in to bare-che runs, execIf predicates must ALL pass"`
 	MixinProfiles []string       `yaml:"mixinProfiles" jsonschema_description:"local profile names composed depth-first, in order"`
@@ -65,20 +60,13 @@ type profileSpec struct {
 	Exclude       excludeSet     `yaml:"exclude"`
 }
 
-// ProfileOptions self-describes when a profile runs. AutoExec (default
-// false): opt in to bare-che runs; without it a profile runs only when named
-// via --profile or composed via mixinProfiles. ExecIf: predicate expressions
-// (`<source>` or `<source> == <literal>`, sources builtin:*/env:*),
-// autoExec-eligible iff ALL pass; empty -> always.
+// ProfileOptions self-describes when a profile runs.
 type ProfileOptions struct {
 	ExecIf   []string `yaml:"execIf"`
 	AutoExec bool     `yaml:"autoExec" jsonschema_description:"run on bare che (default false: runs only via --profile or mixinProfiles)"`
 }
 
-// includeSet is the additive payload: link entries (glob-string OR
-// {source, dest} rewrite), copy/template entries (glob-string OR rich
-// object), mkdirs entries (path-string OR {dest}), script globs, service
-// names.
+// includeSet is the additive payload.
 type includeSet struct {
 	Link            []linkEntry `yaml:"link" jsonschema_description:"symlink-op entries, repo-relative under root/: glob string (dest derived 1:1) or {source, dest} sed-style rewrite"`
 	Copy            []entry     `yaml:"copy" jsonschema_description:"*.ontoHost.cp copy-op perm-groups"`
@@ -88,9 +76,7 @@ type includeSet struct {
 	Services        []string    `yaml:"services" jsonschema_description:"launchd service names"`
 }
 
-// linkEntry is one link item: a bare glob string (dest derived 1:1), or a
-// {source, dest} object where dest is a sed-style rewrite rule. glob is set
-// iff the glob form.
+// linkEntry: bare glob string or {source, dest}. glob set iff the glob form.
 type linkEntry struct {
 	glob   string
 	Source string `yaml:"source"`
@@ -113,8 +99,7 @@ func decodeScalarOr[T any](value *yaml.Node, scalar *string, obj *T) error {
 	return value.Decode(obj)
 }
 
-// excludeSet is the subtractive payload: every key a flat glob-string list, a
-// match drops the item.
+// excludeSet is the subtractive payload: flat glob-string lists.
 type excludeSet struct {
 	Link            []string `yaml:"link" jsonschema_description:"drop matching link items"`
 	Copy            []string `yaml:"copy" jsonschema_description:"drop matching copy items (source or dest)"`
@@ -124,9 +109,8 @@ type excludeSet struct {
 	Services        []string `yaml:"services" jsonschema_description:"drop matching services"`
 }
 
-// DestSpec is one dest path plus its per-dest render options (render-files'
-// canonical type): a scalar path, or a mapping carrying `options`. opts keeps
-// the presence-aware raw form so group-level options merge per field.
+// DestSpec is one dest path plus its per-dest render options. opts keeps the
+// presence-aware raw form so group-level options merge per field.
 type DestSpec struct {
 	Path    string `yaml:"path"`
 	Options render.Options
@@ -157,7 +141,6 @@ type optionsSpec struct {
 	RenderReferencedFiles   *bool   `yaml:"renderReferencedFiles"`
 }
 
-// over overlays the set fields onto base.
 func (o optionsSpec) over(base render.Options) render.Options {
 	if o.WriteType != nil {
 		base.WriteType = *o.WriteType
@@ -178,10 +161,7 @@ type Perms struct {
 	Chmod      string `yaml:"chmod" jsonschema:"pattern=^[0-7]{3\\,4}$" jsonschema_description:"dest mode, octal string"`
 }
 
-// entry is a copy/template perm-group: optional perms, template context and
-// render options cascading to every item in Files (globs included for perms).
-// Item ctx keys win over the group's; dest-set option fields win over the
-// group's.
+// entry is a copy/template perm-group.
 type entry struct {
 	Perms   `yaml:",inline"`
 	Ctx     map[string]string `yaml:"ctx" jsonschema_description:"renderTemplates only: group-level template context, merged under each item's ctx (item keys win)"`
@@ -189,15 +169,13 @@ type entry struct {
 	Files   []fileSpec        `yaml:"files" jsonschema:"required" jsonschema_description:"the group's items, each inheriting the group's perms"`
 }
 
-// dirGroup is a mkdirs perm-group: optional perms cascading to every item in
-// Files (globs included).
+// dirGroup is a mkdirs perm-group.
 type dirGroup struct {
 	Perms `yaml:",inline"`
 	Files []dirSpec `yaml:"files" jsonschema:"required" jsonschema_description:"the group's items, each inheriting the group's perms"`
 }
 
-// dirSpec is one item in a mkdirs perm-group's Files list: a bare dir path
-// string, or a {dest} object. glob is set iff the path form.
+// dirSpec: bare dir path string or {dest}. glob set iff the path form.
 type dirSpec struct {
 	glob string
 	Dest []DestSpec `yaml:"dest"`
@@ -208,8 +186,7 @@ func (d *dirSpec) UnmarshalYAML(value *yaml.Node) error {
 	return decodeScalarOr(value, &d.glob, (*alias)(d))
 }
 
-// fileSpec is one item in a perm-group's Files list: a bare glob string, or a
-// {source, dest} object. glob is set iff the glob form.
+// fileSpec: bare glob string or {source, dest}. glob set iff the glob form.
 type fileSpec struct {
 	glob   string
 	Source string            `yaml:"source"`
@@ -222,10 +199,9 @@ func (f *fileSpec) UnmarshalYAML(value *yaml.Node) error {
 	return decodeScalarOr(value, &f.glob, (*alias)(f))
 }
 
-// FileItem is one resolved file: repo-relative source (templates:
-// repo-root-relative or @-prefixed remote ref; links/copies: under root/),
-// explicit dests (nil -> derived in host), optional perms, optional template
-// context. Per-dest render options live on each DestSpec.
+// FileItem is one resolved file: source (templates: repo-root-relative or
+// @-prefixed remote ref, links/copies: under root/), explicit dests
+// (nil -> derived in host), optional perms and template context.
 type FileItem struct {
 	Rel   string
 	Dests []DestSpec
@@ -254,7 +230,7 @@ type Resolved struct {
 	Plugins   []PluginRef // profile-level plugins entries, composition order
 }
 
-// Load parses che.yml: every top-level key is a defined profile block.
+// Load parses che.yml.
 func Load(path string) (*Raw, error) {
 	b, err := os.ReadFile(path)
 	if err != nil {

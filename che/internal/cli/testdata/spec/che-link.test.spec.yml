@@ -8,7 +8,7 @@ context:
     fsutil.FileSystemReader: testutil.FileSystemMockReader
     host.Sleep: testutil.SleepMock
 cases:
-  - name: linkShouldSymlinkRepoFilesOntoHomeAndSystem
+  - name: ShouldSymlinkRepoFilesOntoHomeAndSystem
     expected:
       stdOut: |
         mkdir(create): ${HOME}/.config
@@ -21,7 +21,7 @@ cases:
         ln(create): ${HOME}/.config/bar/a
         ln(create): ${HOME}/.config/zsh/.zshrc
         ln(create): /etc/zshrc
-  - name: linkShouldRewriteDestPathWithSedRule
+  - name: ShouldRewriteDestPathWithSedRule
     expected:
       stdOut: |
         ln(create): ${HOME}/.config/bar/a

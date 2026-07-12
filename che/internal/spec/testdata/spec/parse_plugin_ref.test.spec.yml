@@ -2,77 +2,77 @@
 context:
   function: spec.parsePluginRef
 cases:
-  - name: parsePluginRefShouldParseScpRemote
+  - name: ShouldParseScpRemote
     input:
       args: [entry: "@git@gitlab.com:g/r.git::p"]
     expected:
       output: {url: "git@gitlab.com:g/r.git", profile: p, isPath: false}
-  - name: parsePluginRefShouldParseHttpsRemote
+  - name: ShouldParseHttpsRemote
     input:
       args: [entry: "@https://gitlab.com/g/r.git::p"]
     expected:
       output: {url: "https://gitlab.com/g/r.git", profile: p, isPath: false}
-  - name: parsePluginRefShouldParseSshRemote
+  - name: ShouldParseSshRemote
     input:
       args: [entry: "@ssh://git@gitlab.com/g/r.git::p"]
     expected:
       output: {url: "ssh://git@gitlab.com/g/r.git", profile: p, isPath: false}
-  - name: parsePluginRefShouldParseFileUrlRemote
+  - name: ShouldParseFileUrlRemote
     input:
       args: [entry: "@file:///tmp/x::p"]
     expected:
       output: {url: "file:///tmp/x", profile: p, isPath: false}
-  - name: parsePluginRefShouldParseAbsoluteDirAsPath
+  - name: ShouldParseAbsoluteDirAsPath
     input:
       args: [entry: /abs/dir::p]
     expected:
       output: {url: /abs/dir, profile: p, isPath: true}
-  - name: parsePluginRefShouldParseDotRelativeDirAsPath
+  - name: ShouldParseDotRelativeDirAsPath
     input:
       args: [entry: ./rel::p]
     expected:
       output: {url: ./rel, profile: p, isPath: true}
-  - name: parsePluginRefShouldParseBareRelativeDirAsPath
+  - name: ShouldParseBareRelativeDirAsPath
     input:
       args: [entry: rel/dir::p]
     expected:
       output: {url: rel/dir, profile: p, isPath: true}
-  - name: parsePluginRefShouldParseTildeDirAsPath
+  - name: ShouldParseTildeDirAsPath
     input:
       args: [entry: ~/x::p]
     expected:
       output: {url: ~/x, profile: p, isPath: true}
-  - name: parsePluginRefShouldParseEnvVarDirAsPath
+  - name: ShouldParseEnvVarDirAsPath
     input:
       args: [entry: $HOME/x::p]
     expected:
       output: {url: $HOME/x, profile: p, isPath: true}
-  - name: parsePluginRefShouldErrorOnRemoteWithoutProfile
+  - name: ShouldErrorOnRemoteWithoutProfile
     input:
       args: [entry: "@nourl"]
     expected:
       errorOutput: ['plugins entry']
-  - name: parsePluginRefShouldErrorOnDirWithoutProfile
+  - name: ShouldErrorOnDirWithoutProfile
     input:
       args: [entry: nodir]
     expected:
       errorOutput: ['plugins entry']
-  - name: parsePluginRefShouldErrorOnEmptyRemoteUrl
+  - name: ShouldErrorOnEmptyRemoteUrl
     input:
       args: [entry: "@::p"]
     expected:
       errorOutput: ['plugins entry']
-  - name: parsePluginRefShouldErrorOnEmptyDirPath
+  - name: ShouldErrorOnEmptyDirPath
     input:
       args: [entry: "::p"]
     expected:
       errorOutput: ['plugins entry']
-  - name: parsePluginRefShouldErrorOnEmptyRemoteProfile
+  - name: ShouldErrorOnEmptyRemoteProfile
     input:
       args: [entry: "@url::"]
     expected:
       errorOutput: ['plugins entry']
-  - name: parsePluginRefShouldErrorOnEmptyDirProfile
+  - name: ShouldErrorOnEmptyDirProfile
     input:
       args: [entry: "dir::"]
     expected:

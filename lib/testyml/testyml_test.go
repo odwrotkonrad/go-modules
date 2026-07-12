@@ -21,18 +21,16 @@ import (
 var td embed.FS
 
 func TestRun(t *testing.T) {
-	ran := map[string]bool{}
+	ran := 0
 	Run(t, td, "testdata/spec/run.test.spec.yml", func(t *testing.T, c Case[int]) {
-		ran[c.Name] = true
+		ran++
 		sum := 0
 		for i := range c.Input.Args {
 			sum += c.Input.Args.Int(t, i)
 		}
 		assert.Equal(t, c.Expected.Output, sum)
 	})
-	assert.True(t, ran["runShouldDecodeCaseAndInvokeCallback"])
-	assert.True(t, ran["runShouldDecodeNegativeValues"])
-	assert.True(t, ran["runShouldDecodeNamedArgs"])
+	assert.Equal(t, 3, ran, "every spec case must invoke the callback")
 }
 
 func TestRunContextMerge(t *testing.T) {

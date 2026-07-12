@@ -8,7 +8,7 @@ context:
     fsutil.FileSystemReader: testutil.FileSystemMockReader
     host.Sleep: testutil.SleepMock
 cases:
-  - name: detectShouldPrintOnlyTheResolvedProfile
+  - name: ShouldPrintOnlyTheResolvedProfile
     expected:
       stdOut: |
         cli/macos

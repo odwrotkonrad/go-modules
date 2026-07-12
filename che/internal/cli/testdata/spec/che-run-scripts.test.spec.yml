@@ -8,18 +8,18 @@ context:
     fsutil.FileSystemReader: testutil.FileSystemMockReader
     host.Sleep: testutil.SleepMock
 cases:
-  - name: runScriptsShouldExecEachScriptAndReportOk
+  - name: ShouldExecEachScriptAndReportOk
     expected:
       stdOut: |
         run-scripts: ${REPO}/install/unit
         run-scripts(report): ok ${REPO}/install/unit
-  - name: runScriptsShouldNarrowToMatchingName
+  - name: ShouldNarrowToMatchingName
     context:
       command: che run-scripts unit
     expected:
       stdOut: |
         run-scripts: ${REPO}/install/unit
-  - name: runScriptsShouldErrorWhenNameMatchesNothing
+  - name: ShouldErrorWhenNameMatchesNothing
     context:
       command: che run-scripts nonExistingScript
     expected:

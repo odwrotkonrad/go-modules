@@ -61,7 +61,6 @@ func (h Host) ResolveServices(names []string) ([]Service, error) {
 	return out, nil
 }
 
-// locate finds name's plist in the three known dirs (first hit).
 func (h Host) locate(name string) (plistSource, bool) {
 	cands := []plistSource{
 		{"Library/LaunchDaemons/" + name + ".plist.ontoHost.cp", ".ontoHost.cp", true},
@@ -76,7 +75,7 @@ func (h Host) locate(name string) (plistSource, bool) {
 	return plistSource{}, false
 }
 
-// Sleep paces the post-bootstrap settle and the bootout-gone poll; tests stub
+// Sleep paces the post-bootstrap settle and the bootout-gone poll, tests stub
 // it to a no-op.
 var Sleep = time.Sleep
 
@@ -125,8 +124,6 @@ func (s Service) waitGone() {
 }
 
 // Bootin bootstraps each service fresh from its plist. Does NOT auto-bootout.
-// A failing bootstrap is logged and the rest still run; failures join into the
-// returned error.
 func (h Host) Bootin(services []Service) error {
 	var errs []error
 	for _, s := range services {

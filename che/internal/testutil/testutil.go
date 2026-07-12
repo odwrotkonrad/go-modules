@@ -21,25 +21,19 @@ import (
 	"gitlab.com/konradodwrot/go-modules/lib/testyml"
 )
 
-// ansiRe matches SGR escape sequences (bold/reset) so assertions stay style-agnostic.
 var ansiRe = regexp.MustCompile(`\x1b\[[0-9;]*m`)
 
-// StripANSI removes SGR escape sequences, leaving plain text to assert against.
+// StripANSI removes SGR escape sequences so assertions stay style-agnostic.
 func StripANSI(s string) string { return ansiRe.ReplaceAllString(s, "") }
 
-// stampRe matches the leading HH:MM:SS.mmm log stamp on each line.
 var stampRe = regexp.MustCompile(`(?m)^\d{2}:\d{2}:\d{2}\.\d{3}: `)
 
 // StripStamps removes per-line log timestamps so adjacent lines assert as one block.
 func StripStamps(s string) string { return stampRe.ReplaceAllString(s, "") }
 
-// specsFS holds the checked-in che.yml fixtures.
-//
 //go:embed specs/*.yml
 var specsFS embed.FS
 
-// treesFS holds the checked-in repo file-tree fixtures.
-//
 //go:embed all:trees
 var treesFS embed.FS
 

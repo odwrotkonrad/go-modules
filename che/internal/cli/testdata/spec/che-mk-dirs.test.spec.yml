@@ -8,7 +8,7 @@ context:
     fsutil.FileSystemReader: testutil.FileSystemMockReader
     host.Sleep: testutil.SleepMock
 cases:
-  - name: mkDirsShouldCreateConfigDirsAndReapplySetgidChmod
+  - name: ShouldCreateConfigDirsAndReapplySetgidChmod
     expected:
       stdOut: |
         mkdir(create): ${HOME}/.config

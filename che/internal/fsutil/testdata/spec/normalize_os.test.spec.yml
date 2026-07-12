@@ -2,12 +2,12 @@
 context:
   function: fsutil.NormalizeOS
 cases:
-  - name: normalizeOsShouldMapDarwinToMacos
+  - name: ShouldMapDarwinToMacos
     input:
       args: [os: darwin]
     expected:
       output: macos
-  - name: normalizeOsShouldKeepLinux
+  - name: ShouldKeepLinux
     input:
       args: [os: linux]
     expected:

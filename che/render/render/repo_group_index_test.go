@@ -55,7 +55,7 @@ func TestRepoGroupIndexLeaf(t *testing.T) {
 	assert.Contains(t, got, "## Repo: ./beta")
 	assert.Contains(t, got, noPurposePlaceholder, "beta needs the placeholder")
 	assert.NotContains(t, got, "Subgroup:", "leaf must have no subgroup headings")
-	assert.Contains(t, got, `This is "leaf" directory with dirs structure containing repositories:`)
+	assert.Contains(t, got, `Repo index for "leaf". Directory tree:`)
 	assert.Less(t, strings.Index(got, "## Repo: ./alpha"), strings.Index(got, "## Repo: ./beta"), "repos must sort deterministically")
 }
 
@@ -70,7 +70,7 @@ func TestRepoGroupIndexParent(t *testing.T) {
 	assert.NotContains(t, got, "### Repositories", "child inline must carry no Repositories heading")
 	assert.Contains(t, got, "### Repo: ./child/gamma")
 	assert.Contains(t, got, "Gamma repo.")
-	assert.Equal(t, 1, strings.Count(got, "dirs structure"), "child inline must carry no tree")
+	assert.Equal(t, 1, strings.Count(got, "Directory tree"), "child inline must carry no tree")
 }
 
 func TestRepoGroupIndexWalk(t *testing.T) {

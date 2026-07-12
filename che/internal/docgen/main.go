@@ -18,10 +18,6 @@ import (
 	"gitlab.com/konradodwrot/go-modules/che/internal/spec"
 )
 
-// docgen renders che's reference docs from the Go source: the che.yml JSON
-// Schema (assets/data/che.schema.json) and the CLI reference (docs/cli.md).
-// Run from the repo root: `go run ./internal/docgen`.
-
 const (
 	schemaPath   = "assets/data/che.schema.json"
 	cliDocPath   = "docs/cli.md"
@@ -61,7 +57,6 @@ func splitSeg(desc, key string) (rest, val string) {
 	return rest, val
 }
 
-// tick wraps s in backticks ("" stays "").
 func tick(s string) string {
 	if s == "" {
 		return ""
@@ -138,7 +133,6 @@ func cliUsage(root *cobra.Command) string {
 	return b.String()
 }
 
-// sortedSubs lists cmd's available subcommands, name-sorted.
 func sortedSubs(cmd *cobra.Command) []*cobra.Command {
 	subs := slices.Clone(cmd.Commands())
 	subs = slices.DeleteFunc(subs, func(c *cobra.Command) bool { return !c.IsAvailableCommand() })

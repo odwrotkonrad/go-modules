@@ -7,7 +7,7 @@ context:
     fsutil.FileSystemReader: testutil.FileSystemMockReader
     host.Sleep: testutil.SleepMock
 cases:
-  - name: renderTemplatesShouldRenderAndInstallHostDest
+  - name: ShouldRenderAndInstallHostDest
     expected:
       stdOut: |
         archive: {{/.*/}}che-render-{{/.*/}}.tar.bz2

@@ -19,10 +19,8 @@ import (
 
 const cheRepoPwd = "testdata/fixture/commands/common/sample-tree"
 
-// repoEnv materializes the pwd fixture as a committed git repo with an on-disk
-// HOME, exports HOME + CHE_SKIP_EXEC_IF, and returns a fresh app (root built,
-// dirFlag pointed at the repo) so a.build() resolves against it. Skips as root
-// (build resolves $HOME).
+// repoEnv: pwd fixture as a committed git repo plus on-disk HOME, fresh app
+// pointed at it.
 func repoEnv(t *testing.T, pwd string) (*CheApp, *cobra.Command, string) {
 	t.Helper()
 	if os.Geteuid() == 0 {
@@ -42,10 +40,7 @@ func repoEnv(t *testing.T, pwd string) (*CheApp, *cobra.Command, string) {
 	return a, root, home
 }
 
-// setupMock wires the mock che repo with dry-run off, injects the safe-double
-// set (record-only writer, scoped reader, launchd-modeling executor, no-op
-// sleep) into every built Host, and runs a.build() so each command test starts
-// from resolved state. Returns the app, its root, and HOME.
+// setupMock: safe doubles in every built Host, a.build() already run.
 func setupMock(t *testing.T, pwd, profile string, decl map[string]string) (*CheApp, *cobra.Command, string) {
 	t.Helper()
 	a, root, home := repoEnv(t, pwd)

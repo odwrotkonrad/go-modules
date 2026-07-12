@@ -6,13 +6,10 @@ Spec-driven dotfile configuration loader: detects OS+arch+virt, resolves a profi
 
 ## Why It Exists
 
-Dotfile loading as shell scripts is fragile, imperative, host-specific. One declarative spec drives every host: the same configs repo loads onto any OS, arch, virt combination through profile selection. che and repo docs generation share one render implementation, so the render engine lives here, in its only consumer.
+Dotfile loading as shell scripts is fragile, imperative, host-specific. One declarative spec drives every host. The render engine lives here, in its only consumer: che and repo docs generation share one implementation.
 
 ## Goals
 
-- One `che.yml` spec declares files, dirs, installs, services per profile.
 - Idempotent host loading: symlink, copy, render, prune, verify.
 - Generated repo docs: `*.ontoRepo.tpl` rendering keeps agent files and README fresh.
-- Secrets stay in 1Password: op:// refs resolve only at render time.
-- One render engine for host and repo templates across all repos, drift detection via `--check`.
-- che releases ship the render CLIs alongside the `che` binary.
+- Releases ship the render CLIs alongside the `che` binary.

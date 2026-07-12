@@ -66,7 +66,6 @@ func New() *CheApp {
 // version is injected at build time via -ldflags -X.
 var version = "dev"
 
-// dryRunModes maps the --dry-run flag value to a config.DryRunMode.
 var dryRunModes = map[string]config.DryRunMode{
 	"":      config.DryRun.Off,
 	"delta": config.DryRun.Delta,
@@ -174,8 +173,7 @@ func (c *CheApp) ensurePlugin(p spec.PluginRef) (unit, bool, error) {
 	return u, true, nil
 }
 
-// withEnv runs fn with u.env exported into the process env (host values
-// shadowed), restoring the prior state after. No-op when u.env is empty.
+// withEnv runs fn with u.env exported (host values shadowed), restoring after.
 func (u unit) withEnv(fn func() error) error {
 	if len(u.env) == 0 {
 		return fn()
@@ -196,8 +194,7 @@ func (u unit) withEnv(fn func() error) error {
 	return fn()
 }
 
-// build loads spec -> lists eligible profiles -> resolves union -> wires the
-// host. Run in PersistentPreRunE before any subcommand RunE.
+// build loads the spec, resolves the eligible-profile union, wires the host.
 func (c *CheApp) build() error {
 	dir := cmp.Or(c.dirFlag, os.Getenv("CHE_DIR"))
 	if dir != "" {
@@ -226,13 +223,6 @@ func (c *CheApp) build() error {
 	if err != nil {
 		return err
 	}
-	// --profile (env CHE_PROFILE) runs only that profile, autoExec
-	// skipped but execIf still enforced; --skip-exec-if (env
-	// CHE_SKIP_EXEC_IF, truthy) makes every execIf pass; else the union of
-	// every autoExec profile passing execIf. --skip-plugins (env
-	// CHE_SKIP_PLUGINS, truthy) drops plugins entries, local repo only.
-	// --debug (env CHE_DEBUG, truthy) prints debug-level lines.
-	// Flags win over envs.
 	cfg := config.Config{
 		Dir:          dir,
 		DryRun:       mode,
@@ -281,11 +271,9 @@ func loadSpecValidated(path, mode string) (*spec.Raw, error) {
 	return spec.Load(path)
 }
 
-// buildPlugin ensures the plugin checkout (git ref: cache clone/pull; dir ref:
-// resolved local dir), loads its spec, then inside the entry's env overlay
-// gates on the remote profile's execIf (fail -> skipped, logged) and resolves
-// it anchored at the checkout, all against pluginCfg. Nested plugin refs
-// inside the remote profile are ignored (v1).
+// buildPlugin ensures the checkout (git ref: cache clone/pull, dir ref: local
+// dir), loads its spec, gates on execIf inside the entry's env overlay,
+// resolves anchored at the checkout. Nested plugin refs are ignored (v1).
 func (c *CheApp) buildPlugin(p spec.PluginRef) (unit, bool, error) {
 	checkout, err := pluginCheckout(p, c.pluginCfg.repoRoot, c.pluginCfg.home)
 	if err != nil {
@@ -319,8 +307,6 @@ func (c *CheApp) buildPlugin(p spec.PluginRef) (unit, bool, error) {
 	return u, true, nil
 }
 
-// pluginCheckout resolves p's repo dir: git URL -> managed cache clone/pull,
-// dir path -> resolved local dir (no ensure logs, no git).
 func pluginCheckout(p spec.PluginRef, repoRoot, home string) (string, error) {
 	if !p.IsPath {
 		return plugin.Ensure(home, p.URL, p.Profile)
@@ -328,8 +314,6 @@ func pluginCheckout(p spec.PluginRef, repoRoot, home string) (string, error) {
 	return resolvePluginDir(p.URL, repoRoot, home)
 }
 
-// resolvePluginDir expands a dir-path plugin ref: $VAR, then ~ -> home, then
-// relative -> joined onto the local repo root (the che.yml dir). The dir must exist.
 func resolvePluginDir(ref, repoRoot, home string) (string, error) {
 	dir := fsutil.ExpandHome(os.ExpandEnv(ref), home)
 	if dir == "~" {
@@ -344,8 +328,7 @@ func resolvePluginDir(ref, repoRoot, home string) (string, error) {
 	return dir, nil
 }
 
-// findRepoRoot resolves repo root from git toplevel of cwd, verifies che.yml
-// lives there (che's defining marker).
+// findRepoRoot: git toplevel of cwd, che.yml must live there (che's defining marker).
 func findRepoRoot() (string, error) {
 	dir, err := os.Getwd()
 	if err != nil {

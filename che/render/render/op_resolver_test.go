@@ -23,7 +23,6 @@ type SecretMockResolver struct {
 	Secret   string
 }
 
-// Resolve serves the scenario: fail FailLeft times, then Secret.
 func (m *SecretMockResolver) Resolve(_ context.Context, _ string) (string, error) {
 	m.Calls++
 	if m.FailLeft > 0 {

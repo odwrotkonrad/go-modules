@@ -11,7 +11,6 @@ import (
 	"gitlab.com/konradodwrot/go-modules/che/internal/execx"
 )
 
-// scriptResult pairs a script with its run status.
 type scriptResult struct {
 	script string
 	status string // "ok" | "fail"

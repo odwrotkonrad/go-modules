@@ -7,12 +7,12 @@ context:
     fsutil.FileSystemReader: testutil.FileSystemMockReader
     host.Sleep: testutil.SleepMock
 cases:
-  - name: runScriptsShouldExecEachScriptAndReportOk
+  - name: ShouldExecEachScriptAndReportOk
     expected:
       stdOut: |
         run-scripts: ${REPO}/install/unit
         run-scripts(report): ok ${REPO}/install/unit
-  - name: runScriptsShouldReportFailAndReturnError
+  - name: ShouldReportFailAndReturnError
     input:
       args: [failCmds: [install/unit]]
     expected:

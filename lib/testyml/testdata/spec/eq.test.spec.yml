@@ -2,19 +2,19 @@
 context:
   function: testyml.Eq
 cases:
-  - name: eqShouldAssertTypedOutput
+  - name: ShouldAssertTypedOutput
     input:
       args: [s: abc]
     expected:
       output: ABC
-  - name: eqShouldApplyContextEnv
+  - name: ShouldApplyContextEnv
     context:
       env: {TESTYML_EQ_ENV: from-env}
     input:
       args: [s: $TESTYML_EQ_ENV]
     expected:
       output: FROM-ENV
-  - name: eqShouldStopAtWantedError
+  - name: ShouldStopAtWantedError
     input:
       args: [s: abc, fail: true]
     expected:

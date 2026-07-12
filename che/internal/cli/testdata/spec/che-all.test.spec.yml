@@ -7,7 +7,7 @@ context:
     fsutil.FileSystemReader: testutil.FileSystemMockReader
     host.Sleep: testutil.SleepMock
 cases:
-  - name: allShouldRunEveryOpSelectedInSpec
+  - name: ShouldRunEveryOpSelectedInSpec
     context:
       pwd: testdata/fixture/commands/common/sample-tree
     expected:
@@ -61,7 +61,7 @@ cases:
         all(run): services ensure
         settle: 15s before pid check
         running: system/otelcol (pid 4242)
-  - name: allShouldSkipOpsWithoutSelection
+  - name: ShouldSkipOpsWithoutSelection
     context:
       pwd: testdata/fixture/commands/all/sample-tree-only-links
     expected:

@@ -40,8 +40,7 @@ func splitProfileArg(args []string) ([]string, string) {
 	return args, testutil.CheProfile
 }
 
-// TestCommands runs each subcommand with dry-run off against the safe-double
-// set: log lines assert the behavior, nothing touches the host.
+// TestCommands: dry-run off, safe-double set, log lines assert the behavior.
 func TestCommands(t *testing.T) {
 	specs, err := fs.Glob(td, "testdata/spec/*.test.spec.yml")
 	require.NoError(t, err)

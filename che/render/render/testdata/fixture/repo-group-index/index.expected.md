@@ -1,6 +1,6 @@
 # Repositories
 
-This is "test-group" directory with dirs structure containing repositories:
+Repo index for "test-group". Directory tree:
 
 ```
 che
@@ -9,9 +9,7 @@ tools/
   render-files
 ```
 
-This structure maps 1:1 to gitlab group "test-group"
-
-Beneath are descriptions and purpose of each repository:
+Maps 1:1 to gitlab group "test-group". Each repo's purpose follows.
 
 ## Repo: ./che
 

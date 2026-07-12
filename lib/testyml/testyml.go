@@ -19,9 +19,8 @@ import (
 	"gitlab.com/konradodwrot/go-modules/lib/yamlcfg"
 )
 
-// Context declares what a spec file or case runs against: the unit under test
-// (function or command) plus the world around it. File-level context deep-merges
-// under each case's own (case wins).
+// Context: the unit under test (function or command) plus the world around
+// it. File-level context deep-merges under each case's own (case wins).
 type Context struct {
 	Function         string            `yaml:"function"`
 	Command          string            `yaml:"command"`
@@ -39,12 +38,10 @@ func (c Context) CommandArgs() []string {
 	return f[1:]
 }
 
-// Input carries a case's arguments.
 type Input struct {
 	Args Args `yaml:"args"`
 }
 
-// arg is one input argument: an optional reader-facing name plus its value node.
 type arg struct {
 	name string
 	node yaml.Node
@@ -54,7 +51,6 @@ type arg struct {
 // argument. Names are for the reader, extraction is positional and typed.
 type Args []arg
 
-// UnmarshalYAML decodes a sequence of bare values or single-key naming maps.
 func (a *Args) UnmarshalYAML(node *yaml.Node) error {
 	var items []yaml.Node
 	if err := node.Decode(&items); err != nil {
@@ -80,7 +76,7 @@ func (a Args) Name(i int) string {
 	return a[i].name
 }
 
-// To decodes argument i into out; absent trailing arguments leave out untouched.
+// To decodes argument i into out, absent arguments leave out untouched.
 func (a Args) To(t *testing.T, i int, out any) {
 	t.Helper()
 	if i >= len(a) {
@@ -89,7 +85,6 @@ func (a Args) To(t *testing.T, i int, out any) {
 	require.NoErrorf(t, a[i].node.Decode(out), "args[%d] (%s)", i, a[i].name)
 }
 
-// String returns argument i as a string ("" when absent).
 func (a Args) String(t *testing.T, i int) string {
 	t.Helper()
 	var v string
@@ -97,7 +92,6 @@ func (a Args) String(t *testing.T, i int) string {
 	return v
 }
 
-// Bool returns argument i as a bool (false when absent).
 func (a Args) Bool(t *testing.T, i int) bool {
 	t.Helper()
 	var v bool
@@ -105,7 +99,6 @@ func (a Args) Bool(t *testing.T, i int) bool {
 	return v
 }
 
-// Int returns argument i as an int (0 when absent).
 func (a Args) Int(t *testing.T, i int) int {
 	t.Helper()
 	var v int
@@ -113,7 +106,6 @@ func (a Args) Int(t *testing.T, i int) int {
 	return v
 }
 
-// Strings returns argument i as a string list (nil when absent).
 func (a Args) Strings(t *testing.T, i int) []string {
 	t.Helper()
 	var v []string
@@ -132,16 +124,14 @@ type Expected[W any] struct {
 	Files       string   `yaml:"files"`
 }
 
-// IsErrorWanted reports whether the case expects the unit to fail: a non-zero
-// exitCode or error-message matchers (errorOutput/stdErr). A bare "expect any
-// error" is not expressible — every error case asserts something concrete.
+// IsErrorWanted: non-zero exitCode or error matchers (errorOutput/stdErr).
+// A bare "expect any error" is not expressible.
 func (e Expected[W]) IsErrorWanted() bool {
 	return e.ExitCode != 0 || len(e.ErrorOutput) > 0 || len(e.StdErr) > 0
 }
 
-// Check runs the standard error ladder. Error wanted: assert the message
-// matchers plus yamlcfg.Code when exitCode is set, return true (case done).
-// Otherwise require no error and return false.
+// Check runs the error ladder, returning true when the case is done (error
+// wanted and asserted).
 func (e Expected[W]) Check(t *testing.T, err error) bool {
 	t.Helper()
 	if !e.IsErrorWanted() {
@@ -160,7 +150,6 @@ func (e Expected[W]) Check(t *testing.T, err error) bool {
 	return true
 }
 
-// Case is the canonical spec case shape.
 type Case[W any] struct {
 	Name        string      `yaml:"name"`
 	Context     Context     `yaml:"context"`
@@ -169,8 +158,7 @@ type Case[W any] struct {
 	NotExpected Expected[W] `yaml:"notExpected"`
 }
 
-// Eq runs a function spec: applies the context env, calls fn, runs the error
-// ladder, asserts expected.output.
+// Eq runs a function spec: context env, error ladder, expected.output equality.
 func Eq[W any](t *testing.T, fsys fs.FS, path string, fn func(t *testing.T, c Case[W]) (W, error)) {
 	t.Helper()
 	Run(t, fsys, path, func(t *testing.T, c Case[W]) {
@@ -197,7 +185,6 @@ func Swap[T any](t testing.TB, ptr *T, v T) {
 // {{/regex/}} holes.
 type Matchers []string
 
-// UnmarshalYAML accepts a single matcher scalar or a matcher list.
 func (m *Matchers) UnmarshalYAML(node *yaml.Node) error {
 	if node.Kind == yaml.ScalarNode {
 		var s string
@@ -234,7 +221,6 @@ func IsMatch(s, matcher string) bool {
 	return compileMatcher(matcher).MatchString(s)
 }
 
-// MustMatch asserts s matches the matcher.
 func MustMatch(t *testing.T, s, matcher string) {
 	t.Helper()
 	if !IsMatch(s, matcher) {
@@ -242,7 +228,6 @@ func MustMatch(t *testing.T, s, matcher string) {
 	}
 }
 
-// MustNotMatch asserts s does not match the matcher.
 func MustNotMatch(t *testing.T, s, matcher string) {
 	t.Helper()
 	if IsMatch(s, matcher) {
@@ -250,12 +235,8 @@ func MustNotMatch(t *testing.T, s, matcher string) {
 	}
 }
 
-// Run decodes path's spec file ({context?, cases}) and runs fn per case as a
-// named subtest. Spec files are named <unit-under-test>.test.spec.yml. Each
-// case's context deep-merges over the file-level one (case wins) before the
-// strict decode into C; the resolved context must name a function or command,
-// its pwd must live under testdata/, and every case must carry
-// expected/notExpected/contains.
+// Run decodes path's spec file ({context?, cases}), strict-decodes each case
+// into C, runs fn per case as a named subtest.
 func Run[C any](t *testing.T, fsys fs.FS, path string, fn func(t *testing.T, c C)) {
 	t.Helper()
 	if !strings.HasSuffix(path, ".test.spec.yml") {
@@ -314,8 +295,6 @@ func requireWantKey(t *testing.T, path, name string, node *yaml.Node) {
 	t.Fatalf("%s: case %q: missing expected/notExpected", path, name)
 }
 
-// mergeCaseContext replaces the case's context with fileCtx deep-merged under
-// it (case wins) and validates the result names a function or command.
 func mergeCaseContext(t *testing.T, path, name string, fileCtx, node *yaml.Node) {
 	t.Helper()
 	merged := mergeNode(cloneNode(t, fileCtx), mapValue(node, "context"))
@@ -334,7 +313,6 @@ func mergeCaseContext(t *testing.T, path, name string, fileCtx, node *yaml.Node)
 	setMapValue(node, "context", merged)
 }
 
-// cloneNode deep-copies a yaml node via a marshal round-trip (nil for zero nodes).
 func cloneNode(t *testing.T, n *yaml.Node) *yaml.Node {
 	t.Helper()
 	if n == nil || n.Kind == 0 {
@@ -350,7 +328,6 @@ func cloneNode(t *testing.T, n *yaml.Node) *yaml.Node {
 	return doc.Content[0]
 }
 
-// mergeNode deep-merges mappings with over winning; non-mappings resolve to over.
 func mergeNode(base, over *yaml.Node) *yaml.Node {
 	if over == nil || over.Kind == 0 {
 		return base
@@ -406,7 +383,6 @@ func Expand(s string, vars map[string]string) string {
 	return s
 }
 
-// ReadFile returns the embedded fixture's content.
 func ReadFile(t *testing.T, fsys fs.FS, path string) string {
 	t.Helper()
 	b, err := fs.ReadFile(fsys, path)
@@ -414,13 +390,11 @@ func ReadFile(t *testing.T, fsys fs.FS, path string) string {
 	return string(b)
 }
 
-// EqualExpected asserts got equals the expected-file fixture's content.
 func EqualExpected(t *testing.T, fsys fs.FS, path, got string) {
 	t.Helper()
 	assert.Equal(t, ReadFile(t, fsys, path), got, "mismatch vs expected %s", path)
 }
 
-// CopyDir materializes an embedded fixture dir onto the real filesystem.
 func CopyDir(t *testing.T, fsys fs.FS, src, dest string) {
 	t.Helper()
 	err := fs.WalkDir(fsys, src, func(p string, d fs.DirEntry, err error) error {

@@ -2,28 +2,28 @@
 context:
   function: yamlcfg.LoadConfigNode
 cases:
-  - name: loadConfigNodeShouldExit13WhenNoConfigExists
+  - name: ShouldExit13WhenNoConfigExists
     input:
       args: []
     expected:
       exitCode: 13
-  - name: loadConfigNodeShouldExit12OnInvalidYaml
+  - name: ShouldExit12OnInvalidYaml
     input:
       args: [user: testdata/fixture/load_config/invalid.yml]
     expected:
       exitCode: 12
       errorOutput: [invalid config]
-  - name: loadConfigNodeShouldLoadUserOnlyConfig
+  - name: ShouldLoadUserOnlyConfig
     input:
       args: [user: testdata/fixture/load_config/user_only.yml]
     expected:
       files: testdata/fixture/load_config/user_only.expected.yml
-  - name: loadConfigNodeShouldDeepMergeSystemAndUser
+  - name: ShouldDeepMergeSystemAndUser
     input:
       args: [user: testdata/fixture/load_config/merge_user.yml, system: testdata/fixture/load_config/merge_system.yml]
     expected:
       files: testdata/fixture/load_config/merge.expected.yml
-  - name: loadConfigNodeShouldReturnNilNodeForEmptyFiles
+  - name: ShouldReturnNilNodeForEmptyFiles
     input:
       args: [user: testdata/fixture/load_config/empty.yml]
     expected:

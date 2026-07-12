@@ -1,40 +1,40 @@
 # [>] 🤖🤖
 cases:
-  - name: toolRunShouldPrintHelpForShortFlag
+  - name: ShouldPrintHelpForShortFlag
     context: {command: checkcmd -h}
     expected:
       exitCode: 0
-  - name: toolRunShouldPrintHelpForLongFlag
+  - name: ShouldPrintHelpForLongFlag
     context: {command: checkcmd --help}
     expected:
       exitCode: 0
-  - name: toolRunShouldEmitWithoutArgs
+  - name: ShouldEmitWithoutArgs
     context: {command: checkcmd}
     expected:
       exitCode: 0
-  - name: toolRunShouldRejectUnexpectedPositional
+  - name: ShouldRejectUnexpectedPositional
     context: {command: checkcmd x}
     expected:
       exitCode: 11
-  - name: toolRunShouldEmitWithRequiredArg
+  - name: ShouldEmitWithRequiredArg
     context: {command: checkcmd x}
     input:
       args: [needsArg: true]
     expected:
       exitCode: 0
-  - name: toolRunShouldRejectMissingRequiredArg
+  - name: ShouldRejectMissingRequiredArg
     context: {command: checkcmd}
     input:
       args: [needsArg: true]
     expected:
       exitCode: 11
-  - name: toolRunShouldRejectFlagAsRequiredArg
+  - name: ShouldRejectFlagAsRequiredArg
     context: {command: checkcmd -x}
     input:
       args: [needsArg: true]
     expected:
       exitCode: 11
-  - name: toolRunShouldRejectUnknownFlag
+  - name: ShouldRejectUnknownFlag
     context: {command: checkcmd --nope y}
     expected:
       exitCode: 11

@@ -29,7 +29,6 @@ func CacheDir() string {
 	return filepath.Join(xdg, "get-term-open-files-with")
 }
 
-// netErr is the CodeNetwork error every fetch/cache failure maps to.
 func netErr(url string) *yamlcfg.CodedError {
 	return &yamlcfg.CodedError{Code: yamlcfg.CodeNetwork, Msg: "network fetch failed: " + url}
 }
@@ -46,7 +45,6 @@ func fetchLanguages(url string) ([]byte, error) {
 	return body, nil
 }
 
-// download GETs url and writes the body to the cached path.
 func download(url, cached string) ([]byte, error) {
 	client := &http.Client{Timeout: 30 * time.Second}
 	res, err := client.Get(url)

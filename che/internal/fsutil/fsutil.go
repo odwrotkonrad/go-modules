@@ -29,7 +29,7 @@ type FileSystemWriter interface {
 }
 
 // FileSystemReader is the read surface host ops consult (settled checks,
-// prune scans, content diffs); OSReader is the real implementation, tests
+// prune scans, content diffs). OSReader is the real implementation, tests
 // swap in a fixture-scoped mock so live host state never leaks into results.
 type FileSystemReader interface {
 	Stat(path string) (os.FileInfo, error)
@@ -74,14 +74,12 @@ func (f FS) escalate(dest string, argv []string) []string {
 	return argv
 }
 
-// Mkdir makes one dir with mode. parents adds -p. mkdir builds its own
-// priv-escalated argv, so it runs the command directly rather than through Priv.
+// Mkdir runs its own priv-escalated argv (MkdirArgv), not through Priv.
 func (f FS) Mkdir(dest string, mode os.FileMode, parents bool) error {
 	return run(f.MkdirArgv(dest, mode, parents))
 }
 
-// MkdirArgv builds a mkdir argv, escalating per dest: root-tree -> sudo unless
-// root, HOME-tree -> direct. parents adds -p. mode 0 -> no -m (mkdir honors umask).
+// MkdirArgv builds a per-dest-escalated mkdir argv. mode 0 -> no -m (mkdir honors umask).
 func (f FS) MkdirArgv(dest string, mode os.FileMode, parents bool) []string {
 	argv := []string{"mkdir"}
 	if parents {
@@ -115,7 +113,6 @@ func (f FS) Remove(dest string) error {
 	return f.Priv(dest, "rm", "-f", dest)
 }
 
-// Chown applies owner[:group].
 func (f FS) Chown(owner, dest string) error {
 	return f.Priv(dest, "chown", owner, dest)
 }
@@ -162,7 +159,6 @@ func modeFlag(m os.FileMode) []string {
 	return []string{"-m", ModeArg(m)}
 }
 
-// IsDir reports whether p is an existing directory.
 func IsDir(p string) bool {
 	fi, err := os.Stat(p)
 	return err == nil && fi.IsDir()
@@ -176,8 +172,7 @@ func ExpandHome(p, home string) string {
 	return p
 }
 
-// openRepo opens the git repo containing dir (walking up for .git), returns it
-// plus worktree root.
+// openRepo opens the git repo containing dir (walking up for .git).
 func openRepo(dir string) (*git.Repository, string, error) {
 	repo, err := git.PlainOpenWithOptions(dir, &git.PlainOpenOptions{DetectDotGit: true})
 	if err != nil {

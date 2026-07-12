@@ -16,9 +16,8 @@ import (
 	"gitlab.com/konradodwrot/go-modules/che/internal/testutil"
 )
 
-// pluginEnv anchors a plugin test in hostRepo: skip-if-root, chdir in, temp
-// HOME, every CHE_* knob cleared, executor mocked (plugin git runs through the
-// go-git model, nothing spawns). Returns HOME.
+// pluginEnv anchors a plugin test in hostRepo: temp HOME, CHE_* cleared,
+// executor mocked. Returns HOME.
 func pluginEnv(t *testing.T, hostRepo string) string {
 	t.Helper()
 	if os.Geteuid() == 0 {

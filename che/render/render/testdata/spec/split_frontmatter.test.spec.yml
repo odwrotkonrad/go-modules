@@ -2,14 +2,14 @@
 context:
   function: render.SplitFrontmatter
 cases:
-  - name: splitFrontmatterShouldSplitFrontAndBody
+  - name: ShouldSplitFrontAndBody
     input:
       args: [file: testdata/fixture/split_frontmatter/doc.md]
     expected:
       output:
         frontFile: testdata/fixture/split_frontmatter/doc.front.expected.md
         bodyFile: testdata/fixture/split_frontmatter/doc.body.expected.md
-  - name: splitFrontmatterShouldReturnEmptyFrontWithoutFrontmatter
+  - name: ShouldReturnEmptyFrontWithoutFrontmatter
     input:
       args: [file: testdata/fixture/split_frontmatter/plain.md]
     expected:

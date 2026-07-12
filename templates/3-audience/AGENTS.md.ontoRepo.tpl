@@ -1,7 +1,5 @@
 # go-modules
 
-Go monorepo: che (+ render engine and CLIs), get-os-open-files-with, get-term-open-files-with, lib
-
 @assets/docs-agents/purpose.md
 
 {{ remoteFile "gitlab.com/konradodwrot/conventions//conventions/conventions.md" }}
