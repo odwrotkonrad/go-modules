@@ -13,103 +13,61 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"gitlab.com/konradodwrot/go-modules/che/internal/testutil"
+	"gitlab.com/konradodwrot/go-modules/lib/testyml"
 )
 
-func TestParseRemoteRef(t *testing.T) {
-	t.Run("bare host path", func(t *testing.T) {
-		got, err := parseRemoteRef("gitlab.com/konradodwrot/conventions//conventions/comments/convention.md")
-		require.NoError(t, err)
-		assert.Equal(t, "https://gitlab.com/konradodwrot/conventions.git", got.repoURL)
-		assert.Equal(t, "ssh://git@gitlab.com/konradodwrot/conventions.git", got.sshURL)
-		assert.Equal(t, "conventions/comments/convention.md", got.path)
-		assert.Empty(t, got.gitRef)
-	})
-	t.Run("ref query", func(t *testing.T) {
-		got, err := parseRemoteRef("github.com/foo/bar//docs/x.md?ref=v1.2.3")
-		require.NoError(t, err)
-		assert.Equal(t, "v1.2.3", got.gitRef)
-		assert.Equal(t, "docs/x.md", got.path)
-	})
-	t.Run("explicit scheme kept verbatim", func(t *testing.T) {
-		got, err := parseRemoteRef("file:///tmp/repo//a/b.md?ref=main")
-		require.NoError(t, err)
-		assert.Equal(t, "file:///tmp/repo", got.repoURL)
-		assert.Empty(t, got.sshURL)
-		assert.Equal(t, "a/b.md", got.path)
-		assert.Equal(t, "main", got.gitRef)
-	})
-	t.Run("errors", func(t *testing.T) {
-		for _, ref := range []string{"gitlab.com/x/y", "gitlab.com/x/y//", "//a.md", "gitlab.com/x/y//a.md?tag=v1"} {
-			_, err := parseRemoteRef(ref)
-			assert.Errorf(t, err, "parseRemoteRef(%q)", ref)
-		}
-	})
+// remoteRefWant is parse_remote_ref's expected.output: the parsed remoteRef fields.
+type remoteRefWant struct {
+	RepoURL string `yaml:"repoURL"`
+	SSHURL  string `yaml:"sshURL"`
+	Path    string `yaml:"path"`
+	GitRef  string `yaml:"gitRef"`
 }
 
-func TestRemoteFile(t *testing.T) {
-	url := "file://" + initRemoteFixture(t)
-
-	resolve := remoteFileResolver()
-
-	t.Run("default branch", func(t *testing.T) {
-		got, err := resolve(url + "//docs/note.md")
-		require.NoError(t, err)
-		assert.Equal(t, "main content\n", got)
-	})
-	t.Run("nested path", func(t *testing.T) {
-		got, err := resolve(url + "//docs/deep/inner.md")
-		require.NoError(t, err)
-		assert.Equal(t, "inner\n", got)
-	})
-	t.Run("branch ref", func(t *testing.T) {
-		got, err := resolve(url + "//docs/note.md?ref=feature")
-		require.NoError(t, err)
-		assert.Equal(t, "feature content\n", got)
-	})
-	t.Run("tag ref", func(t *testing.T) {
-		got, err := resolve(url + "//docs/note.md?ref=v1.0.0")
-		require.NoError(t, err)
-		assert.Equal(t, "main content\n", got)
-	})
-	t.Run("missing file", func(t *testing.T) {
-		_, err := resolve(url + "//docs/absent.md")
-		assert.Error(t, err)
-	})
-	t.Run("missing ref", func(t *testing.T) {
-		_, err := resolve(url + "//docs/note.md?ref=nope")
-		assert.Error(t, err)
+func TestParseRemoteRef(t *testing.T) {
+	testyml.Eq(t, td, "testdata/spec/funcs/parse_remote_ref.test.spec.yml", func(t *testing.T, c testyml.Case[remoteRefWant]) (remoteRefWant, error) {
+		got, err := parseRemoteRef(c.Input.Args.String(t, 0))
+		return remoteRefWant{RepoURL: got.repoURL, SSHURL: got.sshURL, Path: got.path, GitRef: got.gitRef}, err
 	})
 }
 
 func TestIsRemoteRef(t *testing.T) {
-	for ref, want := range map[string]bool{
-		"gitlab.com/acme/tools//snippets/agent.md":            true,
-		"file:///tmp/repo//a/b.md?ref=main":                   true,
-		"templates/agents/ro.md.ontoRepo.tpl":                 false,
-		"root/HOME/.config/claude/settings.json.ontoHost.tpl": false,
-		"gitlab.com/acme/tools":                               false,
-	} {
-		assert.Equal(t, want, IsRemoteRef(ref), "IsRemoteRef(%q)", ref)
-	}
+	testyml.Eq(t, td, "testdata/spec/funcs/is_remote_ref.test.spec.yml", func(t *testing.T, c testyml.Case[bool]) (bool, error) {
+		return IsRemoteRef(c.Input.Args.String(t, 0)), nil
+	})
+}
+
+func TestRemoteFile(t *testing.T) {
+	testyml.Eq(t, td, "testdata/spec/funcs/remote_file.test.spec.yml", func(t *testing.T, c testyml.Case[string]) (string, error) {
+		url := "file://" + initRemoteFixture(t)
+		return remoteFileResolver()(url + c.Input.Args.String(t, 0))
+	})
 }
 
 func TestNewRemoteFetcher(t *testing.T) {
-	url := "file://" + initRemoteFixture(t)
-	fetch := NewRemoteFetcher()
-	for range 2 { // second fetch hits the clone cache
-		got, err := fetch(url + "//docs/note.md")
-		require.NoError(t, err)
-		assert.Equal(t, "main content\n", got)
-	}
+	testyml.Run(t, td, "testdata/spec/funcs/new_remote_fetcher.test.spec.yml", func(t *testing.T, c testyml.Case[string]) {
+		url := "file://" + initRemoteFixture(t)
+		fetch := NewRemoteFetcher()
+		// [why] every fetch past the first must hit the shared clone cache
+		for range c.Input.Args.Int(t, 1) {
+			got, err := fetch(url + c.Input.Args.String(t, 0))
+			require.NoError(t, err)
+			assert.Equal(t, c.Expected.Output, got)
+		}
+	})
 }
 
 func TestExecRemoteFile(t *testing.T) {
-	url := "file://" + initRemoteFixture(t)
-	repoRoot := testutil.Repo(t, map[string]string{"x": "x"})
-	body := "{{ remoteFile \"" + url + "//docs/note.md\" }}"
-	got, err := Exec("t.tpl", []byte(body), repoRoot)
-	require.NoError(t, err)
-	assert.Contains(t, string(got), "main content")
+	testyml.Run(t, td, "testdata/spec/funcs/exec_remote_file.test.spec.yml", func(t *testing.T, c testyml.Case[string]) {
+		url := "file://" + initRemoteFixture(t)
+		repoRoot := testutil.Repo(t, map[string]string{"x": "x"})
+		body := testyml.Expand(c.Input.Args.String(t, 0), map[string]string{"URL": url})
+		got, err := Exec("t.tpl", []byte(body), repoRoot)
+		if c.Expected.Check(t, err) {
+			return
+		}
+		testyml.MustMatch(t, string(got), c.Expected.Output)
+	})
 }
 
 func initRemoteFixture(t *testing.T) string {

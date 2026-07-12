@@ -213,7 +213,7 @@ func assertMembership(t *testing.T, res Resolved, w *wantSet, present bool) {
 }
 
 func TestResolve(t *testing.T) {
-	testyml.Run(t, td, "testdata/spec/resolve.test.spec.yml", func(t *testing.T, c resolveCase) {
+	testyml.Run(t, td, "testdata/spec/funcs/resolve.test.spec.yml", func(t *testing.T, c resolveCase) {
 		dir := t.TempDir()
 		testyml.CopyDir(t, td, c.Context.Pwd, dir)
 		if name := c.Input.Args.String(t, 0); name != "" {
@@ -236,7 +236,7 @@ func TestResolve(t *testing.T) {
 }
 
 func TestEligibleProfiles(t *testing.T) {
-	testyml.Eq(t, td, "testdata/spec/eligible_profiles.test.spec.yml", func(t *testing.T, c testyml.Case[[]string]) ([]string, error) {
+	testyml.Eq(t, td, "testdata/spec/funcs/eligible_profiles.test.spec.yml", func(t *testing.T, c testyml.Case[[]string]) ([]string, error) {
 		a := c.Input.Args
 		dir := testutil.Tree(t, map[string]string{"che.yml": testutil.Spec(t, a.String(t, 0))})
 		s, err := Load(filepath.Join(dir, "che.yml"))

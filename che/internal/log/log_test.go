@@ -40,9 +40,10 @@ type msgWant struct {
 	Text    string `yaml:"text"`
 }
 
+var modes = map[string]DryRun{"off": Off, "delta": Delta, "all": All}
+
 func TestMsg(t *testing.T) {
-	modes := map[string]DryRun{"off": Off, "delta": Delta, "all": All}
-	testyml.Run(t, td, "testdata/spec/msg.test.spec.yml", func(t *testing.T, c testyml.Case[msgWant]) {
+	testyml.Run(t, td, "testdata/spec/funcs/msg.test.spec.yml", func(t *testing.T, c testyml.Case[msgWant]) {
 		a := c.Input.Args
 		title, msg := a.String(t, 0), a.String(t, 1)
 		mode, ok := modes[a.String(t, 2)]
@@ -65,16 +66,32 @@ func TestMsg(t *testing.T) {
 	})
 }
 
-func TestDebugGateOff(t *testing.T) {
-	t.Cleanup(func() { SetDebug(false) })
-	SetDebug(false)
-	out := capture(t, func() { Debug("plugin(p)", "run x", Off) })
-	assert.Empty(t, out, "Debug with gate off must print nothing")
-}
-
-func TestBoldEmitted(t *testing.T) {
-	out := capture(t, func() { Msg("ln", "/x", Off) })
-	assert.Contains(t, out, "\x1b[1mln\x1b[", "output must bold the type")
+// TestMsgRaw asserts the raw emitted bytes: the debug gate silences Debug,
+// Msg bolds the type.
+func TestMsgRaw(t *testing.T) {
+	testyml.Run(t, td, "testdata/spec/funcs/msg_raw.test.spec.yml", func(t *testing.T, c testyml.Case[string]) {
+		a := c.Input.Args
+		mode, ok := modes[a.String(t, 2)]
+		require.Truef(t, ok, "unknown mode %q", a.String(t, 2))
+		var out string
+		switch c.Context.Function {
+		case "log.Msg":
+			out = capture(t, func() { Msg(a.String(t, 0), a.String(t, 1), mode) })
+		case "log.Debug":
+			t.Cleanup(func() { SetDebug(false) })
+			SetDebug(false)
+			out = capture(t, func() { Debug(a.String(t, 0), a.String(t, 1), mode) })
+		default:
+			t.Fatalf("unknown function %q", c.Context.Function)
+		}
+		if len(c.Expected.StdOut) > 0 {
+			for _, m := range c.Expected.StdOut {
+				testyml.MustMatch(t, out, m)
+			}
+			return
+		}
+		assert.Equal(t, c.Expected.Output, out)
+	})
 }
 
 // [<] 🤖🤖

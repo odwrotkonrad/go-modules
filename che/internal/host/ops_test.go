@@ -107,7 +107,7 @@ func seedBrokenLink(t *testing.T, h Host) string {
 // TestOps: dry-run off, record-only writer + mock executor, log lines assert
 // the behavior.
 func TestOps(t *testing.T) {
-	specs, err := fs.Glob(td, "testdata/spec/*.test.spec.yml")
+	specs, err := fs.Glob(td, "testdata/spec/cmds/che-*.test.spec.yml")
 	require.NoError(t, err)
 	require.NotEmpty(t, specs)
 	run := func(t *testing.T, c testyml.Case[struct{}]) {

@@ -1,0 +1,15 @@
+# [>] 🤖🤖
+context:
+  function: climain.HelpVersion
+cases:
+  - name: ShouldPrintUsageForLongHelpFlag
+    input:
+      args: [argv: ["--help"]]
+    expected:
+      output: {usage: true, done: true}
+  - name: ShouldPrintUsageForShortHelpFlag
+    input:
+      args: [argv: ["-h"]]
+    expected:
+      output: {usage: true, done: true}
+# [<] 🤖🤖

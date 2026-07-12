@@ -1,0 +1,10 @@
+# [>] 🤖🤖
+context:
+  function: testyml.Swap
+cases:
+  - name: ShouldSwapValueForTestDuration
+    input:
+      args: [value: after]
+    expected:
+      output: after
+# [<] 🤖🤖

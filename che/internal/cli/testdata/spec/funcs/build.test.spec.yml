@@ -1,0 +1,75 @@
+# [>] 🤖🤖
+context:
+  function: build
+  pwd: testdata/fixture/commands/common/sample-tree
+cases:
+  - name: ShouldForceOneDefinedProfileWithProfileFlag
+    input:
+      args:
+        - profile: ontoRepo
+    expected:
+      output:
+        profile: ontoRepo
+        dryRunAll: false
+  - name: ShouldErrorOnUndefinedProfileFlag
+    input:
+      args:
+        - profile: nonexistent
+    expected:
+      errorOutput: '--profile "nonexistent" is not defined in che.yml'
+  - name: ShouldWarnNotFailOnSpecViolationByDefault
+    input:
+      args:
+        - profile: ""
+        - validateSpecMode: ""
+        - appendSpec: |
+            bogusProfile:
+              includes:
+                link: [HOME/**]
+    expected:
+      output:
+        profile: cli/macos,desktop/macos
+        dryRunAll: false
+  - name: ShouldFailOnSpecViolationWithValidateSpecErrorFlag
+    input:
+      args:
+        - profile: ""
+        - validateSpecMode: error
+        - appendSpec: |
+            bogusProfile:
+              includes:
+                link: [HOME/**]
+    expected:
+      errorOutput:
+        - schema violations in
+        - includes
+  - name: ShouldFailOnSpecViolationWithValidateSpecErrorEnv
+    context:
+      env: {CHE_VALIDATE_SPEC: error}
+    input:
+      args:
+        - profile: ""
+        - validateSpecMode: ""
+        - appendSpec: |
+            bogusProfile:
+              includes:
+                link: [HOME/**]
+    expected:
+      errorOutput:
+        - schema violations in
+        - includes
+  - name: ShouldErrorOnUnknownValidateSpecMode
+    input:
+      args:
+        - profile: ""
+        - validateSpecMode: bogus
+    expected:
+      errorOutput: invalid --validate-spec mode
+  - name: ShouldReadDryRunModeFromEnvWhenFlagUnset
+    context:
+      env: {CHE_DRY_RUN: all}
+    expected:
+      output:
+        profile: cli/macos,desktop/macos
+        dryRunAll: true
+# [<] 🤖🤖

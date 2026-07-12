@@ -3,6 +3,7 @@ package main
 // [>] 🤖🤖
 
 import (
+	"embed"
 	"os"
 	"path/filepath"
 	"strings"
@@ -14,7 +15,11 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"gitlab.com/konradodwrot/go-modules/che/internal/spec"
+	"gitlab.com/konradodwrot/go-modules/lib/testyml"
 )
+
+//go:embed all:testdata
+var td embed.FS
 
 func compileSchema(t *testing.T) *jsonschema.Schema {
 	t.Helper()
@@ -30,110 +35,75 @@ func yamlInstance(t *testing.T, b []byte) any {
 	return inst
 }
 
-// TestSchemaValidatesRealSpecs validates the repo's own che.yml, every
-// testutil fixture, and every sibling-repo che.yml reachable in the local
-// workspace checkout.
-func TestSchemaValidatesRealSpecs(t *testing.T) {
-	sch := compileSchema(t)
-	paths := []string{"../../../che.yml"}
-	fixtures, err := filepath.Glob("../testutil/specs/*.yml")
-	require.NoError(t, err)
-	paths = append(paths, fixtures...)
-	for _, pattern := range []string{"../../../../*/che.yml", "../../../../*/*/che.yml", "../../../../*/*/*/che.yml"} {
-		hits, err := filepath.Glob(pattern)
-		require.NoError(t, err)
-		paths = append(paths, hits...)
-	}
-	for _, p := range paths {
-		t.Run(p, func(t *testing.T) {
-			b, err := os.ReadFile(p)
+// TestSchemaValidate drives the compiled schema per arg shape: doc (inline
+// snippet), path (one file), globs (repo fixtures + every sibling-repo
+// che.yml reachable in the local workspace checkout), docExample (the first
+// yaml fence after docs/spec.md's Full Example heading).
+func TestSchemaValidate(t *testing.T) {
+	testyml.Run(t, td, "testdata/spec/funcs/schema_validate.test.spec.yml", func(t *testing.T, c testyml.Case[bool]) {
+		sch := compileSchema(t)
+		a := c.Input.Args
+		valid := func(b []byte) bool { return sch.Validate(yamlInstance(t, b)) == nil }
+		switch a.Name(0) {
+		case "doc":
+			assert.Equal(t, c.Expected.Output, valid([]byte(a.String(t, 0))))
+		case "path":
+			b, err := os.ReadFile(a.String(t, 0))
 			require.NoError(t, err)
-			assert.NoErrorf(t, sch.Validate(yamlInstance(t, b)), "schema rejects %s", p)
-		})
-	}
+			assert.Equal(t, c.Expected.Output, valid(b))
+		case "globs":
+			for _, pattern := range a.Strings(t, 0) {
+				hits, err := filepath.Glob(pattern)
+				require.NoError(t, err)
+				for _, p := range hits {
+					b, err := os.ReadFile(p)
+					require.NoError(t, err)
+					assert.Equalf(t, c.Expected.Output, valid(b), "schema verdict for %s", p)
+				}
+			}
+		case "docExample":
+			b, err := os.ReadFile(a.String(t, 0))
+			require.NoError(t, err)
+			_, rest, ok := strings.Cut(string(b), "## Full Example")
+			require.True(t, ok, "no Full Example section")
+			_, rest, ok = strings.Cut(rest, "```yaml\n")
+			require.True(t, ok, "no yaml fence in Full Example")
+			example, _, ok := strings.Cut(rest, "```")
+			require.True(t, ok, "unclosed yaml fence in Full Example")
+			assert.Equal(t, c.Expected.Output, valid([]byte(example)))
+		default:
+			t.Fatalf("unknown arg %q", a.Name(0))
+		}
+	})
 }
 
-// TestSpecDocExampleValidates keeps docs/spec.md's Full Example schema-valid:
-// the first yaml fence after the Full Example heading must pass.
-func TestSpecDocExampleValidates(t *testing.T) {
-	b, err := os.ReadFile("../../docs/spec.md")
-	require.NoError(t, err)
-	_, rest, ok := strings.Cut(string(b), "## Full Example")
-	require.True(t, ok, "docs/spec.md: no Full Example section")
-	_, rest, ok = strings.Cut(rest, "```yaml\n")
-	require.True(t, ok, "docs/spec.md: no yaml fence in Full Example")
-	example, _, ok := strings.Cut(rest, "```")
-	require.True(t, ok, "docs/spec.md: unclosed yaml fence in Full Example")
-	assert.NoError(t, compileSchema(t).Validate(yamlInstance(t, []byte(example))), "schema rejects the Full Example")
-}
-
-// TestSchemaRejectsInvalidSpecs guards the schema against loosening: each
-// snippet violates one constraint the parser enforces.
-func TestSchemaRejectsInvalidSpecs(t *testing.T) {
-	sch := compileSchema(t)
-	cases := map[string]string{
-		"bogus writeType": `
-p:
-  include:
-    renderTemplates:
-      - files:
-          - source: templates/a.tpl
-            dest:
-              - {path: a.md, options: {writeType: bogus}}
-`,
-		"plugin ref without ::profile": `
-p:
-  plugins:
-    - ./plugin
-`,
-		"unknown profile key": `
-p:
-  includes:
-    link: [HOME/**]
-`,
-		"file entry without source": `
-p:
-  include:
-    copy:
-      - files:
-          - {dest: [~/.config/a]}
-`,
-		"non-octal chmod": `
-p:
-  include:
-    mkdirs:
-      - chmod: rwxr-xr-x
-        files: [HOME/.cache]
-`,
-		"mixinProfiles not a list": `
-p:
-  mixinProfiles: base
-`,
-	}
-	for name, doc := range cases {
-		t.Run(name, func(t *testing.T) {
-			assert.Errorf(t, sch.Validate(yamlInstance(t, []byte(doc))), "schema accepts invalid spec: %s", name)
-		})
-	}
+type flagDef struct {
+	Type  string `yaml:"type"`
+	Name  string `yaml:"name"`
+	Short string `yaml:"short"`
+	Usage string `yaml:"usage"`
 }
 
 func TestOptionsTable(t *testing.T) {
-	fs := pflag.NewFlagSet("t", pflag.ContinueOnError)
-	var dir, mode string
-	var toggle bool
-	fs.StringVarP(&dir, "dir", "C", "", "change dir; env: X_DIR")
-	fs.StringVar(&mode, "mode", "", "pick mode; values: a (one) | b (two); default: off; env: X_MODE")
-	fs.BoolVar(&toggle, "toggle", false, "flip it")
-	got := optionsTable(fs)
-	want := []string{
-		"| Option | Env | Values | Default | Description |",
-		"| `-C`, `--dir` | `X_DIR` | `string` |  | change dir |",
-		"| `--mode` | `X_MODE` | `a (one)` \\| `b (two)` | `off` | pick mode |",
-		"| `--toggle` |  | `bool` | `false` | flip it |",
-	}
-	for _, w := range want {
-		assert.Contains(t, got, w+"\n", "optionsTable row")
-	}
+	testyml.Run(t, td, "testdata/spec/funcs/options_table.test.spec.yml", func(t *testing.T, c testyml.Case[[]string]) {
+		var defs []flagDef
+		c.Input.Args.To(t, 0, &defs)
+		fs := pflag.NewFlagSet("t", pflag.ContinueOnError)
+		for _, d := range defs {
+			switch d.Type {
+			case "string":
+				fs.StringP(d.Name, d.Short, "", d.Usage)
+			case "bool":
+				fs.BoolP(d.Name, d.Short, false, d.Usage)
+			default:
+				t.Fatalf("unknown flag type %q", d.Type)
+			}
+		}
+		got := optionsTable(fs)
+		for _, w := range c.Expected.Output {
+			assert.Contains(t, got, w+"\n", "optionsTable row")
+		}
+	})
 }
 
 // [<] 🤖🤖

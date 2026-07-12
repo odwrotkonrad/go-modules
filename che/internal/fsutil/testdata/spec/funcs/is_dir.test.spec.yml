@@ -1,0 +1,20 @@
+# [>] 🤖🤖
+context:
+  function: fsutil.IsDir
+cases:
+  - name: ShouldBeTrueForDirectory
+    input:
+      args: [target: dir]
+    expected:
+      output: true
+  - name: ShouldBeFalseForFile
+    input:
+      args: [target: file]
+    expected:
+      output: false
+  - name: ShouldBeFalseForMissingPath
+    input:
+      args: [target: missing]
+    expected:
+      output: false
+# [<] 🤖🤖

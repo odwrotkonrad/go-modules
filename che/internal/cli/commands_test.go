@@ -42,7 +42,7 @@ func splitProfileArg(args []string) ([]string, string) {
 
 // TestCommands: dry-run off, safe-double set, log lines assert the behavior.
 func TestCommands(t *testing.T) {
-	specs, err := fs.Glob(td, "testdata/spec/*.test.spec.yml")
+	specs, err := fs.Glob(td, "testdata/spec/cmds/che-*.test.spec.yml")
 	require.NoError(t, err)
 	require.NotEmpty(t, specs)
 	run := func(t *testing.T, c testyml.Case[struct{}]) {

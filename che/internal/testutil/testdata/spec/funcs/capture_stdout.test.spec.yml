@@ -1,0 +1,10 @@
+# [>] 🤖
+context:
+  function: testutil.CaptureStdout
+cases:
+  - name: ShouldReturnPrintedOutput
+    input:
+      args: [text: hello]
+    expected:
+      output: hello
+# [<] 🤖

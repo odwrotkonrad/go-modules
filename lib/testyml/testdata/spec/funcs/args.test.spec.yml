@@ -1,0 +1,19 @@
+# [>] 🤖🤖
+context:
+  function: testyml.Args
+cases:
+  - name: ShouldExtractNamedBareAndTypedArgs
+    input:
+      args: [pattern: "a/**", 7, flag: true, list: [x, y], users: {ko: 501}]
+    expected:
+      output:
+        name0: pattern
+        name1: ""
+        str0: a/**
+        int1: 7
+        bool2: true
+        strings3: [x, y]
+        users4: {ko: 501}
+        str9: ""
+        bool9: false
+# [<] 🤖🤖

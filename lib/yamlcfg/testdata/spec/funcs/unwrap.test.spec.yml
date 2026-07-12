@@ -1,0 +1,15 @@
+# [>] 🤖🤖
+context:
+  function: yamlcfg.Unwrap
+cases:
+  - name: ShouldReturnSameNonDocumentNode
+    input:
+      args: [nilNode: false]
+    expected:
+      output: true
+  - name: ShouldReturnNilForNilNode
+    input:
+      args: [nilNode: true]
+    expected:
+      output: true
+# [<] 🤖🤖

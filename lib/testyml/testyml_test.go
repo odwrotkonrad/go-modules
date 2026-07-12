@@ -12,7 +12,6 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-	"gopkg.in/yaml.v3"
 
 	"gitlab.com/konradodwrot/go-modules/lib/yamlcfg"
 )
@@ -22,7 +21,7 @@ var td embed.FS
 
 func TestRun(t *testing.T) {
 	ran := 0
-	Run(t, td, "testdata/spec/run.test.spec.yml", func(t *testing.T, c Case[int]) {
+	Run(t, td, "testdata/spec/funcs/run.test.spec.yml", func(t *testing.T, c Case[int]) {
 		ran++
 		sum := 0
 		for i := range c.Input.Args {
@@ -40,7 +39,7 @@ func TestRunContextMerge(t *testing.T) {
 		Env      map[string]string `yaml:"env"`
 		Mock     string            `yaml:"mock"`
 	}
-	Run(t, td, "testdata/spec/merge_case_context.test.spec.yml", func(t *testing.T, c Case[view]) {
+	Run(t, td, "testdata/spec/funcs/merge_case_context.test.spec.yml", func(t *testing.T, c Case[view]) {
 		got := view{
 			Function: c.Context.Function,
 			Pwd:      c.Context.Pwd,
@@ -52,7 +51,7 @@ func TestRunContextMerge(t *testing.T) {
 }
 
 func TestMatchers(t *testing.T) {
-	Run(t, td, "testdata/spec/must_match.test.spec.yml", func(t *testing.T, c Case[struct{}]) {
+	Run(t, td, "testdata/spec/funcs/must_match.test.spec.yml", func(t *testing.T, c Case[struct{}]) {
 		s := c.Input.Args.String(t, 0)
 		for _, m := range c.Expected.StdOut {
 			MustMatch(t, s, m)
@@ -64,7 +63,7 @@ func TestMatchers(t *testing.T) {
 }
 
 func TestCheck(t *testing.T) {
-	Run(t, td, "testdata/spec/expected_check.test.spec.yml", func(t *testing.T, c Case[struct{}]) {
+	Run(t, td, "testdata/spec/funcs/expected_check.test.spec.yml", func(t *testing.T, c Case[struct{}]) {
 		var err error
 		if code := c.Input.Args.Int(t, 0); code != 0 {
 			err = &yamlcfg.CodedError{Code: code, Msg: c.Input.Args.String(t, 1)}
@@ -74,7 +73,7 @@ func TestCheck(t *testing.T) {
 }
 
 func TestEq(t *testing.T) {
-	Eq(t, td, "testdata/spec/eq.test.spec.yml", func(t *testing.T, c Case[string]) (string, error) {
+	Eq(t, td, "testdata/spec/funcs/eq.test.spec.yml", func(t *testing.T, c Case[string]) (string, error) {
 		if c.Input.Args.Bool(t, 1) {
 			return "", errors.New("stub fail")
 		}
@@ -83,62 +82,81 @@ func TestEq(t *testing.T) {
 }
 
 func TestArgs(t *testing.T) {
-	var in Input
-	raw := `args: [pattern: "a/**", 7, flag: true, list: [x, y], users: {ko: 501}]`
-	require.NoError(t, yaml.Unmarshal([]byte(raw), &in))
-	assert.Equal(t, "pattern", in.Args.Name(0))
-	assert.Equal(t, "", in.Args.Name(1))
-	assert.Equal(t, "a/**", in.Args.String(t, 0))
-	assert.Equal(t, 7, in.Args.Int(t, 1))
-	assert.True(t, in.Args.Bool(t, 2))
-	assert.Equal(t, []string{"x", "y"}, in.Args.Strings(t, 3))
-	var users map[string]int
-	in.Args.To(t, 4, &users)
-	assert.Equal(t, map[string]int{"ko": 501}, users)
-	assert.Equal(t, "", in.Args.String(t, 9))
-	assert.False(t, in.Args.Bool(t, 9))
+	type view struct {
+		Name0    string         `yaml:"name0"`
+		Name1    string         `yaml:"name1"`
+		Str0     string         `yaml:"str0"`
+		Int1     int            `yaml:"int1"`
+		Bool2    bool           `yaml:"bool2"`
+		Strings3 []string       `yaml:"strings3"`
+		Users4   map[string]int `yaml:"users4"`
+		Str9     string         `yaml:"str9"`
+		Bool9    bool           `yaml:"bool9"`
+	}
+	Run(t, td, "testdata/spec/funcs/args.test.spec.yml", func(t *testing.T, c Case[view]) {
+		a := c.Input.Args
+		got := view{
+			Name0:    a.Name(0),
+			Name1:    a.Name(1),
+			Str0:     a.String(t, 0),
+			Int1:     a.Int(t, 1),
+			Bool2:    a.Bool(t, 2),
+			Strings3: a.Strings(t, 3),
+			Str9:     a.String(t, 9),
+			Bool9:    a.Bool(t, 9),
+		}
+		a.To(t, 4, &got.Users4)
+		assert.Equal(t, c.Expected.Output, got)
+	})
 }
 
 func TestSwap(t *testing.T) {
 	v := "before"
-	t.Run("inner", func(t *testing.T) {
-		Swap(t, &v, "after")
-		assert.Equal(t, "after", v)
+	Run(t, td, "testdata/spec/funcs/swap.test.spec.yml", func(t *testing.T, c Case[string]) {
+		Swap(t, &v, c.Input.Args.String(t, 0))
+		assert.Equal(t, c.Expected.Output, v)
 	})
 	assert.Equal(t, "before", v)
 }
 
 func TestMatch(t *testing.T) {
-	assert.True(t, IsMatch("ln(create): /etc/zshrc", "ln(create)"))
-	assert.True(t, IsMatch("ln(create): /etc/zshrc", `ln(create): /etc/{{/\w+/}}`))
-	assert.False(t, IsMatch("ln(create): /etc/zshrc", "ln.create."), "literal dots must not act as regex")
-	assert.False(t, IsMatch("cp: /x", "ln(create)"))
+	Eq(t, td, "testdata/spec/funcs/is_match.test.spec.yml", func(t *testing.T, c Case[bool]) (bool, error) {
+		return IsMatch(c.Input.Args.String(t, 0), c.Input.Args.String(t, 1)), nil
+	})
 }
 
 func TestCommandArgs(t *testing.T) {
-	assert.Equal(t, []string{"services", "bootout"}, Context{Command: "che services bootout"}.CommandArgs())
-	assert.Nil(t, Context{Command: "che"}.CommandArgs())
-	assert.Nil(t, Context{}.CommandArgs())
+	Eq(t, td, "testdata/spec/funcs/command_args.test.spec.yml", func(t *testing.T, c Case[[]string]) ([]string, error) {
+		return Context{Command: c.Input.Args.String(t, 0)}.CommandArgs(), nil
+	})
 }
 
 func TestExpand(t *testing.T) {
-	got := Expand("${HOME}/x ${REPO}/y ${MISS}", map[string]string{"HOME": "/h", "REPO": "/r"})
-	assert.Equal(t, "/h/x /r/y ${MISS}", got)
+	Eq(t, td, "testdata/spec/funcs/expand.test.spec.yml", func(t *testing.T, c Case[string]) (string, error) {
+		var vars map[string]string
+		c.Input.Args.To(t, 1, &vars)
+		return Expand(c.Input.Args.String(t, 0), vars), nil
+	})
 }
 
 func TestReadFileExpected(t *testing.T) {
-	assert.Equal(t, "expected body\n", ReadFile(t, td, "testdata/fixture/common/expected.txt"))
-	EqualExpected(t, td, "testdata/fixture/common/expected.txt", "expected body\n")
+	Run(t, td, "testdata/spec/funcs/read_file.test.spec.yml", func(t *testing.T, c Case[string]) {
+		got := ReadFile(t, td, c.Input.Args.String(t, 0))
+		assert.Equal(t, c.Expected.Output, got)
+		EqualExpected(t, td, c.Input.Args.String(t, 0), got)
+	})
 }
 
 func TestCopyDir(t *testing.T) {
-	dest := t.TempDir()
-	CopyDir(t, td, "testdata/fixture/common/tree-nested", dest)
-	for rel, want := range map[string]string{"top.txt": "top\n", "dir/inner.txt": "inner\n"} {
-		b, err := os.ReadFile(filepath.Join(dest, rel))
-		require.NoError(t, err)
-		assert.Equal(t, want, string(b), rel)
-	}
+	Run(t, td, "testdata/spec/funcs/copy_dir.test.spec.yml", func(t *testing.T, c Case[map[string]string]) {
+		dest := t.TempDir()
+		CopyDir(t, td, c.Input.Args.String(t, 0), dest)
+		for rel, want := range c.Expected.Output {
+			b, err := os.ReadFile(filepath.Join(dest, rel))
+			require.NoError(t, err)
+			assert.Equal(t, want, string(b), rel)
+		}
+	})
 }
 
 // [<] 🤖🤖

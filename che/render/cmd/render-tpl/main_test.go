@@ -13,7 +13,7 @@ import (
 var td embed.FS
 
 func TestRun(t *testing.T) {
-	testyml.Run(t, td, "testdata/spec/render-tpl.test.spec.yml", func(t *testing.T, c testyml.Case[struct{}]) {
+	testyml.Run(t, td, "testdata/spec/cmds/render-tpl.test.spec.yml", func(t *testing.T, c testyml.Case[struct{}]) {
 		dir := t.TempDir()
 		if c.Context.Pwd != "" {
 			testyml.CopyDir(t, td, c.Context.Pwd, dir)

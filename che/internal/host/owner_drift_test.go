@@ -42,7 +42,7 @@ func swapLookups(t *testing.T, users, groups map[string]int) {
 }
 
 func TestIsOwnerDrifted(t *testing.T) {
-	testyml.Eq(t, td, "testdata/spec/unit/is_owner_drifted.test.spec.yml", func(t *testing.T, c testyml.Case[bool]) (bool, error) {
+	testyml.Eq(t, td, "testdata/spec/funcs/is_owner_drifted.test.spec.yml", func(t *testing.T, c testyml.Case[bool]) (bool, error) {
 		testutil.RequireRegistered(t, c.Context.MockedInterfaces)
 		a := c.Input.Args
 		var users, groups map[string]int

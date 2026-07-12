@@ -1,0 +1,18 @@
+# [>] 🤖🤖
+context:
+  function: render.DirsTree
+cases:
+  - name: ShouldRenderTrackedDirTree
+    input:
+      args:
+        - files:
+            top: x
+            .hidden/file: x
+            docs/data/x: x
+            src/lib/y: x
+    expected:
+      files: testdata/fixture/dirs-tree/expected.tree
+  - name: ShouldErrorOutsideGitRepo
+    expected:
+      errorOutput: ['open git repo from']
+# [<] 🤖🤖

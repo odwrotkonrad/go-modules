@@ -17,8 +17,6 @@ import (
 	"gitlab.com/konradodwrot/go-modules/lib/testyml"
 )
 
-const cheRepoPwd = "testdata/fixture/commands/common/sample-tree"
-
 // repoEnv: pwd fixture as a committed git repo plus on-disk HOME, fresh app
 // pointed at it.
 func repoEnv(t *testing.T, pwd string) (*CheApp, *cobra.Command, string) {
@@ -58,47 +56,36 @@ func setupMock(t *testing.T, pwd, profile string, decl map[string]string) (*CheA
 	return a, root, home
 }
 
-// --profile forces one defined profile, execIf skipped, autoExec irrelevant.
-func TestBuildProfileFlag(t *testing.T) {
-	a, _, _ := repoEnv(t, cheRepoPwd)
-	a.profileForce = "ontoRepo"
-	require.NoError(t, a.build())
-	assert.Equal(t, "ontoRepo", a.units[0].host.Profile, "--profile forces one")
-	a.profileForce = "nonexistent"
-	assert.Error(t, a.build(), "undefined --profile must error")
+type buildWant struct {
+	Profile   string `yaml:"profile"`
+	DryRunAll bool   `yaml:"dryRunAll"`
 }
 
-func TestBuildValidateSpec(t *testing.T) {
-	a, _, _ := repoEnv(t, cheRepoPwd)
-	specPath := filepath.Join(a.dirFlag, "che.yml")
-	f, err := os.OpenFile(specPath, os.O_APPEND|os.O_WRONLY, 0o644)
-	require.NoError(t, err)
-	_, err = f.WriteString("\nbogusProfile:\n  includes:\n    link: [HOME/**]\n")
-	require.NoError(t, err)
-	require.NoError(t, f.Close())
-
-	t.Setenv("CHE_VALIDATE_SPEC", "")
-	require.NoError(t, a.build(), "warn mode must not fail")
-
-	a.validateSpecMode = "error"
-	err = a.build()
-	require.Error(t, err, "--validate-spec error must fail on the violation")
-	assert.Contains(t, err.Error(), "includes", "error must name the violating key")
-
-	a.validateSpecMode = ""
-	t.Setenv("CHE_VALIDATE_SPEC", "error")
-	assert.Error(t, a.build(), "CHE_VALIDATE_SPEC=error must fail on the violation")
-
-	a.validateSpecMode = "bogus"
-	assert.Error(t, a.build(), "unknown --validate-spec mode must error")
-}
-
-// build() reads CHE_DRY_RUN from env when the flag is unset.
-func TestBuildDryRunEnvFallback(t *testing.T) {
-	a, _, _ := repoEnv(t, cheRepoPwd)
-	t.Setenv("CHE_DRY_RUN", "all")
-	require.NoError(t, a.build())
-	assert.True(t, a.units[0].host.IsDryRun(), "CHE_DRY_RUN=all from env")
+func TestBuild(t *testing.T) {
+	testyml.Run(t, td, "testdata/spec/funcs/build.test.spec.yml",
+		func(t *testing.T, c testyml.Case[buildWant]) {
+			a, _, _ := repoEnv(t, c.Context.Pwd)
+			t.Setenv("CHE_DRY_RUN", "")
+			t.Setenv("CHE_VALIDATE_SPEC", "")
+			for k, v := range c.Context.Env {
+				t.Setenv(k, v)
+			}
+			a.profileForce = c.Input.Args.String(t, 0)
+			a.validateSpecMode = c.Input.Args.String(t, 1)
+			if extra := c.Input.Args.String(t, 2); extra != "" {
+				f, err := os.OpenFile(filepath.Join(a.dirFlag, "che.yml"), os.O_APPEND|os.O_WRONLY, 0o644)
+				require.NoError(t, err)
+				_, err = f.WriteString("\n" + extra)
+				require.NoError(t, err)
+				require.NoError(t, f.Close())
+			}
+			err := a.build()
+			if c.Expected.Check(t, err) {
+				return
+			}
+			got := buildWant{Profile: a.units[0].host.Profile, DryRunAll: a.units[0].host.IsDryRun()}
+			assert.Equal(t, c.Expected.Output, got)
+		})
 }
 
 // [<] 🤖🤖

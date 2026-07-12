@@ -27,13 +27,6 @@ func languagesFixture(t *testing.T) string {
 	return testyml.ReadFile(t, td, "testdata/fixture/common/languages.yml")
 }
 
-func seedCache(t *testing.T) {
-	t.Helper()
-	cache := t.TempDir()
-	require.NoError(t, os.WriteFile(filepath.Join(cache, "languages.yml"), []byte(languagesFixture(t)), 0o644))
-	t.Setenv("LINGUIST_CACHE_DIR", cache)
-}
-
 // configDir writes raw as the user config (system dir absent), returns the dir.
 func configDir(t *testing.T, raw string) string {
 	t.Helper()
@@ -45,59 +38,59 @@ func configDir(t *testing.T, raw string) string {
 	return dir
 }
 
+func serveStatus(t *testing.T, status int, body string) string {
+	t.Helper()
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		w.WriteHeader(status)
+		w.Write([]byte(body))
+	}))
+	t.Cleanup(srv.Close)
+	return srv.URL
+}
+
+type runWant struct {
+	CacheWritten bool `yaml:"cacheWritten"`
+}
+
 func TestRun(t *testing.T) {
-	testyml.Run(t, td, "testdata/spec/get-term-open-files-with.test.spec.yml", func(t *testing.T, c testyml.Case[struct{}]) {
-		seedCache(t)
+	testyml.Run(t, td, "testdata/spec/cmds/get-term-open-files-with.test.spec.yml", func(t *testing.T, c testyml.Case[runWant]) {
+		cache := t.TempDir()
+		t.Setenv("LINGUIST_CACHE_DIR", cache)
+		url := lib.LanguagesURL
+		switch c.Input.Args.String(t, 1) {
+		case "languages":
+			url = serveStatus(t, http.StatusOK, languagesFixture(t))
+		case "error500":
+			url = serveStatus(t, http.StatusInternalServerError, "")
+		default:
+			require.NoError(t, os.WriteFile(filepath.Join(cache, "languages.yml"), []byte(languagesFixture(t)), 0o644))
+		}
 		raw := ""
 		if cfg := c.Input.Args.String(t, 0); cfg != "" {
 			raw = testyml.ReadFile(t, td, cfg)
 		}
-		out, err := run(c.Context.CommandArgs(), configDir(t, raw), lib.LanguagesURL)
+		out, err := run(c.Context.CommandArgs(), configDir(t, raw), url)
 		if c.Expected.Check(t, err) {
 			return
 		}
 		testyml.EqualExpected(t, td, c.Expected.Files, out)
+		if c.Expected.Output.CacheWritten {
+			_, statErr := os.Stat(filepath.Join(cache, "languages.yml"))
+			assert.NoError(t, statErr, "cache not written")
+		}
 	})
 }
 
-func termFixture(t *testing.T) string {
-	t.Helper()
-	return testyml.ReadFile(t, td, "testdata/fixture/run/term.yml")
+type helpVersionWant struct {
+	Usage bool `yaml:"usage"`
+	Done  bool `yaml:"done"`
 }
 
-func TestFetchWritesCache(t *testing.T) {
-	cache := t.TempDir()
-	t.Setenv("LINGUIST_CACHE_DIR", cache)
-	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
-		w.Write([]byte(languagesFixture(t)))
-	}))
-	defer srv.Close()
-	dir := configDir(t, termFixture(t))
-	out, err := run([]string{"any"}, dir, srv.URL)
-	require.NoError(t, err)
-	assert.NotEmpty(t, out)
-	_, err = os.Stat(filepath.Join(cache, "languages.yml"))
-	assert.NoError(t, err, "cache not written")
-}
-
-func TestFetchFailureExit14(t *testing.T) {
-	cache := t.TempDir()
-	t.Setenv("LINGUIST_CACHE_DIR", cache)
-	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
-		w.WriteHeader(http.StatusInternalServerError)
-	}))
-	defer srv.Close()
-	dir := configDir(t, termFixture(t))
-	_, err := run([]string{"any"}, dir, srv.URL)
-	assert.Equal(t, yamlcfg.CodeNetwork, yamlcfg.Code(err), "err: %v", err)
-}
-
-func TestHelp(t *testing.T) {
-	for _, flag := range []string{"--help", "-h"} {
-		out, done := climain.HelpVersion([]string{flag}, usage, "get-term-open-files-with", version)
-		require.Truef(t, done, "%s: not handled", flag)
-		assert.Equal(t, usage, out, flag)
-	}
+func TestHelpVersion(t *testing.T) {
+	testyml.Eq(t, td, "testdata/spec/funcs/help_version.test.spec.yml", func(t *testing.T, c testyml.Case[helpVersionWant]) (helpVersionWant, error) {
+		out, done := climain.HelpVersion(c.Input.Args.Strings(t, 0), usage, "get-term-open-files-with", version)
+		return helpVersionWant{Usage: out == usage, Done: done}, nil
+	})
 }
 
 //[<] 🤖🤖

@@ -1,0 +1,13 @@
+# [>] 🤖🤖
+context:
+  function: render.ReadBody
+cases:
+  - name: ShouldStripLeadingFrontmatter
+    input:
+      args:
+        - files:
+            d.yml: "---\ntitle: T\n---\nk: v\n"
+        - path: d.yml
+    expected:
+      output: "k: v\n"
+# [<] 🤖🤖

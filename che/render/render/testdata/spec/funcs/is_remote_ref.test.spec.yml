@@ -1,0 +1,30 @@
+# [>] 🤖🤖
+context:
+  function: render.IsRemoteRef
+cases:
+  - name: ShouldAcceptBareHostPath
+    input:
+      args: [ref: "gitlab.com/acme/tools//snippets/agent.md"]
+    expected:
+      output: true
+  - name: ShouldAcceptExplicitSchemeWithRef
+    input:
+      args: [ref: "file:///tmp/repo//a/b.md?ref=main"]
+    expected:
+      output: true
+  - name: ShouldRejectRepoTemplatePath
+    input:
+      args: [ref: "templates/agents/ro.md.ontoRepo.tpl"]
+    expected:
+      output: false
+  - name: ShouldRejectHostTemplatePath
+    input:
+      args: [ref: "root/HOME/.config/claude/settings.json.ontoHost.tpl"]
+    expected:
+      output: false
+  - name: ShouldRejectRepoWithoutPath
+    input:
+      args: [ref: "gitlab.com/acme/tools"]
+    expected:
+      output: false
+# [<] 🤖🤖

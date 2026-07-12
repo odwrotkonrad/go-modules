@@ -1,0 +1,18 @@
+# [>] 🤖🤖
+context:
+  function: render.ExecWithCtx
+cases:
+  - name: ShouldExposeItemCtxAsRoot
+    input:
+      args:
+        - body: "name: RO-{{ .repo }} rw: RW-{{ .repo }}"
+        - itemCtx: {repo: Notes}
+    expected:
+      output: "name: RO-Notes rw: RW-Notes"
+  - name: ShouldKeepPlainExecWithoutCtx
+    input:
+      args:
+        - body: 'hello {{ "world" }}'
+    expected:
+      output: hello world
+# [<] 🤖🤖

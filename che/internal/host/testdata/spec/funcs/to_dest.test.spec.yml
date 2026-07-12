@@ -1,0 +1,30 @@
+# [>] 🤖🤖
+context:
+  function: host.Host.ToDest
+cases:
+  - name: ShouldMapBareHomeTokenToHomeDir
+    input:
+      args: [rel: HOME]
+    expected:
+      output: /Users/x
+  - name: ShouldMapHomePrefixedRelUnderHomeDir
+    input:
+      args: [rel: HOME/.config/zsh]
+    expected:
+      output: /Users/x/.config/zsh
+  - name: ShouldMapBareRelToRootAbsolutePath
+    input:
+      args: [rel: etc/zshrc]
+    expected:
+      output: /etc/zshrc
+  - name: ShouldKeepAbsoluteCachePathAsIs
+    input:
+      args: [rel: /var/custom/cache/dir_size_exporter]
+    expected:
+      output: /var/custom/cache/dir_size_exporter
+  - name: ShouldKeepAbsoluteLogPathAsIs
+    input:
+      args: [rel: /var/log/otelcol]
+    expected:
+      output: /var/log/otelcol
+# [<] 🤖🤖

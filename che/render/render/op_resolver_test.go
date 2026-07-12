@@ -51,7 +51,7 @@ func requireSecretResolverMock(t *testing.T, decl map[string]string) {
 }
 
 func TestOpResolver(t *testing.T) {
-	testyml.Run(t, td, "testdata/spec/op_resolver.test.spec.yml", func(t *testing.T, c testyml.Case[opWant]) {
+	testyml.Run(t, td, "testdata/spec/funcs/op_resolver.test.spec.yml", func(t *testing.T, c testyml.Case[opWant]) {
 		requireSecretResolverMock(t, c.Context.MockedInterfaces)
 		for k, v := range c.Context.Env {
 			t.Setenv(k, v)

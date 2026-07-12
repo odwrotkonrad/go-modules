@@ -1,0 +1,10 @@
+# [>] 🤖🤖
+context:
+  function: render.Exec
+cases:
+  - name: ShouldInlineRemoteFileFunc
+    input:
+      args: [body: '{{ remoteFile "${URL}//docs/note.md" }}']
+    expected:
+      output: main content
+# [<] 🤖🤖

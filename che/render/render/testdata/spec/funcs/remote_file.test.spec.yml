@@ -1,0 +1,35 @@
+# [>] 🤖🤖
+context:
+  function: render.remoteFileResolver
+cases:
+  - name: ShouldFetchFromDefaultBranch
+    input:
+      args: [ref: "//docs/note.md"]
+    expected:
+      output: "main content\n"
+  - name: ShouldFetchNestedPath
+    input:
+      args: [ref: "//docs/deep/inner.md"]
+    expected:
+      output: "inner\n"
+  - name: ShouldFetchBranchRef
+    input:
+      args: [ref: "//docs/note.md?ref=feature"]
+    expected:
+      output: "feature content\n"
+  - name: ShouldFetchTagRef
+    input:
+      args: [ref: "//docs/note.md?ref=v1.0.0"]
+    expected:
+      output: "main content\n"
+  - name: ShouldErrorOnMissingFile
+    input:
+      args: [ref: "//docs/absent.md"]
+    expected:
+      errorOutput: ['remoteFile', 'file does not exist']
+  - name: ShouldErrorOnMissingRef
+    input:
+      args: [ref: "//docs/note.md?ref=nope"]
+    expected:
+      errorOutput: ['remoteFile', "couldn't find remote ref"]
+# [<] 🤖🤖

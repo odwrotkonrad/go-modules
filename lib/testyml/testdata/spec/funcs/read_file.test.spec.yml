@@ -1,0 +1,10 @@
+# [>] 🤖🤖
+context:
+  function: testyml.ReadFile
+cases:
+  - name: ShouldReadFixtureAndEqualExpected
+    input:
+      args: [path: testdata/fixture/common/expected.txt]
+    expected:
+      output: "expected body\n"
+# [<] 🤖🤖

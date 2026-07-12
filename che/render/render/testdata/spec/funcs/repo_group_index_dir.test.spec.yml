@@ -1,0 +1,34 @@
+# [>] 🤖🤖
+context:
+  function: render.RepoGroupIndexDir
+cases:
+  - name: ShouldRenderLeafGroup
+    input:
+      args: [dir: leaf]
+    expected:
+      output:
+        - '## Repo: ./alpha'
+        - 'Alpha does things.'
+        - '## Repo: ./beta'
+        - '_(no purpose.md)_'
+        - 'Repo index for "leaf". Directory tree:'
+        - '## Repo: ./alpha{{/(?s).*/}}## Repo: ./beta'
+    notExpected:
+      output:
+        - 'Subgroup:'
+  - name: ShouldInlineChildSubgroupWithoutIntro
+    input:
+      args: [dir: parent]
+    expected:
+      output:
+        - '## Repo: ./direct'
+        - 'Direct repo.'
+        - '## Subgroup: ./child'
+        - '### Repo: ./child/gamma'
+        - 'Gamma repo.'
+        - 'Directory tree'
+    notExpected:
+      output:
+        - '### Repositories'
+        - 'Directory tree{{/(?s).*/}}Directory tree'
+# [<] 🤖🤖

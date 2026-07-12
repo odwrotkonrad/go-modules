@@ -45,7 +45,7 @@ func writeCfg(t *testing.T, dir, fixture string) {
 }
 
 func TestCode(t *testing.T) {
-	testyml.Eq(t, td, "testdata/spec/code.test.spec.yml", func(t *testing.T, c testyml.Case[int]) (int, error) {
+	testyml.Eq(t, td, "testdata/spec/funcs/code.test.spec.yml", func(t *testing.T, c testyml.Case[int]) (int, error) {
 		var err error
 		switch c.Input.Args.Name(0) {
 		case "code":
@@ -58,7 +58,18 @@ func TestCode(t *testing.T) {
 }
 
 func TestLoadConfig(t *testing.T) {
-	testyml.Run(t, td, "testdata/spec/load_config_node.test.spec.yml", func(t *testing.T, c testyml.Case[struct{}]) {
+	testyml.Run(t, td, "testdata/spec/funcs/load_config_node.test.spec.yml", func(t *testing.T, c testyml.Case[struct{}]) {
+		if c.Input.Args.Name(0) == "unreadable" {
+			if os.Geteuid() == 0 {
+				t.Skip("root reads 0o000 files")
+			}
+			testyml.Swap(t, &yamlcfg.SystemDir, filepath.Join(t.TempDir(), "no-system"))
+			userDir := t.TempDir()
+			require.NoError(t, os.WriteFile(filepath.Join(userDir, "cfg.yml"), []byte("a: 1"), 0o000))
+			_, err := yamlcfg.LoadConfigNode("cfg.yml", userDir)
+			c.Expected.Check(t, err)
+			return
+		}
 		userDir := configDirs(t, c.Input.Args.String(t, 0), c.Input.Args.String(t, 1))
 		node, err := yamlcfg.LoadConfigNode("cfg.yml", userDir)
 		if c.Expected.Check(t, err) {
@@ -76,7 +87,7 @@ func TestLoadConfig(t *testing.T) {
 }
 
 func TestLoadConfigDecode(t *testing.T) {
-	testyml.Run(t, td, "testdata/spec/load_config.test.spec.yml", func(t *testing.T, c testyml.Case[struct{}]) {
+	testyml.Run(t, td, "testdata/spec/funcs/load_config.test.spec.yml", func(t *testing.T, c testyml.Case[struct{}]) {
 		userDir := configDirs(t, c.Input.Args.String(t, 0), "")
 		var got map[string]int
 		err := yamlcfg.LoadConfig("cfg.yml", userDir, &got)
@@ -93,21 +104,21 @@ func TestLoadConfigDecode(t *testing.T) {
 	})
 }
 
-func TestUnwrapNonDocument(t *testing.T) {
-	n := &yaml.Node{Kind: yaml.ScalarNode}
-	assert.Same(t, n, yamlcfg.Unwrap(n))
-	assert.Nil(t, yamlcfg.Unwrap(nil))
+func TestUnwrap(t *testing.T) {
+	testyml.Eq(t, td, "testdata/spec/funcs/unwrap.test.spec.yml", func(t *testing.T, c testyml.Case[bool]) (bool, error) {
+		if c.Input.Args.Bool(t, 0) {
+			return yamlcfg.Unwrap(nil) == nil, nil
+		}
+		n := &yaml.Node{Kind: yaml.ScalarNode}
+		return yamlcfg.Unwrap(n) == n, nil
+	})
 }
 
-func TestLoadConfigNodeReadError(t *testing.T) {
-	if os.Geteuid() == 0 {
-		t.Skip("root reads 0o000 files")
-	}
-	testyml.Swap(t, &yamlcfg.SystemDir, filepath.Join(t.TempDir(), "no-system"))
-	userDir := t.TempDir()
-	require.NoError(t, os.WriteFile(filepath.Join(userDir, "cfg.yml"), []byte("a: 1"), 0o000))
-	_, err := yamlcfg.LoadConfigNode("cfg.yml", userDir)
-	assert.Equal(t, yamlcfg.CodeConfig, yamlcfg.Code(err), "err: %v", err)
+func TestCustomPaths(t *testing.T) {
+	testyml.Eq(t, td, "testdata/spec/funcs/custom_paths.test.spec.yml", func(t *testing.T, c testyml.Case[string]) (string, error) {
+		paths := yamlcfg.CustomPaths(c.Input.Args.String(t, 0), c.Input.Args.String(t, 1))
+		return paths[c.Input.Args.Int(t, 2)], nil
+	})
 }
 
 // [<] 🤖🤖

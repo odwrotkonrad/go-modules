@@ -31,20 +31,31 @@ che
                   etc
                 templates
         spec
+          cmds
+          funcs
     config
     docgen
+      testdata
+        spec
+          funcs
     execx
     fsutil
       testdata
         spec
+          funcs
     host
       testdata
         spec
-          unit
+          cmds
+          funcs
     log
       testdata
         spec
+          funcs
     plugin
+      testdata
+        spec
+          funcs
     spec
       testdata
         fixture
@@ -103,8 +114,12 @@ che
             tree-plugin-malformed
               root
         spec
+          funcs
     testutil
       specs
+      testdata
+        spec
+          funcs
       trees
         tree-che-repo
           install
@@ -120,10 +135,16 @@ che
     checkcmd
       testdata
         spec
+          cmds
     cmd
       render-dirs-tree
+        testdata
+          spec
+            cmds
       render-makefile-doc
         testdata
+          spec
+            cmds
       render-repo-group-index
       render-tpl
         testdata
@@ -132,9 +153,11 @@ che
               tree-read_body
               tree-renders
           spec
+            cmds
     lib
       testdata
         spec
+          funcs
     render
       snippets
       testdata
@@ -142,6 +165,7 @@ che
           dirs-tree
           render_markdown
             tree-docs
+            tree-home
           repo-group-index
             group
               che
@@ -156,30 +180,45 @@ che
                     docs-agents
           split_frontmatter
         spec
+          funcs
+  testdata
+    spec
+      funcs
 ci
 get-os-open-files-with
   assets
     docs-agents
   lib
+    testdata
+      spec
+        funcs
   testdata
     fixture
       run
     spec
+      cmds
+      funcs
 get-term-open-files-with
   assets
     docs-agents
   lib
+    testdata
+      spec
+        funcs
   testdata
     fixture
       common
       run
     spec
+      cmds
+      funcs
 lib
   assets
     docs-agents
   climain
     testdata
       spec
+        funcs
   testyml
     testdata
       fixture
@@ -187,11 +226,13 @@ lib
           tree-nested
             dir
       spec
+        funcs
   yamlcfg
     testdata
       fixture
         load_config
       spec
+        funcs
 templates
   2-data
   3-audience

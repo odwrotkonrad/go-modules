@@ -1,0 +1,23 @@
+# [>] 🤖🤖
+context:
+  function: lib.fetchLanguages
+cases:
+  - name: ShouldExit14OnConnectionRefused
+    input:
+      args: [precondition: connectionRefused]
+    expected:
+      exitCode: 14
+      errorOutput: [network fetch failed]
+  - name: ShouldExit14WhenCacheMkdirBlockedByFile
+    input:
+      args: [precondition: mkdirBlockedByFile]
+    expected:
+      exitCode: 14
+      errorOutput: [network fetch failed]
+  - name: ShouldExit14WhenCacheWriteBlockedByDir
+    input:
+      args: [precondition: writeBlockedByDir]
+    expected:
+      exitCode: 14
+      errorOutput: [network fetch failed]
+# [<] 🤖🤖

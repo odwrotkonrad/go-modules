@@ -1,0 +1,12 @@
+# [>] 🤖🤖
+context:
+  function: testyml.CopyDir
+cases:
+  - name: ShouldCopyNestedTreeToDest
+    input:
+      args: [src: testdata/fixture/common/tree-nested]
+    expected:
+      output:
+        top.txt: "top\n"
+        dir/inner.txt: "inner\n"
+# [<] 🤖🤖

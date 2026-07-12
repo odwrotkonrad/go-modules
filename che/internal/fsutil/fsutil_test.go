@@ -30,29 +30,32 @@ func octal(t *testing.T, s string) os.FileMode {
 }
 
 func TestModeArg(t *testing.T) {
-	testyml.Eq(t, td, "testdata/spec/mode_arg.test.spec.yml", func(t *testing.T, c testyml.Case[string]) (string, error) {
+	testyml.Eq(t, td, "testdata/spec/funcs/mode_arg.test.spec.yml", func(t *testing.T, c testyml.Case[string]) (string, error) {
 		return ModeArg(octal(t, c.Input.Args.String(t, 0))), nil
 	})
 }
 
 func TestIsDir(t *testing.T) {
-	dir := t.TempDir()
-	file := filepath.Join(dir, "f")
-	require.NoError(t, os.WriteFile(file, []byte("x"), 0o644))
-	assert.True(t, IsDir(dir))
-	assert.False(t, IsDir(file))
-	assert.False(t, IsDir(filepath.Join(dir, "absent")))
+	testyml.Eq(t, td, "testdata/spec/funcs/is_dir.test.spec.yml", func(t *testing.T, c testyml.Case[bool]) (bool, error) {
+		dir := t.TempDir()
+		file := filepath.Join(dir, "f")
+		require.NoError(t, os.WriteFile(file, []byte("x"), 0o644))
+		targets := map[string]string{"dir": dir, "file": file, "missing": filepath.Join(dir, "absent")}
+		target, ok := targets[c.Input.Args.String(t, 0)]
+		require.Truef(t, ok, "unknown target %q", c.Input.Args.String(t, 0))
+		return IsDir(target), nil
+	})
 }
 
 func TestUnderHome(t *testing.T) {
 	f := FS{Home: "/Users/x"}
-	testyml.Eq(t, td, "testdata/spec/is_under_home.test.spec.yml", func(t *testing.T, c testyml.Case[bool]) (bool, error) {
+	testyml.Eq(t, td, "testdata/spec/funcs/is_under_home.test.spec.yml", func(t *testing.T, c testyml.Case[bool]) (bool, error) {
 		return f.IsUnderHome(c.Input.Args.String(t, 0)), nil
 	})
 }
 
 func TestExpandAll(t *testing.T) {
-	testyml.Eq(t, td, "testdata/spec/expand_all.test.spec.yml", func(t *testing.T, c testyml.Case[[]string]) ([]string, error) {
+	testyml.Eq(t, td, "testdata/spec/funcs/expand_all.test.spec.yml", func(t *testing.T, c testyml.Case[[]string]) ([]string, error) {
 		return ExpandAll(c.Input.Args.Strings(t, 0)), nil
 	})
 }
@@ -60,47 +63,29 @@ func TestExpandAll(t *testing.T) {
 // TestTrackedFiles: subtree filtering, untracked exclusion, and go-git index
 // parity for the mock root/ tree shapes (hidden files, .gitkeep, markers, nesting).
 func TestTrackedFiles(t *testing.T) {
-	dir := testutil.Repo(t, map[string]string{
-		"che.yml":                                        "profiles:\n",
-		"root/etc/zshrc":                                 "z\n",
-		"root/etc/zsh/zshenv":                            "e\n",
-		"root/HOME/.config/zsh/.zshrc":                   "hidden\n",
-		"root/HOME/.config/zsh/.gitkeep":                 "",
-		"root/HOME/.config/git/config.ontoHost.tpl":      "tpl\n",
-		"root/Library/LaunchDaemons/x.plist.ontoHost.cp": "cp\n",
+	testyml.Eq(t, td, "testdata/spec/funcs/tracked_files.test.spec.yml", func(t *testing.T, c testyml.Case[[]string]) ([]string, error) {
+		dir := testutil.Repo(t, map[string]string{
+			"che.yml":                                        "profiles:\n",
+			"root/etc/zshrc":                                 "z\n",
+			"root/etc/zsh/zshenv":                            "e\n",
+			"root/HOME/.config/zsh/.zshrc":                   "hidden\n",
+			"root/HOME/.config/zsh/.gitkeep":                 "",
+			"root/HOME/.config/git/config.ontoHost.tpl":      "tpl\n",
+			"root/Library/LaunchDaemons/x.plist.ontoHost.cp": "cp\n",
+		})
+		require.NoError(t, os.WriteFile(filepath.Join(dir, "untracked"), []byte("x"), 0o644))
+		got, err := TrackedFiles(filepath.Join(dir, c.Input.Args.String(t, 0)))
+		if err != nil {
+			return nil, err
+		}
+		slices.Sort(got)
+		return got, nil
 	})
-	require.NoError(t, os.WriteFile(filepath.Join(dir, "untracked"), []byte("x"), 0o644))
-
-	got, err := TrackedFiles(dir)
-	require.NoError(t, err)
-	slices.Sort(got)
-	want := []string{
-		"che.yml",
-		"root/HOME/.config/git/config.ontoHost.tpl",
-		"root/HOME/.config/zsh/.gitkeep",
-		"root/HOME/.config/zsh/.zshrc",
-		"root/Library/LaunchDaemons/x.plist.ontoHost.cp",
-		"root/etc/zsh/zshenv",
-		"root/etc/zshrc",
-	}
-	assert.Equal(t, want, got, "untracked must be excluded")
-
-	sub, err := TrackedFiles(filepath.Join(dir, "root"))
-	require.NoError(t, err)
-	slices.Sort(sub)
-	assert.Equal(t, []string{
-		"HOME/.config/git/config.ontoHost.tpl",
-		"HOME/.config/zsh/.gitkeep",
-		"HOME/.config/zsh/.zshrc",
-		"Library/LaunchDaemons/x.plist.ontoHost.cp",
-		"etc/zsh/zshenv",
-		"etc/zshrc",
-	}, sub, "subtree entries only, prefix-stripped")
 }
 
 func TestMkdirArgv(t *testing.T) {
 	f := FS{Home: "/Users/x"}
-	testyml.Eq(t, td, "testdata/spec/mkdir_argv.test.spec.yml", func(t *testing.T, c testyml.Case[[]string]) ([]string, error) {
+	testyml.Eq(t, td, "testdata/spec/funcs/mkdir_argv.test.spec.yml", func(t *testing.T, c testyml.Case[[]string]) ([]string, error) {
 		a := c.Input.Args
 		return f.MkdirArgv(a.String(t, 0), octal(t, a.String(t, 1)), a.Bool(t, 2)), nil
 	})
@@ -116,7 +101,7 @@ type fsOpsWant struct {
 // TestFSOps runs each mutating FS op against the mock executor: recorded argv
 // asserts the command shape (sudo escalation, flags), nothing touches the host.
 func TestFSOps(t *testing.T) {
-	testyml.Run(t, td, "testdata/spec/fs_ops.test.spec.yml", func(t *testing.T, c testyml.Case[fsOpsWant]) {
+	testyml.Run(t, td, "testdata/spec/funcs/fs_ops.test.spec.yml", func(t *testing.T, c testyml.Case[fsOpsWant]) {
 		if strings.HasPrefix(c.Expected.Output.Argv, "sudo ") && os.Geteuid() == 0 {
 			t.Skip("sudo prefix absent when running as root")
 		}

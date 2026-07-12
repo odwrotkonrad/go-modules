@@ -1,0 +1,17 @@
+# [>] 🤖🤖
+context:
+  function: withEnv
+cases:
+  - name: ShouldShadowSetAndRestoreEnv
+    context:
+      env: {WITHENV_SHADOWED: host}
+    input:
+      args:
+        - unitEnv: {WITHENV_SHADOWED: plugin, WITHENV_ABSENT: x}
+        - unsetEnv: [WITHENV_ABSENT]
+    expected:
+      output:
+        during: {WITHENV_SHADOWED: plugin, WITHENV_ABSENT: x}
+        after: {WITHENV_SHADOWED: host}
+        unsetAfter: [WITHENV_ABSENT]
+# [<] 🤖🤖

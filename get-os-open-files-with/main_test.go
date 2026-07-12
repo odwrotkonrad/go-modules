@@ -8,7 +8,6 @@ import (
 	"path/filepath"
 	"testing"
 
-	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
 	"gitlab.com/konradodwrot/go-modules/lib/climain"
@@ -31,7 +30,7 @@ func configDir(t *testing.T, raw string) string {
 }
 
 func TestRun(t *testing.T) {
-	testyml.Run(t, td, "testdata/spec/get-os-open-files-with.test.spec.yml", func(t *testing.T, c testyml.Case[struct{}]) {
+	testyml.Run(t, td, "testdata/spec/cmds/get-os-open-files-with.test.spec.yml", func(t *testing.T, c testyml.Case[struct{}]) {
 		raw := ""
 		if cfg := c.Input.Args.String(t, 0); cfg != "" {
 			raw = testyml.ReadFile(t, td, cfg)
@@ -44,12 +43,16 @@ func TestRun(t *testing.T) {
 	})
 }
 
-func TestHelp(t *testing.T) {
-	for _, flag := range []string{"--help", "-h"} {
-		out, done := climain.HelpVersion([]string{flag}, usage, "get-os-open-files-with", version)
-		require.Truef(t, done, "%s: not handled", flag)
-		assert.Equal(t, usage, out, flag)
-	}
+type helpVersionWant struct {
+	Usage bool `yaml:"usage"`
+	Done  bool `yaml:"done"`
+}
+
+func TestHelpVersion(t *testing.T) {
+	testyml.Eq(t, td, "testdata/spec/funcs/help_version.test.spec.yml", func(t *testing.T, c testyml.Case[helpVersionWant]) (helpVersionWant, error) {
+		out, done := climain.HelpVersion(c.Input.Args.Strings(t, 0), usage, "get-os-open-files-with", version)
+		return helpVersionWant{Usage: out == usage, Done: done}, nil
+	})
 }
 
 //[<] 🤖🤖

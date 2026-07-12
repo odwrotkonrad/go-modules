@@ -1,0 +1,16 @@
+# [>] 🤖🤖
+context:
+  function: log.Msg
+cases:
+  - name: ShouldEmitNothingWithDebugGateOff
+    context: {function: log.Debug}
+    input:
+      args: [title: plugin(p), msg: run x, mode: off]
+    expected:
+      output: ""
+  - name: ShouldBoldTheType
+    input:
+      args: [title: ln, msg: /x, mode: off]
+    expected:
+      stdOut: ["\e[1mln\e["]
+# [<] 🤖🤖

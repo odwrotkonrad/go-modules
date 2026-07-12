@@ -78,4 +78,15 @@ cases:
       args: [config: testdata/fixture/run/invalid.yml]
     expected:
       exitCode: 12
+  - name: ShouldFetchAndWriteCacheOnMiss
+    input:
+      args: [config: testdata/fixture/run/term.yml, serve: languages]
+    expected:
+      files: testdata/fixture/run/any.expected.txt
+      output: {cacheWritten: true}
+  - name: ShouldExit14WhenFetchFails
+    input:
+      args: [config: testdata/fixture/run/term.yml, serve: error500]
+    expected:
+      exitCode: 14
 # [<] 🤖🤖

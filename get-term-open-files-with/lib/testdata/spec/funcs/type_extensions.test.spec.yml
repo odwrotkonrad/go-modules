@@ -1,0 +1,11 @@
+# [>] 🤖🤖
+context:
+  function: lib.TypeExtensions
+cases:
+  - name: ShouldExit12OnInvalidCachedYaml
+    input:
+      args: [cachedLanguages: "a: [unclosed"]
+    expected:
+      exitCode: 12
+      errorOutput: [invalid languages data]
+# [<] 🤖🤖

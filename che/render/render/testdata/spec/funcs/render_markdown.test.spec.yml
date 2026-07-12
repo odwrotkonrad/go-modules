@@ -18,4 +18,11 @@ cases:
       args: [path: p.md, transforms: [bogus]]
     expected:
       errorOutput: ['renderMarkdown: unknown opt "bogus"']
+  - name: ShouldExpandTildeAndCapHeadings
+    context:
+      pwd: testdata/fixture/render_markdown/tree-home
+    input:
+      args: [path: "~/r.md", transforms: [remove-frontmatter, normalize-headings], homeTilde: true]
+    expected:
+      files: testdata/fixture/render_markdown/tilde_cap.expected.md
 # [<] 🤖🤖

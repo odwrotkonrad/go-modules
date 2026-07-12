@@ -1,0 +1,19 @@
+# [>] 🤖🤖
+context:
+  function: render.mergeUpsertEnv
+cases:
+  - name: ShouldKeepExistingValuesOverDefaults
+    input:
+      args:
+        - existing: "B=kept\nC=extra\n"
+        - rendered: "A=default\nB=default\n# comment\n\n"
+    expected:
+      output: "A=default\nB=kept\nC=extra\n"
+  - name: ShouldSortRenderedWithoutExisting
+    input:
+      args:
+        - existing: ""
+        - rendered: "B=y\nA=x\n"
+    expected:
+      output: "A=x\nB=y\n"
+# [<] 🤖🤖

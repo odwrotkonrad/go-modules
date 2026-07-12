@@ -11,13 +11,13 @@ import (
 )
 
 func TestNormalizeOS(t *testing.T) {
-	testyml.Eq(t, td, "testdata/spec/normalize_os.test.spec.yml", func(t *testing.T, c testyml.Case[string]) (string, error) {
+	testyml.Eq(t, td, "testdata/spec/funcs/normalize_os.test.spec.yml", func(t *testing.T, c testyml.Case[string]) (string, error) {
 		return NormalizeOS(c.Input.Args.String(t, 0)), nil
 	})
 }
 
 func TestIsVirtualized(t *testing.T) {
-	testyml.Eq(t, td, "testdata/spec/is_virtualized.test.spec.yml", func(t *testing.T, c testyml.Case[bool]) (bool, error) {
+	testyml.Eq(t, td, "testdata/spec/funcs/is_virtualized.test.spec.yml", func(t *testing.T, c testyml.Case[bool]) (bool, error) {
 		m := testutil.ApplyMocks(t, c.Context.MockedInterfaces)
 		a := c.Input.Args
 		m.Exec.Out = a.String(t, 1)
@@ -28,7 +28,7 @@ func TestIsVirtualized(t *testing.T) {
 }
 
 func TestUserHome(t *testing.T) {
-	testyml.Eq(t, td, "testdata/spec/user_home.test.spec.yml", func(t *testing.T, c testyml.Case[string]) (string, error) {
+	testyml.Eq(t, td, "testdata/spec/funcs/user_home.test.spec.yml", func(t *testing.T, c testyml.Case[string]) (string, error) {
 		testutil.RequireRegistered(t, c.Context.MockedInterfaces)
 		var homes map[string]string
 		c.Input.Args.To(t, 1, &homes)

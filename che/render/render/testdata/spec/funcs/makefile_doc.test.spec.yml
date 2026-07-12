@@ -1,0 +1,10 @@
+# [>] 🤖🤖
+context:
+  function: render.MakefileDoc
+cases:
+  - name: ShouldGenerateGenaiIncludeDoc
+    input:
+      args: [makefile: ../cmd/render-makefile-doc/testdata/Makefile]
+    expected:
+      files: ../cmd/render-makefile-doc/testdata/expected.md
+# [<] 🤖🤖

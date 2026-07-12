@@ -3,62 +3,45 @@ package main
 // [>] 🤖🤖
 
 import (
-	"os"
-	"path/filepath"
+	"embed"
 	"testing"
 
-	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
 	"gitlab.com/konradodwrot/go-modules/che/internal/execx"
 	"gitlab.com/konradodwrot/go-modules/che/internal/testutil"
 	"gitlab.com/konradodwrot/go-modules/che/render/lib"
-	"gitlab.com/konradodwrot/go-modules/lib/yamlcfg"
+	"gitlab.com/konradodwrot/go-modules/lib/testyml"
 )
 
-func TestGenerateGolden(t *testing.T) {
-	got, err := lib.Generate("testdata/Makefile")
-	require.NoError(t, err)
-	want, err := os.ReadFile("testdata/expected.md")
-	require.NoError(t, err)
-	assert.Equal(t, string(want), got)
-}
+//go:embed all:testdata
+var td embed.FS
 
-func TestGenerateMissing(t *testing.T) {
-	_, err := lib.Generate("testdata/nope.mk")
-	assert.Error(t, err, "missing makefile")
-}
-
-// TestCheck drives --check against a match, a stale doc, and a missing file;
-// the drift diff runs through the mock executor, nothing spawns.
-func TestCheck(t *testing.T) {
-	execx.Swap(t, testutil.NewCmdMockExecutor())
-	mkSrc, err := os.ReadFile("testdata/Makefile")
-	require.NoError(t, err)
-	doc, err := lib.Generate("testdata/Makefile")
-	require.NoError(t, err)
-	dir := testutil.Tree(t, map[string]string{
-		"Makefile": string(mkSrc),
-		"good.md":  doc,
-		"stale.md": "stale\n",
-	})
-
-	t.Chdir(dir)
-
-	cases := map[string]struct {
-		path string
-		want int
-	}{
-		"match":  {filepath.Join(dir, "good.md"), 0},
-		"differ": {filepath.Join(dir, "stale.md"), 22},
-		"absent": {filepath.Join(dir, "absent.md"), 13},
-	}
-	for name, c := range cases {
-		t.Run(name, func(t *testing.T) {
-			_, err := tool.Run([]string{"--check", c.path})
-			assert.Equal(t, c.want, yamlcfg.Code(err), "Run(--check %s)", name)
+// TestRun drives generate and --check; the drift diff runs through the mock
+// executor, nothing spawns.
+func TestRun(t *testing.T) {
+	testyml.Run(t, td, "testdata/spec/cmds/render-makefile-doc.test.spec.yml", func(t *testing.T, c testyml.Case[struct{}]) {
+		execx.Swap(t, testutil.NewCmdMockExecutor())
+		doc, err := lib.Generate("testdata/Makefile")
+		require.NoError(t, err)
+		dir := testutil.Tree(t, map[string]string{
+			"Makefile": testyml.ReadFile(t, td, "testdata/Makefile"),
+			"good.md":  doc,
+			"stale.md": "stale\n",
 		})
-	}
+		t.Chdir(dir)
+		args := c.Context.CommandArgs()
+		for i, a := range args {
+			args[i] = testyml.Expand(a, map[string]string{"DIR": dir})
+		}
+		out, err := tool.Run(args)
+		if c.Expected.Check(t, err) {
+			return
+		}
+		if c.Expected.Files != "" {
+			testyml.EqualExpected(t, td, c.Expected.Files, out)
+		}
+	})
 }
 
 //[<] 🤖🤖

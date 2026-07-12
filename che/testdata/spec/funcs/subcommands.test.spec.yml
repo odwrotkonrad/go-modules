@@ -1,0 +1,16 @@
+# [>] 🤖
+context:
+  function: cli.CheApp.Root
+cases:
+  - name: ShouldWireEverySubcommandToRoot
+    expected:
+      output:
+        - link
+        - copy
+        - render-templates
+        - mk-dirs
+        - prune-links
+        - run-scripts
+        - detect
+        - services
+# [<] 🤖

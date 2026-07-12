@@ -23,7 +23,7 @@ func stubEvaluator(os string, virt bool) *Evaluator {
 
 func TestEvalExecIf(t *testing.T) {
 	e := stubEvaluator("macos", false)
-	testyml.Eq(t, td, "testdata/spec/eval_exec_if.test.spec.yml", func(t *testing.T, c testyml.Case[bool]) (bool, error) {
+	testyml.Eq(t, td, "testdata/spec/funcs/eval_exec_if.test.spec.yml", func(t *testing.T, c testyml.Case[bool]) (bool, error) {
 		return e.EvalExecIf(c.Input.Args.String(t, 0))
 	})
 }
@@ -38,7 +38,7 @@ type builtinsWant struct {
 // TestNewEvaluatorBuiltins drives the real NewEvaluator wiring against the
 // mock executor and a deny-all reader, so live container markers never leak in.
 func TestNewEvaluatorBuiltins(t *testing.T) {
-	testyml.Run(t, td, "testdata/spec/new_evaluator.test.spec.yml", func(t *testing.T, c testyml.Case[builtinsWant]) {
+	testyml.Run(t, td, "testdata/spec/funcs/new_evaluator.test.spec.yml", func(t *testing.T, c testyml.Case[builtinsWant]) {
 		m := testutil.ApplyMocks(t, c.Context.MockedInterfaces)
 		m.Exec.Out = c.Input.Args.String(t, 1)
 		m.Exec.Fail = c.Input.Args.Bool(t, 2)

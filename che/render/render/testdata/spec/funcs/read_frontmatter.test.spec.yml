@@ -1,0 +1,13 @@
+# [>] 🤖🤖
+context:
+  function: render.ReadFrontmatter
+cases:
+  - name: ShouldReturnLeadingFrontmatter
+    input:
+      args:
+        - files:
+            d.yml: "---\ntitle: T\n---\nk: v\n"
+        - path: d.yml
+    expected:
+      output: "title: T\n"
+# [<] 🤖🤖

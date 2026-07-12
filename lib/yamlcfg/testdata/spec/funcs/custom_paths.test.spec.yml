@@ -1,0 +1,19 @@
+# [>] 🤖🤖
+context:
+  function: yamlcfg.customPaths
+cases:
+  - name: ShouldUseXdgConfigHomeForUserPath
+    context:
+      env: {XDG_CONFIG_HOME: /xdg}
+    input:
+      args: [name: cfg.yml, customDir: "", index: 1]
+    expected:
+      output: /xdg/custom/cfg.yml
+  - name: ShouldFallBackToHomeDotConfigWhenXdgUnset
+    context:
+      env: {XDG_CONFIG_HOME: "", HOME: /h}
+    input:
+      args: [name: cfg.yml, customDir: "", index: 1]
+    expected:
+      output: /h/.config/custom/cfg.yml
+# [<] 🤖🤖

@@ -1,0 +1,41 @@
+# [>] 🤖🤖
+cases:
+  - name: ShouldOnlyReportLinkCreates
+    context: {command: che link}
+    expected:
+      stdOut: "ln(create,dry-run=delta): ${HOME}/.config/zsh/"
+  - name: ShouldOnlyReportCopyCreates
+    context: {command: che copy}
+    expected:
+      stdOut: "cp(create,dry-run=delta): ${HOME}/.config/zsh/"
+  - name: ShouldOnlyReportRenderCreates
+    context: {command: che render-templates}
+    expected:
+      stdOut: "render(create,dry-run=delta): ${HOME}/.config/zsh/"
+  - name: ShouldOnlyReportMkdirCreates
+    context: {command: che mk-dirs}
+    expected:
+      stdOut: "mkdir(create,dry-run=delta): ${HOME}/.config"
+  - name: ShouldOnlyReportPruneScan
+    context: {command: che prune-links}
+    expected:
+      stdOut: "prune-links(dry-run=delta): ${ROOT}"
+  - name: ShouldOnlyReportScriptRuns
+    context: {command: che run-scripts}
+    expected:
+      stdOut: "run-scripts(dry-run=delta): ${REPO}/install/unit"
+  - name: ShouldOnlyReportServiceBootouts
+    context: {command: che services bootout}
+    expected:
+      stdOut: "bootout(dry-run=delta): system/otelcol"
+  - name: ShouldOnlyReportServiceBootstraps
+    context: {command: che services bootin}
+    expected:
+      stdOut: "bootstrap(dry-run=delta): system/otelcol"
+  - name: ShouldOnlyReportServiceEnsures
+    context: {command: che services ensure}
+    expected:
+      stdOut:
+        - "settle(dry-run=delta): 15s before pid check"
+        - "ensure(dry-run=delta): system/otelcol"
+# [<] 🤖🤖

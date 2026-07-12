@@ -3,9 +3,9 @@ package plugin
 // [>] 🤖🤖
 
 import (
+	"embed"
 	"os"
 	"path/filepath"
-	"regexp"
 	"strings"
 	"testing"
 
@@ -14,63 +14,71 @@ import (
 
 	"gitlab.com/konradodwrot/go-modules/che/internal/execx"
 	"gitlab.com/konradodwrot/go-modules/che/internal/testutil"
+	"gitlab.com/konradodwrot/go-modules/lib/testyml"
 )
 
-// slug: deterministic dir name per url form.
+//go:embed all:testdata
+var td embed.FS
+
 func TestSlug(t *testing.T) {
-	cases := map[string]string{
-		"git@gitlab.com:konradodwrot/workspace.git": "gitlab.com-konradodwrot-workspace",
-		"https://gitlab.com/a/b.git":                "gitlab.com-a-b",
-		"ssh://git@gitlab.com/a/b.git":              "gitlab.com-a-b",
-		"file:///tmp/x":                             "tmp-x",
-	}
-	for url, want := range cases {
-		assert.Equal(t, want, slug(url), "slug(%q)", url)
-	}
+	testyml.Eq(t, td, "testdata/spec/funcs/slug.test.spec.yml", func(t *testing.T, c testyml.Case[string]) (string, error) {
+		return slug(c.Input.Args.String(t, 0)), nil
+	})
 }
 
-// Ensure: first call clones into the cache dir (logged as cloned), second
-// hard-resets to new upstream commits (logged as pulled); a no-change pull
-// stays silent (attempt lines are debug-gated). The git CLI runs through the
-// mock executor's go-git model: nothing spawns.
-func TestEnsureCloneThenPull(t *testing.T) {
-	execx.Swap(t, testutil.NewCmdMockExecutor())
-	up := testutil.Repo(t, map[string]string{"che.yml": "p: {}\n"})
-	home := t.TempDir()
-	url := "file://" + up
+// ensureWant is ensure's expected.output: silence plus files the checkout
+// must carry.
+type ensureWant struct {
+	Silent bool     `yaml:"silent"`
+	Files  []string `yaml:"files"`
+}
 
-	var dir string
-	out, err := testutil.CaptureStdout(t, func() error {
-		var e error
-		dir, e = Ensure(home, url, "p")
-		return e
+// TestEnsure: a first call clones into the cache dir (logged as cloned), a
+// later one hard-resets to new upstream commits (logged as pulled); a
+// no-change pull stays silent (attempt lines are debug-gated). The git CLI
+// runs through the mock executor's go-git model: nothing spawns.
+func TestEnsure(t *testing.T) {
+	testyml.Run(t, td, "testdata/spec/funcs/ensure.test.spec.yml", func(t *testing.T, c testyml.Case[ensureWant]) {
+		execx.Swap(t, testutil.NewCmdMockExecutor())
+		up := testutil.Repo(t, map[string]string{"che.yml": "p: {}\n"})
+		home := t.TempDir()
+		url := "file://" + up
+		a := c.Input.Args
+		for range a.Int(t, 0) {
+			_, err := testutil.CaptureStdout(t, func() error {
+				_, e := Ensure(home, url, "p")
+				return e
+			})
+			require.NoError(t, err, "prior Ensure")
+		}
+		if a.Bool(t, 1) {
+			testutil.WriteTree(t, up, map[string]string{"extra.txt": "x\n"})
+			testutil.GitRepo(t, up)
+		}
+		var dir string
+		out, err := testutil.CaptureStdout(t, func() error {
+			var e error
+			dir, e = Ensure(home, url, "p")
+			return e
+		})
+		require.NoError(t, err)
+		assert.Equal(t, Dir(home, url), dir)
+		out = testutil.StripANSI(out)
+		vars := map[string]string{"URL": url, "DIR": dir}
+		for _, m := range c.Expected.StdOut {
+			testyml.MustMatch(t, out, testyml.Expand(m, vars))
+		}
+		for _, m := range c.NotExpected.StdOut {
+			testyml.MustNotMatch(t, out, testyml.Expand(m, vars))
+		}
+		if c.Expected.Output.Silent {
+			assert.Empty(t, strings.TrimSpace(out), "no-change pull must stay silent")
+		}
+		for _, f := range c.Expected.Output.Files {
+			_, err := os.Stat(filepath.Join(dir, f))
+			assert.NoErrorf(t, err, "checkout missing %s", f)
+		}
 	})
-	require.NoError(t, err, "Ensure (clone)")
-	assert.Equal(t, Dir(home, url), dir)
-	_, err = os.Stat(filepath.Join(dir, "che.yml"))
-	require.NoError(t, err, "clone missing che.yml")
-	testutil.WantLines(t, out, "plugin(p): cloned "+url+" -> "+dir)
-	testutil.NotLine(t, out, "clone "+url)
-
-	out, err = testutil.CaptureStdout(t, func() error {
-		_, e := Ensure(home, url, "p")
-		return e
-	})
-	require.NoError(t, err, "Ensure (no-change pull)")
-	assert.Empty(t, strings.TrimSpace(out), "no-change pull must stay silent")
-
-	testutil.WriteTree(t, up, map[string]string{"extra.txt": "x\n"})
-	testutil.GitRepo(t, up)
-	out, err = testutil.CaptureStdout(t, func() error {
-		_, e := Ensure(home, url, "p")
-		return e
-	})
-	require.NoError(t, err, "Ensure (pull)")
-	_, err = os.Stat(filepath.Join(dir, "extra.txt"))
-	assert.NoError(t, err, "pull must fetch extra.txt")
-	pulledRe := regexp.MustCompile(`plugin\(p\): pulled [0-9a-f]{7}\.\.[0-9a-f]{7} ` + regexp.QuoteMeta(dir))
-	assert.True(t, pulledRe.MatchString(testutil.StripANSI(out)), "output %q missing pulled <old7>..<new7> line", out)
-	testutil.NotLine(t, out, "pull "+dir)
 }
 
 // [<] 🤖🤖

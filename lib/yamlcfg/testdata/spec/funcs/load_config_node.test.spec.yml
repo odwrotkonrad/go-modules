@@ -28,4 +28,9 @@ cases:
       args: [user: testdata/fixture/load_config/empty.yml]
     expected:
       exitCode: 0
+  - name: ShouldExit12WhenUserConfigUnreadable
+    input:
+      args: [unreadable: true]
+    expected:
+      exitCode: 12
 # [<] 🤖🤖
