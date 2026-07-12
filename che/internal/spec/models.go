@@ -10,7 +10,7 @@ import (
 //
 //	CheSpec  che.yml: every top-level key one Profile
 //	  Profile
-//	    ProfileOptions  eligibility: autoExec, execIf predicates
+//	    ProfileOptions  eligibility: autoDiscover, execIf predicates
 //	    mixinProfiles   local profile names composed depth-first
 //	    plugins         pluginEntry -> PluginRef: a profile from another repo
 //	    includeSet      additive payload per op
@@ -28,7 +28,7 @@ type CheSpec struct {
 
 type Profile struct {
 	Name          string         `yaml:"-" jsonschema:"-"`
-	Options       ProfileOptions `yaml:"options" jsonschema_description:"when the profile runs: autoExec opts in to bare-che runs, execIf predicates must ALL pass"`
+	Options       ProfileOptions `yaml:"options" jsonschema_description:"when the profile runs: autoDiscover opts in to bare-che runs, execIf predicates must ALL pass"`
 	MixinProfiles []string       `yaml:"mixinProfiles" jsonschema_description:"local profile names composed depth-first, in order"`
 	Plugins       []pluginEntry  `yaml:"plugins"`
 	Include       includeSet     `yaml:"include"`
@@ -37,8 +37,8 @@ type Profile struct {
 
 // ProfileOptions self-describes when a profile runs.
 type ProfileOptions struct {
-	ExecIf   []string `yaml:"execIf"`
-	AutoExec bool     `yaml:"autoExec" jsonschema_description:"run on bare che (default false: runs only via --profile or mixinProfiles)"`
+	ExecIf       []string `yaml:"execIf"`
+	AutoDiscover bool     `yaml:"autoDiscover" jsonschema_description:"run on bare che (default false: runs only via --profile or mixinProfiles)"`
 }
 
 // PluginRef is one parsed plugins entry: a profile defined in another repo,

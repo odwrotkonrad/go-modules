@@ -25,6 +25,7 @@ if [[ "${PUBLISH_PREBUILT:-0}" == 1 ]] {
 } else {
   MODULE_VERSION="$MODULE_VERSION" goreleaser release --verbose --snapshot --clean -f .goreleaser.yaml
 }
+if [[ -d darwin-dist ]] ( cd darwin-dist && sha256sum -- *.tar.gz >> ../dist/checksums.txt )
 
 typeset -a FILES
 FILES=(

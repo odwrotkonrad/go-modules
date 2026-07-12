@@ -67,10 +67,10 @@ type effective struct {
 }
 
 // EligibleProfiles lists the profiles to Resolve, in declaration order:
-//  1. forceOne (--profile by name): only that profile, autoExec skipped,
+//  1. forceOne (--profile by name): only that profile, autoDiscover skipped,
 //     execIf still enforced (forceAll = --skip-exec-if lifts it).
-//  2. else every autoExec profile whose execIf expressions ALL pass
-//     (forceAll makes every execIf pass, it does not lift autoExec).
+//  2. else every autoDiscover profile whose execIf expressions ALL pass
+//     (forceAll makes every execIf pass, it does not lift autoDiscover).
 //  3. zero eligible: error.
 func (r *CheSpec) EligibleProfiles(forceOne string, forceAll bool, eval func(expr string) (bool, error)) ([]string, error) {
 	if forceOne != "" {
@@ -89,7 +89,7 @@ func (r *CheSpec) EligibleProfiles(forceOne string, forceAll bool, eval func(exp
 	}
 	var out []string
 	for _, ps := range r.profiles {
-		if !ps.Options.AutoExec {
+		if !ps.Options.AutoDiscover {
 			continue
 		}
 		ok, err := allPass(ps.Name, ps.Options.ExecIf, forceAll, eval)
@@ -101,8 +101,8 @@ func (r *CheSpec) EligibleProfiles(forceOne string, forceAll bool, eval func(exp
 		}
 	}
 	if len(out) == 0 {
-		return nil, fmt.Errorf("no eligible profile: no autoExec profile passed its execIf (candidates: %v; use --profile or CHE_SKIP_EXEC_IF)",
-			r.names(func(ps Profile) bool { return ps.Options.AutoExec }))
+		return nil, fmt.Errorf("no eligible profile: no autoDiscover profile passed its execIf (candidates: %v; use --profile or CHE_SKIP_EXEC_IF)",
+			r.names(func(ps Profile) bool { return ps.Options.AutoDiscover }))
 	}
 	return out, nil
 }

@@ -71,7 +71,7 @@ base-exclude-cli:
     services: [grafana, prometheus]
 
 desktop/macos:
-  options: {autoExec: true, execIf: ['builtin:isOs == macos', 'builtin:isVirt == false']}
+  options: {autoDiscover: true, execIf: ['builtin:isOs == macos', 'builtin:isVirt == false']}
   mixinProfiles: [base]
   plugins:
     - "@git@gitlab.com:group/repo.git::someProfile"
@@ -80,11 +80,11 @@ desktop/macos:
         SOME_VAR: value
 
 cli/linux:
-  options: {autoExec: true, execIf: ['builtin:isOs == linux']}
+  options: {autoDiscover: true, execIf: ['builtin:isOs == linux']}
   mixinProfiles: [base, base-exclude-cli]
 
 ontoRepo:
-  options: {autoExec: true}
+  options: {autoDiscover: true}
   include:
     renderTemplates:
       - files:
@@ -101,7 +101,7 @@ ontoRepo:
 
 ```yaml
 <profile-name>:
-  options: {autoExec: true, execIf: ['builtin:isOs == macos']}
+  options: {autoDiscover: true, execIf: ['builtin:isOs == macos']}
   mixinProfiles: [base]
   plugins:
     - "@git@gitlab.com:group/repo.git::profile"
@@ -114,7 +114,7 @@ every eligible profile. `$ che --profile <name>`: exactly one.
 
 ### options
 
-- `autoExec` (bool, default `false`): run on bare `$ che`. Off: runs only via
+- `autoDiscover` (bool, default `false`): run on bare `$ che`. Off: runs only via
   `--profile` or `mixinProfiles`.
 - `execIf` (string list): predicates, ALL must pass. `<source>` (truthy:
   builtin iff `true`, env iff set non-empty) or `<source> == <literal>`

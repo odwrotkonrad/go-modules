@@ -14,7 +14,7 @@ base:
     services: [otelcol, grafana]
 
 cli/macos:
-  options: {autoExec: true}
+  options: {autoDiscover: true}
   mixinProfiles: [base]
   exclude:
     link:

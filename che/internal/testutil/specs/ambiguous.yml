@@ -1,5 +1,5 @@
 repo:
-  options: {autoExec: true}
+  options: {autoDiscover: true}
   include:
     renderTemplates:
       - files:
@@ -7,7 +7,7 @@ repo:
             dest:
               - {path: .env, options: {writeType: mergeUpsert}}
 other:
-  options: {autoExec: true}
+  options: {autoDiscover: true}
   include:
     renderTemplates:
       - files:

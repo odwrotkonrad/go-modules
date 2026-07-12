@@ -11,7 +11,7 @@ loads the union of files/dirs/installs/services those profiles select.
 | `--debug` | `CHE_DEBUG` | `bool` | `false` | print debug-level lines (plugin announce, clone/pull attempts) |
 | `-C`, `--directory` | `CHE_DIR` | `string` |  | change into this directory before resolving the repo |
 | `--dry-run` | `CHE_DRY_RUN` | `delta (changed dests, bare-flag default)` \| `all (every dest)` | `off` | print mutating actions instead of executing them |
-| `--profile` | `CHE_PROFILE` | `string` |  | run only this profile (autoExec skipped, execIf still enforced) |
+| `--profile` | `CHE_PROFILE` | `string` |  | run only this profile (autoDiscover skipped, execIf still enforced) |
 | `--skip-exec-if` | `CHE_SKIP_EXEC_IF` | `bool` | `false` | treat every execIf predicate as passing |
 | `--skip-plugins` | `CHE_SKIP_PLUGINS` | `bool` | `false` | skip plugins entries, load only the local repo |
 | `--validate-spec` | `CHE_VALIDATE_SPEC` | `warn (log violations)` \| `error (abort on violations)` | `warn` | validate each loaded che.yml spec against the JSON Schema |
