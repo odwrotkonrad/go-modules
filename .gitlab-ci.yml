@@ -43,14 +43,22 @@ warm-go-mod-release:
   stage: warm
   image: $CI_IMAGE
   rules:
-    - if: $CI_COMMIT_TAG =~ /^(che|get-os-open-files-with|get-term-open-files-with)\/v/
+    - if: $CI_COMMIT_TAG =~ /^che\/v/
+      variables:
+        MODULE: che
+    - if: $CI_COMMIT_TAG =~ /^get-os-open-files-with\/v/
+      variables:
+        MODULE: get-os-open-files-with
+    - if: $CI_COMMIT_TAG =~ /^get-term-open-files-with\/v/
+      variables:
+        MODULE: get-term-open-files-with
   cache:
-    - key: go-mod
+    - key: go-mod-$MODULE
       paths:
         - .cache/go-mod
       policy: pull-push
   script:
-    - (cd "${CI_COMMIT_TAG%%/v*}" && go mod download all)
+    - (cd $MODULE && go mod download all)
 
 validate-pre-commit-all:
   stage: validate
@@ -236,7 +244,7 @@ goreleaser-darwin-che:
     GORELEASER_VERSION: 2.16.0
     GORELEASER_SHA256_DARWIN_ARM64: 8f6898256f35531165d90f2db581c5ee0d32bda83ebc25ac231ff5bdb9d2071a
   cache:
-    - key: go-mod
+    - key: go-mod-che
       paths:
         - .cache/go-mod
       policy: pull
@@ -272,7 +280,7 @@ goreleaser-linux-che:
     matrix:
       - ARCH: [amd64, arm64]
   cache:
-    - key: go-mod
+    - key: go-mod-che
       paths:
         - .cache/go-mod
       policy: pull
@@ -309,7 +317,7 @@ publish-get-os-open-files-with:
   rules:
     - if: $CI_COMMIT_TAG =~ /^get-os-open-files-with\/v/
   cache:
-    - key: go-mod
+    - key: go-mod-get-os-open-files-with
       paths:
         - .cache/go-mod
       policy: pull
@@ -326,7 +334,7 @@ publish-get-term-open-files-with:
   rules:
     - if: $CI_COMMIT_TAG =~ /^get-term-open-files-with\/v/
   cache:
-    - key: go-mod
+    - key: go-mod-get-term-open-files-with
       paths:
         - .cache/go-mod
       policy: pull
