@@ -1,5 +1,6 @@
-// [>] 🤖🤖
 package lib
+
+// [>] 🤖🤖
 
 import (
 	"cmp"

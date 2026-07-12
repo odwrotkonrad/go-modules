@@ -1,5 +1,7 @@
-// [>] 🤖🤖
+// Package testyml runs <unit>.spec.yml table specs from embedded testdata and materializes fixture trees.
 package testyml
+
+// [>] 🤖🤖
 
 import (
 	"bytes"

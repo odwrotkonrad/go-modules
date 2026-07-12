@@ -1,5 +1,7 @@
-// [>] 🤖🤖
+// Get-term-open-files-with prints <ext>=<opener> zsh suffix-alias lines from the merged term-open-files-with.yml.
 package main
+
+// [>] 🤖🤖
 
 import (
 	"gitlab.com/konradodwrot/go-modules/get-term-open-files-with/lib"

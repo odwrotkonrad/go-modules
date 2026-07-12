@@ -1,5 +1,7 @@
-// [>] 🤖🤖
+// Package render is the shared gomplate engine: template funcs, op:// secret resolution, remoteFile inclusion, frontmatter, markdown transforms, doc generators.
 package render
+
+// [>] 🤖🤖
 
 import (
 	"bytes"

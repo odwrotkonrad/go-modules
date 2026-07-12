@@ -1,5 +1,6 @@
-// [>] 🤖🤖
 package climain
+
+// [>] 🤖🤖
 
 import (
 	"embed"

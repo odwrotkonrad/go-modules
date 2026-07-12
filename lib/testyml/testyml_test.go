@@ -1,5 +1,6 @@
-// [>] 🤖🤖
 package testyml
+
+// [>] 🤖🤖
 
 import (
 	"embed"

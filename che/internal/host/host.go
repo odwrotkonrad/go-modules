@@ -1,3 +1,4 @@
+// Package host applies resolved ops onto a target host: links, copies, renders, dirs, services, anchored at a repo root and home.
 package host
 
 // [>] 🤖🤖

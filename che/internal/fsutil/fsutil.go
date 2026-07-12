@@ -1,3 +1,4 @@
+// Package fsutil bundles filesystem helpers for ops: repo root and home resolution, path expansion, archiving.
 package fsutil
 
 // [>] 🤖🤖

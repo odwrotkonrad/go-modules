@@ -1,5 +1,7 @@
-// [>] 🤖🤖
+// Package yamlcfg loads system + user YAML config files deep-merged, failing with coded errors.
 package yamlcfg
+
+// [>] 🤖🤖
 
 import (
 	"cmp"

@@ -1,3 +1,4 @@
+// Package spec parses, schema-validates, and resolves che.yml: profiles, include/exclude sets, plugin refs.
 package spec
 
 // [>] 🤖🤖

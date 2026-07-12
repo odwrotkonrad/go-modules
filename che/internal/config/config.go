@@ -1,3 +1,4 @@
+// Package config carries che's resolved runtime options: flag values with env fallbacks, keyed for op-level queries.
 package config
 
 // [>] 🤖🤖

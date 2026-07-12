@@ -1,3 +1,4 @@
+// Che loads declarative host configuration: resolves eligible che.yml profiles and applies their links, copies, renders, dirs, scripts, services.
 package main
 
 // [>] 🤖

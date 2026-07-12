@@ -1,3 +1,4 @@
+// Package lib parses Makefiles via tree-sitter into the sectioned doc model rendered by render-makefile-doc.
 package lib
 
 import (

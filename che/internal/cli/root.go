@@ -1,3 +1,4 @@
+// Package cli builds che's cobra command tree and orchestrates ops across the local repo and plugin checkouts.
 package cli
 
 // [>] 🤖🤖

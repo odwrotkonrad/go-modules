@@ -1,5 +1,7 @@
-// [>] 🤖🤖
+// Package checkcmd implements the render CLIs' --check mode: render aside, diff against the dest, non-zero on drift.
 package checkcmd
+
+// [>] 🤖🤖
 
 import (
 	"fmt"

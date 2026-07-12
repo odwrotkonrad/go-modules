@@ -1,5 +1,7 @@
-// [>] 🤖🤖
+// Package climain owns the shared CLI main shape: help/version dispatch, coded-exit epilogue.
 package climain
+
+// [>] 🤖🤖
 
 import (
 	"fmt"
