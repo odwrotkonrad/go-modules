@@ -22,6 +22,11 @@ validate-pre-commit-all:
   image: $CI_IMAGE
   rules:
     - if: $CI_PIPELINE_SOURCE == "merge_request_event"
+  cache:
+    - key: go-precommit-all
+      paths:
+        - .cache/go-mod
+        - .cache/go-build
   script:
     - make run-repo-ci-precommit-all
     - git diff --exit-code HEAD
@@ -49,9 +54,7 @@ test-che:
     - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
       changes: [che/**/*, lib/**/*, go.work, .gitlab-ci.yml]
   cache:
-    - key:
-        files:
-          - che/go.sum
+    - key: go-che
       paths:
         - .cache/go-mod
         - .cache/go-build
@@ -66,9 +69,7 @@ test-get-os-open-files-with:
     - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
       changes: [get-os-open-files-with/**/*, lib/**/*, go.work, .gitlab-ci.yml]
   cache:
-    - key:
-        files:
-          - get-os-open-files-with/go.sum
+    - key: go-get-os-open-files-with
       paths:
         - .cache/go-mod
         - .cache/go-build
@@ -83,9 +84,7 @@ test-get-term-open-files-with:
     - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
       changes: [get-term-open-files-with/**/*, lib/**/*, go.work, .gitlab-ci.yml]
   cache:
-    - key:
-        files:
-          - get-term-open-files-with/go.sum
+    - key: go-get-term-open-files-with
       paths:
         - .cache/go-mod
         - .cache/go-build
@@ -100,9 +99,7 @@ test-lib:
     - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
       changes: [lib/**/*, go.work, .gitlab-ci.yml]
   cache:
-    - key:
-        files:
-          - lib/go.sum
+    - key: go-lib
       paths:
         - .cache/go-mod
         - .cache/go-build
@@ -211,10 +208,7 @@ goreleaser-darwin-che:
     GORELEASER_VERSION: 2.16.0
     GORELEASER_SHA256_DARWIN_ARM64: 8f6898256f35531165d90f2db581c5ee0d32bda83ebc25ac231ff5bdb9d2071a
   cache:
-    - key:
-        files:
-          - che/go.sum
-        prefix: darwin
+    - key: go-che-darwin
       paths:
         - .cache/go-mod
         - .cache/go-build
@@ -247,10 +241,7 @@ goreleaser-linux-che:
     matrix:
       - ARCH: [amd64, arm64]
   cache:
-    - key:
-        files:
-          - che/go.sum
-        prefix: zig-$ARCH
+    - key: go-che-zig-$ARCH
       paths:
         - .cache/go-mod
         - .cache/go-build
@@ -284,13 +275,10 @@ publish-get-os-open-files-with:
   rules:
     - if: $CI_COMMIT_TAG =~ /^get-os-open-files-with\/v/
   cache:
-    - key:
-        files:
-          - get-os-open-files-with/go.sum
+    - key: go-get-os-open-files-with
       paths:
         - .cache/go-mod
         - .cache/go-build
-      policy: pull
   script:
     - make publish
 
@@ -301,13 +289,10 @@ publish-get-term-open-files-with:
   rules:
     - if: $CI_COMMIT_TAG =~ /^get-term-open-files-with\/v/
   cache:
-    - key:
-        files:
-          - get-term-open-files-with/go.sum
+    - key: go-get-term-open-files-with
       paths:
         - .cache/go-mod
         - .cache/go-build
-      policy: pull
   script:
     - make publish
 ##[<] 🤖🤖
