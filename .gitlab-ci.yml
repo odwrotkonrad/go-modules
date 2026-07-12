@@ -39,33 +39,6 @@ warm-go:
     - for m in lib che get-os-open-files-with get-term-open-files-with; do (cd $m && echo "## download $m" && go mod download all) || exit 1; done
     - for m in lib che; do (cd $m && echo "## build $m" && go build -v ./...) || exit 1; done
 
-warm-go-mod-darwin:
-  stage: warm
-  needs: []
-  tags:
-    - saas-macos-medium-m1
-  image: macos-26-xcode-26
-  rules:
-    - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
-      changes: [che/**/*, lib/**/*, go.work, .gitlab-ci.yml]
-  variables:
-    GOPATH: $CI_PROJECT_DIR/.cache/go-path
-    GO_VERSION: 1.26.4
-    GO_SHA256_DARWIN_ARM64: b62ad2b6d7d2464f12a5bcad7ff47f19d08325773b5efd21610e445a05a9bf53
-  cache:
-    - key: go-mod-che
-      paths:
-        - .cache/go-mod
-      policy: pull-push
-  before_script:
-    - curl -fsSL -o /tmp/go.tar.gz "https://go.dev/dl/go${GO_VERSION}.darwin-arm64.tar.gz"
-    - echo "$GO_SHA256_DARWIN_ARM64  /tmp/go.tar.gz" | shasum -a 256 -c -
-    - tar -C "$HOME" -xzf /tmp/go.tar.gz
-    - export PATH="$HOME/go/bin:$PATH"
-    - go version
-  script:
-    - (cd che && go mod download all)
-
 verify-precommit-all:
   stage: verify
   image: $CI_IMAGE
