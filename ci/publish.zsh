@@ -27,20 +27,27 @@ if [[ "${PUBLISH_PREBUILT:-0}" == 1 ]] {
 }
 
 typeset -a FILES
-FILES=(dist/*.tar.gz(N) dist/checksums.txt(N) darwin-dist/*.tar.gz(N))
-if [[ "$MODULE" == che ]] FILES+=(assets/data/che.schema.json)
+FILES=(
+  dist/${MODULE}_*.tar.gz(N) darwin-dist/${MODULE}_*.tar.gz(N)
+  dist/render-*.tar.gz(N) darwin-dist/render-*.tar.gz(N)
+  dist/checksums.txt(N)
+)
+if [[ "$MODULE" == che ]] FILES+=(assets/data/che.schema.json dist/che-docs_*.tar.gz(N))
 
 PKG="${CI_API_V4_URL}/projects/${CI_PROJECT_ID}/packages/generic/${MODULE}/${MODULE_VERSION}"
 TAG_ENC="${TAG//\//%2F}"
 
 for f in $FILES; do
   NAME="${f:t}"
-  echo "uploading ${NAME}"
+  TYPE=other
+  if [[ "$NAME" == *.tar.gz && "$NAME" != che-docs_* ]] TYPE=package
+  echo "uploading ${NAME} (${TYPE})"
   curl -fsSL --header "JOB-TOKEN: ${CI_JOB_TOKEN}" --upload-file "$f" "${PKG}/${NAME}"
   echo
   curl -fsSL --request POST --header "JOB-TOKEN: ${CI_JOB_TOKEN}" \
     --data-urlencode "name=${NAME}" \
     --data-urlencode "url=${PKG}/${NAME}" \
+    --data-urlencode "link_type=${TYPE}" \
     "${CI_API_V4_URL}/projects/${CI_PROJECT_ID}/releases/${TAG_ENC}/assets/links"
   echo
 done
