@@ -219,6 +219,16 @@ pages-publish:
     - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
       changes: [che/**/*]
 
+docs-che:
+  extends: .pages-build
+  stage: release
+  rules:
+    - if: $CI_COMMIT_TAG =~ /^che\/v/
+  artifacts:
+    paths:
+      - public
+    expire_in: 1 day
+
 pages-preview:
   extends: .pages-build
   stage: make-docs
@@ -310,6 +320,7 @@ publish-che:
   needs:
     - goreleaser-darwin-che
     - goreleaser-linux-che
+    - docs-che
   rules:
     - if: $CI_COMMIT_TAG =~ /^che\/v/
   variables:
