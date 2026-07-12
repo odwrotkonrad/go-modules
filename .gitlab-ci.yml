@@ -23,9 +23,11 @@ validate-pre-commit-all:
   rules:
     - if: $CI_PIPELINE_SOURCE == "merge_request_event"
   cache:
-    - key: go-precommit-all
+    - key: go-mod-precommit
       paths:
         - .cache/go-mod
+    - key: go-build-precommit
+      paths:
         - .cache/go-build
   script:
     - make run-repo-ci-precommit-all
@@ -54,9 +56,13 @@ test-che:
     - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
       changes: [che/**/*, lib/**/*, go.work, .gitlab-ci.yml]
   cache:
-    - key: go-che
+    - key: go-mod-che
       paths:
         - .cache/go-mod
+    - key: go-build-che-$CI_COMMIT_REF_SLUG
+      fallback_keys:
+        - go-build-che-main
+      paths:
         - .cache/go-build
 
 test-get-os-open-files-with:
@@ -69,9 +75,13 @@ test-get-os-open-files-with:
     - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
       changes: [get-os-open-files-with/**/*, lib/**/*, go.work, .gitlab-ci.yml]
   cache:
-    - key: go-get-os-open-files-with
+    - key: go-mod-get-os-open-files-with
       paths:
         - .cache/go-mod
+    - key: go-build-get-os-open-files-with-$CI_COMMIT_REF_SLUG
+      fallback_keys:
+        - go-build-get-os-open-files-with-main
+      paths:
         - .cache/go-build
 
 test-get-term-open-files-with:
@@ -84,9 +94,13 @@ test-get-term-open-files-with:
     - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
       changes: [get-term-open-files-with/**/*, lib/**/*, go.work, .gitlab-ci.yml]
   cache:
-    - key: go-get-term-open-files-with
+    - key: go-mod-get-term-open-files-with
       paths:
         - .cache/go-mod
+    - key: go-build-get-term-open-files-with-$CI_COMMIT_REF_SLUG
+      fallback_keys:
+        - go-build-get-term-open-files-with-main
+      paths:
         - .cache/go-build
 
 test-lib:
@@ -99,9 +113,13 @@ test-lib:
     - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
       changes: [lib/**/*, go.work, .gitlab-ci.yml]
   cache:
-    - key: go-lib
+    - key: go-mod-lib
       paths:
         - .cache/go-mod
+    - key: go-build-lib-$CI_COMMIT_REF_SLUG
+      fallback_keys:
+        - go-build-lib-main
+      paths:
         - .cache/go-build
 
 .release-module:
@@ -208,9 +226,11 @@ goreleaser-darwin-che:
     GORELEASER_VERSION: 2.16.0
     GORELEASER_SHA256_DARWIN_ARM64: 8f6898256f35531165d90f2db581c5ee0d32bda83ebc25ac231ff5bdb9d2071a
   cache:
-    - key: go-che-darwin
+    - key: go-mod-che
       paths:
         - .cache/go-mod
+    - key: go-build-che-darwin
+      paths:
         - .cache/go-build
   before_script:
     - curl -fsSL -o /tmp/go.tar.gz "https://go.dev/dl/go${GO_VERSION}.darwin-arm64.tar.gz"
@@ -241,9 +261,11 @@ goreleaser-linux-che:
     matrix:
       - ARCH: [amd64, arm64]
   cache:
-    - key: go-che-zig-$ARCH
+    - key: go-mod-che
       paths:
         - .cache/go-mod
+    - key: go-build-che-zig-$ARCH
+      paths:
         - .cache/go-build
   script:
     - export MODULE_VERSION="${CI_COMMIT_TAG#che/v}"
@@ -275,9 +297,11 @@ publish-get-os-open-files-with:
   rules:
     - if: $CI_COMMIT_TAG =~ /^get-os-open-files-with\/v/
   cache:
-    - key: go-get-os-open-files-with
+    - key: go-mod-get-os-open-files-with
       paths:
         - .cache/go-mod
+    - key: go-build-get-os-open-files-with-publish
+      paths:
         - .cache/go-build
   script:
     - make publish
@@ -289,9 +313,11 @@ publish-get-term-open-files-with:
   rules:
     - if: $CI_COMMIT_TAG =~ /^get-term-open-files-with\/v/
   cache:
-    - key: go-get-term-open-files-with
+    - key: go-mod-get-term-open-files-with
       paths:
         - .cache/go-mod
+    - key: go-build-get-term-open-files-with-publish
+      paths:
         - .cache/go-build
   script:
     - make publish
