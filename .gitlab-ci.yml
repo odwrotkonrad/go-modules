@@ -39,26 +39,32 @@ warm-go:
     - for m in lib che get-os-open-files-with get-term-open-files-with; do (cd $m && echo "## download $m" && go mod download all) || exit 1; done
     - for m in lib che; do (cd $m && echo "## build $m" && go build -v ./...) || exit 1; done
 
-warm-go-mod-release:
+warm-go-mod-darwin:
   stage: warm
-  image: $CI_IMAGE
+  needs: []
+  tags:
+    - saas-macos-medium-m1
+  image: macos-26-xcode-26
   rules:
-    - if: $CI_COMMIT_TAG =~ /^che\/v/
-      variables:
-        MODULE: che
-    - if: $CI_COMMIT_TAG =~ /^get-os-open-files-with\/v/
-      variables:
-        MODULE: get-os-open-files-with
-    - if: $CI_COMMIT_TAG =~ /^get-term-open-files-with\/v/
-      variables:
-        MODULE: get-term-open-files-with
+    - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
+      changes: [che/**/*, lib/**/*, go.work, .gitlab-ci.yml]
+  variables:
+    GOPATH: $CI_PROJECT_DIR/.cache/go-path
+    GO_VERSION: 1.26.4
+    GO_SHA256_DARWIN_ARM64: b62ad2b6d7d2464f12a5bcad7ff47f19d08325773b5efd21610e445a05a9bf53
   cache:
-    - key: go-mod-$MODULE
+    - key: go-mod-che
       paths:
         - .cache/go-mod
       policy: pull-push
+  before_script:
+    - curl -fsSL -o /tmp/go.tar.gz "https://go.dev/dl/go${GO_VERSION}.darwin-arm64.tar.gz"
+    - echo "$GO_SHA256_DARWIN_ARM64  /tmp/go.tar.gz" | shasum -a 256 -c -
+    - tar -C "$HOME" -xzf /tmp/go.tar.gz
+    - export PATH="$HOME/go/bin:$PATH"
+    - go version
   script:
-    - (cd $MODULE && go mod download all)
+    - (cd che && go mod download all)
 
 verify-precommit-all:
   stage: verify
@@ -247,7 +253,7 @@ goreleaser-darwin-che:
     - key: go-mod-che
       paths:
         - .cache/go-mod
-      policy: pull
+      policy: pull-push
     - key: go-build-che-darwin
       paths:
         - .cache/go-build
@@ -280,7 +286,7 @@ goreleaser-linux-che:
     matrix:
       - ARCH: [amd64, arm64]
   cache:
-    - key: go-mod-che
+    - key: go-mod
       paths:
         - .cache/go-mod
       policy: pull
@@ -317,7 +323,7 @@ publish-get-os-open-files-with:
   rules:
     - if: $CI_COMMIT_TAG =~ /^get-os-open-files-with\/v/
   cache:
-    - key: go-mod-get-os-open-files-with
+    - key: go-mod
       paths:
         - .cache/go-mod
       policy: pull
@@ -334,7 +340,7 @@ publish-get-term-open-files-with:
   rules:
     - if: $CI_COMMIT_TAG =~ /^get-term-open-files-with\/v/
   cache:
-    - key: go-mod-get-term-open-files-with
+    - key: go-mod
       paths:
         - .cache/go-mod
       policy: pull
