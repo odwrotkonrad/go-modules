@@ -12,9 +12,9 @@ import (
 
 // runScriptsRunE is the run-scripts RunE: the step op plus the name-substring
 // arg filter and a no-match check across all units.
-func (c *CheApp) runScriptsRunE(cmd *cobra.Command, args []string) error {
+func (app *CheApp) runScriptsRunE(cmd *cobra.Command, args []string) error {
 	total := 0
-	err := c.forEachRepoUnit(cmd.Name(), func(u repoUnit) error {
+	err := app.forEachRepoUnit(cmd.Name(), func(u repoUnit) error {
 		n, err := runScripts(u, args)
 		total += n
 		return err

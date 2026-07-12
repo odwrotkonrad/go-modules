@@ -56,9 +56,9 @@ func steps() []step {
 		},
 		{
 			name: "render-templates", short: "render *.tpl sources; each dest path decides target (relative -> repo, ~/ or absolute -> host)",
-			op: func(c *CheApp, u repoUnit) error {
+			op: func(app *CheApp, u repoUnit) error {
 				return u.host.RenderTemplates(u.res.Templates,
-					boolOrEnv(c.renderSkipSecrets, "CHE_RENDER_TEMPLATES_SKIP_SECRETS"))
+					boolOrEnv(app.renderSkipSecrets, "CHE_RENDER_TEMPLATES_SKIP_SECRETS"))
 			},
 			selected: func(r spec.Resolved) bool { return len(r.Templates) > 0 },
 		},
@@ -87,21 +87,21 @@ func steps() []step {
 
 // stepCmd builds a step's subcommand: RunE runs its op over every repoUnit.
 // run-scripts and render-templates layer their arg filter / flag on top.
-func (c *CheApp) stepCmd(s step) *cobra.Command {
+func (app *CheApp) stepCmd(s step) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   s.name,
 		Short: s.short,
 		RunE: func(cmd *cobra.Command, args []string) error {
-			return c.forEachRepoUnit(cmd.Name(), func(u repoUnit) error { return s.op(c, u) })
+			return app.forEachRepoUnit(cmd.Name(), func(u repoUnit) error { return s.op(app, u) })
 		},
 	}
 	switch s.name {
 	case "render-templates":
-		cmd.Flags().BoolVar(&c.renderSkipSecrets, "skip-secrets", false,
+		cmd.Flags().BoolVar(&app.renderSkipSecrets, "skip-secrets", false,
 			"skip sources carrying op:// secret refs (logged, dests untouched); env: CHE_RENDER_TEMPLATES_SKIP_SECRETS")
 	case "run-scripts":
 		cmd.Use = "run-scripts [name...]"
-		cmd.RunE = c.runScriptsRunE
+		cmd.RunE = app.runScriptsRunE
 	}
 	return cmd
 }

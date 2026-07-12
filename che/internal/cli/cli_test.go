@@ -38,7 +38,7 @@ func repoEnv(t *testing.T, pwd string) (*CheApp, *cobra.Command, string) {
 	return a, root, home
 }
 
-// setupMock: safe doubles in every built Host, a.buildUnits() already run.
+// setupMock: safe doubles in every built Host, a.initApp() already run.
 func setupMock(t *testing.T, pwd, profile string, decl map[string]string) (*CheApp, *cobra.Command, string) {
 	t.Helper()
 	a, root, home := repoEnv(t, pwd)
@@ -52,7 +52,7 @@ func setupMock(t *testing.T, pwd, profile string, decl map[string]string) (*CheA
 	}
 	testyml.Swap(t, &host.Sleep, testutil.SleepMock)
 
-	require.NoError(t, a.buildUnits())
+	require.NoError(t, a.initApp())
 	return a, root, home
 }
 
@@ -61,8 +61,8 @@ type buildWant struct {
 	DryRunAll bool   `yaml:"dryRunAll"`
 }
 
-func TestBuildUnits(t *testing.T) {
-	testyml.Run(t, td, "testdata/spec/funcs/build_units.test.spec.yml",
+func TestInitApp(t *testing.T) {
+	testyml.Run(t, td, "testdata/spec/funcs/init_app.test.spec.yml",
 		func(t *testing.T, c testyml.Case[buildWant]) {
 			a, _, _ := repoEnv(t, c.Context.Pwd)
 			t.Setenv("CHE_DRY_RUN", "")
@@ -79,7 +79,7 @@ func TestBuildUnits(t *testing.T) {
 				require.NoError(t, err)
 				require.NoError(t, f.Close())
 			}
-			err := a.buildUnits()
+			err := a.initApp()
 			if c.Expected.Check(t, err) {
 				return
 			}

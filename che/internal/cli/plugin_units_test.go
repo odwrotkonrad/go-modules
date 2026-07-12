@@ -101,10 +101,10 @@ func TestForEachUnit(t *testing.T) {
 
 			a := New()
 			a.skipPlugins = knobs.SkipPlugins
-			buildOut, err := testutil.CaptureStdout(t, a.buildUnits)
-			require.NoErrorf(t, err, "buildUnits()\n%s", buildOut)
-			require.Len(t, a.units, 1, "buildUnits() must defer plugins")
-			require.NotContains(t, buildOut, "plugin", "buildUnits() must defer plugins")
+			buildOut, err := testutil.CaptureStdout(t, a.initApp)
+			require.NoErrorf(t, err, "initApp()\n%s", buildOut)
+			require.Len(t, a.units, 1, "initApp() must defer plugins")
+			require.NotContains(t, buildOut, "plugin", "initApp() must defer plugins")
 			if c.Expected.Output.PluginRefs != nil {
 				assert.Len(t, a.pluginRefs, *c.Expected.Output.PluginRefs, "pluginRefs")
 			}
