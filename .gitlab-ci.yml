@@ -36,8 +36,8 @@ warm-go:
         - .cache/go-build
       policy: pull-push
   script:
-    - for m in lib che get-os-open-files-with get-term-open-files-with; do (cd $m && echo "== download $m" && go mod download all) || exit 1; done
-    - for m in lib che; do (cd $m && echo "== build $m" && go build -v ./...) || exit 1; done
+    - for m in lib che get-os-open-files-with get-term-open-files-with; do (cd $m && echo "## download $m" && go mod download all) || exit 1; done
+    - for m in lib che; do (cd $m && echo "## build $m" && go build -v ./...) || exit 1; done
 
 validate-pre-commit-all:
   stage: validate
