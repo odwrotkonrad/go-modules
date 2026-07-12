@@ -3,8 +3,9 @@ package fsutil
 // [>] 🤖🤖
 
 import (
-	"path/filepath"
 	"strings"
+
+	"github.com/bmatcuk/doublestar/v4"
 )
 
 // IsGlobMatch matches path against pattern. ** spans separators, * one segment, prefix may end in * (suffix glob).
@@ -12,30 +13,8 @@ func IsGlobMatch(pattern, path string) bool {
 	if base, ok := strings.CutSuffix(pattern, "/**"); ok {
 		return IsUnder(path, base)
 	}
-	if strings.Contains(pattern, "**") {
-		return isDoublestarMatch(pattern, path)
-	}
-	ok, err := filepath.Match(pattern, path)
+	ok, err := doublestar.Match(pattern, path)
 	return err == nil && ok
-}
-
-// isDoublestarMatch matches an interior **.
-func isDoublestarMatch(pattern, path string) bool {
-	parts := strings.SplitN(pattern, "**", 2)
-	pre, post := parts[0], strings.TrimPrefix(parts[1], "/")
-	if !strings.HasPrefix(path, pre) {
-		return false
-	}
-	rest := strings.TrimPrefix(path, pre)
-	if post == "" {
-		return true
-	}
-	tail := rest
-	if i := strings.LastIndex(rest, "/"); i >= 0 {
-		tail = rest[i+1:]
-	}
-	ok, _ := filepath.Match(post, tail)
-	return ok
 }
 
 // ExpandBraces expands {a,b,c} groups into the cartesian product (zsh-style), e.g. "x/{a,b}/y" -> ["x/a/y","x/b/y"].

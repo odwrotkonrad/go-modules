@@ -41,18 +41,9 @@ func sectionClose(text string) (depth int, ok bool) {
 	return leaders - 2, true
 }
 
-func whatComment(text string) (string, bool) {
-	const p = "#[what]"
-	if !strings.HasPrefix(text, p) {
-		return "", false
-	}
-	return strings.TrimSpace(strings.TrimPrefix(text, p)), true
-}
-
-// valsComment parses a #[vals] line: a parameter's accepted-values hint,
-// rendered as <name>=<vals>.
-func valsComment(text string) (string, bool) {
-	const p = "#[vals]"
+// tagComment parses a #[<tag>] line, returning its trimmed payload.
+func tagComment(text, tag string) (string, bool) {
+	p := "#[" + tag + "]"
 	if !strings.HasPrefix(text, p) {
 		return "", false
 	}

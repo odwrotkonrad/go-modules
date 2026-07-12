@@ -4,6 +4,7 @@ go 1.26.3
 
 require (
 	github.com/1password/onepassword-sdk-go v0.4.0
+	github.com/bmatcuk/doublestar/v4 v4.10.0
 	github.com/dsnet/compress v0.0.1
 	github.com/fatih/color v1.18.0
 	github.com/go-git/go-billy/v5 v5.9.0

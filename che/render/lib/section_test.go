@@ -48,9 +48,9 @@ func TestValsComment(t *testing.T) {
 		Want want
 	}
 	testyml.Run(t, td, "testdata/spec/vals_comment.spec.yml", func(t *testing.T, c c) {
-		vals, ok := valsComment(c.In.Args[0])
+		vals, ok := tagComment(c.In.Args[0], "vals")
 		if ok != c.Want.OK || vals != c.Want.Vals {
-			t.Errorf("valsComment(%q) = (%q,%v), want %+v", c.In.Args[0], vals, ok, c.Want)
+			t.Errorf("tagComment(%q, vals) = (%q,%v), want %+v", c.In.Args[0], vals, ok, c.Want)
 		}
 	})
 }

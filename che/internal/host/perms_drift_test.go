@@ -18,7 +18,7 @@ func extraDir(dest, chmod string) spec.FileItem {
 	return spec.FileItem{Dests: []spec.DestSpec{{Path: dest}}, Perms: spec.Perms{Chmod: chmod}}
 }
 
-// mode drift on an existing extra-dir: delta reports mkdir(chmod), DryRunOff
+// mode drift on an existing extra-dir: delta reports mkdir(chmod), dry-run off
 // fixes it, a settled dest prints nothing, and isDirSettled no longer swallows drift.
 func TestPermsDriftChmod(t *testing.T) {
 	_, home := testutil.CheRepo(t)
@@ -28,7 +28,7 @@ func TestPermsDriftChmod(t *testing.T) {
 	}
 	item := extraDir(dest, "0755")
 
-	delta := New(home, home, testutil.CheProfile, config.Config{DryRun: config.DryRunDelta})
+	delta := New(home, home, testutil.CheProfile, config.Config{DryRun: config.DryRun.Delta})
 	deltaOut, err := testutil.CaptureStdout(t, func() error { return delta.MkDirs(nil, []spec.FileItem{item}) })
 	if err != nil {
 		t.Fatal(err)
@@ -87,7 +87,7 @@ func TestPermsDriftSpecialBits(t *testing.T) {
 			item := extraDir(dest, c.chmod)
 
 			// already at spec mode -> delta must report nothing (no drift).
-			delta := New(home, home, testutil.CheProfile, config.Config{DryRun: config.DryRunDelta})
+			delta := New(home, home, testutil.CheProfile, config.Config{DryRun: config.DryRun.Delta})
 			out, err := testutil.CaptureStdout(t, func() error { return delta.MkDirs(nil, []spec.FileItem{item}) })
 			if err != nil {
 				t.Fatal(err)
@@ -108,7 +108,7 @@ func TestPermsDriftAddsSetgid(t *testing.T) {
 	}
 	item := extraDir(dest, "2775")
 
-	delta := New(home, home, testutil.CheProfile, config.Config{DryRun: config.DryRunDelta})
+	delta := New(home, home, testutil.CheProfile, config.Config{DryRun: config.DryRun.Delta})
 	out, err := testutil.CaptureStdout(t, func() error { return delta.MkDirs(nil, []spec.FileItem{item}) })
 	if err != nil {
 		t.Fatal(err)

@@ -4,6 +4,7 @@ package main
 // [>] 🤖🤖
 
 import (
+	"cmp"
 	"encoding/json"
 	"fmt"
 	"os"
@@ -54,6 +55,20 @@ func schemaJSON() []byte {
 	return append(b, '\n')
 }
 
+// splitSeg cuts a "; <key>: <val>" trailer off desc, returning the rest and val.
+func splitSeg(desc, key string) (rest, val string) {
+	rest, val, _ = strings.Cut(desc, key)
+	return rest, val
+}
+
+// tick wraps s in backticks ("" stays "").
+func tick(s string) string {
+	if s == "" {
+		return ""
+	}
+	return "`" + s + "`"
+}
+
 // optionsTable renders a FlagSet as an Option|Env|Values|Default|Description
 // table. Each flag's usage string may carry "; values: <...>",
 // "; default: <...>" and "; env: <...>" segments feeding those columns
@@ -63,25 +78,15 @@ func optionsTable(fs *pflag.FlagSet) string {
 	var b strings.Builder
 	b.WriteString("| Option | Env | Values | Default | Description |\n| --- | --- | --- | --- | --- |\n")
 	fs.VisitAll(func(f *pflag.Flag) {
-		desc, env, values, def := f.Usage, "", "", ""
-		if i := strings.Index(desc, "; env: "); i >= 0 {
-			env = "`" + desc[i+len("; env: "):] + "`"
-			desc = desc[:i]
-		}
-		if i := strings.Index(desc, "; default: "); i >= 0 {
-			def = "`" + desc[i+len("; default: "):] + "`"
-			desc = desc[:i]
-		}
-		if i := strings.Index(desc, "; values: "); i >= 0 {
-			values = "`" + strings.ReplaceAll(desc[i+len("; values: "):], " | ", "` \\| `") + "`"
-			desc = desc[:i]
-		}
+		desc, env := splitSeg(f.Usage, "; env: ")
+		desc, def := splitSeg(desc, "; default: ")
+		desc, values := splitSeg(desc, "; values: ")
+		env = tick(env)
+		values = tick(strings.ReplaceAll(values, " | ", "` \\| `"))
 		if values == "" {
 			values = "`" + f.Value.Type() + "`"
 		}
-		if def == "" && f.DefValue != "" {
-			def = "`" + f.DefValue + "`"
-		}
+		def = tick(cmp.Or(def, f.DefValue))
 		opt := "`--" + f.Name + "`"
 		if f.Shorthand != "" {
 			opt = "`-" + f.Shorthand + "`, " + opt

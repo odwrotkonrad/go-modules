@@ -17,6 +17,17 @@ func Run(name, version, usage string, run func(args []string) (string, error)) {
 	Exit(run(os.Args[1:]))
 }
 
+// RunRaw runs a raw-output CLI: out prints via fmt.Print (no appended
+// newline), help/version dispatch left to run.
+func RunRaw(run func(args []string) (string, error)) {
+	out, err := run(os.Args[1:])
+	if err == nil {
+		fmt.Print(out)
+		os.Exit(0)
+	}
+	Exit("", err)
+}
+
 func HelpVersion(args []string, usage, name, version string) (out string, done bool) {
 	if len(args) != 1 {
 		return "", false

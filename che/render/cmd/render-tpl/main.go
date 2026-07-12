@@ -4,12 +4,11 @@ package main
 // [>] 🤖🤖
 
 import (
-	"fmt"
 	"os"
-	"strings"
 
+	"gitlab.com/konradodwrot/go-modules/che/render/checkcmd"
 	"gitlab.com/konradodwrot/go-modules/che/render/render"
-	"gitlab.com/konradodwrot/go-modules/lib/climain"
+	"gitlab.com/konradodwrot/go-modules/lib/yamlcfg"
 )
 
 const usage = `usage: render-tpl -f <template>
@@ -22,37 +21,25 @@ resolve against the cwd.
 
 var version = "dev"
 
-func main() {
-	os.Exit(run(os.Args[1:]))
+var tool = checkcmd.Tool{
+	Name:    "render-tpl",
+	Version: version,
+	Usage:   usage,
+	FlagArg: "-f",
+	Generate: func(path string) (string, error) {
+		src, err := os.ReadFile(path)
+		if err != nil {
+			return "", &yamlcfg.CodedError{Code: yamlcfg.CodeFileNotFound, Msg: "file not found: " + path}
+		}
+		cwd, err := os.Getwd()
+		if err != nil {
+			return "", err
+		}
+		out, err := render.Exec(path, src, cwd)
+		return string(out), err
+	},
 }
 
-func run(args []string) int {
-	if out, done := climain.HelpVersion(args, strings.TrimSuffix(usage, "\n"), "render-tpl", version); done {
-		fmt.Println(out)
-		return 0
-	}
-	if len(args) != 2 || args[0] != "-f" {
-		fmt.Fprintf(os.Stderr, "invalid arguments: %v\n\n%s", args, usage)
-		return 11
-	}
-	path := args[1]
-	src, err := os.ReadFile(path)
-	if err != nil {
-		fmt.Fprintf(os.Stderr, "file not found: %s\n", path)
-		return 13
-	}
-	cwd, err := os.Getwd()
-	if err != nil {
-		fmt.Fprintln(os.Stderr, err)
-		return 21
-	}
-	out, err := render.Exec(path, src, cwd)
-	if err != nil {
-		fmt.Fprintln(os.Stderr, err)
-		return 21
-	}
-	fmt.Print(string(out))
-	return 0
-}
+func main() { tool.Main() }
 
 //[<] 🤖🤖

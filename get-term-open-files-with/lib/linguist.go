@@ -4,6 +4,7 @@ package lib
 
 import (
 	"cmp"
+	"errors"
 	"io"
 	"maps"
 	"net/http"
@@ -38,26 +39,32 @@ func fetchLanguages(url string) ([]byte, error) {
 	if info, err := os.Stat(cached); err == nil && !info.IsDir() {
 		return os.ReadFile(cached)
 	}
-	client := &http.Client{Timeout: 30 * time.Second}
-	res, err := client.Get(url)
+	body, err := download(url, cached)
 	if err != nil {
-		return nil, netErr(url)
-	}
-	defer res.Body.Close()
-	if res.StatusCode != http.StatusOK {
-		return nil, netErr(url)
-	}
-	body, err := io.ReadAll(res.Body)
-	if err != nil {
-		return nil, netErr(url)
-	}
-	if err := os.MkdirAll(CacheDir(), 0o755); err != nil {
-		return nil, netErr(url)
-	}
-	if err := os.WriteFile(cached, body, 0o644); err != nil {
 		return nil, netErr(url)
 	}
 	return body, nil
+}
+
+// download GETs url and writes the body to the cached path.
+func download(url, cached string) ([]byte, error) {
+	client := &http.Client{Timeout: 30 * time.Second}
+	res, err := client.Get(url)
+	if err != nil {
+		return nil, err
+	}
+	defer res.Body.Close()
+	if res.StatusCode != http.StatusOK {
+		return nil, errors.New(res.Status)
+	}
+	body, err := io.ReadAll(res.Body)
+	if err != nil {
+		return nil, err
+	}
+	if err := os.MkdirAll(filepath.Dir(cached), 0o755); err != nil {
+		return nil, err
+	}
+	return body, os.WriteFile(cached, body, 0o644)
 }
 
 type language struct {

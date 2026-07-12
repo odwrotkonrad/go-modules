@@ -68,9 +68,9 @@ var version = "dev"
 
 // dryRunModes maps the --dry-run flag value to a config.DryRunMode.
 var dryRunModes = map[string]config.DryRunMode{
-	"":      config.DryRunOff,
-	"delta": config.DryRunDelta,
-	"all":   config.DryRunAll,
+	"":      config.DryRun.Off,
+	"delta": config.DryRun.Delta,
+	"all":   config.DryRun.All,
 }
 
 // Root builds che's root command with every subcommand attached: the single
@@ -255,7 +255,7 @@ func (c *CheApp) build() error {
 	}
 	c.units = []unit{{host: h, res: res}}
 	c.pluginRefs = res.Plugins
-	if cfg.IsOptionEqualTo(config.OptionSkipPlugins, true) {
+	if cfg.SkipPlugins {
 		c.pluginRefs = nil
 	}
 	c.pluginUnits = map[string]*unit{}

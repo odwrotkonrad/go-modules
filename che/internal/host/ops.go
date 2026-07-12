@@ -77,9 +77,9 @@ func (h Host) ensureConfigDirs(dirRels []string) error {
 }
 
 // isDirSettled reports whether dest already exists as a dir and may be skipped
-// (DryRunAll forces every dest to report, so it never skips).
+// (dry-run=all forces every dest to report, so it never skips).
 func (h Host) isDirSettled(dest string) bool {
-	if h.IsOptionEqualTo(config.OptionDryRun, config.DryRunAll) {
+	if h.cfg.DryRun == config.DryRun.All {
 		return false
 	}
 	fi, err := h.reader.Stat(dest)
@@ -123,9 +123,9 @@ func (h Host) chownIfSet(title string, item spec.FileItem, dest string) error {
 }
 
 // fixPerms applies spec mode/owner to an existing dest when they drift, labeling
-// the fixes with the owning op ("<op>(chmod)" / "<op>(chown)"). In DryRunDelta
-// these lines report the drift; in DryRunOff they correct it. A settled dest
-// (no drift) emits nothing. DryRunAll never reaches here (dests are re-created).
+// the fixes with the owning op ("<op>(chmod)" / "<op>(chown)"). In dry-run=delta
+// these lines report the drift; off they correct it. A settled dest (no drift)
+// emits nothing. Dry-run=all never reaches here (dests are re-created).
 func (h Host) fixPerms(op, dest string, item spec.FileItem) error {
 	needChmod, needChown := h.permsDrift(dest, item)
 	if needChmod {
@@ -216,36 +216,52 @@ func lookupID[T any](name string, lookup func(string) (T, error), idOf func(T) s
 	return uint32(id), true
 }
 
-// MkLinks symlinks each config into its live dest (ln -fhs), archiving existing
-// dests upfront, skipping links already pointing into the repo. A failing link
-// is logged and the rest still run; failures join into the returned error.
-func (h Host) MkLinks(links []spec.FileItem, dirRels []string) error {
+// runFileOp is the shared shape of the archiving file ops: ensure config dirs,
+// archive every dest upfront (failure aborts), then settle each item/dest pair.
+// A failing dest is logged and the rest still run; failures join into the
+// returned error.
+func (h Host) runFileOp(archiveSub, failOp string, dirRels []string, items []spec.FileItem,
+	destsOf func(spec.FileItem) []string, settle func(spec.FileItem, string) error,
+) error {
 	errs := []error{h.ensureConfigDirs(dirRels)}
-	dests := make([]string, len(links))
-	for i, item := range links {
-		dests[i] = h.ToDest(spec.LinkDestRel(item))
+	var dests []string
+	for _, item := range items {
+		dests = append(dests, destsOf(item)...)
 	}
-	if err := h.archiveBefore("link", dests); err != nil {
+	if err := h.archiveBefore(archiveSub, dests); err != nil {
 		return errors.Join(append(errs, err)...)
 	}
-	for _, item := range links {
-		src := h.Src(item.Rel)
-		dest := h.ToDest(spec.LinkDestRel(item))
-		if h.isLinkSettled(src, dest) {
-			continue
-		}
-		err := h.mutate("ln(create)", dest, func() error { return h.fs.Symlink(src, dest) })
-		if err != nil {
-			errs = append(errs, h.failItem("ln", dest, err))
+	for _, item := range items {
+		for _, dest := range destsOf(item) {
+			if err := settle(item, dest); err != nil {
+				errs = append(errs, h.failItem(failOp, dest, err))
+			}
 		}
 	}
 	return errors.Join(errs...)
 }
 
-// isLinkSettled reports whether dest already resolves to src (skippable). DryRunAll
+// MkLinks symlinks each config into its live dest (ln -fhs), archiving existing
+// dests upfront, skipping links already pointing into the repo.
+func (h Host) MkLinks(links []spec.FileItem, dirRels []string) error {
+	return h.runFileOp("link", "ln", dirRels, links,
+		func(item spec.FileItem) []string { return []string{h.ToDest(spec.LinkDestRel(item))} },
+		h.linkOne)
+}
+
+// linkOne settles one link dest: already resolving to src -> skip, else symlink.
+func (h Host) linkOne(item spec.FileItem, dest string) error {
+	src := h.Src(item.Rel)
+	if h.isLinkSettled(src, dest) {
+		return nil
+	}
+	return h.mutate("ln(create)", dest, func() error { return h.fs.Symlink(src, dest) })
+}
+
+// isLinkSettled reports whether dest already resolves to src (skippable). Dry-run=all
 // forces every dest to report, so it never skips.
 func (h Host) isLinkSettled(src, dest string) bool {
-	if h.IsOptionEqualTo(config.OptionDryRun, config.DryRunAll) {
+	if h.cfg.DryRun == config.DryRun.All {
 		return false
 	}
 	destResolved, err := h.reader.EvalSymlinks(dest)
@@ -258,32 +274,16 @@ func (h Host) isLinkSettled(src, dest string) bool {
 
 // MkCopies copies each *.ontoHost.cp to its dest(s) (marker stripped, or explicit
 // dest) when contents differ, archiving existing dests upfront, applying spec
-// perms (else default). A failing dest is logged and the rest still run;
-// failures join into the returned error.
+// perms (else default).
 func (h Host) MkCopies(copies []spec.FileItem, dirRels []string) error {
-	errs := []error{h.ensureConfigDirs(dirRels)}
-	var dests []string
-	for _, item := range copies {
-		dests = append(dests, h.copyDests(item)...)
-	}
-	if err := h.archiveBefore("copy", dests); err != nil {
-		return errors.Join(append(errs, err)...)
-	}
-	for _, item := range copies {
-		for _, dest := range h.copyDests(item) {
-			if err := h.copyOne(item, dest); err != nil {
-				errs = append(errs, h.failItem("cp", dest, err))
-			}
-		}
-	}
-	return errors.Join(errs...)
+	return h.runFileOp("copy", "cp", dirRels, copies, h.copyDests, h.copyOne)
 }
 
 // copyOne settles one copy dest: same content -> perms drift fix only, else
 // copy with spec mode then chown when an owner is set.
 func (h Host) copyOne(item spec.FileItem, dest string) error {
 	src := h.Src(item.Rel)
-	if !h.IsOptionEqualTo(config.OptionDryRun, config.DryRunAll) && h.isSameContent(src, dest) {
+	if h.cfg.DryRun != config.DryRun.All && h.isSameContent(src, dest) {
 		return h.fixPerms("cp", dest, item)
 	}
 	mode, _ := parseMode(item.Chmod)

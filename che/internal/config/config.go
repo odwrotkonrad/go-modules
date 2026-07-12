@@ -1,4 +1,4 @@
-// Package config carries che's resolved runtime options: flag values with env fallbacks, keyed for op-level queries.
+// Package config carries che's resolved runtime options: flag values with env fallbacks.
 package config
 
 // [>] 🤖🤖
@@ -7,24 +7,8 @@ package config
 // that would change), all (every dest, as if nothing existed at the destination).
 type DryRunMode int
 
-const (
-	DryRunOff DryRunMode = iota
-	DryRunDelta
-	DryRunAll
-)
-
-// Option keys one runtime option, named after its flag.
-type Option string
-
-const (
-	OptionDir            Option = "directory"
-	OptionDryRun         Option = "dry-run"
-	OptionProfile        Option = "profile"
-	OptionSkipExecIf     Option = "skip-exec-if"
-	OptionSkipPlugins    Option = "skip-plugins"
-	OptionDebug          Option = "debug"
-	OptionValidateSchema Option = "validate-schema"
-)
+// DryRun namespaces the DryRunMode values: config.DryRun.Off / .Delta / .All.
+var DryRun = struct{ Off, Delta, All DryRunMode }{0, 1, 2}
 
 // Config carries every resolved runtime option (flag value, env fallback applied).
 type Config struct {
@@ -36,29 +20,5 @@ type Config struct {
 	Debug          bool
 	ValidateSchema string
 }
-
-// value maps opt to its field. Unknown opt is a programming error: panic.
-func (c Config) value(opt Option) any {
-	switch opt {
-	case OptionDir:
-		return c.Dir
-	case OptionDryRun:
-		return c.DryRun
-	case OptionProfile:
-		return c.Profile
-	case OptionSkipExecIf:
-		return c.SkipExecIf
-	case OptionSkipPlugins:
-		return c.SkipPlugins
-	case OptionDebug:
-		return c.Debug
-	case OptionValidateSchema:
-		return c.ValidateSchema
-	}
-	panic("unknown option: " + string(opt))
-}
-
-// IsOptionEqualTo reports whether opt's resolved value equals val.
-func (c Config) IsOptionEqualTo(opt Option, val any) bool { return c.value(opt) == val }
 
 // [<] 🤖🤖
