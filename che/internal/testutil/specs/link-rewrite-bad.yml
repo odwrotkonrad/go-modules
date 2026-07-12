@@ -1,6 +1,6 @@
 ##[>] 🤖🤖
 cli/macos:
-  options: {autoExec: true}
+  options: {autoDiscover: true}
   include:
     link:
       - {source: HOME/.config/foo/**, dest: "s/[/x/"}

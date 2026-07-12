@@ -28,9 +28,9 @@ base-exclude-desktop:
     services: [grafana, prometheus]
 
 desktop/macos:
-  options: {autoExec: true}
+  options: {autoDiscover: true}
   mixinProfiles: [base]
 
 cli/macos:
-  options: {autoExec: true}
+  options: {autoDiscover: true}
   mixinProfiles: [base, base-exclude-desktop]

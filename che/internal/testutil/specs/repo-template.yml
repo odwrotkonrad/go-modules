@@ -11,5 +11,5 @@ base:
               - {path: AGENTS.md, options: {renderReferencedFiles: true}}
 
 cli/macos:
-  options: {autoExec: true}
+  options: {autoDiscover: true}
   mixinProfiles: [base]

@@ -11,7 +11,7 @@ cases:
     input:
       args: [spec: che, os: linux, virt: true]
     expected:
-      errorOutput: ['no eligible profile: no autoExec profile passed its execIf']
+      errorOutput: ['no eligible profile: no autoDiscover profile passed its execIf']
   - name: ShouldStillEnforceExecIfWhenForcingOneProfile
     input:
       args: [spec: che, os: linux, virt: true, forceOne: desktop/macos]
@@ -27,12 +27,12 @@ cases:
       args: [spec: che, os: macos, virt: false, forceOne: desktop/macos]
     expected:
       output: [desktop/macos]
-  - name: ShouldSelectForcedNonAutoexecBaseProfile
+  - name: ShouldSelectForcedNonAutoDiscoverBaseProfile
     input:
       args: [spec: che, os: linux, virt: true, forceOne: base]
     expected:
       output: [base]
-  - name: ShouldSelectForcedNonAutoexecOntoRepoProfile
+  - name: ShouldSelectForcedNonAutoDiscoverOntoRepoProfile
     input:
       args: [spec: che, os: linux, virt: true, forceOne: ontoRepo]
     expected:
@@ -42,7 +42,7 @@ cases:
       args: [spec: che, os: macos, virt: true, forceOne: cli/linux]
     expected:
       errorOutput: ['--profile "cli/linux" is not defined in che.yml']
-  - name: ShouldSelectAllAutoexecProfilesWithForceAll
+  - name: ShouldSelectAllAutoDiscoverProfilesWithForceAll
     input:
       args: [spec: che, os: linux, virt: true, forceOne: "", forceAll: true]
     expected:

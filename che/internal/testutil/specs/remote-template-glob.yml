@@ -4,5 +4,5 @@ base:
       - files: ["@gitlab.com/acme/tools//snippets/*.md"]
 
 cli/macos:
-  options: {autoExec: true}
+  options: {autoDiscover: true}
   mixinProfiles: [base]

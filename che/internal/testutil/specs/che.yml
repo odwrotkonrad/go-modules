@@ -22,11 +22,11 @@ base:
     services: [otelcol]
 
 cli/macos:
-  options: {autoExec: true, execIf: ['builtin:isOs == macos', 'builtin:isVirt']}
+  options: {autoDiscover: true, execIf: ['builtin:isOs == macos', 'builtin:isVirt']}
   mixinProfiles: [base]
 
 desktop/macos:
-  options: {autoExec: true, execIf: ['builtin:isOs == macos', 'builtin:isVirt == false']}
+  options: {autoDiscover: true, execIf: ['builtin:isOs == macos', 'builtin:isVirt == false']}
   mixinProfiles: [base]
 
 ontoRepo:

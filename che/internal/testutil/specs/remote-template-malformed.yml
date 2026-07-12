@@ -7,5 +7,5 @@ base:
               - {path: .claude/agents/ro.md}
 
 cli/macos:
-  options: {autoExec: true}
+  options: {autoDiscover: true}
   mixinProfiles: [base]

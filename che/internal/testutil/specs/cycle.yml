@@ -3,5 +3,5 @@ a:
 b:
   mixinProfiles: [a]
 cli/macos:
-  options: {autoExec: true}
+  options: {autoDiscover: true}
   mixinProfiles: [a]

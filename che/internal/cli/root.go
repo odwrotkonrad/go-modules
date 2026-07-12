@@ -48,7 +48,7 @@ loads the union of files/dirs/installs/services those profiles select.`,
 	pf.StringVar((*string)(&ld.config.ValidateSpec), "validate-spec", "",
 		"validate each loaded che.yml spec against the JSON Schema; values: warn (log violations) | error (abort on violations); default: warn; env: CHE_VALIDATE_SPEC")
 	pf.StringVar(&ld.config.Profile, "profile", "",
-		"run only this profile (autoExec skipped, execIf still enforced); env: CHE_PROFILE")
+		"run only this profile (autoDiscover skipped, execIf still enforced); env: CHE_PROFILE")
 	pf.BoolVar(&ld.config.SkipExecIf, "skip-exec-if", false,
 		"treat every execIf predicate as passing; env: CHE_SKIP_EXEC_IF")
 	pf.BoolVar(&ld.config.SkipPlugins, "skip-plugins", false,

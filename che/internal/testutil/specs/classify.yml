@@ -11,9 +11,9 @@ base:
       - files: [root/HOME/.config/zsh/**]
 
 cli/macos:
-  options: {autoExec: true}
+  options: {autoDiscover: true}
   mixinProfiles: [base]
 
 desktop/macos:
-  options: {autoExec: true}
+  options: {autoDiscover: true}
   mixinProfiles: [base]

@@ -4,5 +4,5 @@ base:
       - files: [templates/**/*.ontoRepo.tpl]
 
 cli/macos:
-  options: {autoExec: true}
+  options: {autoDiscover: true}
   mixinProfiles: [base]
