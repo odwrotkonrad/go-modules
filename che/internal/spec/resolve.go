@@ -477,7 +477,7 @@ func splitTemplates(entries []entry, globs *globSet, rich *[]FileItem) error {
 			if len(f.Dest) == 0 && !strings.HasPrefix(f.Source, RootPrefix) {
 				return fmt.Errorf("renderTemplates source without dest must be root/-prefixed (derived host dest): %q", f.Source)
 			}
-			*rich = append(*rich, FileItem{Rel: f.Source, Dests: f.Dest, Ctx: mergeCtx(e.Ctx, f.Ctx), Perms: e.Perms})
+			*rich = append(*rich, FileItem{Rel: f.Source, Dests: mergeDestOptions(e.Options, f.Dest), Ctx: mergeCtx(e.Ctx, f.Ctx), Perms: e.Perms})
 		}
 	}
 	return nil
@@ -491,6 +491,20 @@ func mergeCtx(group, item map[string]string) map[string]string {
 	}
 	out := maps.Clone(group)
 	maps.Copy(out, item)
+	return out
+}
+
+// mergeDestOptions merges group-level render options under each dest's own:
+// fields the dest sets win, unset fields inherit the group's. Zero group ->
+// dests verbatim.
+func mergeDestOptions(group render.Options, dests []DestSpec) []DestSpec {
+	if group == (render.Options{}) {
+		return dests
+	}
+	out := slices.Clone(dests)
+	for i := range out {
+		out[i].Options = out[i].opts.over(group)
+	}
 	return out
 }
 

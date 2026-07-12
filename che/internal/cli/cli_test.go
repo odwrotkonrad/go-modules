@@ -116,6 +116,46 @@ func TestBuildProfileFlag(t *testing.T) {
 	}
 }
 
+func TestBuildValidateSchema(t *testing.T) {
+	a, _, _ := repoEnv(t, cheRepoPwd)
+	specPath := filepath.Join(a.dirFlag, "che.yml")
+	f, err := os.OpenFile(specPath, os.O_APPEND|os.O_WRONLY, 0o644)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := f.WriteString("\nbogusProfile:\n  includes:\n    link: [HOME/**]\n"); err != nil {
+		t.Fatal(err)
+	}
+	if err := f.Close(); err != nil {
+		t.Fatal(err)
+	}
+
+	t.Setenv("CHE_VALIDATE_SCHEMA", "")
+	if err := a.build(); err != nil {
+		t.Fatalf("build() in warn mode errored: %v", err)
+	}
+
+	a.validateSchemaMode = "error"
+	err = a.build()
+	if err == nil {
+		t.Fatal("build() with --validate-schema error should fail on the violation")
+	}
+	if !strings.Contains(err.Error(), "includes") {
+		t.Errorf("error does not name the violating key: %v", err)
+	}
+
+	a.validateSchemaMode = ""
+	t.Setenv("CHE_VALIDATE_SCHEMA", "error")
+	if err := a.build(); err == nil {
+		t.Fatal("build() with CHE_VALIDATE_SCHEMA=error should fail on the violation")
+	}
+
+	a.validateSchemaMode = "bogus"
+	if err := a.build(); err == nil {
+		t.Fatal("build() with an unknown --validate-schema mode should error")
+	}
+}
+
 // build() reads CHE_DRY_RUN from env when the flag is unset.
 func TestBuildDryRunEnvFallback(t *testing.T) {
 	a, _, _ := repoEnv(t, cheRepoPwd)

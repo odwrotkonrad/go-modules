@@ -3,47 +3,29 @@ package main
 // [>] 🤖🤖
 
 import (
-	"bytes"
-	"encoding/json"
 	"os"
 	"path/filepath"
 	"strings"
 	"testing"
 
 	"github.com/santhosh-tekuri/jsonschema/v6"
-	"gopkg.in/yaml.v3"
+	"github.com/spf13/pflag"
+
+	"gitlab.com/konradodwrot/go-modules/che/internal/spec"
 )
 
 func compileSchema(t *testing.T) *jsonschema.Schema {
 	t.Helper()
-	doc, err := jsonschema.UnmarshalJSON(bytes.NewReader(schemaJSON()))
-	if err != nil {
-		t.Fatal(err)
-	}
-	c := jsonschema.NewCompiler()
-	if err := c.AddResource("che.schema.json", doc); err != nil {
-		t.Fatal(err)
-	}
-	sch, err := c.Compile("che.schema.json")
+	sch, err := spec.CompiledSchema()
 	if err != nil {
 		t.Fatal(err)
 	}
 	return sch
 }
 
-// yamlInstance decodes YAML then round-trips through JSON, yielding the value
-// shape jsonschema validates.
 func yamlInstance(t *testing.T, b []byte) any {
 	t.Helper()
-	var v any
-	if err := yaml.Unmarshal(b, &v); err != nil {
-		t.Fatal(err)
-	}
-	j, err := json.Marshal(v)
-	if err != nil {
-		t.Fatal(err)
-	}
-	inst, err := jsonschema.UnmarshalJSON(bytes.NewReader(j))
+	inst, err := spec.YAMLInstance(b)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -154,6 +136,27 @@ p:
 				t.Errorf("schema accepts invalid spec: %s", name)
 			}
 		})
+	}
+}
+
+func TestOptionsTable(t *testing.T) {
+	fs := pflag.NewFlagSet("t", pflag.ContinueOnError)
+	var dir, mode string
+	var toggle bool
+	fs.StringVarP(&dir, "dir", "C", "", "change dir; env: X_DIR")
+	fs.StringVar(&mode, "mode", "", "pick mode; values: a (one) | b (two); default: off; env: X_MODE")
+	fs.BoolVar(&toggle, "toggle", false, "flip it")
+	got := optionsTable(fs)
+	want := []string{
+		"| Option | Env | Values | Default | Description |",
+		"| `-C`, `--dir` | `X_DIR` | `string` |  | change dir |",
+		"| `--mode` | `X_MODE` | `a (one)` \\| `b (two)` | `off` | pick mode |",
+		"| `--toggle` |  | `bool` | `false` | flip it |",
+	}
+	for _, w := range want {
+		if !strings.Contains(got, w+"\n") {
+			t.Errorf("optionsTable missing row %q, got:\n%s", w, got)
+		}
 	}
 }
 

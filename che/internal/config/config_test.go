@@ -14,12 +14,13 @@ var td embed.FS
 
 func TestIsOptionEqualTo(t *testing.T) {
 	type cfgIn struct {
-		Dir         string
-		DryRun      int `yaml:"dryRun"`
-		Profile     string
-		SkipExecIf  bool `yaml:"skipExecIf"`
-		SkipPlugins bool `yaml:"skipPlugins"`
-		Debug       bool
+		Dir            string
+		DryRun         int `yaml:"dryRun"`
+		Profile        string
+		SkipExecIf     bool `yaml:"skipExecIf"`
+		SkipPlugins    bool `yaml:"skipPlugins"`
+		Debug          bool
+		ValidateSchema string `yaml:"validateSchema"`
 	}
 	type in struct {
 		Config cfgIn
@@ -37,12 +38,13 @@ func TestIsOptionEqualTo(t *testing.T) {
 	}
 	testyml.Run(t, td, "testdata/spec/is_option_equal_to.spec.yml", func(t *testing.T, c c) {
 		cfg := Config{
-			Dir:         c.In.Config.Dir,
-			DryRun:      DryRunMode(c.In.Config.DryRun),
-			Profile:     c.In.Config.Profile,
-			SkipExecIf:  c.In.Config.SkipExecIf,
-			SkipPlugins: c.In.Config.SkipPlugins,
-			Debug:       c.In.Config.Debug,
+			Dir:            c.In.Config.Dir,
+			DryRun:         DryRunMode(c.In.Config.DryRun),
+			Profile:        c.In.Config.Profile,
+			SkipExecIf:     c.In.Config.SkipExecIf,
+			SkipPlugins:    c.In.Config.SkipPlugins,
+			Debug:          c.In.Config.Debug,
+			ValidateSchema: c.In.Config.ValidateSchema,
 		}
 		opt := Option(c.In.Option)
 		val := c.In.Val

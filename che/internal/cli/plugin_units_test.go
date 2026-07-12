@@ -13,6 +13,54 @@ import (
 	"gitlab.com/konradodwrot/go-modules/che/internal/testutil"
 )
 
+func TestBuildPluginValidateSchema(t *testing.T) {
+	if os.Geteuid() == 0 {
+		t.Skip("non-root path only; build resolves home from $HOME")
+	}
+	pluginRepo := testutil.Repo(t, map[string]string{
+		"che.yml": "p:\n  includes:\n    link: [HOME/**]\n",
+	})
+	hostRepo := testutil.Repo(t, map[string]string{
+		"che.yml": "main:\n  options: {autoExec: true}\n  plugins: [\"" + pluginRepo + "::p\"]\n",
+	})
+	home := t.TempDir()
+	t.Chdir(hostRepo)
+	t.Setenv("HOME", home)
+	t.Setenv("CHE_SKIP_EXEC_IF", "")
+	t.Setenv("CHE_PROFILE", "")
+	t.Setenv("CHE_DRY_RUN", "")
+	t.Setenv("CHE_SKIP_PLUGINS", "")
+	t.Setenv("CHE_DEBUG", "")
+
+	t.Setenv("CHE_VALIDATE_SCHEMA", "")
+	a := New()
+	if err := a.build(); err != nil {
+		t.Fatalf("build() errored: %v", err)
+	}
+	out, err := testutil.CaptureStdout(t, func() error {
+		return a.forEachUnit("test", func(unit) error { return nil })
+	})
+	if err != nil {
+		t.Fatalf("forEachUnit in warn mode errored: %v\n%s", err, out)
+	}
+	testutil.WantLines(t, out, "validate(che.yml)", "includes")
+
+	t.Setenv("CHE_VALIDATE_SCHEMA", "error")
+	a = New()
+	if err := a.build(); err != nil {
+		t.Fatalf("build() errored (local che.yml is valid): %v", err)
+	}
+	out, err = testutil.CaptureStdout(t, func() error {
+		return a.forEachUnit("test", func(unit) error { return nil })
+	})
+	if err == nil {
+		t.Fatalf("forEachUnit in error mode should fail on the plugin violation\n%s", out)
+	}
+	if !strings.Contains(err.Error(), "includes") {
+		t.Errorf("error does not name the violating key: %v", err)
+	}
+}
+
 // a plugins `@url::profile` entry resolves into an extra unit anchored at
 // the cache checkout; a failing remote execIf skips it (after the pull).
 func TestBuildPluginUnits(t *testing.T) {

@@ -16,22 +16,24 @@ const (
 type Option string
 
 const (
-	OptionDir         Option = "directory"
-	OptionDryRun      Option = "dry-run"
-	OptionProfile     Option = "profile"
-	OptionSkipExecIf  Option = "skip-exec-if"
-	OptionSkipPlugins Option = "skip-plugins"
-	OptionDebug       Option = "debug"
+	OptionDir            Option = "directory"
+	OptionDryRun         Option = "dry-run"
+	OptionProfile        Option = "profile"
+	OptionSkipExecIf     Option = "skip-exec-if"
+	OptionSkipPlugins    Option = "skip-plugins"
+	OptionDebug          Option = "debug"
+	OptionValidateSchema Option = "validate-schema"
 )
 
 // Config carries every resolved runtime option (flag value, env fallback applied).
 type Config struct {
-	Dir         string
-	DryRun      DryRunMode
-	Profile     string
-	SkipExecIf  bool
-	SkipPlugins bool
-	Debug       bool
+	Dir            string
+	DryRun         DryRunMode
+	Profile        string
+	SkipExecIf     bool
+	SkipPlugins    bool
+	Debug          bool
+	ValidateSchema string
 }
 
 // value maps opt to its field. Unknown opt is a programming error: panic.
@@ -49,6 +51,8 @@ func (c Config) value(opt Option) any {
 		return c.SkipPlugins
 	case OptionDebug:
 		return c.Debug
+	case OptionValidateSchema:
+		return c.ValidateSchema
 	}
 	panic("unknown option: " + string(opt))
 }

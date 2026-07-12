@@ -53,17 +53,22 @@ func schemaJSON() []byte {
 	return append(b, '\n')
 }
 
-// optionsTable renders a FlagSet as an Option|Env|Values|Description table.
-// Each flag's usage string may carry "; values: <...>" and "; env: <...>"
-// segments feeding those columns (values default: the flag's value type;
-// flag wins over env).
+// optionsTable renders a FlagSet as an Option|Env|Values|Default|Description
+// table. Each flag's usage string may carry "; values: <...>",
+// "; default: <...>" and "; env: <...>" segments feeding those columns
+// (values default: the flag's value type; default default: the flag's
+// non-empty DefValue; flag wins over env).
 func optionsTable(fs *pflag.FlagSet) string {
 	var b strings.Builder
-	b.WriteString("| Option | Env | Values | Description |\n| --- | --- | --- | --- |\n")
+	b.WriteString("| Option | Env | Values | Default | Description |\n| --- | --- | --- | --- | --- |\n")
 	fs.VisitAll(func(f *pflag.Flag) {
-		desc, env, values := f.Usage, "", ""
+		desc, env, values, def := f.Usage, "", "", ""
 		if i := strings.Index(desc, "; env: "); i >= 0 {
 			env = "`" + desc[i+len("; env: "):] + "`"
+			desc = desc[:i]
+		}
+		if i := strings.Index(desc, "; default: "); i >= 0 {
+			def = "`" + desc[i+len("; default: "):] + "`"
 			desc = desc[:i]
 		}
 		if i := strings.Index(desc, "; values: "); i >= 0 {
@@ -73,11 +78,14 @@ func optionsTable(fs *pflag.FlagSet) string {
 		if values == "" {
 			values = "`" + f.Value.Type() + "`"
 		}
+		if def == "" && f.DefValue != "" {
+			def = "`" + f.DefValue + "`"
+		}
 		opt := "`--" + f.Name + "`"
 		if f.Shorthand != "" {
 			opt = "`-" + f.Shorthand + "`, " + opt
 		}
-		fmt.Fprintf(&b, "| %s | %s | %s | %s |\n", opt, env, values, desc)
+		fmt.Fprintf(&b, "| %s | %s | %s | %s | %s |\n", opt, env, values, def, desc)
 	})
 	return b.String()
 }

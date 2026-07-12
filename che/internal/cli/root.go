@@ -42,17 +42,18 @@ type pluginConfig struct {
 // PersistentPreRunE, read by each RunE. Plugin units build lazily
 // (ensurePlugin), after the local unit's ops ran.
 type CheApp struct {
-	dirFlag           string
-	dryRunMode        string
-	profileForce      string
-	skipExecIf        bool
-	skipPlugins       bool
-	debugFlag         bool
-	renderSkipSecrets bool
-	units             []unit
-	pluginRefs        []spec.PluginRef
-	pluginUnits       map[string]*unit
-	pluginCfg         pluginConfig
+	dirFlag            string
+	dryRunMode         string
+	validateSchemaMode string
+	profileForce       string
+	skipExecIf         bool
+	skipPlugins        bool
+	debugFlag          bool
+	renderSkipSecrets  bool
+	units              []unit
+	pluginRefs         []spec.PluginRef
+	pluginUnits        map[string]*unit
+	pluginCfg          pluginConfig
 	// newHost builds each unit's Host; tests override it to inject a mock fs.
 	newHost func(repoRoot, home, profile string, cfg config.Config) host.Host
 }
@@ -91,8 +92,10 @@ loads the union of files/dirs/installs/services those profiles select.`,
 	pf.StringVarP(&c.dirFlag, "directory", "C", "",
 		"change into this directory before resolving the repo; env: CHE_DIR")
 	pf.StringVar(&c.dryRunMode, "dry-run", "",
-		"print mutating actions instead of executing them; values: delta (changed dests, bare-flag default) | all (every dest); env: CHE_DRY_RUN")
+		"print mutating actions instead of executing them; values: delta (changed dests, bare-flag default) | all (every dest); default: off; env: CHE_DRY_RUN")
 	pf.Lookup("dry-run").NoOptDefVal = "delta"
+	pf.StringVar(&c.validateSchemaMode, "validate-schema", "",
+		"validate each loaded che.yml against its JSON Schema; values: warn (log violations) | error (abort on violations); default: warn; env: CHE_VALIDATE_SCHEMA")
 	pf.StringVar(&c.profileForce, "profile", "",
 		"run only this profile (autoExec skipped, execIf still enforced); env: CHE_PROFILE")
 	pf.BoolVar(&c.skipExecIf, "skip-exec-if", false,
@@ -214,7 +217,11 @@ func (c *CheApp) build() error {
 	if !ok {
 		return fmt.Errorf("invalid --dry-run mode %q: want delta or all", c.dryRunMode)
 	}
-	sp, err := spec.Load(filepath.Join(repoRoot, "che.yml"))
+	c.validateSchemaMode = cmp.Or(c.validateSchemaMode, os.Getenv("CHE_VALIDATE_SCHEMA"), "warn")
+	if c.validateSchemaMode != "warn" && c.validateSchemaMode != "error" {
+		return fmt.Errorf("invalid --validate-schema mode %q: want warn or error", c.validateSchemaMode)
+	}
+	sp, err := loadSpecValidated(filepath.Join(repoRoot, "che.yml"), c.validateSchemaMode)
 	if err != nil {
 		return err
 	}
@@ -226,12 +233,13 @@ func (c *CheApp) build() error {
 	// --debug (env CHE_DEBUG, truthy) prints debug-level lines.
 	// Flags win over envs.
 	cfg := config.Config{
-		Dir:         dir,
-		DryRun:      mode,
-		Profile:     cmp.Or(c.profileForce, os.Getenv("CHE_PROFILE")),
-		SkipExecIf:  boolOrEnv(c.skipExecIf, "CHE_SKIP_EXEC_IF"),
-		SkipPlugins: boolOrEnv(c.skipPlugins, "CHE_SKIP_PLUGINS"),
-		Debug:       boolOrEnv(c.debugFlag, "CHE_DEBUG"),
+		Dir:            dir,
+		DryRun:         mode,
+		Profile:        cmp.Or(c.profileForce, os.Getenv("CHE_PROFILE")),
+		SkipExecIf:     boolOrEnv(c.skipExecIf, "CHE_SKIP_EXEC_IF"),
+		SkipPlugins:    boolOrEnv(c.skipPlugins, "CHE_SKIP_PLUGINS"),
+		Debug:          boolOrEnv(c.debugFlag, "CHE_DEBUG"),
+		ValidateSchema: c.validateSchemaMode,
 	}
 	log.SetDebug(cfg.Debug)
 	eval := spec.NewEvaluator().EvalExecIf
@@ -258,6 +266,20 @@ func boolOrEnv(flag bool, key string) bool {
 	return flag || os.Getenv(key) != ""
 }
 
+func loadSpecValidated(path, mode string) (*spec.Raw, error) {
+	if b, err := os.ReadFile(path); err == nil {
+		if finds := spec.ValidateSchema(b); len(finds) > 0 {
+			if mode == "error" {
+				return nil, fmt.Errorf("schema violations in %s:\n%s", path, strings.Join(finds, "\n"))
+			}
+			for _, f := range finds {
+				log.Msg("validate(che.yml)", f, log.Off)
+			}
+		}
+	}
+	return spec.Load(path)
+}
+
 // buildPlugin ensures the plugin checkout (git ref: cache clone/pull; dir ref:
 // resolved local dir), loads its spec, then inside the entry's env overlay
 // gates on the remote profile's execIf (fail -> skipped, logged) and resolves
@@ -268,7 +290,7 @@ func (c *CheApp) buildPlugin(p spec.PluginRef) (unit, bool, error) {
 	if err != nil {
 		return unit{}, false, err
 	}
-	psp, err := spec.Load(filepath.Join(checkout, "che.yml"))
+	psp, err := loadSpecValidated(filepath.Join(checkout, "che.yml"), c.pluginCfg.cfg.ValidateSchema)
 	if err != nil {
 		return unit{}, false, err
 	}
