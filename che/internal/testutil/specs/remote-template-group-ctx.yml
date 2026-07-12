@@ -1,0 +1,16 @@
+base:
+  include:
+    renderTemplates:
+      - ctx: {repo: Workspace, model: fable}
+        files:
+          - source: "@gitlab.com/acme/tools//snippets/ro.md"
+            dest:
+              - {path: .claude/agents/ro.md}
+          - source: "@gitlab.com/acme/tools//snippets/rw.md"
+            ctx: {model: sonnet}
+            dest:
+              - {path: .claude/agents/rw.md}
+
+cli/macos:
+  options: {autoExec: true}
+  mixinProfiles: [base]
