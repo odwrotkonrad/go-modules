@@ -25,6 +25,16 @@ var tmplExts = []string{".ontoHost.tpl", ".ontoRepo.tpl", ".tpl"}
 // IsTmplSrc reports whether rel is a template source (any accepted suffix).
 func IsTmplSrc(rel string) bool { return strings.HasSuffix(rel, TmplExt) }
 
+// RemoteSrcPrefix marks a renderTemplates source as remote:
+// @<repo>//<path>[?ref=<ref>], fetched at render time.
+const RemoteSrcPrefix = "@"
+
+// IsRemoteSrc reports whether source is a remote template source.
+func IsRemoteSrc(source string) bool { return strings.HasPrefix(source, RemoteSrcPrefix) }
+
+// RemoteSrcRef strips the remote marker, yielding the fetchable ref.
+func RemoteSrcRef(source string) string { return strings.TrimPrefix(source, RemoteSrcPrefix) }
+
 // TrimTmplExt strips the template suffix from rel (longest match first),
 // yielding the derived dest path.
 func TrimTmplExt(rel string) string {
@@ -71,7 +81,7 @@ type ProfileOptions struct {
 type includeSet struct {
 	Link            []linkEntry `yaml:"link" jsonschema_description:"symlink-op entries, repo-relative under root/: glob string (dest derived 1:1) or {source, dest} sed-style rewrite"`
 	Copy            []entry     `yaml:"copy" jsonschema_description:"*.ontoHost.cp copy-op perm-groups"`
-	RenderTemplates []entry     `yaml:"renderTemplates" jsonschema_description:"*.tpl render-op perm-groups; sources repo-root-relative, glob and derived-dest forms must be root/-prefixed"`
+	RenderTemplates []entry     `yaml:"renderTemplates" jsonschema_description:"*.tpl render-op perm-groups; sources repo-root-relative or remote (@<repo>//<path>[?ref=<ref>], explicit dest required), glob and derived-dest forms must be root/-prefixed"`
 	Mkdirs          []dirGroup  `yaml:"mkdirs" jsonschema_description:"extra-dir perm-groups; each item one dir path (brace-expanded)"`
 	Scripts         []string    `yaml:"runScripts" jsonschema_description:"script paths or globs, repo-relative, run in spec order"`
 	Services        []string    `yaml:"services" jsonschema_description:"launchd service names"`
@@ -162,8 +172,9 @@ func (d *dirSpec) UnmarshalYAML(value *yaml.Node) error {
 // {source, dest} object. glob is set iff the glob form.
 type fileSpec struct {
 	glob   string
-	Source string     `yaml:"source"`
-	Dest   []DestSpec `yaml:"dest"`
+	Source string            `yaml:"source"`
+	Dest   []DestSpec        `yaml:"dest"`
+	Ctx    map[string]string `yaml:"ctx" jsonschema_description:"renderTemplates only: values exposed as the template's root context (.key)"`
 }
 
 func (f *fileSpec) UnmarshalYAML(value *yaml.Node) error {
@@ -172,12 +183,13 @@ func (f *fileSpec) UnmarshalYAML(value *yaml.Node) error {
 }
 
 // FileItem is one resolved file: repo-relative source (templates:
-// repo-root-relative; links/copies: under root/), explicit dests (nil ->
-// derived in host), optional perms. Per-dest render options live on each
-// DestSpec.
+// repo-root-relative or @-prefixed remote ref; links/copies: under root/),
+// explicit dests (nil -> derived in host), optional perms, optional template
+// context. Per-dest render options live on each DestSpec.
 type FileItem struct {
 	Rel   string
 	Dests []DestSpec
+	Ctx   map[string]string
 	Perms
 }
 

@@ -13,6 +13,7 @@ import (
 
 	"gitlab.com/konradodwrot/go-modules/che/internal/fsutil"
 	"gitlab.com/konradodwrot/go-modules/che/internal/log"
+	"gitlab.com/konradodwrot/go-modules/che/render/render"
 )
 
 // globSet is an ordered list of op globs, each carrying its group's perms
@@ -449,22 +450,34 @@ func splitEntries(entries []entry, globs *globSet, rich *[]FileItem) {
 
 // splitTemplates walks each renderTemplates perm-group's Files: glob items go
 // to globs, {source, dest} items become rich FileItems. Sources are
-// repo-root-relative; the derived-dest form (glob, or rich without dest)
-// requires a root/-prefixed source ([why] only root/ paths map to host dests).
+// repo-root-relative or remote refs (@<repo>//<path>, explicit dest
+// required); the derived-dest form (glob, or rich without dest) requires a
+// root/-prefixed source ([why] only root/ paths map to host dests).
 func splitTemplates(entries []entry, globs *globSet, rich *[]FileItem) error {
 	for _, e := range entries {
 		for _, f := range e.Files {
 			if f.glob != "" {
+				if IsRemoteSrc(f.glob) {
+					return fmt.Errorf("renderTemplates glob cannot be remote: %q", f.glob)
+				}
 				if !strings.HasPrefix(f.glob, RootPrefix) {
 					return fmt.Errorf("renderTemplates glob must be root/-prefixed (derived host dest): %q", f.glob)
 				}
 				globs.add(f.glob, e.Perms)
 				continue
 			}
+			if IsRemoteSrc(f.Source) {
+				if !render.IsRemoteRef(RemoteSrcRef(f.Source)) {
+					return fmt.Errorf("renderTemplates remote source malformed, want @<repo>//<path>[?ref=<ref>]: %q", f.Source)
+				}
+				if len(f.Dest) == 0 {
+					return fmt.Errorf("renderTemplates remote source requires explicit dest: %q", f.Source)
+				}
+			}
 			if len(f.Dest) == 0 && !strings.HasPrefix(f.Source, RootPrefix) {
 				return fmt.Errorf("renderTemplates source without dest must be root/-prefixed (derived host dest): %q", f.Source)
 			}
-			*rich = append(*rich, FileItem{Rel: f.Source, Dests: f.Dest, Perms: e.Perms})
+			*rich = append(*rich, FileItem{Rel: f.Source, Dests: f.Dest, Ctx: f.Ctx, Perms: e.Perms})
 		}
 	}
 	return nil

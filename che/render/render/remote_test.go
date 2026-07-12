@@ -111,6 +111,34 @@ func TestRemoteFile(t *testing.T) {
 	})
 }
 
+func TestIsRemoteRef(t *testing.T) {
+	for ref, want := range map[string]bool{
+		"gitlab.com/acme/tools//snippets/agent.md":            true,
+		"file:///tmp/repo//a/b.md?ref=main":                   true,
+		"templates/agents/ro.md.ontoRepo.tpl":                 false,
+		"root/HOME/.config/claude/settings.json.ontoHost.tpl": false,
+		"gitlab.com/acme/tools":                               false,
+	} {
+		if got := IsRemoteRef(ref); got != want {
+			t.Errorf("IsRemoteRef(%q) = %v, want %v", ref, got, want)
+		}
+	}
+}
+
+func TestNewRemoteFetcher(t *testing.T) {
+	url := "file://" + initRemoteFixture(t)
+	fetch := NewRemoteFetcher()
+	for range 2 { // second fetch hits the clone cache
+		got, err := fetch(url + "//docs/note.md")
+		if err != nil {
+			t.Fatal(err)
+		}
+		if got != "main content\n" {
+			t.Errorf("content = %q", got)
+		}
+	}
+}
+
 func TestExecRemoteFile(t *testing.T) {
 	url := "file://" + initRemoteFixture(t)
 	repoRoot := initRepo(t, []string{"x"})

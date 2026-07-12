@@ -11,6 +11,7 @@ import (
 	"gitlab.com/konradodwrot/go-modules/che/internal/config"
 	"gitlab.com/konradodwrot/go-modules/che/internal/fsutil"
 	"gitlab.com/konradodwrot/go-modules/che/internal/log"
+	"gitlab.com/konradodwrot/go-modules/che/render/render"
 )
 
 // Host is the live system the load ops act on: repo source tree, invoking
@@ -24,7 +25,20 @@ type Host struct {
 	logSub   string
 	fs       fsutil.FileSystemWriter
 	reader   fsutil.FileSystemReader
+	fetcher  RemoteFetcher
 }
+
+// RemoteFetcher fetches a remote template source ref's content
+// (<repo>//<path>[?ref=<ref>], marker stripped).
+type RemoteFetcher interface {
+	Fetch(ref string) (string, error)
+}
+
+// gitFetcher is the live RemoteFetcher: shallow in-memory git clones, one
+// clone cache shared across the Host's renders.
+type gitFetcher struct{ fetch func(string) (string, error) }
+
+func (g gitFetcher) Fetch(ref string) (string, error) { return g.fetch(ref) }
 
 func New(repoRoot, home, profile string, cfg config.Config) Host {
 	return Host{
@@ -35,7 +49,15 @@ func New(repoRoot, home, profile string, cfg config.Config) Host {
 		cfg:      cfg,
 		fs:       fsutil.FS{Home: home},
 		reader:   fsutil.OSReader{},
+		fetcher:  gitFetcher{fetch: render.NewRemoteFetcher()},
 	}
+}
+
+// WithFetcher returns a copy whose remote template sources fetch through f
+// (test injection).
+func (h Host) WithFetcher(f RemoteFetcher) Host {
+	h.fetcher = f
+	return h
 }
 
 // WithLogSub returns a copy whose op log lines carry s as a trailing subtype
