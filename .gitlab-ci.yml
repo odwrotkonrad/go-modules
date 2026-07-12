@@ -9,6 +9,7 @@ stages:
   - warm
   - validate
   - test
+  - build
   - release
   - make-docs
 
@@ -35,8 +36,8 @@ warm-go:
         - .cache/go-build
       policy: pull-push
   script:
-    - for m in lib che get-os-open-files-with get-term-open-files-with; do (cd $m && go mod download all) || exit 1; done
-    - (cd che && go build -v ./...)
+    - for m in lib che get-os-open-files-with get-term-open-files-with; do (cd $m && echo "== $m" && go mod download all) || exit 1; done
+    - for m in lib che; do (cd $m && echo "== $m" && go build -v ./...) || exit 1; done
 
 validate-pre-commit-all:
   stage: validate
@@ -119,6 +120,41 @@ test-lib:
     - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
       changes: [lib/**/*, go.work, .gitlab-ci.yml]
 
+.build-module:
+  stage: build
+  image: $CI_IMAGE
+  cache:
+    - key: go-mod
+      paths:
+        - .cache/go-mod
+      policy: pull
+    - key: go-build
+      paths:
+        - .cache/go-build
+      policy: pull-push
+  script:
+    - (cd $MODULE && go build -v ./...)
+
+build-get-os-open-files-with:
+  extends: .build-module
+  variables:
+    MODULE: get-os-open-files-with
+  rules:
+    - if: $CI_PIPELINE_SOURCE == "merge_request_event"
+      changes: [get-os-open-files-with/**/*, lib/**/*, .gitlab-ci.yml]
+    - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
+      changes: [get-os-open-files-with/**/*, lib/**/*, .gitlab-ci.yml]
+
+build-get-term-open-files-with:
+  extends: .build-module
+  variables:
+    MODULE: get-term-open-files-with
+  rules:
+    - if: $CI_PIPELINE_SOURCE == "merge_request_event"
+      changes: [get-term-open-files-with/**/*, lib/**/*, .gitlab-ci.yml]
+    - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
+      changes: [get-term-open-files-with/**/*, lib/**/*, .gitlab-ci.yml]
+
 .release-module:
   stage: release
   image: $CI_IMAGE
@@ -196,7 +232,6 @@ pages-preview:
   needs: []
   rules:
     - if: $CI_PIPELINE_SOURCE == "merge_request_event"
-      changes: [che/**/*]
   variables:
     DOCS_DIR_URLS: "false"
   environment:
