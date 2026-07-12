@@ -1,5 +1,6 @@
-// [>] 🤖🤖
 package yamlcfg
+
+// [>] 🤖🤖
 
 import (
 	"embed"

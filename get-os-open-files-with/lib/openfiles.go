@@ -1,5 +1,7 @@
-// [>] 🤖🤖
+// Package lib resolves the merged os-open-files-with.yml into duti association lines, config order preserved.
 package lib
+
+// [>] 🤖🤖
 
 import (
 	"strings"

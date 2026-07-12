@@ -30,13 +30,13 @@ func (h Host) RunScripts(scripts []string) error {
 			continue
 		}
 		c := execx.Cmd{Argv: []string{script}, Env: env, Stdout: os.Stdout, Stderr: os.Stderr}
+		status := "ok"
 		if err := execx.Default.Exec(c); err != nil {
 			h.log("run-scripts(fail)", fmt.Sprintf("%s: %v", script, err))
-			results = append(results, scriptResult{script, "fail"})
+			status = "fail"
 			failed = append(failed, script)
-		} else {
-			results = append(results, scriptResult{script, "ok"})
 		}
+		results = append(results, scriptResult{script, status})
 	}
 
 	for _, r := range results {

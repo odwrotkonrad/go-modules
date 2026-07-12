@@ -39,27 +39,6 @@ warm-go:
     - for m in lib che get-os-open-files-with get-term-open-files-with; do (cd $m && echo "## download $m" && go mod download all) || exit 1; done
     - for m in lib che; do (cd $m && echo "## build $m" && go build -v ./...) || exit 1; done
 
-warm-go-mod-release:
-  stage: warm
-  image: $CI_IMAGE
-  rules:
-    - if: $CI_COMMIT_TAG =~ /^che\/v/
-      variables:
-        MODULE: che
-    - if: $CI_COMMIT_TAG =~ /^get-os-open-files-with\/v/
-      variables:
-        MODULE: get-os-open-files-with
-    - if: $CI_COMMIT_TAG =~ /^get-term-open-files-with\/v/
-      variables:
-        MODULE: get-term-open-files-with
-  cache:
-    - key: go-mod-$MODULE
-      paths:
-        - .cache/go-mod
-      policy: pull-push
-  script:
-    - (cd $MODULE && go mod download all)
-
 verify-precommit-all:
   stage: verify
   image: $CI_IMAGE
@@ -213,6 +192,16 @@ pages-publish:
     - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
       changes: [che/**/*]
 
+docs-che:
+  extends: .pages-build
+  stage: release
+  rules:
+    - if: $CI_COMMIT_TAG =~ /^che\/v/
+  artifacts:
+    paths:
+      - public
+    expire_in: 1 day
+
 pages-preview:
   extends: .pages-build
   stage: make-docs
@@ -247,7 +236,7 @@ goreleaser-darwin-che:
     - key: go-mod-che
       paths:
         - .cache/go-mod
-      policy: pull
+      policy: pull-push
     - key: go-build-che-darwin
       paths:
         - .cache/go-build
@@ -280,7 +269,7 @@ goreleaser-linux-che:
     matrix:
       - ARCH: [amd64, arm64]
   cache:
-    - key: go-mod-che
+    - key: go-mod
       paths:
         - .cache/go-mod
       policy: pull
@@ -304,6 +293,7 @@ publish-che:
   needs:
     - goreleaser-darwin-che
     - goreleaser-linux-che
+    - docs-che
   rules:
     - if: $CI_COMMIT_TAG =~ /^che\/v/
   variables:
@@ -317,7 +307,7 @@ publish-get-os-open-files-with:
   rules:
     - if: $CI_COMMIT_TAG =~ /^get-os-open-files-with\/v/
   cache:
-    - key: go-mod-get-os-open-files-with
+    - key: go-mod
       paths:
         - .cache/go-mod
       policy: pull
@@ -334,7 +324,7 @@ publish-get-term-open-files-with:
   rules:
     - if: $CI_COMMIT_TAG =~ /^get-term-open-files-with\/v/
   cache:
-    - key: go-mod-get-term-open-files-with
+    - key: go-mod
       paths:
         - .cache/go-mod
       policy: pull

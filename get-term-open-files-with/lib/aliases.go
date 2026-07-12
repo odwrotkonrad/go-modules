@@ -1,5 +1,7 @@
-// [>] 🤖🤖
+// Package lib expands term-open-files-with.yml openers against cached GitHub-linguist language data into suffix-alias lines.
 package lib
+
+// [>] 🤖🤖
 
 import "strings"
 

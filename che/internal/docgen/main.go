@@ -1,3 +1,4 @@
+// Docgen renders che's reference docs from the Go source: che.schema.json, docs/cli.md, cli-usage.md.
 package main
 
 // [>] 🤖🤖

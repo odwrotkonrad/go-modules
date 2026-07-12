@@ -1,5 +1,6 @@
-// [>] 🤖🤖
 package checkcmd
+
+// [>] 🤖🤖
 
 import (
 	"embed"

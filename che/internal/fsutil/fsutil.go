@@ -1,3 +1,4 @@
+// Package fsutil bundles filesystem helpers for ops: repo root and home resolution, path expansion, archiving.
 package fsutil
 
 // [>] 🤖🤖
@@ -126,11 +127,11 @@ func (f FS) Install(dest string, body []byte, mode os.FileMode, owner string) er
 	if err != nil {
 		return err
 	}
+	tmp.Close()
 	defer os.Remove(tmp.Name())
-	if _, err := tmp.Write(body); err != nil {
+	if err := os.WriteFile(tmp.Name(), body, 0o600); err != nil {
 		return err
 	}
-	tmp.Close()
 
 	argv := append([]string{"install"}, modeFlag(mode)...)
 	if owner != "" {

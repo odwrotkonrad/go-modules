@@ -1,3 +1,4 @@
+// Package execx runs external commands behind a swappable executor, mockable in tests.
 package execx
 
 // [>] 🤖🤖🤖

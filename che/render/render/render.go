@@ -1,5 +1,7 @@
-// [>] 🤖🤖
+// Package render is the shared gomplate engine: template funcs, op:// secret resolution, remoteFile inclusion, frontmatter, markdown transforms, doc generators.
 package render
+
+// [>] 🤖🤖
 
 import (
 	"bytes"
@@ -82,16 +84,14 @@ func writeCtxFile(itemCtx map[string]string) (*url.URL, func(), error) {
 	if err != nil {
 		return nil, nil, err
 	}
-	if _, err := f.Write(b); err != nil {
-		f.Close()
-		os.Remove(f.Name())
+	f.Close()
+	name := f.Name()
+	cleanup := func() { os.Remove(name) }
+	if err := os.WriteFile(name, b, 0o600); err != nil {
+		cleanup()
 		return nil, nil, err
 	}
-	if err := f.Close(); err != nil {
-		os.Remove(f.Name())
-		return nil, nil, err
-	}
-	return &url.URL{Scheme: "file", Path: f.Name()}, func() { os.Remove(f.Name()) }, nil
+	return &url.URL{Scheme: "file", Path: name}, cleanup, nil
 }
 
 // isRateLimitErr: 1Password SDK surfaces vault rate limiting only in the error text.

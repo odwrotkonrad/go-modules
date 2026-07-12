@@ -1,5 +1,7 @@
-// [>] 🤖🤖
+// Get-os-open-files-with prints <bundle> <uti> <role> duti lines from the merged os-open-files-with.yml.
 package main
+
+// [>] 🤖🤖
 
 import (
 	"gitlab.com/konradodwrot/go-modules/get-os-open-files-with/lib"

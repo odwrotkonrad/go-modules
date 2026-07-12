@@ -1,5 +1,7 @@
-// [>] 🤖🤖
+// Render-tpl renders one gomplate template to stdout or dests: op:// secrets, remoteFile inclusion, frontmatter, markdown transforms.
 package main
+
+// [>] 🤖🤖
 
 import (
 	"fmt"

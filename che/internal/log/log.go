@@ -1,3 +1,4 @@
+// Package log prints che's timestamped op log lines, dry-run mode folded into subtypes.
 package log
 
 // [>] 🤖🤖
