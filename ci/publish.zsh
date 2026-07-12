@@ -18,7 +18,7 @@ cd "$MODULE"
 if [[ "${PUBLISH_PREBUILT:-0}" == 1 ]] {
   ( cd dist && sha256sum -- *.tar.gz > checksums.txt )
 } else {
-  MODULE_VERSION="$MODULE_VERSION" goreleaser release --snapshot --clean -f .goreleaser.yaml
+  MODULE_VERSION="$MODULE_VERSION" goreleaser release --verbose --snapshot --clean -f .goreleaser.yaml
 }
 
 typeset -a FILES
