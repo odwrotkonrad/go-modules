@@ -6,6 +6,7 @@ workflow:
     - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
 
 stages:
+  - warm
   - validate
   - test
   - release
@@ -18,7 +19,7 @@ variables:
   CC: clang
 
 warm-go-mod:
-  stage: validate
+  stage: warm
   image: $CI_IMAGE
   needs: []
   rules:
