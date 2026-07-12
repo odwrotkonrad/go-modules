@@ -26,4 +26,4 @@ Flags:
       --profile string             run only this profile (autoExec skipped, execIf still enforced); env: CHE_PROFILE
       --skip-exec-if               treat every execIf predicate as passing; env: CHE_SKIP_EXEC_IF
       --skip-plugins               skip plugins entries, load only the local repo; env: CHE_SKIP_PLUGINS
-      --validate-schema string     validate each loaded che.yml against its JSON Schema; values: warn (log violations) | error (abort on violations); default: warn; env: CHE_VALIDATE_SCHEMA
+      --validate-spec string       validate each loaded che.yml spec against the JSON Schema; values: warn (log violations) | error (abort on violations); default: warn; env: CHE_VALIDATE_SPEC

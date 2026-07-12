@@ -19,8 +19,8 @@ snapshots the schema, also attached as a release asset.
 
 che validates every loaded che.yml (local repo, plugin checkouts) against this
 schema. Violations (unknown keys, wrong values, missing required fields) log
-as warnings by default. `--validate-schema error` (env
-`CHE_VALIDATE_SCHEMA=error`) aborts the run instead.
+as warnings by default. `--validate-spec error` (env
+`CHE_VALIDATE_SPEC=error`) aborts the run instead.
 
 ## Full Example
 

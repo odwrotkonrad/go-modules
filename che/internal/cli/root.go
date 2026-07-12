@@ -43,18 +43,18 @@ type pluginConfig struct {
 // PersistentPreRunE, read by each RunE. Plugin units build lazily
 // (ensurePlugin), after the local unit's ops ran.
 type CheApp struct {
-	dirFlag            string
-	dryRunMode         string
-	validateSchemaMode string
-	profileForce       string
-	skipExecIf         bool
-	skipPlugins        bool
-	debugFlag          bool
-	renderSkipSecrets  bool
-	units              []unit
-	pluginRefs         []spec.PluginRef
-	pluginUnits        map[string]*unit
-	pluginCfg          pluginConfig
+	dirFlag           string
+	dryRunMode        string
+	validateSpecMode  string
+	profileForce      string
+	skipExecIf        bool
+	skipPlugins       bool
+	debugFlag         bool
+	renderSkipSecrets bool
+	units             []unit
+	pluginRefs        []spec.PluginRef
+	pluginUnits       map[string]*unit
+	pluginCfg         pluginConfig
 	// newHost builds each unit's Host; tests override it to inject a mock fs.
 	newHost func(repoRoot, home, profile string, cfg config.Config) host.Host
 }
@@ -95,8 +95,8 @@ loads the union of files/dirs/installs/services those profiles select.`,
 	pf.StringVar(&c.dryRunMode, "dry-run", "",
 		"print mutating actions instead of executing them; values: delta (changed dests, bare-flag default) | all (every dest); default: off; env: CHE_DRY_RUN")
 	pf.Lookup("dry-run").NoOptDefVal = "delta"
-	pf.StringVar(&c.validateSchemaMode, "validate-schema", "",
-		"validate each loaded che.yml against its JSON Schema; values: warn (log violations) | error (abort on violations); default: warn; env: CHE_VALIDATE_SCHEMA")
+	pf.StringVar(&c.validateSpecMode, "validate-spec", "",
+		"validate each loaded che.yml spec against the JSON Schema; values: warn (log violations) | error (abort on violations); default: warn; env: CHE_VALIDATE_SPEC")
 	pf.StringVar(&c.profileForce, "profile", "",
 		"run only this profile (autoExec skipped, execIf still enforced); env: CHE_PROFILE")
 	pf.BoolVar(&c.skipExecIf, "skip-exec-if", false,
@@ -218,11 +218,11 @@ func (c *CheApp) build() error {
 	if !ok {
 		return fmt.Errorf("invalid --dry-run mode %q: want delta or all", c.dryRunMode)
 	}
-	c.validateSchemaMode = cmp.Or(c.validateSchemaMode, os.Getenv("CHE_VALIDATE_SCHEMA"), "warn")
-	if c.validateSchemaMode != "warn" && c.validateSchemaMode != "error" {
-		return fmt.Errorf("invalid --validate-schema mode %q: want warn or error", c.validateSchemaMode)
+	c.validateSpecMode = cmp.Or(c.validateSpecMode, os.Getenv("CHE_VALIDATE_SPEC"), "warn")
+	if c.validateSpecMode != "warn" && c.validateSpecMode != "error" {
+		return fmt.Errorf("invalid --validate-spec mode %q: want warn or error", c.validateSpecMode)
 	}
-	sp, err := loadSpecValidated(filepath.Join(repoRoot, "che.yml"), c.validateSchemaMode)
+	sp, err := loadSpecValidated(filepath.Join(repoRoot, "che.yml"), c.validateSpecMode)
 	if err != nil {
 		return err
 	}
@@ -234,13 +234,13 @@ func (c *CheApp) build() error {
 	// --debug (env CHE_DEBUG, truthy) prints debug-level lines.
 	// Flags win over envs.
 	cfg := config.Config{
-		Dir:            dir,
-		DryRun:         mode,
-		Profile:        cmp.Or(c.profileForce, os.Getenv("CHE_PROFILE")),
-		SkipExecIf:     boolOrEnv(c.skipExecIf, "CHE_SKIP_EXEC_IF"),
-		SkipPlugins:    boolOrEnv(c.skipPlugins, "CHE_SKIP_PLUGINS"),
-		Debug:          boolOrEnv(c.debugFlag, "CHE_DEBUG"),
-		ValidateSchema: c.validateSchemaMode,
+		Dir:          dir,
+		DryRun:       mode,
+		Profile:      cmp.Or(c.profileForce, os.Getenv("CHE_PROFILE")),
+		SkipExecIf:   boolOrEnv(c.skipExecIf, "CHE_SKIP_EXEC_IF"),
+		SkipPlugins:  boolOrEnv(c.skipPlugins, "CHE_SKIP_PLUGINS"),
+		Debug:        boolOrEnv(c.debugFlag, "CHE_DEBUG"),
+		ValidateSpec: c.validateSpecMode,
 	}
 	log.SetDebug(cfg.Debug)
 	eval := spec.NewEvaluator().EvalExecIf
@@ -291,7 +291,7 @@ func (c *CheApp) buildPlugin(p spec.PluginRef) (unit, bool, error) {
 	if err != nil {
 		return unit{}, false, err
 	}
-	psp, err := loadSpecValidated(filepath.Join(checkout, "che.yml"), c.pluginCfg.cfg.ValidateSchema)
+	psp, err := loadSpecValidated(filepath.Join(checkout, "che.yml"), c.pluginCfg.cfg.ValidateSpec)
 	if err != nil {
 		return unit{}, false, err
 	}

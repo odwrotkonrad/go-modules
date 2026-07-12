@@ -12,13 +12,13 @@ var DryRun = struct{ Off, Delta, All DryRunMode }{0, 1, 2}
 
 // Config carries every resolved runtime option (flag value, env fallback applied).
 type Config struct {
-	Dir            string
-	DryRun         DryRunMode
-	Profile        string
-	SkipExecIf     bool
-	SkipPlugins    bool
-	Debug          bool
-	ValidateSchema string
+	Dir          string
+	DryRun       DryRunMode
+	Profile      string
+	SkipExecIf   bool
+	SkipPlugins  bool
+	Debug        bool
+	ValidateSpec string
 }
 
 // [<] 🤖🤖
