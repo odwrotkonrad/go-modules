@@ -18,7 +18,7 @@ variables:
   GOCACHE: $CI_PROJECT_DIR/.cache/go-build
   CC: clang
 
-warm-go-mod:
+warm-go:
   stage: warm
   image: $CI_IMAGE
   needs: []
@@ -30,13 +30,17 @@ warm-go-mod:
       paths:
         - .cache/go-mod
       policy: pull-push
+    - key: go-build
+      paths:
+        - .cache/go-build
+      policy: pull-push
   script:
-    - for m in che get-os-open-files-with get-term-open-files-with lib; do (cd $m && go mod download all) || exit 1; done
+    - for m in che get-os-open-files-with get-term-open-files-with lib; do (cd $m && go mod download all && go build ./...) || exit 1; done
 
 validate-pre-commit-all:
   stage: validate
   image: $CI_IMAGE
-  needs: [warm-go-mod]
+  needs: [warm-go]
   rules:
     - if: $CI_PIPELINE_SOURCE == "merge_request_event"
   cache:
@@ -44,10 +48,10 @@ validate-pre-commit-all:
       paths:
         - .cache/go-mod
       policy: pull
-    - key: go-build-precommit
+    - key: go-build
       paths:
         - .cache/go-build
-      policy: pull-push
+      policy: pull
   script:
     - make run-repo-ci-precommit-all
     - git diff --exit-code HEAD
@@ -55,7 +59,16 @@ validate-pre-commit-all:
 .test-module:
   image: $CI_IMAGE
   stage: test
-  needs: [warm-go-mod]
+  needs: [warm-go]
+  cache:
+    - key: go-mod
+      paths:
+        - .cache/go-mod
+      policy: pull
+    - key: go-build
+      paths:
+        - .cache/go-build
+      policy: pull
   script:
     - make -C $MODULE test-cover
   coverage: '/total:\s+\(statements\)\s+\d+\.\d+%/'
@@ -74,17 +87,6 @@ test-che:
       changes: [che/**/*, lib/**/*, go.work, .gitlab-ci.yml]
     - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
       changes: [che/**/*, lib/**/*, go.work, .gitlab-ci.yml]
-  cache:
-    - key: go-mod
-      paths:
-        - .cache/go-mod
-      policy: pull
-    - key: go-build-che-$CI_COMMIT_REF_SLUG
-      fallback_keys:
-        - go-build-che-main
-      paths:
-        - .cache/go-build
-      policy: pull-push
 
 test-get-os-open-files-with:
   extends: .test-module
@@ -95,17 +97,6 @@ test-get-os-open-files-with:
       changes: [get-os-open-files-with/**/*, lib/**/*, go.work, .gitlab-ci.yml]
     - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
       changes: [get-os-open-files-with/**/*, lib/**/*, go.work, .gitlab-ci.yml]
-  cache:
-    - key: go-mod
-      paths:
-        - .cache/go-mod
-      policy: pull
-    - key: go-build-get-os-open-files-with-$CI_COMMIT_REF_SLUG
-      fallback_keys:
-        - go-build-get-os-open-files-with-main
-      paths:
-        - .cache/go-build
-      policy: pull-push
 
 test-get-term-open-files-with:
   extends: .test-module
@@ -116,17 +107,6 @@ test-get-term-open-files-with:
       changes: [get-term-open-files-with/**/*, lib/**/*, go.work, .gitlab-ci.yml]
     - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
       changes: [get-term-open-files-with/**/*, lib/**/*, go.work, .gitlab-ci.yml]
-  cache:
-    - key: go-mod
-      paths:
-        - .cache/go-mod
-      policy: pull
-    - key: go-build-get-term-open-files-with-$CI_COMMIT_REF_SLUG
-      fallback_keys:
-        - go-build-get-term-open-files-with-main
-      paths:
-        - .cache/go-build
-      policy: pull-push
 
 test-lib:
   extends: .test-module
@@ -137,17 +117,6 @@ test-lib:
       changes: [lib/**/*, go.work, .gitlab-ci.yml]
     - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
       changes: [lib/**/*, go.work, .gitlab-ci.yml]
-  cache:
-    - key: go-mod
-      paths:
-        - .cache/go-mod
-      policy: pull
-    - key: go-build-lib-$CI_COMMIT_REF_SLUG
-      fallback_keys:
-        - go-build-lib-main
-      paths:
-        - .cache/go-build
-      policy: pull-push
 
 .release-module:
   stage: release
