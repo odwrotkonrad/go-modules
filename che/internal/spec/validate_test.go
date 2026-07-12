@@ -30,6 +30,32 @@ func TestValidateSchemaAcceptsFixtures(t *testing.T) {
 	}
 }
 
+func TestCompiledSchema(t *testing.T) {
+	sch, err := CompiledSchema()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if sch == nil {
+		t.Fatal("CompiledSchema() = nil")
+	}
+}
+
+func TestValidateSchemaUnparseableYAML(t *testing.T) {
+	if finds := ValidateSchema([]byte("p: [")); finds != nil {
+		t.Errorf("ValidateSchema(unparseable) = %v, want nil (parse errors belong to Load)", finds)
+	}
+}
+
+func TestValidateSchemaRootViolation(t *testing.T) {
+	finds := ValidateSchema([]byte("- a\n- b\n"))
+	if len(finds) == 0 {
+		t.Fatal("ValidateSchema(list doc) = none, want a root finding")
+	}
+	if !strings.HasPrefix(finds[0], "/: ") {
+		t.Errorf("root finding not anchored at /: %q", finds[0])
+	}
+}
+
 func TestValidateSchemaFindsViolations(t *testing.T) {
 	cases := map[string]struct {
 		doc  string

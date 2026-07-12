@@ -9,6 +9,7 @@ import (
 	"testing"
 
 	"github.com/santhosh-tekuri/jsonschema/v6"
+	"github.com/spf13/pflag"
 
 	"gitlab.com/konradodwrot/go-modules/che/internal/spec"
 )
@@ -135,6 +136,27 @@ p:
 				t.Errorf("schema accepts invalid spec: %s", name)
 			}
 		})
+	}
+}
+
+func TestOptionsTable(t *testing.T) {
+	fs := pflag.NewFlagSet("t", pflag.ContinueOnError)
+	var dir, mode string
+	var toggle bool
+	fs.StringVarP(&dir, "dir", "C", "", "change dir; env: X_DIR")
+	fs.StringVar(&mode, "mode", "", "pick mode; values: a (one) | b (two); default: off; env: X_MODE")
+	fs.BoolVar(&toggle, "toggle", false, "flip it")
+	got := optionsTable(fs)
+	want := []string{
+		"| Option | Env | Values | Default | Description |",
+		"| `-C`, `--dir` | `X_DIR` | `string` |  | change dir |",
+		"| `--mode` | `X_MODE` | `a (one)` \\| `b (two)` | `off` | pick mode |",
+		"| `--toggle` |  | `bool` | `false` | flip it |",
+	}
+	for _, w := range want {
+		if !strings.Contains(got, w+"\n") {
+			t.Errorf("optionsTable missing row %q, got:\n%s", w, got)
+		}
 	}
 }
 

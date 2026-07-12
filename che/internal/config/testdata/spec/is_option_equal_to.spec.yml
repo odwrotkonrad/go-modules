@@ -35,6 +35,12 @@
 - name: isOptionEqualToShouldRejectDifferentDebug
   in: {config: {debug: true}, option: debug, val: false}
   want: {equal: false}
+- name: isOptionEqualToShouldMatchEqualValidateSchema
+  in: {config: {validateSchema: warn}, option: validate-schema, val: warn}
+  want: {equal: true}
+- name: isOptionEqualToShouldRejectDifferentValidateSchema
+  in: {config: {validateSchema: warn}, option: validate-schema, val: error}
+  want: {equal: false}
 - name: isOptionEqualToShouldPanicOnUnknownOption
   in: {option: bogus, val: x}
   want: {panic: true}
