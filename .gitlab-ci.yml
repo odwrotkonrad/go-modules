@@ -31,7 +31,7 @@ warm-go-mod:
         - .cache/go-mod
       policy: pull-push
   script:
-    - for m in che get-os-open-files-with get-term-open-files-with lib; do (cd $m && go mod download) || exit 1; done
+    - for m in che get-os-open-files-with get-term-open-files-with lib; do (cd $m && go mod download all) || exit 1; done
 
 validate-pre-commit-all:
   stage: validate
@@ -43,7 +43,7 @@ validate-pre-commit-all:
     - key: go-mod
       paths:
         - .cache/go-mod
-      policy: pull-push
+      policy: pull
     - key: go-build-precommit
       paths:
         - .cache/go-build
