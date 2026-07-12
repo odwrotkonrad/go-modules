@@ -13,22 +13,22 @@ COMMANDS := test test-cover build vet install release-check release-snapshot
 ##[>] Go [genai-include]
 #[what] run all tests
 test:
-	$(GO) test ./...
+	$(GO) test -v ./...
 
 #[what] run all tests with coverage, print the per-package and total percentages
 test-cover:
-	$(GO) test -coverprofile=coverage.out -coverpkg=./... ./...
+	$(GO) test -v -coverprofile=coverage.out -coverpkg=./... ./...
 	@$(GO) run $(GOCOVER_COBERTURA) < coverage.out > coverage.xml
 	@sed -i.bak 's|filename="gitlab.com/konradodwrot/go-modules/|filename="|g' coverage.xml && rm coverage.xml.bak
 	@$(GO) tool cover -func=coverage.out | tail -1
 
 #[what] compile all packages (library, no binaries)
 build:
-	$(GO) build ./...
+	$(GO) build -v ./...
 
 #[what] go vet all packages
 vet:
-	$(GO) vet ./...
+	$(GO) vet -v ./...
 
 #[what] no-op: library module, nothing to install
 install:
