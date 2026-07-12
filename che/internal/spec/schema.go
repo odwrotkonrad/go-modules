@@ -19,13 +19,13 @@ func Schema() *jsonschema.Schema {
 		FieldNameTag:               "yaml",
 		RequiredFromJSONSchemaTags: true,
 	}
-	defs := r.Reflect(profileSpec{}).Definitions
+	defs := r.Reflect(Profile{}).Definitions
 	defs["DestSpec"] = DestSpec{}.JSONSchema()
 
-	defs["profileSpec"].Description = "one profile block: options self-describe eligibility, mixinProfiles compose in order, plugins pull remote profiles, include adds, exclude filters last and wins"
+	defs["Profile"].Description = "one profile block: options self-describe eligibility, mixinProfiles compose in order, plugins pull remote profiles, include adds, exclude filters last and wins"
 	defs["includeSet"].Description = "additive payload: link globs, copy/renderTemplates/mkdirs perm-groups, script globs, service names"
 	defs["excludeSet"].Description = "subtractive glob filter, applied last, wins over every include (rich entries too)"
-	prop(defs["profileSpec"], "plugins").Description = "profiles loaded at their own checkout: `@<giturl>::<profile>` (remote) or `<dir>::<profile>` (local dir) string, or {ref, env}"
+	prop(defs["Profile"], "plugins").Description = "profiles loaded at their own checkout: `@<giturl>::<profile>` (remote) or `<dir>::<profile>` (local dir) string, or {ref, env}"
 	prop(defs["ProfileOptions"], "execIf").Description = "predicate expressions `<source>` or `<source> == <literal>`, sources builtin:*/env:*; empty: always"
 
 	return &jsonschema.Schema{
@@ -34,7 +34,7 @@ func Schema() *jsonschema.Schema {
 		Title:                "che.yml",
 		Description:          "che spec: every top-level key defines a profile block",
 		Type:                 "object",
-		AdditionalProperties: &jsonschema.Schema{Ref: "#/$defs/profileSpec"},
+		AdditionalProperties: &jsonschema.Schema{Ref: "#/$defs/Profile"},
 		Definitions:          defs,
 	}
 }

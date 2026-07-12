@@ -7,13 +7,13 @@ import (
 )
 
 // serviceOp builds a launchd step op: resolve profile services, run action over them.
-func serviceOp(action func(host.Host, []host.Service) error) func(*CheApp, repoUnit) error {
-	return func(_ *CheApp, u repoUnit) error {
-		svcs, err := u.host.ResolveServices(u.res.Services)
+func serviceOp(action func(host.Host, []host.Service) error) func(*loader, load) error {
+	return func(_ *loader, l load) error {
+		svcs, err := l.host.ResolveServices(l.selection.Services)
 		if err != nil {
 			return err
 		}
-		return action(u.host, svcs)
+		return action(l.host, svcs)
 	}
 }
 

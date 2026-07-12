@@ -11,14 +11,14 @@ cases:
   - name: ShouldExecEachScriptAndReportOk
     expected:
       stdOut: |
-        run-scripts: ${REPO}/install/unit
-        run-scripts(report): ok ${REPO}/install/unit
+        run-scripts: ${REPO}/install/setup
+        run-scripts(report): ok ${REPO}/install/setup
   - name: ShouldNarrowToMatchingName
     context:
-      command: che run-scripts unit
+      command: che run-scripts setup
     expected:
       stdOut: |
-        run-scripts: ${REPO}/install/unit
+        run-scripts: ${REPO}/install/setup
   - name: ShouldErrorWhenNameMatchesNothing
     context:
       command: che run-scripts nonExistingScript

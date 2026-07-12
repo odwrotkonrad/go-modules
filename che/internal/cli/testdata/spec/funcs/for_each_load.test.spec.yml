@@ -1,6 +1,6 @@
 # [>] 🤖🤖
 context:
-  function: cli.CheApp.forEachRepoUnit
+  function: cli.loader.forEachLoad
   mockedInterfaces:
     execx.CmdExecutor: testutil.CmdMockExecutor
 cases:
@@ -23,7 +23,7 @@ cases:
         - validate(che.yml)
         - includes
       output:
-        ranUnits: 2
+        ranLoads: 2
   - name: ShouldFailOnPluginSpecViolationInErrorMode
     context:
       env: {CHE_VALIDATE_SPEC: error}
@@ -43,8 +43,8 @@ cases:
     expected:
       errorOutput: includes
       output:
-        ranUnits: 1
-  - name: ShouldBuildDeferredPluginUnitFromGitRefAtCacheCheckout
+        ranLoads: 1
+  - name: ShouldBuildDeferredPluginRepoFromGitRefAtCacheCheckout
     context:
       env: {PLUGIN_GATE: "1", CHE_DEBUG: "1"}
     input:
@@ -72,12 +72,12 @@ cases:
         - cloned file://${PLUGIN_DIR}
         - 'execIf(pass): profile gitlabGroup: env:PLUGIN_GATE'
       output:
-        ranUnits: 2
+        ranLoads: 2
         pluginRefs: 1
         ref: ${REF}
         repoRootUnder: ${CACHE}
         script: scripts/bootstrap.zsh
-  - name: ShouldSkipPluginUnitWhenRemoteExecIfFails
+  - name: ShouldSkipPluginRepoWhenRemoteExecIfFails
     context:
       env: {PLUGIN_GATE: "", CHE_DEBUG: ""}
     input:
@@ -102,7 +102,7 @@ cases:
     expected:
       stdOut: skip ${REF} (execIf failed)
       output:
-        ranUnits: 1
+        ranLoads: 1
     notExpected:
       stdOut:
         - execIf(reject)
@@ -137,7 +137,7 @@ cases:
     expected:
       stdOut: 'execIf(pass): profile gitlabGroup: env:PLUGIN_GATE'
       output:
-        ranUnits: 2
+        ranLoads: 2
         env: {PLUGIN_GATE: "1"}
         envInOp: "1"
         script: scripts/bootstrap.zsh
@@ -158,7 +158,7 @@ cases:
             skipPlugins: true
     expected:
       output:
-        ranUnits: 1
+        ranLoads: 1
         pluginRefs: 0
     notExpected:
       stdOut: plugin
@@ -179,7 +179,7 @@ cases:
         - ref: ""
     expected:
       output:
-        ranUnits: 1
+        ranLoads: 1
         pluginRefs: 0
     notExpected:
       stdOut: plugin
@@ -210,7 +210,7 @@ cases:
         - 'run-scripts(dry-run=all,profile=gitlabGroup): '
         - scripts/bootstrap.zsh
       output:
-        ranUnits: 2
+        ranLoads: 2
         repoRoot: ${PLUGIN_DIR}
     notExpected:
       stdOut: [clone, pull]
@@ -241,7 +241,7 @@ cases:
         - 'run-scripts(dry-run=all,profile=gitlabGroup): '
         - scripts/bootstrap.zsh
       output:
-        ranUnits: 2
+        ranLoads: 2
         repoRoot: ${HOST_REPO}/plugin
     notExpected:
       stdOut: [clone, pull]
@@ -272,11 +272,11 @@ cases:
         - 'run-scripts(dry-run=all,profile=gitlabGroup): '
         - scripts/bootstrap.zsh
       output:
-        ranUnits: 2
+        ranLoads: 2
         repoRoot: ${PLUGIN_DIR}
     notExpected:
       stdOut: [clone, pull]
-  - name: ShouldContinuePastFailingUnitAndReportEachFailure
+  - name: ShouldContinuePastFailingRepoAndReportEachFailure
     input:
       args:
         - pluginFiles:
@@ -300,5 +300,5 @@ cases:
       errorOutput: 'local: local boom'
       stdOut: 'test(report): fail local: local boom'
       output:
-        ranUnits: 2
+        ranLoads: 2
 # [<] 🤖🤖

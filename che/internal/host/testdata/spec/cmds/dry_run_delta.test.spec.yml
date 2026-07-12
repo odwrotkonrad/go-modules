@@ -23,7 +23,7 @@ cases:
   - name: ShouldOnlyReportScriptRuns
     context: {command: che run-scripts}
     expected:
-      stdOut: "run-scripts(dry-run=delta): ${REPO}/install/unit"
+      stdOut: "run-scripts(dry-run=delta): ${REPO}/install/setup"
   - name: ShouldOnlyReportServiceBootouts
     context: {command: che services bootout}
     expected:

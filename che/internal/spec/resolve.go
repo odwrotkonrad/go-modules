@@ -72,9 +72,9 @@ type effective struct {
 //  2. else every autoExec profile whose execIf expressions ALL pass
 //     (forceAll makes every execIf pass, it does not lift autoExec).
 //  3. zero eligible: error.
-func (r *Raw) EligibleProfiles(forceOne string, forceAll bool, eval func(expr string) (bool, error)) ([]string, error) {
+func (r *CheSpec) EligibleProfiles(forceOne string, forceAll bool, eval func(expr string) (bool, error)) ([]string, error) {
 	if forceOne != "" {
-		ps, ok := r.profiles[forceOne]
+		ps, ok := r.profile(forceOne)
 		if !ok {
 			return nil, r.undefinedProfile(fmt.Sprintf("--profile %q", forceOne))
 		}
@@ -88,37 +88,46 @@ func (r *Raw) EligibleProfiles(forceOne string, forceAll bool, eval func(expr st
 		return []string{forceOne}, nil
 	}
 	var out []string
-	for _, name := range r.order {
-		ps := r.profiles[name]
+	for _, ps := range r.profiles {
 		if !ps.Options.AutoExec {
 			continue
 		}
-		ok, err := allPass(name, ps.Options.ExecIf, forceAll, eval)
+		ok, err := allPass(ps.Name, ps.Options.ExecIf, forceAll, eval)
 		if err != nil {
 			return nil, err
 		}
 		if ok {
-			out = append(out, name)
+			out = append(out, ps.Name)
 		}
 	}
 	if len(out) == 0 {
 		return nil, fmt.Errorf("no eligible profile: no autoExec profile passed its execIf (candidates: %v; use --profile or CHE_SKIP_EXEC_IF)",
-			r.names(func(ps profileSpec) bool { return ps.Options.AutoExec }))
+			r.names(func(ps Profile) bool { return ps.Options.AutoExec }))
 	}
 	return out, nil
 }
 
 // ExecIfPass: the named profile's execIf expressions all pass.
-func (r *Raw) ExecIfPass(name string, forceAll bool, eval func(expr string) (bool, error)) (bool, error) {
-	ps, ok := r.profiles[name]
+func (r *CheSpec) ExecIfPass(name string, forceAll bool, eval func(expr string) (bool, error)) (bool, error) {
+	ps, ok := r.profile(name)
 	if !ok {
 		return false, r.undefinedProfile(fmt.Sprintf("profile %q", name))
 	}
 	return allPass(name, ps.Options.ExecIf, forceAll, eval)
 }
 
-func (r *Raw) undefinedProfile(ref string) error {
-	return fmt.Errorf("%s is not defined in che.yml (defined: %v)", ref, slices.Sorted(maps.Keys(r.profiles)))
+// profile returns the named Profile.
+func (r *CheSpec) profile(name string) (Profile, bool) {
+	for _, ps := range r.profiles {
+		if ps.Name == name {
+			return ps, true
+		}
+	}
+	return Profile{}, false
+}
+
+func (r *CheSpec) undefinedProfile(ref string) error {
+	return fmt.Errorf("%s is not defined in che.yml (defined: %v)", ref, r.names(func(Profile) bool { return true }))
 }
 
 // allPass logs each pass, rejects at debug level only.
@@ -140,11 +149,11 @@ func allPass(name string, exprs []string, forceAll bool, eval func(expr string) 
 	return true, nil
 }
 
-func (r *Raw) names(keep func(profileSpec) bool) []string {
+func (r *CheSpec) names(keep func(Profile) bool) []string {
 	var out []string
-	for name, ps := range r.profiles {
+	for _, ps := range r.profiles {
 		if keep(ps) {
-			out = append(out, name)
+			out = append(out, ps.Name)
 		}
 	}
 	return slices.Sorted(slices.Values(out))
@@ -153,10 +162,10 @@ func (r *Raw) names(keep func(profileSpec) bool) []string {
 // Resolve validates each profile is defined, composes their mixinProfiles and
 // includes into one union (in order), classifies git-tracked files, then
 // applies excludes as a final glob filter. Output is repo-relative.
-func (r *Raw) Resolve(profiles []string, root string) (Resolved, error) {
+func (r *CheSpec) Resolve(profiles []string, root string) (Resolved, error) {
 	var eff effective
 	for _, profile := range profiles {
-		if _, ok := r.profiles[profile]; !ok {
+		if _, ok := r.profile(profile); !ok {
 			return Resolved{}, r.undefinedProfile(fmt.Sprintf("profile %q", profile))
 		}
 		if err := r.mergeInto(&eff, profile, nil); err != nil {
@@ -358,11 +367,11 @@ func dropStrings(xs, globs []string) []string {
 // mergeInto composes name into eff: mixinProfiles depth-first, then this
 // profile's include sections (additive). Excludes are handled separately
 // (applyExcludes). seen catches cycles.
-func (r *Raw) mergeInto(eff *effective, name string, seen []string) error {
+func (r *CheSpec) mergeInto(eff *effective, name string, seen []string) error {
 	if slices.Contains(seen, name) {
 		return fmt.Errorf("mixinProfiles cycle: %v -> %s", seen, name)
 	}
-	ps, ok := r.profiles[name]
+	ps, ok := r.profile(name)
 	if !ok {
 		return fmt.Errorf("mixinProfiles names undefined profile %q (from %v)", name, seen)
 	}

@@ -1,6 +1,6 @@
 # [>] 🤖🤖
 context:
-  function: spec.Raw.EligibleProfiles
+  function: spec.CheSpec.EligibleProfiles
 cases:
   - name: ShouldSelectProfileWithPassingExecIf
     input:

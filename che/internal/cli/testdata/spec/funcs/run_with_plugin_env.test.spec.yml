@@ -1,13 +1,13 @@
 # [>] 🤖🤖
 context:
-  function: cli.repoUnit.runWithEnv
+  function: cli.load.runWithPluginEnv
 cases:
   - name: ShouldShadowSetAndRestoreEnv
     context:
       env: {WITHENV_SHADOWED: host}
     input:
       args:
-        - unitEnv: {WITHENV_SHADOWED: plugin, WITHENV_ABSENT: x}
+        - env: {WITHENV_SHADOWED: plugin, WITHENV_ABSENT: x}
         - unsetEnv: [WITHENV_ABSENT]
     expected:
       output:

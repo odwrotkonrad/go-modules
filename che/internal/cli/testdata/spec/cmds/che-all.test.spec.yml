@@ -50,8 +50,8 @@ cases:
         archive: ${HOME}/.local/share/che/backups/che-render-{{/.*/}}.tar.bz2
         render(create): ${HOME}/.config/zsh/t
         all(run): run-scripts
-        run-scripts: ${REPO}/install/unit
-        run-scripts(report): ok ${REPO}/install/unit
+        run-scripts: ${REPO}/install/setup
+        run-scripts(report): ok ${REPO}/install/setup
         all(run): services bootout
         bootout: system/otelcol
         bootout(done): system/otelcol

@@ -15,26 +15,6 @@ import (
 	"gitlab.com/konradodwrot/go-modules/che/render/render"
 )
 
-// Host is the live system the load ops act on: repo source tree, invoking
-// identity, detected profile, runtime options, mutating filesystem.
-type Host struct {
-	RepoRoot string // <configs> dir (contains che.yml, ci/, templates/)
-	Root     string // <configs>/root, the load ops' source subtree
-	Home     string
-	Profile  string // "<space>/<os>-<arch>"
-	cfg      config.Config
-	logSub   string
-	fs       fsutil.FileSystemWriter
-	reader   fsutil.FileSystemReader
-	fetcher  RemoteFetcher
-}
-
-// RemoteFetcher fetches a remote template source ref's content
-// (<repo>//<path>[?ref=<ref>], marker stripped).
-type RemoteFetcher interface {
-	Fetch(ref string) (string, error)
-}
-
 // gitFetcher is the live RemoteFetcher: shallow in-memory git clones, one
 // clone cache shared across the Host's renders.
 type gitFetcher struct{ fetch func(string) (string, error) }

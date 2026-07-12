@@ -17,9 +17,9 @@ import (
 	"gitlab.com/konradodwrot/go-modules/lib/testyml"
 )
 
-// repoEnv: pwd fixture as a committed git repo plus on-disk HOME, fresh app
+// repoEnv: pwd fixture as a committed git repo plus on-disk HOME, fresh ld
 // pointed at it.
-func repoEnv(t *testing.T, pwd string) (*CheApp, *cobra.Command, string) {
+func repoEnv(t *testing.T, pwd string) (*loader, *cobra.Command, string) {
 	t.Helper()
 	if os.Geteuid() == 0 {
 		t.Skip("non-root path only; build resolves home from $HOME")
@@ -31,19 +31,19 @@ func repoEnv(t *testing.T, pwd string) (*CheApp, *cobra.Command, string) {
 	require.NoError(t, os.MkdirAll(home, 0o755))
 	a := New()
 	root := a.Root()
-	a.dirFlag = dir
+	a.config.Dir = dir
 	t.Setenv("CHE_SKIP_EXEC_IF", "1")
 	t.Setenv("HOME", home)
 	t.Setenv("XDG_DATA_HOME", filepath.Join(home, ".local/share"))
 	return a, root, home
 }
 
-// setupMock: safe doubles in every built Host, a.initApp() already run.
-func setupMock(t *testing.T, pwd, profile string, decl map[string]string) (*CheApp, *cobra.Command, string) {
+// setupMock: safe doubles in every built Host, a.init() already run.
+func setupMock(t *testing.T, pwd, profile string, decl map[string]string) (*loader, *cobra.Command, string) {
 	t.Helper()
 	a, root, home := repoEnv(t, pwd)
 	t.Setenv("CHE_DRY_RUN", "")
-	a.profileForce = profile
+	a.config.Profile = profile
 
 	m := testutil.ApplyMocks(t, decl)
 	a.newHost = func(repoRoot, home, profile string, cfg config.Config) host.Host {
@@ -52,7 +52,7 @@ func setupMock(t *testing.T, pwd, profile string, decl map[string]string) (*CheA
 	}
 	testyml.Swap(t, &host.Sleep, testutil.SleepMock)
 
-	require.NoError(t, a.initApp())
+	require.NoError(t, a.init())
 	return a, root, home
 }
 
@@ -61,8 +61,8 @@ type buildWant struct {
 	DryRunAll bool   `yaml:"dryRunAll"`
 }
 
-func TestInitApp(t *testing.T) {
-	testyml.Run(t, td, "testdata/spec/funcs/init_app.test.spec.yml",
+func TestInit(t *testing.T) {
+	testyml.Run(t, td, "testdata/spec/funcs/init.test.spec.yml",
 		func(t *testing.T, c testyml.Case[buildWant]) {
 			a, _, _ := repoEnv(t, c.Context.Pwd)
 			t.Setenv("CHE_DRY_RUN", "")
@@ -70,20 +70,20 @@ func TestInitApp(t *testing.T) {
 			for k, v := range c.Context.Env {
 				t.Setenv(k, v)
 			}
-			a.profileForce = c.Input.Args.String(t, 0)
-			a.validateSpecMode = c.Input.Args.String(t, 1)
+			a.config.Profile = c.Input.Args.String(t, 0)
+			a.config.ValidateSpec = config.ValidateSpecMode(c.Input.Args.String(t, 1))
 			if extra := c.Input.Args.String(t, 2); extra != "" {
-				f, err := os.OpenFile(filepath.Join(a.dirFlag, "che.yml"), os.O_APPEND|os.O_WRONLY, 0o644)
+				f, err := os.OpenFile(filepath.Join(a.config.Dir, "che.yml"), os.O_APPEND|os.O_WRONLY, 0o644)
 				require.NoError(t, err)
 				_, err = f.WriteString("\n" + extra)
 				require.NoError(t, err)
 				require.NoError(t, f.Close())
 			}
-			err := a.initApp()
+			err := a.init()
 			if c.Expected.Check(t, err) {
 				return
 			}
-			got := buildWant{Profile: a.units[0].host.Profile, DryRunAll: a.units[0].host.IsDryRun()}
+			got := buildWant{Profile: a.local.host.Profile, DryRunAll: a.local.host.IsDryRun()}
 			assert.Equal(t, c.Expected.Output, got)
 		})
 }

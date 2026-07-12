@@ -19,16 +19,6 @@ import (
 	"gitlab.com/konradodwrot/go-modules/lib/yamlcfg"
 )
 
-// Context: the unit under test (function or command) plus the world around
-// it. File-level context deep-merges under each case's own (case wins).
-type Context struct {
-	Function         string            `yaml:"function"`
-	Command          string            `yaml:"command"`
-	Pwd              string            `yaml:"pwd"`
-	Env              map[string]string `yaml:"env"`
-	MockedInterfaces map[string]string `yaml:"mockedInterfaces"`
-}
-
 // CommandArgs returns the context command's argv past the binary name.
 func (c Context) CommandArgs() []string {
 	f := strings.Fields(c.Command)
@@ -37,19 +27,6 @@ func (c Context) CommandArgs() []string {
 	}
 	return f[1:]
 }
-
-type Input struct {
-	Args Args `yaml:"args"`
-}
-
-type arg struct {
-	name string
-	node yaml.Node
-}
-
-// Args is the case argument list: bare values or single-key maps naming the
-// argument. Names are for the reader, extraction is positional and typed.
-type Args []arg
 
 func (a *Args) UnmarshalYAML(node *yaml.Node) error {
 	var items []yaml.Node
@@ -113,17 +90,6 @@ func (a Args) Strings(t *testing.T, i int) []string {
 	return v
 }
 
-// Expected is the canonical expectation set: function tests use
-// output/errorOutput, command tests use stdOut/stdErr/exitCode/files.
-type Expected[W any] struct {
-	Output      W        `yaml:"output"`
-	ErrorOutput Matchers `yaml:"errorOutput"`
-	StdOut      Matchers `yaml:"stdOut"`
-	StdErr      Matchers `yaml:"stdErr"`
-	ExitCode    int      `yaml:"exitCode"`
-	Files       string   `yaml:"files"`
-}
-
 // IsErrorWanted: non-zero exitCode or error matchers (errorOutput/stdErr).
 // A bare "expect any error" is not expressible.
 func (e Expected[W]) IsErrorWanted() bool {
@@ -150,14 +116,6 @@ func (e Expected[W]) Check(t *testing.T, err error) bool {
 	return true
 }
 
-type Case[W any] struct {
-	Name        string      `yaml:"name"`
-	Context     Context     `yaml:"context"`
-	Input       Input       `yaml:"input"`
-	Expected    Expected[W] `yaml:"expected"`
-	NotExpected Expected[W] `yaml:"notExpected"`
-}
-
 // Eq runs a function spec: context env, error ladder, expected.output equality.
 func Eq[W any](t *testing.T, fsys fs.FS, path string, fn func(t *testing.T, c Case[W]) (W, error)) {
 	t.Helper()
@@ -180,10 +138,6 @@ func Swap[T any](t testing.TB, ptr *T, v T) {
 	*ptr = v
 	t.Cleanup(func() { *ptr = prev })
 }
-
-// Matchers is a list of output matchers: literal text with optional
-// {{/regex/}} holes.
-type Matchers []string
 
 func (m *Matchers) UnmarshalYAML(node *yaml.Node) error {
 	if node.Kind == yaml.ScalarNode {

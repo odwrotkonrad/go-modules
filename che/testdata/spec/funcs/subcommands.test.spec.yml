@@ -1,6 +1,6 @@
 # [>] 🤖
 context:
-  function: cli.CheApp.Root
+  function: cli.loader.Root
 cases:
   - name: ShouldWireEverySubcommandToRoot
     expected:

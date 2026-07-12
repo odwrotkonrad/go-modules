@@ -10,16 +10,16 @@ cases:
   - name: ShouldExecEachScriptAndReportOk
     expected:
       stdOut: |
-        run-scripts: ${REPO}/install/unit
-        run-scripts(report): ok ${REPO}/install/unit
+        run-scripts: ${REPO}/install/setup
+        run-scripts(report): ok ${REPO}/install/setup
   - name: ShouldReportFailAndReturnError
     input:
-      args: [failCmds: [install/unit]]
+      args: [failCmds: [install/setup]]
     expected:
       exitCode: 1
       stdErr:
         - 'scripts failed: '
       stdOut: |
-        run-scripts(fail): ${REPO}/install/unit: stub: fail install/unit
-        run-scripts(report): fail ${REPO}/install/unit
+        run-scripts(fail): ${REPO}/install/setup: stub: fail install/setup
+        run-scripts(report): fail ${REPO}/install/setup
 # [<] 🤖

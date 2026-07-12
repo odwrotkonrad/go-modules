@@ -44,15 +44,15 @@ func mustEval(t *testing.T, p string) string {
 	return out
 }
 
-type unitsKnobs struct {
+type loadKnobs struct {
 	Op          string   `yaml:"op"`
 	SampleEnv   string   `yaml:"sampleEnv"`
 	UnsetEnv    []string `yaml:"unsetEnv"`
 	SkipPlugins bool     `yaml:"skipPlugins"`
 }
 
-type unitsWant struct {
-	RanUnits      int               `yaml:"ranUnits"`
+type loadsWant struct {
+	RanLoads      int               `yaml:"ranLoads"`
 	PluginRefs    *int              `yaml:"pluginRefs"`
 	Ref           string            `yaml:"ref"`
 	RepoRoot      string            `yaml:"repoRoot"`
@@ -62,13 +62,13 @@ type unitsWant struct {
 	EnvInOp       string            `yaml:"envInOp"`
 }
 
-func TestForEachUnit(t *testing.T) {
-	testyml.Run(t, td, "testdata/spec/funcs/for_each_repo_unit.test.spec.yml",
-		func(t *testing.T, c testyml.Case[unitsWant]) {
+func TestForEachLoad(t *testing.T) {
+	testyml.Run(t, td, "testdata/spec/funcs/for_each_load.test.spec.yml",
+		func(t *testing.T, c testyml.Case[loadsWant]) {
 			testutil.RequireRegistered(t, c.Context.MockedInterfaces)
 			var pluginFiles, hostFiles map[string]string
 			var ref string
-			var knobs unitsKnobs
+			var knobs loadKnobs
 			c.Input.Args.To(t, 0, &pluginFiles)
 			c.Input.Args.To(t, 1, &hostFiles)
 			c.Input.Args.To(t, 2, &ref)
@@ -100,13 +100,13 @@ func TestForEachUnit(t *testing.T) {
 			}
 
 			a := New()
-			a.skipPlugins = knobs.SkipPlugins
-			buildOut, err := testutil.CaptureStdout(t, a.initApp)
-			require.NoErrorf(t, err, "initApp()\n%s", buildOut)
-			require.Len(t, a.units, 1, "initApp() must defer plugins")
-			require.NotContains(t, buildOut, "plugin", "initApp() must defer plugins")
+			a.config.SkipPlugins = knobs.SkipPlugins
+			buildOut, err := testutil.CaptureStdout(t, a.init)
+			require.NoErrorf(t, err, "init()\n%s", buildOut)
+			require.Empty(t, a.plugins.built, "init() must defer plugins")
+			require.NotContains(t, buildOut, "plugin", "init() must defer plugins")
 			if c.Expected.Output.PluginRefs != nil {
-				assert.Len(t, a.pluginRefs, *c.Expected.Output.PluginRefs, "pluginRefs")
+				assert.Len(t, a.plugins.refs, *c.Expected.Output.PluginRefs, "pluginRefs")
 			}
 
 			envBefore := map[string]string{}
@@ -114,20 +114,20 @@ func TestForEachUnit(t *testing.T) {
 				k, v, _ := strings.Cut(kv, "=")
 				envBefore[k] = v
 			}
-			var ran []repoUnit
+			var ran []load
 			envInOp := ""
-			op := func(u repoUnit) error {
+			op := func(u load) error {
 				ran = append(ran, u)
-				if knobs.SampleEnv != "" && u.ref != "" {
+				if knobs.SampleEnv != "" && u.pluginRef != "" {
 					envInOp = os.Getenv(knobs.SampleEnv)
 				}
 				switch knobs.Op {
 				case "failLocal":
-					if u.ref == "" {
+					if u.pluginRef == "" {
 						return errors.New("local boom")
 					}
 				case "runScripts":
-					scripts, err := u.host.ResolveScripts(u.res.Scripts)
+					scripts, err := u.host.ResolveScripts(u.selection.Scripts)
 					if err != nil {
 						return err
 					}
@@ -139,19 +139,19 @@ func TestForEachUnit(t *testing.T) {
 			if knobs.Op == "runScripts" {
 				opName = "run-scripts"
 			}
-			out, ferr := testutil.CaptureStdout(t, func() error { return a.forEachRepoUnit(opName, op) })
+			out, ferr := testutil.CaptureStdout(t, func() error { return a.forEachLoad(opName, op) })
 			for _, u := range ran {
-				for k := range u.env {
+				for k := range u.pluginEnv {
 					cur, set := os.LookupEnv(k)
 					prev, had := envBefore[k]
 					assert.Falsef(t, set != had || cur != prev,
-						"%s must not leak into the process env after forEachRepoUnit", k)
+						"%s must not leak into the process env after forEachLoad", k)
 				}
 			}
 			if c.Expected.IsErrorWanted() {
 				c.Expected.Check(t, ferr)
 			} else {
-				require.NoErrorf(t, ferr, "forEachRepoUnit\n%s", out)
+				require.NoErrorf(t, ferr, "forEachLoad\n%s", out)
 			}
 			stripped := testutil.StripStamps(testutil.StripANSI(out))
 			for _, m := range c.Expected.StdOut {
@@ -162,18 +162,18 @@ func TestForEachUnit(t *testing.T) {
 			}
 
 			w := c.Expected.Output
-			require.Lenf(t, ran, w.RanUnits, "ran units\n%s", out)
-			var pu *repoUnit
+			require.Lenf(t, ran, w.RanLoads, "ran repos\n%s", out)
+			var pu *load
 			for i := range ran {
-				if ran[i].ref != "" {
+				if ran[i].pluginRef != "" {
 					pu = &ran[i]
 				}
 			}
 			if w.Ref != "" || w.RepoRoot != "" || w.RepoRootUnder != "" || w.Script != "" || w.Env != nil {
-				require.NotNilf(t, pu, "no plugin repoUnit ran\n%s", out)
+				require.NotNilf(t, pu, "no plugin repo ran\n%s", out)
 			}
 			if w.Ref != "" {
-				assert.Equal(t, testyml.Expand(w.Ref, vars), pu.ref, "plugin ref")
+				assert.Equal(t, testyml.Expand(w.Ref, vars), pu.pluginRef, "plugin ref")
 			}
 			if w.RepoRootUnder != "" {
 				prefix := testyml.Expand(w.RepoRootUnder, vars) + "/"
@@ -185,10 +185,10 @@ func TestForEachUnit(t *testing.T) {
 				assert.Equal(t, mustEval(t, testyml.Expand(w.RepoRoot, vars)), got, "plugin RepoRoot")
 			}
 			if w.Script != "" {
-				assert.Contains(t, pu.res.Scripts, w.Script)
+				assert.Contains(t, pu.selection.Scripts, w.Script)
 			}
 			if w.Env != nil {
-				assert.Equal(t, w.Env, pu.env, "repoUnit env")
+				assert.Equal(t, w.Env, pu.pluginEnv, "repo env")
 			}
 			if knobs.SampleEnv != "" {
 				assert.Equal(t, w.EnvInOp, envInOp, knobs.SampleEnv+" in plugin op")
@@ -196,27 +196,27 @@ func TestForEachUnit(t *testing.T) {
 		})
 }
 
-type runWithEnvWant struct {
+type runWithPluginEnvWant struct {
 	During     map[string]string `yaml:"during"`
 	After      map[string]string `yaml:"after"`
 	UnsetAfter []string          `yaml:"unsetAfter"`
 }
 
 func TestRunWithEnv(t *testing.T) {
-	testyml.Run(t, td, "testdata/spec/funcs/run_with_env.test.spec.yml",
-		func(t *testing.T, c testyml.Case[runWithEnvWant]) {
+	testyml.Run(t, td, "testdata/spec/funcs/run_with_plugin_env.test.spec.yml",
+		func(t *testing.T, c testyml.Case[runWithPluginEnvWant]) {
 			for k, v := range c.Context.Env {
 				t.Setenv(k, v)
 			}
-			var unitEnv map[string]string
-			c.Input.Args.To(t, 0, &unitEnv)
+			var env map[string]string
+			c.Input.Args.To(t, 0, &env)
 			for _, k := range c.Input.Args.Strings(t, 1) {
 				t.Setenv(k, "")
 				os.Unsetenv(k)
 			}
-			u := repoUnit{env: unitEnv}
+			u := load{pluginEnv: env}
 			during := map[string]string{}
-			err := u.runWithEnv(func() error {
+			err := u.runWithPluginEnv(func() error {
 				for k := range c.Expected.Output.During {
 					during[k] = os.Getenv(k)
 				}
@@ -225,11 +225,11 @@ func TestRunWithEnv(t *testing.T) {
 			require.NoError(t, err)
 			assert.Equal(t, c.Expected.Output.During, during)
 			for k, v := range c.Expected.Output.After {
-				assert.Equal(t, v, os.Getenv(k), k+" after runWithEnv")
+				assert.Equal(t, v, os.Getenv(k), k+" after runWithPluginEnv")
 			}
 			for _, k := range c.Expected.Output.UnsetAfter {
 				_, set := os.LookupEnv(k)
-				assert.False(t, set, k+" must be unset after runWithEnv")
+				assert.False(t, set, k+" must be unset after runWithPluginEnv")
 			}
 		})
 }

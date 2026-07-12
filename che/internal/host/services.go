@@ -19,23 +19,7 @@ import (
 // settleSeconds: wait before post-bootstrap pid check, services take time to spawn.
 const settleSeconds = 15
 
-// Service is one resolved launchd job.
-type Service struct {
-	Name        string // label == plist basename
-	Plist       string // live dest plist path
-	Domain      string // "system" or "gui/<uid>"
-	Sudo        bool   // system domain only
-	LongRunning bool   // KeepAlive, expect a live pid after bootstrap
-}
-
 func (s Service) target() string { return s.Domain + "/" + s.Name }
-
-// plistSource is one candidate template path under root/.
-type plistSource struct {
-	rel    string // repo-relative under root/, with marker
-	marker string // ".ontoHost.cp" or ".ontoHost.tpl"
-	system bool   // LaunchDaemons -> system, LaunchAgents -> gui
-}
 
 // ResolveServices maps each name to its live Service via the plist under root/.
 // Unknown name -> error. All current services are KeepAlive (LongRunning).

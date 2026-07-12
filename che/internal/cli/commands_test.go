@@ -50,8 +50,8 @@ func TestCommands(t *testing.T) {
 		a, root, home := setupMock(t, c.Context.Pwd, profile, c.Context.MockedInterfaces)
 		vars := map[string]string{
 			"HOME": home,
-			"REPO": a.units[0].host.RepoRoot,
-			"ROOT": a.units[0].host.Root,
+			"REPO": a.local.host.RepoRoot,
+			"ROOT": a.local.host.Root,
 		}
 		cmd, rest := findCmd(t, root, args)
 		out, runErr := testutil.CaptureStdout(t, func() error { return cmd.RunE(cmd, rest) })

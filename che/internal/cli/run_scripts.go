@@ -11,11 +11,11 @@ import (
 )
 
 // runScriptsRunE is the run-scripts RunE: the step op plus the name-substring
-// arg filter and a no-match check across all units.
-func (app *CheApp) runScriptsRunE(cmd *cobra.Command, args []string) error {
+// arg filter and a no-match check across all repos.
+func (ld *loader) runScriptsRunE(cmd *cobra.Command, args []string) error {
 	total := 0
-	err := app.forEachRepoUnit(cmd.Name(), func(u repoUnit) error {
-		n, err := runScripts(u, args)
+	err := ld.forEachLoad(cmd.Name(), func(l load) error {
+		n, err := runScripts(l, args)
 		total += n
 		return err
 	})
@@ -28,15 +28,15 @@ func (app *CheApp) runScriptsRunE(cmd *cobra.Command, args []string) error {
 	return nil
 }
 
-// runScripts resolves and runs u's scripts filtered by names, returning how
+// runScripts resolves and runs l's scripts filtered by names, returning how
 // many matched.
-func runScripts(u repoUnit, names []string) (int, error) {
-	scripts, err := u.host.ResolveScripts(u.res.Scripts)
+func runScripts(l load, names []string) (int, error) {
+	scripts, err := l.host.ResolveScripts(l.selection.Scripts)
 	if err != nil {
 		return 0, err
 	}
 	scripts = filterScripts(scripts, names)
-	return len(scripts), u.host.RunScripts(scripts)
+	return len(scripts), l.host.RunScripts(scripts)
 }
 
 func filterScripts(scripts, names []string) []string {

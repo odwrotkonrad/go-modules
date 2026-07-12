@@ -1,6 +1,6 @@
 # [>] 🤖🤖
 context:
-  function: spec.Raw.Resolve
+  function: spec.CheSpec.Resolve
 cases:
   - name: ShouldMergeMixinsForDesktopProfile
     context: {pwd: testdata/fixture/resolve/tree-merge}

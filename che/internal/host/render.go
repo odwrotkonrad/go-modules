@@ -15,16 +15,6 @@ import (
 // repoFileMode: repo-rendered dests are plain repo files (git-tracked, group-writable).
 const repoFileMode = 0o660
 
-// tmplDest is one resolved template dest: live absolute path, host vs repo
-// kind (dest path decides: ~/ or absolute -> host, relative -> repo), the
-// per-dest options, and the header path Compose stamps.
-type tmplDest struct {
-	path   string
-	host   bool
-	opts   render.Options
-	header string
-}
-
 // RenderTemplates renders each *.tpl in the resolved set. Glob-form items (no
 // explicit dest) render raw to the derived host path, rich items fan out
 // across their dests through render.Compose, host dests placed with spec

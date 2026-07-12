@@ -67,6 +67,37 @@
       "type": "object",
       "description": "per-dest render options"
     },
+    "Profile": {
+      "properties": {
+        "options": {
+          "$ref": "#/$defs/ProfileOptions",
+          "description": "when the profile runs: autoExec opts in to bare-che runs, execIf predicates must ALL pass"
+        },
+        "mixinProfiles": {
+          "items": {
+            "type": "string"
+          },
+          "type": "array",
+          "description": "local profile names composed depth-first, in order"
+        },
+        "plugins": {
+          "items": {
+            "$ref": "#/$defs/pluginEntry"
+          },
+          "type": "array",
+          "description": "profiles loaded at their own checkout: `@\u003cgiturl\u003e::\u003cprofile\u003e` (remote) or `\u003cdir\u003e::\u003cprofile\u003e` (local dir) string, or {ref, env}"
+        },
+        "include": {
+          "$ref": "#/$defs/includeSet"
+        },
+        "exclude": {
+          "$ref": "#/$defs/excludeSet"
+        }
+      },
+      "additionalProperties": false,
+      "type": "object",
+      "description": "one profile block: options self-describe eligibility, mixinProfiles compose in order, plugins pull remote profiles, include adds, exclude filters last and wins"
+    },
     "ProfileOptions": {
       "properties": {
         "execIf": {
@@ -368,41 +399,10 @@
           ]
         }
       ]
-    },
-    "profileSpec": {
-      "properties": {
-        "options": {
-          "$ref": "#/$defs/ProfileOptions",
-          "description": "when the profile runs: autoExec opts in to bare-che runs, execIf predicates must ALL pass"
-        },
-        "mixinProfiles": {
-          "items": {
-            "type": "string"
-          },
-          "type": "array",
-          "description": "local profile names composed depth-first, in order"
-        },
-        "plugins": {
-          "items": {
-            "$ref": "#/$defs/pluginEntry"
-          },
-          "type": "array",
-          "description": "profiles loaded at their own checkout: `@\u003cgiturl\u003e::\u003cprofile\u003e` (remote) or `\u003cdir\u003e::\u003cprofile\u003e` (local dir) string, or {ref, env}"
-        },
-        "include": {
-          "$ref": "#/$defs/includeSet"
-        },
-        "exclude": {
-          "$ref": "#/$defs/excludeSet"
-        }
-      },
-      "additionalProperties": false,
-      "type": "object",
-      "description": "one profile block: options self-describe eligibility, mixinProfiles compose in order, plugins pull remote profiles, include adds, exclude filters last and wins"
     }
   },
   "additionalProperties": {
-    "$ref": "#/$defs/profileSpec"
+    "$ref": "#/$defs/Profile"
   },
   "type": "object",
   "title": "che.yml",
