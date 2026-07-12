@@ -4,7 +4,6 @@ import (
 	"fmt"
 	"os"
 	"strings"
-	"unsafe"
 
 	tsmake "github.com/tree-sitter-grammars/tree-sitter-make/bindings/go"
 	sitter "github.com/tree-sitter/go-tree-sitter"
@@ -49,7 +48,7 @@ type frame struct {
 
 func parse(src []byte) ([]section, error) {
 	parser := sitter.NewParser()
-	if err := parser.SetLanguage(sitter.NewLanguage(unsafe.Pointer(tsmake.Language()))); err != nil {
+	if err := parser.SetLanguage(sitter.NewLanguage(tsmake.Language())); err != nil {
 		return nil, err
 	}
 	tree := parser.Parse(src, nil)

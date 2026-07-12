@@ -47,7 +47,7 @@ func ExecWithCtx(name string, body []byte, repoRoot string, itemCtx map[string]s
 	funcs := template.FuncMap{
 		"op":                   opResolver(ctx),
 		"renderDirsTree":       func() (string, error) { return DirsTree(repoRoot) },
-		"renderRepoGroupIndex": func(dir string) (string, error) { return RepoGroupIndexDir(dir) },
+		"renderRepoGroupIndex": RepoGroupIndexDir,
 		"renderMakefileDoc":    MakefileDoc,
 		"frontmatter":          func(path string) (string, error) { return ReadFrontmatter(repoRoot, path) },
 		"readBody":             func(path string) (string, error) { return ReadBody(repoRoot, path) },

@@ -2,7 +2,9 @@
 ##[>] 🤖🤖
 # Tag-pipeline publish for one module. Derives MODULE + MODULE_VERSION from
 # $CI_COMMIT_TAG (<module>/v<version>), builds with goreleaser in snapshot mode
-# (build engine only: free goreleaser cannot parse dir-prefixed tags), uploads
+# (build engine only: free goreleaser cannot parse dir-prefixed tags) unless
+# PUBLISH_PREBUILT=1 (dist/*.tar.gz prebuilt by earlier jobs: checksums only),
+# uploads
 # every archive + checksums to the generic package registry at
 # packages/generic/<module>/<version>/<file> and links each upload as a release
 # asset on the existing <module>/v<version> release.
@@ -13,7 +15,11 @@ MODULE="${TAG%%/v*}"
 MODULE_VERSION="${TAG#*/v}"
 
 cd "$MODULE"
-MODULE_VERSION="$MODULE_VERSION" goreleaser release --snapshot --clean -f .goreleaser.yaml
+if [[ "${PUBLISH_PREBUILT:-0}" == 1 ]] {
+  ( cd dist && sha256sum -- *.tar.gz > checksums.txt )
+} else {
+  MODULE_VERSION="$MODULE_VERSION" goreleaser release --verbose --snapshot --clean -f .goreleaser.yaml
+}
 
 typeset -a FILES
 FILES=(dist/*.tar.gz(N) dist/checksums.txt(N) darwin-dist/*.tar.gz(N))

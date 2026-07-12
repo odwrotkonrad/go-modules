@@ -20,7 +20,7 @@ func configDir(t *testing.T, raw string) string {
 	yamlcfg.SystemDir = filepath.Join(t.TempDir(), "no-system")
 	dir := t.TempDir()
 	if raw != "" {
-		if err := os.WriteFile(filepath.Join(dir, configName), []byte(raw), 0644); err != nil {
+		if err := os.WriteFile(filepath.Join(dir, configName), []byte(raw), 0o644); err != nil {
 			t.Fatal(err)
 		}
 	}

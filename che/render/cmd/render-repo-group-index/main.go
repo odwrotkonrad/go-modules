@@ -30,7 +30,7 @@ var tool = checkcmd.Tool{
 	Label:    "render-repo-group-index",
 	NeedsArg: true,
 	CheckArg: ".",
-	Generate: func(arg string) (string, error) { return render.RepoGroupIndexDir(arg) },
+	Generate: render.RepoGroupIndexDir,
 }
 
 func main() {

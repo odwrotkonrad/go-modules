@@ -59,7 +59,7 @@ func (m *Mock) run(argv []string) ([]byte, error) {
 func (m *Mock) Exec(c Cmd) error {
 	out, err := m.run(c.Argv)
 	if c.Stdout != nil && len(out) > 0 {
-		c.Stdout.Write(out)
+		_, _ = c.Stdout.Write(out)
 	}
 	return err
 }
