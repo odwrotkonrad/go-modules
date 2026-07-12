@@ -17,9 +17,24 @@ variables:
   GOCACHE: $CI_PROJECT_DIR/.cache/go-build
   CC: clang
 
+warm-go-mod:
+  stage: validate
+  image: $CI_IMAGE
+  needs: []
+  rules:
+    - if: $CI_PIPELINE_SOURCE == "merge_request_event"
+    - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
+  cache:
+    - key: go-mod
+      paths:
+        - .cache/go-mod
+  script:
+    - for m in che get-os-open-files-with get-term-open-files-with lib; do (cd $m && go mod download) || exit 1; done
+
 validate-pre-commit-all:
   stage: validate
   image: $CI_IMAGE
+  needs: [warm-go-mod]
   rules:
     - if: $CI_PIPELINE_SOURCE == "merge_request_event"
   cache:
@@ -36,7 +51,7 @@ validate-pre-commit-all:
 .test-module:
   image: $CI_IMAGE
   stage: test
-  needs: []
+  needs: [warm-go-mod]
   script:
     - make -C $MODULE test-cover
   coverage: '/total:\s+\(statements\)\s+\d+\.\d+%/'
@@ -59,6 +74,7 @@ test-che:
     - key: go-mod
       paths:
         - .cache/go-mod
+      policy: pull
     - key: go-build-che-$CI_COMMIT_REF_SLUG
       fallback_keys:
         - go-build-che-main
@@ -78,6 +94,7 @@ test-get-os-open-files-with:
     - key: go-mod
       paths:
         - .cache/go-mod
+      policy: pull
     - key: go-build-get-os-open-files-with-$CI_COMMIT_REF_SLUG
       fallback_keys:
         - go-build-get-os-open-files-with-main
@@ -97,6 +114,7 @@ test-get-term-open-files-with:
     - key: go-mod
       paths:
         - .cache/go-mod
+      policy: pull
     - key: go-build-get-term-open-files-with-$CI_COMMIT_REF_SLUG
       fallback_keys:
         - go-build-get-term-open-files-with-main
@@ -116,6 +134,7 @@ test-lib:
     - key: go-mod
       paths:
         - .cache/go-mod
+      policy: pull
     - key: go-build-lib-$CI_COMMIT_REF_SLUG
       fallback_keys:
         - go-build-lib-main
@@ -229,6 +248,7 @@ goreleaser-darwin-che:
     - key: go-mod
       paths:
         - .cache/go-mod
+      policy: pull
     - key: go-build-che-darwin
       paths:
         - .cache/go-build
@@ -264,6 +284,7 @@ goreleaser-linux-che:
     - key: go-mod
       paths:
         - .cache/go-mod
+      policy: pull
     - key: go-build-che-zig-$ARCH
       paths:
         - .cache/go-build
@@ -300,6 +321,7 @@ publish-get-os-open-files-with:
     - key: go-mod
       paths:
         - .cache/go-mod
+      policy: pull
     - key: go-build-get-os-open-files-with-publish
       paths:
         - .cache/go-build
@@ -316,6 +338,7 @@ publish-get-term-open-files-with:
     - key: go-mod
       paths:
         - .cache/go-mod
+      policy: pull
     - key: go-build-get-term-open-files-with-publish
       paths:
         - .cache/go-build
