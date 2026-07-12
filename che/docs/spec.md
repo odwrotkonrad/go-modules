@@ -12,14 +12,13 @@ First line of `che.yml`:
 # yaml-language-server: $schema=https://gitlab.com/konradodwrot/go-modules/-/raw/main/che/assets/data/che.schema.json
 ```
 
-Pin `main` to `v<X.Y.Z>` to match the installed che: each release tag
-snapshots the schema, also attached as a release asset.
+Pin `main` to the release tag matching the installed che: each tag snapshots
+the schema, also a release asset.
 
 ## Load Validation
 
 che validates every loaded che.yml (local repo, plugin checkouts) against this
-schema. Violations (unknown keys, wrong values, missing required fields) log
-as warnings by default. `--validate-spec error` (env
+schema. Violations log as warnings by default. `--validate-spec error` (env
 `CHE_VALIDATE_SPEC=error`) aborts the run instead.
 
 ## Full Example

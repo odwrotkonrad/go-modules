@@ -1,0 +1,28 @@
+# [>] 🤖🤖
+context:
+  function: render.RenderMarkdown
+  pwd: testdata/fixture/render_markdown/tree-docs
+cases:
+  - name: ShouldApplyAllTransforms
+    input:
+      args: [path: p.md, transforms: [remove-frontmatter, strip-comments, normalize-headings]]
+    expected:
+      files: testdata/fixture/render_markdown/all_opts.expected.md
+  - name: ShouldKeepFrontmatterWhenNotRemoved
+    input:
+      args: [path: p.md, transforms: [strip-comments]]
+    expected:
+      files: testdata/fixture/render_markdown/keep_frontmatter.expected.md
+  - name: ShouldErrorOnUnknownOption
+    input:
+      args: [path: p.md, transforms: [bogus]]
+    expected:
+      errorOutput: ['renderMarkdown: unknown opt "bogus"']
+  - name: ShouldExpandTildeAndCapHeadings
+    context:
+      pwd: testdata/fixture/render_markdown/tree-home
+    input:
+      args: [path: "~/r.md", transforms: [remove-frontmatter, normalize-headings], homeTilde: true]
+    expected:
+      files: testdata/fixture/render_markdown/tilde_cap.expected.md
+# [<] 🤖🤖

@@ -1,0 +1,26 @@
+# [>] 🤖🤖
+context:
+  function: testyml.mergeCaseContext
+  pwd: testdata/tree-base
+  env: {A: file, B: file}
+  mockedInterfaces:
+    execx.CmdExecutor: testutil.CmdMockExecutor
+cases:
+  - name: ShouldInheritFileContext
+    expected:
+      output:
+        function: testyml.mergeCaseContext
+        pwd: testdata/tree-base
+        env: {A: file, B: file}
+        mock: testutil.CmdMockExecutor
+  - name: ShouldOverrideAndExtendPerCase
+    context:
+      pwd: testdata/tree-case
+      env: {B: case, C: case}
+    expected:
+      output:
+        function: testyml.mergeCaseContext
+        pwd: testdata/tree-case
+        env: {A: file, B: case, C: case}
+        mock: testutil.CmdMockExecutor
+# [<] 🤖🤖

@@ -3,26 +3,31 @@ package lib
 // [>] 🤖🤖
 
 import (
+	"embed"
 	"testing"
 
+	"github.com/stretchr/testify/require"
 	"gopkg.in/yaml.v3"
+
+	"gitlab.com/konradodwrot/go-modules/lib/testyml"
 )
 
+//go:embed all:testdata
+var td embed.FS
+
 func TestRenderDocumentNode(t *testing.T) {
-	if out, err := Render(nil); err != nil || out != "" {
-		t.Fatalf("Render(nil) = %q, %v", out, err)
-	}
-	if out, err := Render(&yaml.Node{Kind: yaml.DocumentNode}); err != nil || out != "" {
-		t.Fatalf("Render(empty doc) = %q, %v", out, err)
-	}
-	var doc yaml.Node
-	if err := yaml.Unmarshal([]byte("app:\n  editor: [pdf]\n"), &doc); err != nil {
-		t.Fatal(err)
-	}
-	out, err := Render(&doc)
-	if err != nil || out != "app pdf editor" {
-		t.Fatalf("Render(doc) = %q, %v", out, err)
-	}
+	testyml.Eq(t, td, "testdata/spec/funcs/render_duti_lines.test.spec.yml", func(t *testing.T, c testyml.Case[string]) (string, error) {
+		var node *yaml.Node
+		switch raw := c.Input.Args.String(t, 0); raw {
+		case "nil":
+		case "emptyDocument":
+			node = &yaml.Node{Kind: yaml.DocumentNode}
+		default:
+			node = &yaml.Node{}
+			require.NoError(t, yaml.Unmarshal([]byte(raw), node))
+		}
+		return RenderDutiLines(node)
+	})
 }
 
 //[<] 🤖🤖

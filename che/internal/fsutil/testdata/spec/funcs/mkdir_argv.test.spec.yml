@@ -1,0 +1,20 @@
+# [>] 🤖🤖
+context:
+  function: fsutil.FS.MkdirArgv
+cases:
+  - name: ShouldIncludeParentsFlagWhenRequested
+    input:
+      args: [dest: /Users/x/.config, mode: "0750", parents: true]
+    expected:
+      output: [mkdir, -p, -m, "0750", /Users/x/.config]
+  - name: ShouldOmitParentsFlagWhenNotRequested
+    input:
+      args: [dest: /Users/x/.config, mode: "0750", parents: false]
+    expected:
+      output: [mkdir, -m, "0750", /Users/x/.config]
+  - name: ShouldOmitModeFlagForZeroMode
+    input:
+      args: [dest: /Users/x/.config, mode: "0", parents: true]
+    expected:
+      output: [mkdir, -p, /Users/x/.config]
+# [<] 🤖🤖

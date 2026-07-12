@@ -35,7 +35,7 @@ func (gs *globSet) addRule(glob string, perms Perms, rule *destRule) {
 	}
 }
 
-// match returns the last globPerm matching rel, and whether any did.
+// match: last match wins.
 func (gs globSet) match(rel string) (globPerm, bool) {
 	for _, g := range slices.Backward(gs) {
 		if isGlobMatch(g.glob, rel) {
@@ -67,15 +67,14 @@ type effective struct {
 }
 
 // EligibleProfiles lists the profiles to Resolve, in declaration order:
-//  1. forceOne (--profile by name) -> only that profile, autoExec skipped;
-//     must name a defined profile whose execIf expressions ALL pass
-//     (forceAll = --skip-exec-if lifts them).
+//  1. forceOne (--profile by name): only that profile, autoExec skipped,
+//     execIf still enforced (forceAll = --skip-exec-if lifts it).
 //  2. else every autoExec profile whose execIf expressions ALL pass
-//     (forceAll makes every execIf pass; it does not lift autoExec).
-//  3. zero eligible -> error.
-func (r *Raw) EligibleProfiles(forceOne string, forceAll bool, eval func(expr string) (bool, error)) ([]string, error) {
+//     (forceAll makes every execIf pass, it does not lift autoExec).
+//  3. zero eligible: error.
+func (r *CheSpec) EligibleProfiles(forceOne string, forceAll bool, eval func(expr string) (bool, error)) ([]string, error) {
 	if forceOne != "" {
-		ps, ok := r.profiles[forceOne]
+		ps, ok := r.profile(forceOne)
 		if !ok {
 			return nil, r.undefinedProfile(fmt.Sprintf("--profile %q", forceOne))
 		}
@@ -89,44 +88,49 @@ func (r *Raw) EligibleProfiles(forceOne string, forceAll bool, eval func(expr st
 		return []string{forceOne}, nil
 	}
 	var out []string
-	for _, name := range r.order {
-		ps := r.profiles[name]
+	for _, ps := range r.profiles {
 		if !ps.Options.AutoExec {
 			continue
 		}
-		ok, err := allPass(name, ps.Options.ExecIf, forceAll, eval)
+		ok, err := allPass(ps.Name, ps.Options.ExecIf, forceAll, eval)
 		if err != nil {
 			return nil, err
 		}
 		if ok {
-			out = append(out, name)
+			out = append(out, ps.Name)
 		}
 	}
 	if len(out) == 0 {
 		return nil, fmt.Errorf("no eligible profile: no autoExec profile passed its execIf (candidates: %v; use --profile or CHE_SKIP_EXEC_IF)",
-			r.names(func(ps profileSpec) bool { return ps.Options.AutoExec }))
+			r.names(func(ps Profile) bool { return ps.Options.AutoExec }))
 	}
 	return out, nil
 }
 
-// ExecIfPass reports whether the named profile's execIf expressions all pass.
-// name must be a defined profile.
-func (r *Raw) ExecIfPass(name string, forceAll bool, eval func(expr string) (bool, error)) (bool, error) {
-	ps, ok := r.profiles[name]
+// ExecIfPass: the named profile's execIf expressions all pass.
+func (r *CheSpec) ExecIfPass(name string, forceAll bool, eval func(expr string) (bool, error)) (bool, error) {
+	ps, ok := r.profile(name)
 	if !ok {
 		return false, r.undefinedProfile(fmt.Sprintf("profile %q", name))
 	}
 	return allPass(name, ps.Options.ExecIf, forceAll, eval)
 }
 
-// undefinedProfile is the shared not-defined error; ref names the offending
-// reference (e.g. `--profile "x"`, `profile "x"`).
-func (r *Raw) undefinedProfile(ref string) error {
-	return fmt.Errorf("%s is not defined in che.yml (defined: %v)", ref, slices.Sorted(maps.Keys(r.profiles)))
+// profile returns the named Profile.
+func (r *CheSpec) profile(name string) (Profile, bool) {
+	for _, ps := range r.profiles {
+		if ps.Name == name {
+			return ps, true
+		}
+	}
+	return Profile{}, false
 }
 
-// allPass reports whether every execIf expression of profile name passes,
-// logging each pass (rejects log at debug level only).
+func (r *CheSpec) undefinedProfile(ref string) error {
+	return fmt.Errorf("%s is not defined in che.yml (defined: %v)", ref, r.names(func(Profile) bool { return true }))
+}
+
+// allPass logs each pass, rejects at debug level only.
 func allPass(name string, exprs []string, forceAll bool, eval func(expr string) (bool, error)) (bool, error) {
 	if forceAll {
 		return true, nil
@@ -145,12 +149,11 @@ func allPass(name string, exprs []string, forceAll bool, eval func(expr string) 
 	return true, nil
 }
 
-// names lists defined profile block names matching keep, sorted.
-func (r *Raw) names(keep func(profileSpec) bool) []string {
+func (r *CheSpec) names(keep func(Profile) bool) []string {
 	var out []string
-	for name, ps := range r.profiles {
+	for _, ps := range r.profiles {
 		if keep(ps) {
-			out = append(out, name)
+			out = append(out, ps.Name)
 		}
 	}
 	return slices.Sorted(slices.Values(out))
@@ -159,10 +162,10 @@ func (r *Raw) names(keep func(profileSpec) bool) []string {
 // Resolve validates each profile is defined, composes their mixinProfiles and
 // includes into one union (in order), classifies git-tracked files, then
 // applies excludes as a final glob filter. Output is repo-relative.
-func (r *Raw) Resolve(profiles []string, root string) (Resolved, error) {
+func (r *CheSpec) Resolve(profiles []string, root string) (Resolved, error) {
 	var eff effective
 	for _, profile := range profiles {
-		if _, ok := r.profiles[profile]; !ok {
+		if _, ok := r.profile(profile); !ok {
 			return Resolved{}, r.undefinedProfile(fmt.Sprintf("profile %q", profile))
 		}
 		if err := r.mergeInto(&eff, profile, nil); err != nil {
@@ -250,9 +253,7 @@ func classify(root string, eff effective, res *Resolved) error {
 	return nil
 }
 
-// hit appends rel (with its matched perms) to items if any glob in gs matches,
-// reporting whether it did. A matched link dest rule that changes rel lands as
-// the item's explicit dest.
+// hit: a matched link dest rule that changes rel lands as the item's explicit dest.
 func hit(gs globSet, rel string, items *[]FileItem) bool {
 	gp, ok := gs.match(rel)
 	if !ok {
@@ -268,7 +269,6 @@ func hit(gs globSet, rel string, items *[]FileItem) bool {
 	return true
 }
 
-// richRels is the set of source rels claimed by rich copy/template entries.
 func richRels(eff effective) map[string]bool {
 	m := map[string]bool{}
 	for _, it := range eff.richCopy {
@@ -340,7 +340,6 @@ func applyExcludes(ex excludeSet, res *Resolved) {
 	res.Dirs = dropStrings(res.Dirs, dirG)
 }
 
-// dropFiles drops any FileItem whose rel or any dest matches an exclude glob.
 func dropFiles(items []FileItem, globs []string) []FileItem {
 	if len(globs) == 0 {
 		return items
@@ -358,7 +357,6 @@ func dropFiles(items []FileItem, globs []string) []FileItem {
 	})
 }
 
-// dropStrings drops any entry matching an exclude glob.
 func dropStrings(xs, globs []string) []string {
 	if len(globs) == 0 {
 		return xs
@@ -369,11 +367,11 @@ func dropStrings(xs, globs []string) []string {
 // mergeInto composes name into eff: mixinProfiles depth-first, then this
 // profile's include sections (additive). Excludes are handled separately
 // (applyExcludes). seen catches cycles.
-func (r *Raw) mergeInto(eff *effective, name string, seen []string) error {
+func (r *CheSpec) mergeInto(eff *effective, name string, seen []string) error {
 	if slices.Contains(seen, name) {
 		return fmt.Errorf("mixinProfiles cycle: %v -> %s", seen, name)
 	}
-	ps, ok := r.profiles[name]
+	ps, ok := r.profile(name)
 	if !ok {
 		return fmt.Errorf("mixinProfiles names undefined profile %q (from %v)", name, seen)
 	}
@@ -424,7 +422,6 @@ func (r *Raw) mergeInto(eff *effective, name string, seen []string) error {
 	return nil
 }
 
-// append accumulates another profile's exclude globs (composition order).
 func (ex *excludeSet) append(o excludeSet) {
 	ex.Link = append(ex.Link, o.Link...)
 	ex.Copy = append(ex.Copy, o.Copy...)
@@ -434,8 +431,6 @@ func (ex *excludeSet) append(o excludeSet) {
 	ex.Services = append(ex.Services, o.Services...)
 }
 
-// splitEntries walks each perm-group's Files: glob items go to globs carrying
-// the group's perms, {source,dest} items become rich FileItems carrying them.
 func splitEntries(entries []entry, globs *globSet, rich *[]FileItem) {
 	for _, e := range entries {
 		for _, f := range e.Files {
@@ -448,11 +443,10 @@ func splitEntries(entries []entry, globs *globSet, rich *[]FileItem) {
 	}
 }
 
-// splitTemplates walks each renderTemplates perm-group's Files: glob items go
-// to globs, {source, dest} items become rich FileItems. Sources are
-// repo-root-relative or remote refs (@<repo>//<path>, explicit dest
-// required); the derived-dest form (glob, or rich without dest) requires a
-// root/-prefixed source ([why] only root/ paths map to host dests).
+// splitTemplates: glob items go to globs, {source, dest} items become rich
+// FileItems. Remote refs (@<repo>//<path>) require an explicit dest, the
+// derived-dest form (glob, or rich without dest) a root/-prefixed source
+// ([why] only root/ paths map to host dests).
 func splitTemplates(entries []entry, globs *globSet, rich *[]FileItem) error {
 	for _, e := range entries {
 		for _, f := range e.Files {
@@ -483,8 +477,7 @@ func splitTemplates(entries []entry, globs *globSet, rich *[]FileItem) error {
 	return nil
 }
 
-// mergeCtx merges a group-level ctx under an item's ctx: item keys win.
-// Either side empty -> the other verbatim.
+// mergeCtx merges a group-level ctx under an item's: item keys win.
 func mergeCtx(group, item map[string]string) map[string]string {
 	if len(group) == 0 {
 		return item
@@ -495,8 +488,7 @@ func mergeCtx(group, item map[string]string) map[string]string {
 }
 
 // mergeDestOptions merges group-level render options under each dest's own:
-// fields the dest sets win, unset fields inherit the group's. Zero group ->
-// dests verbatim.
+// fields the dest sets win, unset fields inherit the group's.
 func mergeDestOptions(group render.Options, dests []DestSpec) []DestSpec {
 	if group == (render.Options{}) {
 		return dests

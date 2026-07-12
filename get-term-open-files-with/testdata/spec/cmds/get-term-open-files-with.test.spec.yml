@@ -1,0 +1,92 @@
+# [>] 🤖🤖
+context:
+  command: get-term-open-files-with any
+cases:
+  - name: ShouldUseAnyOpenerForAnyTerminal
+    input:
+      args: [config: testdata/fixture/run/term.yml]
+    expected:
+      files: testdata/fixture/run/any.expected.txt
+  - name: ShouldOverrideAnyWithVscodeKeepingProse
+    context:
+      command: get-term-open-files-with vscode
+    input:
+      args: [config: testdata/fixture/run/term.yml]
+    expected:
+      files: testdata/fixture/run/vscode.expected.txt
+  - name: ShouldPartiallyOverrideAnyForKitty
+    context:
+      command: get-term-open-files-with kitty
+    input:
+      args: [config: testdata/fixture/run/term.yml]
+    expected:
+      files: testdata/fixture/run/kitty.expected.txt
+  - name: ShouldLetLastOpenerWin
+    context:
+      command: get-term-open-files-with vscode
+    input:
+      args: [config: testdata/fixture/run/last_opener.yml]
+    expected:
+      files: testdata/fixture/run/last_opener.expected.txt
+  - name: ShouldSkipRulesWithEmptyOpener
+    input:
+      args: [config: testdata/fixture/run/empty_opener.yml]
+    expected:
+      files: testdata/fixture/run/empty_opener.expected.txt
+  - name: ShouldExit11WithoutArgs
+    context:
+      command: get-term-open-files-with
+    input:
+      args: [config: testdata/fixture/run/term.yml]
+    expected:
+      exitCode: 11
+  - name: ShouldExit11OnTwoArgs
+    context:
+      command: get-term-open-files-with any vscode
+    input:
+      args: [config: testdata/fixture/run/term.yml]
+    expected:
+      exitCode: 11
+  - name: ShouldExit11OnThreeArgs
+    context:
+      command: get-term-open-files-with any vscode kitty
+    input:
+      args: [config: testdata/fixture/run/term.yml]
+    expected:
+      exitCode: 11
+  - name: ShouldExit11OnUnknownTerminal
+    context:
+      command: get-term-open-files-with alacritty
+    input:
+      args: [config: testdata/fixture/run/term.yml]
+    expected:
+      exitCode: 11
+  - name: ShouldExit11OnWrongCaseTerminal
+    context:
+      command: get-term-open-files-with Any
+    input:
+      args: [config: testdata/fixture/run/term.yml]
+    expected:
+      exitCode: 11
+  - name: ShouldExit13WhenConfigMissing
+    input:
+      args: []
+    expected:
+      exitCode: 13
+  - name: ShouldExit12OnInvalidConfig
+    input:
+      args: [config: testdata/fixture/run/invalid.yml]
+    expected:
+      exitCode: 12
+  - name: ShouldFetchAndWriteCacheOnMiss
+    input:
+      args: [config: testdata/fixture/run/term.yml, serve: languages]
+    expected:
+      files: testdata/fixture/run/any.expected.txt
+      output: {cacheWritten: true}
+  - name: ShouldExit14WhenFetchFails
+    input:
+      args: [config: testdata/fixture/run/term.yml, serve: error500]
+    expected:
+      exitCode: 14
+# [<] 🤖🤖

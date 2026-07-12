@@ -1,0 +1,15 @@
+# [>] 🤖🤖
+context:
+  function: lib.CacheDir
+cases:
+  - name: ShouldFallBackToXdgCacheHome
+    context:
+      env: {LINGUIST_CACHE_DIR: "", XDG_CACHE_HOME: /xc}
+    expected:
+      output: /xc/get-term-open-files-with
+  - name: ShouldFallBackToHomeCache
+    context:
+      env: {LINGUIST_CACHE_DIR: "", XDG_CACHE_HOME: "", HOME: /h}
+    expected:
+      output: /h/.cache/get-term-open-files-with
+# [<] 🤖🤖

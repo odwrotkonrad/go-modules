@@ -4,20 +4,26 @@ package render
 
 import (
 	"maps"
-	"os"
+	"path"
 	"path/filepath"
 	"slices"
-	"strings"
 	"testing"
+
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
+
+	"gitlab.com/konradodwrot/go-modules/che/internal/testutil"
+	"gitlab.com/konradodwrot/go-modules/lib/testyml"
 )
 
 // mkRepo creates a fake repo under root/rel with a .git marker and, if purpose
-// is non-empty, an assets/docs-agents/purpose.md carrying it.
+// is non-empty, an assets/docs-agents/purpose.md carrying it. [why] .git
+// markers are stamped at runtime: nested .git dirs cannot be version-controlled.
 func mkRepo(t *testing.T, root, rel, purpose string) {
 	t.Helper()
-	writeFile(t, filepath.Join(root, rel, ".git", "HEAD"), "ref: refs/heads/main\n")
+	testutil.WriteFile(t, filepath.Join(root, rel, ".git", "HEAD"), "ref: refs/heads/main\n")
 	if purpose != "" {
-		writeFile(t, filepath.Join(root, rel, purposeRelPath), purpose)
+		testutil.WriteFile(t, filepath.Join(root, rel, purposeRelPath), purpose)
 	}
 }
 
@@ -41,101 +47,55 @@ func buildWorkspace(t *testing.T) string {
 	return root
 }
 
-func TestRepoGroupIndexLeaf(t *testing.T) {
-	root := buildWorkspace(t)
-	got, err := RepoGroupIndexDir(filepath.Join(root, "leaf"))
-	if err != nil {
-		t.Fatal(err)
-	}
-	if !strings.Contains(got, "## Repo: ./alpha") || !strings.Contains(got, "Alpha does things.") {
-		t.Errorf("leaf missing alpha purpose:\n%s", got)
-	}
-	if !strings.Contains(got, "## Repo: ./beta") || !strings.Contains(got, noPurposePlaceholder) {
-		t.Errorf("leaf missing beta placeholder:\n%s", got)
-	}
-	if strings.Contains(got, "Subgroup:") {
-		t.Errorf("leaf should have no subgroup headings:\n%s", got)
-	}
-	if !strings.Contains(got, `This is "leaf" directory with dirs structure containing repositories:`) {
-		t.Errorf("leaf missing pwd line:\n%s", got)
-	}
-	// deterministic order: alpha before beta
-	if strings.Index(got, "## Repo: ./alpha") > strings.Index(got, "## Repo: ./beta") {
-		t.Errorf("repos not sorted:\n%s", got)
-	}
+func TestRepoGroupIndexDir(t *testing.T) {
+	testyml.Run(t, td, "testdata/spec/funcs/repo_group_index_dir.test.spec.yml", func(t *testing.T, c testyml.Case[testyml.Matchers]) {
+		root := buildWorkspace(t)
+		got, err := RepoGroupIndexDir(filepath.Join(root, c.Input.Args.String(t, 0)))
+		require.NoError(t, err)
+		for _, m := range c.Expected.Output {
+			testyml.MustMatch(t, got, m)
+		}
+		for _, m := range c.NotExpected.Output {
+			testyml.MustNotMatch(t, got, m)
+		}
+	})
 }
 
-func TestRepoGroupIndexParent(t *testing.T) {
-	root := buildWorkspace(t)
-	got, err := RepoGroupIndexDir(filepath.Join(root, "parent"))
-	if err != nil {
-		t.Fatal(err)
-	}
-	if !strings.Contains(got, "## Repo: ./direct") || !strings.Contains(got, "Direct repo.") {
-		t.Errorf("parent missing direct repo:\n%s", got)
-	}
-	// child subgroup inlined without its own section headings or tree
-	if !strings.Contains(got, "## Subgroup: ./child") || strings.Contains(got, "### Repositories") {
-		t.Errorf("child inline should carry a Subgroup heading, no Repositories heading:\n%s", got)
-	}
-	if !strings.Contains(got, "### Repo: ./child/gamma") || !strings.Contains(got, "Gamma repo.") {
-		t.Errorf("parent missing grandchild repo via child inline:\n%s", got)
-	}
-	if strings.Count(got, "dirs structure") != 1 {
-		t.Errorf("child inline should carry no tree:\n%s", got)
-	}
+// groupIndexWant is repo_group_index's expected.output: subgroup keys the walk
+// must (not) yield, per-key content matchers, per-key expected-file indexes.
+type groupIndexWant struct {
+	Keys        []string          `yaml:"keys"`
+	MissingKeys []string          `yaml:"missingKeys"`
+	Contains    map[string]string `yaml:"contains"`
+	Indexes     map[string]string `yaml:"indexes"`
 }
 
-func TestRepoGroupIndexWalk(t *testing.T) {
-	root := buildWorkspace(t)
-	idx, err := RepoGroupIndex(root)
-	if err != nil {
-		t.Fatal(err)
-	}
-	for _, want := range []string{"leaf", "parent", filepath.Join("parent", "child")} {
-		if _, ok := idx[want]; !ok {
-			t.Errorf("walk missing subgroup %q; got keys %v", want, slices.Collect(maps.Keys(idx)))
+func TestRepoGroupIndex(t *testing.T) {
+	testyml.Run(t, td, "testdata/spec/funcs/repo_group_index.test.spec.yml", func(t *testing.T, c testyml.Case[groupIndexWant]) {
+		a := c.Input.Args
+		dir := buildWorkspace(t)
+		if fixture := a.String(t, 0); fixture != "" {
+			dir = filepath.Join(t.TempDir(), "test-group")
+			for _, repo := range a.Strings(t, 1) {
+				mkRepo(t, dir, repo, testyml.ReadFile(t, td, path.Join(fixture, repo, purposeRelPath)))
+			}
 		}
-	}
-	// repos are not subgroups
-	if _, ok := idx[filepath.Join("leaf", "alpha")]; ok {
-		t.Error("repo should not be indexed as a subgroup")
-	}
-	// child index lists gamma directly
-	if !strings.Contains(idx[filepath.Join("parent", "child")], "## Repo: ./gamma") {
-		t.Errorf("child index missing gamma:\n%s", idx[filepath.Join("parent", "child")])
-	}
-}
-
-// TestRepoGroupIndexExpected: the presentation fixture (testdata/fixture/repo-group-index/group:
-// one repo plus a child group of two repos, each with purpose.md) renders to the
-// checked-in expected indexes. .git markers are stamped at runtime ([why] nested
-// .git dirs cannot be version-controlled).
-func TestRepoGroupIndexExpected(t *testing.T) {
-	dir := filepath.Join(t.TempDir(), "test-group")
-	for _, repo := range []string{"che", "tools/render-files", "tools/configs"} {
-		purpose, err := os.ReadFile(filepath.Join("testdata/fixture/repo-group-index/group", repo, purposeRelPath))
-		if err != nil {
-			t.Fatal(err)
+		idx, err := RepoGroupIndex(dir)
+		require.NoError(t, err)
+		want := c.Expected.Output
+		for _, k := range want.Keys {
+			assert.Containsf(t, idx, filepath.FromSlash(k), "walk missing subgroup %q; got keys %v", k, slices.Collect(maps.Keys(idx)))
 		}
-		mkRepo(t, dir, repo, string(purpose))
-	}
-	idx, err := RepoGroupIndex(dir)
-	if err != nil {
-		t.Fatal(err)
-	}
-	for rel, expected := range map[string]string{
-		".":     "testdata/fixture/repo-group-index/index.expected.md",
-		"tools": "testdata/fixture/repo-group-index/child-group-index.expected.md",
-	} {
-		want, err := os.ReadFile(expected)
-		if err != nil {
-			t.Fatal(err)
+		for _, k := range want.MissingKeys {
+			assert.NotContains(t, idx, filepath.FromSlash(k), "repos are not subgroups")
 		}
-		if idx[rel] != string(want) {
-			t.Errorf("%s index mismatch:\n--- got ---\n%s\n--- want ---\n%s", rel, idx[rel], want)
+		for k, m := range want.Contains {
+			testyml.MustMatch(t, idx[filepath.FromSlash(k)], m)
 		}
-	}
+		for k, expected := range want.Indexes {
+			testyml.EqualExpected(t, td, expected, idx[k])
+		}
+	})
 }
 
 // [<] 🤖🤖

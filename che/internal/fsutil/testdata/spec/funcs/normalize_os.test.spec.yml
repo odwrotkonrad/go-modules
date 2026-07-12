@@ -1,0 +1,15 @@
+# [>] 🤖🤖
+context:
+  function: fsutil.NormalizeOS
+cases:
+  - name: ShouldMapDarwinToMacos
+    input:
+      args: [os: darwin]
+    expected:
+      output: macos
+  - name: ShouldKeepLinux
+    input:
+      args: [os: linux]
+    expected:
+      output: linux
+# [<] 🤖🤖

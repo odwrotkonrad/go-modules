@@ -32,13 +32,13 @@ func slug(url string) string {
 	return strings.Trim(s, "-")
 }
 
-// Ensure clones url into its cache dir (first run: shallow, remote default
+// EnsureCheckout clones url into its cache dir (first run: shallow, remote default
 // branch only) or updates it to the remote tip (shallow fetch + hard reset:
 // [why] a shallow --ff-only pull fails once the fetched history is truncated;
 // the dir is a managed cache, never edited in place), returning the checkout
 // path. name subtypes the logs. Shells out to system git so the user's ssh
 // config and credential helpers apply.
-func Ensure(home, url, name string) (string, error) {
+func EnsureCheckout(home, url, name string) (string, error) {
 	dir := Dir(home, url)
 	if _, err := os.Stat(filepath.Join(dir, ".git")); err != nil {
 		log.Debug("plugin("+name+")", fmt.Sprintf("clone %s -> %s", url, dir), log.Off)

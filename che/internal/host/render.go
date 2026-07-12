@@ -15,24 +15,11 @@ import (
 // repoFileMode: repo-rendered dests are plain repo files (git-tracked, group-writable).
 const repoFileMode = 0o660
 
-// tmplDest is one resolved template dest: live absolute path, host vs repo
-// kind (dest path decides: ~/ or absolute -> host, relative -> repo), the
-// per-dest options, and the header path Compose stamps.
-type tmplDest struct {
-	path   string
-	host   bool
-	opts   render.Options
-	header string
-}
-
-// RenderTemplates renders each *.tpl in the resolved set. Sources are
-// repo-root-relative or remote refs (@<repo>//<path>, fetched via one shared
-// clone cache per run). Glob-form items (no explicit dest) render raw to the
-// derived host path; rich items fan out across their dests through
-// render.Compose, host dests placed with spec perms, repo dests written as
-// plain repo files. skipSecrets drops sources carrying op:// secret refs
-// (logged, dests untouched). A failing item is logged and the rest still
-// render; failures join into the returned error.
+// RenderTemplates renders each *.tpl in the resolved set. Glob-form items (no
+// explicit dest) render raw to the derived host path, rich items fan out
+// across their dests through render.Compose, host dests placed with spec
+// perms, repo dests written as plain repo files. skipSecrets drops sources
+// carrying op:// refs (logged, dests untouched).
 func (h Host) RenderTemplates(templates []spec.FileItem, skipSecrets bool) error {
 	type tmplItem struct {
 		item  spec.FileItem
@@ -82,10 +69,9 @@ func (h Host) RenderTemplates(templates []spec.FileItem, skipSecrets bool) error
 	return errors.Join(errs...)
 }
 
-// isSecretRefInItem reports whether the item's template source carries an
-// op:// secret reference (a render-time vault fetch). Remote sources scan
-// fetched content, except under dry-run ([why] dry-run stays offline).
-// Unreadable source -> false (render proceeds, errors there).
+// isSecretRefInItem: the item's template source carries an op:// ref. Remote
+// sources scan fetched content, except under dry-run ([why] dry-run stays
+// offline). Unreadable source -> false (render proceeds, errors there).
 func (h Host) isSecretRefInItem(item spec.FileItem) bool {
 	if spec.IsRemoteSrc(item.Rel) {
 		if h.IsDryRun() {
@@ -104,8 +90,6 @@ func (h Host) isSecretRefInItem(item spec.FileItem) bool {
 	return render.IsSecretRefPresent(src)
 }
 
-// templateDests resolves an item's dests: derived host path (no explicit dest,
-// root/-prefixed source) else its expanded dests, kind by path shape.
 func (h Host) templateDests(item spec.FileItem) []tmplDest {
 	if len(item.Dests) == 0 {
 		rel := strings.TrimPrefix(item.Rel, spec.RootPrefix)

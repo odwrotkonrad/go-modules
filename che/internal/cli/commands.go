@@ -9,17 +9,6 @@ import (
 	"gitlab.com/konradodwrot/go-modules/che/internal/spec"
 )
 
-// step is one op of the full load: its subcommand shape (use/parent/short)
-// plus the unit op and a predicate over the local repo's resolved selection
-// gating it under `all`.
-type step struct {
-	name     string
-	parent   string
-	short    string
-	op       func(*CheApp, unit) error
-	selected func(spec.Resolved) bool
-}
-
 // displayName is the step's `all` log name: parent-qualified for subcommands.
 func (s step) displayName() string {
 	if s.parent != "" {
@@ -36,36 +25,36 @@ func steps() []step {
 	return []step{
 		{
 			name: "prune-links", short: "delete broken symlinks",
-			op:       func(_ *CheApp, u unit) error { return u.host.PruneBrokenLinks(u.res.Dirs) },
+			op:       func(_ *loader, l load) error { return l.host.PruneBrokenLinks(l.selection.Dirs) },
 			selected: dirs,
 		},
 		{
 			name: "mk-dirs", short: "create repo-tree dirs + extra-dirs",
-			op:       func(_ *CheApp, u unit) error { return u.host.MkDirs(u.res.Dirs, u.res.ExtraDirs) },
+			op:       func(_ *loader, l load) error { return l.host.MkDirs(l.selection.Dirs, l.selection.ExtraDirs) },
 			selected: func(r spec.Resolved) bool { return len(r.Dirs)+len(r.ExtraDirs) > 0 },
 		},
 		{
 			name: "link", short: "symlink op (configs into system root)",
-			op:       func(_ *CheApp, u unit) error { return u.host.MkLinks(u.res.Links, u.res.Dirs) },
+			op:       func(_ *loader, l load) error { return l.host.MkLinks(l.selection.Links, l.selection.Dirs) },
 			selected: func(r spec.Resolved) bool { return len(r.Links) > 0 },
 		},
 		{
 			name: "copy", short: "*.ontoHost.cp copy op",
-			op:       func(_ *CheApp, u unit) error { return u.host.MkCopies(u.res.Copies, u.res.Dirs) },
+			op:       func(_ *loader, l load) error { return l.host.MkCopies(l.selection.Copies, l.selection.Dirs) },
 			selected: func(r spec.Resolved) bool { return len(r.Copies) > 0 },
 		},
 		{
 			name: "render-templates", short: "render *.tpl sources; each dest path decides target (relative -> repo, ~/ or absolute -> host)",
-			op: func(c *CheApp, u unit) error {
-				return u.host.RenderTemplates(u.res.Templates,
-					boolOrEnv(c.renderSkipSecrets, "CHE_RENDER_TEMPLATES_SKIP_SECRETS"))
+			op: func(ld *loader, l load) error {
+				return l.host.RenderTemplates(l.selection.Templates,
+					ld.config.RenderSkipSecrets)
 			},
 			selected: func(r spec.Resolved) bool { return len(r.Templates) > 0 },
 		},
 		{
 			name: "run-scripts", short: "run the profile's scripts, optionally filtered by name substring",
-			op: func(_ *CheApp, u unit) error {
-				_, err := runScripts(u, nil)
+			op: func(_ *loader, l load) error {
+				_, err := runScripts(l, nil)
 				return err
 			},
 			selected: func(r spec.Resolved) bool { return len(r.Scripts) > 0 },
@@ -85,23 +74,23 @@ func steps() []step {
 	}
 }
 
-// stepCmd builds a step's subcommand: RunE runs its op over every unit.
+// stepCmd builds a step's subcommand: RunE runs its op over every load.
 // run-scripts and render-templates layer their arg filter / flag on top.
-func (c *CheApp) stepCmd(s step) *cobra.Command {
+func (ld *loader) stepCmd(s step) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   s.name,
 		Short: s.short,
 		RunE: func(cmd *cobra.Command, args []string) error {
-			return c.forEachUnit(cmd.Name(), func(u unit) error { return s.op(c, u) })
+			return ld.forEachLoad(cmd.Name(), func(l load) error { return s.op(ld, l) })
 		},
 	}
 	switch s.name {
 	case "render-templates":
-		cmd.Flags().BoolVar(&c.renderSkipSecrets, "skip-secrets", false,
+		cmd.Flags().BoolVar(&ld.config.RenderSkipSecrets, "skip-secrets", false,
 			"skip sources carrying op:// secret refs (logged, dests untouched); env: CHE_RENDER_TEMPLATES_SKIP_SECRETS")
 	case "run-scripts":
 		cmd.Use = "run-scripts [name...]"
-		cmd.RunE = c.runScriptsRunE
+		cmd.RunE = ld.runScriptsRunE
 	}
 	return cmd
 }

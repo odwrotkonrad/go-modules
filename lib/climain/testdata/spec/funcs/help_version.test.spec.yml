@@ -1,0 +1,40 @@
+# [>] 🤖🤖
+context:
+  function: climain.HelpVersion
+cases:
+  - name: ShouldPrintUsageForLongHelpFlag
+    input:
+      args: [argv: ["--help"]]
+    expected:
+      output: {out: usage text, done: true}
+  - name: ShouldPrintUsageForShortHelpFlag
+    input:
+      args: [argv: ["-h"]]
+    expected:
+      output: {out: usage text, done: true}
+  - name: ShouldPrintVersionForLongVersionFlag
+    input:
+      args: [argv: ["--version"]]
+    expected:
+      output: {out: tool version 1.2.3, done: true}
+  - name: ShouldPrintVersionForShortVersionFlag
+    input:
+      args: [argv: ["-v"]]
+    expected:
+      output: {out: tool version 1.2.3, done: true}
+  - name: ShouldNotHandleEmptyArgs
+    input:
+      args: [argv: []]
+    expected:
+      output: {out: "", done: false}
+  - name: ShouldNotHandleOtherArg
+    input:
+      args: [argv: [any]]
+    expected:
+      output: {out: "", done: false}
+  - name: ShouldNotHandleHelpWithExtraArg
+    input:
+      args: [argv: ["--help", x]]
+    expected:
+      output: {out: "", done: false}
+# [<] 🤖🤖

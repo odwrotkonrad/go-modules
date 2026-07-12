@@ -4,7 +4,6 @@ package cli
 // [>] 🤖🤖
 
 import (
-	"cmp"
 	"errors"
 	"fmt"
 	"maps"
@@ -17,66 +16,17 @@ import (
 
 	"gitlab.com/konradodwrot/go-modules/che/internal/config"
 	"gitlab.com/konradodwrot/go-modules/che/internal/fsutil"
-	"gitlab.com/konradodwrot/go-modules/che/internal/host"
 	"gitlab.com/konradodwrot/go-modules/che/internal/log"
 	"gitlab.com/konradodwrot/go-modules/che/internal/plugin"
 	"gitlab.com/konradodwrot/go-modules/che/internal/spec"
 )
 
-// unit is one loaded repo: units[0] the local repo, the rest plugin checkouts
-// (ref carries their @url::profile form, env the entry's exported envs).
-type unit struct {
-	host host.Host
-	res  spec.Resolved
-	ref  string
-	env  map[string]string
-}
-
-type pluginConfig struct {
-	repoRoot string
-	home     string
-	cfg      config.Config
-	eval     func(string) (bool, error)
-}
-
-// CheApp owns the CLI's flag destinations and the state built in
-// PersistentPreRunE, read by each RunE. Plugin units build lazily
-// (ensurePlugin), after the local unit's ops ran.
-type CheApp struct {
-	dirFlag           string
-	dryRunMode        string
-	validateSpecMode  string
-	profileForce      string
-	skipExecIf        bool
-	skipPlugins       bool
-	debugFlag         bool
-	renderSkipSecrets bool
-	units             []unit
-	pluginRefs        []spec.PluginRef
-	pluginUnits       map[string]*unit
-	pluginCfg         pluginConfig
-	// newHost builds each unit's Host; tests override it to inject a mock fs.
-	newHost func(repoRoot, home, profile string, cfg config.Config) host.Host
-}
-
-func New() *CheApp {
-	return &CheApp{newHost: host.New}
-}
-
 // version is injected at build time via -ldflags -X.
 var version = "dev"
 
-// dryRunModes maps the --dry-run flag value to a config.DryRunMode.
-var dryRunModes = map[string]config.DryRunMode{
-	"":      config.DryRun.Off,
-	"delta": config.DryRun.Delta,
-	"all":   config.DryRun.All,
-}
-
 // Root builds che's root command with every subcommand attached: the single
-// command-tree source for main and docgen. Resolves the eligible profiles
-// (build) before any subcommand runs.
-func (c *CheApp) Root() *cobra.Command {
+// command-tree source for main and docgen.
+func (ld *loader) Root() *cobra.Command {
 	root := &cobra.Command{
 		Use:     "che",
 		Version: version,
@@ -86,33 +36,33 @@ loads the union of files/dirs/installs/services those profiles select.`,
 		SilenceUsage:  true,
 		SilenceErrors: true,
 		PersistentPreRunE: func(cmd *cobra.Command, args []string) error {
-			return c.build()
+			return ld.init()
 		},
 	}
 	pf := root.PersistentFlags()
-	pf.StringVarP(&c.dirFlag, "directory", "C", "",
+	pf.StringVarP(&ld.config.Dir, "directory", "C", "",
 		"change into this directory before resolving the repo; env: CHE_DIR")
-	pf.StringVar(&c.dryRunMode, "dry-run", "",
+	pf.StringVar((*string)(&ld.config.DryRun), "dry-run", "",
 		"print mutating actions instead of executing them; values: delta (changed dests, bare-flag default) | all (every dest); default: off; env: CHE_DRY_RUN")
 	pf.Lookup("dry-run").NoOptDefVal = "delta"
-	pf.StringVar(&c.validateSpecMode, "validate-spec", "",
+	pf.StringVar((*string)(&ld.config.ValidateSpec), "validate-spec", "",
 		"validate each loaded che.yml spec against the JSON Schema; values: warn (log violations) | error (abort on violations); default: warn; env: CHE_VALIDATE_SPEC")
-	pf.StringVar(&c.profileForce, "profile", "",
+	pf.StringVar(&ld.config.Profile, "profile", "",
 		"run only this profile (autoExec skipped, execIf still enforced); env: CHE_PROFILE")
-	pf.BoolVar(&c.skipExecIf, "skip-exec-if", false,
+	pf.BoolVar(&ld.config.SkipExecIf, "skip-exec-if", false,
 		"treat every execIf predicate as passing; env: CHE_SKIP_EXEC_IF")
-	pf.BoolVar(&c.skipPlugins, "skip-plugins", false,
+	pf.BoolVar(&ld.config.SkipPlugins, "skip-plugins", false,
 		"skip plugins entries, load only the local repo; env: CHE_SKIP_PLUGINS")
-	pf.BoolVar(&c.debugFlag, "debug", false,
+	pf.BoolVar(&ld.config.Debug, "debug", false,
 		"print debug-level lines (plugin announce, clone/pull attempts); env: CHE_DEBUG")
 
 	services := &cobra.Command{
 		Use:   "services",
 		Short: "load/unload/verify the profile's launchd services",
 	}
-	root.AddCommand(c.allCmd(), c.detectCmd(), services)
+	root.AddCommand(ld.allCmd(), ld.detectCmd(), services)
 	for _, s := range steps() {
-		cmd := c.stepCmd(s)
+		cmd := ld.stepCmd(s)
 		if s.parent == "services" {
 			services.AddCommand(cmd)
 		} else {
@@ -122,28 +72,78 @@ loads the union of files/dirs/installs/services those profiles select.`,
 	return root
 }
 
-// forEachUnit runs op over every unit: the local repo first, then each plugin
-// grouped (announce, pull, execIf, resolve, op), skipped ones dropped. A
-// failing unit does not stop the rest: failures collect (ref-wrapped, "local"
-// for the local repo), report as "<name>(report): fail <ref>: <err>" lines
-// after all units, and join into the returned error.
-func (c *CheApp) forEachUnit(name string, op func(unit) error) error {
+// init finalizes config, loads the local repo (spec, eligible
+// profiles, host, selection), and constructs the plugin loader.
+func (ld *loader) init() error {
+	if err := ld.config.Resolve(); err != nil {
+		return err
+	}
+	cfg := ld.config
+	if cfg.Dir != "" {
+		if err := os.Chdir(cfg.Dir); err != nil {
+			return fmt.Errorf("-C: %w", err)
+		}
+	}
+	repoRoot, err := findRepoRoot()
+	if err != nil {
+		return err
+	}
+	home, err := invokingHome()
+	if err != nil {
+		return err
+	}
+	sp, err := loadSpecValidated(filepath.Join(repoRoot, "che.yml"), cfg.ValidateSpec)
+	if err != nil {
+		return err
+	}
+	log.SetDebug(cfg.Debug)
+	eval := spec.NewEvaluator().EvalExecIf
+	profiles, err := sp.EligibleProfiles(cfg.Profile, cfg.SkipExecIf, eval)
+	if err != nil {
+		return err
+	}
+	h := ld.newHost(repoRoot, home, strings.Join(profiles, ","), cfg)
+	selection, err := sp.Resolve(profiles, h.Root)
+	if err != nil {
+		return err
+	}
+	ld.local = load{host: h, selection: selection}
+	refs := selection.Plugins
+	if cfg.SkipPlugins {
+		refs = nil
+	}
+	ld.plugins = pluginLoader{
+		refs:     refs,
+		built:    map[string]*load{},
+		repoRoot: repoRoot,
+		home:     home,
+		cfg:      cfg,
+		eval:     eval,
+		newHost:  ld.newHost,
+	}
+	return nil
+}
+
+// forEachLoad runs op over the local load, then each plugin load (built on
+// first use, execIf-skipped ones dropped). A failing load does not stop the
+// rest: failures collect (ref-wrapped, "local" for the local repo), report as
+// "<name>(report): fail <ref>: <err>" lines after all loads, and join into
+// the returned error.
+func (ld *loader) forEachLoad(name string, op func(load) error) error {
 	var fails []error
-	run := func(ref string, u unit) {
-		if err := u.withEnv(func() error { return op(u) }); err != nil {
+	run := func(ref string, l load) {
+		if err := l.runWithPluginEnv(func() error { return op(l) }); err != nil {
 			fails = append(fails, fmt.Errorf("%s: %w", ref, err))
 		}
 	}
-	for _, u := range c.units {
-		run("local", u)
-	}
-	for _, p := range c.pluginRefs {
-		u, ok, err := c.ensurePlugin(p)
+	run("local", ld.local)
+	for _, p := range ld.plugins.refs {
+		l, ok, err := ld.plugins.ensure(p)
 		switch {
 		case err != nil:
 			fails = append(fails, fmt.Errorf("%s: %w", p, err))
 		case ok:
-			run(p.String(), u)
+			run(p.String(), l)
 		}
 	}
 	for _, err := range fails {
@@ -152,37 +152,15 @@ func (c *CheApp) forEachUnit(name string, op func(unit) error) error {
 	return errors.Join(fails...)
 }
 
-// ensurePlugin returns p's unit, building it on first use (announced) and
-// caching the outcome (ok=false: skipped by execIf).
-func (c *CheApp) ensurePlugin(p spec.PluginRef) (unit, bool, error) {
-	if u, seen := c.pluginUnits[p.String()]; seen {
-		if u == nil {
-			return unit{}, false, nil
-		}
-		return *u, true, nil
-	}
-	log.Debug("plugin("+p.Profile+")", fmt.Sprintf("run %s", p), log.Off)
-	u, ok, err := c.buildPlugin(p)
-	if err != nil {
-		return unit{}, false, err
-	}
-	if !ok {
-		c.pluginUnits[p.String()] = nil
-		return unit{}, false, nil
-	}
-	c.pluginUnits[p.String()] = &u
-	return u, true, nil
-}
-
-// withEnv runs fn with u.env exported into the process env (host values
-// shadowed), restoring the prior state after. No-op when u.env is empty.
-func (u unit) withEnv(fn func() error) error {
-	if len(u.env) == 0 {
+// runWithPluginEnv runs fn with l.pluginEnv exported (host values shadowed),
+// restoring after.
+func (l load) runWithPluginEnv(fn func() error) error {
+	if len(l.pluginEnv) == 0 {
 		return fn()
 	}
-	for _, k := range slices.Sorted(maps.Keys(u.env)) {
+	for _, k := range slices.Sorted(maps.Keys(l.pluginEnv)) {
 		prev, had := os.LookupEnv(k)
-		if err := os.Setenv(k, u.env[k]); err != nil {
+		if err := os.Setenv(k, l.pluginEnv[k]); err != nil {
 			return err
 		}
 		defer func() {
@@ -196,81 +174,68 @@ func (u unit) withEnv(fn func() error) error {
 	return fn()
 }
 
-// build loads spec -> lists eligible profiles -> resolves union -> wires the
-// host. Run in PersistentPreRunE before any subcommand RunE.
-func (c *CheApp) build() error {
-	dir := cmp.Or(c.dirFlag, os.Getenv("CHE_DIR"))
-	if dir != "" {
-		if err := os.Chdir(dir); err != nil {
-			return fmt.Errorf("-C: %w", err)
+// ensure returns p's load, building it on first use (announced) and caching
+// the outcome (ok=false: skipped by execIf).
+func (pl *pluginLoader) ensure(p spec.PluginRef) (load, bool, error) {
+	if l, seen := pl.built[p.String()]; seen {
+		if l == nil {
+			return load{}, false, nil
 		}
+		return *l, true, nil
 	}
-	repoRoot, err := findRepoRoot()
+	log.Debug("plugin("+p.Profile+")", fmt.Sprintf("run %s", p), log.Off)
+	l, ok, err := pl.build(p)
 	if err != nil {
-		return err
+		return load{}, false, err
 	}
-	home, err := invokingHome()
-	if err != nil {
-		return err
-	}
-	c.dryRunMode = cmp.Or(c.dryRunMode, os.Getenv("CHE_DRY_RUN"))
-	mode, ok := dryRunModes[c.dryRunMode]
 	if !ok {
-		return fmt.Errorf("invalid --dry-run mode %q: want delta or all", c.dryRunMode)
+		pl.built[p.String()] = nil
+		return load{}, false, nil
 	}
-	c.validateSpecMode = cmp.Or(c.validateSpecMode, os.Getenv("CHE_VALIDATE_SPEC"), "warn")
-	if c.validateSpecMode != "warn" && c.validateSpecMode != "error" {
-		return fmt.Errorf("invalid --validate-spec mode %q: want warn or error", c.validateSpecMode)
-	}
-	sp, err := loadSpecValidated(filepath.Join(repoRoot, "che.yml"), c.validateSpecMode)
-	if err != nil {
-		return err
-	}
-	// --profile (env CHE_PROFILE) runs only that profile, autoExec
-	// skipped but execIf still enforced; --skip-exec-if (env
-	// CHE_SKIP_EXEC_IF, truthy) makes every execIf pass; else the union of
-	// every autoExec profile passing execIf. --skip-plugins (env
-	// CHE_SKIP_PLUGINS, truthy) drops plugins entries, local repo only.
-	// --debug (env CHE_DEBUG, truthy) prints debug-level lines.
-	// Flags win over envs.
-	cfg := config.Config{
-		Dir:          dir,
-		DryRun:       mode,
-		Profile:      cmp.Or(c.profileForce, os.Getenv("CHE_PROFILE")),
-		SkipExecIf:   boolOrEnv(c.skipExecIf, "CHE_SKIP_EXEC_IF"),
-		SkipPlugins:  boolOrEnv(c.skipPlugins, "CHE_SKIP_PLUGINS"),
-		Debug:        boolOrEnv(c.debugFlag, "CHE_DEBUG"),
-		ValidateSpec: c.validateSpecMode,
-	}
-	log.SetDebug(cfg.Debug)
-	eval := spec.NewEvaluator().EvalExecIf
-	profiles, err := sp.EligibleProfiles(cfg.Profile, cfg.SkipExecIf, eval)
-	if err != nil {
-		return err
-	}
-	h := c.newHost(repoRoot, home, strings.Join(profiles, ","), cfg)
-	res, err := sp.Resolve(profiles, h.Root)
-	if err != nil {
-		return err
-	}
-	c.units = []unit{{host: h, res: res}}
-	c.pluginRefs = res.Plugins
-	if cfg.SkipPlugins {
-		c.pluginRefs = nil
-	}
-	c.pluginUnits = map[string]*unit{}
-	c.pluginCfg = pluginConfig{repoRoot: repoRoot, home: home, cfg: cfg, eval: eval}
-	return nil
+	pl.built[p.String()] = &l
+	return l, true, nil
 }
 
-func boolOrEnv(flag bool, key string) bool {
-	return flag || os.Getenv(key) != ""
+// build ensures the checkout (git ref: cache clone/pull, dir ref: local dir),
+// loads its spec, gates on execIf inside the entry's env overlay, resolves
+// anchored at the checkout. Nested plugin refs are ignored (v1).
+func (pl *pluginLoader) build(p spec.PluginRef) (load, bool, error) {
+	checkout, err := pluginCheckout(p, pl.repoRoot, pl.home)
+	if err != nil {
+		return load{}, false, err
+	}
+	psp, err := loadSpecValidated(filepath.Join(checkout, "che.yml"), pl.cfg.ValidateSpec)
+	if err != nil {
+		return load{}, false, err
+	}
+	h := pl.newHost(checkout, pl.home, p.Profile, pl.cfg).WithLogSub("profile=" + p.Profile)
+	l := load{host: h, pluginRef: p.String(), pluginEnv: p.Env}
+	var pass bool
+	err = l.runWithPluginEnv(func() error {
+		var err error
+		if pass, err = psp.ExecIfPass(p.Profile, pl.cfg.SkipExecIf, pl.eval); err != nil || !pass {
+			return err
+		}
+		l.selection, err = psp.Resolve([]string{p.Profile}, l.host.Root)
+		return err
+	})
+	if err != nil {
+		return load{}, false, fmt.Errorf("plugin %s: %w", p, err)
+	}
+	if !pass {
+		log.Msg("plugin("+p.Profile+")", fmt.Sprintf("skip %s (execIf failed)", p), log.Off)
+		return load{}, false, nil
+	}
+	if len(l.selection.Plugins) > 0 {
+		log.Msg("plugin("+p.Profile+")", fmt.Sprintf("%s: nested plugin refs ignored: %v", p, l.selection.Plugins), log.Off)
+	}
+	return l, true, nil
 }
 
-func loadSpecValidated(path, mode string) (*spec.Raw, error) {
+func loadSpecValidated(path string, mode config.ValidateSpecMode) (*spec.CheSpec, error) {
 	if b, err := os.ReadFile(path); err == nil {
 		if finds := spec.ValidateSchema(b); len(finds) > 0 {
-			if mode == "error" {
+			if mode == config.ValidateSpec.Error {
 				return nil, fmt.Errorf("schema violations in %s:\n%s", path, strings.Join(finds, "\n"))
 			}
 			for _, f := range finds {
@@ -281,55 +246,13 @@ func loadSpecValidated(path, mode string) (*spec.Raw, error) {
 	return spec.Load(path)
 }
 
-// buildPlugin ensures the plugin checkout (git ref: cache clone/pull; dir ref:
-// resolved local dir), loads its spec, then inside the entry's env overlay
-// gates on the remote profile's execIf (fail -> skipped, logged) and resolves
-// it anchored at the checkout, all against pluginCfg. Nested plugin refs
-// inside the remote profile are ignored (v1).
-func (c *CheApp) buildPlugin(p spec.PluginRef) (unit, bool, error) {
-	checkout, err := pluginCheckout(p, c.pluginCfg.repoRoot, c.pluginCfg.home)
-	if err != nil {
-		return unit{}, false, err
-	}
-	psp, err := loadSpecValidated(filepath.Join(checkout, "che.yml"), c.pluginCfg.cfg.ValidateSpec)
-	if err != nil {
-		return unit{}, false, err
-	}
-	h := c.newHost(checkout, c.pluginCfg.home, p.Profile, c.pluginCfg.cfg).WithLogSub("profile=" + p.Profile)
-	u := unit{host: h, ref: p.String(), env: p.Env}
-	var pass bool
-	err = u.withEnv(func() error {
-		var err error
-		if pass, err = psp.ExecIfPass(p.Profile, c.pluginCfg.cfg.SkipExecIf, c.pluginCfg.eval); err != nil || !pass {
-			return err
-		}
-		u.res, err = psp.Resolve([]string{p.Profile}, u.host.Root)
-		return err
-	})
-	if err != nil {
-		return unit{}, false, fmt.Errorf("plugin %s: %w", p, err)
-	}
-	if !pass {
-		log.Msg("plugin("+p.Profile+")", fmt.Sprintf("skip %s (execIf failed)", p), log.Off)
-		return unit{}, false, nil
-	}
-	if len(u.res.Plugins) > 0 {
-		log.Msg("plugin("+p.Profile+")", fmt.Sprintf("%s: nested plugin refs ignored: %v", p, u.res.Plugins), log.Off)
-	}
-	return u, true, nil
-}
-
-// pluginCheckout resolves p's repo dir: git URL -> managed cache clone/pull,
-// dir path -> resolved local dir (no ensure logs, no git).
 func pluginCheckout(p spec.PluginRef, repoRoot, home string) (string, error) {
 	if !p.IsPath {
-		return plugin.Ensure(home, p.URL, p.Profile)
+		return plugin.EnsureCheckout(home, p.URL, p.Profile)
 	}
 	return resolvePluginDir(p.URL, repoRoot, home)
 }
 
-// resolvePluginDir expands a dir-path plugin ref: $VAR, then ~ -> home, then
-// relative -> joined onto the local repo root (the che.yml dir). The dir must exist.
 func resolvePluginDir(ref, repoRoot, home string) (string, error) {
 	dir := fsutil.ExpandHome(os.ExpandEnv(ref), home)
 	if dir == "~" {
@@ -344,8 +267,7 @@ func resolvePluginDir(ref, repoRoot, home string) (string, error) {
 	return dir, nil
 }
 
-// findRepoRoot resolves repo root from git toplevel of cwd, verifies che.yml
-// lives there (che's defining marker).
+// findRepoRoot: git toplevel of cwd, che.yml must live there (che's defining marker).
 func findRepoRoot() (string, error) {
 	dir, err := os.Getwd()
 	if err != nil {

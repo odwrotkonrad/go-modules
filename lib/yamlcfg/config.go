@@ -28,7 +28,7 @@ type CodedError struct {
 
 func (e *CodedError) Error() string { return e.Msg }
 
-func Code(err error) int {
+func ExitCode(err error) int {
 	if err == nil {
 		return 0
 	}
@@ -38,12 +38,10 @@ func Code(err error) int {
 	return 1
 }
 
-// ArgsError is the CodeArgs error for an invalid argv.
 func ArgsError(args []string) *CodedError {
 	return &CodedError{CodeArgs, "invalid arguments: " + fmt.Sprint(args)}
 }
 
-// invalidConfig is the CodeConfig error for a broken config at path.
 func invalidConfig(path string, err error) *CodedError {
 	return &CodedError{CodeConfig, "invalid config: " + path + ": " + err.Error()}
 }
@@ -59,7 +57,6 @@ func customPaths(name, customDir string) []string {
 	return []string{system, filepath.Join(xdg, "custom", name)}
 }
 
-// MapPairs iterates a mapping node's key/value pairs.
 func MapPairs(n *yaml.Node) iter.Seq2[*yaml.Node, *yaml.Node] {
 	return func(yield func(*yaml.Node, *yaml.Node) bool) {
 		for i := 0; i+1 < len(n.Content); i += 2 {

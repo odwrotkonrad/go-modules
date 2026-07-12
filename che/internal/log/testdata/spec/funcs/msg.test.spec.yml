@@ -1,0 +1,54 @@
+# [>] 🤖🤖
+context:
+  function: log.Msg
+cases:
+  - name: msgShouldSplitPlainTitleIntoTypeAndText
+    input:
+      args: [title: ln, msg: /etc/zshrc, mode: off]
+    expected:
+      output: {type: ln, subtype: "", text: /etc/zshrc}
+  - name: msgShouldExtractParenthesizedSubtype
+    input:
+      args: [title: render(skip-secrets), msg: /x, mode: off]
+    expected:
+      output: {type: render, subtype: (skip-secrets), text: /x}
+  - name: msgShouldAppendDryRunDeltaSubtype
+    input:
+      args: [title: cp, msg: /x, mode: delta]
+    expected:
+      output: {type: cp, subtype: (dry-run=delta), text: /x}
+  - name: msgShouldAppendDryRunAllSubtype
+    input:
+      args: [title: cp, msg: /x, mode: all]
+    expected:
+      output: {type: cp, subtype: (dry-run=all), text: /x}
+  - name: msgShouldCombineTitleSubtypeWithDryRun
+    input:
+      args: [title: render(skip-secrets), msg: /x, mode: delta]
+    expected:
+      output: {type: render, subtype: "(skip-secrets,dry-run=delta)", text: /x}
+  - name: msgSubShouldAppendSubAfterDryRun
+    context: {function: log.MsgSub}
+    input:
+      args: [title: run-scripts, msg: /x, mode: all, sub: profile=gitlabGroup]
+    expected:
+      output: {type: run-scripts, subtype: "(dry-run=all,profile=gitlabGroup)", text: /x}
+  - name: msgSubShouldAppendSubAfterTitleSubtype
+    context: {function: log.MsgSub}
+    input:
+      args: [title: mkdir(create), msg: /x, mode: off, sub: profile=p]
+    expected:
+      output: {type: mkdir, subtype: "(create,profile=p)", text: /x}
+  - name: msgSubShouldIgnoreEmptySub
+    context: {function: log.MsgSub}
+    input:
+      args: [title: ln, msg: /x, mode: off, sub: ""]
+    expected:
+      output: {type: ln, subtype: "", text: /x}
+  - name: debugShouldPrintLikeMsg
+    context: {function: log.Debug}
+    input:
+      args: [title: plugin(p), msg: run x, mode: off]
+    expected:
+      output: {type: plugin, subtype: (p), text: run x}
+# [<] 🤖🤖

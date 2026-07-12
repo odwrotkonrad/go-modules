@@ -1,0 +1,28 @@
+# [>] 🤖🤖
+context:
+  function: fsutil.TrackedFiles
+cases:
+  - name: ShouldExcludeUntrackedAtRepoRoot
+    input:
+      args: [subdir: ""]
+    expected:
+      output:
+        - che.yml
+        - root/HOME/.config/git/config.ontoHost.tpl
+        - root/HOME/.config/zsh/.gitkeep
+        - root/HOME/.config/zsh/.zshrc
+        - root/Library/LaunchDaemons/x.plist.ontoHost.cp
+        - root/etc/zsh/zshenv
+        - root/etc/zshrc
+  - name: ShouldStripPrefixForSubtree
+    input:
+      args: [subdir: root]
+    expected:
+      output:
+        - HOME/.config/git/config.ontoHost.tpl
+        - HOME/.config/zsh/.gitkeep
+        - HOME/.config/zsh/.zshrc
+        - Library/LaunchDaemons/x.plist.ontoHost.cp
+        - etc/zsh/zshenv
+        - etc/zshrc
+# [<] 🤖🤖

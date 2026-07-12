@@ -1,0 +1,23 @@
+# [>] 🤖🤖
+context:
+  function: spec.NewEvaluator
+  mockedInterfaces:
+    execx.CmdExecutor: testutil.CmdMockExecutor
+    fsutil.FileSystemReader: testutil.FileSystemMockReader
+cases:
+  - name: ShouldCacheIsVirtTrueResultAcrossEvals
+    input:
+      args: [expr: "builtin:isVirt", execOut: "1"]
+    expected:
+      output: {value: true, execCalls: 1}
+  - name: ShouldReportIsVirtFalseWhenDetectFails
+    input:
+      args: [expr: "builtin:isVirt", execOut: "", execFail: true]
+    expected:
+      output: {value: false, execCalls: 1}
+  - name: ShouldNotTreatBareIsOsAsTruthy
+    input:
+      args: [expr: "builtin:isOs"]
+    expected:
+      output: {value: false, execCalls: 0}
+# [<] 🤖🤖

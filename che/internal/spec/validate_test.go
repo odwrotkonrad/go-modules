@@ -7,120 +7,47 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
+
+	"gitlab.com/konradodwrot/go-modules/lib/testyml"
 )
 
-func TestValidateSchemaAcceptsFixtures(t *testing.T) {
-	paths, err := filepath.Glob("../testutil/specs/*.yml")
-	if err != nil {
-		t.Fatal(err)
-	}
-	if len(paths) == 0 {
-		t.Fatal("no testutil spec fixtures found")
-	}
-	for _, p := range paths {
-		t.Run(p, func(t *testing.T) {
-			b, err := os.ReadFile(p)
-			if err != nil {
-				t.Fatal(err)
-			}
-			if finds := ValidateSchema(b); len(finds) > 0 {
-				t.Errorf("ValidateSchema(%s) = %v, want none", p, finds)
-			}
-		})
-	}
-}
-
 func TestCompiledSchema(t *testing.T) {
-	sch, err := CompiledSchema()
-	if err != nil {
-		t.Fatal(err)
-	}
-	if sch == nil {
-		t.Fatal("CompiledSchema() = nil")
-	}
+	testyml.Eq(t, td, "testdata/spec/funcs/compiled_schema.test.spec.yml", func(t *testing.T, c testyml.Case[bool]) (bool, error) {
+		sch, err := CompiledSchema()
+		if err != nil {
+			return false, err
+		}
+		return sch != nil, nil
+	})
 }
 
-func TestValidateSchemaUnparseableYAML(t *testing.T) {
-	if finds := ValidateSchema([]byte("p: [")); finds != nil {
-		t.Errorf("ValidateSchema(unparseable) = %v, want nil (parse errors belong to Load)", finds)
-	}
-}
-
-func TestValidateSchemaRootViolation(t *testing.T) {
-	finds := ValidateSchema([]byte("- a\n- b\n"))
-	if len(finds) == 0 {
-		t.Fatal("ValidateSchema(list doc) = none, want a root finding")
-	}
-	if !strings.HasPrefix(finds[0], "/: ") {
-		t.Errorf("root finding not anchored at /: %q", finds[0])
-	}
-}
-
-func TestValidateSchemaFindsViolations(t *testing.T) {
-	cases := map[string]struct {
-		doc  string
-		want string
-	}{
-		"extra key": {
-			doc: `
-p:
-  includes:
-    link: [HOME/**]
-`,
-			want: "includes",
-		},
-		"bogus writeType enum": {
-			doc: `
-p:
-  include:
-    renderTemplates:
-      - files:
-          - source: templates/a.tpl
-            dest:
-              - {path: a.md, options: {writeType: bogus}}
-`,
-			want: "writeType",
-		},
-		"non-octal chmod": {
-			doc: `
-p:
-  include:
-    mkdirs:
-      - chmod: rwxr-xr-x
-        files: [HOME/.cache]
-`,
-			want: "chmod",
-		},
-		"group without files": {
-			doc: `
-p:
-  include:
-    copy:
-      - chmod: "0644"
-`,
-			want: "files",
-		},
-		"plugin ref without profile": {
-			doc: `
-p:
-  plugins:
-    - ./plugin
-`,
-			want: "plugins",
-		},
-	}
-	for name, c := range cases {
-		t.Run(name, func(t *testing.T) {
-			finds := ValidateSchema([]byte(c.doc))
-			if len(finds) == 0 {
-				t.Fatalf("ValidateSchema() = none, want a finding mentioning %q", c.want)
+// TestValidateSchema: the fixturesGlob case accepts every testutil fixture,
+// doc cases assert the findings (empty output: none wanted).
+func TestValidateSchema(t *testing.T) {
+	testyml.Run(t, td, "testdata/spec/funcs/validate_schema.test.spec.yml", func(t *testing.T, c testyml.Case[string]) {
+		a := c.Input.Args
+		if a.Name(0) == "fixturesGlob" {
+			paths, err := filepath.Glob(a.String(t, 0))
+			require.NoError(t, err)
+			require.NotEmpty(t, paths, "no testutil spec fixtures found")
+			for _, p := range paths {
+				b, err := os.ReadFile(p)
+				require.NoError(t, err)
+				assert.Emptyf(t, ValidateSchema(b), "schema rejects %s", p)
 			}
-			joined := strings.Join(finds, "\n")
-			if !strings.Contains(joined, c.want) {
-				t.Errorf("findings do not mention %q:\n%s", c.want, joined)
-			}
-		})
-	}
+			return
+		}
+		finds := ValidateSchema([]byte(a.String(t, 0)))
+		if c.Expected.Output == "" {
+			assert.Empty(t, finds)
+			return
+		}
+		require.NotEmptyf(t, finds, "want a finding matching %q", c.Expected.Output)
+		testyml.MustMatch(t, strings.Join(finds, "\n"), c.Expected.Output)
+	})
 }
 
 // [<] 🤖🤖

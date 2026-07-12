@@ -1,0 +1,22 @@
+# [>] 🤖🤖
+context:
+  function: render.RepoGroupIndex
+cases:
+  - name: ShouldIndexEverySubgroup
+    expected:
+      output:
+        keys: [leaf, parent, parent/child]
+        missingKeys: [leaf/alpha]
+        contains:
+          parent/child: '## Repo: ./gamma'
+  - name: ShouldRenderExpectedIndexes
+    input:
+      args:
+        - fixtureGroup: testdata/fixture/repo-group-index/group
+        - repos: [che, tools/render-files, tools/configs]
+    expected:
+      output:
+        indexes:
+          '.': testdata/fixture/repo-group-index/index.expected.md
+          tools: testdata/fixture/repo-group-index/child-group-index.expected.md
+# [<] 🤖🤖

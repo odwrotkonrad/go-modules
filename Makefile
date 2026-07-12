@@ -10,7 +10,7 @@ COMMANDS := render-templates render-docs run-repo-ci-prepare-hooks run-repo-ci-p
 .PHONY: $(WRAPPERS) $(COMMANDS)
 
 ##[>] Docs [genai-include]
-#[what] render *.ontoRepo.tpl onto the repo (makefile.agents.md, repo-structure.md, CLAUDE.md, AGENTS.md, README.md) with this checkout's che build
+#[what] render *.ontoRepo.tpl onto the repo with this checkout's che build
 render-templates:
 	@$(MAKE) -C che build
 	@che/dist/che render-templates
@@ -25,7 +25,7 @@ render-docs:
 run-repo-ci-prepare-hooks:
 	@lefthook install --force
 
-#[what] run pre-commit hooks over all files (not just staged)
+#[what] run pre-commit hooks over all files
 run-repo-ci-precommit-all: run-repo-ci-prepare-hooks
 	@lefthook run pre-commit --all-files --force
 ##[<] CI

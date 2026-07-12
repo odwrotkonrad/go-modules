@@ -1,0 +1,90 @@
+# [>] 🤖🤖
+context:
+  function: fsutil.IsGlobMatch
+cases:
+  - name: ShouldMatchDirectChildUnderSubtreeGlob
+    input:
+      args: [pattern: HOME/.config/zsh/**, path: HOME/.config/zsh/.zshrc]
+    expected:
+      output: true
+  - name: ShouldMatchNestedPathUnderSubtreeGlob
+    input:
+      args: [pattern: HOME/.config/zsh/**, path: HOME/.config/zsh/zshrc.d/auto.d/80-tools.zsh]
+    expected:
+      output: true
+  - name: ShouldMatchSubtreeGlobRootItself
+    input:
+      args: [pattern: HOME/.config/zsh/**, path: HOME/.config/zsh]
+    expected:
+      output: true
+  - name: ShouldRejectSiblingDirOfSubtreeGlob
+    input:
+      args: [pattern: HOME/.config/zsh/**, path: HOME/.config/git/config]
+    expected:
+      output: false
+  - name: ShouldRejectPrefixOnlySiblingOfSubtreeGlob
+    input:
+      args: [pattern: HOME/.config/zsh/**, path: HOME/.config/zshenv]
+    expected:
+      output: false
+  - name: ShouldMatchExactPath
+    input:
+      args: [pattern: etc/zshrc, path: etc/zshrc]
+    expected:
+      output: true
+  - name: ShouldRejectSubtreeUnderExactPath
+    input:
+      args: [pattern: etc/zshrc, path: etc/zshrc.d/auto.d/x]
+    expected:
+      output: false
+  - name: ShouldMatchStarSuffixBareStem
+    input:
+      args: [pattern: Library/LaunchDaemons/otelcol.plist*, path: Library/LaunchDaemons/otelcol.plist]
+    expected:
+      output: true
+  - name: ShouldMatchStarSuffixWithMarkerSuffix
+    input:
+      args: [pattern: Library/LaunchDaemons/otelcol.plist*, path: Library/LaunchDaemons/otelcol.plist.ontoHost.cp]
+    expected:
+      output: true
+  - name: ShouldRejectStarSuffixOtherFile
+    input:
+      args: [pattern: Library/LaunchDaemons/otelcol.plist*, path: Library/LaunchDaemons/grafana.plist]
+    expected:
+      output: false
+  - name: ShouldMatchFileUnderSubtreeGlob
+    input:
+      args: [pattern: etc/otelcol/**, path: etc/otelcol/config.yml]
+    expected:
+      output: true
+  - name: ShouldMatchNestedPathThroughInteriorDoublestar
+    input:
+      args: [pattern: root/**/foo.txt, path: root/a/b/foo.txt]
+    expected:
+      output: true
+  - name: ShouldRejectInteriorDoublestarPrefixMiss
+    input:
+      args: [pattern: root/**/foo.txt, path: other/a/foo.txt]
+    expected:
+      output: false
+  - name: ShouldRejectInteriorDoublestarTailMiss
+    input:
+      args: [pattern: root/**/*.md, path: root/a/b.txt]
+    expected:
+      output: false
+  - name: ShouldMatchNestedPathThroughMultiSegmentTail
+    input:
+      args: [pattern: root/**/foo/*.md, path: root/a/b/foo/x.md]
+    expected:
+      output: true
+  - name: ShouldTreatNonSegmentDoublestarAsStar
+    input:
+      args: [pattern: root**, path: rootabc]
+    expected:
+      output: true
+  - name: ShouldRejectSeparatorForNonSegmentDoublestar
+    input:
+      args: [pattern: root**, path: rootabc/x]
+    expected:
+      output: false
+# [<] 🤖🤖

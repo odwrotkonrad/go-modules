@@ -11,12 +11,11 @@ import (
 	"gitlab.com/konradodwrot/go-modules/lib/yamlcfg"
 )
 
-// cfgErr is the CodeConfig error for a malformed config shape.
 func cfgErr(msg string) *yamlcfg.CodedError {
 	return &yamlcfg.CodedError{Code: yamlcfg.CodeConfig, Msg: "invalid config: " + msg}
 }
 
-func Render(cfg *yaml.Node) (string, error) {
+func RenderDutiLines(cfg *yaml.Node) (string, error) {
 	if cfg == nil {
 		return "", nil
 	}

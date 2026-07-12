@@ -15,26 +15,6 @@ import (
 	"gitlab.com/konradodwrot/go-modules/che/render/render"
 )
 
-// Host is the live system the load ops act on: repo source tree, invoking
-// identity, detected profile, runtime options, mutating filesystem.
-type Host struct {
-	RepoRoot string // <configs> dir (contains che.yml, ci/, templates/)
-	Root     string // <configs>/root, the load ops' source subtree
-	Home     string
-	Profile  string // "<space>/<os>-<arch>"
-	cfg      config.Config
-	logSub   string
-	fs       fsutil.FileSystemWriter
-	reader   fsutil.FileSystemReader
-	fetcher  RemoteFetcher
-}
-
-// RemoteFetcher fetches a remote template source ref's content
-// (<repo>//<path>[?ref=<ref>], marker stripped).
-type RemoteFetcher interface {
-	Fetch(ref string) (string, error)
-}
-
 // gitFetcher is the live RemoteFetcher: shallow in-memory git clones, one
 // clone cache shared across the Host's renders.
 type gitFetcher struct{ fetch func(string) (string, error) }
@@ -54,35 +34,30 @@ func New(repoRoot, home, profile string, cfg config.Config) Host {
 	}
 }
 
-// WithFetcher returns a copy whose remote template sources fetch through f
-// (test injection).
+// WithFetcher: copy fetching remote template sources through f (test injection).
 func (h Host) WithFetcher(f RemoteFetcher) Host {
 	h.fetcher = f
 	return h
 }
 
-// WithLogSub returns a copy whose op log lines carry s as a trailing subtype
-// word (e.g. "profile=<name>").
+// WithLogSub: copy logging s as a trailing subtype word (e.g. "profile=<name>").
 func (h Host) WithLogSub(s string) Host {
 	h.logSub = s
 	return h
 }
 
-// WithFS returns a copy whose mutating fs ops run through fs (test injection).
+// WithFS: copy running mutating fs ops through fs (test injection).
 func (h Host) WithFS(fs fsutil.FileSystemWriter) Host {
 	h.fs = fs
 	return h
 }
 
-// WithFSReader returns a copy whose dest-facing reads (settled checks, prune
-// scans, content diffs) run through r (test injection).
+// WithFSReader: copy running dest-facing reads through r (test injection).
 func (h Host) WithFSReader(r fsutil.FileSystemReader) Host {
 	h.reader = r
 	return h
 }
 
-// log emits a 'title: msg' line, folding the dry-run mode plus logSub into the
-// subtype. Title is "type" or "type(subtype)" (see log.MsgSub).
 func (h Host) log(title, msg string) { log.MsgSub(title, msg, logMode(h.cfg.DryRun), h.logSub) }
 
 // mutate is the one dry-run+log gate for every mutating op: dry run logs only
@@ -97,7 +72,6 @@ func (h Host) mutate(title, msg string, fn func() error) error {
 	return nil
 }
 
-// logMode maps a config.DryRunMode to the log-layer dry-run mode (subtype rendering).
 func logMode(m config.DryRunMode) log.DryRun {
 	switch m {
 	case config.DryRun.Delta:

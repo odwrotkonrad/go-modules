@@ -11,7 +11,6 @@ stages:
   - test
   - release
   - publish
-  - make-docs
 
 variables:
   CI_IMAGE: registry.gitlab.com/konradodwrot/infra/oci-images/ci-linux:latest
@@ -25,7 +24,6 @@ warm-go:
   needs: []
   rules:
     - if: $CI_PIPELINE_SOURCE == "merge_request_event"
-    - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
   cache:
     - key: go-mod
       paths:
@@ -63,7 +61,9 @@ verify-precommit-all:
 .test-module:
   image: $CI_IMAGE
   stage: test
-  needs: [warm-go]
+  needs:
+    - job: warm-go
+      optional: true
   cache:
     - key: go-mod
       paths:
@@ -185,7 +185,7 @@ release-lib:
 
 pages-publish:
   extends: .pages-build
-  stage: make-docs
+  stage: publish
   pages: true
   needs: [release-che]
   rules:
@@ -206,7 +206,7 @@ docs-che:
 
 pages-preview:
   extends: .pages-build
-  stage: make-docs
+  stage: verify
   needs: []
   rules:
     - if: $CI_PIPELINE_SOURCE == "merge_request_event"

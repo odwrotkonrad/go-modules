@@ -36,9 +36,7 @@ func (h Host) failItem(op, dest string, err error) error {
 	return err
 }
 
-// MkDirs creates repo-tree ancestor dirs (parents first) plus profile
-// extra-dirs. A failing dir is logged and the rest still run; failures join
-// into the returned error.
+// MkDirs creates repo-tree ancestor dirs (parents first) plus profile extra-dirs.
 func (h Host) MkDirs(dirRels []string, extraDirs []spec.FileItem) error {
 	errs := []error{h.ensureConfigDirs(dirRels)}
 	for _, item := range extraDirs {
@@ -50,8 +48,6 @@ func (h Host) MkDirs(dirRels []string, extraDirs []spec.FileItem) error {
 	return errors.Join(errs...)
 }
 
-// upsertExtraDir settles one extra-dir: existing dest -> perms drift fix only,
-// else create with spec perms.
 func (h Host) upsertExtraDir(item spec.FileItem, dest string) error {
 	if h.isDirSettled(dest) {
 		return h.fixPerms("mkdir", dest, item)
@@ -60,7 +56,7 @@ func (h Host) upsertExtraDir(item spec.FileItem, dest string) error {
 }
 
 // ensureConfigDirs creates repo-tree ancestor dirs (parents first), no spec
-// perms: mode 0 -> mkdir honors umask. Idempotent; failures collect per dir.
+// perms: mode 0 -> mkdir honors umask.
 func (h Host) ensureConfigDirs(dirRels []string) error {
 	var errs []error
 	for _, rel := range dirRels {
@@ -103,18 +99,15 @@ func (h Host) mkExtraDir(item spec.FileItem, dest string) error {
 	return h.chownIfSet("mkdir(chown)", item, dest)
 }
 
-// chmod applies an explicit mode arg under the op-scoped title (e.g. "mkdir(chmod)").
 func (h Host) chmod(title string, mode os.FileMode, dest string) error {
 	arg := fsutil.ModeArg(mode)
 	return h.mutate(title, arg+" "+dest, func() error { return h.fs.Chmod(arg, dest) })
 }
 
-// chown applies owner[:group] under the op-scoped title (e.g. "mkdir(chown)").
 func (h Host) chown(title, owner, dest string) error {
 	return h.mutate(title, owner+" "+dest, func() error { return h.fs.Chown(owner, dest) })
 }
 
-// chownIfSet applies the item's spec owner when one is set, else no-op.
 func (h Host) chownIfSet(title string, item spec.FileItem, dest string) error {
 	if owner := ownerSpec(item); owner != "" {
 		return h.chown(title, owner, dest)
@@ -199,8 +192,7 @@ func isOwnerDrifted(fi os.FileInfo, owner string) bool {
 	return (uidOK && uid != st.Uid) || (gidOK && gid != st.Gid)
 }
 
-// lookupID resolves name to a numeric id via lookup+idOf ("" name -> not set).
-// Unresolvable name -> not set (ok=false), so the caller treats it as no drift.
+// lookupID resolves name to a numeric id: empty or unresolvable -> ok=false (no drift).
 func lookupID[T any](name string, lookup func(string) (T, error), idOf func(T) string) (uint32, bool) {
 	if name == "" {
 		return 0, false
@@ -218,8 +210,6 @@ func lookupID[T any](name string, lookup func(string) (T, error), idOf func(T) s
 
 // runFileOp is the shared shape of the archiving file ops: ensure config dirs,
 // archive every dest upfront (failure aborts), then settle each item/dest pair.
-// A failing dest is logged and the rest still run; failures join into the
-// returned error.
 func (h Host) runFileOp(archiveSub, failOp string, dirRels []string, items []spec.FileItem,
 	destsOf func(spec.FileItem) []string, settle func(spec.FileItem, string) error,
 ) error {
@@ -249,7 +239,6 @@ func (h Host) MkLinks(links []spec.FileItem, dirRels []string) error {
 		h.linkOne)
 }
 
-// linkOne settles one link dest: already resolving to src -> skip, else symlink.
 func (h Host) linkOne(item spec.FileItem, dest string) error {
 	src := h.Src(item.Rel)
 	if h.isLinkSettled(src, dest) {
@@ -279,8 +268,6 @@ func (h Host) MkCopies(copies []spec.FileItem, dirRels []string) error {
 	return h.runFileOp("copy", "cp", dirRels, copies, h.copyDests, h.copyOne)
 }
 
-// copyOne settles one copy dest: same content -> perms drift fix only, else
-// copy with spec mode then chown when an owner is set.
 func (h Host) copyOne(item spec.FileItem, dest string) error {
 	src := h.Src(item.Rel)
 	if h.cfg.DryRun != config.DryRun.All && h.isSameContent(src, dest) {
@@ -329,7 +316,6 @@ func parseMode(s string) (os.FileMode, bool) {
 	return os.FileMode(n), true
 }
 
-// expandHome resolves a leading ~/ to the host home.
 func (h Host) expandHome(p string) string {
 	return fsutil.ExpandHome(p, h.Home)
 }
@@ -346,9 +332,7 @@ func (h Host) isSameContent(a, b string) bool {
 	return bytes.Equal(x, y)
 }
 
-// PruneBrokenLinks removes broken symlinks in config-set dirs (live dests). A
-// failing removal is logged and the rest still run; failures join into the
-// returned error.
+// PruneBrokenLinks removes broken symlinks in config-set dirs (live dests).
 func (h Host) PruneBrokenLinks(dirRels []string) error {
 	h.log("prune-links", h.Root)
 	var errs []error
@@ -377,7 +361,7 @@ func (h Host) PruneBrokenLinks(dirRels []string) error {
 	return errors.Join(errs...)
 }
 
-// isBrokenRepoLink: check if p is a symlink into root/ whose target is gone.
+// isBrokenRepoLink: p is a symlink into root/ whose target is gone.
 func (h Host) isBrokenRepoLink(p string) bool {
 	target, err := h.reader.Readlink(p) // [what] non-symlink -> err
 	if err != nil {

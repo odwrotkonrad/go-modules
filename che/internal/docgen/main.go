@@ -18,10 +18,6 @@ import (
 	"gitlab.com/konradodwrot/go-modules/che/internal/spec"
 )
 
-// docgen renders che's reference docs from the Go source: the che.yml JSON
-// Schema (assets/data/che.schema.json) and the CLI reference (docs/cli.md).
-// Run from the repo root: `go run ./internal/docgen`.
-
 const (
 	schemaPath   = "assets/data/che.schema.json"
 	cliDocPath   = "docs/cli.md"
@@ -61,7 +57,6 @@ func splitSeg(desc, key string) (rest, val string) {
 	return rest, val
 }
 
-// tick wraps s in backticks ("" stays "").
 func tick(s string) string {
 	if s == "" {
 		return ""
@@ -69,12 +64,12 @@ func tick(s string) string {
 	return "`" + s + "`"
 }
 
-// optionsTable renders a FlagSet as an Option|Env|Values|Default|Description
+// renderOptionsTable renders a FlagSet as an Option|Env|Values|Default|Description
 // table. Each flag's usage string may carry "; values: <...>",
 // "; default: <...>" and "; env: <...>" segments feeding those columns
 // (values default: the flag's value type; default default: the flag's
 // non-empty DefValue; flag wins over env).
-func optionsTable(fs *pflag.FlagSet) string {
+func renderOptionsTable(fs *pflag.FlagSet) string {
 	var b strings.Builder
 	b.WriteString("| Option | Env | Values | Default | Description |\n| --- | --- | --- | --- | --- |\n")
 	fs.VisitAll(func(f *pflag.Flag) {
@@ -105,7 +100,7 @@ func cliDoc(root *cobra.Command) string {
 	b.WriteString(root.Long)
 	b.WriteString("\n\n")
 	b.WriteString("## Global options\n\n")
-	b.WriteString(optionsTable(root.PersistentFlags()))
+	b.WriteString(renderOptionsTable(root.PersistentFlags()))
 	b.WriteString("\n## Commands\n")
 	walkCommands(root, &b)
 	return b.String()
@@ -138,7 +133,6 @@ func cliUsage(root *cobra.Command) string {
 	return b.String()
 }
 
-// sortedSubs lists cmd's available subcommands, name-sorted.
 func sortedSubs(cmd *cobra.Command) []*cobra.Command {
 	subs := slices.Clone(cmd.Commands())
 	subs = slices.DeleteFunc(subs, func(c *cobra.Command) bool { return !c.IsAvailableCommand() })
@@ -156,7 +150,7 @@ func walkCommands(cmd *cobra.Command, b *strings.Builder) {
 			fmt.Fprintf(b, "\nUsage: `%s`\n", sub.UseLine())
 		}
 		if sub.NonInheritedFlags().HasAvailableFlags() {
-			fmt.Fprintf(b, "\n%s", optionsTable(sub.NonInheritedFlags()))
+			fmt.Fprintf(b, "\n%s", renderOptionsTable(sub.NonInheritedFlags()))
 		}
 		walkCommands(sub, b)
 	}

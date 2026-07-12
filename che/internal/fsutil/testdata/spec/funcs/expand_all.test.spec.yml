@@ -1,0 +1,10 @@
+# [>] 🤖🤖
+context:
+  function: fsutil.ExpandAll
+cases:
+  - name: ShouldKeepPlainAndExpandBracedPaths
+    input:
+      args: [paths: [plain, "x/{a,b}/y"]]
+    expected:
+      output: [plain, x/a/y, x/b/y]
+# [<] 🤖🤖

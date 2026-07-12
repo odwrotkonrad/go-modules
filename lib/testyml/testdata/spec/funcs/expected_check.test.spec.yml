@@ -1,0 +1,21 @@
+# [>] 🤖🤖
+context:
+  function: testyml.Expected.Check
+cases:
+  - name: ShouldAcceptNilErrorWhenNoErrorWanted
+    input:
+      args: []
+    expected:
+      exitCode: 0
+  - name: ShouldMatchCodedErrorCodeAndMessage
+    input:
+      args: [code: 13, msg: "file not found: x"]
+    expected:
+      exitCode: 13
+      errorOutput: [file not found]
+  - name: ShouldAcceptWantedPlainError
+    input:
+      args: [code: 1, msg: plain failure]
+    expected:
+      errorOutput: [plain failure]
+# [<] 🤖🤖

@@ -1,0 +1,35 @@
+# [>] 🤖🤖
+context:
+  function: spec.CheSpec.ExecIfPass
+cases:
+  - name: ShouldRejectSilentlyOnEmptyEnvAtNormalLevel
+    context:
+      env: {X: ""}
+    input:
+      args: [profile: p, debug: false]
+    expected:
+      output: false
+    notExpected:
+      stdOut: ["execIf(reject)"]
+  - name: ShouldLogRejectAtDebugLevel
+    context:
+      env: {X: ""}
+    input:
+      args: [profile: p, debug: true]
+    expected:
+      output: false
+      stdOut: ["execIf(reject): profile p: env:X"]
+  - name: ShouldPassAndLogOnSetEnv
+    context:
+      env: {X: "1"}
+    input:
+      args: [profile: p, debug: false]
+    expected:
+      output: true
+      stdOut: ["execIf(pass): profile p: env:X"]
+  - name: ShouldErrorOnUndefinedProfile
+    input:
+      args: [profile: nope, debug: false]
+    expected:
+      errorOutput: ['profile "nope" is not defined in che.yml']
+# [<] 🤖🤖

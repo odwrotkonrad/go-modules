@@ -9,17 +9,6 @@ import (
 	"gopkg.in/yaml.v3"
 )
 
-// PluginRef is one parsed plugins entry: a profile defined in another repo,
-// loaded and anchored at its own checkout, optionally with envs exported
-// around everything done for its unit. IsPath marks a local dir ref (no `@`
-// prefix): URL then holds the dir path (absolute, relative, ~/, $VAR).
-type PluginRef struct {
-	URL     string
-	Profile string
-	Env     map[string]string
-	IsPath  bool
-}
-
 // String renders the canonical entry form (env not rendered):
 // `@<giturl>::<profile>` remote, `<dir>::<profile>` local.
 func (p PluginRef) String() string {
@@ -27,13 +16,6 @@ func (p PluginRef) String() string {
 		return p.URL + "::" + p.Profile
 	}
 	return "@" + p.URL + "::" + p.Profile
-}
-
-// pluginEntry is one plugins list item: a bare `@<giturl>::<profile>` /
-// `<dir>::<profile>` string, or a {ref, env} object.
-type pluginEntry struct {
-	Ref string            `yaml:"ref"`
-	Env map[string]string `yaml:"env"`
 }
 
 func (p *pluginEntry) UnmarshalYAML(value *yaml.Node) error {

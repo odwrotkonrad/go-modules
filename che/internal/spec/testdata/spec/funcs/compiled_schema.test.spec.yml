@@ -1,0 +1,8 @@
+# [>] 🤖🤖
+context:
+  function: spec.CompiledSchema
+cases:
+  - name: ShouldCompileAndReturnSchema
+    expected:
+      output: true
+# [<] 🤖🤖

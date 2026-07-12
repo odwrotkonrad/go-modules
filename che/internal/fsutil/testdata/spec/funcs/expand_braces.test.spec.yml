@@ -1,0 +1,25 @@
+# [>] 🤖🤖
+context:
+  function: fsutil.ExpandBraces
+cases:
+  - name: ShouldReturnBracelessPathUnchanged
+    input:
+      args: [path: no/braces/here]
+    expected:
+      output: [no/braces/here]
+  - name: ShouldExpandSingleGroup
+    input:
+      args: [path: "x/{a,b}/y"]
+    expected:
+      output: [x/a/y, x/b/y]
+  - name: ShouldExpandCartesianProductOfTwoGroups
+    input:
+      args: [path: "{a,b}/{c,d}"]
+    expected:
+      output: [a/c, a/d, b/c, b/d]
+  - name: ShouldFlattenNestedGroups
+    input:
+      args: [path: "x/{a,{b,c}}/y"]
+    expected:
+      output: [x/a/y, x/b/y, x/c/y]
+# [<] 🤖🤖

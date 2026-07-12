@@ -1,40 +1,39 @@
-// Package testutil holds shared che test fixtures: file tree, committed git repo, stdout capture.
+// Package testutil holds shared che test fixtures: file tree, committed git repo, stdout capture, mock registry.
 package testutil
 
 // [>] 🤖🤖
 
 import (
 	"embed"
+	"errors"
 	"io"
 	"os"
-	"os/exec"
 	"path/filepath"
 	"regexp"
 	"strings"
 	"testing"
+	"time"
+
+	git "github.com/go-git/go-git/v5"
+	"github.com/go-git/go-git/v5/plumbing/object"
+	"github.com/stretchr/testify/require"
 
 	"gitlab.com/konradodwrot/go-modules/lib/testyml"
 )
 
-// ansiRe matches SGR escape sequences (bold/reset) so assertions stay style-agnostic.
 var ansiRe = regexp.MustCompile(`\x1b\[[0-9;]*m`)
 
-// StripANSI removes SGR escape sequences, leaving plain text to assert against.
+// StripANSI removes SGR escape sequences so assertions stay style-agnostic.
 func StripANSI(s string) string { return ansiRe.ReplaceAllString(s, "") }
 
-// stampRe matches the leading HH:MM:SS.mmm log stamp on each line.
 var stampRe = regexp.MustCompile(`(?m)^\d{2}:\d{2}:\d{2}\.\d{3}: `)
 
 // StripStamps removes per-line log timestamps so adjacent lines assert as one block.
 func StripStamps(s string) string { return stampRe.ReplaceAllString(s, "") }
 
-// specsFS holds the checked-in che.yml fixtures.
-//
 //go:embed specs/*.yml
 var specsFS embed.FS
 
-// treesFS holds the checked-in repo file-tree fixtures.
-//
 //go:embed all:trees
 var treesFS embed.FS
 
@@ -42,47 +41,55 @@ var treesFS embed.FS
 func Spec(t *testing.T, name string) string {
 	t.Helper()
 	b, err := specsFS.ReadFile("specs/" + name + ".yml")
-	if err != nil {
-		t.Fatalf("read spec fixture %q: %v", name, err)
-	}
+	require.NoErrorf(t, err, "read spec fixture %q", name)
 	return string(b)
+}
+
+// WriteFile writes content at path, creating parent dirs.
+func WriteFile(t *testing.T, path, content string) {
+	t.Helper()
+	require.NoError(t, os.MkdirAll(filepath.Dir(path), 0o755))
+	require.NoError(t, os.WriteFile(path, []byte(content), 0o644))
 }
 
 // WriteTree writes each rel->content file under dir, creating parent dirs.
 func WriteTree(t *testing.T, dir string, files map[string]string) {
 	t.Helper()
 	for rel, body := range files {
-		p := filepath.Join(dir, rel)
-		if err := os.MkdirAll(filepath.Dir(p), 0o755); err != nil {
-			t.Fatal(err)
-		}
-		if err := os.WriteFile(p, []byte(body), 0o644); err != nil {
-			t.Fatal(err)
-		}
+		WriteFile(t, filepath.Join(dir, rel), body)
 	}
 }
 
-// GitRepo inits dir as a git repo and commits everything in it.
+// Tree returns a temp dir holding the rel->content files.
+func Tree(t *testing.T, files map[string]string) string {
+	t.Helper()
+	dir := t.TempDir()
+	WriteTree(t, dir, files)
+	return dir
+}
+
+// GitRepo inits dir as a git repo (go-git, idempotent) and commits everything in it.
 func GitRepo(t *testing.T, dir string) {
 	t.Helper()
-	for _, args := range [][]string{
-		{"init", "-q"},
-		{"-c", "core.excludesfile=", "add", "-Af"},
-		{"-c", "user.email=t@t", "-c", "user.name=t", "-c", "commit.gpgsign=false", "commit", "-qm", "x"},
-	} {
-		c := exec.Command("git", args...)
-		c.Dir = dir
-		if out, err := c.CombinedOutput(); err != nil {
-			t.Fatalf("git %v: %v\n%s", args, err, out)
-		}
+	repo, err := git.PlainInit(dir, false)
+	if errors.Is(err, git.ErrRepositoryAlreadyExists) {
+		repo, err = git.PlainOpen(dir)
 	}
+	require.NoError(t, err)
+	wt, err := repo.Worktree()
+	require.NoError(t, err)
+	require.NoError(t, wt.AddWithOptions(&git.AddOptions{All: true}))
+	_, err = wt.Commit("x", &git.CommitOptions{
+		Author:            &object.Signature{Name: "t", Email: "t@t", When: time.Now()},
+		AllowEmptyCommits: true,
+	})
+	require.NoError(t, err)
 }
 
 // Repo returns a temp dir of files, committed as a git repo.
 func Repo(t *testing.T, files map[string]string) string {
 	t.Helper()
-	dir := t.TempDir()
-	WriteTree(t, dir, files)
+	dir := Tree(t, files)
 	GitRepo(t, dir)
 	return dir
 }
@@ -99,9 +106,7 @@ func CheRepo(t *testing.T) (string, string) {
 	WriteTree(t, dir, map[string]string{"che.yml": Spec(t, "che")})
 	GitRepo(t, dir)
 	home := filepath.Join(dir, "home")
-	if err := os.MkdirAll(home, 0o755); err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(t, os.MkdirAll(home, 0o755))
 	return dir, home
 }
 
@@ -130,9 +135,7 @@ func CaptureStdout(t *testing.T, fn func() error) (string, error) {
 	t.Helper()
 	orig := os.Stdout
 	r, w, err := os.Pipe()
-	if err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(t, err)
 	os.Stdout = w
 	runErr := fn()
 	w.Close()

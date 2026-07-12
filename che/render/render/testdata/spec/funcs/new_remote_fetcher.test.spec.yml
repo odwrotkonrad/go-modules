@@ -1,0 +1,10 @@
+# [>] 🤖🤖
+context:
+  function: render.NewRemoteFetcher
+cases:
+  - name: ShouldServeRepeatedFetchesFromCloneCache
+    input:
+      args: [ref: "//docs/note.md", fetches: 2]
+    expected:
+      output: "main content\n"
+# [<] 🤖🤖

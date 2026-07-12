@@ -1,10 +1,8 @@
 {{.Section}} Repositories
 
-This is "{{.Label}}" directory with dirs structure containing repositories:
+Repo index for "{{.Label}}". Directory tree:
 
 ```
 {{.Tree}}```
 
-This structure maps 1:1 to gitlab group "{{.Label}}"
-
-Beneath are descriptions and purpose of each repository:
+Maps 1:1 to gitlab group "{{.Label}}". Each repo's purpose follows.

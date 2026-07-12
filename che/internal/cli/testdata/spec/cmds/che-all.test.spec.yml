@@ -1,0 +1,88 @@
+# [>] 🤖
+context:
+  command: che all
+  mockedInterfaces:
+    execx.CmdExecutor: testutil.CmdMockExecutor
+    fsutil.FileSystemWriter: testutil.FileSystemMockWriter
+    fsutil.FileSystemReader: testutil.FileSystemMockReader
+    host.Sleep: testutil.SleepMock
+cases:
+  - name: ShouldRunEveryOpSelectedInSpec
+    context:
+      pwd: testdata/fixture/commands/common/sample-tree
+    expected:
+      stdOut: |
+        all(run): prune-links
+        prune-links: ${ROOT}
+        all(run): mk-dirs
+        mkdir(create): ${HOME}/.config
+        mkdir(create): ${HOME}/.config/bar
+        mkdir(create): ${HOME}/.config/zsh
+        mkdir(create): /Library
+        mkdir(create): /Library/LaunchDaemons
+        mkdir(create): /etc
+        mkdir(create): ${HOME}/.cache/zsh
+        mkdir(create): /var/log/che-test-setgid
+        mkdir(chmod): 2775 /var/log/che-test-setgid
+        all(run): link
+        mkdir(create): ${HOME}/.config
+        mkdir(create): ${HOME}/.config/bar
+        mkdir(create): ${HOME}/.config/zsh
+        mkdir(create): /Library
+        mkdir(create): /Library/LaunchDaemons
+        mkdir(create): /etc
+        archive: ${HOME}/.local/share/che/backups/che-link-{{/.*/}}.tar.bz2
+        ln(create): ${HOME}/.config/bar/a
+        ln(create): ${HOME}/.config/zsh/.zshrc
+        ln(create): /etc/zshrc
+        all(run): copy
+        mkdir(create): ${HOME}/.config
+        mkdir(create): ${HOME}/.config/bar
+        mkdir(create): ${HOME}/.config/zsh
+        mkdir(create): /Library
+        mkdir(create): /Library/LaunchDaemons
+        mkdir(create): /etc
+        archive: ${HOME}/.local/share/che/backups/che-copy-{{/.*/}}.tar.bz2
+        cp(create): ${HOME}/.config/zsh/c
+        cp(create): /Library/LaunchDaemons/otelcol.plist
+        cp(chown): root:wheel /Library/LaunchDaemons/otelcol.plist
+        all(run): render-templates
+        archive: ${HOME}/.local/share/che/backups/che-render-{{/.*/}}.tar.bz2
+        render(create): ${HOME}/.config/zsh/t
+        all(run): run-scripts
+        run-scripts: ${REPO}/install/setup
+        run-scripts(report): ok ${REPO}/install/setup
+        all(run): services bootout
+        bootout: system/otelcol
+        bootout(done): system/otelcol
+        all(run): services bootin
+        bootstrap: system/otelcol
+        bootstrap(done): system/otelcol
+        all(run): services ensure
+        settle: 15s before pid check
+        running: system/otelcol (pid 4242)
+  - name: ShouldSkipOpsWithoutSelection
+    context:
+      pwd: testdata/fixture/commands/all/sample-tree-only-links
+    expected:
+      stdOut: |
+        all(run): prune-links
+        prune-links: ${ROOT}
+        all(run): mk-dirs
+        mkdir(create): ${HOME}/.config
+        mkdir(create): ${HOME}/.config/bar
+        all(run): link
+        mkdir(create): ${HOME}/.config
+        mkdir(create): ${HOME}/.config/bar
+        archive: ${HOME}/.local/share/che/backups/che-link-{{/.*/}}.tar.bz2
+        ln(create): ${HOME}/.config/bar/a
+    notExpected:
+      stdOut:
+        - 'all(run): copy'
+        - 'all(run): render-templates'
+        - 'all(run): run-scripts'
+        - 'all(run): services'
+        - cp(create
+        - render(create
+        - bootout
+# [<] 🤖

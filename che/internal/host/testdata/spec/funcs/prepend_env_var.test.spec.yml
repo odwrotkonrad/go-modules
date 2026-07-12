@@ -1,0 +1,15 @@
+# [>] 🤖🤖
+context:
+  function: host.prependEnvVar
+cases:
+  - name: ShouldPrependWithColonWhenKeyPresent
+    input:
+      args: [env: [PATH=foo, OTHER=x], key: PATH, value: bar]
+    expected:
+      output: ["PATH=bar:foo", OTHER=x]
+  - name: ShouldAppendBareWhenKeyAbsent
+    input:
+      args: [env: [OTHER=x], key: PATH, value: bar]
+    expected:
+      output: [OTHER=x, PATH=bar]
+# [<] 🤖🤖

@@ -1,0 +1,72 @@
+# [>] 🤖🤖
+context:
+  function: spec.ValidateSchema
+cases:
+  - name: ShouldAcceptEveryTestutilFixture
+    input:
+      args: [fixturesGlob: ../testutil/specs/*.yml]
+    expected:
+      output: ""
+  - name: ShouldReturnNoFindingsForUnparseableYAML
+    input:
+      args: [doc: "p: ["]
+    expected:
+      output: ""
+  - name: ShouldAnchorRootViolationAtSlash
+    input:
+      args: [doc: "- a\n- b\n"]
+    expected:
+      output: '{{/^/: /}}'
+  - name: ShouldFlagExtraKey
+    input:
+      args:
+        - doc: |
+            p:
+              includes:
+                link: [HOME/**]
+    expected:
+      output: includes
+  - name: ShouldFlagBogusWriteTypeEnum
+    input:
+      args:
+        - doc: |
+            p:
+              include:
+                renderTemplates:
+                  - files:
+                      - source: templates/a.tpl
+                        dest:
+                          - {path: a.md, options: {writeType: bogus}}
+    expected:
+      output: writeType
+  - name: ShouldFlagNonOctalChmod
+    input:
+      args:
+        - doc: |
+            p:
+              include:
+                mkdirs:
+                  - chmod: rwxr-xr-x
+                    files: [HOME/.cache]
+    expected:
+      output: chmod
+  - name: ShouldFlagGroupWithoutFiles
+    input:
+      args:
+        - doc: |
+            p:
+              include:
+                copy:
+                  - chmod: "0644"
+    expected:
+      output: files
+  - name: ShouldFlagPluginRefWithoutProfile
+    input:
+      args:
+        - doc: |
+            p:
+              plugins:
+                - ./plugin
+    expected:
+      output: plugins
+# [<] 🤖🤖

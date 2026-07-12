@@ -1,0 +1,41 @@
+# [>] 🤖🤖
+cases:
+  - name: ShouldPrintHelpForShortFlag
+    context: {command: checkcmd -h}
+    expected:
+      exitCode: 0
+  - name: ShouldPrintHelpForLongFlag
+    context: {command: checkcmd --help}
+    expected:
+      exitCode: 0
+  - name: ShouldEmitWithoutArgs
+    context: {command: checkcmd}
+    expected:
+      exitCode: 0
+  - name: ShouldRejectUnexpectedPositional
+    context: {command: checkcmd x}
+    expected:
+      exitCode: 11
+  - name: ShouldEmitWithRequiredArg
+    context: {command: checkcmd x}
+    input:
+      args: [needsArg: true]
+    expected:
+      exitCode: 0
+  - name: ShouldRejectMissingRequiredArg
+    context: {command: checkcmd}
+    input:
+      args: [needsArg: true]
+    expected:
+      exitCode: 11
+  - name: ShouldRejectFlagAsRequiredArg
+    context: {command: checkcmd -x}
+    input:
+      args: [needsArg: true]
+    expected:
+      exitCode: 11
+  - name: ShouldRejectUnknownFlag
+    context: {command: checkcmd --nope y}
+    expected:
+      exitCode: 11
+# [<] 🤖🤖

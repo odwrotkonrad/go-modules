@@ -1,0 +1,12 @@
+# [>] 🤖
+context:
+  function: testutil.Repo
+cases:
+  - name: ShouldWriteNestedFilesAndCommitAsGitRepo
+    input:
+      args:
+        - files: {a.txt: "hi\n", sub/b.txt: "yo\n"}
+        - read: sub/b.txt
+    expected:
+      output: "yo\n"
+# [<] 🤖

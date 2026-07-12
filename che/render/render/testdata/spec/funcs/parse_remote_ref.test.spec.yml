@@ -1,0 +1,52 @@
+# [>] 🤖🤖
+context:
+  function: render.parseRemoteRef
+cases:
+  - name: ShouldParseBareHostPath
+    input:
+      args: [ref: "gitlab.com/konradodwrot/conventions//conventions/comments/convention.md"]
+    expected:
+      output:
+        repoURL: "https://gitlab.com/konradodwrot/conventions.git"
+        sshURL: "ssh://git@gitlab.com/konradodwrot/conventions.git"
+        path: conventions/comments/convention.md
+        gitRef: ""
+  - name: ShouldParseRefQuery
+    input:
+      args: [ref: "github.com/foo/bar//docs/x.md?ref=v1.2.3"]
+    expected:
+      output:
+        repoURL: "https://github.com/foo/bar.git"
+        sshURL: "ssh://git@github.com/foo/bar.git"
+        path: docs/x.md
+        gitRef: v1.2.3
+  - name: ShouldKeepExplicitSchemeVerbatim
+    input:
+      args: [ref: "file:///tmp/repo//a/b.md?ref=main"]
+    expected:
+      output:
+        repoURL: "file:///tmp/repo"
+        sshURL: ""
+        path: a/b.md
+        gitRef: main
+  - name: ShouldErrorWithoutPathSeparator
+    input:
+      args: [ref: "gitlab.com/x/y"]
+    expected:
+      errorOutput: ['want <repo>//<path>']
+  - name: ShouldErrorOnEmptyPath
+    input:
+      args: [ref: "gitlab.com/x/y//"]
+    expected:
+      errorOutput: ['want <repo>//<path>']
+  - name: ShouldErrorOnEmptyRepo
+    input:
+      args: [ref: "//a.md"]
+    expected:
+      errorOutput: ['want <repo>//<path>']
+  - name: ShouldErrorOnUnknownQuery
+    input:
+      args: [ref: "gitlab.com/x/y//a.md?tag=v1"]
+    expected:
+      errorOutput: ['unknown query']
+# [<] 🤖🤖

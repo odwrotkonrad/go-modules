@@ -1,0 +1,93 @@
+# [>] 🤖🤖
+context:
+  function: spec.Evaluator.EvalExecIf
+cases:
+  - name: ShouldBeTrueForSetEnv
+    context:
+      env: {CHE_TEST_SET: grp}
+    input:
+      args: [expr: env:CHE_TEST_SET]
+    expected:
+      output: true
+  - name: ShouldBeFalseForEmptyEnv
+    context:
+      env: {CHE_TEST_EMPTY: ""}
+    input:
+      args: [expr: env:CHE_TEST_EMPTY]
+    expected:
+      output: false
+  - name: ShouldBeFalseForUnsetEnv
+    input:
+      args: [expr: env:CHE_TEST_UNSET]
+    expected:
+      output: false
+  - name: ShouldMatchEnvEquality
+    context:
+      env: {CHE_TEST_SET: grp}
+    input:
+      args: [expr: env:CHE_TEST_SET == grp]
+    expected:
+      output: true
+  - name: ShouldRejectEnvEqualityMismatch
+    context:
+      env: {CHE_TEST_SET: grp}
+    input:
+      args: [expr: env:CHE_TEST_SET == other]
+    expected:
+      output: false
+  - name: ShouldEquateUnsetEnvWithEmpty
+    input:
+      args: [expr: "env:CHE_TEST_UNSET == "]
+    expected:
+      output: true
+  - name: ShouldMatchBuiltinOsEquality
+    input:
+      args: [expr: builtin:isOs == macos]
+    expected:
+      output: true
+  - name: ShouldRejectBuiltinOsMismatch
+    input:
+      args: [expr: builtin:isOs == linux]
+    expected:
+      output: false
+  - name: ShouldParseEqualityWithoutSpaces
+    input:
+      args: [expr: builtin:isOs==macos]
+    expected:
+      output: true
+  - name: ShouldEvalBareBuiltinIsVirt
+    input:
+      args: [expr: builtin:isVirt]
+    expected:
+      output: false
+  - name: ShouldMatchBuiltinIsVirtEqualsFalse
+    input:
+      args: [expr: builtin:isVirt == false]
+    expected:
+      output: true
+  - name: ShouldErrorOnUnknownBuiltin
+    input:
+      args: [expr: builtin:isWindows]
+    expected:
+      errorOutput: ['unknown builtin "builtin:isWindows"']
+  - name: ShouldErrorOnUnknownScheme
+    input:
+      args: [expr: host:isOs]
+    expected:
+      errorOutput: ['unknown source "host:isOs"']
+  - name: ShouldErrorOnBareWord
+    input:
+      args: [expr: GITLAB_GROUP]
+    expected:
+      errorOutput: ['unknown source "GITLAB_GROUP"']
+  - name: ShouldErrorOnUnknownSourceInEquality
+    input:
+      args: [expr: host:isOs == macos]
+    expected:
+      errorOutput: ['unknown source "host:isOs"']
+  - name: ShouldErrorOnDoubleEquality
+    input:
+      args: [expr: a == b == c]
+    expected:
+      errorOutput: ['malformed expression: want <source> or <source> == <literal>']
+# [<] 🤖🤖

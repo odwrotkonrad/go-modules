@@ -1,0 +1,25 @@
+# [>] 🤖🤖
+context:
+  function: fsutil.ModeArg
+cases:
+  - name: ShouldKeep0644
+    input:
+      args: [mode: "0644"]
+    expected:
+      output: "0644"
+  - name: ShouldKeep0600
+    input:
+      args: [mode: "0600"]
+    expected:
+      output: "0600"
+  - name: ShouldKeep0755
+    input:
+      args: [mode: "0755"]
+    expected:
+      output: "0755"
+  - name: ShouldKeepSetgid2775
+    input:
+      args: [mode: "2775"]
+    expected:
+      output: "2775"
+# [<] 🤖🤖

@@ -19,7 +19,7 @@ base:
         files:
           - {dest: [/var/log/che-test-setgid]}
     runScripts:
-      - install/unit
+      - install/setup
     services: [otelcol]
 
 cli/macos:

@@ -32,7 +32,7 @@ func run(args []string, customDir string) (string, error) {
 	if err != nil {
 		return "", err
 	}
-	return lib.Render(node)
+	return lib.RenderDutiLines(node)
 }
 
 func main() {

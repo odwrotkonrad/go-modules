@@ -1,0 +1,20 @@
+# [>] 🤖🤖
+context:
+  function: render.isRateLimitErr
+cases:
+  - name: ShouldDetectRateLimitText
+    input:
+      args: [errMsg: "performing a vault operation: rate limit exceeded"]
+    expected:
+      output: true
+  - name: ShouldRejectOtherErrors
+    input:
+      args: [errMsg: "op resolve: secret not found"]
+    expected:
+      output: false
+  - name: ShouldRejectNilError
+    input:
+      args: [errMsg: ""]
+    expected:
+      output: false
+# [<] 🤖🤖

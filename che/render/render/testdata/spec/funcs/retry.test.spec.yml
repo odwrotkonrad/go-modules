@@ -1,0 +1,27 @@
+# [>] 🤖🤖
+context:
+  function: render.retry
+cases:
+  - name: ShouldSucceedFirstTryWithoutSleep
+    input:
+      args: [failTimes: 0, failMsg: rate limit exceeded]
+    expected:
+      output: {value: ok, calls: 1, slept: 0}
+  - name: ShouldRetryRateLimitThenSucceed
+    input:
+      args: [failTimes: 2, failMsg: rate limit exceeded]
+    expected:
+      output: {value: ok, calls: 3, slept: 2}
+  - name: ShouldExhaustRetriesReturningLastError
+    input:
+      args: [failTimes: 99, failMsg: rate limit exceeded]
+    expected:
+      errorOutput: ['rate limit exceeded']
+      output: {calls: 4, slept: 3}
+  - name: ShouldFailFastOnNonRetryableError
+    input:
+      args: [failTimes: 1, failMsg: bad ref]
+    expected:
+      errorOutput: ['bad ref']
+      output: {calls: 1, slept: 0}
+# [<] 🤖🤖

@@ -1,0 +1,35 @@
+# [>] 🤖🤖
+context:
+  function: render.isAtIncludeLine
+cases:
+  - name: ShouldAcceptTildePath
+    input:
+      args: [line: "@~/.config/x"]
+    expected:
+      output: true
+  - name: ShouldAcceptRelativePath
+    input:
+      args: [line: "@path/to/file"]
+    expected:
+      output: true
+  - name: ShouldRejectSpaceAfterAt
+    input:
+      args: [line: "@ has space"]
+    expected:
+      output: false
+  - name: ShouldRejectMidLineAt
+    input:
+      args: [line: "text @middle"]
+    expected:
+      output: false
+  - name: ShouldRejectPlainText
+    input:
+      args: [line: plain]
+    expected:
+      output: false
+  - name: ShouldRejectBareAt
+    input:
+      args: [line: "@"]
+    expected:
+      output: false
+# [<] 🤖🤖

@@ -13,8 +13,8 @@ import (
 
 // allCmd runs every step op in load order, each gated on whether the resolved
 // selection defines anything for it. A failing step does not stop the rest:
-// step errors collect and join, matching forEachUnit semantics.
-func (c *CheApp) allCmd() *cobra.Command {
+// step errors collect and join, matching forEachLoad semantics.
+func (ld *loader) allCmd() *cobra.Command {
 	return &cobra.Command{
 		Use:   "all",
 		Short: "run every op the profile selects, in order",
@@ -22,15 +22,15 @@ func (c *CheApp) allCmd() *cobra.Command {
 			var fails []error
 			for _, s := range steps() {
 				name := s.displayName()
-				// [why] plugin selections build lazily inside forEachUnit;
+				// [why] plugin selections build lazily inside forEachLoad;
 				// skipping on the local selection alone would silently drop
 				// plugin content.
-				if len(c.pluginRefs) == 0 && !s.selected(c.units[0].res) {
+				if len(ld.plugins.refs) == 0 && !s.selected(ld.local.selection) {
 					log.Debug("all(skip)", name+" (nothing selected)", log.Off)
 					continue
 				}
 				log.Msg("all(run)", name, log.Off)
-				if err := c.forEachUnit(s.name, func(u unit) error { return s.op(c, u) }); err != nil {
+				if err := ld.forEachLoad(s.name, func(l load) error { return s.op(ld, l) }); err != nil {
 					fails = append(fails, fmt.Errorf("%s: %w", name, err))
 				}
 			}

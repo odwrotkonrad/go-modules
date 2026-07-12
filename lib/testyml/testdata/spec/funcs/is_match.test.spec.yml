@@ -1,0 +1,25 @@
+# [>] 🤖🤖
+context:
+  function: testyml.IsMatch
+cases:
+  - name: ShouldMatchLiteralSubstring
+    input:
+      args: [s: "ln(create): /etc/zshrc", matcher: "ln(create)"]
+    expected:
+      output: true
+  - name: ShouldMatchRegexHole
+    input:
+      args: [s: "ln(create): /etc/zshrc", matcher: 'ln(create): /etc/{{/\w+/}}']
+    expected:
+      output: true
+  - name: ShouldNotTreatLiteralDotsAsRegex
+    input:
+      args: [s: "ln(create): /etc/zshrc", matcher: ln.create.]
+    expected:
+      output: false
+  - name: ShouldNotMatchDifferentText
+    input:
+      args: [s: "cp: /x", matcher: "ln(create)"]
+    expected:
+      output: false
+# [<] 🤖🤖

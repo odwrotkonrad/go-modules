@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"gitlab.com/konradodwrot/go-modules/che/internal/fsutil"
+	"gitlab.com/konradodwrot/go-modules/che/internal/testutil"
 	"gitlab.com/konradodwrot/go-modules/lib/testyml"
 )
 
@@ -24,52 +25,35 @@ func (f fakeInfo) ModTime() time.Time { return time.Time{} }
 func (f fakeInfo) IsDir() bool        { return false }
 func (f fakeInfo) Sys() any           { return f.sys }
 
-// swapLookups replaces the passwd/group lookups with map-backed fakes so the
-// live user db never leaks into results.
+// swapLookups replaces the passwd/group lookups with the map-served mocks so
+// the live user db never leaks into results.
 func swapLookups(t *testing.T, users, groups map[string]int) {
 	t.Helper()
-	prevU, prevG := fsutil.UserLookup, fsutil.GroupLookup
-	fsutil.UserLookup = func(name string) (*user.User, error) {
-		id, ok := users[name]
-		if !ok {
-			return nil, user.UnknownUserError(name)
-		}
-		return &user.User{Uid: strconv.Itoa(id)}, nil
+	u := testutil.UserMockLookup{}
+	for name, id := range users {
+		u[name] = user.User{Uid: strconv.Itoa(id)}
 	}
-	fsutil.GroupLookup = func(name string) (*user.Group, error) {
-		id, ok := groups[name]
-		if !ok {
-			return nil, user.UnknownGroupError(name)
-		}
-		return &user.Group{Gid: strconv.Itoa(id)}, nil
+	g := testutil.GroupMockLookup{}
+	for name, id := range groups {
+		g[name] = user.Group{Gid: strconv.Itoa(id)}
 	}
-	t.Cleanup(func() { fsutil.UserLookup, fsutil.GroupLookup = prevU, prevG })
+	testyml.Swap(t, &fsutil.UserLookup, u.Lookup)
+	testyml.Swap(t, &fsutil.GroupLookup, g.Lookup)
 }
 
 func TestIsOwnerDrifted(t *testing.T) {
-	type in struct {
-		Uid    uint32 `yaml:"uid"`
-		Gid    uint32 `yaml:"gid"`
-		Owner  string
-		NoStat bool `yaml:"noStat"`
-		Users  map[string]int
-		Groups map[string]int
-	}
-	type c struct {
-		Name string
-		In   in
-		Want bool
-	}
-	testyml.Run(t, td, "testdata/spec/unit/owner_drift.spec.yml", func(t *testing.T, c c) {
-		swapLookups(t, c.In.Users, c.In.Groups)
+	testyml.Eq(t, td, "testdata/spec/funcs/is_owner_drifted.test.spec.yml", func(t *testing.T, c testyml.Case[bool]) (bool, error) {
+		testutil.RequireRegistered(t, c.Context.MockedInterfaces)
+		a := c.Input.Args
+		var users, groups map[string]int
+		a.To(t, 1, &users)
+		a.To(t, 2, &groups)
+		swapLookups(t, users, groups)
 		var sys any
-		if !c.In.NoStat {
-			sys = &syscall.Stat_t{Uid: c.In.Uid, Gid: c.In.Gid}
+		if !a.Bool(t, 5) {
+			sys = &syscall.Stat_t{Uid: uint32(a.Int(t, 3)), Gid: uint32(a.Int(t, 4))}
 		}
-		if got := isOwnerDrifted(fakeInfo{sys}, c.In.Owner); got != c.Want {
-			t.Errorf("isOwnerDrifted(uid=%d gid=%d, %q) = %v, want %v",
-				c.In.Uid, c.In.Gid, c.In.Owner, got, c.Want)
-		}
+		return isOwnerDrifted(fakeInfo{sys}, a.String(t, 0)), nil
 	})
 }
 

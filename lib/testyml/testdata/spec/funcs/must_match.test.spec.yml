@@ -1,0 +1,24 @@
+# [>] 🤖🤖
+context:
+  function: testyml.MustMatch
+cases:
+  - name: ShouldMatchMultilineLiteralBlock
+    input:
+      args: [s: "line one (raw)\nline two $x\nln(create): /etc/zshrc\n"]
+    expected:
+      stdOut: |
+        line one (raw)
+        line two $x
+  - name: ShouldMatchInlineRegexHole
+    input:
+      args: [s: "ln(create): /etc/zshrc"]
+    expected:
+      stdOut: ['ln(create): /etc/{{/\w+/}}']
+  - name: ShouldRejectNonMatchingMatchers
+    input:
+      args: [s: "cp: /x"]
+    expected:
+      stdOut: ["cp: /x"]
+    notExpected:
+      stdOut: ["ln(create)", 'rm: /etc/{{/\w+/}}']
+# [<] 🤖🤖

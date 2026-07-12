@@ -1,0 +1,15 @@
+# [>] 🤖
+context:
+  command: che render-templates
+  mockedInterfaces:
+    execx.CmdExecutor: testutil.CmdMockExecutor
+    fsutil.FileSystemWriter: testutil.FileSystemMockWriter
+    fsutil.FileSystemReader: testutil.FileSystemMockReader
+    host.Sleep: testutil.SleepMock
+cases:
+  - name: ShouldRenderAndInstallHostDest
+    expected:
+      stdOut: |
+        archive: {{/.*/}}che-render-{{/.*/}}.tar.bz2
+        render(create): ${HOME}/.config/zsh/t
+# [<] 🤖

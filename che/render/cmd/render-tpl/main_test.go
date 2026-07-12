@@ -7,38 +7,27 @@ import (
 	"testing"
 
 	"gitlab.com/konradodwrot/go-modules/lib/testyml"
-	"gitlab.com/konradodwrot/go-modules/lib/yamlcfg"
 )
 
 //go:embed all:testdata
 var td embed.FS
 
 func TestRun(t *testing.T) {
-	type in struct {
-		Tree string
-		Env  map[string]string
-		Args []string
-	}
-	type c struct {
-		Name string
-		In   in
-		Want testyml.Want
-	}
-	testyml.Run(t, td, "testdata/spec/run.spec.yml", func(t *testing.T, c c) {
+	testyml.Run(t, td, "testdata/spec/cmds/render-tpl.test.spec.yml", func(t *testing.T, c testyml.Case[struct{}]) {
 		dir := t.TempDir()
-		if c.In.Tree != "" {
-			testyml.CopyDir(t, td, "testdata/fixture/run/"+c.In.Tree, dir)
+		if c.Context.Pwd != "" {
+			testyml.CopyDir(t, td, c.Context.Pwd, dir)
 		}
 		t.Chdir(dir)
-		for k, v := range c.In.Env {
+		for k, v := range c.Context.Env {
 			t.Setenv(k, v)
 		}
-		args := make([]string, len(c.In.Args))
-		for i, a := range c.In.Args {
+		args := c.Context.CommandArgs()
+		for i, a := range args {
 			args[i] = testyml.Expand(a, map[string]string{"DIR": dir})
 		}
 		_, err := tool.Run(args)
-		c.Want.CheckCode(t, yamlcfg.Code(err))
+		c.Expected.Check(t, err)
 	})
 }
 

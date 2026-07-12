@@ -1,0 +1,29 @@
+# [>] 🤖🤖
+cases:
+  - name: ShouldGenerateDocMatchingGolden
+    context:
+      command: render-makefile-doc ${DIR}/Makefile
+    expected:
+      files: testdata/expected.md
+  - name: ShouldExit21WhenMakefileMissing
+    context:
+      command: render-makefile-doc ${DIR}/nope.mk
+    expected:
+      exitCode: 21
+      errorOutput: [file not found]
+  - name: ShouldPassCheckWhenDocMatches
+    context:
+      command: render-makefile-doc --check ${DIR}/good.md
+    expected:
+      exitCode: 0
+  - name: ShouldExit22WhenDocDiffers
+    context:
+      command: render-makefile-doc --check ${DIR}/stale.md
+    expected:
+      exitCode: 22
+  - name: ShouldExit13WhenDocFileAbsent
+    context:
+      command: render-makefile-doc --check ${DIR}/absent.md
+    expected:
+      exitCode: 13
+# [<] 🤖🤖

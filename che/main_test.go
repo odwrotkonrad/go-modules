@@ -3,26 +3,29 @@ package main
 // [>] 🤖
 
 import (
-	"slices"
+	"embed"
 	"testing"
 
+	"github.com/stretchr/testify/assert"
+
 	"gitlab.com/konradodwrot/go-modules/che/internal/cli"
+	"gitlab.com/konradodwrot/go-modules/lib/testyml"
 )
+
+//go:embed all:testdata
+var td embed.FS
 
 // cli.New().Root() wires every subcommand to root.
 func TestSubcommandsWired(t *testing.T) {
-	var got []string
-	for _, c := range cli.New().Root().Commands() {
-		got = append(got, c.Name())
-	}
-	for _, want := range []string{
-		"link", "copy", "render-templates", "mk-dirs",
-		"prune-links", "run-scripts", "detect", "services",
-	} {
-		if !slices.Contains(got, want) {
-			t.Errorf("subcommand %q not wired to RootCmd; have %v", want, got)
+	testyml.Run(t, td, "testdata/spec/funcs/subcommands.test.spec.yml", func(t *testing.T, c testyml.Case[[]string]) {
+		var got []string
+		for _, cmd := range cli.New().Root().Commands() {
+			got = append(got, cmd.Name())
 		}
-	}
+		for _, want := range c.Expected.Output {
+			assert.Contains(t, got, want, "subcommand not wired to RootCmd")
+		}
+	})
 }
 
 // [<] 🤖

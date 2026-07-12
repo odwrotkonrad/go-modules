@@ -1,0 +1,18 @@
+# [>] 🤖🤖
+context:
+  function: docgen.renderOptionsTable
+cases:
+  - name: ShouldRenderRowsForFlagShapes
+    input:
+      args:
+        - flags:
+            - {type: string, name: dir, short: C, usage: "change dir; env: X_DIR"}
+            - {type: string, name: mode, usage: "pick mode; values: a (one) | b (two); default: off; env: X_MODE"}
+            - {type: bool, name: toggle, usage: flip it}
+    expected:
+      output:
+        - "| Option | Env | Values | Default | Description |"
+        - "| `-C`, `--dir` | `X_DIR` | `string` |  | change dir |"
+        - "| `--mode` | `X_MODE` | `a (one)` \\| `b (two)` | `off` | pick mode |"
+        - "| `--toggle` |  | `bool` | `false` | flip it |"
+# [<] 🤖🤖

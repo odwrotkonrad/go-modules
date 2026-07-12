@@ -12,29 +12,25 @@ import (
 	"text/template"
 )
 
-// purposeRelPath: a repo's purpose file, relative to the repo root.
 const purposeRelPath = "assets/docs-agents/purpose.md"
 
-// noPurposePlaceholder: emitted when a repo has no purpose.md.
 const noPurposePlaceholder = "_(no purpose.md)_"
 
-// indexHeadingLevel: level of the top index's section headings (Repositories,
-// Subgroups). Repo headings nest one below, inlined purposes below that, each
-// nested child index two below its subgroup heading.
+// indexHeadingLevel: the top index's section headings. Repo headings nest one
+// below, inlined purposes below that.
 const indexHeadingLevel = 1
 
-// indexIntroMD: the Repositories section intro snippet ({{.Section}} heading
-// marker, {{.Label}} group name, {{.Tree}} directory structure).
+// indexIntroMD: {{.Section}} heading marker, {{.Label}} group name, {{.Tree}}
+// directory structure.
 //
 //go:embed snippets/repo-group-index-intro.md
 var indexIntroMD string
 
 var indexIntroTpl = template.Must(template.New("repo-group-index-intro").Parse(indexIntroMD))
 
-// heading renders an ATX heading marker of the given level.
 func heading(level int) string { return strings.Repeat("#", level) }
 
-// demoteHeadings demotes every ATX heading in body by levels (capped at 6 per pass).
+// demoteHeadings demotes every ATX heading by levels, capped at 6 per pass.
 func demoteHeadings(body string, levels int) string {
 	for range levels {
 		body = mdHeading.ReplaceAllString(body, "$1#$2")
@@ -49,7 +45,6 @@ type groupNode struct {
 	childSubgroups []string
 }
 
-// isRepoDir: dir holds a .git entry (leaf; recursion stops here).
 func isRepoDir(dir string) bool {
 	_, err := os.Stat(filepath.Join(dir, ".git"))
 	return err == nil
@@ -69,8 +64,7 @@ func isRepoWithin(dir string) bool {
 	})
 }
 
-// scanGroup classifies dir's direct children: repos (.git) vs child subgroups
-// (dirs with a repo below). Non-subgroup dirs (no repo anywhere below) are dropped.
+// scanGroup classifies dir's direct children, non-subgroup dirs dropped.
 func scanGroup(dir string) (groupNode, error) {
 	entries, err := os.ReadDir(dir)
 	if err != nil {
@@ -138,10 +132,9 @@ func groupLabel(dir string) string {
 	return filepath.Base(abs)
 }
 
-// renderGroupBody emits a group's body: each repo as a `Repo: ./<rel-path>`
-// heading + purpose, then each child subgroup as a `Subgroup: ./<rel-path>`
-// heading + its own body, recursively (no intro, no tree: the top index's
-// tree already covers the whole structure). Headings at level+1.
+// renderGroupBody: `Repo: ./<rel-path>` heading + purpose per repo, then each
+// child subgroup's body recursively, headings at level+1. No intro, no tree:
+// the top index's tree covers the whole structure.
 func renderGroupBody(dir string, node groupNode, level int, rel string) string {
 	child := heading(level + 1)
 	var b strings.Builder
@@ -169,12 +162,8 @@ func renderGroupBody(dir string, node groupNode, level int, rel string) string {
 	return b.String()
 }
 
-// renderGroupIndex emits the markdown index for one subgroup dir at the given
-// heading level: the Repositories intro (where you are, the directory
-// structure tree), then the group body via renderGroupBody (each direct repo
-// as a `Repo: ./<rel-path>` heading + inlined purpose, each child subgroup as
-// a `Subgroup: ./<rel-path>` heading + its inlined body). rel is this group's
-// path relative to the index root (pwd), "" at the top. Deterministic order.
+// renderGroupIndex emits one subgroup dir's index markdown: intro + group
+// body. rel: this group's path relative to the index root, "" at the top.
 func renderGroupIndex(dir string, node groupNode, level int, rel string) string {
 	var b strings.Builder
 	if len(node.childRepos) > 0 {
@@ -185,8 +174,7 @@ func renderGroupIndex(dir string, node groupNode, level int, rel string) string 
 	return b.String()
 }
 
-// RepoGroupIndexDir renders the index for a single subgroup dir (the CLI + template
-// entry point): scan direct children, emit the index markdown.
+// RepoGroupIndexDir renders one subgroup dir's index (the CLI + template entry point).
 func RepoGroupIndexDir(dir string) (string, error) {
 	node, err := scanGroup(dir)
 	if err != nil {
@@ -195,9 +183,8 @@ func RepoGroupIndexDir(dir string) (string, error) {
 	return renderGroupIndex(dir, node, indexHeadingLevel, ""), nil
 }
 
-// RepoGroupIndex walks workspaceRoot and returns each subgroup's rel-dir →
-// rendered index markdown. A subgroup is any dir with ≥1 repo below; each
-// index inlines its direct repos and every child subgroup's index recursively.
+// RepoGroupIndex walks workspaceRoot and returns each subgroup's rel-dir ->
+// rendered index markdown.
 func RepoGroupIndex(workspaceRoot string) (map[string]string, error) {
 	out := map[string]string{}
 	var walk func(dir string) error

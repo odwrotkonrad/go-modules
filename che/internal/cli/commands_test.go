@@ -8,6 +8,7 @@ import (
 	"testing"
 
 	"github.com/spf13/cobra"
+	"github.com/stretchr/testify/require"
 
 	"gitlab.com/konradodwrot/go-modules/che/internal/testutil"
 	"gitlab.com/konradodwrot/go-modules/lib/testyml"
@@ -39,47 +40,27 @@ func splitProfileArg(args []string) ([]string, string) {
 	return args, testutil.CheProfile
 }
 
-// TestCommands runs each subcommand with dry-run off against a record-only
-// MockFS and a mock command executor: log lines assert the behavior, nothing
-// touches the host.
+// TestCommands: dry-run off, safe-double set, log lines assert the behavior.
 func TestCommands(t *testing.T) {
-	type context struct {
-		Directory string
-	}
-	type in struct {
-		Args []string
-	}
-	type c struct {
-		Name    string
-		Context context
-		In      in
-		Want    testyml.Want
-		NotWant testyml.Want `yaml:"notWant"`
-	}
-	specs, err := fs.Glob(td, "testdata/spec/*.spec.yml")
-	if err != nil || len(specs) == 0 {
-		t.Fatalf("glob spec files: %v (%d found)", err, len(specs))
-	}
-	run := func(t *testing.T, c c) {
-		args, profile := splitProfileArg(c.In.Args)
-		a, root, home := setupMock(t, c.Context.Directory, profile)
+	specs, err := fs.Glob(td, "testdata/spec/cmds/che-*.test.spec.yml")
+	require.NoError(t, err)
+	require.NotEmpty(t, specs)
+	run := func(t *testing.T, c testyml.Case[struct{}]) {
+		args, profile := splitProfileArg(c.Context.CommandArgs())
+		a, root, home := setupMock(t, c.Context.Pwd, profile, c.Context.MockedInterfaces)
 		vars := map[string]string{
 			"HOME": home,
-			"REPO": a.units[0].host.RepoRoot,
-			"ROOT": a.units[0].host.Root,
+			"REPO": a.local.host.RepoRoot,
+			"ROOT": a.local.host.Root,
 		}
 		cmd, rest := findCmd(t, root, args)
-		out, err := testutil.CaptureStdout(t, func() error { return cmd.RunE(cmd, rest) })
-		if c.Want.IsErrorWanted() {
-			c.Want.CheckErr(t, err)
-		} else if err != nil {
-			t.Fatalf("%v errored: %v\n%s", c.In.Args, err, out)
-		}
+		out, runErr := testutil.CaptureStdout(t, func() error { return cmd.RunE(cmd, rest) })
+		c.Expected.Check(t, runErr)
 		stripped := testutil.StripStamps(testutil.StripANSI(out))
-		for _, f := range c.Want.StdOut {
+		for _, f := range c.Expected.StdOut {
 			testyml.MustMatch(t, stripped, testyml.Expand(f, vars))
 		}
-		for _, f := range c.NotWant.StdOut {
+		for _, f := range c.NotExpected.StdOut {
 			testyml.MustNotMatch(t, stripped, testyml.Expand(f, vars))
 		}
 	}

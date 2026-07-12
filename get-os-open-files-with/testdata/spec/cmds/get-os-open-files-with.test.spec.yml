@@ -1,0 +1,77 @@
+# [>] 🤖🤖
+context:
+  command: get-os-open-files-with
+cases:
+  - name: ShouldPrintSingleAppSingleRoleLine
+    input:
+      args: [config: testdata/fixture/run/single_app_single_role.yml]
+    expected:
+      files: testdata/fixture/run/single_app_single_role.expected.txt
+  - name: ShouldPrintLinePerRoleForOneApp
+    input:
+      args: [config: testdata/fixture/run/one_app_multiple_roles.yml]
+    expected:
+      files: testdata/fixture/run/one_app_multiple_roles.expected.txt
+  - name: ShouldPrintMultipleAppsInConfigOrder
+    input:
+      args: [config: testdata/fixture/run/multiple_apps.yml]
+    expected:
+      files: testdata/fixture/run/multiple_apps.expected.txt
+  - name: ShouldPrintNothingForEmptyMapping
+    input:
+      args: [config: testdata/fixture/run/empty_config.yml]
+    expected:
+      files: testdata/fixture/run/empty.expected.txt
+  - name: ShouldPrintNothingForAppWithEmptyRoles
+    input:
+      args: [config: testdata/fixture/run/app_with_empty_role_list.yml]
+    expected:
+      files: testdata/fixture/run/empty.expected.txt
+  - name: ShouldPrintNothingForNullConfig
+    input:
+      args: [config: testdata/fixture/run/null_config.yml]
+    expected:
+      files: testdata/fixture/run/empty.expected.txt
+  - name: ShouldExit12WhenTopLevelNotMapping
+    input:
+      args: [config: testdata/fixture/run/top_level_list.yml]
+    expected:
+      exitCode: 12
+      errorOutput: [top level must be a mapping]
+  - name: ShouldExit12WhenUtisNotList
+    input:
+      args: [config: testdata/fixture/run/utis_not_list.yml]
+    expected:
+      exitCode: 12
+      errorOutput: [must be a list]
+  - name: ShouldExit13WhenConfigMissing
+    input:
+      args: []
+    expected:
+      exitCode: 13
+  - name: ShouldExit12OnInvalidYamlSyntax
+    input:
+      args: [config: testdata/fixture/run/invalid_syntax.yml]
+    expected:
+      exitCode: 12
+      errorOutput: [invalid config]
+  - name: ShouldExit12WhenRolesNull
+    input:
+      args: [config: testdata/fixture/run/invalid_null_roles.yml]
+    expected:
+      exitCode: 12
+  - name: ShouldExit11OnTwoArgs
+    context:
+      command: get-os-open-files-with one two
+    input:
+      args: [config: testdata/fixture/run/empty_config.yml]
+    expected:
+      exitCode: 11
+  - name: ShouldExit11OnThreeArgs
+    context:
+      command: get-os-open-files-with one two three
+    input:
+      args: [config: testdata/fixture/run/empty_config.yml]
+    expected:
+      exitCode: 11
+# [<] 🤖🤖

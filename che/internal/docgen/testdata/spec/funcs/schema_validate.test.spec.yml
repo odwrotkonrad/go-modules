@@ -1,0 +1,86 @@
+# [>] 🤖🤖
+context:
+  function: spec.CompiledSchema.Validate
+cases:
+  - name: ShouldValidateRepoCheYml
+    input:
+      args: [path: ../../../che.yml]
+    expected:
+      output: true
+  - name: ShouldValidateTestutilFixtures
+    input:
+      args: [globs: ["../testutil/specs/*.yml"]]
+    expected:
+      output: true
+  - name: ShouldValidateWorkspaceSiblingCheYmls
+    input:
+      args: [globs: ["../../../../*/che.yml", "../../../../*/*/che.yml", "../../../../*/*/*/che.yml"]]
+    expected:
+      output: true
+  - name: ShouldValidateSpecDocFullExample
+    input:
+      args: [docExample: ../../docs/spec.md]
+    expected:
+      output: true
+  - name: ShouldRejectBogusWriteType
+    input:
+      args:
+        - doc: |
+            p:
+              include:
+                renderTemplates:
+                  - files:
+                      - source: templates/a.tpl
+                        dest:
+                          - {path: a.md, options: {writeType: bogus}}
+    expected:
+      output: false
+  - name: ShouldRejectPluginRefWithoutProfile
+    input:
+      args:
+        - doc: |
+            p:
+              plugins:
+                - ./plugin
+    expected:
+      output: false
+  - name: ShouldRejectUnknownProfileKey
+    input:
+      args:
+        - doc: |
+            p:
+              includes:
+                link: [HOME/**]
+    expected:
+      output: false
+  - name: ShouldRejectFileEntryWithoutSource
+    input:
+      args:
+        - doc: |
+            p:
+              include:
+                copy:
+                  - files:
+                      - {dest: [~/.config/a]}
+    expected:
+      output: false
+  - name: ShouldRejectNonOctalChmod
+    input:
+      args:
+        - doc: |
+            p:
+              include:
+                mkdirs:
+                  - chmod: rwxr-xr-x
+                    files: [HOME/.cache]
+    expected:
+      output: false
+  - name: ShouldRejectMixinProfilesNotAList
+    input:
+      args:
+        - doc: |
+            p:
+              mixinProfiles: base
+    expected:
+      output: false
+# [<] 🤖🤖

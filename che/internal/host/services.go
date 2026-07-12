@@ -19,23 +19,7 @@ import (
 // settleSeconds: wait before post-bootstrap pid check, services take time to spawn.
 const settleSeconds = 15
 
-// Service is one resolved launchd job.
-type Service struct {
-	Name        string // label == plist basename
-	Plist       string // live dest plist path
-	Domain      string // "system" or "gui/<uid>"
-	Sudo        bool   // system domain only
-	LongRunning bool   // KeepAlive, expect a live pid after bootstrap
-}
-
 func (s Service) target() string { return s.Domain + "/" + s.Name }
-
-// plistSource is one candidate template path under root/.
-type plistSource struct {
-	rel    string // repo-relative under root/, with marker
-	marker string // ".ontoHost.cp" or ".ontoHost.tpl"
-	system bool   // LaunchDaemons -> system, LaunchAgents -> gui
-}
 
 // ResolveServices maps each name to its live Service via the plist under root/.
 // Unknown name -> error. All current services are KeepAlive (LongRunning).
@@ -61,7 +45,6 @@ func (h Host) ResolveServices(names []string) ([]Service, error) {
 	return out, nil
 }
 
-// locate finds name's plist in the three known dirs (first hit).
 func (h Host) locate(name string) (plistSource, bool) {
 	cands := []plistSource{
 		{"Library/LaunchDaemons/" + name + ".plist.ontoHost.cp", ".ontoHost.cp", true},
@@ -76,7 +59,7 @@ func (h Host) locate(name string) (plistSource, bool) {
 	return plistSource{}, false
 }
 
-// Sleep paces the post-bootstrap settle and the bootout-gone poll; tests stub
+// Sleep paces the post-bootstrap settle and the bootout-gone poll, tests stub
 // it to a no-op.
 var Sleep = time.Sleep
 
@@ -125,8 +108,6 @@ func (s Service) waitGone() {
 }
 
 // Bootin bootstraps each service fresh from its plist. Does NOT auto-bootout.
-// A failing bootstrap is logged and the rest still run; failures join into the
-// returned error.
 func (h Host) Bootin(services []Service) error {
 	var errs []error
 	for _, s := range services {

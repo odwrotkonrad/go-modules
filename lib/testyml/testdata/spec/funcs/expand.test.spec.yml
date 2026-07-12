@@ -1,0 +1,10 @@
+# [>] 🤖🤖
+context:
+  function: testyml.Expand
+cases:
+  - name: ShouldExpandKnownVarsKeepUnknown
+    input:
+      args: [s: "${HOME}/x ${REPO}/y ${MISS}", vars: {HOME: /h, REPO: /r}]
+    expected:
+      output: /h/x /r/y ${MISS}
+# [<] 🤖🤖

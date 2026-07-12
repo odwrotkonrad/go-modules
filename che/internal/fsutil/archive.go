@@ -54,9 +54,6 @@ func (f FS) ArchiveDests(archivePath string, dests []string) error {
 	return nil
 }
 
-// archiveDest writes one dest's CONTENTS into tw, following symlinks (the
-// linked file's data, not the link). Missing dests, broken links and dirs are
-// skipped.
 func archiveDest(tw *tar.Writer, dest string) error {
 	fi, err := os.Stat(dest) // [why] follow links: back up contents, not the link
 	if err != nil {

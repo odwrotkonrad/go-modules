@@ -1,15 +1,13 @@
 # Repositories
 
-This is "tools" directory with dirs structure containing repositories:
+Repo index for "tools". Directory tree:
 
 ```
 configs
 render-files
 ```
 
-This structure maps 1:1 to gitlab group "tools"
-
-Beneath are descriptions and purpose of each repository:
+Maps 1:1 to gitlab group "tools". Each repo's purpose follows.
 
 ## Repo: ./configs
 

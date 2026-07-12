@@ -1,70 +1,47 @@
 package main
 
+// [>] 🤖🤖
+
 import (
-	"os"
-	"path/filepath"
+	"embed"
 	"testing"
 
+	"github.com/stretchr/testify/require"
+
+	"gitlab.com/konradodwrot/go-modules/che/internal/execx"
+	"gitlab.com/konradodwrot/go-modules/che/internal/testutil"
 	"gitlab.com/konradodwrot/go-modules/che/render/lib"
-	"gitlab.com/konradodwrot/go-modules/lib/yamlcfg"
+	"gitlab.com/konradodwrot/go-modules/lib/testyml"
 )
 
-// [>] 🤖🤖
-func TestGenerateGolden(t *testing.T) {
-	got, err := lib.Generate("testdata/Makefile")
-	if err != nil {
-		t.Fatalf("generate: %v", err)
-	}
-	wantBytes, err := os.ReadFile("testdata/expected.md")
-	if err != nil {
-		t.Fatalf("read golden: %v", err)
-	}
-	if got != string(wantBytes) {
-		t.Errorf("output mismatch:\n--- got ---\n%s\n--- want ---\n%s", got, wantBytes)
-	}
-}
+//go:embed all:testdata
+var td embed.FS
 
-func TestGenerateMissing(t *testing.T) {
-	if _, err := lib.Generate("testdata/nope.mk"); err == nil {
-		t.Fatal("expected error for missing makefile")
-	}
-}
-
-func TestCheck(t *testing.T) {
-	dir := t.TempDir()
-	mkSrc, _ := os.ReadFile("testdata/Makefile")
-	if err := os.WriteFile(filepath.Join(dir, "Makefile"), mkSrc, 0o644); err != nil {
-		t.Fatal(err)
-	}
-	doc, err := lib.Generate("testdata/Makefile")
-	if err != nil {
-		t.Fatal(err)
-	}
-	good := filepath.Join(dir, "good.md")
-	stale := filepath.Join(dir, "stale.md")
-	os.WriteFile(good, []byte(doc), 0o644)
-	os.WriteFile(stale, []byte("stale\n"), 0o644)
-
-	wd, _ := os.Getwd()
-	defer os.Chdir(wd)
-	os.Chdir(dir)
-
-	cases := map[string]struct {
-		path string
-		want int
-	}{
-		"match":  {good, 0},
-		"differ": {stale, 22},
-		"absent": {filepath.Join(dir, "absent.md"), 13},
-	}
-	for name, c := range cases {
-		t.Run(name, func(t *testing.T) {
-			_, err := tool.Run([]string{"--check", c.path})
-			if code := yamlcfg.Code(err); code != c.want {
-				t.Errorf("Run(--check %s) = %d, want %d", name, code, c.want)
-			}
+// TestRun drives generate and --check; the drift diff runs through the mock
+// executor, nothing spawns.
+func TestRun(t *testing.T) {
+	testyml.Run(t, td, "testdata/spec/cmds/render-makefile-doc.test.spec.yml", func(t *testing.T, c testyml.Case[struct{}]) {
+		execx.Swap(t, testutil.NewCmdMockExecutor())
+		doc, err := lib.Generate("testdata/Makefile")
+		require.NoError(t, err)
+		dir := testutil.Tree(t, map[string]string{
+			"Makefile": testyml.ReadFile(t, td, "testdata/Makefile"),
+			"good.md":  doc,
+			"stale.md": "stale\n",
 		})
-	}
+		t.Chdir(dir)
+		args := c.Context.CommandArgs()
+		for i, a := range args {
+			args[i] = testyml.Expand(a, map[string]string{"DIR": dir})
+		}
+		out, err := tool.Run(args)
+		if c.Expected.Check(t, err) {
+			return
+		}
+		if c.Expected.Files != "" {
+			testyml.EqualExpected(t, td, c.Expected.Files, out)
+		}
+	})
 }
 
 //[<] 🤖🤖

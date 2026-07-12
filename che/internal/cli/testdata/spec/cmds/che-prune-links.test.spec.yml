@@ -1,0 +1,18 @@
+# [>] 🤖
+context:
+  command: che prune-links
+  pwd: testdata/fixture/commands/common/sample-tree
+  mockedInterfaces:
+    execx.CmdExecutor: testutil.CmdMockExecutor
+    fsutil.FileSystemWriter: testutil.FileSystemMockWriter
+    fsutil.FileSystemReader: testutil.FileSystemMockReader
+    host.Sleep: testutil.SleepMock
+cases:
+  - name: ShouldScanRootAndRemoveNothingOnFreshTree
+    expected:
+      stdOut: |
+        prune-links: ${ROOT}
+    notExpected:
+      stdOut:
+        - 'rm: '
+# [<] 🤖

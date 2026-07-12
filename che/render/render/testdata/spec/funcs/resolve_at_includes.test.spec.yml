@@ -1,0 +1,13 @@
+# [>] 🤖🤖
+context:
+  function: render.resolveAtIncludes
+cases:
+  - name: ShouldInlineTildeIncludeLine
+    input:
+      args:
+        - files:
+            root/HOME/.config/agents/docs/comments.md: "INCLUDED\n"
+        - body: "before\n@~/.config/agents/docs/comments.md\nafter\n"
+    expected:
+      output: "before\nINCLUDED\nafter\n"
+# [<] 🤖🤖
