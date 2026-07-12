@@ -7,10 +7,10 @@ workflow:
 
 stages:
   - warm
-  - validate
+  - verify
   - test
-  - build
   - release
+  - publish
   - make-docs
 
 variables:
@@ -39,8 +39,29 @@ warm-go:
     - for m in lib che get-os-open-files-with get-term-open-files-with; do (cd $m && echo "## download $m" && go mod download all) || exit 1; done
     - for m in lib che; do (cd $m && echo "## build $m" && go build -v ./...) || exit 1; done
 
-validate-pre-commit-all:
-  stage: validate
+warm-go-mod-release:
+  stage: warm
+  image: $CI_IMAGE
+  rules:
+    - if: $CI_COMMIT_TAG =~ /^che\/v/
+      variables:
+        MODULE: che
+    - if: $CI_COMMIT_TAG =~ /^get-os-open-files-with\/v/
+      variables:
+        MODULE: get-os-open-files-with
+    - if: $CI_COMMIT_TAG =~ /^get-term-open-files-with\/v/
+      variables:
+        MODULE: get-term-open-files-with
+  cache:
+    - key: go-mod-$MODULE
+      paths:
+        - .cache/go-mod
+      policy: pull-push
+  script:
+    - (cd $MODULE && go mod download all)
+
+verify-precommit-all:
+  stage: verify
   image: $CI_IMAGE
   needs: [warm-go]
   rules:
@@ -122,45 +143,9 @@ test-lib:
     - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
       changes: [lib/**/*, go.work, .gitlab-ci.yml]
 
-.build-module:
-  stage: build
-  image: $CI_IMAGE
-  cache:
-    - key: go-mod
-      paths:
-        - .cache/go-mod
-      policy: pull
-    - key: go-build
-      paths:
-        - .cache/go-build
-      policy: pull-push
-  script:
-    - (cd $MODULE && go build -v ./...)
-
-build-get-os-open-files-with:
-  extends: .build-module
-  variables:
-    MODULE: get-os-open-files-with
-  rules:
-    - if: $CI_PIPELINE_SOURCE == "merge_request_event"
-      changes: [get-os-open-files-with/**/*, lib/**/*, .gitlab-ci.yml]
-    - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
-      changes: [get-os-open-files-with/**/*, lib/**/*, .gitlab-ci.yml]
-
-build-get-term-open-files-with:
-  extends: .build-module
-  variables:
-    MODULE: get-term-open-files-with
-  rules:
-    - if: $CI_PIPELINE_SOURCE == "merge_request_event"
-      changes: [get-term-open-files-with/**/*, lib/**/*, .gitlab-ci.yml]
-    - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
-      changes: [get-term-open-files-with/**/*, lib/**/*, .gitlab-ci.yml]
-
 .release-module:
   stage: release
   image: $CI_IMAGE
-  needs: []
   variables:
     GITLAB_TOKEN: $CI_JOB_TOKEN
     GIT_DEPTH: "0"
@@ -247,7 +232,6 @@ pages-preview:
 
 goreleaser-darwin-che:
   stage: release
-  needs: []
   tags:
     - saas-macos-medium-m1
   image: macos-26-xcode-26
@@ -260,7 +244,7 @@ goreleaser-darwin-che:
     GORELEASER_VERSION: 2.16.0
     GORELEASER_SHA256_DARWIN_ARM64: 8f6898256f35531165d90f2db581c5ee0d32bda83ebc25ac231ff5bdb9d2071a
   cache:
-    - key: go-mod
+    - key: go-mod-che
       paths:
         - .cache/go-mod
       policy: pull
@@ -290,14 +274,13 @@ goreleaser-darwin-che:
 goreleaser-linux-che:
   stage: release
   image: $CI_IMAGE
-  needs: []
   rules:
     - if: $CI_COMMIT_TAG =~ /^che\/v/
   parallel:
     matrix:
       - ARCH: [amd64, arm64]
   cache:
-    - key: go-mod
+    - key: go-mod-che
       paths:
         - .cache/go-mod
       policy: pull
@@ -316,7 +299,7 @@ goreleaser-linux-che:
     expire_in: 1 day
 
 publish-che:
-  stage: release
+  stage: publish
   image: $CI_IMAGE
   needs:
     - goreleaser-darwin-che
@@ -329,13 +312,12 @@ publish-che:
     - make publish
 
 publish-get-os-open-files-with:
-  stage: release
+  stage: publish
   image: $CI_IMAGE
-  needs: []
   rules:
     - if: $CI_COMMIT_TAG =~ /^get-os-open-files-with\/v/
   cache:
-    - key: go-mod
+    - key: go-mod-get-os-open-files-with
       paths:
         - .cache/go-mod
       policy: pull
@@ -347,13 +329,12 @@ publish-get-os-open-files-with:
     - make publish
 
 publish-get-term-open-files-with:
-  stage: release
+  stage: publish
   image: $CI_IMAGE
-  needs: []
   rules:
     - if: $CI_COMMIT_TAG =~ /^get-term-open-files-with\/v/
   cache:
-    - key: go-mod
+    - key: go-mod-get-term-open-files-with
       paths:
         - .cache/go-mod
       policy: pull
