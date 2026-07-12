@@ -36,13 +36,13 @@ func (gs *globSet) addRule(glob string, perms Perms, rule *destRule) {
 }
 
 // match returns the last globPerm matching rel, and whether any did.
-func (gs globSet) match(rel string) (gp globPerm, hit bool) {
-	for _, g := range gs {
+func (gs globSet) match(rel string) (globPerm, bool) {
+	for _, g := range slices.Backward(gs) {
 		if isGlobMatch(g.glob, rel) {
-			gp, hit = g, true
+			return g, true
 		}
 	}
-	return gp, hit
+	return globPerm{}, false
 }
 
 // isGlobMatch matches rel against an op glob, ignoring a trailing slash.
