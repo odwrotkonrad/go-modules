@@ -1,6 +1,6 @@
 # [>] 🤖🤖
 context:
-  function: plugin.Ensure
+  function: plugin.EnsureCheckout
 cases:
   - name: ShouldCloneIntoCacheDirAndLogClonedOnFirstEnsure
     input:

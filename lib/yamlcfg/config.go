@@ -28,7 +28,7 @@ type CodedError struct {
 
 func (e *CodedError) Error() string { return e.Msg }
 
-func Code(err error) int {
+func ExitCode(err error) int {
 	if err == nil {
 		return 0
 	}

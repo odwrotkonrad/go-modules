@@ -1,6 +1,6 @@
 # [>] 🤖🤖
 context:
-  function: build
+  function: cli.CheApp.buildUnits
   pwd: testdata/fixture/commands/common/sample-tree
 cases:
   - name: ShouldForceOneDefinedProfileWithProfileFlag

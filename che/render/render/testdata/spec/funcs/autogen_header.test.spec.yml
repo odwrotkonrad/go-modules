@@ -1,6 +1,6 @@
 # [>] 🤖🤖
 context:
-  function: render.header
+  function: render.autogenHeader
 cases:
   - name: ShouldUseHtmlCommentForMarkdown
     input:

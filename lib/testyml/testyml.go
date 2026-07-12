@@ -145,7 +145,7 @@ func (e Expected[W]) Check(t *testing.T, err error) bool {
 		}
 	}
 	if e.ExitCode != 0 {
-		assert.Equal(t, e.ExitCode, yamlcfg.Code(err), "exit code (%v)", err)
+		assert.Equal(t, e.ExitCode, yamlcfg.ExitCode(err), "exit code (%v)", err)
 	}
 	return true
 }

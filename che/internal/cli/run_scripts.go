@@ -14,7 +14,7 @@ import (
 // arg filter and a no-match check across all units.
 func (c *CheApp) runScriptsRunE(cmd *cobra.Command, args []string) error {
 	total := 0
-	err := c.forEachUnit(cmd.Name(), func(u unit) error {
+	err := c.forEachRepoUnit(cmd.Name(), func(u repoUnit) error {
 		n, err := runScripts(u, args)
 		total += n
 		return err
@@ -30,7 +30,7 @@ func (c *CheApp) runScriptsRunE(cmd *cobra.Command, args []string) error {
 
 // runScripts resolves and runs u's scripts filtered by names, returning how
 // many matched.
-func runScripts(u unit, names []string) (int, error) {
+func runScripts(u repoUnit, names []string) (int, error) {
 	scripts, err := u.host.ResolveScripts(u.res.Scripts)
 	if err != nil {
 		return 0, err

@@ -64,12 +64,12 @@ func tick(s string) string {
 	return "`" + s + "`"
 }
 
-// optionsTable renders a FlagSet as an Option|Env|Values|Default|Description
+// renderOptionsTable renders a FlagSet as an Option|Env|Values|Default|Description
 // table. Each flag's usage string may carry "; values: <...>",
 // "; default: <...>" and "; env: <...>" segments feeding those columns
 // (values default: the flag's value type; default default: the flag's
 // non-empty DefValue; flag wins over env).
-func optionsTable(fs *pflag.FlagSet) string {
+func renderOptionsTable(fs *pflag.FlagSet) string {
 	var b strings.Builder
 	b.WriteString("| Option | Env | Values | Default | Description |\n| --- | --- | --- | --- | --- |\n")
 	fs.VisitAll(func(f *pflag.Flag) {
@@ -100,7 +100,7 @@ func cliDoc(root *cobra.Command) string {
 	b.WriteString(root.Long)
 	b.WriteString("\n\n")
 	b.WriteString("## Global options\n\n")
-	b.WriteString(optionsTable(root.PersistentFlags()))
+	b.WriteString(renderOptionsTable(root.PersistentFlags()))
 	b.WriteString("\n## Commands\n")
 	walkCommands(root, &b)
 	return b.String()
@@ -150,7 +150,7 @@ func walkCommands(cmd *cobra.Command, b *strings.Builder) {
 			fmt.Fprintf(b, "\nUsage: `%s`\n", sub.UseLine())
 		}
 		if sub.NonInheritedFlags().HasAvailableFlags() {
-			fmt.Fprintf(b, "\n%s", optionsTable(sub.NonInheritedFlags()))
+			fmt.Fprintf(b, "\n%s", renderOptionsTable(sub.NonInheritedFlags()))
 		}
 		walkCommands(sub, b)
 	}

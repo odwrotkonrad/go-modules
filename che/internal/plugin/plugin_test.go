@@ -38,7 +38,7 @@ type ensureWant struct {
 // no-change pull stays silent (attempt lines are debug-gated). The git CLI
 // runs through the mock executor's go-git model: nothing spawns.
 func TestEnsure(t *testing.T) {
-	testyml.Run(t, td, "testdata/spec/funcs/ensure.test.spec.yml", func(t *testing.T, c testyml.Case[ensureWant]) {
+	testyml.Run(t, td, "testdata/spec/funcs/ensure_checkout.test.spec.yml", func(t *testing.T, c testyml.Case[ensureWant]) {
 		execx.Swap(t, testutil.NewCmdMockExecutor())
 		up := testutil.Repo(t, map[string]string{"che.yml": "p: {}\n"})
 		home := t.TempDir()
@@ -46,10 +46,10 @@ func TestEnsure(t *testing.T) {
 		a := c.Input.Args
 		for range a.Int(t, 0) {
 			_, err := testutil.CaptureStdout(t, func() error {
-				_, e := Ensure(home, url, "p")
+				_, e := EnsureCheckout(home, url, "p")
 				return e
 			})
-			require.NoError(t, err, "prior Ensure")
+			require.NoError(t, err, "prior EnsureCheckout")
 		}
 		if a.Bool(t, 1) {
 			testutil.WriteTree(t, up, map[string]string{"extra.txt": "x\n"})
@@ -58,7 +58,7 @@ func TestEnsure(t *testing.T) {
 		var dir string
 		out, err := testutil.CaptureStdout(t, func() error {
 			var e error
-			dir, e = Ensure(home, url, "p")
+			dir, e = EnsureCheckout(home, url, "p")
 			return e
 		})
 		require.NoError(t, err)

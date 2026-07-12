@@ -1,6 +1,6 @@
 # [>] 🤖🤖
 context:
-  function: withEnv
+  function: cli.repoUnit.runWithEnv
 cases:
   - name: ShouldShadowSetAndRestoreEnv
     context:

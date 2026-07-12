@@ -84,8 +84,8 @@ type flagDef struct {
 	Usage string `yaml:"usage"`
 }
 
-func TestOptionsTable(t *testing.T) {
-	testyml.Run(t, td, "testdata/spec/funcs/options_table.test.spec.yml", func(t *testing.T, c testyml.Case[[]string]) {
+func TestRenderOptionsTable(t *testing.T) {
+	testyml.Run(t, td, "testdata/spec/funcs/render_options_table.test.spec.yml", func(t *testing.T, c testyml.Case[[]string]) {
 		var defs []flagDef
 		c.Input.Args.To(t, 0, &defs)
 		fs := pflag.NewFlagSet("t", pflag.ContinueOnError)
@@ -99,9 +99,9 @@ func TestOptionsTable(t *testing.T) {
 				t.Fatalf("unknown flag type %q", d.Type)
 			}
 		}
-		got := optionsTable(fs)
+		got := renderOptionsTable(fs)
 		for _, w := range c.Expected.Output {
-			assert.Contains(t, got, w+"\n", "optionsTable row")
+			assert.Contains(t, got, w+"\n", "renderOptionsTable row")
 		}
 	})
 }

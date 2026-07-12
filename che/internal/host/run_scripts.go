@@ -56,14 +56,14 @@ func (h Host) scriptsEnv() []string {
 	bootstrap := filepath.Join(scripts, "bootstrap")
 
 	env := os.Environ()
-	env = prepend(env, "FPATH", fns)
-	env = prepend(env, "PATH", fns+":"+scripts+":"+installs+":"+bootstrap)
+	env = prependEnvVar(env, "FPATH", fns)
+	env = prependEnvVar(env, "PATH", fns+":"+scripts+":"+installs+":"+bootstrap)
 	env = append(env, "CONFIGS_PROFILE="+h.Profile)
 	return env
 }
 
-// prepend sets key=value:<existing> in env copy.
-func prepend(env []string, key, value string) []string {
+// prependEnvVar sets key=value:<existing> in env copy.
+func prependEnvVar(env []string, key, value string) []string {
 	prefix := key + "="
 	out := make([]string, 0, len(env)+1)
 	found := false

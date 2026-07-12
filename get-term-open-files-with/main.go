@@ -41,7 +41,7 @@ func run(args []string, customDir, url string) (string, error) {
 	if err != nil {
 		return "", err
 	}
-	return lib.Render(terminal, sections, byType), nil
+	return lib.RenderSuffixAliases(terminal, sections, byType), nil
 }
 
 func main() {

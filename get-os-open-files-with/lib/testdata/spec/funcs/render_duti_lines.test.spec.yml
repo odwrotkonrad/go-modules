@@ -1,6 +1,6 @@
 # [>] 🤖🤖
 context:
-  function: lib.Render
+  function: lib.RenderDutiLines
 cases:
   - name: ShouldRenderEmptyForNilNode
     input:

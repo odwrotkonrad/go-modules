@@ -13,7 +13,7 @@ import (
 
 // allCmd runs every step op in load order, each gated on whether the resolved
 // selection defines anything for it. A failing step does not stop the rest:
-// step errors collect and join, matching forEachUnit semantics.
+// step errors collect and join, matching forEachRepoUnit semantics.
 func (c *CheApp) allCmd() *cobra.Command {
 	return &cobra.Command{
 		Use:   "all",
@@ -22,7 +22,7 @@ func (c *CheApp) allCmd() *cobra.Command {
 			var fails []error
 			for _, s := range steps() {
 				name := s.displayName()
-				// [why] plugin selections build lazily inside forEachUnit;
+				// [why] plugin selections build lazily inside forEachRepoUnit;
 				// skipping on the local selection alone would silently drop
 				// plugin content.
 				if len(c.pluginRefs) == 0 && !s.selected(c.units[0].res) {
@@ -30,7 +30,7 @@ func (c *CheApp) allCmd() *cobra.Command {
 					continue
 				}
 				log.Msg("all(run)", name, log.Off)
-				if err := c.forEachUnit(s.name, func(u unit) error { return s.op(c, u) }); err != nil {
+				if err := c.forEachRepoUnit(s.name, func(u repoUnit) error { return s.op(c, u) }); err != nil {
 					fails = append(fails, fmt.Errorf("%s: %w", name, err))
 				}
 			}

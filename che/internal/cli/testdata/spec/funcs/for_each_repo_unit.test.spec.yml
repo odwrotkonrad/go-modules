@@ -1,6 +1,6 @@
 # [>] 🤖🤖
 context:
-  function: forEachUnit
+  function: cli.CheApp.forEachRepoUnit
   mockedInterfaces:
     execx.CmdExecutor: testutil.CmdMockExecutor
 cases:

@@ -19,10 +19,10 @@ func TestToDest(t *testing.T) {
 	})
 }
 
-func TestPrepend(t *testing.T) {
-	testyml.Eq(t, td, "testdata/spec/funcs/prepend.test.spec.yml", func(t *testing.T, c testyml.Case[[]string]) ([]string, error) {
+func TestPrependEnvVar(t *testing.T) {
+	testyml.Eq(t, td, "testdata/spec/funcs/prepend_env_var.test.spec.yml", func(t *testing.T, c testyml.Case[[]string]) ([]string, error) {
 		a := c.Input.Args
-		return prepend(a.Strings(t, 0), a.String(t, 1), a.String(t, 2)), nil
+		return prependEnvVar(a.Strings(t, 0), a.String(t, 1), a.String(t, 2)), nil
 	})
 }
 

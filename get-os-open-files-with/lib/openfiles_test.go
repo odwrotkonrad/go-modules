@@ -16,7 +16,7 @@ import (
 var td embed.FS
 
 func TestRenderDocumentNode(t *testing.T) {
-	testyml.Eq(t, td, "testdata/spec/funcs/render_document_node.test.spec.yml", func(t *testing.T, c testyml.Case[string]) (string, error) {
+	testyml.Eq(t, td, "testdata/spec/funcs/render_duti_lines.test.spec.yml", func(t *testing.T, c testyml.Case[string]) (string, error) {
 		var node *yaml.Node
 		switch raw := c.Input.Args.String(t, 0); raw {
 		case "nil":
@@ -26,7 +26,7 @@ func TestRenderDocumentNode(t *testing.T) {
 			node = &yaml.Node{}
 			require.NoError(t, yaml.Unmarshal([]byte(raw), node))
 		}
-		return Render(node)
+		return RenderDutiLines(node)
 	})
 }
 

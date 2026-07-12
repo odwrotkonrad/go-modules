@@ -1,6 +1,6 @@
 # [>] 🤖🤖
 context:
-  function: main.optionsTable
+  function: docgen.renderOptionsTable
 cases:
   - name: ShouldRenderRowsForFlagShapes
     input:

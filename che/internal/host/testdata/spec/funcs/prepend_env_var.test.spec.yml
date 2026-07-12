@@ -1,6 +1,6 @@
 # [>] 🤖🤖
 context:
-  function: host.prepend
+  function: host.prependEnvVar
 cases:
   - name: ShouldPrependWithColonWhenKeyPresent
     input:

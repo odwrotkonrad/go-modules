@@ -19,9 +19,9 @@ import (
 //go:embed all:testdata/spec all:testdata/fixture
 var td embed.FS
 
-func TestHeader(t *testing.T) {
-	testyml.Eq(t, td, "testdata/spec/funcs/header.test.spec.yml", func(t *testing.T, c testyml.Case[string]) (string, error) {
-		return header(c.Input.Args.String(t, 0), "tmpl"), nil
+func TestAutogenHeader(t *testing.T) {
+	testyml.Eq(t, td, "testdata/spec/funcs/autogen_header.test.spec.yml", func(t *testing.T, c testyml.Case[string]) (string, error) {
+		return autogenHeader(c.Input.Args.String(t, 0), "tmpl"), nil
 	})
 }
 

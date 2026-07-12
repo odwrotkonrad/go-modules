@@ -47,7 +47,7 @@ func Exit(out string, err error) {
 	} else {
 		fmt.Println(out)
 	}
-	os.Exit(yamlcfg.Code(err))
+	os.Exit(yamlcfg.ExitCode(err))
 }
 
 //[<] 🤖🤖

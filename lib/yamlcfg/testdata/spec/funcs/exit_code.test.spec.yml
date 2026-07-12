@@ -1,6 +1,6 @@
 # [>] 🤖🤖
 context:
-  function: yamlcfg.Code
+  function: yamlcfg.ExitCode
 cases:
   - name: ShouldReturnZeroForNilError
     input:

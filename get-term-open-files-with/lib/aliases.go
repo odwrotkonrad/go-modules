@@ -31,7 +31,7 @@ func appendAliases(order []string, aliases map[string]string, rules []OpenerRule
 	return order
 }
 
-func Render(terminal string, sections Sections, byType map[string][]string) string {
+func RenderSuffixAliases(terminal string, sections Sections, byType map[string][]string) string {
 	var order []string
 	aliases := map[string]string{}
 	order = appendAliases(order, aliases, sections["any"], byType)

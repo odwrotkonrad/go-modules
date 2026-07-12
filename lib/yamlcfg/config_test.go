@@ -44,8 +44,8 @@ func writeCfg(t *testing.T, dir, fixture string) {
 	require.NoError(t, os.WriteFile(filepath.Join(dir, "cfg.yml"), []byte(body), 0o644))
 }
 
-func TestCode(t *testing.T) {
-	testyml.Eq(t, td, "testdata/spec/funcs/code.test.spec.yml", func(t *testing.T, c testyml.Case[int]) (int, error) {
+func TestExitCode(t *testing.T) {
+	testyml.Eq(t, td, "testdata/spec/funcs/exit_code.test.spec.yml", func(t *testing.T, c testyml.Case[int]) (int, error) {
 		var err error
 		switch c.Input.Args.Name(0) {
 		case "code":
@@ -53,7 +53,7 @@ func TestCode(t *testing.T) {
 		case "plain":
 			err = errors.New(c.Input.Args.String(t, 0))
 		}
-		return yamlcfg.Code(err), nil
+		return yamlcfg.ExitCode(err), nil
 	})
 }
 
