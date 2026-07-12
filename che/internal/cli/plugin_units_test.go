@@ -13,7 +13,7 @@ import (
 	"gitlab.com/konradodwrot/go-modules/che/internal/testutil"
 )
 
-func TestBuildPluginValidateSchema(t *testing.T) {
+func TestBuildPluginValidateSpec(t *testing.T) {
 	if os.Geteuid() == 0 {
 		t.Skip("non-root path only; build resolves home from $HOME")
 	}
@@ -32,7 +32,7 @@ func TestBuildPluginValidateSchema(t *testing.T) {
 	t.Setenv("CHE_SKIP_PLUGINS", "")
 	t.Setenv("CHE_DEBUG", "")
 
-	t.Setenv("CHE_VALIDATE_SCHEMA", "")
+	t.Setenv("CHE_VALIDATE_SPEC", "")
 	a := New()
 	if err := a.build(); err != nil {
 		t.Fatalf("build() errored: %v", err)
@@ -45,7 +45,7 @@ func TestBuildPluginValidateSchema(t *testing.T) {
 	}
 	testutil.WantLines(t, out, "validate(che.yml)", "includes")
 
-	t.Setenv("CHE_VALIDATE_SCHEMA", "error")
+	t.Setenv("CHE_VALIDATE_SPEC", "error")
 	a = New()
 	if err := a.build(); err != nil {
 		t.Fatalf("build() errored (local che.yml is valid): %v", err)

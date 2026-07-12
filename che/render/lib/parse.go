@@ -99,9 +99,9 @@ func parse(src []byte) ([]section, error) {
 					emit(stack[len(stack)-1])
 					stack = stack[:len(stack)-1]
 				}
-			} else if what, ok := whatComment(text); ok {
+			} else if what, ok := tagComment(text, "what"); ok {
 				pending = pendingCmt{what: what, vals: prev.vals}
-			} else if vals, ok := valsComment(text); ok {
+			} else if vals, ok := tagComment(text, "vals"); ok {
 				pending = pendingCmt{what: prev.what, vals: vals}
 			}
 		case "rule":

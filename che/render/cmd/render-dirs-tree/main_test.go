@@ -8,6 +8,7 @@ import (
 	git "github.com/go-git/go-git/v5"
 
 	"gitlab.com/konradodwrot/go-modules/che/render/render"
+	"gitlab.com/konradodwrot/go-modules/lib/yamlcfg"
 )
 
 // [>] 🤖🤖
@@ -62,7 +63,8 @@ func TestRunCheck(t *testing.T) {
 	}
 	for name, c := range cases {
 		t.Run(name, func(t *testing.T) {
-			if code := tool.Run([]string{"--check", c.path}); code != c.want {
+			_, err := tool.Run([]string{"--check", c.path})
+			if code := yamlcfg.Code(err); code != c.want {
 				t.Errorf("Run(--check %s) = %d, want %d", name, code, c.want)
 			}
 		})

@@ -14,7 +14,7 @@ loads the union of files/dirs/installs/services those profiles select.
 | `--profile` | `CHE_PROFILE` | `string` |  | run only this profile (autoExec skipped, execIf still enforced) |
 | `--skip-exec-if` | `CHE_SKIP_EXEC_IF` | `bool` | `false` | treat every execIf predicate as passing |
 | `--skip-plugins` | `CHE_SKIP_PLUGINS` | `bool` | `false` | skip plugins entries, load only the local repo |
-| `--validate-schema` | `CHE_VALIDATE_SCHEMA` | `warn (log violations)` \| `error (abort on violations)` | `warn` | validate each loaded che.yml against its JSON Schema |
+| `--validate-spec` | `CHE_VALIDATE_SPEC` | `warn (log violations)` \| `error (abort on violations)` | `warn` | validate each loaded che.yml spec against the JSON Schema |
 
 ## Commands
 

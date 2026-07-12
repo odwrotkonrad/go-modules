@@ -100,9 +100,9 @@ func (h Host) mutate(title, msg string, fn func() error) error {
 // logMode maps a config.DryRunMode to the log-layer dry-run mode (subtype rendering).
 func logMode(m config.DryRunMode) log.DryRun {
 	switch m {
-	case config.DryRunDelta:
+	case config.DryRun.Delta:
 		return log.Delta
-	case config.DryRunAll:
+	case config.DryRun.All:
 		return log.All
 	default:
 		return log.Off
@@ -110,12 +110,7 @@ func logMode(m config.DryRunMode) log.DryRun {
 }
 
 // IsDryRun reports whether this is any dry run (delta or all).
-func (h Host) IsDryRun() bool { return !h.cfg.IsOptionEqualTo(config.OptionDryRun, config.DryRunOff) }
-
-// IsOptionEqualTo reports whether opt's resolved runtime option equals val.
-func (h Host) IsOptionEqualTo(opt config.Option, val any) bool {
-	return h.cfg.IsOptionEqualTo(opt, val)
-}
+func (h Host) IsDryRun() bool { return h.cfg.DryRun != config.DryRun.Off }
 
 // Src maps a repo-relative path (under root/) to its absolute source path.
 func (h Host) Src(rel string) string { return filepath.Join(h.Root, rel) }

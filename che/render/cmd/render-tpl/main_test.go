@@ -7,6 +7,7 @@ import (
 	"testing"
 
 	"gitlab.com/konradodwrot/go-modules/lib/testyml"
+	"gitlab.com/konradodwrot/go-modules/lib/yamlcfg"
 )
 
 //go:embed all:testdata
@@ -36,7 +37,8 @@ func TestRun(t *testing.T) {
 		for i, a := range c.In.Args {
 			args[i] = testyml.Expand(a, map[string]string{"DIR": dir})
 		}
-		c.Want.CheckCode(t, run(args))
+		_, err := tool.Run(args)
+		c.Want.CheckCode(t, yamlcfg.Code(err))
 	})
 }
 

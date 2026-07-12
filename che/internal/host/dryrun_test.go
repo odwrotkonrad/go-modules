@@ -98,16 +98,16 @@ func TestDryRunAllReportsSettledDests(t *testing.T) {
 				t.Fatal(err)
 			}
 
-			dest := c.settle(t, New(dir, home, testutil.CheProfile, config.Config{DryRun: config.DryRunDelta}), res)
+			dest := c.settle(t, New(dir, home, testutil.CheProfile, config.Config{DryRun: config.DryRun.Delta}), res)
 
-			delta := New(dir, home, testutil.CheProfile, config.Config{DryRun: config.DryRunDelta})
+			delta := New(dir, home, testutil.CheProfile, config.Config{DryRun: config.DryRun.Delta})
 			deltaOut, err := testutil.CaptureStdout(t, func() error { return c.run(delta, res) })
 			if err != nil {
 				t.Fatal(err)
 			}
 			testutil.NotLine(t, deltaOut, dest)
 
-			all := New(dir, home, testutil.CheProfile, config.Config{DryRun: config.DryRunAll})
+			all := New(dir, home, testutil.CheProfile, config.Config{DryRun: config.DryRun.All})
 			allOut, err := testutil.CaptureStdout(t, func() error { return c.run(all, res) })
 			if err != nil {
 				t.Fatal(err)
@@ -121,7 +121,7 @@ func TestDryRunAllReportsSettledDests(t *testing.T) {
 func TestDryRunMutatesNothing(t *testing.T) {
 	for name, run := range ops {
 		t.Run(name, func(t *testing.T) {
-			h, res, dir := setupHost(t, config.Config{DryRun: config.DryRunDelta})
+			h, res, dir := setupHost(t, config.Config{DryRun: config.DryRun.Delta})
 			before := snapshotTree(t, dir)
 
 			out, err := testutil.CaptureStdout(t, func() error { return run(h, res) })
@@ -149,7 +149,7 @@ func TestDryRunLineFormat(t *testing.T) {
 	}
 	for op, frag := range cases {
 		t.Run(op, func(t *testing.T) {
-			h, res, _ := setupHost(t, config.Config{DryRun: config.DryRunDelta})
+			h, res, _ := setupHost(t, config.Config{DryRun: config.DryRun.Delta})
 			out, err := testutil.CaptureStdout(t, func() error { return ops[op](h, res) })
 			if err != nil {
 				t.Fatal(err)

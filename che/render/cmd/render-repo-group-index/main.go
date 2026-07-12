@@ -4,8 +4,6 @@ package main
 // [>] 🤖🤖
 
 import (
-	"os"
-
 	"gitlab.com/konradodwrot/go-modules/che/render/checkcmd"
 	"gitlab.com/konradodwrot/go-modules/che/render/render"
 )
@@ -35,8 +33,6 @@ var tool = checkcmd.Tool{
 	Generate: render.RepoGroupIndexDir,
 }
 
-func main() {
-	os.Exit(tool.Run(os.Args[1:]))
-}
+func main() { tool.Main() }
 
 //[<] 🤖🤖

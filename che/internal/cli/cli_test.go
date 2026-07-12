@@ -116,7 +116,7 @@ func TestBuildProfileFlag(t *testing.T) {
 	}
 }
 
-func TestBuildValidateSchema(t *testing.T) {
+func TestBuildValidateSpec(t *testing.T) {
 	a, _, _ := repoEnv(t, cheRepoPwd)
 	specPath := filepath.Join(a.dirFlag, "che.yml")
 	f, err := os.OpenFile(specPath, os.O_APPEND|os.O_WRONLY, 0o644)
@@ -130,29 +130,29 @@ func TestBuildValidateSchema(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	t.Setenv("CHE_VALIDATE_SCHEMA", "")
+	t.Setenv("CHE_VALIDATE_SPEC", "")
 	if err := a.build(); err != nil {
 		t.Fatalf("build() in warn mode errored: %v", err)
 	}
 
-	a.validateSchemaMode = "error"
+	a.validateSpecMode = "error"
 	err = a.build()
 	if err == nil {
-		t.Fatal("build() with --validate-schema error should fail on the violation")
+		t.Fatal("build() with --validate-spec error should fail on the violation")
 	}
 	if !strings.Contains(err.Error(), "includes") {
 		t.Errorf("error does not name the violating key: %v", err)
 	}
 
-	a.validateSchemaMode = ""
-	t.Setenv("CHE_VALIDATE_SCHEMA", "error")
+	a.validateSpecMode = ""
+	t.Setenv("CHE_VALIDATE_SPEC", "error")
 	if err := a.build(); err == nil {
-		t.Fatal("build() with CHE_VALIDATE_SCHEMA=error should fail on the violation")
+		t.Fatal("build() with CHE_VALIDATE_SPEC=error should fail on the violation")
 	}
 
-	a.validateSchemaMode = "bogus"
+	a.validateSpecMode = "bogus"
 	if err := a.build(); err == nil {
-		t.Fatal("build() with an unknown --validate-schema mode should error")
+		t.Fatal("build() with an unknown --validate-spec mode should error")
 	}
 }
 
@@ -163,8 +163,8 @@ func TestBuildDryRunEnvFallback(t *testing.T) {
 	if err := a.build(); err != nil {
 		t.Fatalf("build() errored: %v", err)
 	}
-	if !a.units[0].host.IsOptionEqualTo(config.OptionDryRun, config.DryRunAll) {
-		t.Fatal("DryRunAll() = false, want true (CHE_DRY_RUN=all from env)")
+	if !a.units[0].host.IsDryRun() {
+		t.Fatal("IsDryRun() = false, want true (CHE_DRY_RUN=all from env)")
 	}
 }
 

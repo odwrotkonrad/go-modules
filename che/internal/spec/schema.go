@@ -57,6 +57,14 @@ func obj(desc string, required []string) *jsonschema.Schema {
 	}
 }
 
+// scalarOr wraps o into the union with its scalar-string shorthand form.
+func scalarOr(scalarDesc, pattern string, o *jsonschema.Schema) *jsonschema.Schema {
+	return &jsonschema.Schema{OneOf: []*jsonschema.Schema{
+		{Description: scalarDesc, Type: "string", Pattern: pattern},
+		o,
+	}}
+}
+
 const destPathDesc = "dest path: relative -> repo, ~/ or absolute -> host"
 
 func (linkEntry) JSONSchema() *jsonschema.Schema {
@@ -70,10 +78,7 @@ func (linkEntry) JSONSchema() *jsonschema.Schema {
 		Type:        "string",
 		Pattern:     "^s/.+/.*/g?$",
 	})
-	return &jsonschema.Schema{OneOf: []*jsonschema.Schema{
-		{Description: "glob over git-tracked files under root/ (brace-expanded), dest derived 1:1", Type: "string"},
-		o,
-	}}
+	return scalarOr("glob over git-tracked files under root/ (brace-expanded), dest derived 1:1", "", o)
 }
 
 func (fileSpec) JSONSchema() *jsonschema.Schema {
@@ -92,10 +97,7 @@ func (fileSpec) JSONSchema() *jsonschema.Schema {
 		Type:                 "object",
 		AdditionalProperties: &jsonschema.Schema{Type: "string"},
 	})
-	return &jsonschema.Schema{OneOf: []*jsonschema.Schema{
-		{Description: "glob over git-tracked files (brace-expanded)", Type: "string"},
-		o,
-	}}
+	return scalarOr("glob over git-tracked files (brace-expanded)", "", o)
 }
 
 func (dirSpec) JSONSchema() *jsonschema.Schema {
@@ -105,20 +107,14 @@ func (dirSpec) JSONSchema() *jsonschema.Schema {
 		Type:        "array",
 		Items:       &jsonschema.Schema{Ref: "#/$defs/DestSpec"},
 	})
-	return &jsonschema.Schema{OneOf: []*jsonschema.Schema{
-		{Description: "dir path (brace-expanded)", Type: "string"},
-		o,
-	}}
+	return scalarOr("dir path (brace-expanded)", "", o)
 }
 
 func (DestSpec) JSONSchema() *jsonschema.Schema {
 	o := obj("", []string{"path"})
 	o.Properties.Set("path", &jsonschema.Schema{Description: destPathDesc, Type: "string"})
 	o.Properties.Set("options", render.Options{}.JSONSchema())
-	return &jsonschema.Schema{OneOf: []*jsonschema.Schema{
-		{Description: destPathDesc, Type: "string"},
-		o,
-	}}
+	return scalarOr(destPathDesc, "", o)
 }
 
 func (pluginEntry) JSONSchema() *jsonschema.Schema {
@@ -134,10 +130,7 @@ func (pluginEntry) JSONSchema() *jsonschema.Schema {
 		Type:                 "object",
 		AdditionalProperties: &jsonschema.Schema{Type: "string"},
 	})
-	return &jsonschema.Schema{OneOf: []*jsonschema.Schema{
-		{Description: refDesc, Type: "string", Pattern: "^.+::.+$"},
-		o,
-	}}
+	return scalarOr(refDesc, "^.+::.+$", o)
 }
 
 // [<] 🤖🤖

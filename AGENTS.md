@@ -248,8 +248,6 @@ che
                 templates
         spec
     config
-      testdata
-        spec
     docgen
     execx
     fsutil

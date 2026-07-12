@@ -55,8 +55,16 @@
   in:
     args: [root/**/*.md, root/a/b.txt]
   want: false
-- name: isGlobMatchShouldMatchDoublestarWithEmptyTail
+- name: isGlobMatchShouldMatchNestedPathThroughMultiSegmentTail
+  in:
+    args: [root/**/foo/*.md, root/a/b/foo/x.md]
+  want: true
+- name: isGlobMatchShouldTreatNonSegmentDoublestarAsStar
+  in:
+    args: [root**, rootabc]
+  want: true
+- name: isGlobMatchShouldRejectSeparatorForNonSegmentDoublestar
   in:
     args: [root**, rootabc/x]
-  want: true
+  want: false
 # [<] 🤖🤖
