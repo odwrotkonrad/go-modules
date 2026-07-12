@@ -6,7 +6,7 @@ GO ?= go
 GOCOVER_COBERTURA ?= github.com/t-yuki/gocover-cobertura@v0.0.0-20180217150009-aaee18c8195c
 
 WRAPPERS :=
-COMMANDS := test test-cover build vet install release-check release-snapshot
+COMMANDS := test test-cover build vet lint install release-check release-snapshot
 
 .PHONY: $(WRAPPERS) $(COMMANDS)
 
@@ -25,6 +25,10 @@ test-cover:
 #[what] compile all packages (library, no binaries)
 build:
 	$(GO) build -v ./...
+
+#[what] golangci-lint all packages
+lint:
+	golangci-lint run
 
 #[what] go vet all packages
 vet:

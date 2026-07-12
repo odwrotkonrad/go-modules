@@ -4,15 +4,15 @@ extends:
 
 pre-commit:
   jobs:
-    - name: gofmt
+    - name: golangci-fmt
       glob: "*.go"
-      run: gofmt -l -w {staged_files} && git add {staged_files}
+      run: golangci-lint fmt {staged_files} && git add {staged_files}
     - name: gomodtidy
       glob: "{go.mod,go.sum,*.go}"
       run: for m in che get-os-open-files-with get-term-open-files-with lib; do (cd $m && go mod tidy -diff) || exit 1; done
-    - name: govet
+    - name: golangci-lint
       glob: "*.go"
-      run: make vet
+      run: make lint
     - name: docsgen
       run: make render-docs render-templates && git add che/assets/data/che.schema.json che/assets/data/cli-usage.md che/docs/cli.md assets/data/makefile.agents.md assets/data/repo-structure.md CLAUDE.md AGENTS.md README.md
 ##[<] 🤖

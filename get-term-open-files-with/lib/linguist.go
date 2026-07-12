@@ -50,10 +50,10 @@ func fetchLanguages(url string) ([]byte, error) {
 	if err != nil {
 		return nil, netErr(url)
 	}
-	if err := os.MkdirAll(CacheDir(), 0755); err != nil {
+	if err := os.MkdirAll(CacheDir(), 0o755); err != nil {
 		return nil, netErr(url)
 	}
-	if err := os.WriteFile(cached, body, 0644); err != nil {
+	if err := os.WriteFile(cached, body, 0o644); err != nil {
 		return nil, netErr(url)
 	}
 	return body, nil

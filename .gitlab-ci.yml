@@ -45,6 +45,8 @@ validate-pre-commit-all:
   needs: [warm-go]
   rules:
     - if: $CI_PIPELINE_SOURCE == "merge_request_event"
+  variables:
+    LEFTHOOK_OUTPUT: meta,summary,execution,execution_info,execution_out
   cache:
     - key: go-mod
       paths:

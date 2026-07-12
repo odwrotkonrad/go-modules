@@ -8,7 +8,7 @@ CC ?= clang
 BIN := che
 
 WRAPPERS :=
-COMMANDS := render-docs test test-cover build vet install release-check release-darwin release-snapshot
+COMMANDS := render-docs test test-cover build vet lint install release-check release-darwin release-snapshot
 
 .PHONY: $(WRAPPERS) $(COMMANDS)
 
@@ -33,6 +33,10 @@ test-cover:
 #[what] build the binary into ./dist via go build
 build:
 	CC=$(CC) $(GO) build -v -o dist/$(BIN) .
+
+#[what] golangci-lint all packages
+lint:
+	CC=$(CC) golangci-lint run
 
 #[what] go vet all packages
 vet:

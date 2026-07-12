@@ -7,7 +7,7 @@ GOCOVER_COBERTURA ?= github.com/t-yuki/gocover-cobertura@v0.0.0-20180217150009-a
 BIN := get-term-open-files-with
 
 WRAPPERS :=
-COMMANDS := test test-cover build vet install release-check release-snapshot
+COMMANDS := test test-cover build vet lint install release-check release-snapshot
 
 .PHONY: $(WRAPPERS) $(COMMANDS)
 
@@ -26,6 +26,10 @@ test-cover:
 #[what] build the binary into ./dist
 build:
 	$(GO) build -v -o dist/$(BIN) .
+
+#[what] golangci-lint all packages
+lint:
+	golangci-lint run
 
 #[what] go vet all packages
 vet:

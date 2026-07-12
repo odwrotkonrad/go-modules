@@ -26,7 +26,7 @@ func languagesFixture(t *testing.T) []byte {
 func seedCache(t *testing.T) {
 	t.Helper()
 	cache := t.TempDir()
-	if err := os.WriteFile(filepath.Join(cache, "languages.yml"), languagesFixture(t), 0644); err != nil {
+	if err := os.WriteFile(filepath.Join(cache, "languages.yml"), languagesFixture(t), 0o644); err != nil {
 		t.Fatal(err)
 	}
 	t.Setenv("LINGUIST_CACHE_DIR", cache)
@@ -37,7 +37,7 @@ func configDir(t *testing.T, raw []byte) string {
 	yamlcfg.SystemDir = filepath.Join(t.TempDir(), "no-system")
 	dir := t.TempDir()
 	if raw != nil {
-		if err := os.WriteFile(filepath.Join(dir, configName), raw, 0644); err != nil {
+		if err := os.WriteFile(filepath.Join(dir, configName), raw, 0o644); err != nil {
 			t.Fatal(err)
 		}
 	}

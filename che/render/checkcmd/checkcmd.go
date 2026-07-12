@@ -71,8 +71,8 @@ func diff(want, got, wantLabel, gotLabel string) string {
 	gf, _ := os.CreateTemp("", "check-got-*")
 	defer os.Remove(wf.Name())
 	defer os.Remove(gf.Name())
-	wf.WriteString(want)
-	gf.WriteString(got)
+	_, _ = wf.WriteString(want)
+	_, _ = gf.WriteString(got)
 	wf.Close()
 	gf.Close()
 	out, _ := execx.Default.Output(execx.Cmd{Argv: []string{

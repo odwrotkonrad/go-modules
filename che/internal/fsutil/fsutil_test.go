@@ -49,7 +49,7 @@ func TestModeArg(t *testing.T) {
 func TestIsDir(t *testing.T) {
 	dir := t.TempDir()
 	file := filepath.Join(dir, "f")
-	if err := os.WriteFile(file, []byte("x"), 0644); err != nil {
+	if err := os.WriteFile(file, []byte("x"), 0o644); err != nil {
 		t.Fatal(err)
 	}
 	if !IsDir(dir) {

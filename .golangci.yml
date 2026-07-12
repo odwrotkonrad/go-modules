@@ -1,0 +1,47 @@
+##[>] 🤖🤖
+version: "2"
+linters:
+  default: none
+  enable:
+    - copyloopvar
+    - errcheck
+    - errorlint
+    - gocritic
+    - govet
+    - ineffassign
+    - intrange
+    - misspell
+    - nolintlint
+    - staticcheck
+    - unconvert
+    - unparam
+    - unused
+  settings:
+    errcheck:
+      exclude-functions:
+        - (*os.File).Close
+        - (*archive/tar.Writer).Close
+        - (*github.com/dsnet/compress/bzip2.Writer).Close
+        - (io.ReadCloser).Close
+        - os.Remove
+        - os.Setenv
+        - os.Unsetenv
+    gocritic:
+      disabled-checks:
+        - commentFormatting
+  exclusions:
+    rules:
+      - path: _test\.go
+        linters:
+          - errcheck
+formatters:
+  enable:
+    - gofumpt
+    - gci
+  settings:
+    gci:
+      sections:
+        - standard
+        - default
+        - prefix(gitlab.com/konradodwrot)
+##[<] 🤖🤖

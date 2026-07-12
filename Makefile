@@ -5,7 +5,7 @@ SHELL := zsh
 MODULES := che get-os-open-files-with get-term-open-files-with lib
 
 WRAPPERS :=
-COMMANDS := render-templates render-docs run-repo-ci-prepare-hooks run-repo-ci-precommit-all test test-cover build vet install create-tag publish release-check release-snapshot
+COMMANDS := render-templates render-docs run-repo-ci-prepare-hooks run-repo-ci-precommit-all test test-cover build vet lint install create-tag publish release-check release-snapshot
 
 .PHONY: $(WRAPPERS) $(COMMANDS)
 
@@ -46,6 +46,10 @@ build:
 #[what] go vet every module
 vet:
 	@for m in $(MODULES); do $(MAKE) -C $$m vet || exit 1; done
+
+#[what] golangci-lint every module
+lint:
+	@for m in $(MODULES); do $(MAKE) -C $$m lint || exit 1; done
 
 #[what] install every module's binaries into $GOPATH/bin
 install:
