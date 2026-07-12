@@ -142,11 +142,13 @@ type Perms struct {
 	Chmod      string `yaml:"chmod" jsonschema:"pattern=^[0-7]{3\\,4}$" jsonschema_description:"dest mode, octal string"`
 }
 
-// entry is a copy/template perm-group: optional perms cascading to every
-// item in Files (globs included).
+// entry is a copy/template perm-group: optional perms and template context
+// cascading to every item in Files (globs included). Item ctx keys win over
+// the group's.
 type entry struct {
 	Perms `yaml:",inline"`
-	Files []fileSpec `yaml:"files" jsonschema:"required" jsonschema_description:"the group's items, each inheriting the group's perms"`
+	Ctx   map[string]string `yaml:"ctx" jsonschema_description:"renderTemplates only: group-level template context, merged under each item's ctx (item keys win)"`
+	Files []fileSpec        `yaml:"files" jsonschema:"required" jsonschema_description:"the group's items, each inheriting the group's perms"`
 }
 
 // dirGroup is a mkdirs perm-group: optional perms cascading to every item in

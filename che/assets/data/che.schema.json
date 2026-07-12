@@ -130,6 +130,13 @@
           "pattern": "^[0-7]{3,4}$",
           "description": "dest mode, octal string"
         },
+        "ctx": {
+          "additionalProperties": {
+            "type": "string"
+          },
+          "type": "object",
+          "description": "renderTemplates only: group-level template context, merged under each item's ctx (item keys win)"
+        },
         "files": {
           "items": {
             "$ref": "#/$defs/fileSpec"
