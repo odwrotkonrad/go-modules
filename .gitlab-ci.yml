@@ -7,7 +7,7 @@ workflow:
 
 stages:
   - warm
-  - validate
+  - verify
   - test
   - release
   - publish
@@ -60,8 +60,8 @@ warm-go-mod-release:
   script:
     - (cd $MODULE && go mod download all)
 
-validate-pre-commit-all:
-  stage: validate
+verify-precommit-all:
+  stage: verify
   image: $CI_IMAGE
   needs: [warm-go]
   rules:
