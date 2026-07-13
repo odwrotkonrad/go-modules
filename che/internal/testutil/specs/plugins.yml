@@ -6,14 +6,11 @@ main:
   include:
     profiles:
       - base
-      - ref: p
-        options: {source: "@git@gitlab.com:g/r.git"}
-      - ref: q
-        options: {source: "@https://gitlab.com/g/r2.git"}
+      - source: "@git@gitlab.com:g/r.git/che.yml::p"
+      - source: "@https://gitlab.com/g/r2.git/che.yml::q"
         env:
           GITLAB_GROUP: konradodwrot
-      - ref: p
-        options: {source: "@git@gitlab.com:g/r.git"}
+      - source: "@git@gitlab.com:g/r.git/che.yml::p"
         env:
           IGNORED: dup
 #[<] 🤖🤖

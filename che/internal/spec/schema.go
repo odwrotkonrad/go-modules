@@ -25,10 +25,10 @@ func Schema() *jsonschema.Schema {
 	defs["SpecOptions"] = r.Reflect(Options{}).Definitions["Options"]
 	defs["DestSpec"] = DestSpec{}.JSONSchema()
 
-	defs["ProfileRecipe"].Description = "one profile block: options self-describe eligibility, include.profiles compose refs in order (local scalars, sourced {ref, options, env}), include adds, exclude filters last and wins"
+	defs["ProfileRecipe"].Description = "one profile block: options self-describe eligibility, include.profiles compose refs in order (local scalars, sourced {source, options, env}), include adds, exclude filters last and wins"
 	defs["includeSet"].Description = "additive payload: profile refs, link globs, copy/renderTemplates/mkdirs perm-groups, script globs, service names"
 	defs["excludeSet"].Description = "subtractive glob filter, applied last, wins over every include (rich entries too)"
-	defs["SpecOptions"].Description = "reserved top-level options: block: spec-wide defaults (execIf gate, autoDiscover/debug/directory) + che knobs (validateSpec)"
+	defs["SpecOptions"].Description = "reserved top-level options: block: spec-wide defaults (execIf gate, autoDiscover/debug/workingDirectory) + che knobs (validateSpec)"
 	prop(defs["ProfileOptions"], "execIf").Description = "predicate expressions `<source>` or `<source> == <literal>`, sources builtin:*/env:*; empty: always"
 
 	root := &jsonschema.Schema{
@@ -146,13 +146,13 @@ func (DestSpec) JSONSchema() *jsonschema.Schema {
 }
 
 func (ProfileSourceRecipe) JSONSchema() *jsonschema.Schema {
-	o := obj("sourced profile ref: options.source locates the containing spec, env overlays its run", []string{"ref"})
-	o.Properties.Set("ref", &jsonschema.Schema{
-		Description: "profile name within the referenced spec",
+	o := obj("sourced profile ref: source is <source>/<spec-file>.yml::<profile>, options override its options, env overlays its run", []string{"source"})
+	o.Properties.Set("source", &jsonschema.Schema{
+		Description: "<source>/<spec-file>.yml::<profile>: source @<giturl> (remote) or <dir> (local); bare <profile> for the local spec",
 		Type:        "string",
 	})
 	o.Properties.Set("options", &jsonschema.Schema{Ref: "#/$defs/ProfileOptions"})
-	o.Properties.Set("env", envSchema("envs exported around everything done for the referenced profile (options.source entries only)"))
+	o.Properties.Set("env", envSchema("envs exported around everything done for the referenced profile (sourced entries only)"))
 	return scalarOr("local profile name, composed depth-first", o)
 }
 

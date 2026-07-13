@@ -9,7 +9,7 @@ import (
 	"github.com/spf13/cobra"
 
 	"gitlab.com/konradodwrot/go-modules/che/internal/che"
-	"gitlab.com/konradodwrot/go-modules/che/internal/config"
+	"gitlab.com/konradodwrot/go-modules/che/internal/options"
 	"gitlab.com/konradodwrot/go-modules/che/internal/spec"
 )
 
@@ -19,9 +19,9 @@ var version = "dev"
 // app wires the cobra tree: init (PersistentPreRunE) prepares opts and the
 // root SpecReady as separately initialized values, read by each RunE.
 type app struct {
-	config config.Options // cobra flag destinations
-	opts   config.Options // finalized by che.PrepareOptions
-	root   *che.SpecReady // prepared by che.PrepareSpecs
+	flags options.Options // cobra flag destinations
+	opts  options.Options // finalized by che.PrepareOptions
+	root  *che.SpecReady  // prepared by che.PrepareSpecs
 }
 
 func New() *app { return &app{} }
@@ -43,20 +43,22 @@ sourced profile refs included).`,
 		},
 	}
 	pf := root.PersistentFlags()
-	pf.StringVarP(&a.config.Dir, "directory", "C", "",
+	pf.StringVarP(&a.flags.Dir, "directory", "C", "",
 		"change into this directory before resolving the repo; env: CHE_DIR")
-	pf.StringVar((*string)(&a.config.DryRun), "dry-run", "",
+	pf.StringVar(&a.flags.WorkingDirectory, "working-directory", "",
+		"the load-ops source tree (che level; spec/profile options.workingDirectory override); default root; env: CHE_WORKING_DIRECTORY")
+	pf.StringVar((*string)(&a.flags.DryRun), "dry-run", "",
 		"print mutating actions instead of executing them; values: delta (changed dests, bare-flag default) | all (every dest); default: off; env: CHE_DRY_RUN")
 	pf.Lookup("dry-run").NoOptDefVal = "delta"
-	pf.StringVar((*string)(&a.config.ValidateSpec), "validate-spec", "",
+	pf.StringVar((*string)(&a.flags.ValidateSpec), "validate-spec", "",
 		"validate each loaded che.yml spec against the JSON Schema; values: warn (log violations) | error (abort on violations); default: warn; env: CHE_VALIDATE_SPEC")
-	pf.StringVar(&a.config.Profile, "profile", "",
+	pf.StringVar(&a.flags.Profile, "profile", "",
 		"run only this profile (autoDiscover skipped, execIf still enforced); env: CHE_PROFILE")
-	pf.BoolVar(&a.config.SkipExecIf, "skip-exec-if", false,
+	pf.BoolVar(&a.flags.SkipExecIf, "skip-exec-if", false,
 		"treat every execIf predicate as passing; env: CHE_SKIP_EXEC_IF")
-	pf.BoolVar(&a.config.SkipRemoteRefs, "skip-remote-refs", false,
+	pf.BoolVar(&a.flags.SkipRemoteRefs, "skip-remote-refs", false,
 		"skip sourced include.profiles refs, load only the local repo's specs; env: CHE_SKIP_REMOTE_REFS")
-	pf.BoolVar(&a.config.Debug, "debug", false,
+	pf.BoolVar(&a.flags.Debug, "debug", false,
 		"print debug-level lines (source announce, clone/pull attempts); env: CHE_DEBUG")
 
 	services := &cobra.Command{
@@ -78,7 +80,7 @@ sourced profile refs included).`,
 // init prepares the run: options (flags > env vars > local che.yml options: >
 // defaults), then the whole spec tree.
 func (a *app) init() error {
-	opts, err := che.PrepareOptions(a.config)
+	opts, err := che.PrepareOptions(a.flags)
 	if err != nil {
 		return err
 	}

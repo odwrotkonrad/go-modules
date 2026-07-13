@@ -17,10 +17,10 @@ import (
 
 	"gopkg.in/yaml.v3"
 
-	"gitlab.com/konradodwrot/go-modules/che/internal/config"
 	"gitlab.com/konradodwrot/go-modules/che/internal/fsutil"
 	"gitlab.com/konradodwrot/go-modules/che/internal/host"
 	"gitlab.com/konradodwrot/go-modules/che/internal/log"
+	"gitlab.com/konradodwrot/go-modules/che/internal/options"
 	"gitlab.com/konradodwrot/go-modules/che/internal/spec"
 )
 
@@ -36,7 +36,7 @@ import (
 //	            UNRESOLVED subjects, its Ready the RESOLVED (host-bound) ones;
 //	            Host is built at call time and passed in, never stored
 //
-// cli holds opts (config.Options) and the root *SpecReady as separately
+// cli holds opts (options.Options) and the root *SpecReady as separately
 // initialized values: PrepareOptions, then PrepareSpecs.
 
 // NewHost builds each profile's Host; tests override it to inject a mock fs.
@@ -49,7 +49,7 @@ var NewHost = host.New
 // PrepareOptions finalizes the runtime options: chdir (-C), locate the repo,
 // then resolve with precedence flags > env vars > local che.yml options: >
 // defaults.
-func PrepareOptions(flags config.Options) (config.Options, error) {
+func PrepareOptions(flags options.Options) (options.Options, error) {
 	c := flags
 	c.Dir = cmp.Or(c.Dir, os.Getenv("CHE_DIR"))
 	if c.Dir != "" {
@@ -70,24 +70,24 @@ func PrepareOptions(flags config.Options) (config.Options, error) {
 
 // specLayer leniently reads the local spec's options: block ([why] parse
 // errors surface later, at PrepareSpecs).
-func specLayer(path string) config.SpecLayer {
+func specLayer(path string) options.SpecLayer {
 	b, err := os.ReadFile(path)
 	if err != nil {
-		return config.SpecLayer{}
+		return options.SpecLayer{}
 	}
 	var d struct {
 		Options spec.Options `yaml:"options"`
 	}
 	if err := yaml.Unmarshal(b, &d); err != nil {
-		return config.SpecLayer{}
+		return options.SpecLayer{}
 	}
-	return config.SpecLayer{ValidateSpec: d.Options.ValidateSpec, Debug: d.Options.Debug}
+	return options.SpecLayer{ValidateSpec: d.Options.ValidateSpec, Debug: d.Options.Debug}
 }
 
 // PrepareSpecs resolves the root spec and its whole Include tree (top-level
 // include.sources + sourced include.profiles refs), fully recursive,
 // cycle-guarded, deduped by source URI + profile name.
-func PrepareSpecs(opts config.Options, src spec.SpecSourceRecipe) (*SpecReady, error) {
+func PrepareSpecs(opts options.Options, src spec.SpecSourceRecipe) (*SpecReady, error) {
 	repoRoot, err := findRepoRoot()
 	if err != nil {
 		return nil, err
@@ -108,7 +108,7 @@ func PrepareSpecs(opts config.Options, src spec.SpecSourceRecipe) (*SpecReady, e
 
 // specsPrep threads the shared composition state through the recursion.
 type specsPrep struct {
-	opts      config.Options
+	opts      options.Options
 	home      string
 	eval      func(expr string) (bool, error)
 	seenSpecs map[string]bool // resolved spec dirs (include.sources cycle/dup guard)
@@ -240,7 +240,7 @@ func (r *SpecRecipe) PrepareSpec(anchor, home string) error {
 // PrepareProfileRecipes parses and schema-validates the spec, then stamps each
 // recipe with its Source (effective directory in Source.DirectoryPath, option
 // cascade applied: profile > spec).
-func (r *SpecRecipe) PrepareProfileRecipes(opts config.Options) error {
+func (r *SpecRecipe) PrepareProfileRecipes(opts options.Options) error {
 	if err := r.validateSchema(opts.ValidateSpec); err != nil {
 		return err
 	}
@@ -249,41 +249,38 @@ func (r *SpecRecipe) PrepareProfileRecipes(opts config.Options) error {
 		return err
 	}
 	r.Options, r.Env, r.Include = doc.Options, doc.Env, doc.Include
-	specDir, err := r.effectiveDir(r.Options.Directory)
-	if err != nil {
-		return err
+	// [why] che-level (flag/env) seeds the spec default: profile > spec > che.
+	if r.Options.WorkingDirectory == "" {
+		r.Options.WorkingDirectory = opts.WorkingDirectory
 	}
-	r.sourceReady.DirectoryPath = specDir
 	for i := range doc.ProfileRecipes {
 		rec := &doc.ProfileRecipes[i]
 		rec.Options = rec.Options.Over(r.Options)
 		rec.Source.URI = r.Source.URI
-		rec.Source.DirectoryPath, err = r.effectiveDir(rec.Options.Directory)
-		if err != nil {
-			return err
-		}
+		rec.Source.DirectoryPath = r.sourceReady.DirectoryPath
 	}
 	r.ProfileRecipes = doc.ProfileRecipes
 	return nil
 }
 
-// effectiveDir applies a directory option onto the checkout anchor: empty ->
-// the anchor, else expanded (~/, $VAR), relative -> under the checkout.
-func (r *SpecRecipe) effectiveDir(directory string) (string, error) {
+// workingDir resolves a profile's effective options.workingDirectory onto the
+// checkout anchor: empty -> the checkout itself, else env-expanded (~/, $VAR,
+// env vars), relative -> under the checkout. Must be an existing dir.
+func workingDir(anchor, directory string) (string, error) {
 	if directory == "" {
-		return r.sourceReady.DirectoryPath, nil
+		directory = spec.DefaultWorkingDir
 	}
 	dir := fsutil.ExpandHome(os.ExpandEnv(directory), os.Getenv("HOME"))
 	if !filepath.IsAbs(dir) {
-		dir = filepath.Join(r.sourceReady.DirectoryPath, dir)
+		dir = filepath.Join(anchor, dir)
 	}
 	if !fsutil.IsDir(dir) {
-		return "", fmt.Errorf("options.directory not found: %s (from %q)", dir, directory)
+		return "", fmt.Errorf("options.workingDirectory not found: %s (from %q)", dir, directory)
 	}
 	return dir, nil
 }
 
-func (r *SpecRecipe) validateSchema(mode config.ValidateSpecMode) error {
+func (r *SpecRecipe) validateSchema(mode options.ValidateSpecMode) error {
 	b, err := os.ReadFile(r.sourceReady.DefinitionURI)
 	if err != nil {
 		return fmt.Errorf("spec not found: %s", r.sourceReady.DefinitionURI)
@@ -292,24 +289,13 @@ func (r *SpecRecipe) validateSchema(mode config.ValidateSpecMode) error {
 	if len(finds) == 0 {
 		return nil
 	}
-	if mode == config.ValidateSpec.Error {
-		return fmt.Errorf("schema violations in %s:\n%s", r.sourceReady.DefinitionURI, joinLines(finds))
+	if mode == options.ValidateSpec.Error {
+		return fmt.Errorf("schema violations in %s:\n%s", r.sourceReady.DefinitionURI, strings.Join(finds, "\n"))
 	}
 	for _, f := range finds {
 		log.Msg("validate(che.yml)", f, log.Off)
 	}
 	return nil
-}
-
-func joinLines(xs []string) string {
-	out := ""
-	for i, x := range xs {
-		if i > 0 {
-			out += "\n"
-		}
-		out += x
-	}
-	return out
 }
 
 // PrepareProfiles assembles the SpecReady: spec-level execIf gate, top-level
@@ -430,7 +416,7 @@ func (r *SpecRecipe) assembleProfiles(p *specsPrep, ready *SpecReady, lookup []s
 		}
 		for _, ref := range refs {
 			log.Debug("source("+ref.ProfileName+")", "run "+ref.String(), log.Off)
-			child, err := p.prepare(spec.SpecSourceRecipe{SourceRecipe: spec.SourceRecipe{URI: ref.URI}}, r.sourceReady.DirectoryPath, &ref, false)
+			child, err := p.prepare(spec.SpecSourceRecipe{SourceRecipe: spec.SourceRecipe{URI: ref.URI, SpecFile: ref.SpecFile}}, r.sourceReady.DirectoryPath, &ref, false)
 			if err != nil {
 				return fmt.Errorf("ref %s: %w", ref, err)
 			}
@@ -450,7 +436,11 @@ func (r *SpecRecipe) makeProfileReady(p *specsPrep, rec spec.ProfileRecipe, look
 	var pr *ProfileReady
 	var refs []spec.ProfileSourceRecipe
 	err := withEnv(env, func() error {
-		ops, sourced, err := rec.MakeProfile(lookup)
+		wd, err := workingDir(rec.Source.DirectoryPath, rec.Options.WorkingDirectory)
+		if err != nil {
+			return err
+		}
+		ops, sourced, err := rec.MakeProfile(lookup, wd)
 		if err != nil {
 			return err
 		}
@@ -460,12 +450,13 @@ func (r *SpecRecipe) makeProfileReady(p *specsPrep, rec spec.ProfileRecipe, look
 				SourceReady: spec.SourceReady{DefinitionURI: r.sourceReady.DefinitionURI, DirectoryPath: rec.Source.DirectoryPath},
 				ProfileName: name,
 			},
-			Options:  rec.Options,
-			Env:      env,
-			Profiles: sourced,
-			ref:      rec.Source.String(),
-			opts:     p.opts,
-			home:     p.home,
+			Options:    rec.Options,
+			Env:        env,
+			Profiles:   sourced,
+			ref:        rec.Source.String(),
+			workingDir: wd,
+			opts:       p.opts,
+			home:       p.home,
 		}
 		pr.OperationsReady, err = prepareOperations(ops, pr.newHost(), p.opts)
 		return err
@@ -532,17 +523,19 @@ type ProfileReady struct {
 	Profiles        []spec.ProfileSourceRecipe // sourced refs, consumed by PrepareSpecs
 	OperationsReady []operationReady           // prepared, in run order
 	ref             string                     // display ref: bare name local, <source>::<name> sourced
-	opts            config.Options
+	workingDir      string                     // resolved load-ops source tree (options.workingDirectory cascade)
+	opts            options.Options
 	home            string
 }
 
 // Ref is the profile's display ref (report lines, detect).
 func (p *ProfileReady) Ref() string { return p.ref }
 
-// newHost builds the op executor anchored at the profile's directory. Sourced
-// profiles carry a profile= log subtype ([why] disambiguates interleaved runs).
+// newHost builds the op executor anchored at the profile's checkout, its
+// load-ops tree at the resolved working dir. Sourced profiles carry a profile=
+// log subtype ([why] disambiguates interleaved runs).
 func (p *ProfileReady) newHost() host.Host {
-	h := NewHost(p.Source.DirectoryPath, p.home, p.Source.GetProfileName(), p.opts)
+	h := NewHost(p.Source.DirectoryPath, p.workingDir, p.home, p.Source.GetProfileName(), p.opts)
 	if p.ref != p.Source.GetProfileName() {
 		h = h.WithLogSub("profile=" + p.Source.GetProfileName())
 	}
@@ -654,7 +647,7 @@ type operationReady interface {
 
 // prepareOperations resolves each operation recipe's subjects against h,
 // returning the prepared operations in run order.
-func prepareOperations(ops spec.OperationRecipes, h host.Host, opts config.Options) ([]operationReady, error) {
+func prepareOperations(ops spec.OperationRecipes, h host.Host, opts options.Options) ([]operationReady, error) {
 	scripts, err := h.ResolveScripts(ops.RunScripts.Scripts)
 	if err != nil {
 		return nil, err

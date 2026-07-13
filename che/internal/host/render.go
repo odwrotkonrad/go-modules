@@ -93,11 +93,13 @@ func (h Host) templateDests(item spec.FileItem) []tmplDest {
 	}
 	out := make([]tmplDest, len(item.Dests))
 	for i, d := range item.Dests {
-		if strings.HasPrefix(d.Path, "~/") || strings.HasPrefix(d.Path, "/") {
-			p := h.expandHome(d.Path)
+		// [why] expand env / ~ before the host-vs-repo decision so $HOME/... and
+		// $VAR/... dests resolve to their absolute host path, not a repo-relative one.
+		p := h.expandHome(d.Path)
+		if strings.HasPrefix(p, "/") {
 			out[i] = tmplDest{path: p, host: true, opts: d.Options, header: p}
 		} else {
-			out[i] = tmplDest{path: filepath.Join(h.RepoRoot, d.Path), opts: d.Options, header: d.Path}
+			out[i] = tmplDest{path: filepath.Join(h.RepoRoot, p), opts: d.Options, header: d.Path}
 		}
 	}
 	return out

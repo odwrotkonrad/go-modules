@@ -12,7 +12,7 @@ import (
 
 	"github.com/stretchr/testify/require"
 
-	"gitlab.com/konradodwrot/go-modules/che/internal/config"
+	"gitlab.com/konradodwrot/go-modules/che/internal/options"
 	"gitlab.com/konradodwrot/go-modules/che/internal/spec"
 	"gitlab.com/konradodwrot/go-modules/che/internal/testutil"
 	"gitlab.com/konradodwrot/go-modules/lib/testyml"
@@ -31,17 +31,17 @@ func makeProfile(t *testing.T, dir, profile string) spec.OperationRecipes {
 	}
 	rec, err := spec.FindRecipe(d.ProfileRecipes, profile)
 	require.NoError(t, err)
-	ops, _, err := rec.MakeProfile(d.ProfileRecipes)
+	ops, _, err := rec.MakeProfile(d.ProfileRecipes, filepath.Join(dir, "root"))
 	require.NoError(t, err)
 	return ops
 }
 
 // setupHost: mock che repo, returns Host under cfg, resolved op recipes, repo dir.
-func setupHost(t *testing.T, cfg config.Options) (Host, spec.OperationRecipes, string) {
+func setupHost(t *testing.T, cfg options.Options) (Host, spec.OperationRecipes, string) {
 	t.Helper()
 	dir, home := testutil.CheRepo(t)
 	t.Setenv("XDG_DATA_HOME", filepath.Join(home, ".local/share"))
-	h := New(dir, home, testutil.CheProfile, cfg)
+	h := New(dir, filepath.Join(dir, "root"), home, testutil.CheProfile, cfg)
 	return h, makeProfile(t, dir, testutil.CheProfile), dir
 }
 
@@ -126,7 +126,7 @@ func TestOps(t *testing.T) {
 	run := func(t *testing.T, c testyml.Case[struct{}]) {
 		op, ok := ops[strings.Join(c.Context.CommandArgs(), "-")]
 		require.Truef(t, ok, "unknown command %q", c.Context.Command)
-		h, res, dir := setupHost(t, config.Options{})
+		h, res, dir := setupHost(t, options.Options{})
 		m := testutil.ApplyMocks(t, c.Context.MockedInterfaces)
 		m.Reader.Roots = []string{dir}
 		h = h.WithFS(m.FS).WithFSReader(m.Reader)

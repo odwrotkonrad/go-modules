@@ -18,15 +18,14 @@ cases:
                 options: {autoDiscover: true}
                 include:
                   profiles:
-                    - ref: p
-                      options: {source: "${REF_DIR}"}
+                    - source: "${REF_DIR}/che.yml::p"
         - knobs: {}
     expected:
       stdOut:
         - validate(che.yml)
         - includes
       output:
-        profiles: [main, "${REF_DIR}::p"]
+        profiles: [main, "${REF_DIR}/che.yml::p"]
   - name: ShouldFailOnRefSpecViolationInErrorMode
     input:
       args:
@@ -41,8 +40,7 @@ cases:
                 options: {autoDiscover: true}
                 include:
                   profiles:
-                    - ref: p
-                      options: {source: "${REF_DIR}"}
+                    - source: "${REF_DIR}/che.yml::p"
         - knobs: {validateSpec: error}
     expected:
       errorOutput: includes
@@ -65,18 +63,17 @@ cases:
                 options: {autoDiscover: true}
                 include:
                   profiles:
-                    - ref: gitlabGroup
-                      options: {source: "@file://${REF_DIR}"}
+                    - source: "@file://${REF_DIR}/che.yml::gitlabGroup"
                   runScripts: [scripts/local.zsh]
             scripts/local.zsh: "#!/bin/zsh\n"
         - knobs: {debug: true}
     expected:
       stdOut:
-        - run @file://${REF_DIR}::gitlabGroup
+        - run @file://${REF_DIR}/che.yml::gitlabGroup
         - cloned file://${REF_DIR}
         - 'execIf(pass): profile gitlabGroup: env:REF_GATE'
       output:
-        profiles: [main, "@file://${REF_DIR}::gitlabGroup"]
+        profiles: [main, "@file://${REF_DIR}/che.yml::gitlabGroup"]
         repoRootUnder: ${CACHE}
         script: scripts/bootstrap.zsh
   - name: ShouldSkipRefWhenExecIfFails
@@ -98,12 +95,11 @@ cases:
                 options: {autoDiscover: true}
                 include:
                   profiles:
-                    - ref: gitlabGroup
-                      options: {source: "${REF_DIR}"}
+                    - source: "${REF_DIR}/che.yml::gitlabGroup"
         - knobs:
             unsetEnv: [REF_GATE]
     expected:
-      stdOut: skip ${REF_DIR}::gitlabGroup (execIf failed)
+      stdOut: skip ${REF_DIR}/che.yml::gitlabGroup (execIf failed)
       output:
         profiles: [main]
     notExpected:
@@ -126,8 +122,7 @@ cases:
                 options: {autoDiscover: true}
                 include:
                   profiles:
-                    - ref: gitlabGroup
-                      options: {source: "${REF_DIR}"}
+                    - source: "${REF_DIR}/che.yml::gitlabGroup"
                       env:
                         REF_GATE: "1"
         - knobs:
@@ -136,7 +131,7 @@ cases:
     expected:
       stdOut: 'execIf(pass): profile gitlabGroup: env:REF_GATE'
       output:
-        profiles: [main, "${REF_DIR}::gitlabGroup"]
+        profiles: [main, "${REF_DIR}/che.yml::gitlabGroup"]
         env: {REF_GATE: "1"}
         envInOverlay: "1"
         script: scripts/bootstrap.zsh
@@ -158,14 +153,13 @@ cases:
                 options: {autoDiscover: true}
                 include:
                   profiles:
-                    - ref: gitlabGroup
-                      options: {source: "${REF_DIR}"}
+                    - source: "${REF_DIR}/che.yml::gitlabGroup"
                       env:
                         SHADOWED: entry
         - knobs: {}
     expected:
       output:
-        profiles: [main, "${REF_DIR}::gitlabGroup"]
+        profiles: [main, "${REF_DIR}/che.yml::gitlabGroup"]
         env: {FROM_SPEC: spec, SHADOWED: entry}
   - name: ShouldSkipRemoteRefsWithKnob
     input:
@@ -177,8 +171,7 @@ cases:
                 options: {autoDiscover: true}
                 include:
                   profiles:
-                    - ref: p
-                      options: {source: /nonexistent}
+                    - source: "/nonexistent/che.yml::p"
                   runScripts: [scripts/local.zsh]
             scripts/local.zsh: "#!/bin/zsh\n"
         - knobs:
@@ -198,8 +191,7 @@ cases:
                 options: {autoDiscover: true}
                 include:
                   profiles:
-                    - ref: gitlabGroup
-                      options: {source: ./ref}
+                    - source: "./ref/che.yml::gitlabGroup"
             ref/che.yml: |
               gitlabGroup:
                 include:
@@ -208,7 +200,7 @@ cases:
         - knobs: {}
     expected:
       output:
-        profiles: [main, ./ref::gitlabGroup]
+        profiles: [main, ./ref/che.yml::gitlabGroup]
         repoRoot: ${HOST_REPO}/ref
         script: scripts/bootstrap.zsh
   - name: ShouldAnchorDirRefAtEnvVarDir
@@ -226,12 +218,11 @@ cases:
                 options: {autoDiscover: true}
                 include:
                   profiles:
-                    - ref: gitlabGroup
-                      options: {source: $REF_DIR_VAR}
+                    - source: "$REF_DIR_VAR/che.yml::gitlabGroup"
         - knobs: {}
     expected:
       output:
-        profiles: [main, $REF_DIR_VAR::gitlabGroup]
+        profiles: [main, $REF_DIR_VAR/che.yml::gitlabGroup]
         repoRoot: ${REF_DIR}
     notExpected:
       stdOut: [clone, pull]
@@ -250,18 +241,16 @@ cases:
                 options: {autoDiscover: true}
                 include:
                   profiles:
-                    - ref: p
-                      options: {source: "${REF_DIR}"}
+                    - source: "${REF_DIR}/che.yml::p"
               b:
                 options: {autoDiscover: true}
                 include:
                   profiles:
-                    - ref: p
-                      options: {source: "${REF_DIR}"}
+                    - source: "${REF_DIR}/che.yml::p"
         - knobs: {}
     expected:
       output:
-        profiles: [a, b, "${REF_DIR}::p"]
+        profiles: [a, b, "${REF_DIR}/che.yml::p"]
   - name: ShouldResolveRefsRecursivelyWithCycleGuard
     input:
       args:
@@ -272,24 +261,21 @@ cases:
                 options: {autoDiscover: true}
                 include:
                   profiles:
-                    - ref: p1
-                      options: {source: ./a}
+                    - source: "./a/che.yml::p1"
             a/che.yml: |
               p1:
                 include:
                   profiles:
-                    - ref: p2
-                      options: {source: ../b}
+                    - source: "../b/che.yml::p2"
             b/che.yml: |
               p2:
                 include:
                   profiles:
-                    - ref: p1
-                      options: {source: ../a}
+                    - source: "../a/che.yml::p1"
         - knobs: {}
     expected:
       output:
-        profiles: [main, ./a::p1, ../b::p2]
+        profiles: [main, ./a/che.yml::p1, ../b/che.yml::p2]
   - name: ShouldComposeIncludeSourcesSpecs
     input:
       args:
@@ -315,7 +301,7 @@ cases:
         - knobs: {}
     expected:
       output:
-        profiles: [main, ./sibling::sib]
+        profiles: [main, ./sibling/che.yml::sib]
   - name: ShouldErrorOnCrossSpecProfileNameCollision
     input:
       args:

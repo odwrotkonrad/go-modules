@@ -241,7 +241,7 @@ func loadAndMake(dir, profile string) (OperationRecipes, []ProfileSourceRecipe, 
 	if err != nil {
 		return OperationRecipes{}, nil, err
 	}
-	return rec.MakeProfile(d.ProfileRecipes)
+	return rec.MakeProfile(d.ProfileRecipes, filepath.Join(dir, "root"))
 }
 
 func TestMakeProfile(t *testing.T) {

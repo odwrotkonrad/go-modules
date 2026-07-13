@@ -87,10 +87,8 @@ desktop/macos:
   include:
     profiles:
       - base
-      - ref: someProfile
-        options: {source: "@git@gitlab.com:group/repo.git"}
-      - ref: otherProfile
-        options: {source: "@https://gitlab.com/group/other.git"}
+      - source: "@git@gitlab.com:group/repo.git/che.yml::someProfile"
+      - source: "@https://gitlab.com/group/other.git/che.yml::otherProfile"
         env:
           SOME_VAR: value
 
@@ -122,8 +120,12 @@ Spec-wide defaults + che knobs:
 - `execIf` (string list): gates every profile of this spec (same predicate
   grammar as profile execIf).
 - `autoDiscover`, `debug` (bool): defaults for profiles that don't set them.
-- `directory` (path): anchor the spec's files there (che.yml lookup stays at
-  the checkout).
+- `workingDirectory` (path): the load-ops source tree, default `.` (the
+  checkout itself). Absolute, `~/`, `$VAR`, and env vars expand; a relative
+  path resolves under the checkout. The `root/` logical token in `include`
+  globs maps onto it, and the `HOME/` folder under it maps onto `$HOME`.
+  che.yml lookup and repo-relative paths (scripts, `renderTemplates` sources)
+  stay at the checkout.
 - `validateSpec` (`warn` | `error`): top-level only, overridden by the flag
   and env var.
 
@@ -168,9 +170,31 @@ eligible profile runs its full op sequence, profile by profile.
   `--skip-exec-if` (env `CHE_SKIP_EXEC_IF`): all pass.
 - `debug` (bool): debug-level lines around this profile. Unset: inherit spec,
   then che level.
-- `directory` (path): anchor this profile's files there. Unset: inherit spec,
-  then the checkout.
-- `source`: `include.profiles` rich entries only (below).
+- `workingDirectory` (path): the profile's load-ops source tree. Unset: inherit
+  spec, then che level (`--working-directory` / `CHE_WORKING_DIRECTORY`), then
+  `.` (the checkout).
+
+## Dest Mapping
+
+A working-tree path maps onto its live dest by folder: the first-level `HOME/`
+folder maps onto `$HOME` (`HOME/.config/x` -> `~/.config/x`), everything else
+is a system-root path (`etc/x` -> `/etc/x`).
+
+Dest strings expand env vars, with `$HOME` bound to the invoking user's home
+(correct under sudo, where the process `$HOME` differs). So explicit dests may
+write `$HOME` directly instead of relying on the `HOME/` folder convention:
+
+```yaml
+renderTemplates:
+  - files:
+      - {source: root/x.tpl, dest: [$HOME/.config/x]}
+copy:
+  - files:
+      - {source: HOME/foo.ontoHost.cp, dest: [$HOME/.config/foo]}
+```
+
+Link entries reach `$HOME` through their sed rewrite's replacement side
+(`{source: HOME/**, dest: 's#^HOME#$HOME#'}`).
 
 ## include
 
@@ -187,17 +211,20 @@ own checkout:
 include:
   profiles:
     - base
-    - ref: gitlabGroup
-      options: {source: "@https://gitlab.com/konradodwrot/workspace.git"}
+    - source: "@https://gitlab.com/konradodwrot/workspace.git/che.yml::gitlabGroup"
       env:
         GITLAB_GROUP: konradodwrot
 ```
 
-- `options.source`: `@<giturl>` (remote, cloned/pulled into a managed cache
-  checkout) or `<dir>` (local dir used in place, no git; `$VAR` and `~`
-  expand, a relative path resolves against the referencing spec's checkout).
-- other `options` fields override the referenced profile's own (one more
-  cascade level, most nested wins).
+- `source`: `<source>/<spec-file>.yml::<profile>` — `::` splits off the
+  profile name; the last path segment before it is the spec file (`.yml`), the
+  rest is the source. Source is `@<giturl>` (remote, cloned/pulled into a
+  managed cache checkout) or `<dir>` (local dir used in place, no git; `$VAR`
+  and `~` expand, a relative path resolves against the referencing spec's
+  checkout). A bare `<profile>` (no `::`) is a local profile, written as a
+  scalar.
+- `options` fields override the referenced profile's own (one more cascade
+  level, most nested wins).
 - `env`: exported around everything done for the referenced profile
   (`options.source` entries only). The referenced spec's `env:` merges under
   it (entry wins).

@@ -197,7 +197,7 @@ cases:
     input:
       args: [spec: "", profile: main]
     expected:
-      errorOutput: ['env requires options.source']
+      errorOutput: ['env requires a source']
   - name: ShouldErrorOnUndefinedProfileRef
     context: {pwd: testdata/fixture/resolve/tree-empty}
     input:

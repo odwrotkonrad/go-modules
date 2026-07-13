@@ -146,14 +146,14 @@ func names(recipes []ProfileRecipe, keep func(ProfileRecipe) bool) []string {
 // refs depth-first (looked up in recipes, cycle-guarded), classifies
 // git-tracked files under <DirectoryPath>/root, applies excludes last, then
 // emits the per-kind OperationRecipes (run order) plus the sourced
-// include.profiles refs (options.source set), deduped in composition order.
-func (r ProfileRecipe) MakeProfile(recipes []ProfileRecipe) (OperationRecipes, []ProfileSourceRecipe, error) {
+// include.profiles refs (source set), deduped in composition order.
+func (r ProfileRecipe) MakeProfile(recipes []ProfileRecipe, workingDir string) (OperationRecipes, []ProfileSourceRecipe, error) {
 	var eff effective
 	if err := mergeRecipe(recipes, &eff, r, nil); err != nil {
 		return OperationRecipes{}, nil, err
 	}
 	repoRoot := r.Source.DirectoryPath
-	root := filepath.Join(repoRoot, "root")
+	root := workingDir
 	scripts, err := expandScripts(repoRoot, fsutil.ExpandAll(eff.scripts))
 	if err != nil {
 		return OperationRecipes{}, nil, err
@@ -367,7 +367,7 @@ func dropStrings(xs, globs []string) []string {
 
 // mergeRecipe composes ps into eff: local include.profiles refs depth-first,
 // then this profile's include sections (additive). Sourced refs
-// (options.source set) collect into eff.refs (deduped) for the caller to
+// (source set) collect into eff.refs (deduped) for the caller to
 // resolve at their own checkout. Excludes are handled separately
 // (applyExcludes). seen catches cycles.
 func mergeRecipe(recipes []ProfileRecipe, eff *effective, ps ProfileRecipe, seen []string) error {
@@ -526,8 +526,8 @@ func (o ProfileOptions) Over(spec Options) ProfileOptions {
 	if o.Debug == nil {
 		o.Debug = spec.Debug
 	}
-	if o.Directory == "" {
-		o.Directory = spec.Directory
+	if o.WorkingDirectory == "" {
+		o.WorkingDirectory = spec.WorkingDirectory
 	}
 	return o
 }
@@ -544,8 +544,8 @@ func (o ProfileOptions) OverRef(entry ProfileOptions) ProfileOptions {
 	if entry.Debug != nil {
 		o.Debug = entry.Debug
 	}
-	if entry.Directory != "" {
-		o.Directory = entry.Directory
+	if entry.WorkingDirectory != "" {
+		o.WorkingDirectory = entry.WorkingDirectory
 	}
 	return o
 }

@@ -3,9 +3,11 @@ package spec
 // [>] 🤖🤖
 
 import (
+	"cmp"
 	"fmt"
 	"os"
 	"path/filepath"
+	"strings"
 
 	"gopkg.in/yaml.v3"
 
@@ -42,9 +44,10 @@ func (r SourceRecipe) prepare(repoRoot, home, name string) (SourceReady, error) 
 	if err != nil {
 		return SourceReady{}, err
 	}
-	def := filepath.Join(dir, "che.yml")
+	specFile := cmp.Or(r.SpecFile, "che.yml")
+	def := filepath.Join(dir, specFile)
 	if _, err := os.Stat(def); err != nil {
-		return SourceReady{}, fmt.Errorf("che.yml not found at %s (source %q)", dir, r.URI)
+		return SourceReady{}, fmt.Errorf("%s not found at %s (source %q)", specFile, dir, r.URI)
 	}
 	return SourceReady{DefinitionURI: def, DirectoryPath: dir}, nil
 }
@@ -100,31 +103,65 @@ func (r ProfileSourceRecipe) GetProfileName() string { return r.ProfileName }
 // GetProfileName is the one accessor for a profile's name.
 func (r ProfileSourceReady) GetProfileName() string { return r.ProfileName }
 
-// String renders the canonical ref form: bare name local, <source>::<name> sourced.
+// String renders the canonical ref form: bare name local, else
+// <source>/<spec-file>::<name> (spec file defaults to che.yml).
 func (r ProfileSourceRecipe) String() string {
 	if r.URI == "" {
 		return r.ProfileName
 	}
-	return r.URI + "::" + r.ProfileName
+	return r.URI + "/" + cmp.Or(r.SpecFile, "che.yml") + "::" + r.ProfileName
 }
 
-// UnmarshalYAML decodes an include.profiles entry: scalar -> local profile
-// name; {ref, options, env} object -> sourced ref (options.source lifts to
-// URI; env allowed on sourced entries only).
+// UnmarshalYAML decodes an include.profiles entry: a scalar is a local profile
+// name; an object's `source` is `<source>/<spec-file>::<profile>` (bare
+// `<profile>` -> local) with `options`/`env` alongside. Splits source into URI
+// + SpecFile + ProfileName; env is allowed on sourced entries only.
 func (r *ProfileSourceRecipe) UnmarshalYAML(value *yaml.Node) error {
+	var scalar string
 	type alias ProfileSourceRecipe
-	if err := decodeScalarOr(value, &r.ProfileName, (*alias)(r)); err != nil {
+	if err := decodeScalarOr(value, &scalar, (*alias)(r)); err != nil {
 		return err
 	}
-	if r.ProfileName == "" {
-		return fmt.Errorf("include.profiles entry missing ref")
+	src := cmp.Or(scalar, r.Src)
+	if src == "" {
+		return fmt.Errorf("include.profiles entry missing source")
 	}
-	r.URI = r.Options.Source
-	r.Options.Source = ""
+	uri, specFile, profile, err := splitSourceRef(src)
+	if err != nil {
+		return err
+	}
+	r.URI, r.SpecFile, r.ProfileName = uri, specFile, profile
+	r.Src = ""
 	if r.URI == "" && len(r.Env) > 0 {
-		return fmt.Errorf("include.profiles entry %q: env requires options.source", r.ProfileName)
+		return fmt.Errorf("include.profiles entry %q: env requires a source", r.ProfileName)
 	}
 	return nil
+}
+
+// splitSourceRef splits `<source>/<spec-file>::<profile>` into its parts. No
+// `::` -> a bare local profile name (empty URI + spec file). Otherwise the last
+// `/`-segment before `::` is the spec file (must end in .yml, distinguishing it
+// from a `.git` source suffix), and the rest is the source.
+func splitSourceRef(src string) (uri, specFile, profile string, err error) {
+	i := strings.LastIndex(src, "::")
+	if i < 0 {
+		return "", "", src, nil
+	}
+	ref, profile := src[:i], src[i+2:]
+	if profile == "" {
+		return "", "", "", fmt.Errorf("include.profiles source %q: missing profile name", src)
+	}
+	// [why] split on the last '/' by hand: path.Dir collapses the // in
+	// file:// / https:// URLs.
+	slash := strings.LastIndex(ref, "/")
+	if slash <= 0 {
+		return "", "", "", fmt.Errorf("include.profiles source %q: needs a <source>/<spec-file>.yml::<profile> path", src)
+	}
+	dir, file := ref[:slash], ref[slash+1:]
+	if !strings.HasSuffix(file, ".yml") {
+		return "", "", "", fmt.Errorf("include.profiles source %q: needs a <source>/<spec-file>.yml::<profile> path", src)
+	}
+	return dir, file, profile, nil
 }
 
 // [<] 🤖🤖

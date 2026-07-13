@@ -7,12 +7,11 @@ cases:
       args: [entry: base]
     expected:
       output: {source: "", profile: base, sourceType: filesystem, string: base}
-  - name: ShouldDecodeRichRemoteEntry
+  - name: ShouldDecodeRemoteSourceRef
     input:
       args:
         - entry: |
-            ref: gitlabGroup
-            options: {source: "@https://gitlab.com/konradodwrot/workspace.git"}
+            source: "@https://gitlab.com/konradodwrot/workspace.git/che.yml::gitlabGroup"
             env: {GITLAB_GROUP: konradodwrot}
     expected:
       output:
@@ -20,44 +19,66 @@ cases:
         profile: gitlabGroup
         sourceType: remote
         env: {GITLAB_GROUP: konradodwrot}
-        string: "@https://gitlab.com/konradodwrot/workspace.git::gitlabGroup"
-  - name: ShouldDecodeRichDirEntryAsFilesystem
+        string: "@https://gitlab.com/konradodwrot/workspace.git/che.yml::gitlabGroup"
+  - name: ShouldDecodeRemoteSourceRefWithNestedSpecFile
     input:
       args:
         - entry: |
-            ref: p
-            options: {source: ./plugin}
+            source: "@https://gitlab.com/g/r.git/sub/che.yml::p"
     expected:
-      output: {source: ./plugin, profile: p, sourceType: filesystem, string: ./plugin::p}
-  - name: ShouldDecodeTildeDirEntryAsFilesystem
+      output:
+        source: "@https://gitlab.com/g/r.git/sub"
+        profile: p
+        sourceType: remote
+        string: "@https://gitlab.com/g/r.git/sub/che.yml::p"
+  - name: ShouldDecodeDirSourceRefAsFilesystem
     input:
       args:
         - entry: |
-            ref: p
-            options: {source: ~/x}
+            source: ./plugin/che.yml::p
     expected:
-      output: {source: ~/x, profile: p, sourceType: filesystem, string: ~/x::p}
+      output: {source: ./plugin, profile: p, sourceType: filesystem, string: ./plugin/che.yml::p}
+  - name: ShouldDecodeNestedDirSourceRef
+    input:
+      args:
+        - entry: |
+            source: ./a/b/che.yml::cli
+    expected:
+      output: {source: ./a/b, profile: cli, sourceType: filesystem, string: ./a/b/che.yml::cli}
   - name: ShouldErrorOnEnvWithoutSource
     input:
       args:
         - entry: |
-            ref: p
+            source: p
             env: {A: b}
     expected:
-      errorOutput: ['env requires options.source']
-  - name: ShouldErrorOnMissingRef
+      errorOutput: ['env requires a source']
+  - name: ShouldErrorOnMissingSource
     input:
       args:
         - entry: |
-            options: {source: ./plugin}
+            env: {A: b}
     expected:
-      errorOutput: ['include.profiles entry missing ref']
-  - name: ShouldErrorOnEmptyRemoteURL
+      errorOutput: ['include.profiles entry missing source']
+  - name: ShouldErrorOnMissingProfileName
     input:
       args:
         - entry: |
-            ref: p
-            options: {source: "@"}
+            source: "@https://gitlab.com/g/r.git/che.yml::"
     expected:
-      errorOutput: ['empty git url']
+      errorOutput: ['missing profile name']
+  - name: ShouldErrorOnSourceWithoutSpecFileSegment
+    input:
+      args:
+        - entry: |
+            source: "@https://gitlab.com/g/r.git::p"
+    expected:
+      errorOutput: ['needs a <source>/<spec-file>.yml::<profile> path']
+  - name: ShouldErrorOnBareDirSourceWithoutSpecFile
+    input:
+      args:
+        - entry: |
+            source: "sibling::cli"
+    expected:
+      errorOutput: ['needs a <source>/<spec-file>.yml::<profile> path']
 # [<] 🤖🤖

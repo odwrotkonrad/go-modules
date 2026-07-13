@@ -13,10 +13,10 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	"gitlab.com/konradodwrot/go-modules/che/internal/config"
 	"gitlab.com/konradodwrot/go-modules/che/internal/execx"
 	"gitlab.com/konradodwrot/go-modules/che/internal/host"
 	"gitlab.com/konradodwrot/go-modules/che/internal/log"
+	"gitlab.com/konradodwrot/go-modules/che/internal/options"
 	"gitlab.com/konradodwrot/go-modules/che/internal/spec"
 	"gitlab.com/konradodwrot/go-modules/che/internal/testutil"
 	"gitlab.com/konradodwrot/go-modules/lib/testyml"
@@ -109,9 +109,9 @@ func TestPrepareSpecs(t *testing.T) {
 				k, v, _ := strings.Cut(kv, "=")
 				envBefore[k] = v
 			}
-			opts := config.Options{
+			opts := options.Options{
 				SkipRemoteRefs: knobs.SkipRemoteRefs,
-				ValidateSpec:   config.ValidateSpecMode(testyml.Expand(knobs.ValidateSpec, vars)),
+				ValidateSpec:   options.ValidateSpecMode(testyml.Expand(knobs.ValidateSpec, vars)),
 				Debug:          knobs.Debug,
 			}
 			log.SetDebug(knobs.Debug)
@@ -201,19 +201,68 @@ func TestPrepareOptionsPrecedence(t *testing.T) {
 	})
 	prepEnv(t, repo)
 
-	opts, err := PrepareOptions(config.Options{})
+	opts, err := PrepareOptions(options.Options{})
 	require.NoError(t, err)
-	assert.Equal(t, config.ValidateSpec.Error, opts.ValidateSpec, "yaml layer over default")
+	assert.Equal(t, options.ValidateSpec.Error, opts.ValidateSpec, "yaml layer over default")
 	assert.True(t, opts.Debug, "yaml debug over default")
 
 	t.Setenv("CHE_VALIDATE_SPEC", "warn")
-	opts, err = PrepareOptions(config.Options{})
+	opts, err = PrepareOptions(options.Options{})
 	require.NoError(t, err)
-	assert.Equal(t, config.ValidateSpec.Warn, opts.ValidateSpec, "env var over yaml")
+	assert.Equal(t, options.ValidateSpec.Warn, opts.ValidateSpec, "env var over yaml")
 
-	opts, err = PrepareOptions(config.Options{ValidateSpec: config.ValidateSpec.Error})
+	opts, err = PrepareOptions(options.Options{ValidateSpec: options.ValidateSpec.Error})
 	require.NoError(t, err)
-	assert.Equal(t, config.ValidateSpec.Error, opts.ValidateSpec, "flag over env var")
+	assert.Equal(t, options.ValidateSpec.Error, opts.ValidateSpec, "flag over env var")
+}
+
+// TestWorkingDirectoryCascade: profile > spec > che for options.workingDirectory,
+// and the resolved tree feeds classification (links come from it).
+func TestWorkingDirectoryCascade(t *testing.T) {
+	repo := testutil.Repo(t, map[string]string{
+		"che.yml": "options:\n  workingDirectory: spectree\n" +
+			"p:\n  options: {autoDiscover: true}\n  include:\n    link: [HOME/**]\n" +
+			"q:\n  options: {autoDiscover: true, workingDirectory: proftree}\n  include:\n    link: [HOME/**]\n",
+		"spectree/HOME/.config/a": "a\n",
+		"proftree/HOME/.config/b": "b\n",
+	})
+	home := prepEnv(t, repo)
+
+	root, err := PrepareSpecs(options.Options{SkipExecIf: true}, spec.SpecSourceRecipe{})
+	require.NoError(t, err)
+	byName := map[string]*ProfileReady{}
+	for _, pr := range root.AllProfiles() {
+		byName[pr.Source.GetProfileName()] = pr
+	}
+
+	eval := func(p string) string { r, _ := filepath.EvalSymlinks(p); return r }
+	// p: inherits the spec-level workingDirectory.
+	assert.Equal(t, eval(filepath.Join(repo, "spectree")), eval(byName["p"].workingDir))
+	// q: its own workingDirectory wins.
+	assert.Equal(t, eval(filepath.Join(repo, "proftree")), eval(byName["q"].workingDir))
+
+	linkDest := func(pr *ProfileReady) string {
+		for _, op := range pr.OperationsReady {
+			if lo, ok := op.(*LinkOperationReady); ok && len(lo.Links) > 0 {
+				return host.New(pr.Source.DirectoryPath, pr.workingDir, home, "x", options.Options{}).ToDest(lo.Links[0].Rel)
+			}
+		}
+		return ""
+	}
+	assert.Equal(t, filepath.Join(home, ".config/a"), linkDest(byName["p"]), "p links from spectree")
+	assert.Equal(t, filepath.Join(home, ".config/b"), linkDest(byName["q"]), "q links from proftree")
+
+	// che level (flag) seeds the default when the spec omits it.
+	repo2 := testutil.Repo(t, map[string]string{
+		"che.yml":                "r:\n  options: {autoDiscover: true}\n  include:\n    link: [HOME/**]\n",
+		"chetree/HOME/.config/c": "c\n",
+	})
+	prepEnv(t, repo2)
+	root2, err := PrepareSpecs(options.Options{SkipExecIf: true, WorkingDirectory: "chetree"}, spec.SpecSourceRecipe{})
+	require.NoError(t, err)
+	wantWD, _ := filepath.EvalSymlinks(filepath.Join(repo2, "chetree"))
+	gotWD, _ := filepath.EvalSymlinks(root2.AllProfiles()[0].workingDir)
+	assert.Equal(t, wantWD, gotWD, "che-level flag default")
 }
 
 // TestWithEnv: overlay shadows, sets, and restores the process env.

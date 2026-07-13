@@ -1,4 +1,5 @@
 ##[>] 🤖🤖
+options: {workingDirectory: root}
 cli/macos:
   options: {autoDiscover: true}
   include:

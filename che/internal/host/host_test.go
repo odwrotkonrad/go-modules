@@ -8,7 +8,7 @@ import (
 
 	"github.com/stretchr/testify/assert"
 
-	"gitlab.com/konradodwrot/go-modules/che/internal/config"
+	"gitlab.com/konradodwrot/go-modules/che/internal/options"
 	"gitlab.com/konradodwrot/go-modules/che/internal/testutil"
 	"gitlab.com/konradodwrot/go-modules/lib/testyml"
 )
@@ -29,7 +29,7 @@ func TestPrependEnvVar(t *testing.T) {
 func TestSrc(t *testing.T) {
 	testyml.Eq(t, td, "testdata/spec/funcs/src.test.spec.yml", func(t *testing.T, c testyml.Case[string]) (string, error) {
 		a := c.Input.Args
-		h := New(a.String(t, 0), "/Users/x", testutil.CheProfile, config.Options{})
+		h := New(a.String(t, 0), filepath.Join(a.String(t, 0), "root"), "/Users/x", testutil.CheProfile, options.Options{})
 		return h.Src(a.String(t, 1)), nil
 	})
 }
@@ -44,7 +44,7 @@ func TestResolveScripts(t *testing.T) {
 			files[rel] = "#!/bin/sh\n"
 		}
 		dir := testutil.Tree(t, files)
-		h := New(dir, "/Users/x", testutil.CheProfile, config.Options{})
+		h := New(dir, filepath.Join(dir, "root"), "/Users/x", testutil.CheProfile, options.Options{})
 		got, err := h.ResolveScripts(a.Strings(t, 1))
 		if c.Expected.Check(t, err) {
 			return

@@ -56,7 +56,7 @@ func (a *app) opCmd(o opCmd) *cobra.Command {
 	}
 	switch o.name {
 	case "render-templates":
-		cmd.Flags().BoolVar(&a.config.RenderSkipSecrets, "skip-secrets", false,
+		cmd.Flags().BoolVar(&a.flags.RenderSkipSecrets, "skip-secrets", false,
 			"skip sources carrying op:// secret refs (logged, dests untouched); env: CHE_RENDER_TEMPLATES_SKIP_SECRETS")
 	case "run-scripts":
 		cmd.Use = "run-scripts [name...]"

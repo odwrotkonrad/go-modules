@@ -11,7 +11,7 @@ import (
 
 	"github.com/stretchr/testify/require"
 
-	"gitlab.com/konradodwrot/go-modules/che/internal/config"
+	"gitlab.com/konradodwrot/go-modules/che/internal/options"
 	"gitlab.com/konradodwrot/go-modules/che/internal/spec"
 	"gitlab.com/konradodwrot/go-modules/che/internal/testutil"
 	"gitlab.com/konradodwrot/go-modules/lib/testyml"
@@ -53,7 +53,7 @@ func TestDryRunDelta(t *testing.T) {
 		run, ok := ops[op]
 		require.Truef(t, ok, "unknown command %q", c.Context.Command)
 		covered[op] = true
-		h, res, dir := setupHost(t, config.Options{DryRun: config.DryRun.Delta})
+		h, res, dir := setupHost(t, options.Options{DryRun: options.DryRun.Delta})
 		before := snapshotTree(t, dir)
 		out, err := testutil.CaptureStdout(t, func() error { return run(h, res) })
 		require.NoErrorf(t, err, "%s dry-run", op)
@@ -111,17 +111,17 @@ func TestDryRunAll(t *testing.T) {
 		require.Truef(t, ok, "unknown command %q", c.Context.Command)
 		dir, home := testutil.CheRepo(t)
 		res := makeProfile(t, dir, testutil.CheProfile)
-		dest := settle(t, New(dir, home, testutil.CheProfile, config.Options{}), res)
+		dest := settle(t, New(dir, filepath.Join(dir, "root"), home, testutil.CheProfile, options.Options{}), res)
 		vars := map[string]string{"DEST": dest}
 
-		delta := New(dir, home, testutil.CheProfile, config.Options{DryRun: config.DryRun.Delta})
+		delta := New(dir, filepath.Join(dir, "root"), home, testutil.CheProfile, options.Options{DryRun: options.DryRun.Delta})
 		deltaOut, err := testutil.CaptureStdout(t, func() error { return ops[op](delta, res) })
 		require.NoError(t, err)
 		for _, f := range c.NotExpected.StdOut {
 			testyml.MustNotMatch(t, testutil.StripANSI(deltaOut), testyml.Expand(f, vars))
 		}
 
-		all := New(dir, home, testutil.CheProfile, config.Options{DryRun: config.DryRun.All})
+		all := New(dir, filepath.Join(dir, "root"), home, testutil.CheProfile, options.Options{DryRun: options.DryRun.All})
 		allOut, err := testutil.CaptureStdout(t, func() error { return ops[op](all, res) })
 		require.NoError(t, err)
 		for _, f := range c.Expected.StdOut {

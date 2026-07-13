@@ -16,6 +16,7 @@ sourced profile refs included).
 | `--skip-exec-if` | `CHE_SKIP_EXEC_IF` | `bool` | `false` | treat every execIf predicate as passing |
 | `--skip-remote-refs` | `CHE_SKIP_REMOTE_REFS` | `bool` | `false` | skip sourced include.profiles refs, load only the local repo's specs |
 | `--validate-spec` | `CHE_VALIDATE_SPEC` | `warn (log violations)` \| `error (abort on violations)` | `warn` | validate each loaded che.yml spec against the JSON Schema |
+| `--working-directory` | `CHE_WORKING_DIRECTORY` | `string` |  | the load-ops source tree (che level; spec/profile options.workingDirectory override); default root |
 
 ## Commands
 

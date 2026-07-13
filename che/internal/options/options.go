@@ -1,5 +1,5 @@
-// Package config models che's runtime options: flag values finalized by Resolve.
-package config
+// Package options models che's runtime options: flag values finalized by Resolve.
+package options
 
 // [>] 🤖🤖
 
@@ -25,6 +25,7 @@ func (c *Options) Resolve(l SpecLayer) error {
 		return fmt.Errorf("invalid --validate-spec mode %q: want warn or error", c.ValidateSpec)
 	}
 	c.Dir = cmp.Or(c.Dir, os.Getenv("CHE_DIR"))
+	c.WorkingDirectory = cmp.Or(c.WorkingDirectory, os.Getenv("CHE_WORKING_DIRECTORY"))
 	c.Profile = cmp.Or(c.Profile, os.Getenv("CHE_PROFILE"))
 	c.SkipExecIf = boolOrEnv(c.SkipExecIf, "CHE_SKIP_EXEC_IF")
 	c.SkipRemoteRefs = boolOrEnv(c.SkipRemoteRefs, "CHE_SKIP_REMOTE_REFS")

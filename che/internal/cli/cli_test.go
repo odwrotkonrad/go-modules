@@ -13,8 +13,8 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"gitlab.com/konradodwrot/go-modules/che/internal/che"
-	"gitlab.com/konradodwrot/go-modules/che/internal/config"
 	"gitlab.com/konradodwrot/go-modules/che/internal/host"
+	"gitlab.com/konradodwrot/go-modules/che/internal/options"
 	"gitlab.com/konradodwrot/go-modules/che/internal/testutil"
 	"gitlab.com/konradodwrot/go-modules/lib/testyml"
 )
@@ -33,7 +33,7 @@ func repoEnv(t *testing.T, pwd string) (*app, *cobra.Command, string) {
 	require.NoError(t, os.MkdirAll(home, 0o755))
 	a := New()
 	root := a.Root()
-	a.config.Dir = dir
+	a.flags.Dir = dir
 	t.Setenv("CHE_SKIP_EXEC_IF", "1")
 	t.Setenv("HOME", home)
 	t.Setenv("XDG_DATA_HOME", filepath.Join(home, ".local/share"))
@@ -45,12 +45,12 @@ func setupMock(t *testing.T, pwd, profile string, decl map[string]string) (*app,
 	t.Helper()
 	a, root, home := repoEnv(t, pwd)
 	t.Setenv("CHE_DRY_RUN", "")
-	a.config.Profile = profile
+	a.flags.Profile = profile
 
 	m := testutil.ApplyMocks(t, decl)
-	testyml.Swap(t, &che.NewHost, func(repoRoot, home, profile string, cfg config.Options) host.Host {
+	testyml.Swap(t, &che.NewHost, func(repoRoot, root, home, profile string, cfg options.Options) host.Host {
 		reader := &testutil.FileSystemMockReader{Roots: []string{repoRoot, home}}
-		return host.New(repoRoot, home, profile, cfg).WithFS(m.FS).WithFSReader(reader)
+		return host.New(repoRoot, root, home, profile, cfg).WithFS(m.FS).WithFSReader(reader)
 	})
 	testyml.Swap(t, &host.Sleep, testutil.SleepMock)
 
@@ -72,10 +72,10 @@ func TestInit(t *testing.T) {
 			for k, v := range c.Context.Env {
 				t.Setenv(k, v)
 			}
-			a.config.Profile = c.Input.Args.String(t, 0)
-			a.config.ValidateSpec = config.ValidateSpecMode(c.Input.Args.String(t, 1))
+			a.flags.Profile = c.Input.Args.String(t, 0)
+			a.flags.ValidateSpec = options.ValidateSpecMode(c.Input.Args.String(t, 1))
 			if extra := c.Input.Args.String(t, 2); extra != "" {
-				f, err := os.OpenFile(filepath.Join(a.config.Dir, "che.yml"), os.O_APPEND|os.O_WRONLY, 0o644)
+				f, err := os.OpenFile(filepath.Join(a.flags.Dir, "che.yml"), os.O_APPEND|os.O_WRONLY, 0o644)
 				require.NoError(t, err)
 				_, err = f.WriteString("\n" + extra)
 				require.NoError(t, err)
@@ -89,7 +89,7 @@ func TestInit(t *testing.T) {
 			for _, p := range a.root.AllProfiles() {
 				names = append(names, p.Ref())
 			}
-			got := buildWant{Profiles: strings.Join(names, ","), DryRunAll: a.opts.DryRun == config.DryRun.All}
+			got := buildWant{Profiles: strings.Join(names, ","), DryRunAll: a.opts.DryRun == options.DryRun.All}
 			assert.Equal(t, c.Expected.Output, got)
 		})
 }

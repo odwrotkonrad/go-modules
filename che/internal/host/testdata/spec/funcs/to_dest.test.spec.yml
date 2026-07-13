@@ -27,4 +27,19 @@ cases:
       args: [rel: /var/log/otelcol]
     expected:
       output: /var/log/otelcol
+  - name: ShouldExpandHomeEnvVarInDest
+    input:
+      args: [rel: $HOME/.config/zsh]
+    expected:
+      output: /Users/x/.config/zsh
+  - name: ShouldExpandBracedHomeEnvVarInDest
+    input:
+      args: [rel: "${HOME}/.ssh"]
+    expected:
+      output: /Users/x/.ssh
+  - name: ShouldMapBareHomeEnvVarToHomeDir
+    input:
+      args: [rel: $HOME]
+    expected:
+      output: /Users/x
 # [<] 🤖🤖

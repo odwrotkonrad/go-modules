@@ -13,8 +13,8 @@ import (
 	"syscall"
 	"time"
 
-	"gitlab.com/konradodwrot/go-modules/che/internal/config"
 	"gitlab.com/konradodwrot/go-modules/che/internal/fsutil"
+	"gitlab.com/konradodwrot/go-modules/che/internal/options"
 	"gitlab.com/konradodwrot/go-modules/che/internal/spec"
 )
 
@@ -86,7 +86,7 @@ func (h Host) ensureConfigDir(rel string) error {
 // isDirSettled reports whether dest already exists as a dir and may be skipped
 // (dry-run=all forces every dest to report, so it never skips).
 func (h Host) isDirSettled(dest string) bool {
-	if h.cfg.DryRun == config.DryRun.All {
+	if h.cfg.DryRun == options.DryRun.All {
 		return false
 	}
 	fi, err := h.reader.Stat(dest)
@@ -261,7 +261,7 @@ func (h Host) linkOne(item spec.FileItem, dest string) error {
 // isLinkSettled reports whether dest already resolves to src (skippable). Dry-run=all
 // forces every dest to report, so it never skips.
 func (h Host) isLinkSettled(src, dest string) bool {
-	if h.cfg.DryRun == config.DryRun.All {
+	if h.cfg.DryRun == options.DryRun.All {
 		return false
 	}
 	destResolved, err := h.reader.EvalSymlinks(dest)
@@ -281,7 +281,7 @@ func (h Host) MkCopies(copies []spec.FileItem, dirRels []string) error {
 
 func (h Host) copyOne(item spec.FileItem, dest string) error {
 	src := h.Src(item.Rel)
-	if h.cfg.DryRun != config.DryRun.All && h.isSameContent(src, dest) {
+	if h.cfg.DryRun != options.DryRun.All && h.isSameContent(src, dest) {
 		return h.fixPerms("cp", dest, item)
 	}
 	mode, _ := parseMode(item.Chmod)
@@ -327,8 +327,10 @@ func parseMode(s string) (os.FileMode, bool) {
 	return os.FileMode(n), true
 }
 
+// expandHome expands env vars ($HOME bound to h.Home) then the ~/ prefix, so a
+// dest may be written with $VAR / $HOME or ~/.
 func (h Host) expandHome(p string) string {
-	return fsutil.ExpandHome(p, h.Home)
+	return fsutil.ExpandHome(h.expandEnv(p), h.Home)
 }
 
 func (h Host) isSameContent(a, b string) bool {

@@ -12,7 +12,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	"gitlab.com/konradodwrot/go-modules/che/internal/config"
+	"gitlab.com/konradodwrot/go-modules/che/internal/options"
 	"gitlab.com/konradodwrot/go-modules/che/internal/spec"
 	"gitlab.com/konradodwrot/go-modules/che/internal/testutil"
 	"gitlab.com/konradodwrot/go-modules/lib/testyml"
@@ -69,7 +69,7 @@ func TestPermsDrift(t *testing.T) {
 		require.NoError(t, err)
 		modeBefore := fi.Mode()
 
-		delta := New(home, home, testutil.CheProfile, config.Options{DryRun: config.DryRun.Delta})
+		delta := New(home, filepath.Join(home, "root"), home, testutil.CheProfile, options.Options{DryRun: options.DryRun.Delta})
 		deltaRun := func() string {
 			out, err := testutil.CaptureStdout(t, func() error { return delta.MkDirs(items) })
 			require.NoError(t, err)
@@ -90,7 +90,7 @@ func TestPermsDrift(t *testing.T) {
 		if w.WetPerm == "" {
 			return
 		}
-		wet := New(home, home, testutil.CheProfile, config.Options{})
+		wet := New(home, filepath.Join(home, "root"), home, testutil.CheProfile, options.Options{})
 		_, err = testutil.CaptureStdout(t, func() error { return wet.MkDirs(items) })
 		require.NoError(t, err)
 		fi, err = os.Stat(dest)

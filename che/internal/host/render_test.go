@@ -10,7 +10,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	"gitlab.com/konradodwrot/go-modules/che/internal/config"
+	"gitlab.com/konradodwrot/go-modules/che/internal/options"
 	"gitlab.com/konradodwrot/go-modules/che/internal/spec"
 	"gitlab.com/konradodwrot/go-modules/che/internal/testutil"
 	"gitlab.com/konradodwrot/go-modules/lib/testyml"
@@ -65,7 +65,7 @@ func TestRenderTemplates(t *testing.T) {
 		for _, d := range dirs {
 			require.NoError(t, os.MkdirAll(filepath.Join(root, d), 0o755))
 		}
-		h := New(root, filepath.Join(root, "home"), testutil.CheProfile, config.Options{})
+		h := New(root, filepath.Join(root, "root"), filepath.Join(root, "home"), testutil.CheProfile, options.Options{})
 		if remote {
 			h = h.WithFetcher(testutil.RemoteMockFetcher(fetch))
 		}

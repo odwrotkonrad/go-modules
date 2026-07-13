@@ -3,8 +3,8 @@ package host
 // [>] 🤖🤖
 
 import (
-	"gitlab.com/konradodwrot/go-modules/che/internal/config"
 	"gitlab.com/konradodwrot/go-modules/che/internal/fsutil"
+	"gitlab.com/konradodwrot/go-modules/che/internal/options"
 	"gitlab.com/konradodwrot/go-modules/che/internal/spec"
 	"gitlab.com/konradodwrot/go-modules/che/render/render"
 )
@@ -24,7 +24,7 @@ type Host struct {
 	Root     string // <configs>/root, the load ops' source subtree
 	Home     string
 	Profile  string // "<space>/<os>-<arch>"
-	cfg      config.Options
+	cfg      options.Options
 	logSub   string
 	fs       fsutil.FileSystemWriter
 	reader   fsutil.FileSystemReader

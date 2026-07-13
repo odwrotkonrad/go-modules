@@ -1,4 +1,4 @@
-package config
+package options
 
 // [>] 🤖🤖
 
@@ -13,7 +13,7 @@ package config
 // that would change), all (every dest, as if nothing existed at the destination).
 type DryRunMode string
 
-// DryRun namespaces the DryRunMode values: config.DryRun.Off / .Delta / .All.
+// DryRun namespaces the DryRunMode values: options.DryRun.Off / .Delta / .All.
 var DryRun = struct{ Off, Delta, All DryRunMode }{"", "delta", "all"}
 
 // ValidateSpecMode selects how che.yml schema violations report: warn (log)
@@ -26,6 +26,7 @@ var ValidateSpec = struct{ Warn, Error ValidateSpecMode }{"warn", "error"}
 // Options carries every runtime option.
 type Options struct {
 	Dir               string
+	WorkingDirectory  string
 	DryRun            DryRunMode
 	ValidateSpec      ValidateSpecMode
 	Profile           string

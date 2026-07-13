@@ -84,13 +84,9 @@
           "type": "boolean",
           "description": "print debug-level lines around this profile (nil: inherit spec options, then che level)"
         },
-        "directory": {
+        "workingDirectory": {
           "type": "string",
-          "description": "anchor the profile's files at this directory (empty: inherit spec options, then the checkout)"
-        },
-        "source": {
-          "type": "string",
-          "description": "include.profiles rich entries only: the containing spec's source, @\u003cgiturl\u003e or \u003cdir\u003e"
+          "description": "the profile's load-ops source tree (empty: inherit spec options, then che level, then the checkout)"
         }
       },
       "additionalProperties": false,
@@ -100,7 +96,7 @@
       "properties": {
         "options": {
           "$ref": "#/$defs/ProfileOptions",
-          "description": "when the profile runs: autoDiscover opts in to bare-che runs, execIf predicates must ALL pass; debug/directory cascade (most nested wins)"
+          "description": "when the profile runs: autoDiscover opts in to bare-che runs, execIf predicates must ALL pass; debug/workingDirectory cascade (most nested wins)"
         },
         "include": {
           "$ref": "#/$defs/includeSet"
@@ -111,7 +107,7 @@
       },
       "additionalProperties": false,
       "type": "object",
-      "description": "one profile block: options self-describe eligibility, include.profiles compose refs in order (local scalars, sourced {ref, options, env}), include adds, exclude filters last and wins"
+      "description": "one profile block: options self-describe eligibility, include.profiles compose refs in order (local scalars, sourced {source, options, env}), include adds, exclude filters last and wins"
     },
     "ProfileSourceRecipe": {
       "oneOf": [
@@ -121,9 +117,9 @@
         },
         {
           "properties": {
-            "ref": {
+            "source": {
               "type": "string",
-              "description": "profile name within the referenced spec"
+              "description": "\u003csource\u003e/\u003cspec-file\u003e.yml::\u003cprofile\u003e: source @\u003cgiturl\u003e (remote) or \u003cdir\u003e (local); bare \u003cprofile\u003e for the local spec"
             },
             "options": {
               "$ref": "#/$defs/ProfileOptions"
@@ -133,15 +129,15 @@
                 "type": "string"
               },
               "type": "object",
-              "description": "envs exported around everything done for the referenced profile (options.source entries only)"
+              "description": "envs exported around everything done for the referenced profile (sourced entries only)"
             }
           },
           "additionalProperties": false,
           "type": "object",
           "required": [
-            "ref"
+            "source"
           ],
-          "description": "sourced profile ref: options.source locates the containing spec, env overlays its run"
+          "description": "sourced profile ref: source is \u003csource\u003e/\u003cspec-file\u003e.yml::\u003cprofile\u003e, options override its options, env overlays its run"
         }
       ]
     },
@@ -162,9 +158,9 @@
           "type": "boolean",
           "description": "default for profiles that don't set it"
         },
-        "directory": {
+        "workingDirectory": {
           "type": "string",
-          "description": "anchor the spec's files at this directory (absolute, relative to the checkout, ~/, $VAR); che.yml lookup stays at the checkout"
+          "description": "the load-ops source tree (absolute, relative to the checkout, ~/, $VAR, env vars expanded); default root; the RootPrefix logical token maps onto it, the HOME/ folder under it maps onto $HOME"
         },
         "validateSpec": {
           "type": "string",
@@ -177,7 +173,7 @@
       },
       "additionalProperties": false,
       "type": "object",
-      "description": "reserved top-level options: block: spec-wide defaults (execIf gate, autoDiscover/debug/directory) + che knobs (validateSpec)"
+      "description": "reserved top-level options: block: spec-wide defaults (execIf gate, autoDiscover/debug/workingDirectory) + che knobs (validateSpec)"
     },
     "dirGroup": {
       "properties": {
@@ -364,7 +360,7 @@
             "$ref": "#/$defs/ProfileSourceRecipe"
           },
           "type": "array",
-          "description": "profile refs composed depth-first before this profile's own payload: local profile name scalar, or {ref, options, env} with options.source locating another spec (its own checkout anchor)"
+          "description": "profile refs composed depth-first before this profile's own payload: local profile name scalar, or {source, options, env} where source is \u003csource\u003e/\u003cspec-file\u003e.yml::\u003cprofile\u003e locating a profile in another spec (its own checkout anchor)"
         },
         "link": {
           "items": {

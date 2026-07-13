@@ -2,6 +2,6 @@
 main:
   include:
     profiles:
-      - ref: nourl
+      - source: nourl
         env: {A: b}
 #[<] 🤖🤖

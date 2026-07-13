@@ -27,3 +27,4 @@ Flags:
       --skip-exec-if               treat every execIf predicate as passing; env: CHE_SKIP_EXEC_IF
       --skip-remote-refs           skip sourced include.profiles refs, load only the local repo's specs; env: CHE_SKIP_REMOTE_REFS
       --validate-spec string       validate each loaded che.yml spec against the JSON Schema; values: warn (log violations) | error (abort on violations); default: warn; env: CHE_VALIDATE_SPEC
+      --working-directory string   the load-ops source tree (che level; spec/profile options.workingDirectory override); default root; env: CHE_WORKING_DIRECTORY

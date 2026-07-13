@@ -5,11 +5,12 @@ package host
 import (
 	"fmt"
 	"os"
+	"path/filepath"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
 
-	"gitlab.com/konradodwrot/go-modules/che/internal/config"
+	"gitlab.com/konradodwrot/go-modules/che/internal/options"
 	"gitlab.com/konradodwrot/go-modules/che/internal/testutil"
 	"gitlab.com/konradodwrot/go-modules/lib/testyml"
 )
@@ -22,7 +23,7 @@ func fixtureHost(t *testing.T) Host {
 		"root/Library/LaunchAgents/gitlab-runner.plist.ontoHost.tpl":             "<plist/>\n",
 		"root/HOME/Library/LaunchAgents/load-defaults-config.plist.ontoHost.tpl": "<plist/>\n",
 	})
-	return New(dir, "/Users/x", "desktop/macos", config.Options{})
+	return New(dir, filepath.Join(dir, "root"), "/Users/x", "desktop/macos", options.Options{})
 }
 
 // svcWant mirrors Service for spec equality; "${GUI}" expands to gui/<uid>.

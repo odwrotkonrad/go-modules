@@ -37,7 +37,6 @@ che
         spec
           cmds
           funcs
-    config
     docgen
       testdata
         spec
@@ -56,6 +55,7 @@ che
       testdata
         spec
           funcs
+    options
     source
       testdata
         spec

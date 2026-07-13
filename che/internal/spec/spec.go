@@ -17,6 +17,9 @@ const (
 	TmplExt    = ".tpl"
 	CpExt      = ".ontoHost.cp"
 	RootPrefix = "root/"
+	// DefaultWorkingDir is the load-ops source tree when options.workingDirectory
+	// is unset: the checkout itself.
+	DefaultWorkingDir = "."
 )
 
 // tmplExts are the accepted template suffixes, longest first (informational
@@ -157,9 +160,6 @@ func (d *Doc) decodeKey(key string, node *yaml.Node) error {
 		var ps ProfileRecipe
 		if err := node.Decode(&ps); err != nil {
 			return fmt.Errorf("parse profile %q: %w", key, err)
-		}
-		if ps.Options.Source != "" {
-			return fmt.Errorf("profile %q: options.source is include.profiles-entry only", key)
 		}
 		ps.Source.ProfileName = key
 		d.ProfileRecipes = append(d.ProfileRecipes, ps)

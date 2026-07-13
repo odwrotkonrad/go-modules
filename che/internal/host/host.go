@@ -9,18 +9,22 @@ import (
 	"path/filepath"
 	"strings"
 
-	"gitlab.com/konradodwrot/go-modules/che/internal/config"
 	"gitlab.com/konradodwrot/go-modules/che/internal/fsutil"
 	"gitlab.com/konradodwrot/go-modules/che/internal/log"
+	"gitlab.com/konradodwrot/go-modules/che/internal/options"
 	"gitlab.com/konradodwrot/go-modules/che/render/render"
 )
 
 func (g gitFetcher) Fetch(ref string) (string, error) { return g.fetch(ref) }
 
-func New(repoRoot, home, profile string, cfg config.Options) Host {
+// New builds a Host anchored at repoRoot (che.yml + repo-relative
+// scripts/templates), with root the resolved load-ops source tree (the
+// options.workingDirectory value; the RootPrefix logical token and the HOME/
+// folder map onto it).
+func New(repoRoot, root, home, profile string, cfg options.Options) Host {
 	return Host{
 		RepoRoot: repoRoot,
-		Root:     filepath.Join(repoRoot, "root"),
+		Root:     root,
 		Home:     home,
 		Profile:  profile,
 		cfg:      cfg,
@@ -68,11 +72,11 @@ func (h Host) mutate(title, msg string, fn func() error) error {
 	return nil
 }
 
-func logMode(m config.DryRunMode) log.DryRun {
+func logMode(m options.DryRunMode) log.DryRun {
 	switch m {
-	case config.DryRun.Delta:
+	case options.DryRun.Delta:
 		return log.Delta
-	case config.DryRun.All:
+	case options.DryRun.All:
 		return log.All
 	default:
 		return log.Off
@@ -80,7 +84,7 @@ func logMode(m config.DryRunMode) log.DryRun {
 }
 
 // IsDryRun reports whether this is any dry run (delta or all).
-func (h Host) IsDryRun() bool { return h.cfg.DryRun != config.DryRun.Off }
+func (h Host) IsDryRun() bool { return h.cfg.DryRun != options.DryRun.Off }
 
 // Src maps a repo-relative path (under root/) to its absolute source path.
 func (h Host) Src(rel string) string { return filepath.Join(h.Root, rel) }
@@ -99,9 +103,13 @@ func (h Host) ResolveScripts(rels []string) ([]string, error) {
 	return out, nil
 }
 
-// ToDest maps a repo-relative path (under root/) to its live dest:
-// HOME or HOME/<rest> -> $HOME[/<rest>], else /<rest>.
+// ToDest maps a working-tree rel path to its live dest. Env vars expand first
+// (so specs can write $HOME/... dests), $HOME resolving to the invoking user's
+// home (h.Home, correct under sudo where the process $HOME differs). Then: an
+// already-absolute path stays (make-extra-dirs entries, $HOME-rooted dests),
+// the HOME tree folder maps onto h.Home, everything else is a system-root path.
 func (h Host) ToDest(rel string) string {
+	rel = h.expandEnv(rel)
 	if rel == "HOME" {
 		return h.Home
 	}
@@ -109,9 +117,20 @@ func (h Host) ToDest(rel string) string {
 		return filepath.Join(h.Home, rest)
 	}
 	if strings.HasPrefix(rel, "/") {
-		return rel // already a live absolute path (make-extra-dirs entries)
+		return rel
 	}
 	return "/" + rel
+}
+
+// expandEnv expands env vars in p, with $HOME/${HOME} bound to h.Home ([why]
+// the invoking user's home, not the process env, which diverges under sudo).
+func (h Host) expandEnv(p string) string {
+	return os.Expand(p, func(k string) string {
+		if k == "HOME" {
+			return h.Home
+		}
+		return os.Getenv(k)
+	})
 }
 
 // [<] 🤖🤖

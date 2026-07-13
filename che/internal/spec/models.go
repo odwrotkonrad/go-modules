@@ -16,7 +16,7 @@ import (
 //	  include  sources: other specs composed in (SpecSourceRecipe list)
 //	  ProfileRecipe  raw declared profile
 //	    Source          ProfileSourceRecipe stamped at parse
-//	    ProfileOptions  eligibility + cascade: autoDiscover, execIf, debug, directory
+//	    ProfileOptions  eligibility + cascade: autoDiscover, execIf, debug, workingDirectory
 //	    includeSet      additive payload per op, plus profiles: profile refs
 //	      linkEntry / entry / dirGroup   perm-groups (Perms cascade to items)
 //	        fileSpec / dirSpec           scalar-or-object union items
@@ -43,14 +43,19 @@ type SourceRecipe struct {
 	// URI locates the source: <dir> (absolute, relative, ~/, $VAR) or
 	// @<giturl>; "" -> the local repo.
 	URI string `yaml:"-"`
+	// SpecFile is the spec-file path within the source (relative to the
+	// resolved dir); "" -> che.yml.
+	SpecFile string `yaml:"-"`
 	// DirectoryPath is where the source lives locally; defaults: remote ->
 	// the XDG cache dir it clones into, filesystem -> the expanded URI dir,
 	// "" local -> the repo root. The directory option (cascade) lands here.
 	DirectoryPath string `yaml:"-"`
 }
 
-// SourceReady is the shared resolved-source parent. DirectoryPath is only the
-// checkout anchor: root/ subtree and HOME mapping stay hardcoded Host concerns.
+// SourceReady is the shared resolved-source parent. DirectoryPath is the
+// checkout anchor (che.yml + repo-relative scripts/templates). The load-ops
+// working dir and the $HOME-mapping folder are option-level (Che/Spec/Profile),
+// resolved and threaded separately, not source properties.
 type SourceReady struct {
 	DefinitionURI string
 	DirectoryPath string
@@ -68,15 +73,18 @@ type SpecSourceReady struct {
 }
 
 // ProfileSourceRecipe locates one profile within a spec: include.profiles
-// entries (scalar = local ProfileName; rich {ref, options, env} sets
-// options.source + env), and each ProfileRecipe's parse-stamped Source.
+// entries (scalar = local profile name; rich {source, options, env} where
+// source is <uri>/<spec-file>.yml::<profile>), and each ProfileRecipe's parse-stamped Source.
 type ProfileSourceRecipe struct {
 	SourceRecipe `yaml:"-"`
-	ProfileName  string `yaml:"ref"`
+	ProfileName  string `yaml:"-"`
+	// Src is the entry's source URI, <source>/<spec-file>.yml::<profile> (source: @<giturl> or
+	// <dir>; bare <profile> -> local). Split at decode into URI + SpecFile + ProfileName.
+	Src string `yaml:"source"`
 	// Options are the entry-set overrides of the referenced profile's own
-	// (one more cascade level, most nested wins); options.source lifts to URI.
+	// (one more cascade level, most nested wins).
 	Options ProfileOptions `yaml:"options"`
-	// Env is the overlay exported around the referenced profile (remote refs only).
+	// Env is the overlay exported around the referenced profile (sourced refs only).
 	Env map[string]string `yaml:"env"`
 }
 
@@ -101,17 +109,17 @@ type Doc struct {
 
 // Options is the top-level options: block: spec-wide defaults + che knobs.
 type Options struct {
-	ExecIf       []string `yaml:"execIf" jsonschema_description:"spec-level predicates: gate every profile of this spec (ANDed with each profile's own)"`
-	AutoDiscover *bool    `yaml:"autoDiscover" jsonschema_description:"default for profiles that don't set it"`
-	Debug        *bool    `yaml:"debug" jsonschema_description:"default for profiles that don't set it"`
-	Directory    string   `yaml:"directory" jsonschema_description:"anchor the spec's files at this directory (absolute, relative to the checkout, ~/, $VAR); che.yml lookup stays at the checkout"`
-	ValidateSpec string   `yaml:"validateSpec" jsonschema:"enum=warn,enum=error" jsonschema_description:"top-level only: how schema violations report; overridden by the flag and env var"`
+	ExecIf           []string `yaml:"execIf" jsonschema_description:"spec-level predicates: gate every profile of this spec (ANDed with each profile's own)"`
+	AutoDiscover     *bool    `yaml:"autoDiscover" jsonschema_description:"default for profiles that don't set it"`
+	Debug            *bool    `yaml:"debug" jsonschema_description:"default for profiles that don't set it"`
+	WorkingDirectory string   `yaml:"workingDirectory" jsonschema_description:"the load-ops source tree (absolute, relative to the checkout, ~/, $VAR, env vars expanded); default root; the RootPrefix logical token maps onto it, the HOME/ folder under it maps onto $HOME"`
+	ValidateSpec     string   `yaml:"validateSpec" jsonschema:"enum=warn,enum=error" jsonschema_description:"top-level only: how schema violations report; overridden by the flag and env var"`
 }
 
 // ProfileRecipe is one raw declared profile.
 type ProfileRecipe struct {
 	Source  ProfileSourceRecipe `yaml:"-" jsonschema:"-"`
-	Options ProfileOptions      `yaml:"options" jsonschema_description:"when the profile runs: autoDiscover opts in to bare-che runs, execIf predicates must ALL pass; debug/directory cascade (most nested wins)"`
+	Options ProfileOptions      `yaml:"options" jsonschema_description:"when the profile runs: autoDiscover opts in to bare-che runs, execIf predicates must ALL pass; debug/workingDirectory cascade (most nested wins)"`
 	Include includeSet          `yaml:"include"`
 	Exclude excludeSet          `yaml:"exclude"`
 }
@@ -119,16 +127,15 @@ type ProfileRecipe struct {
 // ProfileOptions self-describes when and where a profile runs. Pointer/zero
 // fields inherit the level above (profile > spec > che, most nested wins).
 type ProfileOptions struct {
-	ExecIf       []string `yaml:"execIf"`
-	AutoDiscover *bool    `yaml:"autoDiscover" jsonschema_description:"run on bare che (nil: inherit spec options, then false: runs only via --profile or include.profiles)"`
-	Debug        *bool    `yaml:"debug" jsonschema_description:"print debug-level lines around this profile (nil: inherit spec options, then che level)"`
-	Directory    string   `yaml:"directory" jsonschema_description:"anchor the profile's files at this directory (empty: inherit spec options, then the checkout)"`
-	Source       string   `yaml:"source" jsonschema_description:"include.profiles rich entries only: the containing spec's source, @<giturl> or <dir>"`
+	ExecIf           []string `yaml:"execIf"`
+	AutoDiscover     *bool    `yaml:"autoDiscover" jsonschema_description:"run on bare che (nil: inherit spec options, then false: runs only via --profile or include.profiles)"`
+	Debug            *bool    `yaml:"debug" jsonschema_description:"print debug-level lines around this profile (nil: inherit spec options, then che level)"`
+	WorkingDirectory string   `yaml:"workingDirectory" jsonschema_description:"the profile's load-ops source tree (empty: inherit spec options, then che level, then the checkout)"`
 }
 
 // includeSet is the additive payload.
 type includeSet struct {
-	Profiles        []ProfileSourceRecipe `yaml:"profiles" jsonschema_description:"profile refs composed depth-first before this profile's own payload: local profile name scalar, or {ref, options, env} with options.source locating another spec (its own checkout anchor)"`
+	Profiles        []ProfileSourceRecipe `yaml:"profiles" jsonschema_description:"profile refs composed depth-first before this profile's own payload: local profile name scalar, or {source, options, env} where source is <source>/<spec-file>.yml::<profile> locating a profile in another spec (its own checkout anchor)"`
 	Link            []linkEntry           `yaml:"link" jsonschema_description:"symlink-op entries, repo-relative under root/: glob string (dest derived 1:1) or {source, dest} sed-style rewrite"`
 	Copy            []entry               `yaml:"copy" jsonschema_description:"*.ontoHost.cp copy-op perm-groups"`
 	RenderTemplates []entry               `yaml:"renderTemplates" jsonschema_description:"*.tpl render-op perm-groups; sources repo-root-relative or remote (@<repo>//<path>[?ref=<ref>], explicit dest required), glob and derived-dest forms must be root/-prefixed"`
