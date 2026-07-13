@@ -84,7 +84,7 @@ var settlers = map[string]func(*testing.T, *ProfileReady, spec.OperationRecipes)
 	"make-links": func(t *testing.T, p *ProfileReady, r spec.OperationRecipes) string {
 		t.Helper()
 		item := r.MakeLinks.Links[0]
-		dest := p.toDest(item.Rel)
+		dest := p.toDest(spec.DestRel(item))
 		require.NoError(t, os.MkdirAll(filepath.Dir(dest), 0o755))
 		require.NoError(t, os.Symlink(p.resolveSrc(item.Rel), dest))
 		return dest

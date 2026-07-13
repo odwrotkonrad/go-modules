@@ -134,6 +134,9 @@ func (p *ProfileReady) resolveTemplateDests(item spec.FileItem) []tmplDest {
 	if len(item.Dests) == 0 {
 		return []tmplDest{{path: p.toDest(spec.TrimTmplExt(item.Rel)), host: true}}
 	}
+	if item.Derived { // glob dest rewrite: derived host dest, raw body like the bare-glob form
+		return []tmplDest{{path: p.toDest(item.Dests[0].Path), host: true}}
+	}
 	out := make([]tmplDest, len(item.Dests))
 	for i, d := range item.Dests {
 		// [why] expand env / ~ before the host-vs-repo decision so $HOME/... and
@@ -169,7 +172,7 @@ func (p *ProfileReady) renderTemplate(item spec.FileItem, dests []tmplDest) erro
 	if err != nil {
 		return err
 	}
-	if len(item.Dests) == 0 { // derived host dest: raw body, no Compose header
+	if len(item.Dests) == 0 || item.Derived { // derived host dest: raw body, no Compose header
 		return p.placeFile(dests[0].path, body, item)
 	}
 	for _, d := range dests {

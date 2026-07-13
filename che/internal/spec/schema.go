@@ -99,17 +99,23 @@ func scalarOr(scalarDesc string, o *jsonschema.Schema) *jsonschema.Schema {
 
 const destPathDesc = "dest path: relative -> repo, ~/ or absolute -> host"
 
+// destRuleSchema is the sed-style dest-rewrite string form shared by makeLinks
+// and makeCopies/renderTemplates glob sources.
+func destRuleSchema() *jsonschema.Schema {
+	return &jsonschema.Schema{
+		Description: "sed-style rewrite s<delim><pattern><delim><replacement><delim>[g] (Go regexp pattern, literal replacement so $HOME survives; g: every match, absent: first only), applied to the workingDirectory-relative dest path before host mapping (e.g. s#^HOME#$HOME# targets the invoking user's home)",
+		Type:        "string",
+		Pattern:     "^s\\W.+\\W(g)?$",
+	}
+}
+
 func (linkEntry) JSONSchema() *jsonschema.Schema {
 	o := obj("source file or glob with a sed-style dest rewrite", []string{"source", "dest"})
 	o.Properties.Set("source", &jsonschema.Schema{
 		Description: "file or glob, workingDirectory-relative",
 		Type:        "string",
 	})
-	o.Properties.Set("dest", &jsonschema.Schema{
-		Description: "sed-style rewrite s/<pattern>/<replacement>/[g] (Go regexp, $1 backrefs; g: every match, absent: first only), applied to the workingDirectory-relative dest path before host mapping",
-		Type:        "string",
-		Pattern:     "^s/.+/.*/g?$",
-	})
+	o.Properties.Set("dest", destRuleSchema())
 	return scalarOr("glob over git-tracked files (brace-expanded), workingDirectory-relative, dest derived 1:1", o)
 }
 
@@ -119,11 +125,14 @@ func (fileSpec) JSONSchema() *jsonschema.Schema {
 		Description: "source path (host sources workingDirectory-relative, repo-doc sources checkout-relative), or remote ref @<repo>//<path>[?ref=<ref>] (renderTemplates only, explicit dest required)",
 		Type:        "string",
 	})
-	o.Properties.Set("dest", &jsonschema.Schema{
-		Description: "dest paths: relative -> repo, ~/ or absolute -> host; omitted -> derived from the workingDirectory-relative source path",
-		Type:        "array",
-		Items:       &jsonschema.Schema{Ref: "#/$defs/DestSpec"},
-	})
+	o.Properties.Set("dest", &jsonschema.Schema{OneOf: []*jsonschema.Schema{
+		{
+			Description: "dest paths: relative -> repo, ~/ or absolute -> host; omitted -> derived from the workingDirectory-relative source path",
+			Type:        "array",
+			Items:       &jsonschema.Schema{Ref: "#/$defs/DestSpec"},
+		},
+		destRuleSchema(),
+	}})
 	o.Properties.Set("ctx", &jsonschema.Schema{
 		Description:          "renderTemplates only: values exposed as the template's root context (.key)",
 		Type:                 "object",

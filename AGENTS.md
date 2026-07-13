@@ -281,6 +281,12 @@ che
                 etc
                   grafana
                   zsh
+            tree-copy-template-rewrite
+              root
+                HOME
+                  .config
+                    foo
+                etc
             tree-empty
               root
             tree-exclude-script-glob

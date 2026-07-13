@@ -666,7 +666,7 @@ func (p *ProfileReady) Ref() string { return p.ref }
 func (p *ProfileReady) resolveRepoRoot() string { return p.Source.DirectoryPath }
 
 // resolveRoot is the resolved load-ops source tree (the options.workingDirectory
-// value; host op sources resolve against it, the HOME/ folder maps onto it).
+// value; host op sources resolve against it).
 func (p *ProfileReady) resolveRoot() string { return p.workingDir }
 
 // resolveProfileName is the resolved profile name (CONFIGS_PROFILE, plist domain).
@@ -797,15 +797,11 @@ func (p *ProfileReady) resolveSrc(relativePath string) string {
 // (so specs can write $HOME/... dests), $HOME resolving to the invoking user's
 // home (p.home, correct under sudo where the process $HOME differs). Then: an
 // already-absolute path stays (make-extra-dirs entries, $HOME-rooted dests),
-// the HOME tree folder maps onto p.home, everything else is a system-root path.
+// everything else is a system-root path. Home targeting is explicit: a spec
+// rewrites its dest to $HOME/... (e.g. dest: 's#^HOME#$HOME#'), no implicit
+// HOME/ folder mapping.
 func (p *ProfileReady) toDest(relativePath string) string {
 	relativePath = p.expandEnv(relativePath)
-	if relativePath == "HOME" {
-		return p.home
-	}
-	if rest, ok := strings.CutPrefix(relativePath, "HOME/"); ok {
-		return filepath.Join(p.home, rest)
-	}
 	if strings.HasPrefix(relativePath, "/") {
 		return relativePath
 	}

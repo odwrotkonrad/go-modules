@@ -158,7 +158,7 @@ func (p *ProfileReady) runFileOp(archiveSub, failOp, kind string, dirRelativePat
 // dests upfront, skipping links already pointing into the repo.
 func (p *ProfileReady) makeLinks(links []spec.FileItem, dirRelativePaths []string) error {
 	return p.runFileOp("make-links", "make-links", "link", dirRelativePaths, links,
-		func(item spec.FileItem) []string { return []string{p.toDest(spec.LinkDestRel(item))} },
+		func(item spec.FileItem) []string { return []string{p.toDest(spec.DestRel(item))} },
 		p.makeLink)
 }
 
@@ -194,6 +194,9 @@ func (p *ProfileReady) makeCopy(item spec.FileItem, dest string) error {
 func (p *ProfileReady) resolveCopyDests(item spec.FileItem) []string {
 	if len(item.Dests) == 0 {
 		return []string{p.toDest(strings.TrimSuffix(item.Rel, spec.CpExt))}
+	}
+	if item.Derived { // glob dest rewrite: derived dest through the host mapping
+		return []string{p.toDest(item.Dests[0].Path)}
 	}
 	out := make([]string, len(item.Dests))
 	for i, d := range item.Dests {

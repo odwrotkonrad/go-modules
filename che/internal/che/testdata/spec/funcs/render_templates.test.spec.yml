@@ -67,7 +67,7 @@ cases:
               hello {{ "world" }}
         - dirs: [home/.config/zsh]
         - items:
-            - {rel: HOME/.config/zsh/t.ontoHost.tpl}
+            - {rel: HOME/.config/zsh/t.ontoHost.tpl, dests: [$HOME/.config/zsh/t], derived: true}
     expected:
       output:
         files:

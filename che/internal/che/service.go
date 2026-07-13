@@ -30,6 +30,7 @@ type plistSource struct {
 	relativePath string // repo-relative under root/, with marker
 	marker       string // ".ontoHost.cp" or ".ontoHost.tpl"
 	system       bool   // LaunchDaemons -> system, LaunchAgents -> gui
+	home         string // rel prefix to rewrite to $HOME ("" -> system-root dest)
 }
 
 // resolveServices maps each name to its live Service via the plist under root/.
@@ -42,9 +43,10 @@ func (p *ProfileReady) resolveServices(names []string) ([]Service, error) {
 		if !ok {
 			return nil, fmt.Errorf("unknown service %q: no plist under root/", name)
 		}
+		rel := strings.TrimSuffix(src.relativePath, src.marker)
 		svc := Service{
 			Name:        name,
-			Plist:       p.toDest(strings.TrimSuffix(src.relativePath, src.marker)),
+			Plist:       p.plistDest(rel, src.home),
 			Domain:      guiDomain,
 			LongRunning: true,
 		}
@@ -56,11 +58,20 @@ func (p *ProfileReady) resolveServices(names []string) ([]Service, error) {
 	return out, nil
 }
 
+// plistDest maps a plist source rel to its live dest. A home candidate rewrites
+// its leading tree folder (e.g. HOME/) onto $HOME; otherwise system-root.
+func (p *ProfileReady) plistDest(rel, home string) string {
+	if home != "" {
+		return p.toDest("$HOME/" + strings.TrimPrefix(rel, home))
+	}
+	return p.toDest(rel)
+}
+
 func (p *ProfileReady) locatePlist(name string) (plistSource, bool) {
 	candidates := []plistSource{
-		{"Library/LaunchDaemons/" + name + ".plist.ontoHost.cp", ".ontoHost.cp", true},
-		{"Library/LaunchAgents/" + name + ".plist.ontoHost.tpl", ".ontoHost.tpl", false},
-		{"HOME/Library/LaunchAgents/" + name + ".plist.ontoHost.tpl", ".ontoHost.tpl", false},
+		{"Library/LaunchDaemons/" + name + ".plist.ontoHost.cp", ".ontoHost.cp", true, ""},
+		{"Library/LaunchAgents/" + name + ".plist.ontoHost.tpl", ".ontoHost.tpl", false, ""},
+		{"HOME/Library/LaunchAgents/" + name + ".plist.ontoHost.tpl", ".ontoHost.tpl", false, "HOME/"},
 	}
 	for _, c := range candidates {
 		if _, err := os.Stat(filepath.Join(p.resolveRoot(), c.relativePath)); err == nil {

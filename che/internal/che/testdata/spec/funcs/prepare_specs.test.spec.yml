@@ -406,7 +406,7 @@ cases:
               alpha:
                 options: {autoDiscover: true}
                 include:
-                  makeLinks: [HOME/**]
+                  makeLinks: [{source: HOME/**, dest: 's#^HOME#$HOME#'}]
                 exclude:
                   makeLinks: [HOME/.config/skip-a]
             one/HOME/.config/keep-a: keep-a
@@ -415,7 +415,7 @@ cases:
               beta:
                 options: {autoDiscover: true}
                 include:
-                  makeLinks: [HOME/**]
+                  makeLinks: [{source: HOME/**, dest: 's#^HOME#$HOME#'}]
                 exclude:
                   makeLinks: [HOME/.config/skip-b]
             two/HOME/.config/keep-b: keep-b
@@ -462,7 +462,7 @@ cases:
               s:
                 options: {autoDiscover: true}
                 include:
-                  makeLinks: [HOME/**]
+                  makeLinks: [{source: HOME/**, dest: 's#^HOME#$HOME#'}]
             sub/tree/HOME/.config/x: x
         - flags: {}
     expected:
@@ -478,7 +478,7 @@ cases:
               gitlabGroup:
                 options: {workingDirectory: default-tree}
                 include:
-                  makeLinks: [HOME/**]
+                  makeLinks: [{source: HOME/**, dest: 's#^HOME#$HOME#'}]
             default-tree/HOME/.config/def: def
             override-tree/HOME/.config/ovr: ovr
         - hostFiles:

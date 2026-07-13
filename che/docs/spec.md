@@ -43,17 +43,17 @@ include:
 base:
   include:
     makeLinks:
-      - HOME/**
+      - {source: HOME/**, dest: 's#^HOME#$HOME#'}
       - etc/{grafana,prometheus}/**
     makeCopies:
-      - files: [HOME/**]
+      - files: [{source: HOME/**, dest: 's#^HOME#$HOME#'}]
       - owner: root
         ownerGroup: "0"
         chmod: "0644"
         files:
           - {source: Library/LaunchDaemons/otelcol.plist.ontoHost.cp, dest: [/Library/LaunchDaemons/otelcol.plist]}
     renderTemplates:
-      - templates: [HOME/**]
+      - templates: [{source: HOME/**, dest: 's#^HOME#$HOME#'}]
       - owner: root
         ownerGroup: "0"
         chmod: "0440"
@@ -61,7 +61,7 @@ base:
           - {source: etc/sudoers.d/configs.ontoHost.tpl, dest: [/etc/sudoers.d/configs]}
     makeDirs:
       - directories:
-          - HOME/.local/{bin,share}
+          - $HOME/.local/{bin,share}
       - chmod: "2775"
         directories:
           - {dest: ["/var/log/{grafana,prometheus}"]}
@@ -124,8 +124,9 @@ Spec-wide defaults + che knobs:
 - `workingDirectory` (path): load-ops source tree, default `.` (the checkout).
   Absolute, `~/`, `$VAR`, env vars expand; relative resolves under the
   checkout. makeLinks/makeCopies globs and renderTemplates host sources resolve
-  against it; the `HOME/` folder under it maps onto `$HOME`. che.yml lookup,
-  scripts, and repo-doc template sources (repo dest) stay at the checkout.
+  against it; home targeting is explicit via a `$HOME` dest rewrite (no implicit
+  `HOME/` folder mapping). che.yml lookup, scripts, and repo-doc template
+  sources (repo dest) stay at the checkout.
 - `validateSpec` (`warn` | `error`): top-level only; flag and env override.
 - `dryRun` (`delta` | `all`): default dry-run mode; flag and env override.
 - `profiles` (string list): profiles to run (autoDiscover skipped, execIf still
@@ -187,25 +188,33 @@ profile runs its full op sequence, profile by profile.
 
 ## Dest Mapping
 
-Working-tree path maps onto its live dest by first-level folder: `HOME/` maps
-onto `$HOME` (`HOME/.config/x` -> `~/.config/x`); everything else is
-system-root (`etc/x` -> `/etc/x`).
+A working-tree path maps onto its live dest as a system-root path (`etc/x` ->
+`/etc/x`); there is no implicit `HOME/` folder mapping. Home targeting is
+explicit: a dest that resolves to an absolute path (`/...`) or expands `$HOME`
+lands there directly.
 
 Dest strings expand env vars, `$HOME` bound to the invoking user's home
-(correct under sudo, where process `$HOME` differs). Explicit dests may write
-`$HOME` directly instead of the `HOME/` folder convention:
+(correct under sudo, where process `$HOME` differs). State home targeting
+explicitly, either per-file or as a glob sed rewrite:
 
 ```yaml
-renderTemplates:
-  - templates:
-      - {source: HOME/x.tpl, dest: [$HOME/.config/x]}
+makeLinks:
+  - {source: HOME/**, dest: 's#^HOME#$HOME#'}
 makeCopies:
   - files:
-      - {source: HOME/foo.ontoHost.cp, dest: [$HOME/.config/foo]}
+      - {source: HOME/**, dest: 's#^HOME#$HOME#'}       # glob + rewrite
+      - {source: HOME/foo.ontoHost.cp, dest: [$HOME/.config/foo]}  # explicit
+renderTemplates:
+  - templates:
+      - {source: HOME/**, dest: 's#^HOME#$HOME#'}
+      - {source: HOME/x.tpl, dest: [$HOME/.config/x]}
+makeDirs:
+  - directories: [$HOME/.local/{bin,share}]
 ```
 
-`makeLinks` entries reach `$HOME` through their sed rewrite's replacement side
-(`{source: HOME/**, dest: 's#^HOME#$HOME#'}`).
+The sed rewrite `s<delim><pattern><delim><replacement><delim>[g]` (any `<delim>`
+after `s`, Go regexp pattern, literal replacement so `$HOME` survives to host
+mapping) rewrites the workingDirectory-relative dest before host mapping.
 
 ## Environment
 
@@ -300,24 +309,26 @@ too), deduped by source + profile, cycle-guarded. `--skip-remote-refs` (env
 ### makeLinks
 
 Entries over git-tracked files under `root/`, repo-relative below it. Symlinks
-to the derived host path (`root/HOME/x` -> `~/x`, `root/etc/x` -> `/etc/x`).
-Templates, `*.ontoHost.cp`, `.gitkeep` never link.
+to the derived host path (`root/etc/x` -> `/etc/x`; home targeting via a `$HOME`
+dest rewrite). Templates, `*.ontoHost.cp`, `.gitkeep` never link.
 
 Items: glob string (brace-expanded, dest derived 1:1), or `{source, dest}` where
 `source` is a file or glob and `dest` a sed-style rewrite
-`s/<pattern>/<replacement>/[g]` (Go regexp, `$1` backrefs, `\/` escapes a
-literal slash; `g` rewrites every match, absent: first only) applied to the
-repo-relative dest path before host mapping.
+`s<delim><pattern><delim><replacement><delim>[g]` (any `<delim>` after `s`, Go
+regexp pattern, literal replacement, `\<delim>` escapes a literal delimiter; `g`
+rewrites every match, absent: first only) applied to the repo-relative dest path
+before host mapping.
 
 ```yaml
 include:
   makeLinks:
-    - HOME/**
+    - {source: HOME/**, dest: 's#^HOME#$HOME#'}
     - etc/{grafana,prometheus}/**
-    - {source: HOME/.config/foo/**, dest: s/foo/bar/}
+    - {source: HOME/.config/foo/**, dest: 's#^HOME/.config/foo#$HOME/.config/bar#'}
 ```
 
-The rewrite entry links `root/HOME/.config/foo/x` to `~/.config/bar/x`.
+The first entry links `root/HOME/.config/x` to `~/.config/x`; the rewrite entry
+links `root/HOME/.config/foo/x` to `~/.config/bar/x`.
 
 ### makeCopies
 
@@ -326,7 +337,7 @@ to every item in `files`.
 
 ```yaml
 makeCopies:
-  - files: [HOME/**]
+  - files: [{source: HOME/**, dest: 's#^HOME#$HOME#'}]
   - owner: root
     ownerGroup: "0"
     chmod: "0644"
@@ -334,8 +345,9 @@ makeCopies:
       - {source: Library/LaunchDaemons/otelcol.plist.ontoHost.cp, dest: [/Library/LaunchDaemons/otelcol.plist]}
 ```
 
-`files` items: glob string (derived dest, `.ontoHost.cp` stripped), or
-`{source, dest}` (one source, explicit dests).
+`files` items: glob string (derived dest, `.ontoHost.cp` stripped),
+`{source, dest: [paths]}` (one source, explicit dests), or `{source, dest: <rule>}`
+(glob source + sed-style dest rewrite, `.ontoHost.cp` stripped first).
 
 ### renderTemplates
 
@@ -348,7 +360,7 @@ dest.
 
 ```yaml
 renderTemplates:
-  - templates: [HOME/**]
+  - templates: [{source: HOME/**, dest: 's#^HOME#$HOME#'}]
   - templates:
       - source: templates/1-env/local.env.ontoRepo.tpl
         dest:
@@ -358,6 +370,10 @@ renderTemplates:
           - CLAUDE.md
           - {path: AGENTS.md, options: {renderReferencedFiles: true}}
 ```
+
+A `templates` glob source may also carry `{source, dest: <rule>}` (sed-style
+dest rewrite, template suffix stripped first, raw-body host dest like the bare
+glob form).
 
 Dest: path string, or `{path, options}`:
 

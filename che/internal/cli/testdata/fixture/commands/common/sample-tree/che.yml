@@ -2,20 +2,20 @@ options: {workingDirectory: root}
 base:
   include:
     makeLinks:
-      - HOME/.config/zsh/**
+      - {source: HOME/.config/zsh/**, dest: 's#^HOME#$HOME#'}
       - etc/zshrc
-      - {source: HOME/.config/foo/**, dest: s/foo/bar/}
+      - {source: HOME/.config/foo/**, dest: 's#^HOME/.config/foo#$HOME/.config/bar#'}
     makeCopies:
-      - files: [HOME/.config/zsh/**]
+      - files: [{source: HOME/.config/zsh/**, dest: 's#^HOME#$HOME#'}]
       - owner: root
         ownerGroup: wheel
         chmod: "0644"
         files:
           - {source: Library/LaunchDaemons/otelcol.plist.ontoHost.cp, dest: [/Library/LaunchDaemons/otelcol.plist]}
     renderTemplates:
-      - templates: [HOME/.config/zsh/**]
+      - templates: [{source: HOME/.config/zsh/**, dest: 's#^HOME#$HOME#'}]
     makeDirs:
-      - directories: [HOME/.cache/zsh]
+      - directories: [$HOME/.cache/zsh]
       - chmod: "2775"
         directories:
           - {dest: [/var/log/che-test-setgid]}
