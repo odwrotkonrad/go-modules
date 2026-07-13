@@ -228,7 +228,7 @@ func (p *specsPrep) prepare(src spec.SpecSourceRecipe, anchor string, forced *sp
 		return nil, nil
 	}
 	p.seenSpecs[recipe.sourceReady.DirectoryPath] = true
-	if err := recipe.PrepareProfileRecipes(p.opts); err != nil {
+	if err := recipe.PrepareProfileRecipes(p.opts, root); err != nil {
 		return nil, err
 	}
 	return recipe.PrepareProfiles(p, forced, root)
@@ -308,8 +308,10 @@ func (r *SpecRecipe) PrepareSpec(anchor, home string) error {
 
 // PrepareProfileRecipes parses and schema-validates the spec, then stamps each
 // recipe with its Source (effective directory in Source.DirectoryPath, option
-// cascade applied: profile > spec).
-func (r *SpecRecipe) PrepareProfileRecipes(opts options.Options) error {
+// cascade applied: profile > spec). root marks the user-invoked spec: the
+// che-level workingDirectory seeds only it, never a sourced/composed spec ([why]
+// workingDirectory is checkout-relative, meaningless in another repo's checkout).
+func (r *SpecRecipe) PrepareProfileRecipes(opts options.Options, root bool) error {
 	if err := r.validateSchema(opts.ValidateSpecCLI); err != nil {
 		return err
 	}
@@ -319,8 +321,9 @@ func (r *SpecRecipe) PrepareProfileRecipes(opts options.Options) error {
 	}
 	r.Options, r.Env, r.Include = doc.Options, doc.Env, doc.Include
 	// [why] che-level (flag/env/user-config) seeds the spec default, cascading
-	// down to each profile: profile > spec > user-config.
-	if r.Options.WorkingDirectory == "" {
+	// down to each profile: profile > spec > user-config. workingDirectory seeds
+	// the root spec only: a sourced spec resolves it against its own checkout.
+	if root && r.Options.WorkingDirectory == "" {
 		r.Options.WorkingDirectory = opts.WorkingDirectory
 	}
 	if r.Options.AutoDiscover == nil {

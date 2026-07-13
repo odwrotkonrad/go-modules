@@ -388,6 +388,32 @@ func TestWorkingDirectoryCascade(t *testing.T) {
 	assert.Equal(t, wantWD, gotWD, "che-level flag default")
 }
 
+// TestCheLevelWorkingDirectoryDoesNotLeakIntoSourcedSpec: the che-level
+// workingDirectory (flag / root spec) seeds only the root spec; a sourced spec
+// resolves against its own checkout, where the root's tree name does not exist.
+func TestCheLevelWorkingDirectoryDoesNotLeakIntoSourcedSpec(t *testing.T) {
+	ref := testutil.Repo(t, map[string]string{
+		"che.yml":        "s:\n  options: {autoDiscover: true}\n  include:\n    makeLinks: [HOME/**]\n",
+		"HOME/.config/x": "x\n",
+	})
+	host := testutil.Repo(t, map[string]string{
+		"che.yml": "main:\n  options: {autoDiscover: true}\n  include:\n    profiles:\n" +
+			"      - source: \"" + ref + "/che.yml::s\"\n",
+		"roottree/HOME/.config/c": "c\n",
+	})
+	_, baseEnv := prepEnv(t)
+
+	// che-level workingDirectory "roottree" exists in host, NOT in ref. Before the
+	// fix it leaked into the sourced spec and failed resolving ref/roottree.
+	root, err := PrepareSpecs(newContext(baseEnv, host), options.Options{SkipExecIf: true, WorkingDirectory: "roottree"}, spec.SpecSourceRecipe{})
+	require.NoError(t, err)
+
+	byName := profileByName(root.AllProfiles())
+	wantRefWD, _ := filepath.EvalSymlinks(ref)
+	gotRefWD, _ := filepath.EvalSymlinks(byName["s"].workingDir)
+	assert.Equal(t, wantRefWD, gotRefWD, "sourced spec anchors at its own checkout, not che-level roottree")
+}
+
 // TestAutoDiscoverGlobal: the user-config global autoDiscover discovers every
 // profile that leaves it unset, but a profile's own autoDiscover: false wins.
 func TestAutoDiscoverGlobal(t *testing.T) {
