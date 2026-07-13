@@ -42,7 +42,51 @@ func (c *Options) Resolve(env LookupEnv, user, spec Layer) error {
 	c.RenderSkipSecrets = boolOr(env, c.RenderSkipSecrets, "CHE_RENDER_TEMPLATES_SKIP_SECRETS",
 		user.RenderTemplates.SkipSecrets, spec.RenderTemplates.SkipSecrets)
 	c.AutoDiscover = user.AutoDiscover
+	return c.resolveOtel(env, user, spec)
+}
+
+// resolveOtel finalizes the OTLP telemetry group: env > user-config > spec >
+// defaults. enabled off (default) -> the provider is a no-op regardless of the
+// rest; metrics/logs default on when enabled. protocol validated (grpc default).
+func (c *Options) resolveOtel(env LookupEnv, user, spec Layer) error {
+	c.Otel.Enabled = boolOr(env, false, "CHE_OTEL_ENABLED", user.Otel.Enabled, spec.Otel.Enabled)
+	c.Otel.Protocol = cmp.Or(env("CHE_OTEL_PROTOCOL"), user.Otel.Protocol, spec.Otel.Protocol, "grpc")
+	switch c.Otel.Protocol {
+	case "grpc", "http":
+	default:
+		return fmt.Errorf("invalid otel.protocol %q: want grpc or http", c.Otel.Protocol)
+	}
+	c.Otel.Endpoint = cmp.Or(env("CHE_OTEL_ENDPOINT"), user.Otel.Endpoint, spec.Otel.Endpoint, defaultOtelEndpoint(c.Otel.Protocol))
+	c.Otel.Metrics = boolDefaultTrue(env, "CHE_OTEL_METRICS", user.Otel.Metrics, spec.Otel.Metrics)
+	c.Otel.Logs = boolDefaultTrue(env, "CHE_OTEL_LOGS", user.Otel.Logs, spec.Otel.Logs)
 	return nil
+}
+
+// defaultOtelEndpoint is the local collector's default OTLP endpoint per transport.
+func defaultOtelEndpoint(protocol string) string {
+	if protocol == "http" {
+		return "localhost:4318"
+	}
+	return "localhost:4317"
+}
+
+// boolDefaultTrue resolves an on-by-default bool: CHE_<key> ("0"/"false"/"off"/""
+// -> false, else true) wins, else the first set layer pointer, else true.
+func boolDefaultTrue(env LookupEnv, envKey string, layers ...*bool) bool {
+	if e := env(envKey); e != "" {
+		switch strings.ToLower(e) {
+		case "0", "false", "off", "no":
+			return false
+		default:
+			return true
+		}
+	}
+	for _, l := range layers {
+		if l != nil {
+			return *l
+		}
+	}
+	return true
 }
 
 // strOr resolves a string option: flag, else env, else each layer in order.

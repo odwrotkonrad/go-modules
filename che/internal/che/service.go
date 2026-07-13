@@ -83,6 +83,7 @@ func (p *ProfileReady) bootout(services []Service) error {
 		p.logMsg("bootout", s.formatTarget())
 		_ = execx.Default.Exec(fsutil.BuildLctl(s.Sudo, "bootout", s.formatTarget())) // async, ignore exit
 		fsutil.WaitGone(s.Sudo, s.formatTarget())
+		p.tel.CountUnit("service", "bootout", p.command)
 		p.logMsg("bootout(done)", s.formatTarget())
 	}
 	return nil
@@ -102,9 +103,11 @@ func (p *ProfileReady) bootin(services []Service) error {
 		if err := execx.Default.Exec(c); err != nil {
 			err = fmt.Errorf("bootstrap %s: %w", s.formatTarget(), err)
 			p.logMsg("bootstrap(fail)", err.Error())
+			p.tel.CountUnit("service", "bootin-fail", p.command)
 			errs = append(errs, err)
 			continue
 		}
+		p.tel.CountUnit("service", "bootin", p.command)
 		p.logMsg("bootstrap(done)", s.formatTarget())
 	}
 	return errors.Join(errs...)
@@ -130,8 +133,10 @@ func (p *ProfileReady) ensure(services []Service) error {
 			continue
 		}
 		if pid, ok := fsutil.ResolvePID(s.Sudo, s.formatTarget()); ok {
+			p.tel.CountUnit("service", "ensure", p.command)
 			p.logMsg("running", fmt.Sprintf("%s (pid %d)", s.formatTarget(), pid))
 		} else {
+			p.tel.CountUnit("service", "ensure-fail", p.command)
 			p.logMsg("error", s.formatTarget()+" has no running process")
 			missing++
 		}

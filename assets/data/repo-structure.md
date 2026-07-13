@@ -116,6 +116,7 @@ che
               root
         spec
           funcs
+    telemetry
     testutil
       specs
       testdata

@@ -121,11 +121,23 @@ type Options struct {
 	Profiles         []string        `yaml:"profiles" jsonschema_description:"profiles to run (autoDiscover skipped, execIf still enforced); overridden by --profiles and CHE_PROFILE"`
 	SkipRemoteRefs   *bool           `yaml:"skipRemoteRefs" jsonschema_description:"skip sourced include.profiles refs; overridden by the flag and env var"`
 	RenderTemplates  RenderTemplates `yaml:"renderTemplates" jsonschema_description:"renderTemplates op defaults"`
+	Otel             Otel            `yaml:"otel" jsonschema_description:"OTLP telemetry (metrics + logs) to a local collector; overridden by CHE_OTEL_* env"`
 }
 
 // RenderTemplates namespaces renderTemplates-op option defaults.
 type RenderTemplates struct {
 	SkipSecrets *bool `yaml:"skipSecrets" jsonschema_description:"skip op:// secret resolution, render placeholders; overridden by the flag and env var"`
+}
+
+// Otel namespaces the OTLP telemetry options: push run + operation metrics and
+// mirror che's log lines to a local collector. The collector is a local
+// plaintext endpoint, so the client always dials without TLS.
+type Otel struct {
+	Enabled  *bool  `yaml:"enabled" jsonschema_description:"emit OTLP telemetry to the collector; default off; overridden by CHE_OTEL_ENABLED"`
+	Endpoint string `yaml:"endpoint" jsonschema_description:"OTLP collector endpoint (host:port); default localhost:4317 (grpc) / localhost:4318 (http); overridden by CHE_OTEL_ENDPOINT"`
+	Protocol string `yaml:"protocol" jsonschema:"enum=grpc,enum=http" jsonschema_description:"OTLP transport: grpc | http; default grpc; overridden by CHE_OTEL_PROTOCOL"`
+	Metrics  *bool  `yaml:"metrics" jsonschema_description:"export metrics; default on when enabled; overridden by CHE_OTEL_METRICS"`
+	Logs     *bool  `yaml:"logs" jsonschema_description:"export che log lines as OTel logs; default on when enabled; overridden by CHE_OTEL_LOGS"`
 }
 
 // ProfileRecipe is one raw declared profile.

@@ -22,6 +22,7 @@ import (
 	"gitlab.com/konradodwrot/go-modules/che/internal/log"
 	"gitlab.com/konradodwrot/go-modules/che/internal/options"
 	"gitlab.com/konradodwrot/go-modules/che/internal/spec"
+	"gitlab.com/konradodwrot/go-modules/che/internal/telemetry"
 	"gitlab.com/konradodwrot/go-modules/che/render/render"
 )
 
@@ -174,6 +175,7 @@ func PrepareSpecs(ctx Context, opts options.Options, src spec.SpecSourceRecipe) 
 		ctx:       ctx,
 		opts:      opts,
 		home:      home,
+		tel:       ctx.Tel,
 		seenSpecs: map[string]bool{},
 		seenRefs:  map[string]bool{},
 	}
@@ -185,9 +187,10 @@ type specsPrep struct {
 	ctx       Context
 	opts      options.Options
 	home      string
-	seenSpecs map[string]bool    // resolved spec dirs (include.sources cycle/dup guard)
-	seenRefs  map[string]bool    // <uri>::<profile> (sourced-ref dedup)
-	specDone  *database.SpecDone // the run's ledger row, created lazily by the first recording profile
+	tel       *telemetry.Telemetry // OTLP counters/logs (nil = no-op), threaded onto each ProfileReady
+	seenSpecs map[string]bool      // resolved spec dirs (include.sources cycle/dup guard)
+	seenRefs  map[string]bool      // <uri>::<profile> (sourced-ref dedup)
+	specDone  *database.SpecDone   // the run's ledger row, created lazily by the first recording profile
 }
 
 // startSpec lazily creates (once per run) the ledger SpecDone row on the shared
@@ -395,7 +398,7 @@ func peekSpecValidateMode(b []byte) string {
 // per-recipe eligibility, one MakeProfile per eligible recipe, sourced refs
 // spawning nested SpecReadys (recursive).
 func (r *SpecRecipe) PrepareProfiles(p *specsPrep, forced *spec.ProfileSourceRecipe, root bool) (*SpecReady, error) {
-	ready := &SpecReady{Source: r.sourceReady, Options: r.Options, Env: r.Env, recipes: r.ProfileRecipes}
+	ready := &SpecReady{Source: r.sourceReady, Options: r.Options, Env: r.Env, recipes: r.ProfileRecipes, tel: p.tel}
 	// [why] the spec-level env: overlay gates this spec's own execIf.
 	eval := p.evalWith(r.Env)
 	pass, err := spec.AllPass("spec "+r.sourceReady.DefinitionURI, r.Options.ExecIf, p.opts.SkipExecIf, eval)
@@ -559,6 +562,8 @@ func (r *SpecRecipe) makeProfileReady(p *specsPrep, rec spec.ProfileRecipe, look
 		opts:        p.opts,
 		home:        p.home,
 		runID:       p.ctx.RunID,
+		tel:         p.tel,
+		command:     p.ctx.Command,
 		specDone:    specDone,
 		profileDone: profileDone,
 		Seams:       seams,
@@ -583,6 +588,7 @@ type SpecReady struct {
 	Env      map[string]string
 	Profiles []*ProfileReady
 	recipes  []spec.ProfileRecipe // this spec's recipes, joining the includer's lookup
+	tel      *telemetry.Telemetry // OTLP counters (nil = no-op), for the per-profile ExecEach count
 }
 
 // AllProfiles flattens the tree depth-first: own profiles, then each composed
@@ -602,6 +608,7 @@ func (s *SpecReady) AllProfiles() []*ProfileReady {
 func (s *SpecReady) ExecEach(opName string, fn func(*ProfileReady) error) error {
 	var fails []error
 	for _, p := range s.AllProfiles() {
+		s.tel.CountProfile(p.Ref())
 		if err := fn(p); err != nil {
 			fails = append(fails, fmt.Errorf("%s: %w", p.Ref(), err))
 		}
@@ -631,6 +638,8 @@ type ProfileReady struct {
 	home            string
 	env             map[string]string     // captured launch env overlaid with Env, read by expandEnv/buildScriptsEnv
 	runID           string                // the run's TsLayout stamp (backup filenames + ledger run)
+	tel             *telemetry.Telemetry  // OTLP counters (nil = no-op), emitted at mutate + scripts/services
+	command         string                // the invoked subcommand, the CountUnit command label
 	specDone        *database.SpecDone    // the run's ledger row (nil when not recording)
 	profileDone     *database.ProfileDone // this profile's ledger row (nil when not recording)
 	currentArchive  string                // archive path the in-flight op's archiveBefore wrote ("" -> no backup)
@@ -698,6 +707,9 @@ func (p *ProfileReady) mutate(title, msg, dest string, info opInfo, fn func() er
 	}
 	p.logMsg(title, msg)
 	p.recordOperation(dest, info, prev)
+	if info.kind != "" && dest != "" {
+		p.tel.CountUnit(info.kind, deriveOpType(prev, p.classifyDest(dest)), p.command)
+	}
 	return nil
 }
 
@@ -852,6 +864,7 @@ func (p *ProfileReady) ExecOperations() error {
 				continue
 			}
 			log.Msg("all(run)", op.Name(), log.Off)
+			p.tel.CountOperation(op.Name())
 			if err := op.execOperation(p); err != nil {
 				fails = append(fails, fmt.Errorf("%s: %w", op.Name(), err))
 			}
@@ -868,6 +881,7 @@ func (p *ProfileReady) ExecOperation(op operationReady) error {
 			log.Debug("all(skip)", op.Name()+" (nothing selected)", log.Off)
 			return nil
 		}
+		p.tel.CountOperation(op.Name())
 		return op.execOperation(p)
 	})
 }

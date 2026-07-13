@@ -43,6 +43,18 @@ type Options struct {
 	// AutoDiscover is the user-config global default for profiles that set
 	// neither profile nor spec autoDiscover (nil: unset).
 	AutoDiscover *bool
+	Otel         Otel
+}
+
+// Otel is the resolved OTLP telemetry config: the finalized runtime shape the
+// telemetry provider reads. Disabled -> the provider is a no-op. The local
+// collector is plaintext, so the client always dials without TLS.
+type Otel struct {
+	Enabled  bool
+	Endpoint string
+	Protocol string // grpc | http
+	Metrics  bool
+	Logs     bool
 }
 
 // Layer is one options: contribution feeding Resolve (the user-config file or
