@@ -1,0 +1,28 @@
+# [>] 🤖
+context:
+  command: che make-links
+  pwd: testdata/fixture/commands/common/sample-tree
+  mockedInterfaces:
+    execx.CmdExecutor: testutil.CmdMockExecutor
+    fsutil.FileSystemWriter: testutil.FileSystemMockWriter
+    fsutil.FileSystemReader: testutil.FileSystemMockReader
+    fsutil.Sleep: testutil.SleepMock
+cases:
+  - name: ShouldSymlinkRepoFilesOntoHomeAndSystem
+    expected:
+      stdOut: |
+        make-dirs(create): ${HOME}/.config
+        make-dirs(create): ${HOME}/.config/bar
+        make-dirs(create): ${HOME}/.config/zsh
+        make-dirs(create): /Library
+        make-dirs(create): /Library/LaunchDaemons
+        make-dirs(create): /etc
+        archive: ${HOME}/.local/state/che/backups/che-make-links-{{/.*/}}.tar.bz2
+        make-links(create): ${HOME}/.config/bar/a
+        make-links(create): ${HOME}/.config/zsh/.zshrc
+        make-links(create): /etc/zshrc
+  - name: ShouldRewriteDestPathWithSedRule
+    expected:
+      stdOut: |
+        make-links(create): ${HOME}/.config/bar/a
+# [<] 🤖

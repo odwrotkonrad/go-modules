@@ -8,6 +8,11 @@ che
     docs-agents
   docs
   internal
+    che
+      testdata
+        spec
+          cmds
+          funcs
     cli
       testdata
         fixture
@@ -33,7 +38,6 @@ che
         spec
           cmds
           funcs
-    config
     docgen
       testdata
         spec
@@ -43,16 +47,12 @@ che
       testdata
         spec
           funcs
-    host
-      testdata
-        spec
-          cmds
-          funcs
     log
       testdata
         spec
           funcs
-    plugin
+    options
+    source
       testdata
         spec
           funcs
@@ -111,7 +111,7 @@ che
                   LaunchDaemons
                 etc
                   grafana
-            tree-plugin-malformed
+            tree-ref-env-local
               root
         spec
           funcs

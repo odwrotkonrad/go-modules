@@ -1,8 +1,9 @@
 base:
   include:
     renderTemplates:
-      - files: [templates/**/*.ontoRepo.tpl]
+      - templates: [templates/**/*.ontoRepo.tpl]
 
 cli/macos:
   options: {autoDiscover: true}
-  mixinProfiles: [base]
+  include:
+    profiles: [base]

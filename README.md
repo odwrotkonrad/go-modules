@@ -9,13 +9,13 @@ Go monorepo for all user Go modules: `che` (spec-driven dotfile loader, carrying
 
 ### Why It Exists
 
-Four sibling Go repos duplicated toolchain, CI shape, conventions scaffolding, and release flow. One repo carries them all: cross-module changes land in one MR, render-files folded into che (its only consumer).
+Four sibling repos duplicated toolchain, CI, conventions, release flow. One repo carries all: cross-module changes in one MR, render-files folded into che (its only consumer).
 
 ### Goals
 
-- One repo, one pipeline: per-module test and release jobs fire only for changed dirs.
-- Dir-prefixed tags (`<module>/vX.Y.Z`) continue each module's standalone numbering.
-- Same conventions as sibling repos: generated docs, lefthook, Makefile style, one MIT license.
+- One pipeline: per-module test and release jobs fire only for changed dirs.
+- Dir-prefixed tags (`<module>/vX.Y.Z`) continue each module's numbering.
+- Shared conventions: generated docs, lefthook, Makefile style, one MIT license.
 
 ## Modules
 
@@ -28,10 +28,9 @@ Four sibling Go repos duplicated toolchain, CI shape, conventions scaffolding, a
 
 ## Install
 
-Prebuilt binaries: each [release](https://gitlab.com/konradodwrot/go-modules/-/releases)
+Prebuilt: each [release](https://gitlab.com/konradodwrot/go-modules/-/releases)
 `<module>/vX.Y.Z` attaches `<binary>_<version>_{darwin,linux}_{amd64,arm64}.tar.gz`
-plus `checksums.txt` (che releases: also the render CLI archives and
-`che.schema.json`).
+plus `checksums.txt` (che: also the render CLI archives and `che.schema.json`).
 
 From source:
 
@@ -61,8 +60,8 @@ make build    # build every module into <module>/dist
 
 Releases are per module, automatic: a push to `main` touching `<module>/` runs
 its tests, then CI bumps the patch from the highest `<module>/vX.Y.Z` tag. The
-tag pipeline goreleaser-builds the module and uploads the archives to the
-generic package registry, linked as release assets.
+tag pipeline goreleaser-builds the module and uploads archives to the generic
+package registry, linked as release assets.
 
 ## License
 

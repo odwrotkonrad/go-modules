@@ -52,7 +52,7 @@ func ExecWithCtx(name string, body []byte, repoRoot string, itemCtx map[string]s
 		"frontmatter":          func(path string) (string, error) { return ReadFrontmatter(repoRoot, path) },
 		"readBody":             func(path string) (string, error) { return ReadBody(repoRoot, path) },
 		"renderMarkdown":       func(path string, opts ...string) (string, error) { return RenderMarkdown(repoRoot, path, opts...) },
-		"remoteFile":           remoteFileResolver(),
+		"remoteFile":           NewRemoteFetcher(),
 	}
 	opts := gomplate.RenderOptions{Funcs: funcs, MissingKey: "error"}
 	if len(itemCtx) > 0 {
@@ -111,8 +111,6 @@ func retry[T any](delays []time.Duration, sleep func(time.Duration), shouldRetry
 type secretResolver interface {
 	Resolve(ctx context.Context, ref string) (string, error)
 }
-
-type sdkResolver struct{ client *onepassword.Client }
 
 func (r sdkResolver) Resolve(ctx context.Context, ref string) (string, error) {
 	return r.client.Secrets().Resolve(ctx, ref)
@@ -338,7 +336,7 @@ func RenderMarkdown(repoRoot, path string, opts ...string) (string, error) {
 		case "strip-comments":
 			body = mdComment.ReplaceAllString(body, "")
 		case "normalize-headings":
-			body = mdHeading.ReplaceAllString(body, "$1#$2")
+			body = demoteHeadings(body, 1)
 		default:
 			return "", fmt.Errorf("renderMarkdown: unknown opt %q", opt)
 		}
@@ -348,12 +346,10 @@ func RenderMarkdown(repoRoot, path string, opts ...string) (string, error) {
 
 // --- native generators ---
 
-type treeNode map[string]treeNode
-
 // DirsTree prints the plain nested dir tree of repoRoot's git-tracked files:
 // index paths, file leaves dropped, dirs nested + sorted, 2-space indented.
 func DirsTree(repoRoot string) (string, error) {
-	paths, err := fsutil.TrackedFiles(repoRoot)
+	paths, err := fsutil.ListTrackedFiles(repoRoot)
 	if err != nil {
 		return "", err
 	}

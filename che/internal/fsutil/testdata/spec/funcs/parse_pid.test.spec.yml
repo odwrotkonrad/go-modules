@@ -1,0 +1,15 @@
+# [>] 🤖🤖
+context:
+  function: fsutil.ParsePID
+cases:
+  - name: ShouldParsePidFromLaunchctlPrint
+    input:
+      args: [printOut: "system/otelcol = {\n\tactive count = 1\n\tpid = 4242\n\tstate = running\n}\n"]
+    expected:
+      output: {pid: 4242, ok: true}
+  - name: ShouldNotMatchPidlessOutput
+    input:
+      args: [printOut: no pid here]
+    expected:
+      output: {pid: 0, ok: false}
+# [<] 🤖🤖

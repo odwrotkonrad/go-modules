@@ -1,0 +1,23 @@
+# [>] 🤖
+context:
+  command: che make-dirs
+  pwd: testdata/fixture/commands/common/sample-tree
+  mockedInterfaces:
+    execx.CmdExecutor: testutil.CmdMockExecutor
+    fsutil.FileSystemWriter: testutil.FileSystemMockWriter
+    fsutil.FileSystemReader: testutil.FileSystemMockReader
+    fsutil.Sleep: testutil.SleepMock
+cases:
+  - name: ShouldCreateConfigDirsAndReapplySetgidChmod
+    expected:
+      stdOut: |
+        make-dirs(create): ${HOME}/.config
+        make-dirs(create): ${HOME}/.config/bar
+        make-dirs(create): ${HOME}/.config/zsh
+        make-dirs(create): /Library
+        make-dirs(create): /Library/LaunchDaemons
+        make-dirs(create): /etc
+        make-dirs(create): ${HOME}/.cache/zsh
+        make-dirs(create): /var/log/che-test-setgid
+        make-dirs(chmod): 2775 /var/log/che-test-setgid
+# [<] 🤖

@@ -31,13 +31,13 @@ type optWant struct {
 	RenderReferencedFiles   bool   `yaml:"renderReferencedFiles"`
 }
 
-type pluginWant struct {
-	URL     string            `yaml:"url"`
+type refWant struct {
+	Source  string            `yaml:"source"`
 	Profile string            `yaml:"profile"`
 	Env     map[string]string `yaml:"env"`
 }
 
-// wantSet is resolve's domain projection set, carried inside
+// wantSet is make_profile's domain projection set, carried inside
 // expected/notExpected/contains (the canonical schema's one exception).
 type wantSet struct {
 	testyml.Expected[struct{}] `yaml:",inline"`
@@ -54,11 +54,11 @@ type wantSet struct {
 	Ctx           map[string]map[string]string `yaml:"ctx"`
 	TemplateDests [][]string                   `yaml:"templateDests"`
 	TemplateOpts  [][]optWant                  `yaml:"templateOpts"`
-	Plugins       []pluginWant                 `yaml:"plugins"`
+	Refs          []refWant                    `yaml:"refs"`
 }
 
-// resolveCase is resolve's spec case: the canonical shape plus contains.
-type resolveCase struct {
+// makeProfileCase is make_profile's spec case: the canonical shape plus contains.
+type makeProfileCase struct {
 	Name        string          `yaml:"name"`
 	Context     testyml.Context `yaml:"context"`
 	Input       testyml.Input   `yaml:"input"`
@@ -75,14 +75,6 @@ func rels(items []FileItem) []string {
 	return out
 }
 
-func dirPaths(items []FileItem) []string {
-	out := make([]string, len(items))
-	for i, it := range items {
-		out[i] = it.Dests[0].Path
-	}
-	return out
-}
-
 func destPaths(item FileItem) []string {
 	out := make([]string, len(item.Dests))
 	for i, d := range item.Dests {
@@ -91,27 +83,49 @@ func destPaths(item FileItem) []string {
 	return out
 }
 
-func findItem(res Resolved, key string) *FileItem {
-	for _, items := range [][]FileItem{res.Links, res.Copies, res.Templates} {
+// extraDirs picks the mkdirs entries out of the merged MakeDirs list (the
+// ancestor items carry no Dests).
+func extraDirs(ops OperationRecipes) []FileItem {
+	var out []FileItem
+	for _, it := range ops.MakeDirs.Dirs {
+		if len(it.Dests) > 0 {
+			out = append(out, it)
+		}
+	}
+	return out
+}
+
+func extraDirPaths(ops OperationRecipes) []string {
+	items := extraDirs(ops)
+	out := make([]string, len(items))
+	for i, it := range items {
+		out[i] = it.Dests[0].Path
+	}
+	return out
+}
+
+func findItem(ops OperationRecipes, key string) *FileItem {
+	for _, items := range [][]FileItem{ops.MakeLinks.Links, ops.MakeCopies.Copies, ops.RenderTemplates.Templates} {
 		if i := slices.IndexFunc(items, func(it FileItem) bool { return it.Rel == key }); i >= 0 {
 			return &items[i]
 		}
 	}
-	if i := slices.IndexFunc(res.ExtraDirs, func(it FileItem) bool { return it.Dests[0].Path == key }); i >= 0 {
-		return &res.ExtraDirs[i]
+	extras := extraDirs(ops)
+	if i := slices.IndexFunc(extras, func(it FileItem) bool { return it.Dests[0].Path == key }); i >= 0 {
+		return &extras[i]
 	}
 	return nil
 }
 
-func projections(res Resolved) map[string][]string {
+func projections(ops OperationRecipes) map[string][]string {
 	return map[string][]string{
-		"links":     rels(res.Links),
-		"copies":    rels(res.Copies),
-		"templates": rels(res.Templates),
-		"dirs":      res.Dirs,
-		"extraDirs": dirPaths(res.ExtraDirs),
-		"scripts":   res.Scripts,
-		"services":  res.Services,
+		"links":     rels(ops.MakeLinks.Links),
+		"copies":    rels(ops.MakeCopies.Copies),
+		"templates": rels(ops.RenderTemplates.Templates),
+		"dirs":      ops.PruneLinks.Dirs,
+		"extraDirs": extraDirPaths(ops),
+		"scripts":   ops.RunScripts.Scripts,
+		"services":  ops.RunServices.Services,
 	}
 }
 
@@ -127,16 +141,16 @@ func (w wantSet) lists() map[string][]string {
 	}
 }
 
-func assertWant(t *testing.T, res Resolved, w wantSet) {
+func assertWant(t *testing.T, ops OperationRecipes, refs []ProfileSourceRecipe, w wantSet) {
 	t.Helper()
-	got := projections(res)
+	got := projections(ops)
 	for key, want := range w.lists() {
 		if want != nil {
 			assert.Equal(t, want, got[key], key)
 		}
 	}
 	for key, p := range w.Perms {
-		item := findItem(res, key)
+		item := findItem(ops, key)
 		if !assert.NotNil(t, item, "perms: %q not resolved", key) {
 			continue
 		}
@@ -147,7 +161,7 @@ func assertWant(t *testing.T, res Resolved, w wantSet) {
 		}
 	}
 	for key, want := range w.Dests {
-		item := findItem(res, key)
+		item := findItem(ops, key)
 		if !assert.NotNil(t, item, "dests: %q not resolved", key) {
 			continue
 		}
@@ -159,23 +173,24 @@ func assertWant(t *testing.T, res Resolved, w wantSet) {
 		assert.Equal(t, want, got, "dests[%q]", key)
 	}
 	for key, want := range w.Ctx {
-		item := findItem(res, key)
+		item := findItem(ops, key)
 		if !assert.NotNil(t, item, "ctx: %q not resolved", key) {
 			continue
 		}
 		assert.True(t, maps.Equal(item.Ctx, want), "ctx[%q] = %v, want %v", key, item.Ctx, want)
 	}
+	tmpls := ops.RenderTemplates.Templates
 	for i, want := range w.TemplateDests {
-		if !assert.Less(t, i, len(res.Templates), "templateDests[%d]: only %d templates resolved", i, len(res.Templates)) {
+		if !assert.Less(t, i, len(tmpls), "templateDests[%d]: only %d templates resolved", i, len(tmpls)) {
 			continue
 		}
-		assert.Equal(t, want, destPaths(res.Templates[i]), "templateDests[%d]", i)
+		assert.Equal(t, want, destPaths(tmpls[i]), "templateDests[%d]", i)
 	}
 	for i, opts := range w.TemplateOpts {
-		if !assert.Less(t, i, len(res.Templates), "templateOpts[%d]: only %d templates resolved", i, len(res.Templates)) {
+		if !assert.Less(t, i, len(tmpls), "templateOpts[%d]: only %d templates resolved", i, len(tmpls)) {
 			continue
 		}
-		dests := res.Templates[i].Dests
+		dests := tmpls[i].Dests
 		if !assert.Len(t, dests, len(opts), "templateOpts[%d]", i) {
 			continue
 		}
@@ -188,23 +203,23 @@ func assertWant(t *testing.T, res Resolved, w wantSet) {
 			assert.Equal(t, o, got, "templateOpts[%d][%d]", i, j)
 		}
 	}
-	if w.Plugins != nil {
-		require.Len(t, res.Plugins, len(w.Plugins))
-		for i, p := range w.Plugins {
-			got := res.Plugins[i]
-			if got.URL != p.URL || got.Profile != p.Profile || !maps.Equal(got.Env, p.Env) {
-				t.Errorf("plugins[%d] = %+v, want %+v", i, got, p)
+	if w.Refs != nil {
+		require.Len(t, refs, len(w.Refs))
+		for i, p := range w.Refs {
+			got := refs[i]
+			if got.URI != p.Source || got.ProfileName != p.Profile || !maps.Equal(got.Env, p.Env) {
+				t.Errorf("refs[%d] = %+v, want %+v", i, got, p)
 			}
 		}
 	}
 }
 
-func assertMembership(t *testing.T, res Resolved, w *wantSet, present bool) {
+func assertMembership(t *testing.T, ops OperationRecipes, w *wantSet, present bool) {
 	t.Helper()
 	if w == nil {
 		return
 	}
-	got := projections(res)
+	got := projections(ops)
 	for key, entries := range w.lists() {
 		for _, e := range entries {
 			assert.Equal(t, present, slices.Contains(got[key], e), "%s: %q (%v)", key, e, got[key])
@@ -212,36 +227,51 @@ func assertMembership(t *testing.T, res Resolved, w *wantSet, present bool) {
 	}
 }
 
-func TestResolve(t *testing.T) {
-	testyml.Run(t, td, "testdata/spec/funcs/resolve.test.spec.yml", func(t *testing.T, c resolveCase) {
+// loadAndMake loads dir's che.yml, anchors every recipe at dir, and resolves
+// the named profile.
+func loadAndMake(dir, profile string) (OperationRecipes, []ProfileSourceRecipe, error) {
+	d, err := Load(filepath.Join(dir, "che.yml"))
+	if err != nil {
+		return OperationRecipes{}, nil, err
+	}
+	for i := range d.ProfileRecipes {
+		d.ProfileRecipes[i].Source.DirectoryPath = dir
+	}
+	rec, err := FindRecipe(d.ProfileRecipes, profile)
+	if err != nil {
+		return OperationRecipes{}, nil, err
+	}
+	return rec.MakeProfile(d.ProfileRecipes, filepath.Join(dir, "root"))
+}
+
+func TestMakeProfile(t *testing.T) {
+	testyml.Run(t, td, "testdata/spec/funcs/make_profile.test.spec.yml", func(t *testing.T, c makeProfileCase) {
 		dir := t.TempDir()
 		testyml.CopyDir(t, td, c.Context.Pwd, dir)
 		if name := c.Input.Args.String(t, 0); name != "" {
 			testutil.WriteTree(t, dir, map[string]string{"che.yml": testutil.Spec(t, name)})
 		}
 		testutil.GitRepo(t, dir)
-		s, err := Load(filepath.Join(dir, "che.yml"))
-		require.NoError(t, err)
-		res, err := s.Resolve(c.Input.Args.Strings(t, 1), filepath.Join(dir, "root"))
+		ops, refs, err := loadAndMake(dir, c.Input.Args.String(t, 1))
 		if c.Expected != nil && c.Expected.Check(t, err) {
 			return
 		}
 		require.NoError(t, err)
 		if c.Expected != nil {
-			assertWant(t, res, *c.Expected)
+			assertWant(t, ops, refs, *c.Expected)
 		}
-		assertMembership(t, res, c.Contains, true)
-		assertMembership(t, res, c.NotExpected, false)
+		assertMembership(t, ops, c.Contains, true)
+		assertMembership(t, ops, c.NotExpected, false)
 	})
 }
 
-func TestEligibleProfiles(t *testing.T) {
-	testyml.Eq(t, td, "testdata/spec/funcs/eligible_profiles.test.spec.yml", func(t *testing.T, c testyml.Case[[]string]) ([]string, error) {
+func TestEligibleRecipes(t *testing.T) {
+	testyml.Eq(t, td, "testdata/spec/funcs/eligible_recipes.test.spec.yml", func(t *testing.T, c testyml.Case[[]string]) ([]string, error) {
 		a := c.Input.Args
 		dir := testutil.Tree(t, map[string]string{"che.yml": testutil.Spec(t, a.String(t, 0))})
-		s, err := Load(filepath.Join(dir, "che.yml"))
+		d, err := Load(filepath.Join(dir, "che.yml"))
 		require.NoError(t, err)
-		return s.EligibleProfiles(a.String(t, 3), a.Bool(t, 4), stubEvaluator(a.String(t, 1), a.Bool(t, 2)).EvalExecIf)
+		return EligibleRecipes(d.ProfileRecipes, a.Strings(t, 3), a.Bool(t, 4), stubEvaluator(a.String(t, 1), a.Bool(t, 2)).EvalExecIf)
 	})
 }
 

@@ -6,7 +6,7 @@ context:
     execx.CmdExecutor: testutil.CmdMockExecutor
     fsutil.FileSystemWriter: testutil.FileSystemMockWriter
     fsutil.FileSystemReader: testutil.FileSystemMockReader
-    host.Sleep: testutil.SleepMock
+    fsutil.Sleep: testutil.SleepMock
 cases:
   - name: ShouldExecEachScriptAndReportOk
     expected:

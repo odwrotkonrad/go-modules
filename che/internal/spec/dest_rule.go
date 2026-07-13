@@ -8,14 +8,6 @@ import (
 	"strings"
 )
 
-// destRule is a parsed sed-style dest rewrite: pattern, replacement ($1
-// backrefs), global flag (absent -> first match only).
-type destRule struct {
-	re     *regexp.Regexp
-	repl   string
-	global bool
-}
-
 // parseDestRule parses a link dest rewrite "s/<pattern>/<replacement>/[g]"
 // (Go regexp flavor, `\/` escapes a literal slash). Anything else errors:
 // the 1:1 form is the bare glob string, not a dest value.

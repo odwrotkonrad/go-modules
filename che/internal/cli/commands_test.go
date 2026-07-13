@@ -5,6 +5,7 @@ package cli
 import (
 	"embed"
 	"io/fs"
+	"path/filepath"
 	"testing"
 
 	"github.com/spf13/cobra"
@@ -48,10 +49,12 @@ func TestCommands(t *testing.T) {
 	run := func(t *testing.T, c testyml.Case[struct{}]) {
 		args, profile := splitProfileArg(c.Context.CommandArgs())
 		a, root, home := setupMock(t, c.Context.Pwd, profile, c.Context.MockedInterfaces)
+		require.NotEmpty(t, a.root.AllProfiles())
+		repo := a.root.AllProfiles()[0].Source.DirectoryPath
 		vars := map[string]string{
 			"HOME": home,
-			"REPO": a.local.host.RepoRoot,
-			"ROOT": a.local.host.Root,
+			"REPO": repo,
+			"ROOT": filepath.Join(repo, "root"),
 		}
 		cmd, rest := findCmd(t, root, args)
 		out, runErr := testutil.CaptureStdout(t, func() error { return cmd.RunE(cmd, rest) })

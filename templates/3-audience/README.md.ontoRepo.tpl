@@ -13,10 +13,9 @@
 
 ## Install
 
-Prebuilt binaries: each [release](https://gitlab.com/konradodwrot/go-modules/-/releases)
+Prebuilt: each [release](https://gitlab.com/konradodwrot/go-modules/-/releases)
 `<module>/vX.Y.Z` attaches `<binary>_<version>_{darwin,linux}_{amd64,arm64}.tar.gz`
-plus `checksums.txt` (che releases: also the render CLI archives and
-`che.schema.json`).
+plus `checksums.txt` (che: also the render CLI archives and `che.schema.json`).
 
 From source:
 
@@ -46,8 +45,8 @@ make build    # build every module into <module>/dist
 
 Releases are per module, automatic: a push to `main` touching `<module>/` runs
 its tests, then CI bumps the patch from the highest `<module>/vX.Y.Z` tag. The
-tag pipeline goreleaser-builds the module and uploads the archives to the
-generic package registry, linked as release assets.
+tag pipeline goreleaser-builds the module and uploads archives to the generic
+package registry, linked as release assets.
 
 ## License
 

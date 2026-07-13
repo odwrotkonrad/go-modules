@@ -9,13 +9,13 @@ Go monorepo for all user Go modules: `che` (spec-driven dotfile loader, carrying
 
 ## Why It Exists
 
-Four sibling Go repos duplicated toolchain, CI shape, conventions scaffolding, and release flow. One repo carries them all: cross-module changes land in one MR, render-files folded into che (its only consumer).
+Four sibling repos duplicated toolchain, CI, conventions, release flow. One repo carries all: cross-module changes in one MR, render-files folded into che (its only consumer).
 
 ## Goals
 
-- One repo, one pipeline: per-module test and release jobs fire only for changed dirs.
-- Dir-prefixed tags (`<module>/vX.Y.Z`) continue each module's standalone numbering.
-- Same conventions as sibling repos: generated docs, lefthook, Makefile style, one MIT license.
+- One pipeline: per-module test and release jobs fire only for changed dirs.
+- Dir-prefixed tags (`<module>/vX.Y.Z`) continue each module's numbering.
+- Shared conventions: generated docs, lefthook, Makefile style, one MIT license.
 
 # Conventions
 
@@ -25,13 +25,14 @@ Four sibling Go repos duplicated toolchain, CI shape, conventions scaffolding, a
 - `conventions/templates/convention.md`: generating repo docs with che templates: `templates/1-env|2-data|3-audience`, `che.yml` wiring, `make render-templates`.
 - `conventions/ci/convention.md`: lefthook pre-commit hooks (minimal: docs generation check), re-run in a minimal CI validate job.
 - `conventions/license/convention.md`: every public repo carries `LICENSE` (unmodified MIT, creation-year copyright).
+- `conventions/claude-agents/convention.md`: per-repo `RO-<Repo>`/`RW-<Repo>` claude agents, che-rendered into `.claude/` on virt only: shared snippets in `configs`, fetched as remote renderTemplates sources (`@<repo>//<path>` + `ctx`), rendered outputs never committed.
 
 Each convention dir carries a runnable `example/`. This repo itself follows all of these conventions.
 
 
 # Modules
 
-Each module has its own `go.mod` (`gitlab.com/konradodwrot/go-modules/<module>`) and its own release stream: dir-prefixed tags `<module>/vX.Y.Z`, bumped by CI on default-branch pushes touching the module dir. `go.work` at the root ties the modules together for local dev.
+Each module has its own `go.mod` (`gitlab.com/konradodwrot/go-modules/<module>`) and release stream: dir-prefixed tags `<module>/vX.Y.Z`, bumped by CI on default-branch pushes touching the module dir. Root `go.work` ties the modules together for local dev.
 
 ## che
 
@@ -61,7 +62,7 @@ CLI printing `<bundle> <uti> <role>` file-handler association lines from `os-ope
 
 ## Why It Exists
 
-macOS file associations belong in config, not clicked together in Finder. The YAML lives in the configs repo.
+macOS file associations belong in config, not clicked in Finder. The YAML lives in the configs repo.
 
 ## Goals
 
@@ -216,6 +217,11 @@ che
     docs-agents
   docs
   internal
+    che
+      testdata
+        spec
+          cmds
+          funcs
     cli
       testdata
         fixture
@@ -241,7 +247,6 @@ che
         spec
           cmds
           funcs
-    config
     docgen
       testdata
         spec
@@ -251,16 +256,12 @@ che
       testdata
         spec
           funcs
-    host
-      testdata
-        spec
-          cmds
-          funcs
     log
       testdata
         spec
           funcs
-    plugin
+    options
+    source
       testdata
         spec
           funcs
@@ -319,7 +320,7 @@ che
                   LaunchDaemons
                 etc
                   grafana
-            tree-plugin-malformed
+            tree-ref-env-local
               root
         spec
           funcs

@@ -1,0 +1,15 @@
+# [>] 🤖🤖
+cases:
+  - name: ShouldReportSettledLinkDestOnlyUnderAll
+    context: {command: che make-links}
+    expected:
+      stdOut: "${DEST}"
+    notExpected:
+      stdOut: "${DEST}"
+  - name: ShouldReportSettledCopyDestOnlyUnderAll
+    context: {command: che make-copies}
+    expected:
+      stdOut: "${DEST}"
+    notExpected:
+      stdOut: "${DEST}"
+# [<] 🤖🤖

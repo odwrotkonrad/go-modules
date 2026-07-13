@@ -19,17 +19,6 @@ const (
 	codeDrift   = 22
 )
 
-type Tool struct {
-	Name     string
-	Version  string
-	Usage    string
-	Label    string
-	NeedsArg bool
-	FlagArg  string
-	CheckArg string
-	Generate func(arg string) (string, error)
-}
-
 func (t Tool) Main() { climain.RunRaw(t.Run) }
 
 func (t Tool) Run(args []string) (string, error) {

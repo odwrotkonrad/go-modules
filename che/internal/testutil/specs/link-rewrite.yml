@@ -1,17 +1,19 @@
 ##[>] 🤖🤖
 base:
   include:
-    link:
+    makeLinks:
       - etc/zshrc
       - {source: HOME/.config/foo/**, dest: s/foo/bar/}
 
 cli/macos:
   options: {autoDiscover: true}
-  mixinProfiles: [base]
+  include:
+    profiles: [base]
 
 exclude-rewritten:
-  mixinProfiles: [base]
+  include:
+    profiles: [base]
   exclude:
-    link:
+    makeLinks:
       - HOME/.config/bar/b
 ##[<] 🤖🤖

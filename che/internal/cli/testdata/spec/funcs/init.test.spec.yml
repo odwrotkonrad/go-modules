@@ -1,6 +1,6 @@
 # [>] 🤖🤖
 context:
-  function: cli.loader.init
+  function: cli.app.init
   pwd: testdata/fixture/commands/common/sample-tree
 cases:
   - name: ShouldForceOneDefinedProfileWithProfileFlag
@@ -9,14 +9,14 @@ cases:
         - profile: ontoRepo
     expected:
       output:
-        profile: ontoRepo
+        profiles: ontoRepo
         dryRunAll: false
   - name: ShouldErrorOnUndefinedProfileFlag
     input:
       args:
         - profile: nonexistent
     expected:
-      errorOutput: '--profile "nonexistent" is not defined in che.yml'
+      errorOutput: '--profiles "nonexistent" is not defined in che.yml'
   - name: ShouldWarnNotFailOnSpecViolationByDefault
     input:
       args:
@@ -25,10 +25,10 @@ cases:
         - appendSpec: |
             bogusProfile:
               includes:
-                link: [HOME/**]
+                makeLinks: [HOME/**]
     expected:
       output:
-        profile: cli/macos,desktop/macos
+        profiles: cli/macos,desktop/macos
         dryRunAll: false
   - name: ShouldFailOnSpecViolationWithValidateSpecErrorFlag
     input:
@@ -38,7 +38,7 @@ cases:
         - appendSpec: |
             bogusProfile:
               includes:
-                link: [HOME/**]
+                makeLinks: [HOME/**]
     expected:
       errorOutput:
         - schema violations in
@@ -53,7 +53,7 @@ cases:
         - appendSpec: |
             bogusProfile:
               includes:
-                link: [HOME/**]
+                makeLinks: [HOME/**]
     expected:
       errorOutput:
         - schema violations in
@@ -70,6 +70,6 @@ cases:
       env: {CHE_DRY_RUN: all}
     expected:
       output:
-        profile: cli/macos,desktop/macos
+        profiles: cli/macos,desktop/macos
         dryRunAll: true
 # [<] 🤖🤖

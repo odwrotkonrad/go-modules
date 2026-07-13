@@ -1,6 +1,6 @@
 # [>] 🤖🤖
 context:
-  function: spec.CheSpec.ExecIfPass
+  function: spec.AllPass
 cases:
   - name: ShouldRejectSilentlyOnEmptyEnvAtNormalLevel
     context:

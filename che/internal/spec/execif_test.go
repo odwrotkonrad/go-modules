@@ -3,6 +3,7 @@ package spec
 // [>] 🤖🤖
 
 import (
+	"os"
 	"strconv"
 	"testing"
 
@@ -14,11 +15,14 @@ import (
 	"gitlab.com/konradodwrot/go-modules/lib/testyml"
 )
 
-func stubEvaluator(os string, virt bool) *Evaluator {
-	return &Evaluator{builtins: map[string]func() string{
-		"isOs":   func() string { return os },
-		"isVirt": func() string { return strconv.FormatBool(virt) },
-	}}
+func stubEvaluator(osName string, virt bool) *Evaluator {
+	return &Evaluator{
+		builtins: map[string]func() string{
+			"isOs":   func() string { return osName },
+			"isVirt": func() string { return strconv.FormatBool(virt) },
+		},
+		lookupEnv: os.Getenv,
+	}
 }
 
 func TestEvalExecIf(t *testing.T) {
@@ -43,7 +47,7 @@ func TestNewEvaluatorBuiltins(t *testing.T) {
 		m.Exec.Out = c.Input.Args.String(t, 1)
 		m.Exec.Fail = c.Input.Args.Bool(t, 2)
 		testyml.Swap(t, &fsutil.DetectReader, fsutil.FileSystemReader(m.Reader))
-		e := NewEvaluator()
+		e := NewEvaluator(os.Getenv)
 		expr := c.Input.Args.String(t, 0)
 		for range 2 {
 			got, err := e.EvalExecIf(expr)

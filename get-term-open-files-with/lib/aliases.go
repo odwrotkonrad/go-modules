@@ -5,13 +5,6 @@ package lib
 
 import "strings"
 
-type OpenerRule struct {
-	Opener string   `yaml:"opener"`
-	Types  []string `yaml:"types"`
-}
-
-type Sections map[string][]OpenerRule
-
 // appendAliases folds one section's rules into aliases (last rule wins),
 // returning order extended with each first-seen extension.
 func appendAliases(order []string, aliases map[string]string, rules []OpenerRule, byType map[string][]string) []string {

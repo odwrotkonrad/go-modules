@@ -5,7 +5,7 @@ cases:
   - name: ShouldEmitNothingWithDebugGateOff
     context: {function: log.Debug}
     input:
-      args: [title: plugin(p), msg: run x, mode: off]
+      args: [title: profile(p), msg: run x, mode: off]
     expected:
       output: ""
   - name: ShouldBoldTheType

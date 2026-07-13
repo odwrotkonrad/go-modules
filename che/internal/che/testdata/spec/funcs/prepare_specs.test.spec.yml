@@ -1,0 +1,518 @@
+# [>] 🤖🤖
+context:
+  function: che.PrepareSpecs
+  mockedInterfaces:
+    execx.CmdExecutor: testutil.CmdMockExecutor
+cases:
+  - name: ShouldWarnOnRefSpecViolationByDefault
+    input:
+      args:
+        - refFiles:
+            che.yml: |
+              p:
+                includes:
+                  makeLinks: [HOME/**]
+        - hostFiles:
+            che.yml: |
+              main:
+                options: {autoDiscover: true}
+                include:
+                  profiles:
+                    - source: "${REF_DIR}/che.yml::p"
+        - flags: {}
+    expected:
+      stdOut:
+        - validate(che.yml)
+        - includes
+      output:
+        profiles: [main, "${REF_DIR}/che.yml::p"]
+  - name: ShouldFailOnRefSpecViolationInErrorMode
+    input:
+      args:
+        - refFiles:
+            che.yml: |
+              p:
+                includes:
+                  makeLinks: [HOME/**]
+        - hostFiles:
+            che.yml: |
+              main:
+                options: {autoDiscover: true}
+                include:
+                  profiles:
+                    - source: "${REF_DIR}/che.yml::p"
+        - flags: {validateSpec: error}
+    expected:
+      errorOutput: includes
+  - name: ShouldBuildRemoteRefFromGitURLAtCacheCheckout
+    context:
+      env: {REF_GATE: "1"}
+    input:
+      args:
+        - refFiles:
+            che.yml: |
+              gitlabGroup:
+                options:
+                  execIf: ['env:REF_GATE']
+                include:
+                  runScripts: [scripts/bootstrap.zsh]
+            scripts/bootstrap.zsh: "#!/bin/zsh\n"
+        - hostFiles:
+            che.yml: |
+              main:
+                options: {autoDiscover: true}
+                include:
+                  profiles:
+                    - source: "@file://${REF_DIR}/che.yml::gitlabGroup"
+                  runScripts: [scripts/local.zsh]
+            scripts/local.zsh: "#!/bin/zsh\n"
+        - flags: {debug: true}
+    expected:
+      stdOut:
+        - run @file://${REF_DIR}/che.yml::gitlabGroup
+        - cloned file://${REF_DIR}
+        - 'execIf(pass): profile gitlabGroup: env:REF_GATE'
+      output:
+        profiles: [main, "@file://${REF_DIR}/che.yml::gitlabGroup"]
+        repoRootUnder: ${CACHE}
+        script: scripts/bootstrap.zsh
+  - name: ShouldSkipRefWhenExecIfFails
+    context:
+      env: {REF_GATE: ""}
+    input:
+      args:
+        - refFiles:
+            che.yml: |
+              gitlabGroup:
+                options:
+                  execIf: ['env:REF_GATE']
+                include:
+                  runScripts: [scripts/bootstrap.zsh]
+            scripts/bootstrap.zsh: "#!/bin/zsh\n"
+        - hostFiles:
+            che.yml: |
+              main:
+                options: {autoDiscover: true}
+                include:
+                  profiles:
+                    - source: "${REF_DIR}/che.yml::gitlabGroup"
+        - flags:
+            unsetEnv: [REF_GATE]
+    expected:
+      stdOut: skip ${REF_DIR}/che.yml::gitlabGroup (execIf failed)
+      output:
+        profiles: [main]
+    notExpected:
+      stdOut:
+        - execIf(reject)
+  - name: ShouldGateRefExecIfWithEntryEnvWithoutLeaking
+    input:
+      args:
+        - refFiles:
+            che.yml: |
+              gitlabGroup:
+                options:
+                  execIf: ['env:REF_GATE']
+                include:
+                  runScripts: [scripts/bootstrap.zsh]
+            scripts/bootstrap.zsh: "#!/bin/zsh\n"
+        - hostFiles:
+            che.yml: |
+              main:
+                options: {autoDiscover: true}
+                include:
+                  profiles:
+                    - source: "${REF_DIR}/che.yml::gitlabGroup"
+                      env:
+                        REF_GATE: "1"
+        - flags:
+            unsetEnv: [REF_GATE]
+    expected:
+      stdOut: 'execIf(pass): profile gitlabGroup: env:REF_GATE'
+      output:
+        profiles: [main, "${REF_DIR}/che.yml::gitlabGroup"]
+        env: {REF_GATE: "1"}
+        sampleEnv: REF_GATE
+        envInOverlay: "1"
+        script: scripts/bootstrap.zsh
+  - name: ShouldMergeSpecEnvUnderEntryEnv
+    input:
+      args:
+        - refFiles:
+            che.yml: |
+              env:
+                FROM_SPEC: spec
+                SHADOWED: spec
+              gitlabGroup:
+                include:
+                  runScripts: [scripts/bootstrap.zsh]
+            scripts/bootstrap.zsh: "#!/bin/zsh\n"
+        - hostFiles:
+            che.yml: |
+              main:
+                options: {autoDiscover: true}
+                include:
+                  profiles:
+                    - source: "${REF_DIR}/che.yml::gitlabGroup"
+                      env:
+                        SHADOWED: entry
+        - flags: {}
+    expected:
+      output:
+        profiles: [main, "${REF_DIR}/che.yml::gitlabGroup"]
+        env: {FROM_SPEC: spec, SHADOWED: entry}
+  - name: ShouldSkipRemoteRefsWithKnob
+    input:
+      args:
+        - refFiles: {}
+        - hostFiles:
+            che.yml: |
+              main:
+                options: {autoDiscover: true}
+                include:
+                  profiles:
+                    - source: "/nonexistent/che.yml::p"
+                  runScripts: [scripts/local.zsh]
+            scripts/local.zsh: "#!/bin/zsh\n"
+        - flags:
+            skipRemoteRefs: true
+    expected:
+      output:
+        profiles: [main]
+    notExpected:
+      stdOut: source(
+  - name: ShouldAnchorDirRefAtRepoRelativeDir
+    input:
+      args:
+        - refFiles: {}
+        - hostFiles:
+            che.yml: |
+              main:
+                options: {autoDiscover: true}
+                include:
+                  profiles:
+                    - source: "./ref/che.yml::gitlabGroup"
+            ref/che.yml: |
+              gitlabGroup:
+                include:
+                  runScripts: [scripts/bootstrap.zsh]
+            ref/scripts/bootstrap.zsh: "#!/bin/zsh\n"
+        - flags: {}
+    expected:
+      output:
+        profiles: [main, ./ref/che.yml::gitlabGroup]
+        repoRoot: ${HOST_REPO}/ref
+        script: scripts/bootstrap.zsh
+  - name: ShouldAnchorDirRefAtEnvVarDir
+    input:
+      args:
+        - refFiles:
+            che.yml: |
+              gitlabGroup:
+                include:
+                  runScripts: [scripts/bootstrap.zsh]
+            scripts/bootstrap.zsh: "#!/bin/zsh\n"
+        - hostFiles:
+            che.yml: |
+              main:
+                options: {autoDiscover: true}
+                include:
+                  profiles:
+                    - source: "$REF_DIR_VAR/che.yml::gitlabGroup"
+        - flags: {}
+    expected:
+      output:
+        profiles: [main, $REF_DIR_VAR/che.yml::gitlabGroup]
+        repoRoot: ${REF_DIR}
+    notExpected:
+      stdOut: [clone, pull]
+  - name: ShouldDedupeSameRefAcrossProfiles
+    input:
+      args:
+        - refFiles:
+            che.yml: |
+              p:
+                include:
+                  runScripts: [scripts/bootstrap.zsh]
+            scripts/bootstrap.zsh: "#!/bin/zsh\n"
+        - hostFiles:
+            che.yml: |
+              a:
+                options: {autoDiscover: true}
+                include:
+                  profiles:
+                    - source: "${REF_DIR}/che.yml::p"
+              b:
+                options: {autoDiscover: true}
+                include:
+                  profiles:
+                    - source: "${REF_DIR}/che.yml::p"
+        - flags: {}
+    expected:
+      output:
+        profiles: [a, b, "${REF_DIR}/che.yml::p"]
+  - name: ShouldResolveRefsRecursivelyWithCycleGuard
+    input:
+      args:
+        - refFiles: {}
+        - hostFiles:
+            che.yml: |
+              main:
+                options: {autoDiscover: true}
+                include:
+                  profiles:
+                    - source: "./a/che.yml::p1"
+            a/che.yml: |
+              p1:
+                include:
+                  profiles:
+                    - source: "../b/che.yml::p2"
+            b/che.yml: |
+              p2:
+                include:
+                  profiles:
+                    - source: "../a/che.yml::p1"
+        - flags: {}
+    expected:
+      output:
+        profiles: [main, ./a/che.yml::p1, ../b/che.yml::p2]
+  - name: ShouldComposeIncludeSourcesSpecs
+    input:
+      args:
+        - refFiles: {}
+        - hostFiles:
+            che.yml: |
+              include:
+                sources: [./sibling]
+              main:
+                options: {autoDiscover: true}
+                include:
+                  profiles: [sharedBase]
+            sibling/che.yml: |
+              sib:
+                options: {autoDiscover: true}
+                include:
+                  makeDirs:
+                    - directories: [HOME/.cache/sib]
+              sharedBase:
+                include:
+                  makeDirs:
+                    - directories: [HOME/.cache/shared]
+        - flags: {}
+    expected:
+      output:
+        profiles: [main, ./sibling/che.yml::sib]
+  - name: ShouldErrorOnCrossSpecProfileNameCollision
+    input:
+      args:
+        - refFiles: {}
+        - hostFiles:
+            che.yml: |
+              include:
+                sources: [./sibling]
+              main:
+                options: {autoDiscover: true}
+            sibling/che.yml: |
+              main:
+                include:
+                  makeDirs:
+                    - directories: [HOME/.cache/sib]
+        - flags: {}
+    expected:
+      errorOutput: ['profile "main" collides']
+  - name: ShouldGateWholeSpecOnSpecLevelExecIf
+    input:
+      args:
+        - refFiles:
+            che.yml: |
+              options:
+                execIf: ['env:SPEC_GATE']
+              p:
+                options: {autoDiscover: true}
+                include:
+                  runScripts: [scripts/bootstrap.zsh]
+            scripts/bootstrap.zsh: "#!/bin/zsh\n"
+        - hostFiles:
+            che.yml: |
+              include:
+                sources: ["${REF_DIR}"]
+              main:
+                options: {autoDiscover: true}
+        - flags:
+            unsetEnv: [SPEC_GATE]
+    expected:
+      stdOut: spec(skip)
+      output:
+        profiles: [main]
+  - name: ShouldInheritSpecAutoDiscoverDefault
+    input:
+      args:
+        - refFiles: {}
+        - hostFiles:
+            che.yml: |
+              options:
+                autoDiscover: true
+              a: {}
+              b:
+                options: {autoDiscover: false}
+        - flags: {}
+    expected:
+      output:
+        profiles: [a]
+  - name: ShouldAutoDiscoverAndGateAtLocalSpecLevelWhenExecIfPasses
+    context:
+      env: {SPEC_GATE: "1"}
+    input:
+      args:
+        - refFiles: {}
+        - hostFiles:
+            che.yml: |
+              options:
+                autoDiscover: true
+                execIf: ['env:SPEC_GATE']
+              a: {}
+              b: {}
+        - flags: {}
+    expected:
+      output:
+        profiles: [a, b]
+  - name: ShouldSkipAllLocalProfilesWhenSpecLevelExecIfFails
+    input:
+      args:
+        - refFiles: {}
+        - hostFiles:
+            che.yml: |
+              options:
+                autoDiscover: true
+                execIf: ['env:SPEC_GATE']
+              a: {}
+              b: {}
+        - flags:
+            unsetEnv: [SPEC_GATE]
+    expected:
+      output:
+        profiles: []
+  - name: ShouldComposeTwoIncludedSpecsEachWithIncludeExcludeProfiles
+    input:
+      args:
+        - refFiles: {}
+        - hostFiles:
+            che.yml: |
+              include:
+                sources: [./one, ./two]
+              main:
+                options: {autoDiscover: true}
+            one/che.yml: |
+              alpha:
+                options: {autoDiscover: true}
+                include:
+                  makeLinks: [HOME/**]
+                exclude:
+                  makeLinks: [HOME/.config/skip-a]
+            one/HOME/.config/keep-a: keep-a
+            one/HOME/.config/skip-a: skip-a
+            two/che.yml: |
+              beta:
+                options: {autoDiscover: true}
+                include:
+                  makeLinks: [HOME/**]
+                exclude:
+                  makeLinks: [HOME/.config/skip-b]
+            two/HOME/.config/keep-b: keep-b
+            two/HOME/.config/skip-b: skip-b
+        - flags: {}
+    expected:
+      output:
+        profiles: [main, ./one/che.yml::alpha, ./two/che.yml::beta]
+        linkDests:
+          alpha: ['${HOME}/.config/keep-a']
+          beta: ['${HOME}/.config/keep-b']
+  - name: ShouldHonorIncludedSpecValidateSpecError
+    input:
+      args:
+        - refFiles:
+            che.yml: |
+              options:
+                validateSpec: error
+              p:
+                includes:
+                  makeLinks: [HOME/**]
+        - hostFiles:
+            che.yml: |
+              include:
+                sources: ["${REF_DIR}"]
+              main:
+                options: {autoDiscover: true}
+        - flags: {}
+    expected:
+      errorOutput: includes
+  - name: ShouldResolveIncludedSpecWorkingDirectoryOption
+    input:
+      args:
+        - refFiles: {}
+        - hostFiles:
+            che.yml: |
+              include:
+                sources: [./sub]
+              main:
+                options: {autoDiscover: true}
+            sub/che.yml: |
+              options:
+                workingDirectory: tree
+              s:
+                options: {autoDiscover: true}
+                include:
+                  makeLinks: [HOME/**]
+            sub/tree/HOME/.config/x: x
+        - flags: {}
+    expected:
+      output:
+        profiles: [main, ./sub/che.yml::s]
+        linkDests:
+          s: ['${HOME}/.config/x']
+  - name: ShouldOverrideRemoteRefEntryWorkingDirectory
+    input:
+      args:
+        - refFiles:
+            che.yml: |
+              gitlabGroup:
+                options: {workingDirectory: default-tree}
+                include:
+                  makeLinks: [HOME/**]
+            default-tree/HOME/.config/def: def
+            override-tree/HOME/.config/ovr: ovr
+        - hostFiles:
+            che.yml: |
+              main:
+                options: {autoDiscover: true}
+                include:
+                  profiles:
+                    - source: "@file://${REF_DIR}/che.yml::gitlabGroup"
+                      options: {workingDirectory: override-tree}
+        - flags: {}
+    expected:
+      output:
+        profiles: [main, "@file://${REF_DIR}/che.yml::gitlabGroup"]
+        linkDests:
+          gitlabGroup: ['${HOME}/.config/ovr']
+  - name: ShouldMapNonHomeDestsToSystemRoot
+    input:
+      args:
+        - refFiles: {}
+        - hostFiles:
+            che.yml: |
+              main:
+                options: {autoDiscover: true}
+                include:
+                  makeLinks:
+                    - etc/**
+                    - Library/**
+            etc/zshenv: zshenv
+            Library/LaunchDaemons/x.plist: plist
+        - flags: {}
+    expected:
+      output:
+        profiles: [main]
+        linkDests:
+          main: ['/Library/LaunchDaemons/x.plist', '/etc/zshenv']
+# [<] 🤖🤖

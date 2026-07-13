@@ -11,13 +11,14 @@
 - `conventions/templates/convention.md`: generating repo docs with che templates: `templates/1-env|2-data|3-audience`, `che.yml` wiring, `make render-templates`.
 - `conventions/ci/convention.md`: lefthook pre-commit hooks (minimal: docs generation check), re-run in a minimal CI validate job.
 - `conventions/license/convention.md`: every public repo carries `LICENSE` (unmodified MIT, creation-year copyright).
+- `conventions/claude-agents/convention.md`: per-repo `RO-<Repo>`/`RW-<Repo>` claude agents, che-rendered into `.claude/` on virt only: shared snippets in `configs`, fetched as remote renderTemplates sources (`@<repo>//<path>` + `ctx`), rendered outputs never committed.
 
 Each convention dir carries a runnable `example/`. This repo itself follows all of these conventions.
 
 
 # Modules
 
-Each module has its own `go.mod` (`gitlab.com/konradodwrot/go-modules/<module>`) and its own release stream: dir-prefixed tags `<module>/vX.Y.Z`, bumped by CI on default-branch pushes touching the module dir. `go.work` at the root ties the modules together for local dev.
+Each module has its own `go.mod` (`gitlab.com/konradodwrot/go-modules/<module>`) and release stream: dir-prefixed tags `<module>/vX.Y.Z`, bumped by CI on default-branch pushes touching the module dir. Root `go.work` ties the modules together for local dev.
 
 ## che
 

@@ -1,0 +1,84 @@
+# [>] 🤖🤖
+context:
+  function: spec.ProfileSourceRecipe.UnmarshalYAML
+cases:
+  - name: ShouldDecodeScalarAsLocalProfileName
+    input:
+      args: [entry: base]
+    expected:
+      output: {source: "", profile: base, sourceType: filesystem, string: base}
+  - name: ShouldDecodeRemoteSourceRef
+    input:
+      args:
+        - entry: |
+            source: "@https://gitlab.com/konradodwrot/workspace.git/che.yml::gitlabGroup"
+            env: {GITLAB_GROUP: konradodwrot}
+    expected:
+      output:
+        source: "@https://gitlab.com/konradodwrot/workspace.git"
+        profile: gitlabGroup
+        sourceType: remote
+        env: {GITLAB_GROUP: konradodwrot}
+        string: "@https://gitlab.com/konradodwrot/workspace.git/che.yml::gitlabGroup"
+  - name: ShouldDecodeRemoteSourceRefWithNestedSpecFile
+    input:
+      args:
+        - entry: |
+            source: "@https://gitlab.com/g/r.git/sub/che.yml::p"
+    expected:
+      output:
+        source: "@https://gitlab.com/g/r.git/sub"
+        profile: p
+        sourceType: remote
+        string: "@https://gitlab.com/g/r.git/sub/che.yml::p"
+  - name: ShouldDecodeDirSourceRefAsFilesystem
+    input:
+      args:
+        - entry: |
+            source: ./sub/che.yml::p
+    expected:
+      output: {source: ./sub, profile: p, sourceType: filesystem, string: ./sub/che.yml::p}
+  - name: ShouldDecodeNestedDirSourceRef
+    input:
+      args:
+        - entry: |
+            source: ./a/b/che.yml::cli
+    expected:
+      output: {source: ./a/b, profile: cli, sourceType: filesystem, string: ./a/b/che.yml::cli}
+  - name: ShouldErrorOnEnvWithoutSource
+    input:
+      args:
+        - entry: |
+            source: p
+            env: {A: b}
+    expected:
+      errorOutput: ['env requires a source']
+  - name: ShouldErrorOnMissingSource
+    input:
+      args:
+        - entry: |
+            env: {A: b}
+    expected:
+      errorOutput: ['include.profiles entry missing source']
+  - name: ShouldErrorOnMissingProfileName
+    input:
+      args:
+        - entry: |
+            source: "@https://gitlab.com/g/r.git/che.yml::"
+    expected:
+      errorOutput: ['missing profile name']
+  - name: ShouldErrorOnSourceWithoutSpecFileSegment
+    input:
+      args:
+        - entry: |
+            source: "@https://gitlab.com/g/r.git::p"
+    expected:
+      errorOutput: ['needs a <source>/<spec-file>.yml::<profile> path']
+  - name: ShouldErrorOnBareDirSourceWithoutSpecFile
+    input:
+      args:
+        - entry: |
+            source: "sibling::cli"
+    expected:
+      errorOutput: ['needs a <source>/<spec-file>.yml::<profile> path']
+# [<] 🤖🤖

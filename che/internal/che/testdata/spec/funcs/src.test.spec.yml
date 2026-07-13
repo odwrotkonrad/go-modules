@@ -1,0 +1,10 @@
+# [>] 🤖🤖
+context:
+  function: che.ProfileReady.src
+cases:
+  - name: ShouldJoinRelUnderRepoRootTree
+    input:
+      args: [repoRoot: /repo, rel: etc/zshrc]
+    expected:
+      output: /repo/root/etc/zshrc
+# [<] 🤖🤖

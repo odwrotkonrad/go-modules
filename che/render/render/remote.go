@@ -16,13 +16,6 @@ import (
 	"github.com/go-git/go-git/v5/storage/memory"
 )
 
-type remoteRef struct {
-	repoURL string
-	sshURL  string
-	path    string
-	gitRef  string
-}
-
 func (r remoteRef) key() string { return r.repoURL + "?" + r.gitRef }
 
 func parseRemoteRef(ref string) (remoteRef, error) {
@@ -65,10 +58,6 @@ func IsRemoteRef(ref string) bool {
 // NewRemoteFetcher returns a remote-file fetch func sharing one clone cache
 // across calls: N fetches from the same repo+ref clone once.
 func NewRemoteFetcher() func(string) (string, error) {
-	return remoteFileResolver()
-}
-
-func remoteFileResolver() func(string) (string, error) {
 	clones := map[string]billy.Filesystem{}
 	return func(ref string) (string, error) {
 		src, err := parseRemoteRef(ref)

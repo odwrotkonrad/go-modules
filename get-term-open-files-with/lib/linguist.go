@@ -65,11 +65,6 @@ func download(url, cached string) ([]byte, error) {
 	return body, os.WriteFile(cached, body, 0o644)
 }
 
-type language struct {
-	Type       string   `yaml:"type"`
-	Extensions []string `yaml:"extensions"`
-}
-
 func TypeExtensions(url string) (map[string][]string, error) {
 	data, err := fetchLanguages(url)
 	if err != nil {

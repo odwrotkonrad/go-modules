@@ -6,12 +6,12 @@ context:
     execx.CmdExecutor: testutil.CmdMockExecutor
     fsutil.FileSystemWriter: testutil.FileSystemMockWriter
     fsutil.FileSystemReader: testutil.FileSystemMockReader
-    host.Sleep: testutil.SleepMock
+    fsutil.Sleep: testutil.SleepMock
 cases:
   - name: ShouldRenderOnlyHostDestsForHostProfile
     expected:
       stdOut: |
-        archive: ${HOME}/.local/share/che/backups/che-render-{{/.*/}}.tar.bz2
+        archive: ${HOME}/.local/state/che/backups/che-render-{{/.*/}}.tar.bz2
         render(create): ${HOME}/.config/zsh/t
   - name: ShouldRenderOnlyRepoDestsForOntoRepoProfile
     context:

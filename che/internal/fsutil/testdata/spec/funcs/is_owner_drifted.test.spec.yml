@@ -1,0 +1,43 @@
+# [>] 🤖🤖
+context:
+  function: fsutil.IsOwnerDrifted
+  mockedInterfaces:
+    fsutil.UserLookup: testutil.UserMockLookup
+    fsutil.GroupLookup: testutil.GroupMockLookup
+cases:
+  - name: ShouldReportNoDriftWhenUidAndGidMatch
+    input:
+      args: [owner: "ko:staff", users: {ko: 501}, groups: {staff: 20}, uid: 501, gid: 20]
+    expected:
+      output: false
+  - name: ShouldReportDriftWhenUidDiffers
+    input:
+      args: [owner: "ko:staff", users: {ko: 501}, groups: {staff: 20}, uid: 502, gid: 20]
+    expected:
+      output: true
+  - name: ShouldReportDriftWhenGidDiffers
+    input:
+      args: [owner: "ko:staff", users: {ko: 501}, groups: {staff: 20}, uid: 501, gid: 0]
+    expected:
+      output: true
+  - name: ShouldReportNoDriftForUnresolvableNames
+    input:
+      args: [owner: "ghost:phantom", users: {ko: 501}, groups: {staff: 20}, uid: 501, gid: 20]
+    expected:
+      output: false
+  - name: ShouldCheckOnlyUidForBareOwner
+    input:
+      args: [owner: ko, users: {ko: 501}, groups: {staff: 20}, uid: 501, gid: 999]
+    expected:
+      output: false
+  - name: ShouldReportDriftForBareOwnerUidMismatch
+    input:
+      args: [owner: ko, users: {ko: 501}, groups: {staff: 20}, uid: 0, gid: 20]
+    expected:
+      output: true
+  - name: ShouldReportNoDriftWithoutStatSys
+    input:
+      args: [owner: "ko:staff", users: {ko: 501}, groups: {staff: 20}, uid: 0, gid: 0, noStat: true]
+    expected:
+      output: false
+# [<] 🤖🤖

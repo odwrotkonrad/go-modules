@@ -23,7 +23,7 @@ cases:
         - doc: |
             p:
               includes:
-                link: [HOME/**]
+                makeLinks: [HOME/**]
     expected:
       output: includes
   - name: ShouldFlagBogusWriteTypeEnum
@@ -33,7 +33,7 @@ cases:
             p:
               include:
                 renderTemplates:
-                  - files:
+                  - templates:
                       - source: templates/a.tpl
                         dest:
                           - {path: a.md, options: {writeType: bogus}}
@@ -45,9 +45,9 @@ cases:
         - doc: |
             p:
               include:
-                mkdirs:
+                makeDirs:
                   - chmod: rwxr-xr-x
-                    files: [HOME/.cache]
+                    directories: [HOME/.cache]
     expected:
       output: chmod
   - name: ShouldFlagGroupWithoutFiles
@@ -56,17 +56,63 @@ cases:
         - doc: |
             p:
               include:
-                copy:
+                makeCopies:
                   - chmod: "0644"
     expected:
       output: files
-  - name: ShouldFlagPluginRefWithoutProfile
+  - name: ShouldFlagDroppedPluginsKey
     input:
       args:
         - doc: |
             p:
               plugins:
-                - ./plugin
+                - ./sub::p
     expected:
       output: plugins
+  - name: ShouldFlagDroppedMixinProfilesKey
+    input:
+      args:
+        - doc: |
+            p:
+              mixinProfiles: [base]
+    expected:
+      output: mixinProfiles
+  - name: ShouldAcceptTopLevelOptionsEnvInclude
+    input:
+      args:
+        - doc: |
+            options:
+              execIf: ['env:X']
+              autoDiscover: true
+              debug: false
+              validateSpec: warn
+            env:
+              GITLAB_GROUP: konradodwrot
+            include:
+              sources: ["@https://gitlab.com/g/r.git", ./sibling]
+            p:
+              include:
+                makeLinks: [HOME/**]
+    expected:
+      output: ""
+  - name: ShouldAcceptIncludeProfilesUnionForms
+    input:
+      args:
+        - doc: |
+            p:
+              include:
+                profiles:
+                  - base
+                  - source: "@https://gitlab.com/g/r.git/che.yml::gitlabGroup"
+                    env: {GITLAB_GROUP: konradodwrot}
+    expected:
+      output: ""
+  - name: ShouldFlagBogusValidateSpecEnum
+    input:
+      args:
+        - doc: |
+            options:
+              validateSpec: bogus
+    expected:
+      output: validateSpec
 # [<] 🤖🤖

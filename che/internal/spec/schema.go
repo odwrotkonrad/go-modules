@@ -19,23 +19,54 @@ func Schema() *jsonschema.Schema {
 		FieldNameTag:               "yaml",
 		RequiredFromJSONSchemaTags: true,
 	}
-	defs := r.Reflect(Profile{}).Definitions
+	defs := r.Reflect(ProfileRecipe{}).Definitions
+	// [why] both spec.Options and render.Options reflect to an "Options" def:
+	// the top-level block lands under its own name. Options nests RenderTemplates
+	// ($ref), carried over from the same reflection.
+	optDefs := r.Reflect(Options{}).Definitions
+	defs["SpecOptions"] = optDefs["Options"]
+	defs["RenderTemplates"] = optDefs["RenderTemplates"]
 	defs["DestSpec"] = DestSpec{}.JSONSchema()
 
-	defs["Profile"].Description = "one profile block: options self-describe eligibility, mixinProfiles compose in order, plugins pull remote profiles, include adds, exclude filters last and wins"
-	defs["includeSet"].Description = "additive payload: link globs, copy/renderTemplates/mkdirs perm-groups, script globs, service names"
+	defs["ProfileRecipe"].Description = "one profile block: options self-describe eligibility, include.profiles compose refs in order (local scalars, sourced {source, options, env}), include adds, exclude filters last and wins"
+	defs["includeSet"].Description = "additive payload: profile refs, makeLinks globs, makeCopies/renderTemplates/makeDirs perm-groups, runScripts globs, runServices names"
 	defs["excludeSet"].Description = "subtractive glob filter, applied last, wins over every include (rich entries too)"
-	prop(defs["Profile"], "plugins").Description = "profiles loaded at their own checkout: `@<giturl>::<profile>` (remote) or `<dir>::<profile>` (local dir) string, or {ref, env}"
+	defs["SpecOptions"].Description = "reserved top-level options: block: spec-wide defaults (execIf gate, autoDiscover/debug/workingDirectory) + che knobs (validateSpec/dryRun/profiles/skipRemoteRefs/renderTemplates.skipSecrets); same shape as the user-config file"
 	prop(defs["ProfileOptions"], "execIf").Description = "predicate expressions `<source>` or `<source> == <literal>`, sources builtin:*/env:*; empty: always"
 
-	return &jsonschema.Schema{
+	root := &jsonschema.Schema{
 		Version:              jsonschema.Version,
 		ID:                   schemaID,
 		Title:                "che.yml",
-		Description:          "che spec: every top-level key defines a profile block",
+		Description:          "che spec: reserved keys options/env/include, every other top-level key defines a profile block",
 		Type:                 "object",
-		AdditionalProperties: &jsonschema.Schema{Ref: "#/$defs/Profile"},
+		AdditionalProperties: &jsonschema.Schema{Ref: "#/$defs/ProfileRecipe"},
 		Definitions:          defs,
+		Properties:           jsonschema.NewProperties(),
+	}
+	root.Properties.Set("options", &jsonschema.Schema{Ref: "#/$defs/SpecOptions"})
+	root.Properties.Set("env", envSchema("environment exported around this spec's preparation and execution"))
+	root.Properties.Set("include", topIncludeSchema())
+	return root
+}
+
+// topIncludeSchema is the reserved top-level include: block: sources compose
+// other specs into this one, as if running multiple specs together.
+func topIncludeSchema() *jsonschema.Schema {
+	o := obj("other specs composed into this one", nil)
+	o.Properties.Set("sources", &jsonschema.Schema{
+		Description: "spec sources, each a <dir> (absolute, relative, ~/, $VAR) or @<giturl>",
+		Type:        "array",
+		Items:       &jsonschema.Schema{Type: "string"},
+	})
+	return o
+}
+
+func envSchema(desc string) *jsonschema.Schema {
+	return &jsonschema.Schema{
+		Description:          desc,
+		Type:                 "object",
+		AdditionalProperties: &jsonschema.Schema{Type: "string"},
 	}
 }
 
@@ -58,9 +89,9 @@ func obj(desc string, required []string) *jsonschema.Schema {
 }
 
 // scalarOr wraps o into the union with its scalar-string shorthand form.
-func scalarOr(scalarDesc, pattern string, o *jsonschema.Schema) *jsonschema.Schema {
+func scalarOr(scalarDesc string, o *jsonschema.Schema) *jsonschema.Schema {
 	return &jsonschema.Schema{OneOf: []*jsonschema.Schema{
-		{Description: scalarDesc, Type: "string", Pattern: pattern},
+		{Description: scalarDesc, Type: "string"},
 		o,
 	}}
 }
@@ -78,7 +109,7 @@ func (linkEntry) JSONSchema() *jsonschema.Schema {
 		Type:        "string",
 		Pattern:     "^s/.+/.*/g?$",
 	})
-	return scalarOr("glob over git-tracked files under root/ (brace-expanded), dest derived 1:1", "", o)
+	return scalarOr("glob over git-tracked files under root/ (brace-expanded), dest derived 1:1", o)
 }
 
 func (fileSpec) JSONSchema() *jsonschema.Schema {
@@ -97,7 +128,7 @@ func (fileSpec) JSONSchema() *jsonschema.Schema {
 		Type:                 "object",
 		AdditionalProperties: &jsonschema.Schema{Type: "string"},
 	})
-	return scalarOr("glob over git-tracked files (brace-expanded)", "", o)
+	return scalarOr("glob over git-tracked files (brace-expanded)", o)
 }
 
 func (dirSpec) JSONSchema() *jsonschema.Schema {
@@ -107,30 +138,25 @@ func (dirSpec) JSONSchema() *jsonschema.Schema {
 		Type:        "array",
 		Items:       &jsonschema.Schema{Ref: "#/$defs/DestSpec"},
 	})
-	return scalarOr("dir path (brace-expanded)", "", o)
+	return scalarOr("dir path (brace-expanded)", o)
 }
 
 func (DestSpec) JSONSchema() *jsonschema.Schema {
 	o := obj("", []string{"path"})
 	o.Properties.Set("path", &jsonschema.Schema{Description: destPathDesc, Type: "string"})
 	o.Properties.Set("options", render.Options{}.JSONSchema())
-	return scalarOr(destPathDesc, "", o)
+	return scalarOr(destPathDesc, o)
 }
 
-func (pluginEntry) JSONSchema() *jsonschema.Schema {
-	const refDesc = "`@<giturl>::<profile>` (remote) or `<dir>::<profile>` (local dir) plugin ref"
-	o := obj("", []string{"ref"})
-	o.Properties.Set("ref", &jsonschema.Schema{
-		Description: refDesc,
+func (ProfileSourceRecipe) JSONSchema() *jsonschema.Schema {
+	o := obj("sourced profile ref: source is <source>/<spec-file>.yml::<profile>, options override its options, env overlays its run", []string{"source"})
+	o.Properties.Set("source", &jsonschema.Schema{
+		Description: "<source>/<spec-file>.yml::<profile>: source @<giturl> (remote) or <dir> (local); bare <profile> for the local spec",
 		Type:        "string",
-		Pattern:     "^.+::.+$",
 	})
-	o.Properties.Set("env", &jsonschema.Schema{
-		Description:          "envs exported around everything done for the plugin's unit",
-		Type:                 "object",
-		AdditionalProperties: &jsonschema.Schema{Type: "string"},
-	})
-	return scalarOr(refDesc, "^.+::.+$", o)
+	o.Properties.Set("options", &jsonschema.Schema{Ref: "#/$defs/ProfileOptions"})
+	o.Properties.Set("env", envSchema("envs exported around everything done for the referenced profile (sourced entries only)"))
+	return scalarOr("local profile name, composed depth-first", o)
 }
 
 // [<] 🤖🤖

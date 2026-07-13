@@ -2,6 +2,10 @@ package render
 
 // [>] 🤖🤖
 
+import (
+	onepassword "github.com/1password/onepassword-sdk-go"
+)
+
 // Domain model:
 //
 //	Options      per-dest render options from che.yml (writeType,
@@ -29,5 +33,23 @@ type Composition struct {
 	Existing   []byte  // current dest content (mergeUpsert only)
 	RepoRoot   string  // base for @-include resolution
 }
+
+type remoteRef struct {
+	repoURL string
+	sshURL  string
+	path    string
+	gitRef  string
+}
+
+type sdkResolver struct{ client *onepassword.Client }
+
+// groupNode: one subgroup dir's direct children. childRepos/childSubgroups are
+// names (basenames) relative to this node's dir. Repos stop recursion (.git present).
+type groupNode struct {
+	childRepos     []string
+	childSubgroups []string
+}
+
+type treeNode map[string]treeNode
 
 // [<] 🤖🤖

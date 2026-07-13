@@ -1,0 +1,26 @@
+# [>] 🤖🤖
+context:
+  function: source.EnsureCheckout
+cases:
+  - name: ShouldCloneIntoCacheDirAndLogClonedOnFirstEnsure
+    input:
+      args: [priorEnsures: 0, commitExtra: false]
+    expected:
+      output: {files: [che.yml]}
+      stdOut: ["source(p): cloned ${URL} -> ${DIR}"]
+    notExpected:
+      stdOut: ["clone ${URL}"]
+  - name: ShouldStaySilentOnNoChangePull
+    input:
+      args: [priorEnsures: 1, commitExtra: false]
+    expected:
+      output: {silent: true}
+  - name: ShouldHardResetAndLogPulledOnUpstreamChange
+    input:
+      args: [priorEnsures: 1, commitExtra: true]
+    expected:
+      output: {files: [extra.txt]}
+      stdOut: ['source(p): pulled {{/[0-9a-f]{7}\.\.[0-9a-f]{7}/}} ${DIR}']
+    notExpected:
+      stdOut: ["pull ${DIR}"]
+# [<] 🤖🤖

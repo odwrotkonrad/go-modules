@@ -36,9 +36,9 @@ cases:
   - name: msgSubShouldAppendSubAfterTitleSubtype
     context: {function: log.MsgSub}
     input:
-      args: [title: mkdir(create), msg: /x, mode: off, sub: profile=p]
+      args: [title: make-dirs(create), msg: /x, mode: off, sub: profile=p]
     expected:
-      output: {type: mkdir, subtype: "(create,profile=p)", text: /x}
+      output: {type: make-dirs, subtype: "(create,profile=p)", text: /x}
   - name: msgSubShouldIgnoreEmptySub
     context: {function: log.MsgSub}
     input:
@@ -48,7 +48,7 @@ cases:
   - name: debugShouldPrintLikeMsg
     context: {function: log.Debug}
     input:
-      args: [title: plugin(p), msg: run x, mode: off]
+      args: [title: profile(p), msg: run x, mode: off]
     expected:
-      output: {type: plugin, subtype: (p), text: run x}
+      output: {type: profile, subtype: (p), text: run x}
 # [<] 🤖🤖

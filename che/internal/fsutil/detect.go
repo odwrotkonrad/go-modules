@@ -42,10 +42,10 @@ func isVirtualized(goos string, exec execx.CmdExecutor, read FileSystemReader) b
 		if exec.Exec(execx.Cmd{Argv: []string{"systemd-detect-virt", "-q"}}) == nil {
 			return true
 		}
-		if _, err := read.Stat("/.dockerenv"); err == nil {
+		if _, err := read.StatPath("/.dockerenv"); err == nil {
 			return true
 		}
-		if b, err := read.ReadFile("/proc/1/cgroup"); err == nil {
+		if b, err := read.ReadFileBytes("/proc/1/cgroup"); err == nil {
 			s := string(b)
 			return strings.Contains(s, "docker") || strings.Contains(s, "containerd") || strings.Contains(s, "lxc")
 		}
@@ -55,8 +55,8 @@ func isVirtualized(goos string, exec execx.CmdExecutor, read FileSystemReader) b
 	}
 }
 
-// UserHome: named user's home from passwd.
-func UserHome(name string) (string, error) {
+// ResolveUserHome: named user's home from passwd.
+func ResolveUserHome(name string) (string, error) {
 	u, err := UserLookup(name)
 	if err != nil {
 		return "", err

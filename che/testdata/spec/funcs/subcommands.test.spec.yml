@@ -5,12 +5,12 @@ cases:
   - name: ShouldWireEverySubcommandToRoot
     expected:
       output:
-        - link
-        - copy
+        - make-links
+        - make-copies
         - render-templates
-        - mk-dirs
+        - make-dirs
         - prune-links
         - run-scripts
-        - detect
+        - discover
         - services
 # [<] 🤖

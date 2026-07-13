@@ -12,9 +12,9 @@ cases:
       args: [globs: ["../testutil/specs/*.yml"]]
     expected:
       output: true
-  - name: ShouldValidateWorkspaceSiblingCheYmls
+  - name: ShouldValidateMigratedSiblingCheYmls
     input:
-      args: [globs: ["../../../../*/che.yml", "../../../../*/*/che.yml", "../../../../*/*/*/che.yml"]]
+      args: [globs: ["../../../../configs/che.yml"]]
     expected:
       output: true
   - name: ShouldValidateSpecDocFullExample
@@ -29,19 +29,19 @@ cases:
             p:
               include:
                 renderTemplates:
-                  - files:
+                  - templates:
                       - source: templates/a.tpl
                         dest:
                           - {path: a.md, options: {writeType: bogus}}
     expected:
       output: false
-  - name: ShouldRejectPluginRefWithoutProfile
+  - name: ShouldRejectDroppedPluginsKey
     input:
       args:
         - doc: |
             p:
               plugins:
-                - ./plugin
+                - ./sub
     expected:
       output: false
   - name: ShouldRejectUnknownProfileKey
@@ -50,7 +50,7 @@ cases:
         - doc: |
             p:
               includes:
-                link: [HOME/**]
+                makeLinks: [HOME/**]
     expected:
       output: false
   - name: ShouldRejectFileEntryWithoutSource
@@ -59,7 +59,7 @@ cases:
         - doc: |
             p:
               include:
-                copy:
+                makeCopies:
                   - files:
                       - {dest: [~/.config/a]}
     expected:
@@ -70,9 +70,9 @@ cases:
         - doc: |
             p:
               include:
-                mkdirs:
+                makeDirs:
                   - chmod: rwxr-xr-x
-                    files: [HOME/.cache]
+                    directories: [HOME/.cache]
     expected:
       output: false
   - name: ShouldRejectMixinProfilesNotAList
