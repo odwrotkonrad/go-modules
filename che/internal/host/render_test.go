@@ -65,7 +65,7 @@ func TestRenderTemplates(t *testing.T) {
 		for _, d := range dirs {
 			require.NoError(t, os.MkdirAll(filepath.Join(root, d), 0o755))
 		}
-		h := New(root, filepath.Join(root, "home"), testutil.CheProfile, config.Config{})
+		h := New(root, filepath.Join(root, "home"), testutil.CheProfile, config.Options{})
 		if remote {
 			h = h.WithFetcher(testutil.RemoteMockFetcher(fetch))
 		}

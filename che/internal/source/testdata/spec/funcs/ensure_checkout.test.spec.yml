@@ -1,13 +1,13 @@
 # [>] 🤖🤖
 context:
-  function: plugin.EnsureCheckout
+  function: source.EnsureCheckout
 cases:
   - name: ShouldCloneIntoCacheDirAndLogClonedOnFirstEnsure
     input:
       args: [priorEnsures: 0, commitExtra: false]
     expected:
       output: {files: [che.yml]}
-      stdOut: ["plugin(p): cloned ${URL} -> ${DIR}"]
+      stdOut: ["source(p): cloned ${URL} -> ${DIR}"]
     notExpected:
       stdOut: ["clone ${URL}"]
   - name: ShouldStaySilentOnNoChangePull
@@ -20,7 +20,7 @@ cases:
       args: [priorEnsures: 1, commitExtra: true]
     expected:
       output: {files: [extra.txt]}
-      stdOut: ['plugin(p): pulled {{/[0-9a-f]{7}\.\.[0-9a-f]{7}/}} ${DIR}']
+      stdOut: ['source(p): pulled {{/[0-9a-f]{7}\.\.[0-9a-f]{7}/}} ${DIR}']
     notExpected:
       stdOut: ["pull ${DIR}"]
 # [<] 🤖🤖

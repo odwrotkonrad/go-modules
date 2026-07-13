@@ -8,6 +8,10 @@ che
     docs-agents
   docs
   internal
+    che
+      testdata
+        spec
+          funcs
     cli
       testdata
         fixture
@@ -52,7 +56,7 @@ che
       testdata
         spec
           funcs
-    plugin
+    source
       testdata
         spec
           funcs
@@ -111,7 +115,7 @@ che
                   LaunchDaemons
                 etc
                   grafana
-            tree-plugin-malformed
+            tree-ref-env-local
               root
         spec
           funcs

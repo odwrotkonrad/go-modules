@@ -29,8 +29,10 @@ base-exclude-desktop:
 
 desktop/macos:
   options: {autoDiscover: true}
-  mixinProfiles: [base]
+  include:
+    profiles: [base]
 
 cli/macos:
   options: {autoDiscover: true}
-  mixinProfiles: [base, base-exclude-desktop]
+  include:
+    profiles: [base, base-exclude-desktop]

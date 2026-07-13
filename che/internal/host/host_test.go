@@ -29,7 +29,7 @@ func TestPrependEnvVar(t *testing.T) {
 func TestSrc(t *testing.T) {
 	testyml.Eq(t, td, "testdata/spec/funcs/src.test.spec.yml", func(t *testing.T, c testyml.Case[string]) (string, error) {
 		a := c.Input.Args
-		h := New(a.String(t, 0), "/Users/x", testutil.CheProfile, config.Config{})
+		h := New(a.String(t, 0), "/Users/x", testutil.CheProfile, config.Options{})
 		return h.Src(a.String(t, 1)), nil
 	})
 }
@@ -44,7 +44,7 @@ func TestResolveScripts(t *testing.T) {
 			files[rel] = "#!/bin/sh\n"
 		}
 		dir := testutil.Tree(t, files)
-		h := New(dir, "/Users/x", testutil.CheProfile, config.Config{})
+		h := New(dir, "/Users/x", testutil.CheProfile, config.Options{})
 		got, err := h.ResolveScripts(a.Strings(t, 1))
 		if c.Expected.Check(t, err) {
 			return

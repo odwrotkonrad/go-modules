@@ -22,7 +22,7 @@ func fixtureHost(t *testing.T) Host {
 		"root/Library/LaunchAgents/gitlab-runner.plist.ontoHost.tpl":             "<plist/>\n",
 		"root/HOME/Library/LaunchAgents/load-defaults-config.plist.ontoHost.tpl": "<plist/>\n",
 	})
-	return New(dir, "/Users/x", "desktop/macos", config.Config{})
+	return New(dir, "/Users/x", "desktop/macos", config.Options{})
 }
 
 // svcWant mirrors Service for spec equality; "${GUI}" expands to gui/<uid>.

@@ -1,6 +1,6 @@
 # [>] 🤖🤖
 context:
-  function: cli.loader.init
+  function: cli.app.init
   pwd: testdata/fixture/commands/common/sample-tree
 cases:
   - name: ShouldForceOneDefinedProfileWithProfileFlag
@@ -9,7 +9,7 @@ cases:
         - profile: ontoRepo
     expected:
       output:
-        profile: ontoRepo
+        profiles: ontoRepo
         dryRunAll: false
   - name: ShouldErrorOnUndefinedProfileFlag
     input:
@@ -28,7 +28,7 @@ cases:
                 link: [HOME/**]
     expected:
       output:
-        profile: cli/macos,desktop/macos
+        profiles: cli/macos,desktop/macos
         dryRunAll: false
   - name: ShouldFailOnSpecViolationWithValidateSpecErrorFlag
     input:
@@ -70,6 +70,6 @@ cases:
       env: {CHE_DRY_RUN: all}
     expected:
       output:
-        profile: cli/macos,desktop/macos
+        profiles: cli/macos,desktop/macos
         dryRunAll: true
 # [<] 🤖🤖

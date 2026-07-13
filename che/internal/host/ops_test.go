@@ -21,48 +21,61 @@ import (
 //go:embed all:testdata
 var td embed.FS
 
-// setupHost: mock che repo, returns Host under cfg, resolved spec, repo dir.
-func setupHost(t *testing.T, cfg config.Config) (Host, spec.Resolved, string) {
+// makeProfile resolves one profile of dir's che.yml into its operation recipes.
+func makeProfile(t *testing.T, dir, profile string) spec.OperationRecipes {
+	t.Helper()
+	d, err := spec.Load(filepath.Join(dir, "che.yml"))
+	require.NoError(t, err)
+	for i := range d.ProfileRecipes {
+		d.ProfileRecipes[i].Source.DirectoryPath = dir
+	}
+	rec, err := spec.FindRecipe(d.ProfileRecipes, profile)
+	require.NoError(t, err)
+	ops, _, err := rec.MakeProfile(d.ProfileRecipes)
+	require.NoError(t, err)
+	return ops
+}
+
+// setupHost: mock che repo, returns Host under cfg, resolved op recipes, repo dir.
+func setupHost(t *testing.T, cfg config.Options) (Host, spec.OperationRecipes, string) {
 	t.Helper()
 	dir, home := testutil.CheRepo(t)
 	t.Setenv("XDG_DATA_HOME", filepath.Join(home, ".local/share"))
 	h := New(dir, home, testutil.CheProfile, cfg)
-	s, err := spec.Load(filepath.Join(dir, "che.yml"))
-	require.NoError(t, err)
-	res, err := s.Resolve([]string{testutil.CheProfile}, h.Root)
-	require.NoError(t, err)
-	return h, res, dir
+	return h, makeProfile(t, dir, testutil.CheProfile), dir
 }
 
-var ops = map[string]func(Host, spec.Resolved) error{
-	"link":             func(h Host, r spec.Resolved) error { return h.MkLinks(r.Links, r.Dirs) },
-	"copy":             func(h Host, r spec.Resolved) error { return h.MkCopies(r.Copies, r.Dirs) },
-	"render-templates": func(h Host, r spec.Resolved) error { return h.RenderTemplates(r.Templates, false) },
-	"mk-dirs":          func(h Host, r spec.Resolved) error { return h.MkDirs(r.Dirs, r.ExtraDirs) },
-	"prune-links":      func(h Host, r spec.Resolved) error { return h.PruneBrokenLinks(r.Dirs) },
-	"run-scripts": func(h Host, r spec.Resolved) error {
-		scripts, err := h.ResolveScripts(r.Scripts)
+var ops = map[string]func(Host, spec.OperationRecipes) error{
+	"link": func(h Host, r spec.OperationRecipes) error { return h.MkLinks(r.Link.Links, r.Link.Dirs) },
+	"copy": func(h Host, r spec.OperationRecipes) error { return h.MkCopies(r.Copy.Copies, r.Copy.Dirs) },
+	"render-templates": func(h Host, r spec.OperationRecipes) error {
+		return h.RenderTemplates(r.RenderTemplates.Templates, false)
+	},
+	"mk-dirs":     func(h Host, r spec.OperationRecipes) error { return h.MkDirs(r.MkDirs.Dirs) },
+	"prune-links": func(h Host, r spec.OperationRecipes) error { return h.PruneBrokenLinks(r.PruneLinks.Dirs) },
+	"run-scripts": func(h Host, r spec.OperationRecipes) error {
+		scripts, err := h.ResolveScripts(r.RunScripts.Scripts)
 		if err != nil {
 			return err
 		}
 		return h.RunScripts(scripts)
 	},
-	"services-bootout": func(h Host, r spec.Resolved) error {
-		svcs, err := h.ResolveServices(r.Services)
+	"services-bootout": func(h Host, r spec.OperationRecipes) error {
+		svcs, err := h.ResolveServices(r.Services.Services)
 		if err != nil {
 			return err
 		}
 		return h.Bootout(svcs)
 	},
-	"services-bootin": func(h Host, r spec.Resolved) error {
-		svcs, err := h.ResolveServices(r.Services)
+	"services-bootin": func(h Host, r spec.OperationRecipes) error {
+		svcs, err := h.ResolveServices(r.Services.Services)
 		if err != nil {
 			return err
 		}
 		return h.Bootin(svcs)
 	},
-	"services-ensure": func(h Host, r spec.Resolved) error {
-		svcs, err := h.ResolveServices(r.Services)
+	"services-ensure": func(h Host, r spec.OperationRecipes) error {
+		svcs, err := h.ResolveServices(r.Services.Services)
 		if err != nil {
 			return err
 		}
@@ -113,7 +126,7 @@ func TestOps(t *testing.T) {
 	run := func(t *testing.T, c testyml.Case[struct{}]) {
 		op, ok := ops[strings.Join(c.Context.CommandArgs(), "-")]
 		require.Truef(t, ok, "unknown command %q", c.Context.Command)
-		h, res, dir := setupHost(t, config.Config{})
+		h, res, dir := setupHost(t, config.Options{})
 		m := testutil.ApplyMocks(t, c.Context.MockedInterfaces)
 		m.Reader.Roots = []string{dir}
 		h = h.WithFS(m.FS).WithFSReader(m.Reader)

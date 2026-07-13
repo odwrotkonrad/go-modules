@@ -131,7 +131,7 @@ func (m *CmdMockExecutor) launchctl(cmd string) ([]byte, error) {
 	return nil, nil
 }
 
-// git models the plugin CLI calls (clone / rev-parse / fetch / reset) without
+// git models the source-checkout CLI calls (clone / rev-parse / fetch / reset) without
 // spawning git: a clone copies the file:// source worktree plus .git, a reset
 // re-copies it (the cache dir contract: hard reset to the remote tip).
 func (m *CmdMockExecutor) git(args []string) ([]byte, error) {

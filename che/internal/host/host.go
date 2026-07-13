@@ -17,7 +17,7 @@ import (
 
 func (g gitFetcher) Fetch(ref string) (string, error) { return g.fetch(ref) }
 
-func New(repoRoot, home, profile string, cfg config.Config) Host {
+func New(repoRoot, home, profile string, cfg config.Options) Host {
 	return Host{
 		RepoRoot: repoRoot,
 		Root:     filepath.Join(repoRoot, "root"),

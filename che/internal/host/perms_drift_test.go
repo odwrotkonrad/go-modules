@@ -69,9 +69,9 @@ func TestPermsDrift(t *testing.T) {
 		require.NoError(t, err)
 		modeBefore := fi.Mode()
 
-		delta := New(home, home, testutil.CheProfile, config.Config{DryRun: config.DryRun.Delta})
+		delta := New(home, home, testutil.CheProfile, config.Options{DryRun: config.DryRun.Delta})
 		deltaRun := func() string {
-			out, err := testutil.CaptureStdout(t, func() error { return delta.MkDirs(nil, items) })
+			out, err := testutil.CaptureStdout(t, func() error { return delta.MkDirs(items) })
 			require.NoError(t, err)
 			return testutil.StripANSI(out)
 		}
@@ -90,8 +90,8 @@ func TestPermsDrift(t *testing.T) {
 		if w.WetPerm == "" {
 			return
 		}
-		wet := New(home, home, testutil.CheProfile, config.Config{})
-		_, err = testutil.CaptureStdout(t, func() error { return wet.MkDirs(nil, items) })
+		wet := New(home, home, testutil.CheProfile, config.Options{})
+		_, err = testutil.CaptureStdout(t, func() error { return wet.MkDirs(items) })
 		require.NoError(t, err)
 		fi, err = os.Stat(dest)
 		require.NoError(t, err)

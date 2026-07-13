@@ -1,4 +1,4 @@
-// Package spec parses, schema-validates, and resolves che.yml: profiles, include/exclude sets, plugin refs.
+// Package spec parses, schema-validates, and resolves che.yml: profile recipes, include/exclude sets, spec and profile sources.
 package spec
 
 // [>] 🤖🤖
@@ -110,8 +110,9 @@ func LinkDestRel(it FileItem) string {
 	return it.Rel
 }
 
-// Load parses che.yml.
-func Load(path string) (*CheSpec, error) {
+// Load parses che.yml: reserved top-level keys options/env/include, every
+// other key one ProfileRecipe (stamped with its name).
+func Load(path string) (*Doc, error) {
 	b, err := os.ReadFile(path)
 	if err != nil {
 		return nil, fmt.Errorf("spec not found: %s", path)
@@ -120,21 +121,50 @@ func Load(path string) (*CheSpec, error) {
 	if err := yaml.Unmarshal(b, &doc); err != nil {
 		return nil, fmt.Errorf("parse %s: %w", path, err)
 	}
-	s := &CheSpec{}
+	d := &Doc{}
 	if len(doc.Content) == 0 {
-		return s, nil
+		return d, nil
 	}
 	m := doc.Content[0]
 	for i := 0; i+1 < len(m.Content); i += 2 {
-		key := m.Content[i].Value
-		var ps Profile
-		if err := m.Content[i+1].Decode(&ps); err != nil {
-			return nil, fmt.Errorf("parse profile %q: %w", key, err)
+		key, node := m.Content[i].Value, m.Content[i+1]
+		if err := d.decodeKey(key, node); err != nil {
+			return nil, err
 		}
-		ps.Name = key
-		s.profiles = append(s.profiles, ps)
 	}
-	return s, nil
+	return d, nil
+}
+
+// decodeKey decodes one top-level entry: a reserved key or a profile block.
+func (d *Doc) decodeKey(key string, node *yaml.Node) error {
+	switch key {
+	case "options":
+		return node.Decode(&d.Options)
+	case "env":
+		return node.Decode(&d.Env)
+	case "include":
+		var inc struct {
+			Sources []string `yaml:"sources"`
+		}
+		if err := node.Decode(&inc); err != nil {
+			return fmt.Errorf("parse include: %w", err)
+		}
+		for _, s := range inc.Sources {
+			d.Include = append(d.Include, SpecSourceRecipe{SourceRecipe{URI: s}})
+		}
+		return nil
+	default:
+		var ps ProfileRecipe
+		if err := node.Decode(&ps); err != nil {
+			return fmt.Errorf("parse profile %q: %w", key, err)
+		}
+		if ps.Options.Source != "" {
+			return fmt.Errorf("profile %q: options.source is include.profiles-entry only", key)
+		}
+		ps.Source.ProfileName = key
+		d.ProfileRecipes = append(d.ProfileRecipes, ps)
+		return nil
+	}
 }
 
 // [<] 🤖🤖

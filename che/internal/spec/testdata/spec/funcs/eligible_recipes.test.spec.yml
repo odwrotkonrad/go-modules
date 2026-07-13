@@ -1,6 +1,6 @@
 # [>] 🤖🤖
 context:
-  function: spec.CheSpec.EligibleProfiles
+  function: spec.EligibleRecipes
 cases:
   - name: ShouldSelectProfileWithPassingExecIf
     input:

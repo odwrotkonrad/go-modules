@@ -1,11 +1,11 @@
 # [>] 🤖🤖
 context:
-  function: spec.CheSpec.Resolve
+  function: spec.ProfileRecipe.MakeProfile
 cases:
-  - name: ShouldMergeMixinsForDesktopProfile
+  - name: ShouldMergeIncludedProfilesForDesktopProfile
     context: {pwd: testdata/fixture/resolve/tree-merge}
     input:
-      args: [spec: merge, profiles: [desktop/macos]]
+      args: [spec: merge, profile: desktop/macos]
     expected:
       scripts: [ci/zsh/scripts/installs/10-brew.zsh, ci/zsh/scripts/installs/20-kitty.zsh]
       services: [otelcol, port-exporter, grafana, prometheus]
@@ -18,7 +18,7 @@ cases:
   - name: ShouldExcludeDesktopEntriesForCliProfile
     context: {pwd: testdata/fixture/resolve/tree-merge}
     input:
-      args: [spec: merge, profiles: [cli/macos]]
+      args: [spec: merge, profile: cli/macos]
     expected:
       scripts: [ci/zsh/scripts/installs/10-brew.zsh]
       services: [otelcol, port-exporter]
@@ -28,7 +28,7 @@ cases:
   - name: ShouldClassifyTreeIntoLinksCopiesTemplates
     context: {pwd: testdata/fixture/resolve/tree-classify}
     input:
-      args: [spec: classify, profiles: [cli/macos]]
+      args: [spec: classify, profile: cli/macos]
     expected:
       links:
         - HOME/.config/git/config
@@ -44,19 +44,19 @@ cases:
   - name: ShouldErrorOnUndefinedProfile
     context: {pwd: testdata/fixture/resolve/tree-merge}
     input:
-      args: [spec: merge, profiles: [cli/linux]]
+      args: [spec: merge, profile: cli/linux]
     expected:
       errorOutput: ['profile "cli/linux" is not defined in che.yml']
-  - name: ShouldErrorOnMixinCycle
+  - name: ShouldErrorOnIncludeProfilesCycle
     context: {pwd: testdata/fixture/resolve/tree-empty}
     input:
-      args: [spec: cycle, profiles: [cli/macos]]
+      args: [spec: cycle, profile: cli/macos]
     expected:
-      errorOutput: ['mixinProfiles cycle:']
+      errorOutput: ['include.profiles cycle:']
   - name: ShouldApplyIncludeAndExcludeSections
     context: {pwd: testdata/fixture/resolve/tree-include-exclude}
     input:
-      args: [spec: include-exclude, profiles: [cli/macos]]
+      args: [spec: include-exclude, profile: cli/macos]
     contains:
       links: [HOME/.config/extra/x, etc/zshrc]
       scripts: [ci/zsh/scripts/installs/10-brew.zsh]
@@ -69,19 +69,19 @@ cases:
   - name: ShouldExcludeScriptsMatchingGlob
     context: {pwd: testdata/fixture/resolve/tree-exclude-script-glob}
     input:
-      args: [spec: exclude-script-glob, profiles: [cli/macos]]
+      args: [spec: exclude-script-glob, profile: cli/macos]
     expected:
       scripts: [ci/zsh/scripts/installs/10-brew.zsh, ci/zsh/scripts/installs/30-tmux.zsh]
-  - name: ShouldErrorOnUndefinedMixin
+  - name: ShouldErrorOnUndefinedIncludedProfile
     context: {pwd: testdata/fixture/resolve/tree-empty}
     input:
-      args: [spec: undefined-include, profiles: [cli/macos]]
+      args: [spec: undefined-include, profile: cli/macos]
     expected:
-      errorOutput: ['mixinProfiles names undefined profile "nonexistent"']
+      errorOutput: ['include.profiles names undefined profile "nonexistent"']
   - name: ShouldParseRichRepoTemplateEntries
     context: {pwd: testdata/fixture/resolve/tree-empty}
     input:
-      args: [spec: repo-template, profiles: [cli/macos]]
+      args: [spec: repo-template, profile: cli/macos]
     expected:
       templates: [templates/1-env/local.env.ontoRepo.tpl, templates/3-agents/AGENTS.md.ontoRepo.tpl]
       dests:
@@ -93,13 +93,13 @@ cases:
   - name: ShouldErrorOnRepoTemplateGlob
     context: {pwd: testdata/fixture/resolve/tree-empty}
     input:
-      args: [spec: repo-template-glob, profiles: [cli/macos]]
+      args: [spec: repo-template-glob, profile: cli/macos]
     expected:
       errorOutput: [renderTemplates glob must be root/-prefixed]
   - name: ShouldAcceptRemoteTemplateSourceWithCtx
     context: {pwd: testdata/fixture/resolve/tree-empty}
     input:
-      args: [spec: remote-template, profiles: [cli/macos]]
+      args: [spec: remote-template, profile: cli/macos]
     expected:
       templates: ["@gitlab.com/acme/tools//snippets/agent.md"]
       templateDests: [[.claude/agents/ro.md]]
@@ -109,7 +109,7 @@ cases:
   - name: ShouldMergeGroupCtxUnderItemCtx
     context: {pwd: testdata/fixture/resolve/tree-empty}
     input:
-      args: [spec: remote-template-group-ctx, profiles: [cli/macos]]
+      args: [spec: remote-template-group-ctx, profile: cli/macos]
     expected:
       templates: ["@gitlab.com/acme/tools//snippets/ro.md", "@gitlab.com/acme/tools//snippets/rw.md"]
       ctx:
@@ -118,7 +118,7 @@ cases:
   - name: ShouldMergeGroupOptionsUnderDestOptions
     context: {pwd: testdata/fixture/resolve/tree-empty}
     input:
-      args: [spec: remote-template-group-options, profiles: [cli/macos]]
+      args: [spec: remote-template-group-options, profile: cli/macos]
     expected:
       templates: ["@gitlab.com/acme/tools//snippets/gitignore", "@gitlab.com/acme/tools//snippets/ro.md", "@gitlab.com/acme/tools//snippets/settings.json"]
       templateOpts:
@@ -128,42 +128,42 @@ cases:
   - name: ShouldErrorOnRemoteTemplateWithoutDest
     context: {pwd: testdata/fixture/resolve/tree-empty}
     input:
-      args: [spec: remote-template-no-dest, profiles: [cli/macos]]
+      args: [spec: remote-template-no-dest, profile: cli/macos]
     expected:
       errorOutput: [renderTemplates remote source requires explicit dest]
   - name: ShouldErrorOnRemoteTemplateGlob
     context: {pwd: testdata/fixture/resolve/tree-empty}
     input:
-      args: [spec: remote-template-glob, profiles: [cli/macos]]
+      args: [spec: remote-template-glob, profile: cli/macos]
     expected:
       errorOutput: [renderTemplates glob cannot be remote]
   - name: ShouldErrorOnMalformedRemoteTemplateSource
     context: {pwd: testdata/fixture/resolve/tree-empty}
     input:
-      args: [spec: remote-template-malformed, profiles: [cli/macos]]
+      args: [spec: remote-template-malformed, profile: cli/macos]
     expected:
       errorOutput: ['renderTemplates remote source malformed, want @<repo>//<path>']
-  - name: ShouldUnionProfilesInGivenOrder
+  - name: ShouldComposeIncludedProfilesInGivenOrder
     context: {pwd: testdata/fixture/resolve/tree-empty}
     input:
-      args: [spec: ambiguous, profiles: [repo, other]]
+      args: [spec: ambiguous, profile: both]
     expected:
       templates: [templates/1-env/local.env.ontoRepo.tpl, templates/1-env/local.env.ontoRepo.tpl]
       templateDests: [[.env], [.env2]]
-  - name: ShouldCollectAndDedupePluginRefs
+  - name: ShouldCollectAndDedupeSourcedRefs
     context: {pwd: testdata/fixture/resolve/tree-empty}
     input:
-      args: [spec: plugins, profiles: [main]]
+      args: [spec: plugins, profile: main]
     expected:
-      plugins:
-        - {url: "git@gitlab.com:g/r.git", profile: p}
-        - {url: "https://gitlab.com/g/r2.git", profile: q, env: {GITLAB_GROUP: konradodwrot}}
+      refs:
+        - {source: "@git@gitlab.com:g/r.git", profile: p}
+        - {source: "@https://gitlab.com/g/r2.git", profile: q, env: {GITLAB_GROUP: konradodwrot}}
     contains:
       services: [svc]
   - name: ShouldMapLinkMatchesThroughSedRewriteRule
     context: {pwd: testdata/fixture/resolve/tree-link-rewrite}
     input:
-      args: [spec: link-rewrite, profiles: [cli/macos]]
+      args: [spec: link-rewrite, profile: cli/macos]
     expected:
       links: [HOME/.config/foo/a, HOME/.config/foo/b, etc/zshrc]
       dests:
@@ -173,7 +173,7 @@ cases:
   - name: ShouldContributeRewrittenLinkAncestorDirs
     context: {pwd: testdata/fixture/resolve/tree-link-rewrite}
     input:
-      args: [spec: link-rewrite, profiles: [cli/macos]]
+      args: [spec: link-rewrite, profile: cli/macos]
     contains:
       dirs: [HOME/.config/bar]
     notExpected:
@@ -181,7 +181,7 @@ cases:
   - name: ShouldExcludeLinkByRewrittenDest
     context: {pwd: testdata/fixture/resolve/tree-link-rewrite}
     input:
-      args: [spec: link-rewrite, profiles: [exclude-rewritten]]
+      args: [spec: link-rewrite, profile: exclude-rewritten]
     contains:
       links: [HOME/.config/foo/a]
     notExpected:
@@ -189,19 +189,19 @@ cases:
   - name: ShouldErrorOnMalformedLinkDestRule
     context: {pwd: testdata/fixture/resolve/tree-link-rewrite}
     input:
-      args: [spec: link-rewrite-bad, profiles: [cli/macos]]
+      args: [spec: link-rewrite-bad, profile: cli/macos]
     expected:
       errorOutput: [link dest]
-  - name: ShouldErrorOnMalformedPluginRef
-    context: {pwd: testdata/fixture/resolve/tree-plugin-malformed}
+  - name: ShouldErrorOnLocalRefWithEnv
+    context: {pwd: testdata/fixture/resolve/tree-ref-env-local}
     input:
-      args: [spec: "", profiles: [main]]
+      args: [spec: "", profile: main]
     expected:
-      errorOutput: ['plugins entry "@nourl"']
-  - name: ShouldErrorOnUndefinedMixinPluginRef
+      errorOutput: ['env requires options.source']
+  - name: ShouldErrorOnUndefinedProfileRef
     context: {pwd: testdata/fixture/resolve/tree-empty}
     input:
-      args: [spec: mixin-plugin-ref, profiles: [main]]
+      args: [spec: undefined-profile-ref, profile: main]
     expected:
-      errorOutput: [mixinProfiles names undefined profile]
+      errorOutput: ['include.profiles names undefined profile "nonexistent-ref"']
 # [<] 🤖🤖

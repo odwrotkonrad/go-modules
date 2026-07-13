@@ -1,7 +1,10 @@
 a:
-  mixinProfiles: [b]
+  include:
+    profiles: [b]
 b:
-  mixinProfiles: [a]
+  include:
+    profiles: [a]
 cli/macos:
   options: {autoDiscover: true}
-  mixinProfiles: [a]
+  include:
+    profiles: [a]

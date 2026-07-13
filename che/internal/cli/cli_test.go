@@ -5,21 +5,23 @@ package cli
 import (
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 
 	"github.com/spf13/cobra"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
+	"gitlab.com/konradodwrot/go-modules/che/internal/che"
 	"gitlab.com/konradodwrot/go-modules/che/internal/config"
 	"gitlab.com/konradodwrot/go-modules/che/internal/host"
 	"gitlab.com/konradodwrot/go-modules/che/internal/testutil"
 	"gitlab.com/konradodwrot/go-modules/lib/testyml"
 )
 
-// repoEnv: pwd fixture as a committed git repo plus on-disk HOME, fresh ld
+// repoEnv: pwd fixture as a committed git repo plus on-disk HOME, fresh app
 // pointed at it.
-func repoEnv(t *testing.T, pwd string) (*loader, *cobra.Command, string) {
+func repoEnv(t *testing.T, pwd string) (*app, *cobra.Command, string) {
 	t.Helper()
 	if os.Geteuid() == 0 {
 		t.Skip("non-root path only; build resolves home from $HOME")
@@ -39,17 +41,17 @@ func repoEnv(t *testing.T, pwd string) (*loader, *cobra.Command, string) {
 }
 
 // setupMock: safe doubles in every built Host, a.init() already run.
-func setupMock(t *testing.T, pwd, profile string, decl map[string]string) (*loader, *cobra.Command, string) {
+func setupMock(t *testing.T, pwd, profile string, decl map[string]string) (*app, *cobra.Command, string) {
 	t.Helper()
 	a, root, home := repoEnv(t, pwd)
 	t.Setenv("CHE_DRY_RUN", "")
 	a.config.Profile = profile
 
 	m := testutil.ApplyMocks(t, decl)
-	a.newHost = func(repoRoot, home, profile string, cfg config.Config) host.Host {
+	testyml.Swap(t, &che.NewHost, func(repoRoot, home, profile string, cfg config.Options) host.Host {
 		reader := &testutil.FileSystemMockReader{Roots: []string{repoRoot, home}}
 		return host.New(repoRoot, home, profile, cfg).WithFS(m.FS).WithFSReader(reader)
-	}
+	})
 	testyml.Swap(t, &host.Sleep, testutil.SleepMock)
 
 	require.NoError(t, a.init())
@@ -57,7 +59,7 @@ func setupMock(t *testing.T, pwd, profile string, decl map[string]string) (*load
 }
 
 type buildWant struct {
-	Profile   string `yaml:"profile"`
+	Profiles  string `yaml:"profiles"`
 	DryRunAll bool   `yaml:"dryRunAll"`
 }
 
@@ -83,7 +85,11 @@ func TestInit(t *testing.T) {
 			if c.Expected.Check(t, err) {
 				return
 			}
-			got := buildWant{Profile: a.local.host.Profile, DryRunAll: a.local.host.IsDryRun()}
+			var names []string
+			for _, p := range a.root.AllProfiles() {
+				names = append(names, p.Ref())
+			}
+			got := buildWant{Profiles: strings.Join(names, ","), DryRunAll: a.opts.DryRun == config.DryRun.All}
 			assert.Equal(t, c.Expected.Output, got)
 		})
 }

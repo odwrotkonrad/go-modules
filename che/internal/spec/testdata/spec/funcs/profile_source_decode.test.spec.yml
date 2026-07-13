@@ -1,0 +1,63 @@
+# [>] 🤖🤖
+context:
+  function: spec.ProfileSourceRecipe.UnmarshalYAML
+cases:
+  - name: ShouldDecodeScalarAsLocalProfileName
+    input:
+      args: [entry: base]
+    expected:
+      output: {source: "", profile: base, sourceType: filesystem, string: base}
+  - name: ShouldDecodeRichRemoteEntry
+    input:
+      args:
+        - entry: |
+            ref: gitlabGroup
+            options: {source: "@https://gitlab.com/konradodwrot/workspace.git"}
+            env: {GITLAB_GROUP: konradodwrot}
+    expected:
+      output:
+        source: "@https://gitlab.com/konradodwrot/workspace.git"
+        profile: gitlabGroup
+        sourceType: remote
+        env: {GITLAB_GROUP: konradodwrot}
+        string: "@https://gitlab.com/konradodwrot/workspace.git::gitlabGroup"
+  - name: ShouldDecodeRichDirEntryAsFilesystem
+    input:
+      args:
+        - entry: |
+            ref: p
+            options: {source: ./plugin}
+    expected:
+      output: {source: ./plugin, profile: p, sourceType: filesystem, string: ./plugin::p}
+  - name: ShouldDecodeTildeDirEntryAsFilesystem
+    input:
+      args:
+        - entry: |
+            ref: p
+            options: {source: ~/x}
+    expected:
+      output: {source: ~/x, profile: p, sourceType: filesystem, string: ~/x::p}
+  - name: ShouldErrorOnEnvWithoutSource
+    input:
+      args:
+        - entry: |
+            ref: p
+            env: {A: b}
+    expected:
+      errorOutput: ['env requires options.source']
+  - name: ShouldErrorOnMissingRef
+    input:
+      args:
+        - entry: |
+            options: {source: ./plugin}
+    expected:
+      errorOutput: ['include.profiles entry missing ref']
+  - name: ShouldErrorOnEmptyRemoteURL
+    input:
+      args:
+        - entry: |
+            ref: p
+            options: {source: "@"}
+    expected:
+      errorOutput: ['empty git url']
+# [<] 🤖🤖

@@ -1,6 +1,6 @@
 # [>] 🤖🤖
 context:
-  function: plugin.slug
+  function: source.slug
 cases:
   - name: ShouldSlugScpLikeSshUrl
     input:

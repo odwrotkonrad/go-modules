@@ -1,0 +1,7 @@
+#[>] 🤖🤖
+main:
+  include:
+    profiles:
+      - ref: nourl
+        env: {A: b}
+#[<] 🤖🤖

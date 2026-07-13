@@ -7,10 +7,12 @@ base:
 
 cli/macos:
   options: {autoDiscover: true}
-  mixinProfiles: [base]
+  include:
+    profiles: [base]
 
 exclude-rewritten:
-  mixinProfiles: [base]
+  include:
+    profiles: [base]
   exclude:
     link:
       - HOME/.config/bar/b

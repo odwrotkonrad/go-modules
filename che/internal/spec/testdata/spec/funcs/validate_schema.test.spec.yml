@@ -60,13 +60,60 @@ cases:
                   - chmod: "0644"
     expected:
       output: files
-  - name: ShouldFlagPluginRefWithoutProfile
+  - name: ShouldFlagDroppedPluginsKey
     input:
       args:
         - doc: |
             p:
               plugins:
-                - ./plugin
+                - ./plugin::p
     expected:
       output: plugins
+  - name: ShouldFlagDroppedMixinProfilesKey
+    input:
+      args:
+        - doc: |
+            p:
+              mixinProfiles: [base]
+    expected:
+      output: mixinProfiles
+  - name: ShouldAcceptTopLevelOptionsEnvInclude
+    input:
+      args:
+        - doc: |
+            options:
+              execIf: ['env:X']
+              autoDiscover: true
+              debug: false
+              validateSpec: warn
+            env:
+              GITLAB_GROUP: konradodwrot
+            include:
+              sources: ["@https://gitlab.com/g/r.git", ./sibling]
+            p:
+              include:
+                link: [HOME/**]
+    expected:
+      output: ""
+  - name: ShouldAcceptIncludeProfilesUnionForms
+    input:
+      args:
+        - doc: |
+            p:
+              include:
+                profiles:
+                  - base
+                  - ref: gitlabGroup
+                    options: {source: "@https://gitlab.com/g/r.git"}
+                    env: {GITLAB_GROUP: konradodwrot}
+    expected:
+      output: ""
+  - name: ShouldFlagBogusValidateSpecEnum
+    input:
+      args:
+        - doc: |
+            options:
+              validateSpec: bogus
+    expected:
+      output: validateSpec
 # [<] 🤖🤖

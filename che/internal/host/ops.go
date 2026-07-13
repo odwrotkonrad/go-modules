@@ -36,10 +36,16 @@ func (h Host) failItem(op, dest string, err error) error {
 	return err
 }
 
-// MkDirs creates repo-tree ancestor dirs (parents first) plus profile extra-dirs.
-func (h Host) MkDirs(dirRels []string, extraDirs []spec.FileItem) error {
-	errs := []error{h.ensureConfigDirs(dirRels)}
-	for _, item := range extraDirs {
+// MkDirs creates the profile's dirs, one list: items without Dests are
+// repo-tree ancestor dirs (path in Rel, parents first, umask mode), items with
+// Dests are mkdirs extra-dirs (perms applied, -p).
+func (h Host) MkDirs(dirs []spec.FileItem) error {
+	var errs []error
+	for _, item := range dirs {
+		if len(item.Dests) == 0 {
+			errs = append(errs, h.ensureConfigDir(item.Rel))
+			continue
+		}
 		dest := h.ToDest(item.Dests[0].Path)
 		if err := h.upsertExtraDir(item, dest); err != nil {
 			errs = append(errs, h.failItem("mkdir", dest, err))
@@ -60,16 +66,21 @@ func (h Host) upsertExtraDir(item spec.FileItem, dest string) error {
 func (h Host) ensureConfigDirs(dirRels []string) error {
 	var errs []error
 	for _, rel := range dirRels {
-		dest := h.ToDest(rel)
-		if h.isDirSettled(dest) {
-			continue
-		}
-		err := h.mutate("mkdir(create)", dest, func() error { return h.fs.Mkdir(dest, 0, false) })
-		if err != nil {
-			errs = append(errs, h.failItem("mkdir", dest, err))
-		}
+		errs = append(errs, h.ensureConfigDir(rel))
 	}
 	return errors.Join(errs...)
+}
+
+func (h Host) ensureConfigDir(rel string) error {
+	dest := h.ToDest(rel)
+	if h.isDirSettled(dest) {
+		return nil
+	}
+	err := h.mutate("mkdir(create)", dest, func() error { return h.fs.Mkdir(dest, 0, false) })
+	if err != nil {
+		return h.failItem("mkdir", dest, err)
+	}
+	return nil
 }
 
 // isDirSettled reports whether dest already exists as a dir and may be skipped

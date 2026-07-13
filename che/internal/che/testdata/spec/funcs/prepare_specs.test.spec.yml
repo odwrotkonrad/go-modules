@@ -1,0 +1,376 @@
+# [>] 🤖🤖
+context:
+  function: che.PrepareSpecs
+  mockedInterfaces:
+    execx.CmdExecutor: testutil.CmdMockExecutor
+cases:
+  - name: ShouldWarnOnRefSpecViolationByDefault
+    input:
+      args:
+        - refFiles:
+            che.yml: |
+              p:
+                includes:
+                  link: [HOME/**]
+        - hostFiles:
+            che.yml: |
+              main:
+                options: {autoDiscover: true}
+                include:
+                  profiles:
+                    - ref: p
+                      options: {source: "${REF_DIR}"}
+        - knobs: {}
+    expected:
+      stdOut:
+        - validate(che.yml)
+        - includes
+      output:
+        profiles: [main, "${REF_DIR}::p"]
+  - name: ShouldFailOnRefSpecViolationInErrorMode
+    input:
+      args:
+        - refFiles:
+            che.yml: |
+              p:
+                includes:
+                  link: [HOME/**]
+        - hostFiles:
+            che.yml: |
+              main:
+                options: {autoDiscover: true}
+                include:
+                  profiles:
+                    - ref: p
+                      options: {source: "${REF_DIR}"}
+        - knobs: {validateSpec: error}
+    expected:
+      errorOutput: includes
+  - name: ShouldBuildRemoteRefFromGitURLAtCacheCheckout
+    context:
+      env: {REF_GATE: "1"}
+    input:
+      args:
+        - refFiles:
+            che.yml: |
+              gitlabGroup:
+                options:
+                  execIf: ['env:REF_GATE']
+                include:
+                  runScripts: [scripts/bootstrap.zsh]
+            scripts/bootstrap.zsh: "#!/bin/zsh\n"
+        - hostFiles:
+            che.yml: |
+              main:
+                options: {autoDiscover: true}
+                include:
+                  profiles:
+                    - ref: gitlabGroup
+                      options: {source: "@file://${REF_DIR}"}
+                  runScripts: [scripts/local.zsh]
+            scripts/local.zsh: "#!/bin/zsh\n"
+        - knobs: {debug: true}
+    expected:
+      stdOut:
+        - run @file://${REF_DIR}::gitlabGroup
+        - cloned file://${REF_DIR}
+        - 'execIf(pass): profile gitlabGroup: env:REF_GATE'
+      output:
+        profiles: [main, "@file://${REF_DIR}::gitlabGroup"]
+        repoRootUnder: ${CACHE}
+        script: scripts/bootstrap.zsh
+  - name: ShouldSkipRefWhenExecIfFails
+    context:
+      env: {REF_GATE: ""}
+    input:
+      args:
+        - refFiles:
+            che.yml: |
+              gitlabGroup:
+                options:
+                  execIf: ['env:REF_GATE']
+                include:
+                  runScripts: [scripts/bootstrap.zsh]
+            scripts/bootstrap.zsh: "#!/bin/zsh\n"
+        - hostFiles:
+            che.yml: |
+              main:
+                options: {autoDiscover: true}
+                include:
+                  profiles:
+                    - ref: gitlabGroup
+                      options: {source: "${REF_DIR}"}
+        - knobs:
+            unsetEnv: [REF_GATE]
+    expected:
+      stdOut: skip ${REF_DIR}::gitlabGroup (execIf failed)
+      output:
+        profiles: [main]
+    notExpected:
+      stdOut:
+        - execIf(reject)
+  - name: ShouldGateRefExecIfWithEntryEnvWithoutLeaking
+    input:
+      args:
+        - refFiles:
+            che.yml: |
+              gitlabGroup:
+                options:
+                  execIf: ['env:REF_GATE']
+                include:
+                  runScripts: [scripts/bootstrap.zsh]
+            scripts/bootstrap.zsh: "#!/bin/zsh\n"
+        - hostFiles:
+            che.yml: |
+              main:
+                options: {autoDiscover: true}
+                include:
+                  profiles:
+                    - ref: gitlabGroup
+                      options: {source: "${REF_DIR}"}
+                      env:
+                        REF_GATE: "1"
+        - knobs:
+            sampleEnv: REF_GATE
+            unsetEnv: [REF_GATE]
+    expected:
+      stdOut: 'execIf(pass): profile gitlabGroup: env:REF_GATE'
+      output:
+        profiles: [main, "${REF_DIR}::gitlabGroup"]
+        env: {REF_GATE: "1"}
+        envInOverlay: "1"
+        script: scripts/bootstrap.zsh
+  - name: ShouldMergeSpecEnvUnderEntryEnv
+    input:
+      args:
+        - refFiles:
+            che.yml: |
+              env:
+                FROM_SPEC: spec
+                SHADOWED: spec
+              gitlabGroup:
+                include:
+                  runScripts: [scripts/bootstrap.zsh]
+            scripts/bootstrap.zsh: "#!/bin/zsh\n"
+        - hostFiles:
+            che.yml: |
+              main:
+                options: {autoDiscover: true}
+                include:
+                  profiles:
+                    - ref: gitlabGroup
+                      options: {source: "${REF_DIR}"}
+                      env:
+                        SHADOWED: entry
+        - knobs: {}
+    expected:
+      output:
+        profiles: [main, "${REF_DIR}::gitlabGroup"]
+        env: {FROM_SPEC: spec, SHADOWED: entry}
+  - name: ShouldSkipRemoteRefsWithKnob
+    input:
+      args:
+        - refFiles: {}
+        - hostFiles:
+            che.yml: |
+              main:
+                options: {autoDiscover: true}
+                include:
+                  profiles:
+                    - ref: p
+                      options: {source: /nonexistent}
+                  runScripts: [scripts/local.zsh]
+            scripts/local.zsh: "#!/bin/zsh\n"
+        - knobs:
+            skipRemoteRefs: true
+    expected:
+      output:
+        profiles: [main]
+    notExpected:
+      stdOut: source(
+  - name: ShouldAnchorDirRefAtRepoRelativeDir
+    input:
+      args:
+        - refFiles: {}
+        - hostFiles:
+            che.yml: |
+              main:
+                options: {autoDiscover: true}
+                include:
+                  profiles:
+                    - ref: gitlabGroup
+                      options: {source: ./ref}
+            ref/che.yml: |
+              gitlabGroup:
+                include:
+                  runScripts: [scripts/bootstrap.zsh]
+            ref/scripts/bootstrap.zsh: "#!/bin/zsh\n"
+        - knobs: {}
+    expected:
+      output:
+        profiles: [main, ./ref::gitlabGroup]
+        repoRoot: ${HOST_REPO}/ref
+        script: scripts/bootstrap.zsh
+  - name: ShouldAnchorDirRefAtEnvVarDir
+    input:
+      args:
+        - refFiles:
+            che.yml: |
+              gitlabGroup:
+                include:
+                  runScripts: [scripts/bootstrap.zsh]
+            scripts/bootstrap.zsh: "#!/bin/zsh\n"
+        - hostFiles:
+            che.yml: |
+              main:
+                options: {autoDiscover: true}
+                include:
+                  profiles:
+                    - ref: gitlabGroup
+                      options: {source: $REF_DIR_VAR}
+        - knobs: {}
+    expected:
+      output:
+        profiles: [main, $REF_DIR_VAR::gitlabGroup]
+        repoRoot: ${REF_DIR}
+    notExpected:
+      stdOut: [clone, pull]
+  - name: ShouldDedupeSameRefAcrossProfiles
+    input:
+      args:
+        - refFiles:
+            che.yml: |
+              p:
+                include:
+                  runScripts: [scripts/bootstrap.zsh]
+            scripts/bootstrap.zsh: "#!/bin/zsh\n"
+        - hostFiles:
+            che.yml: |
+              a:
+                options: {autoDiscover: true}
+                include:
+                  profiles:
+                    - ref: p
+                      options: {source: "${REF_DIR}"}
+              b:
+                options: {autoDiscover: true}
+                include:
+                  profiles:
+                    - ref: p
+                      options: {source: "${REF_DIR}"}
+        - knobs: {}
+    expected:
+      output:
+        profiles: [a, b, "${REF_DIR}::p"]
+  - name: ShouldResolveRefsRecursivelyWithCycleGuard
+    input:
+      args:
+        - refFiles: {}
+        - hostFiles:
+            che.yml: |
+              main:
+                options: {autoDiscover: true}
+                include:
+                  profiles:
+                    - ref: p1
+                      options: {source: ./a}
+            a/che.yml: |
+              p1:
+                include:
+                  profiles:
+                    - ref: p2
+                      options: {source: ../b}
+            b/che.yml: |
+              p2:
+                include:
+                  profiles:
+                    - ref: p1
+                      options: {source: ../a}
+        - knobs: {}
+    expected:
+      output:
+        profiles: [main, ./a::p1, ../b::p2]
+  - name: ShouldComposeIncludeSourcesSpecs
+    input:
+      args:
+        - refFiles: {}
+        - hostFiles:
+            che.yml: |
+              include:
+                sources: [./sibling]
+              main:
+                options: {autoDiscover: true}
+                include:
+                  profiles: [sharedBase]
+            sibling/che.yml: |
+              sib:
+                options: {autoDiscover: true}
+                include:
+                  mkdirs:
+                    - files: [HOME/.cache/sib]
+              sharedBase:
+                include:
+                  mkdirs:
+                    - files: [HOME/.cache/shared]
+        - knobs: {}
+    expected:
+      output:
+        profiles: [main, ./sibling::sib]
+  - name: ShouldErrorOnCrossSpecProfileNameCollision
+    input:
+      args:
+        - refFiles: {}
+        - hostFiles:
+            che.yml: |
+              include:
+                sources: [./sibling]
+              main:
+                options: {autoDiscover: true}
+            sibling/che.yml: |
+              main:
+                include:
+                  mkdirs:
+                    - files: [HOME/.cache/sib]
+        - knobs: {}
+    expected:
+      errorOutput: ['profile "main" collides']
+  - name: ShouldGateWholeSpecOnSpecLevelExecIf
+    input:
+      args:
+        - refFiles:
+            che.yml: |
+              options:
+                execIf: ['env:SPEC_GATE']
+              p:
+                options: {autoDiscover: true}
+                include:
+                  runScripts: [scripts/bootstrap.zsh]
+            scripts/bootstrap.zsh: "#!/bin/zsh\n"
+        - hostFiles:
+            che.yml: |
+              include:
+                sources: ["${REF_DIR}"]
+              main:
+                options: {autoDiscover: true}
+        - knobs:
+            unsetEnv: [SPEC_GATE]
+    expected:
+      stdOut: spec(skip)
+      output:
+        profiles: [main]
+  - name: ShouldInheritSpecAutoDiscoverDefault
+    input:
+      args:
+        - refFiles: {}
+        - hostFiles:
+            che.yml: |
+              options:
+                autoDiscover: true
+              a: {}
+              b:
+                options: {autoDiscover: false}
+        - knobs: {}
+    expected:
+      output:
+        profiles: [a]
+# [<] 🤖🤖

@@ -53,7 +53,7 @@ func TestDryRunDelta(t *testing.T) {
 		run, ok := ops[op]
 		require.Truef(t, ok, "unknown command %q", c.Context.Command)
 		covered[op] = true
-		h, res, dir := setupHost(t, config.Config{DryRun: config.DryRun.Delta})
+		h, res, dir := setupHost(t, config.Options{DryRun: config.DryRun.Delta})
 		before := snapshotTree(t, dir)
 		out, err := testutil.CaptureStdout(t, func() error { return run(h, res) })
 		require.NoErrorf(t, err, "%s dry-run", op)
@@ -80,18 +80,18 @@ func TestDryRunDelta(t *testing.T) {
 
 // settlers put one dest into desired state (link points into repo / copy
 // matches), returning it.
-var settlers = map[string]func(*testing.T, Host, spec.Resolved) string{
-	"link": func(t *testing.T, h Host, r spec.Resolved) string {
+var settlers = map[string]func(*testing.T, Host, spec.OperationRecipes) string{
+	"link": func(t *testing.T, h Host, r spec.OperationRecipes) string {
 		t.Helper()
-		item := r.Links[0]
+		item := r.Link.Links[0]
 		dest := h.ToDest(item.Rel)
 		require.NoError(t, os.MkdirAll(filepath.Dir(dest), 0o755))
 		require.NoError(t, os.Symlink(h.Src(item.Rel), dest))
 		return dest
 	},
-	"copy": func(t *testing.T, h Host, r spec.Resolved) string {
+	"copy": func(t *testing.T, h Host, r spec.OperationRecipes) string {
 		t.Helper()
-		item := r.Copies[0]
+		item := r.Copy.Copies[0]
 		dest := h.copyDests(item)[0]
 		src, err := os.ReadFile(h.Src(item.Rel))
 		require.NoError(t, err)
@@ -110,21 +110,18 @@ func TestDryRunAll(t *testing.T) {
 		settle, ok := settlers[op]
 		require.Truef(t, ok, "unknown command %q", c.Context.Command)
 		dir, home := testutil.CheRepo(t)
-		s, err := spec.Load(filepath.Join(dir, "che.yml"))
-		require.NoError(t, err)
-		res, err := s.Resolve([]string{testutil.CheProfile}, filepath.Join(dir, "root"))
-		require.NoError(t, err)
-		dest := settle(t, New(dir, home, testutil.CheProfile, config.Config{}), res)
+		res := makeProfile(t, dir, testutil.CheProfile)
+		dest := settle(t, New(dir, home, testutil.CheProfile, config.Options{}), res)
 		vars := map[string]string{"DEST": dest}
 
-		delta := New(dir, home, testutil.CheProfile, config.Config{DryRun: config.DryRun.Delta})
+		delta := New(dir, home, testutil.CheProfile, config.Options{DryRun: config.DryRun.Delta})
 		deltaOut, err := testutil.CaptureStdout(t, func() error { return ops[op](delta, res) })
 		require.NoError(t, err)
 		for _, f := range c.NotExpected.StdOut {
 			testyml.MustNotMatch(t, testutil.StripANSI(deltaOut), testyml.Expand(f, vars))
 		}
 
-		all := New(dir, home, testutil.CheProfile, config.Config{DryRun: config.DryRun.All})
+		all := New(dir, home, testutil.CheProfile, config.Options{DryRun: config.DryRun.All})
 		allOut, err := testutil.CaptureStdout(t, func() error { return ops[op](all, res) })
 		require.NoError(t, err)
 		for _, f := range c.Expected.StdOut {

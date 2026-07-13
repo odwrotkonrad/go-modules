@@ -4,8 +4,10 @@ package config
 
 // Domain model:
 //
-//	Config  CLI option values (cobra flag destinations), finalized in place by
-//	        Resolve: env fallbacks (flags win), validated mode values
+//	Options    CLI option values (cobra flag destinations), finalized in place
+//	           by Resolve: flags win over env vars, env vars over the local
+//	           che.yml options: block (SpecLayer), then defaults
+//	SpecLayer  the local che.yml options: knobs feeding Resolve
 
 // DryRunMode selects how a dry run reports: off (real run), delta (only dests
 // that would change), all (every dest, as if nothing existed at the destination).
@@ -21,16 +23,23 @@ type ValidateSpecMode string
 // ValidateSpec namespaces the ValidateSpecMode values.
 var ValidateSpec = struct{ Warn, Error ValidateSpecMode }{"warn", "error"}
 
-// Config carries every runtime option.
-type Config struct {
+// Options carries every runtime option.
+type Options struct {
 	Dir               string
 	DryRun            DryRunMode
 	ValidateSpec      ValidateSpecMode
 	Profile           string
 	SkipExecIf        bool
-	SkipPlugins       bool
+	SkipRemoteRefs    bool
 	Debug             bool
 	RenderSkipSecrets bool
+}
+
+// SpecLayer is the local spec's options: contribution to Resolve: applied
+// under flags and env vars, over the defaults.
+type SpecLayer struct {
+	ValidateSpec string
+	Debug        *bool
 }
 
 // [<] 🤖🤖

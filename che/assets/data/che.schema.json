@@ -67,37 +67,6 @@
       "type": "object",
       "description": "per-dest render options"
     },
-    "Profile": {
-      "properties": {
-        "options": {
-          "$ref": "#/$defs/ProfileOptions",
-          "description": "when the profile runs: autoDiscover opts in to bare-che runs, execIf predicates must ALL pass"
-        },
-        "mixinProfiles": {
-          "items": {
-            "type": "string"
-          },
-          "type": "array",
-          "description": "local profile names composed depth-first, in order"
-        },
-        "plugins": {
-          "items": {
-            "$ref": "#/$defs/pluginEntry"
-          },
-          "type": "array",
-          "description": "profiles loaded at their own checkout: `@\u003cgiturl\u003e::\u003cprofile\u003e` (remote) or `\u003cdir\u003e::\u003cprofile\u003e` (local dir) string, or {ref, env}"
-        },
-        "include": {
-          "$ref": "#/$defs/includeSet"
-        },
-        "exclude": {
-          "$ref": "#/$defs/excludeSet"
-        }
-      },
-      "additionalProperties": false,
-      "type": "object",
-      "description": "one profile block: options self-describe eligibility, mixinProfiles compose in order, plugins pull remote profiles, include adds, exclude filters last and wins"
-    },
     "ProfileOptions": {
       "properties": {
         "execIf": {
@@ -109,11 +78,106 @@
         },
         "autoDiscover": {
           "type": "boolean",
-          "description": "run on bare che (default false: runs only via --profile or mixinProfiles)"
+          "description": "run on bare che (nil: inherit spec options, then false: runs only via --profile or include.profiles)"
+        },
+        "debug": {
+          "type": "boolean",
+          "description": "print debug-level lines around this profile (nil: inherit spec options, then che level)"
+        },
+        "directory": {
+          "type": "string",
+          "description": "anchor the profile's files at this directory (empty: inherit spec options, then the checkout)"
+        },
+        "source": {
+          "type": "string",
+          "description": "include.profiles rich entries only: the containing spec's source, @\u003cgiturl\u003e or \u003cdir\u003e"
         }
       },
       "additionalProperties": false,
       "type": "object"
+    },
+    "ProfileRecipe": {
+      "properties": {
+        "options": {
+          "$ref": "#/$defs/ProfileOptions",
+          "description": "when the profile runs: autoDiscover opts in to bare-che runs, execIf predicates must ALL pass; debug/directory cascade (most nested wins)"
+        },
+        "include": {
+          "$ref": "#/$defs/includeSet"
+        },
+        "exclude": {
+          "$ref": "#/$defs/excludeSet"
+        }
+      },
+      "additionalProperties": false,
+      "type": "object",
+      "description": "one profile block: options self-describe eligibility, include.profiles compose refs in order (local scalars, sourced {ref, options, env}), include adds, exclude filters last and wins"
+    },
+    "ProfileSourceRecipe": {
+      "oneOf": [
+        {
+          "type": "string",
+          "description": "local profile name, composed depth-first"
+        },
+        {
+          "properties": {
+            "ref": {
+              "type": "string",
+              "description": "profile name within the referenced spec"
+            },
+            "options": {
+              "$ref": "#/$defs/ProfileOptions"
+            },
+            "env": {
+              "additionalProperties": {
+                "type": "string"
+              },
+              "type": "object",
+              "description": "envs exported around everything done for the referenced profile (options.source entries only)"
+            }
+          },
+          "additionalProperties": false,
+          "type": "object",
+          "required": [
+            "ref"
+          ],
+          "description": "sourced profile ref: options.source locates the containing spec, env overlays its run"
+        }
+      ]
+    },
+    "SpecOptions": {
+      "properties": {
+        "execIf": {
+          "items": {
+            "type": "string"
+          },
+          "type": "array",
+          "description": "spec-level predicates: gate every profile of this spec (ANDed with each profile's own)"
+        },
+        "autoDiscover": {
+          "type": "boolean",
+          "description": "default for profiles that don't set it"
+        },
+        "debug": {
+          "type": "boolean",
+          "description": "default for profiles that don't set it"
+        },
+        "directory": {
+          "type": "string",
+          "description": "anchor the spec's files at this directory (absolute, relative to the checkout, ~/, $VAR); che.yml lookup stays at the checkout"
+        },
+        "validateSpec": {
+          "type": "string",
+          "enum": [
+            "warn",
+            "error"
+          ],
+          "description": "top-level only: how schema violations report; overridden by the flag and env var"
+        }
+      },
+      "additionalProperties": false,
+      "type": "object",
+      "description": "reserved top-level options: block: spec-wide defaults (execIf gate, autoDiscover/debug/directory) + che knobs (validateSpec)"
     },
     "dirGroup": {
       "properties": {
@@ -295,6 +359,13 @@
     },
     "includeSet": {
       "properties": {
+        "profiles": {
+          "items": {
+            "$ref": "#/$defs/ProfileSourceRecipe"
+          },
+          "type": "array",
+          "description": "profile refs composed depth-first before this profile's own payload: local profile name scalar, or {ref, options, env} with options.source locating another spec (its own checkout anchor)"
+        },
         "link": {
           "items": {
             "$ref": "#/$defs/linkEntry"
@@ -340,7 +411,7 @@
       },
       "additionalProperties": false,
       "type": "object",
-      "description": "additive payload: link globs, copy/renderTemplates/mkdirs perm-groups, script globs, service names"
+      "description": "additive payload: profile refs, link globs, copy/renderTemplates/mkdirs perm-groups, script globs, service names"
     },
     "linkEntry": {
       "oneOf": [
@@ -369,42 +440,38 @@
           "description": "source file or glob with a sed-style dest rewrite"
         }
       ]
+    }
+  },
+  "properties": {
+    "options": {
+      "$ref": "#/$defs/SpecOptions"
     },
-    "pluginEntry": {
-      "oneOf": [
-        {
-          "type": "string",
-          "pattern": "^.+::.+$",
-          "description": "`@\u003cgiturl\u003e::\u003cprofile\u003e` (remote) or `\u003cdir\u003e::\u003cprofile\u003e` (local dir) plugin ref"
-        },
-        {
-          "properties": {
-            "ref": {
-              "type": "string",
-              "pattern": "^.+::.+$",
-              "description": "`@\u003cgiturl\u003e::\u003cprofile\u003e` (remote) or `\u003cdir\u003e::\u003cprofile\u003e` (local dir) plugin ref"
-            },
-            "env": {
-              "additionalProperties": {
-                "type": "string"
-              },
-              "type": "object",
-              "description": "envs exported around everything done for the plugin's unit"
-            }
+    "env": {
+      "additionalProperties": {
+        "type": "string"
+      },
+      "type": "object",
+      "description": "environment exported around this spec's preparation and execution"
+    },
+    "include": {
+      "properties": {
+        "sources": {
+          "items": {
+            "type": "string"
           },
-          "additionalProperties": false,
-          "type": "object",
-          "required": [
-            "ref"
-          ]
+          "type": "array",
+          "description": "spec sources, each a \u003cdir\u003e (absolute, relative, ~/, $VAR) or @\u003cgiturl\u003e"
         }
-      ]
+      },
+      "additionalProperties": false,
+      "type": "object",
+      "description": "other specs composed into this one"
     }
   },
   "additionalProperties": {
-    "$ref": "#/$defs/Profile"
+    "$ref": "#/$defs/ProfileRecipe"
   },
   "type": "object",
   "title": "che.yml",
-  "description": "che spec: every top-level key defines a profile block"
+  "description": "che spec: reserved keys options/env/include, every other top-level key defines a profile block"
 }

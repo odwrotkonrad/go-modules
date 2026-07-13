@@ -1,7 +1,5 @@
 package host
 
-// TODO: consider redesigning the data model for these types now that they're consolidated in one place.
-
 // [>] 🤖🤖
 
 import (
@@ -26,7 +24,7 @@ type Host struct {
 	Root     string // <configs>/root, the load ops' source subtree
 	Home     string
 	Profile  string // "<space>/<os>-<arch>"
-	cfg      config.Config
+	cfg      config.Options
 	logSub   string
 	fs       fsutil.FileSystemWriter
 	reader   fsutil.FileSystemReader

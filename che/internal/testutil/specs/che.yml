@@ -23,11 +23,13 @@ base:
 
 cli/macos:
   options: {autoDiscover: true, execIf: ['builtin:isOs == macos', 'builtin:isVirt']}
-  mixinProfiles: [base]
+  include:
+    profiles: [base]
 
 desktop/macos:
   options: {autoDiscover: true, execIf: ['builtin:isOs == macos', 'builtin:isVirt == false']}
-  mixinProfiles: [base]
+  include:
+    profiles: [base]
 
 ontoRepo:
   include:

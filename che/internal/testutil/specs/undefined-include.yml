@@ -1,3 +1,4 @@
 cli/macos:
   options: {autoDiscover: true}
-  mixinProfiles: [nonexistent]
+  include:
+    profiles: [nonexistent]

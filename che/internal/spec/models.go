@@ -1,7 +1,5 @@
 package spec
 
-// TODO: consider redesigning the data model for these types now that they're consolidated in one place.
-
 // [>] 🤖🤖
 
 import (
@@ -12,65 +10,131 @@ import (
 
 // Domain model:
 //
-//	CheSpec  che.yml: every top-level key one Profile
-//	  Profile
-//	    ProfileOptions  eligibility: autoDiscover, execIf predicates
-//	    mixinProfiles   local profile names composed depth-first
-//	    plugins         pluginEntry -> PluginRef: a profile from another repo
-//	    includeSet      additive payload per op
+//	Doc  che.yml: reserved top-level keys options/env/include, every other
+//	     top-level key one ProfileRecipe
+//	  Options  top-level options: block: spec-wide defaults + che knobs
+//	  include  sources: other specs composed in (SpecSourceRecipe list)
+//	  ProfileRecipe  raw declared profile
+//	    Source          ProfileSourceRecipe stamped at parse
+//	    ProfileOptions  eligibility + cascade: autoDiscover, execIf, debug, directory
+//	    includeSet      additive payload per op, plus profiles: profile refs
 //	      linkEntry / entry / dirGroup   perm-groups (Perms cascade to items)
 //	        fileSpec / dirSpec           scalar-or-object union items
 //	          DestSpec                   dest path + per-dest render options
 //	    excludeSet      subtractive glob filter, applied last, wins
-//	Resolved  Resolve output, the selection the ops consume
+//	Sources  Recipe/Ready pairs locating a spec (SpecSource*) or one profile
+//	         within a spec (ProfileSource*), sharing embedded parents
+//	OperationRecipes  MakeProfile output: per-kind operation recipes with the
+//	                  profile's UNRESOLVED subjects, in run order
 //	  FileItem  one resolved file: source rel, dests, perms, template ctx
 
-// CheSpec mirrors che.yml: every top-level key is a defined profile block.
-type CheSpec struct {
-	profiles []Profile // in declaration order
+// [<] 🤖🤖
+
+// [>] 🤖🤖 sources
+
+// SourceType classifies a source URI: remote (@ prefix) | filesystem.
+type SourceType string
+
+// SourceTypes namespaces the SourceType values.
+var SourceTypes = struct{ Remote, Filesystem SourceType }{"remote", "filesystem"}
+
+// SourceRecipe is the shared declared-source parent.
+type SourceRecipe struct {
+	// URI locates the source: <dir> (absolute, relative, ~/, $VAR) or
+	// @<giturl>; "" -> the local repo.
+	URI string `yaml:"-"`
+	// DirectoryPath is where the source lives locally; defaults: remote ->
+	// the XDG cache dir it clones into, filesystem -> the expanded URI dir,
+	// "" local -> the repo root. The directory option (cascade) lands here.
+	DirectoryPath string `yaml:"-"`
 }
 
-type Profile struct {
-	Name          string         `yaml:"-" jsonschema:"-"`
-	Options       ProfileOptions `yaml:"options" jsonschema_description:"when the profile runs: autoDiscover opts in to bare-che runs, execIf predicates must ALL pass"`
-	MixinProfiles []string       `yaml:"mixinProfiles" jsonschema_description:"local profile names composed depth-first, in order"`
-	Plugins       []pluginEntry  `yaml:"plugins"`
-	Include       includeSet     `yaml:"include"`
-	Exclude       excludeSet     `yaml:"exclude"`
+// SourceReady is the shared resolved-source parent. DirectoryPath is only the
+// checkout anchor: root/ subtree and HOME mapping stay hardcoded Host concerns.
+type SourceReady struct {
+	DefinitionURI string
+	DirectoryPath string
 }
 
-// ProfileOptions self-describes when a profile runs.
+// SpecSourceRecipe locates a whole spec (a che.yml): top-level include.sources
+// entries, the spec's own Source.
+type SpecSourceRecipe struct {
+	SourceRecipe `yaml:"-"`
+}
+
+// SpecSourceReady is a resolved SpecSourceRecipe.
+type SpecSourceReady struct {
+	SourceReady
+}
+
+// ProfileSourceRecipe locates one profile within a spec: include.profiles
+// entries (scalar = local ProfileName; rich {ref, options, env} sets
+// options.source + env), and each ProfileRecipe's parse-stamped Source.
+type ProfileSourceRecipe struct {
+	SourceRecipe `yaml:"-"`
+	ProfileName  string `yaml:"ref"`
+	// Options are the entry-set overrides of the referenced profile's own
+	// (one more cascade level, most nested wins); options.source lifts to URI.
+	Options ProfileOptions `yaml:"options"`
+	// Env is the overlay exported around the referenced profile (remote refs only).
+	Env map[string]string `yaml:"env"`
+}
+
+// ProfileSourceReady is a resolved ProfileSourceRecipe.
+type ProfileSourceReady struct {
+	SourceReady
+	ProfileName string
+}
+
+// [<] 🤖🤖
+
+// [>] 🤖🤖 doc + profiles
+
+// Doc mirrors che.yml: reserved keys options/env/include, every other
+// top-level key a defined profile block.
+type Doc struct {
+	Options        Options
+	Env            map[string]string
+	Include        []SpecSourceRecipe
+	ProfileRecipes []ProfileRecipe
+}
+
+// Options is the top-level options: block: spec-wide defaults + che knobs.
+type Options struct {
+	ExecIf       []string `yaml:"execIf" jsonschema_description:"spec-level predicates: gate every profile of this spec (ANDed with each profile's own)"`
+	AutoDiscover *bool    `yaml:"autoDiscover" jsonschema_description:"default for profiles that don't set it"`
+	Debug        *bool    `yaml:"debug" jsonschema_description:"default for profiles that don't set it"`
+	Directory    string   `yaml:"directory" jsonschema_description:"anchor the spec's files at this directory (absolute, relative to the checkout, ~/, $VAR); che.yml lookup stays at the checkout"`
+	ValidateSpec string   `yaml:"validateSpec" jsonschema:"enum=warn,enum=error" jsonschema_description:"top-level only: how schema violations report; overridden by the flag and env var"`
+}
+
+// ProfileRecipe is one raw declared profile.
+type ProfileRecipe struct {
+	Source  ProfileSourceRecipe `yaml:"-" jsonschema:"-"`
+	Options ProfileOptions      `yaml:"options" jsonschema_description:"when the profile runs: autoDiscover opts in to bare-che runs, execIf predicates must ALL pass; debug/directory cascade (most nested wins)"`
+	Include includeSet          `yaml:"include"`
+	Exclude excludeSet          `yaml:"exclude"`
+}
+
+// ProfileOptions self-describes when and where a profile runs. Pointer/zero
+// fields inherit the level above (profile > spec > che, most nested wins).
 type ProfileOptions struct {
 	ExecIf       []string `yaml:"execIf"`
-	AutoDiscover bool     `yaml:"autoDiscover" jsonschema_description:"run on bare che (default false: runs only via --profile or mixinProfiles)"`
-}
-
-// PluginRef is one parsed plugins entry: a profile defined in another repo,
-// loaded and anchored at its own checkout, optionally with envs exported
-// around its load. IsPath marks a local dir ref (no `@` prefix): URL then
-// holds the dir path (absolute, relative, ~/, $VAR).
-type PluginRef struct {
-	URL     string
-	Profile string
-	Env     map[string]string
-	IsPath  bool
-}
-
-// pluginEntry is one plugins list item: a bare `@<giturl>::<profile>` /
-// `<dir>::<profile>` string, or a {ref, env} object.
-type pluginEntry struct {
-	Ref string            `yaml:"ref"`
-	Env map[string]string `yaml:"env"`
+	AutoDiscover *bool    `yaml:"autoDiscover" jsonschema_description:"run on bare che (nil: inherit spec options, then false: runs only via --profile or include.profiles)"`
+	Debug        *bool    `yaml:"debug" jsonschema_description:"print debug-level lines around this profile (nil: inherit spec options, then che level)"`
+	Directory    string   `yaml:"directory" jsonschema_description:"anchor the profile's files at this directory (empty: inherit spec options, then the checkout)"`
+	Source       string   `yaml:"source" jsonschema_description:"include.profiles rich entries only: the containing spec's source, @<giturl> or <dir>"`
 }
 
 // includeSet is the additive payload.
 type includeSet struct {
-	Link            []linkEntry `yaml:"link" jsonschema_description:"symlink-op entries, repo-relative under root/: glob string (dest derived 1:1) or {source, dest} sed-style rewrite"`
-	Copy            []entry     `yaml:"copy" jsonschema_description:"*.ontoHost.cp copy-op perm-groups"`
-	RenderTemplates []entry     `yaml:"renderTemplates" jsonschema_description:"*.tpl render-op perm-groups; sources repo-root-relative or remote (@<repo>//<path>[?ref=<ref>], explicit dest required), glob and derived-dest forms must be root/-prefixed"`
-	Mkdirs          []dirGroup  `yaml:"mkdirs" jsonschema_description:"extra-dir perm-groups; each item one dir path (brace-expanded)"`
-	Scripts         []string    `yaml:"runScripts" jsonschema_description:"script paths or globs, repo-relative, run in spec order"`
-	Services        []string    `yaml:"services" jsonschema_description:"launchd service names"`
+	Profiles        []ProfileSourceRecipe `yaml:"profiles" jsonschema_description:"profile refs composed depth-first before this profile's own payload: local profile name scalar, or {ref, options, env} with options.source locating another spec (its own checkout anchor)"`
+	Link            []linkEntry           `yaml:"link" jsonschema_description:"symlink-op entries, repo-relative under root/: glob string (dest derived 1:1) or {source, dest} sed-style rewrite"`
+	Copy            []entry               `yaml:"copy" jsonschema_description:"*.ontoHost.cp copy-op perm-groups"`
+	RenderTemplates []entry               `yaml:"renderTemplates" jsonschema_description:"*.tpl render-op perm-groups; sources repo-root-relative or remote (@<repo>//<path>[?ref=<ref>], explicit dest required), glob and derived-dest forms must be root/-prefixed"`
+	Mkdirs          []dirGroup            `yaml:"mkdirs" jsonschema_description:"extra-dir perm-groups; each item one dir path (brace-expanded)"`
+	Scripts         []string              `yaml:"runScripts" jsonschema_description:"script paths or globs, repo-relative, run in spec order"`
+	Services        []string              `yaml:"services" jsonschema_description:"launchd service names"`
 }
 
 // excludeSet is the subtractive payload: flat glob-string lists.
@@ -143,7 +207,8 @@ type Perms struct {
 
 // FileItem is one resolved file: source (templates: repo-root-relative or
 // @-prefixed remote ref, links/copies: under root/), explicit dests
-// (nil -> derived in host), optional perms and template context.
+// (nil -> derived in host), optional perms and template context. MkDirs items
+// without Dests are ancestor dirs (path in Rel, zero perms).
 type FileItem struct {
 	Rel   string
 	Dests []DestSpec
@@ -151,16 +216,81 @@ type FileItem struct {
 	Perms
 }
 
-// Resolved is the classified, repo-relative selection the ops consume.
-type Resolved struct {
-	Links     []FileItem  // link op: regular files minus templates/copies/.gitkeep
-	Copies    []FileItem  // copy op: *.ontoHost.cp
-	Templates []FileItem  // render op: *.tpl, dest path decides host vs repo
-	Dirs      []string    // every ancestor dir of links+copies+derived-dest templates, plus mkdirs
-	ExtraDirs []FileItem  // mkdirs only (live dest entries), one per path, carrying perms
-	Services  []string    // service names
-	Scripts   []string    // script entries in spec order
-	Plugins   []PluginRef // profile-level plugins entries, composition order
+// [<] 🤖🤖
+
+// [>] 🤖🤖 operation recipes
+
+// OperationOptions is the shared per-op recipe knob set.
+type OperationOptions struct {
+	SkipSecrets bool // render: skip sources carrying op:// secret refs
+}
+
+// OperationRecipe is the shared operation-recipe parent: pure data, no Host.
+type OperationRecipe struct {
+	Options OperationOptions
+}
+
+// Per-kind operation recipes: one per subcommand, subjects UNRESOLVED
+// (spec domain, emitted by MakeProfile).
+type (
+	PruneLinksOperationRecipe struct {
+		OperationRecipe
+		Dirs []string
+	}
+	MkDirsOperationRecipe struct {
+		OperationRecipe
+		Dirs []FileItem // ancestor dirs (Rel, zero perms) + mkdirs entries (Dests + perms), one list
+	}
+	LinkOperationRecipe struct {
+		OperationRecipe
+		Links []FileItem
+		Dirs  []string
+	}
+	CopyOperationRecipe struct {
+		OperationRecipe
+		Copies []FileItem
+		Dirs   []string
+	}
+	RenderTemplatesOperationRecipe struct {
+		OperationRecipe
+		Templates []FileItem
+	}
+	RunScriptsOperationRecipe struct {
+		OperationRecipe
+		Scripts []string // repo-relative, run order
+	}
+	ServicesOperationRecipe struct {
+		OperationRecipe
+		Services []string // service names
+	}
+)
+
+// OperationRecipes is the ordered per-kind recipe set one profile selects:
+// MakeProfile output, field order = run order.
+type OperationRecipes struct {
+	PruneLinks      PruneLinksOperationRecipe
+	MkDirs          MkDirsOperationRecipe
+	Link            LinkOperationRecipe
+	Copy            CopyOperationRecipe
+	RenderTemplates RenderTemplatesOperationRecipe
+	RunScripts      RunScriptsOperationRecipe
+	Services        ServicesOperationRecipe
+}
+
+// [<] 🤖🤖
+
+// [>] 🤖🤖 internals
+
+// resolved is the classified, repo-relative selection MakeProfile builds
+// before emitting OperationRecipes.
+type resolved struct {
+	Links     []FileItem // link op: regular files minus templates/copies/.gitkeep
+	Copies    []FileItem // copy op: *.ontoHost.cp
+	Templates []FileItem // render op: *.tpl, dest path decides host vs repo
+	Dirs      []string   // every ancestor dir of links+copies+derived-dest templates
+	ExtraDirs []FileItem // mkdirs only (live dest entries), one per path, carrying perms
+	Services  []string   // service names
+	Scripts   []string   // script entries in spec order
 }
 
 // destRule is a parsed sed-style dest rewrite: pattern, replacement ($1
@@ -192,16 +322,16 @@ type globPerm struct {
 // Each op's globs carry their group's perms; classify stamps matched files
 // with them (last match wins).
 type effective struct {
-	linkGlobs globSet     // link-op globs (repo-relative under root/)
-	copyGlobs globSet     // copy-op globs
-	tmplGlobs globSet     // render-templates globs (repo-root-relative, root/-prefixed)
-	richCopy  []FileItem  // rich-form copy entries
-	richTmpl  []FileItem  // rich-form render-templates entries (repo-root-relative)
-	dirs      []FileItem  // mkdirs: glob forms expanded to one item per path, rich carry perms
-	scripts   []string    // script paths (order = run order)
-	services  []string    // service names
-	plugins   []PluginRef // profile-level plugin refs (composition order)
-	exclude   excludeSet  // accumulated exclude globs (applied last, wins)
+	linkGlobs globSet               // link-op globs (repo-relative under root/)
+	copyGlobs globSet               // copy-op globs
+	tmplGlobs globSet               // render-templates globs (repo-root-relative, root/-prefixed)
+	richCopy  []FileItem            // rich-form copy entries
+	richTmpl  []FileItem            // rich-form render-templates entries (repo-root-relative)
+	dirs      []FileItem            // mkdirs: glob forms expanded to one item per path, rich carry perms
+	scripts   []string              // script paths (order = run order)
+	services  []string              // service names
+	refs      []ProfileSourceRecipe // sourced include.profiles refs (composition order)
+	exclude   excludeSet            // accumulated exclude globs (applied last, wins)
 }
 
 // [<] 🤖🤖

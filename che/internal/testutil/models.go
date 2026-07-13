@@ -19,7 +19,7 @@ type MockSet struct {
 }
 
 // CmdMockExecutor is the execx.CmdExecutor test double: records every call,
-// nothing spawns, models launchd state and the plugin git CLI.
+// nothing spawns, models launchd state and the source-checkout git CLI.
 type CmdMockExecutor struct {
 	execx.Mock
 	Fail           bool     // every call fails
@@ -31,7 +31,7 @@ type CmdMockExecutor struct {
 	Bodies         []string // captured install file bodies
 
 	loaded *bool             // launchd state, lazily seeded from NotLoaded
-	clones map[string]string // plugin clone dir -> source url
+	clones map[string]string // source clone dir -> source url
 }
 
 // FileSystemMockWriter is a record-only fsutil.FileSystemWriter: every call
