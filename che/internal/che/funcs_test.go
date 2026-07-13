@@ -26,7 +26,7 @@ func TestSrc(t *testing.T) {
 	testyml.Eq(t, td, "testdata/spec/funcs/src.test.spec.yml", func(t *testing.T, c testyml.Case[string]) (string, error) {
 		a := c.Input.Args
 		p := newProfile(a.String(t, 0), "/Users/x", options.Options{}).withDir(a.String(t, 0))
-		return p.src(a.String(t, 1)), nil
+		return p.resolveSrc(a.String(t, 1)), nil
 	})
 }
 

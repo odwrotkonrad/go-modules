@@ -7,7 +7,7 @@ Available Commands:
     fish            Generate the autocompletion script for fish
     powershell      Generate the autocompletion script for powershell
     zsh             Generate the autocompletion script for zsh
-  detect            print the prepared profiles (one per line) and exit
+  discover          print the prepared profiles (one per line) and exit
   make-copies       *.ontoHost.cp copy op
   make-dirs         create repo-tree dirs + extra-dirs
   make-links        symlink op (configs into system root)

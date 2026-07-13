@@ -37,7 +37,7 @@ func TestUserHome(t *testing.T) {
 			users[name] = user.User{HomeDir: home}
 		}
 		testyml.Swap(t, &UserLookup, users.Lookup)
-		return UserHome(c.Input.Args.String(t, 0))
+		return ResolveUserHome(c.Input.Args.String(t, 0))
 	})
 }
 

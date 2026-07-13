@@ -19,7 +19,7 @@ cases:
                 include:
                   profiles:
                     - source: "${REF_DIR}/che.yml::p"
-        - knobs: {}
+        - flags: {}
     expected:
       stdOut:
         - validate(che.yml)
@@ -41,7 +41,7 @@ cases:
                 include:
                   profiles:
                     - source: "${REF_DIR}/che.yml::p"
-        - knobs: {validateSpec: error}
+        - flags: {validateSpec: error}
     expected:
       errorOutput: includes
   - name: ShouldBuildRemoteRefFromGitURLAtCacheCheckout
@@ -66,7 +66,7 @@ cases:
                     - source: "@file://${REF_DIR}/che.yml::gitlabGroup"
                   runScripts: [scripts/local.zsh]
             scripts/local.zsh: "#!/bin/zsh\n"
-        - knobs: {debug: true}
+        - flags: {debug: true}
     expected:
       stdOut:
         - run @file://${REF_DIR}/che.yml::gitlabGroup
@@ -96,7 +96,7 @@ cases:
                 include:
                   profiles:
                     - source: "${REF_DIR}/che.yml::gitlabGroup"
-        - knobs:
+        - flags:
             unsetEnv: [REF_GATE]
     expected:
       stdOut: skip ${REF_DIR}/che.yml::gitlabGroup (execIf failed)
@@ -125,14 +125,14 @@ cases:
                     - source: "${REF_DIR}/che.yml::gitlabGroup"
                       env:
                         REF_GATE: "1"
-        - knobs:
-            sampleEnv: REF_GATE
+        - flags:
             unsetEnv: [REF_GATE]
     expected:
       stdOut: 'execIf(pass): profile gitlabGroup: env:REF_GATE'
       output:
         profiles: [main, "${REF_DIR}/che.yml::gitlabGroup"]
         env: {REF_GATE: "1"}
+        sampleEnv: REF_GATE
         envInOverlay: "1"
         script: scripts/bootstrap.zsh
   - name: ShouldMergeSpecEnvUnderEntryEnv
@@ -156,7 +156,7 @@ cases:
                     - source: "${REF_DIR}/che.yml::gitlabGroup"
                       env:
                         SHADOWED: entry
-        - knobs: {}
+        - flags: {}
     expected:
       output:
         profiles: [main, "${REF_DIR}/che.yml::gitlabGroup"]
@@ -174,7 +174,7 @@ cases:
                     - source: "/nonexistent/che.yml::p"
                   runScripts: [scripts/local.zsh]
             scripts/local.zsh: "#!/bin/zsh\n"
-        - knobs:
+        - flags:
             skipRemoteRefs: true
     expected:
       output:
@@ -197,7 +197,7 @@ cases:
                 include:
                   runScripts: [scripts/bootstrap.zsh]
             ref/scripts/bootstrap.zsh: "#!/bin/zsh\n"
-        - knobs: {}
+        - flags: {}
     expected:
       output:
         profiles: [main, ./ref/che.yml::gitlabGroup]
@@ -219,7 +219,7 @@ cases:
                 include:
                   profiles:
                     - source: "$REF_DIR_VAR/che.yml::gitlabGroup"
-        - knobs: {}
+        - flags: {}
     expected:
       output:
         profiles: [main, $REF_DIR_VAR/che.yml::gitlabGroup]
@@ -247,7 +247,7 @@ cases:
                 include:
                   profiles:
                     - source: "${REF_DIR}/che.yml::p"
-        - knobs: {}
+        - flags: {}
     expected:
       output:
         profiles: [a, b, "${REF_DIR}/che.yml::p"]
@@ -272,7 +272,7 @@ cases:
                 include:
                   profiles:
                     - source: "../a/che.yml::p1"
-        - knobs: {}
+        - flags: {}
     expected:
       output:
         profiles: [main, ./a/che.yml::p1, ../b/che.yml::p2]
@@ -298,7 +298,7 @@ cases:
                 include:
                   makeDirs:
                     - directories: [HOME/.cache/shared]
-        - knobs: {}
+        - flags: {}
     expected:
       output:
         profiles: [main, ./sibling/che.yml::sib]
@@ -317,7 +317,7 @@ cases:
                 include:
                   makeDirs:
                     - directories: [HOME/.cache/sib]
-        - knobs: {}
+        - flags: {}
     expected:
       errorOutput: ['profile "main" collides']
   - name: ShouldGateWholeSpecOnSpecLevelExecIf
@@ -338,7 +338,7 @@ cases:
                 sources: ["${REF_DIR}"]
               main:
                 options: {autoDiscover: true}
-        - knobs:
+        - flags:
             unsetEnv: [SPEC_GATE]
     expected:
       stdOut: spec(skip)
@@ -355,7 +355,7 @@ cases:
               a: {}
               b:
                 options: {autoDiscover: false}
-        - knobs: {}
+        - flags: {}
     expected:
       output:
         profiles: [a]
@@ -372,7 +372,7 @@ cases:
                 execIf: ['env:SPEC_GATE']
               a: {}
               b: {}
-        - knobs: {}
+        - flags: {}
     expected:
       output:
         profiles: [a, b]
@@ -387,7 +387,7 @@ cases:
                 execIf: ['env:SPEC_GATE']
               a: {}
               b: {}
-        - knobs:
+        - flags:
             unsetEnv: [SPEC_GATE]
     expected:
       output:
@@ -420,7 +420,7 @@ cases:
                   makeLinks: [HOME/.config/skip-b]
             two/HOME/.config/keep-b: keep-b
             two/HOME/.config/skip-b: skip-b
-        - knobs: {}
+        - flags: {}
     expected:
       output:
         profiles: [main, ./one/che.yml::alpha, ./two/che.yml::beta]
@@ -443,7 +443,7 @@ cases:
                 sources: ["${REF_DIR}"]
               main:
                 options: {autoDiscover: true}
-        - knobs: {}
+        - flags: {}
     expected:
       errorOutput: includes
   - name: ShouldResolveIncludedSpecWorkingDirectoryOption
@@ -464,7 +464,7 @@ cases:
                 include:
                   makeLinks: [HOME/**]
             sub/tree/HOME/.config/x: x
-        - knobs: {}
+        - flags: {}
     expected:
       output:
         profiles: [main, ./sub/che.yml::s]
@@ -489,7 +489,7 @@ cases:
                   profiles:
                     - source: "@file://${REF_DIR}/che.yml::gitlabGroup"
                       options: {workingDirectory: override-tree}
-        - knobs: {}
+        - flags: {}
     expected:
       output:
         profiles: [main, "@file://${REF_DIR}/che.yml::gitlabGroup"]
@@ -509,7 +509,7 @@ cases:
                     - Library/**
             etc/zshenv: zshenv
             Library/LaunchDaemons/x.plist: plist
-        - knobs: {}
+        - flags: {}
     expected:
       output:
         profiles: [main]

@@ -15,19 +15,19 @@ import (
 // TsLayout stamps backup filenames + log lines (one stamp per run).
 const TsLayout = "20060102T150405"
 
-// BackupArchivePath resolves the XDG state backups dir + per-run archive
+// ResolveBackupArchivePath resolves the XDG state backups dir + per-run archive
 // filename: <ResolveStateHome>/backups/<bin>-<sub>-<ts>.tar.bz2 (default
 // ~/.local/state/che/backups).
-func BackupArchivePath(home, bin, sub, ts string) string {
+func ResolveBackupArchivePath(home, bin, sub, ts string) string {
 	name := fmt.Sprintf("%s-%s-%s.tar.bz2", bin, sub, ts)
 	return filepath.Join(ResolveStateHome(home), "backups", name)
 }
 
-// ArchiveDests snapshots each existing dest's contents into a single .tar.bz2
+// ArchiveDestinations snapshots each existing dest's contents into a single .tar.bz2
 // at archivePath, entries named by stripped-absolute path. Symlinks followed
 // (linked contents stored, not the link); missing dests, broken links + dirs
 // skipped. Always writes the archive, even empty.
-func (f FS) ArchiveDests(archivePath string, dests []string) error {
+func (f FS) ArchiveDestinations(archivePath string, dests []string) error {
 	if err := os.MkdirAll(filepath.Dir(archivePath), 0o755); err != nil {
 		return err
 	}

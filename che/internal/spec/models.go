@@ -328,8 +328,10 @@ type destRule struct {
 
 // Evaluator resolves execIf predicate expressions. Builtins are lazy (resolved
 // only when referenced) and cached per run ([why] IsVirtualized shells out).
+// lookupEnv reads the env: source from the injected launch env.
 type Evaluator struct {
-	builtins map[string]func() string
+	builtins  map[string]func() string
+	lookupEnv func(string) string
 }
 
 // globSet is an ordered list of op globs, each carrying its group's perms

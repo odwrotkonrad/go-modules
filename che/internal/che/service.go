@@ -23,13 +23,13 @@ type Service struct {
 	LongRunning bool   // KeepAlive, expect a live pid after bootstrap
 }
 
-func (s Service) target() string { return s.Domain + "/" + s.Name }
+func (s Service) formatTarget() string { return s.Domain + "/" + s.Name }
 
 // plistSource is one candidate template path under root/.
 type plistSource struct {
-	rel    string // repo-relative under root/, with marker
-	marker string // ".ontoHost.cp" or ".ontoHost.tpl"
-	system bool   // LaunchDaemons -> system, LaunchAgents -> gui
+	relativePath string // repo-relative under root/, with marker
+	marker       string // ".ontoHost.cp" or ".ontoHost.tpl"
+	system       bool   // LaunchDaemons -> system, LaunchAgents -> gui
 }
 
 // resolveServices maps each name to its live Service via the plist under root/.
@@ -38,13 +38,13 @@ func (p *ProfileReady) resolveServices(names []string) ([]Service, error) {
 	guiDomain := fmt.Sprintf("gui/%d", os.Getuid())
 	out := make([]Service, 0, len(names))
 	for _, name := range names {
-		src, ok := p.locate(name)
+		src, ok := p.locatePlist(name)
 		if !ok {
 			return nil, fmt.Errorf("unknown service %q: no plist under root/", name)
 		}
 		svc := Service{
 			Name:        name,
-			Plist:       p.toDest(strings.TrimSuffix(src.rel, src.marker)),
+			Plist:       p.toDest(strings.TrimSuffix(src.relativePath, src.marker)),
 			Domain:      guiDomain,
 			LongRunning: true,
 		}
@@ -56,14 +56,14 @@ func (p *ProfileReady) resolveServices(names []string) ([]Service, error) {
 	return out, nil
 }
 
-func (p *ProfileReady) locate(name string) (plistSource, bool) {
-	cands := []plistSource{
+func (p *ProfileReady) locatePlist(name string) (plistSource, bool) {
+	candidates := []plistSource{
 		{"Library/LaunchDaemons/" + name + ".plist.ontoHost.cp", ".ontoHost.cp", true},
 		{"Library/LaunchAgents/" + name + ".plist.ontoHost.tpl", ".ontoHost.tpl", false},
 		{"HOME/Library/LaunchAgents/" + name + ".plist.ontoHost.tpl", ".ontoHost.tpl", false},
 	}
-	for _, c := range cands {
-		if _, err := os.Stat(filepath.Join(p.root(), c.rel)); err == nil {
+	for _, c := range candidates {
+		if _, err := os.Stat(filepath.Join(p.resolveRoot(), c.relativePath)); err == nil {
 			return c, true
 		}
 	}
@@ -74,16 +74,16 @@ func (p *ProfileReady) locate(name string) (plistSource, bool) {
 func (p *ProfileReady) bootout(services []Service) error {
 	for _, s := range services {
 		if p.isDryRun() {
-			p.logMsg("bootout", s.target())
+			p.logMsg("bootout", s.formatTarget())
 			continue
 		}
-		if !fsutil.IsLoaded(s.Sudo, s.target()) {
+		if !fsutil.IsLoaded(s.Sudo, s.formatTarget()) {
 			continue
 		}
-		p.logMsg("bootout", s.target())
-		_ = execx.Default.Exec(fsutil.Lctl(s.Sudo, "bootout", s.target())) // async, ignore exit
-		fsutil.WaitGone(s.Sudo, s.target())
-		p.logMsg("bootout(done)", s.target())
+		p.logMsg("bootout", s.formatTarget())
+		_ = execx.Default.Exec(fsutil.BuildLctl(s.Sudo, "bootout", s.formatTarget())) // async, ignore exit
+		fsutil.WaitGone(s.Sudo, s.formatTarget())
+		p.logMsg("bootout(done)", s.formatTarget())
 	}
 	return nil
 }
@@ -93,19 +93,19 @@ func (p *ProfileReady) bootin(services []Service) error {
 	var errs []error
 	for _, s := range services {
 		if p.isDryRun() {
-			p.logMsg("bootstrap", s.target())
+			p.logMsg("bootstrap", s.formatTarget())
 			continue
 		}
-		p.logMsg("bootstrap", s.target())
-		c := fsutil.Lctl(s.Sudo, "bootstrap", s.Domain, s.Plist)
+		p.logMsg("bootstrap", s.formatTarget())
+		c := fsutil.BuildLctl(s.Sudo, "bootstrap", s.Domain, s.Plist)
 		c.Stdout, c.Stderr = os.Stdout, os.Stderr
 		if err := execx.Default.Exec(c); err != nil {
-			err = fmt.Errorf("bootstrap %s: %w", s.target(), err)
+			err = fmt.Errorf("bootstrap %s: %w", s.formatTarget(), err)
 			p.logMsg("bootstrap(fail)", err.Error())
 			errs = append(errs, err)
 			continue
 		}
-		p.logMsg("bootstrap(done)", s.target())
+		p.logMsg("bootstrap(done)", s.formatTarget())
 	}
 	return errors.Join(errs...)
 }
@@ -117,7 +117,7 @@ func (p *ProfileReady) ensure(services []Service) error {
 		p.logMsg("settle", fmt.Sprintf("%ds before pid check", fsutil.SettleSeconds))
 		for _, s := range services {
 			if s.LongRunning {
-				p.logMsg("ensure", s.target())
+				p.logMsg("ensure", s.formatTarget())
 			}
 		}
 		return nil
@@ -129,10 +129,10 @@ func (p *ProfileReady) ensure(services []Service) error {
 		if !s.LongRunning {
 			continue
 		}
-		if pid, ok := fsutil.PID(s.Sudo, s.target()); ok {
-			p.logMsg("running", fmt.Sprintf("%s (pid %d)", s.target(), pid))
+		if pid, ok := fsutil.ResolvePID(s.Sudo, s.formatTarget()); ok {
+			p.logMsg("running", fmt.Sprintf("%s (pid %d)", s.formatTarget(), pid))
 		} else {
-			p.logMsg("error", s.target()+" has no running process")
+			p.logMsg("error", s.formatTarget()+" has no running process")
 			missing++
 		}
 	}

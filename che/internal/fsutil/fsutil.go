@@ -19,34 +19,34 @@ import (
 // FileSystemWriter is the mutating fs surface host ops drive; FS is the real
 // implementation, record-only mocks stand in for tests.
 type FileSystemWriter interface {
-	Mkdir(dest string, mode os.FileMode, parents bool) error
-	Chmod(chmodArg, dest string) error
-	Symlink(target, dest string) error
-	Copy(src, dest string, mode os.FileMode) error
-	Remove(dest string) error
-	Chown(owner, dest string) error
-	Install(dest string, body []byte, mode os.FileMode, owner string) error
-	ArchiveDests(archivePath string, dests []string) error
+	MakeDir(dest string, mode os.FileMode, parents bool) error
+	ChangeMode(chmodArg, dest string) error
+	MakeSymlink(target, dest string) error
+	CopyFile(src, dest string, mode os.FileMode) error
+	RemoveFile(dest string) error
+	ChangeOwner(owner, dest string) error
+	InstallFile(dest string, body []byte, mode os.FileMode, owner string) error
+	ArchiveDestinations(archivePath string, dests []string) error
 }
 
 // FileSystemReader is the read surface host ops consult (settled checks,
 // prune scans, content diffs). OSReader is the real implementation, tests
 // swap in a fixture-scoped mock so live host state never leaks into results.
 type FileSystemReader interface {
-	Stat(path string) (os.FileInfo, error)
-	Lstat(path string) (os.FileInfo, error)
-	ReadDir(path string) ([]os.DirEntry, error)
-	ReadFile(path string) ([]byte, error)
-	Readlink(path string) (string, error)
-	EvalSymlinks(path string) (string, error)
+	StatPath(path string) (os.FileInfo, error)
+	LstatPath(path string) (os.FileInfo, error)
+	ReadDirectory(path string) ([]os.DirEntry, error)
+	ReadFileBytes(path string) ([]byte, error)
+	ReadLink(path string) (string, error)
+	EvaluateSymlinks(path string) (string, error)
 }
 
-func (OSReader) Stat(path string) (os.FileInfo, error)      { return os.Stat(path) }
-func (OSReader) Lstat(path string) (os.FileInfo, error)     { return os.Lstat(path) }
-func (OSReader) ReadDir(path string) ([]os.DirEntry, error) { return os.ReadDir(path) }
-func (OSReader) ReadFile(path string) ([]byte, error)       { return os.ReadFile(path) }
-func (OSReader) Readlink(path string) (string, error)       { return os.Readlink(path) }
-func (OSReader) EvalSymlinks(path string) (string, error)   { return filepath.EvalSymlinks(path) }
+func (OSReader) StatPath(path string) (os.FileInfo, error)        { return os.Stat(path) }
+func (OSReader) LstatPath(path string) (os.FileInfo, error)       { return os.Lstat(path) }
+func (OSReader) ReadDirectory(path string) ([]os.DirEntry, error) { return os.ReadDir(path) }
+func (OSReader) ReadFileBytes(path string) ([]byte, error)        { return os.ReadFile(path) }
+func (OSReader) ReadLink(path string) (string, error)             { return os.Readlink(path) }
+func (OSReader) EvaluateSymlinks(path string) (string, error)     { return filepath.EvalSymlinks(path) }
 
 // IsUnder reports path inside the root tree (root itself included).
 func IsUnder(path, root string) bool {
@@ -66,52 +66,52 @@ func (f FS) escalate(dest string, argv []string) []string {
 	return argv
 }
 
-// Mkdir runs its own priv-escalated argv (MkdirArgv), not through Priv.
-func (f FS) Mkdir(dest string, mode os.FileMode, parents bool) error {
-	return run(f.MkdirArgv(dest, mode, parents))
+// MakeDir runs its own priv-escalated argv (MkdirArgv), not through Priv.
+func (f FS) MakeDir(dest string, mode os.FileMode, parents bool) error {
+	return run(f.BuildMkdirArgv(dest, mode, parents))
 }
 
-// MkdirArgv builds a per-dest-escalated mkdir argv. mode 0 -> no -m (mkdir honors umask).
-func (f FS) MkdirArgv(dest string, mode os.FileMode, parents bool) []string {
+// BuildMkdirArgv builds a per-dest-escalated mkdir argv. mode 0 -> no -m (mkdir honors umask).
+func (f FS) BuildMkdirArgv(dest string, mode os.FileMode, parents bool) []string {
 	argv := []string{"mkdir"}
 	if parents {
 		argv = append(argv, "-p")
 	}
-	argv = append(argv, modeFlag(mode)...)
+	argv = append(argv, buildModeFlag(mode)...)
 	argv = append(argv, dest)
 	return f.escalate(dest, argv)
 }
 
-// Chmod applies explicit mode arg (setgid/sticky bits, not honored by mkdir mode).
-func (f FS) Chmod(chmodArg, dest string) error {
-	return f.Priv(dest, "chmod", chmodArg, dest)
+// ChangeMode applies explicit mode arg (setgid/sticky bits, not honored by mkdir mode).
+func (f FS) ChangeMode(chmodArg, dest string) error {
+	return f.RunPrivileged(dest, "chmod", chmodArg, dest)
 }
 
-func (f FS) Symlink(target, dest string) error {
+func (f FS) MakeSymlink(target, dest string) error {
 	noDeref := "-n"
 	if runtime.GOOS == "darwin" {
 		noDeref = "-h"
 	}
-	return f.Priv(dest, "ln", "-fs", noDeref, target, dest)
+	return f.RunPrivileged(dest, "ln", "-fs", noDeref, target, dest)
 }
 
-func (f FS) Copy(src, dest string, mode os.FileMode) error {
-	argv := append([]string{"install"}, modeFlag(mode)...)
+func (f FS) CopyFile(src, dest string, mode os.FileMode) error {
+	argv := append([]string{"install"}, buildModeFlag(mode)...)
 	argv = append(argv, src, dest)
-	return f.Priv(dest, argv...)
+	return f.RunPrivileged(dest, argv...)
 }
 
-func (f FS) Remove(dest string) error {
-	return f.Priv(dest, "rm", "-f", dest)
+func (f FS) RemoveFile(dest string) error {
+	return f.RunPrivileged(dest, "rm", "-f", dest)
 }
 
-func (f FS) Chown(owner, dest string) error {
-	return f.Priv(dest, "chown", owner, dest)
+func (f FS) ChangeOwner(owner, dest string) error {
+	return f.RunPrivileged(dest, "chown", owner, dest)
 }
 
-// Install writes body to a temp, installs at dest with mode/owner, sudo iff dest
+// InstallFile writes body to a temp, installs at dest with mode/owner, sudo iff dest
 // outside Home. owner "" -> no -o/-g.
-func (f FS) Install(dest string, body []byte, mode os.FileMode, owner string) error {
+func (f FS) InstallFile(dest string, body []byte, mode os.FileMode, owner string) error {
 	tmp, err := os.CreateTemp("", "che-tmpl-*")
 	if err != nil {
 		return err
@@ -122,17 +122,17 @@ func (f FS) Install(dest string, body []byte, mode os.FileMode, owner string) er
 		return err
 	}
 
-	argv := append([]string{"install"}, modeFlag(mode)...)
+	argv := append([]string{"install"}, buildModeFlag(mode)...)
 	if owner != "" {
 		o, g, _ := strings.Cut(owner, ":")
 		argv = append(argv, "-o", o, "-g", g)
 	}
 	argv = append(argv, tmp.Name(), dest)
-	return f.Priv(dest, argv...)
+	return f.RunPrivileged(dest, argv...)
 }
 
-// Priv runs argv as root unless dest under Home (user-owned).
-func (f FS) Priv(dest string, argv ...string) error {
+// RunPrivileged runs argv as root unless dest under Home (user-owned).
+func (f FS) RunPrivileged(dest string, argv ...string) error {
 	return run(f.escalate(dest, argv))
 }
 
@@ -140,15 +140,15 @@ func run(argv []string) error {
 	return execx.Default.Exec(execx.Cmd{Argv: argv, Stdout: os.Stdout, Stderr: os.Stderr})
 }
 
-// ModeArg renders an octal mode for install/mkdir/chmod argv.
-func ModeArg(m os.FileMode) string { return fmt.Sprintf("%04o", m) }
+// FormatModeArg renders an octal mode for install/mkdir/chmod argv.
+func FormatModeArg(m os.FileMode) string { return fmt.Sprintf("%04o", m) }
 
-// modeFlag is ["-m", <mode>] for a set mode, nil when unset (0).
-func modeFlag(m os.FileMode) []string {
+// buildModeFlag is ["-m", <mode>] for a set mode, nil when unset (0).
+func buildModeFlag(m os.FileMode) []string {
 	if m == 0 {
 		return nil
 	}
-	return []string{"-m", ModeArg(m)}
+	return []string{"-m", FormatModeArg(m)}
 }
 
 func IsDir(p string) bool {
@@ -192,15 +192,15 @@ func openRepo(dir string) (*git.Repository, string, error) {
 	return repo, root, nil
 }
 
-// RepoRoot returns the git toplevel for dir (working-tree root).
-func RepoRoot(dir string) (string, error) {
+// ResolveRepoRoot returns the git toplevel for dir (working-tree root).
+func ResolveRepoRoot(dir string) (string, error) {
 	_, root, err := openRepo(dir)
 	return root, err
 }
 
-// TrackedFiles lists git-tracked files under root, relative to root. root may be
+// ListTrackedFiles lists git-tracked files under root, relative to root. root may be
 // a repo subtree: only entries within it returned, prefix-stripped.
-func TrackedFiles(root string) ([]string, error) {
+func ListTrackedFiles(root string) ([]string, error) {
 	repo, repoRoot, err := openRepo(root)
 	if err != nil {
 		return nil, err

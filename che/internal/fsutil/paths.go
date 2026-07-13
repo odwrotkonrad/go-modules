@@ -33,9 +33,9 @@ func ResolveConfigHome(home string) string {
 	return resolveBaseDir("CHE_CONFIG_HOME", "XDG_CONFIG_HOME", home, ".config")
 }
 
-// UserConfigPath is the user-config file: <ResolveConfigHome>/config.yml
+// ResolveUserConfigPath is the user-config file: <ResolveConfigHome>/config.yml
 // (default ~/.config/che/config.yml).
-func UserConfigPath(home string) string {
+func ResolveUserConfigPath(home string) string {
 	return filepath.Join(ResolveConfigHome(home), "config.yml")
 }
 

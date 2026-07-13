@@ -37,7 +37,7 @@ import (
 //	            runs each op's logic against its owning *ProfileReady
 //
 // cli holds opts (options.Options) and the root *SpecReady as separately
-// initialized values: PrepareOptions, then PrepareSpecs.
+// initialized values: PrepareApplicationOptions, then PrepareSpecs.
 
 // Seams are the fs surfaces a profile drives to touch the host: mutating
 // writer, dest-facing reader, remote template fetcher. Exported so tests can
@@ -74,36 +74,51 @@ func (g gitFetcher) Fetch(ref string) (string, error) { return g.fetch(ref) }
 
 // [>] 🤖🤖 package-level funcs
 
-// PrepareOptions finalizes the runtime options: chdir (-C), locate the repo,
+// PrepareApplicationOptions finalizes the runtime options: chdir (-C), locate the repo,
 // then resolve with per-field precedence flags > env vars > the user-config
 // file ($XDG_CONFIG_HOME/che/config.yml) > local che.yml options: > defaults.
-func PrepareOptions(flags options.Options) (options.Options, error) {
-	c := flags
-	c.Dir = cmp.Or(c.Dir, os.Getenv("CHE_DIR"))
-	if c.Dir != "" {
-		if err := os.Chdir(c.Dir); err != nil {
-			return c, fmt.Errorf("-C: %w", err)
+// ctx carries the captured launch world (env/cwd); -C shifts ctx.Cwd forward.
+func PrepareApplicationOptions(ctx appCtx, opts options.Options) (appCtx, options.Options, error) {
+	resolvedOptions := opts
+	resolvedOptions.Dir = cmp.Or(resolvedOptions.Dir, ctx.Env["CHE_DIR"])
+	if resolvedOptions.Dir != "" {
+		next, err := changeDir(ctx.Cwd, resolvedOptions.Dir)
+		if err != nil {
+			return ctx, resolvedOptions, fmt.Errorf("-C: %w", err)
 		}
+		ctx.Cwd = next
 	}
-	repoRoot, err := findRepoRoot()
+	repoRoot, err := findRepoRoot(ctx)
 	if err != nil {
-		return c, err
+		return ctx, resolvedOptions, err
 	}
-	home, err := invokingHome()
+	home, err := resolveInvokingHome(ctx)
 	if err != nil {
-		return c, err
+		return ctx, resolvedOptions, err
 	}
-	if err := c.Resolve(userLayer(fsutil.UserConfigPath(home)), specLayer(filepath.Join(repoRoot, "che.yml"))); err != nil {
-		return c, err
+	if err := resolvedOptions.Resolve(ctx.lookupEnv(), readUserLayer(fsutil.ResolveUserConfigPath(home)), readSpecLayer(filepath.Join(repoRoot, "che.yml"))); err != nil {
+		return ctx, resolvedOptions, err
 	}
-	log.SetDebug(c.Debug)
-	return c, nil
+	log.SetDebug(resolvedOptions.Debug)
+	return ctx, resolvedOptions, nil
 }
 
-// userLayer leniently reads the user-config file: a bare options: object
+// changeDir resolves the -C target against cwd (absolute stays, relative joins),
+// verifying it is an existing dir; returns the shifted working directory.
+func changeDir(cwd, dir string) (string, error) {
+	if !filepath.IsAbs(dir) {
+		dir = filepath.Join(cwd, dir)
+	}
+	if !fsutil.IsDir(dir) {
+		return "", fmt.Errorf("chdir %s: not a directory", dir)
+	}
+	return dir, nil
+}
+
+// readUserLayer leniently reads the user-config file: a bare options: object
 // ($XDG_CONFIG_HOME/che/config.yml) mirroring the che.yml options: block
 // ([why] absent file -> empty layer; parse errors surface later).
-func userLayer(path string) options.Layer {
+func readUserLayer(path string) options.Layer {
 	b, err := os.ReadFile(path)
 	if err != nil {
 		return options.Layer{}
@@ -115,9 +130,10 @@ func userLayer(path string) options.Layer {
 	return o
 }
 
-// specLayer leniently reads the local spec's options: block into a resolution
-// layer ([why] absent file / parse errors surface later, at PrepareSpecs).
-func specLayer(path string) options.Layer {
+// readSpecLayer leniently reads the local spec's options: block into a
+// resolution layer ([why] absent file / parse errors surface later, at
+// PrepareSpecs).
+func readSpecLayer(path string) options.Layer {
 	b, err := os.ReadFile(path)
 	if err != nil {
 		return options.Layer{}
@@ -133,20 +149,21 @@ func specLayer(path string) options.Layer {
 
 // PrepareSpecs resolves the root spec and its whole Include tree (top-level
 // include.sources + sourced include.profiles refs), fully recursive,
-// cycle-guarded, deduped by source URI + profile name.
-func PrepareSpecs(opts options.Options, src spec.SpecSourceRecipe) (*SpecReady, error) {
-	repoRoot, err := findRepoRoot()
+// cycle-guarded, deduped by source URI + profile name. ctx carries the captured
+// launch world, held once on specsPrep for the whole prepare pass.
+func PrepareSpecs(ctx appCtx, opts options.Options, src spec.SpecSourceRecipe) (*SpecReady, error) {
+	repoRoot, err := findRepoRoot(ctx)
 	if err != nil {
 		return nil, err
 	}
-	home, err := invokingHome()
+	home, err := resolveInvokingHome(ctx)
 	if err != nil {
 		return nil, err
 	}
 	p := &specsPrep{
+		ctx:       ctx,
 		opts:      opts,
 		home:      home,
-		eval:      spec.NewEvaluator().EvalExecIf,
 		seenSpecs: map[string]bool{},
 		seenRefs:  map[string]bool{},
 	}
@@ -155,9 +172,9 @@ func PrepareSpecs(opts options.Options, src spec.SpecSourceRecipe) (*SpecReady, 
 
 // specsPrep threads the shared composition state through the recursion.
 type specsPrep struct {
+	ctx       appCtx
 	opts      options.Options
 	home      string
-	eval      func(expr string) (bool, error)
 	seenSpecs map[string]bool // resolved spec dirs (include.sources cycle/dup guard)
 	seenRefs  map[string]bool // <uri>::<profile> (sourced-ref dedup)
 }
@@ -167,37 +184,34 @@ type specsPrep struct {
 // user-invoked spec (zero eligible profiles is fatal there only). Returns nil
 // for an include.sources duplicate.
 func (p *specsPrep) prepare(src spec.SpecSourceRecipe, anchor string, forced *spec.ProfileSourceRecipe, root bool) (*SpecReady, error) {
-	rcp := &SpecRecipe{Source: src}
-	if err := rcp.PrepareSpec(anchor, p.home); err != nil {
+	recipe := &SpecRecipe{Source: src}
+	if err := recipe.PrepareSpec(anchor, p.home); err != nil {
 		return nil, err
 	}
 	if forced != nil {
 		// [why] keyed on the resolved dir, not the raw URI: the same spec is
 		// referenced under different relative URIs across hops.
-		key := rcp.sourceReady.DirectoryPath + "::" + forced.ProfileName
+		key := recipe.sourceReady.DirectoryPath + "::" + forced.ProfileName
 		if p.seenRefs[key] {
 			log.Debug("source("+forced.ProfileName+")", "skip duplicate "+forced.String(), log.Off)
 			return nil, nil
 		}
 		p.seenRefs[key] = true
-	} else if !root && p.seenSpecs[rcp.sourceReady.DirectoryPath] {
-		log.Debug("source(spec)", "skip duplicate "+rcp.sourceReady.DirectoryPath, log.Off)
+	} else if !root && p.seenSpecs[recipe.sourceReady.DirectoryPath] {
+		log.Debug("source(spec)", "skip duplicate "+recipe.sourceReady.DirectoryPath, log.Off)
 		return nil, nil
 	}
-	p.seenSpecs[rcp.sourceReady.DirectoryPath] = true
-	if err := rcp.PrepareProfileRecipes(p.opts); err != nil {
+	p.seenSpecs[recipe.sourceReady.DirectoryPath] = true
+	if err := recipe.PrepareProfileRecipes(p.opts); err != nil {
 		return nil, err
 	}
-	return rcp.PrepareProfiles(p, forced, root)
+	return recipe.PrepareProfiles(p, forced, root)
 }
 
-// findRepoRoot: git toplevel of cwd, che.yml must live there (che's defining marker).
-func findRepoRoot() (string, error) {
-	dir, err := os.Getwd()
-	if err != nil {
-		return "", err
-	}
-	root, err := fsutil.RepoRoot(dir)
+// findRepoRoot: git toplevel of ctx.Cwd, che.yml must live there (che's
+// defining marker).
+func findRepoRoot(ctx appCtx) (string, error) {
+	root, err := fsutil.ResolveRepoRoot(ctx.Cwd)
 	if err != nil {
 		return "", err
 	}
@@ -207,45 +221,37 @@ func findRepoRoot() (string, error) {
 	return root, nil
 }
 
-// invokingHome resolves the invoking user's home. Under sudo (EUID 0,
+// resolveInvokingHome resolves the invoking user's home. Under sudo (EUID 0,
 // SUDO_USER set), looks up that user's home from passwd so dest paths derive
 // from the real user, not /var/root. Otherwise uses $HOME.
-func invokingHome() (string, error) {
-	if os.Geteuid() == 0 {
-		if name := os.Getenv("SUDO_USER"); name != "" {
-			h, err := fsutil.UserHome(name)
+func resolveInvokingHome(ctx appCtx) (string, error) {
+	if ctx.Euid == 0 {
+		if name := ctx.Env["SUDO_USER"]; name != "" {
+			h, err := fsutil.ResolveUserHome(name)
 			if err != nil {
 				return "", fmt.Errorf("lookup SUDO_USER %q: %w", name, err)
 			}
 			return h, nil
 		}
 	}
-	home := os.Getenv("HOME")
+	home := ctx.Env["HOME"]
 	if home == "" {
 		return "", fmt.Errorf("HOME must be set")
 	}
 	return home, nil
 }
 
-// withEnv runs fn with env exported (host values shadowed), restoring after.
-func withEnv(env map[string]string, fn func() error) error {
-	if len(env) == 0 {
-		return fn()
+// overlayEnv derives a new env map from base with overlay's keys applied
+// (overlay wins), the pure replacement for the old process-env shadowing. Empty
+// overlay returns base unchanged.
+func overlayEnv(base map[string]string, overlay map[string]string) map[string]string {
+	if len(overlay) == 0 {
+		return base
 	}
-	for _, k := range slices.Sorted(maps.Keys(env)) {
-		prev, had := os.LookupEnv(k)
-		if err := os.Setenv(k, env[k]); err != nil {
-			return err
-		}
-		defer func() {
-			if had {
-				os.Setenv(k, prev)
-			} else {
-				os.Unsetenv(k)
-			}
-		}()
-	}
-	return fn()
+	out := make(map[string]string, len(base)+len(overlay))
+	maps.Copy(out, base)
+	maps.Copy(out, overlay)
+	return out
 }
 
 // [<] 🤖🤖
@@ -304,14 +310,16 @@ func (r *SpecRecipe) PrepareProfileRecipes(opts options.Options) error {
 	return nil
 }
 
-// workingDir resolves a profile's effective options.workingDirectory onto the
-// checkout anchor: empty -> the checkout itself, else env-expanded (~/, $VAR,
-// env vars), relative -> under the checkout. Must be an existing dir.
-func workingDir(anchor, directory string) (string, error) {
+// resolveWorkingDir resolves a profile's effective options.workingDirectory
+// onto the checkout anchor: empty -> the checkout itself, else env-expanded
+// (~/, $VAR, env vars against env), relative -> under the checkout. Must be an
+// existing dir.
+func resolveWorkingDir(env map[string]string, anchor, directory string) (string, error) {
 	if directory == "" {
 		directory = spec.DefaultWorkingDir
 	}
-	dir := fsutil.ExpandHome(os.ExpandEnv(directory), os.Getenv("HOME"))
+	expanded := os.Expand(directory, func(k string) string { return env[k] })
+	dir := fsutil.ExpandHome(expanded, env["HOME"])
 	if !filepath.IsAbs(dir) {
 		dir = filepath.Join(anchor, dir)
 	}
@@ -331,7 +339,7 @@ func (r *SpecRecipe) validateSchema(cli options.ValidateSpecMode) error {
 		return nil
 	}
 	// [why] flag/env wins over this spec's own options.validateSpec, then warn.
-	mode := options.ValidateSpecMode(cmp.Or(string(cli), specValidateSpec(b), string(options.ValidateSpec.Warn)))
+	mode := options.ValidateSpecMode(cmp.Or(string(cli), peekSpecValidateMode(b), string(options.ValidateSpec.Warn)))
 	if mode == options.ValidateSpec.Error {
 		return fmt.Errorf("schema violations in %s:\n%s", r.sourceReady.DefinitionURI, strings.Join(finds, "\n"))
 	}
@@ -341,9 +349,9 @@ func (r *SpecRecipe) validateSchema(cli options.ValidateSpecMode) error {
 	return nil
 }
 
-// specValidateSpec leniently peeks a spec's own options.validateSpec from its
-// bytes ("" if absent or unparseable; the schema check surfaces real errors).
-func specValidateSpec(b []byte) string {
+// peekSpecValidateMode leniently peeks a spec's own options.validateSpec from
+// its bytes ("" if absent or unparseable; the schema check surfaces real errors).
+func peekSpecValidateMode(b []byte) string {
 	var d struct {
 		Options spec.Options `yaml:"options"`
 	}
@@ -359,29 +367,36 @@ func specValidateSpec(b []byte) string {
 // spawning nested SpecReadys (recursive).
 func (r *SpecRecipe) PrepareProfiles(p *specsPrep, forced *spec.ProfileSourceRecipe, root bool) (*SpecReady, error) {
 	ready := &SpecReady{Source: r.sourceReady, Options: r.Options, Env: r.Env, recipes: r.ProfileRecipes}
-	err := withEnv(r.Env, func() error {
-		pass, err := spec.AllPass("spec "+r.sourceReady.DefinitionURI, r.Options.ExecIf, p.opts.SkipExecIf, p.eval)
-		if err != nil {
-			return err
-		}
-		if !pass {
-			log.Msg("spec(skip)", r.sourceReady.DefinitionURI+" (execIf failed)", log.Off)
-			return nil
-		}
-		lookup, err := r.composeIncludes(p, ready)
-		if err != nil {
-			return err
-		}
-		names, err := r.eligibleNames(p, forced, root)
-		if err != nil || len(names) == 0 {
-			return err
-		}
-		return r.assembleProfiles(p, ready, lookup, names, forced)
-	})
+	// [why] the spec-level env: overlay gates this spec's own execIf.
+	eval := p.evalWith(r.Env)
+	pass, err := spec.AllPass("spec "+r.sourceReady.DefinitionURI, r.Options.ExecIf, p.opts.SkipExecIf, eval)
 	if err != nil {
 		return nil, err
 	}
+	if !pass {
+		log.Msg("spec(skip)", r.sourceReady.DefinitionURI+" (execIf failed)", log.Off)
+		return ready, nil
+	}
+	lookup, err := r.composeIncludes(p, ready)
+	if err != nil {
+		return nil, err
+	}
+	names, err := r.selectEligibleNames(p, forced, root)
+	if err != nil || len(names) == 0 {
+		return ready, err
+	}
+	if err := r.assembleProfiles(p, ready, lookup, names, forced); err != nil {
+		return nil, err
+	}
 	return ready, nil
+}
+
+// evalWith builds an execIf evaluator whose env: source reads the captured
+// launch env overlaid with the given profile/spec/ref env ([why] the overlay
+// wins, matching the old process-env shadowing without mutating it).
+func (p *specsPrep) evalWith(overlay map[string]string) func(string) (bool, error) {
+	env := overlayEnv(p.ctx.Env, overlay)
+	return spec.NewEvaluator(func(k string) string { return env[k] }).EvalExecIf
 }
 
 // composeIncludes prepares each include.sources spec (own anchor, own env
@@ -409,21 +424,17 @@ func (r *SpecRecipe) composeIncludes(p *specsPrep, ready *SpecReady) ([]spec.Pro
 	return lookup, nil
 }
 
-// eligibleNames picks this spec's own profiles to assemble: the forced ref's
-// one profile (execIf gated inside its env overlay, skip on fail), or
+// selectEligibleNames picks this spec's own profiles to assemble: the forced
+// ref's one profile (execIf gated inside its env overlay, skip on fail), or
 // EligibleRecipes (zero eligible fatal only at the root spec).
-func (r *SpecRecipe) eligibleNames(p *specsPrep, forced *spec.ProfileSourceRecipe, root bool) ([]string, error) {
+func (r *SpecRecipe) selectEligibleNames(p *specsPrep, forced *spec.ProfileSourceRecipe, root bool) ([]string, error) {
 	if forced != nil {
 		rec, err := spec.FindRecipe(r.ProfileRecipes, forced.ProfileName)
 		if err != nil {
 			return nil, fmt.Errorf("ref %s: %w", forced, err)
 		}
-		var pass bool
-		err = withEnv(forced.Env, func() error {
-			var e error
-			pass, e = spec.AllPass(forced.ProfileName, rec.Options.OverRef(forced.Options).ExecIf, p.opts.SkipExecIf, p.eval)
-			return e
-		})
+		// [why] the ref entry's env overlays the launch env for its execIf gate.
+		pass, err := spec.AllPass(forced.ProfileName, rec.Options.OverRef(forced.Options).ExecIf, p.opts.SkipExecIf, p.evalWith(forced.Env))
 		if err != nil {
 			return nil, fmt.Errorf("ref %s: %w", forced, err)
 		}
@@ -437,7 +448,7 @@ func (r *SpecRecipe) eligibleNames(p *specsPrep, forced *spec.ProfileSourceRecip
 	if root {
 		forcedProfiles = p.opts.Profiles
 	}
-	names, err := spec.EligibleRecipes(r.ProfileRecipes, forcedProfiles, p.opts.SkipExecIf, p.eval)
+	names, err := spec.EligibleRecipes(r.ProfileRecipes, forcedProfiles, p.opts.SkipExecIf, p.evalWith(r.Env))
 	if err != nil {
 		if !root && errors.Is(err, spec.ErrNoneEligible) {
 			log.Debug("spec(skip)", r.sourceReady.DefinitionURI+" (no eligible profile)", log.Off)
@@ -485,43 +496,40 @@ func (r *SpecRecipe) assembleProfiles(p *specsPrep, ready *SpecReady, lookup []s
 
 // makeProfileReady resolves one recipe into an executable profile: MakeProfile
 // emits the operation recipes, the profile (anchored at the recipe's directory,
-// its fs seams built) prepares them (subjects resolved), the env overlay wraps
-// preparation.
+// its fs seams built) prepares them (subjects resolved). The profile captures
+// the effective launch env (launch env overlaid with its own env: block) so
+// downstream op methods read p.env, never the process.
 func (r *SpecRecipe) makeProfileReady(p *specsPrep, rec spec.ProfileRecipe, lookup []spec.ProfileRecipe, env map[string]string) (*ProfileReady, []spec.ProfileSourceRecipe, error) {
 	name := rec.Source.GetProfileName()
-	var pr *ProfileReady
-	var refs []spec.ProfileSourceRecipe
-	err := withEnv(env, func() error {
-		wd, err := workingDir(rec.Source.DirectoryPath, rec.Options.WorkingDirectory)
-		if err != nil {
-			return err
-		}
-		ops, sourced, err := rec.MakeProfile(lookup, wd)
-		if err != nil {
-			return err
-		}
-		refs = sourced
-		pr = &ProfileReady{
-			Source: spec.ProfileSourceReady{
-				SourceReady: spec.SourceReady{DefinitionURI: r.sourceReady.DefinitionURI, DirectoryPath: rec.Source.DirectoryPath},
-				ProfileName: name,
-			},
-			Options:    rec.Options,
-			Env:        env,
-			Profiles:   sourced,
-			ref:        rec.Source.String(),
-			workingDir: wd,
-			opts:       p.opts,
-			home:       p.home,
-			Seams:      NewSeams(p.home),
-		}
-		pr.OperationsReady, err = pr.prepareOperations(ops)
-		return err
-	})
+	effectiveEnv := overlayEnv(p.ctx.Env, env)
+	wd, err := resolveWorkingDir(effectiveEnv, rec.Source.DirectoryPath, rec.Options.WorkingDirectory)
 	if err != nil {
 		return nil, nil, fmt.Errorf("profile %q: %w", name, err)
 	}
-	return pr, refs, nil
+	ops, sourced, err := rec.MakeProfile(lookup, wd)
+	if err != nil {
+		return nil, nil, fmt.Errorf("profile %q: %w", name, err)
+	}
+	pr := &ProfileReady{
+		Source: spec.ProfileSourceReady{
+			SourceReady: spec.SourceReady{DefinitionURI: r.sourceReady.DefinitionURI, DirectoryPath: rec.Source.DirectoryPath},
+			ProfileName: name,
+		},
+		Options:    rec.Options,
+		Env:        env,
+		env:        effectiveEnv,
+		Profiles:   sourced,
+		ref:        rec.Source.String(),
+		workingDir: wd,
+		opts:       p.opts,
+		home:       p.home,
+		Seams:      NewSeams(p.home),
+	}
+	pr.OperationsReady, err = pr.prepareOperations(ops)
+	if err != nil {
+		return nil, nil, fmt.Errorf("profile %q: %w", name, err)
+	}
+	return pr, sourced, nil
 }
 
 // [<] 🤖🤖
@@ -583,29 +591,30 @@ type ProfileReady struct {
 	workingDir      string                     // resolved load-ops source tree (options.workingDirectory cascade)
 	opts            options.Options
 	home            string
-	Seams           // fs writer/reader/fetcher, defaulted in prepare, test-injectable
+	env             map[string]string // captured launch env overlaid with Env, read by expandEnv/buildScriptsEnv
+	Seams                             // fs writer/reader/fetcher, defaulted in prepare, test-injectable
 }
 
-// Ref is the profile's display ref (report lines, detect).
+// Ref is the profile's display ref (report lines, discover).
 func (p *ProfileReady) Ref() string { return p.ref }
 
 // [>] 🤖🤖 execution-context accessors: options + minimal state, profile-scoped
 
-// repoRoot is the checkout anchor (che.yml + repo-relative scripts/templates).
-func (p *ProfileReady) repoRoot() string { return p.Source.DirectoryPath }
+// resolveRepoRoot is the checkout anchor (che.yml + repo-relative scripts/templates).
+func (p *ProfileReady) resolveRepoRoot() string { return p.Source.DirectoryPath }
 
-// root is the resolved load-ops source tree (the options.workingDirectory
+// resolveRoot is the resolved load-ops source tree (the options.workingDirectory
 // value; the RootPrefix logical token and the HOME/ folder map onto it).
-func (p *ProfileReady) root() string { return p.workingDir }
+func (p *ProfileReady) resolveRoot() string { return p.workingDir }
 
-// profileName is the resolved profile name (CONFIGS_PROFILE, plist domain).
-func (p *ProfileReady) profileName() string { return p.Source.GetProfileName() }
+// resolveProfileName is the resolved profile name (CONFIGS_PROFILE, plist domain).
+func (p *ProfileReady) resolveProfileName() string { return p.Source.GetProfileName() }
 
-// logSub is the trailing log subtype word: sourced profiles carry "profile=
-// <name>" ([why] disambiguates interleaved runs), local ones none.
-func (p *ProfileReady) logSub() string {
-	if p.ref != p.profileName() {
-		return "profile=" + p.profileName()
+// buildLogSubtype is the trailing log subtype word: sourced profiles carry
+// "profile=<name>" ([why] disambiguates interleaved runs), local ones none.
+func (p *ProfileReady) buildLogSubtype() string {
+	if p.ref != p.resolveProfileName() {
+		return "profile=" + p.resolveProfileName()
 	}
 	return ""
 }
@@ -618,7 +627,7 @@ func (p *ProfileReady) isDryRunAll() bool { return p.opts.DryRun == options.DryR
 
 // logMsg logs title/msg at the profile's dry-run mode, carrying its log subtype.
 func (p *ProfileReady) logMsg(title, msg string) {
-	log.MsgSub(title, msg, logMode(p.opts.DryRun), p.logSub())
+	log.MsgSub(title, msg, toLogMode(p.opts.DryRun), p.buildLogSubtype())
 }
 
 // mutate is the one dry-run+log gate for every mutating op: dry run logs only
@@ -633,7 +642,7 @@ func (p *ProfileReady) mutate(title, msg string, fn func() error) error {
 	return nil
 }
 
-func logMode(m options.DryRunMode) log.DryRun {
+func toLogMode(m options.DryRunMode) log.DryRun {
 	switch m {
 	case options.DryRun.Delta:
 		return log.Delta
@@ -644,36 +653,39 @@ func logMode(m options.DryRunMode) log.DryRun {
 	}
 }
 
-// src maps a repo-relative path (under root/) to its absolute source path.
-func (p *ProfileReady) src(rel string) string { return filepath.Join(p.root(), rel) }
+// resolveSrc maps a repo-relative path (under root/) to its absolute source path.
+func (p *ProfileReady) resolveSrc(relativePath string) string {
+	return filepath.Join(p.resolveRoot(), relativePath)
+}
 
 // toDest maps a working-tree rel path to its live dest. Env vars expand first
 // (so specs can write $HOME/... dests), $HOME resolving to the invoking user's
 // home (p.home, correct under sudo where the process $HOME differs). Then: an
 // already-absolute path stays (make-extra-dirs entries, $HOME-rooted dests),
 // the HOME tree folder maps onto p.home, everything else is a system-root path.
-func (p *ProfileReady) toDest(rel string) string {
-	rel = p.expandEnv(rel)
-	if rel == "HOME" {
+func (p *ProfileReady) toDest(relativePath string) string {
+	relativePath = p.expandEnv(relativePath)
+	if relativePath == "HOME" {
 		return p.home
 	}
-	if rest, ok := strings.CutPrefix(rel, "HOME/"); ok {
+	if rest, ok := strings.CutPrefix(relativePath, "HOME/"); ok {
 		return filepath.Join(p.home, rest)
 	}
-	if strings.HasPrefix(rel, "/") {
-		return rel
+	if strings.HasPrefix(relativePath, "/") {
+		return relativePath
 	}
-	return "/" + rel
+	return "/" + relativePath
 }
 
-// expandEnv expands env vars in path, with $HOME/${HOME} bound to p.home ([why]
-// the invoking user's home, not the process env, which diverges under sudo).
+// expandEnv expands env vars in path from the captured profile env, with
+// $HOME/${HOME} bound to p.home ([why] the invoking user's home, not the
+// process env, which diverges under sudo).
 func (p *ProfileReady) expandEnv(path string) string {
 	return os.Expand(path, func(k string) string {
 		if k == "HOME" {
 			return p.home
 		}
-		return os.Getenv(k)
+		return p.env[k]
 	})
 }
 
@@ -685,22 +697,23 @@ func (p *ProfileReady) expandHome(path string) string {
 
 // [<] 🤖🤖
 
-// withEnv runs fn inside the profile's env overlay and effective debug level.
-func (p *ProfileReady) withEnv(fn func() error) error {
+// withDebugLevel runs fn under the profile's effective debug level ([why] a
+// profile's options.debug overrides the che-level level for its ops).
+func (p *ProfileReady) withDebugLevel(fn func() error) error {
 	debug := p.opts.Debug
 	if p.Options.Debug != nil {
 		debug = *p.Options.Debug
 	}
 	log.SetDebug(debug)
 	defer log.SetDebug(p.opts.Debug)
-	return withEnv(p.Env, fn)
+	return fn()
 }
 
 // ExecOperations executes ALL of the profile's operations, in run order:
 // Selected() gated (all(skip) debug line), errors join, a failing op does not
 // stop the rest.
 func (p *ProfileReady) ExecOperations() error {
-	return p.withEnv(func() error {
+	return p.withDebugLevel(func() error {
 		var fails []error
 		for _, op := range p.OperationsReady {
 			if !op.Selected() {
@@ -717,9 +730,9 @@ func (p *ProfileReady) ExecOperations() error {
 }
 
 // ExecOperation executes one prepared operation (per-op subcommands): same
-// env overlay and Selected() gating.
+// debug level and Selected() gating.
 func (p *ProfileReady) ExecOperation(op operationReady) error {
-	return p.withEnv(func() error {
+	return p.withDebugLevel(func() error {
 		if !op.Selected() {
 			log.Debug("all(skip)", op.Name()+" (nothing selected)", log.Off)
 			return nil
@@ -743,13 +756,13 @@ func (p *ProfileReady) ExecOperationNamed(name string) error {
 // returning how many matched.
 func (p *ProfileReady) ExecRunScripts(names []string) (int, error) {
 	matched := 0
-	err := p.withEnv(func() error {
+	err := p.withDebugLevel(func() error {
 		for _, op := range p.OperationsReady {
 			rs, ok := op.(*RunScriptsOperationReady)
 			if !ok {
 				continue
 			}
-			scripts := filterScripts(rs.Scripts, names)
+			scripts := filterScriptsByName(rs.Scripts, names)
 			matched = len(scripts)
 			return p.runScripts(scripts)
 		}
@@ -758,7 +771,7 @@ func (p *ProfileReady) ExecRunScripts(names []string) (int, error) {
 	return matched, err
 }
 
-func filterScripts(scripts, names []string) []string {
+func filterScriptsByName(scripts, names []string) []string {
 	if len(names) == 0 {
 		return scripts
 	}

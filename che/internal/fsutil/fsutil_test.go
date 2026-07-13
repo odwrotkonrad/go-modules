@@ -31,7 +31,7 @@ func octal(t *testing.T, s string) os.FileMode {
 
 func TestModeArg(t *testing.T) {
 	testyml.Eq(t, td, "testdata/spec/funcs/mode_arg.test.spec.yml", func(t *testing.T, c testyml.Case[string]) (string, error) {
-		return ModeArg(octal(t, c.Input.Args.String(t, 0))), nil
+		return FormatModeArg(octal(t, c.Input.Args.String(t, 0))), nil
 	})
 }
 
@@ -90,7 +90,7 @@ func TestTrackedFiles(t *testing.T) {
 			"root/Library/LaunchDaemons/x.plist.ontoHost.cp": "cp\n",
 		})
 		require.NoError(t, os.WriteFile(filepath.Join(dir, "untracked"), []byte("x"), 0o644))
-		got, err := TrackedFiles(filepath.Join(dir, c.Input.Args.String(t, 0)))
+		got, err := ListTrackedFiles(filepath.Join(dir, c.Input.Args.String(t, 0)))
 		if err != nil {
 			return nil, err
 		}
@@ -103,7 +103,7 @@ func TestMkdirArgv(t *testing.T) {
 	f := FS{Home: "/Users/x"}
 	testyml.Eq(t, td, "testdata/spec/funcs/mkdir_argv.test.spec.yml", func(t *testing.T, c testyml.Case[[]string]) ([]string, error) {
 		a := c.Input.Args
-		return f.MkdirArgv(a.String(t, 0), octal(t, a.String(t, 1)), a.Bool(t, 2)), nil
+		return f.BuildMkdirArgv(a.String(t, 0), octal(t, a.String(t, 1)), a.Bool(t, 2)), nil
 	})
 }
 
@@ -127,19 +127,19 @@ func TestFSOps(t *testing.T) {
 		var err error
 		switch c.Context.Function {
 		case "fsutil.FS.Mkdir":
-			err = f.Mkdir(a.String(t, 0), octal(t, a.String(t, 1)), a.Bool(t, 2))
+			err = f.MakeDir(a.String(t, 0), octal(t, a.String(t, 1)), a.Bool(t, 2))
 		case "fsutil.FS.Symlink":
-			err = f.Symlink(a.String(t, 0), a.String(t, 1))
+			err = f.MakeSymlink(a.String(t, 0), a.String(t, 1))
 		case "fsutil.FS.Copy":
-			err = f.Copy(a.String(t, 0), a.String(t, 1), octal(t, a.String(t, 2)))
+			err = f.CopyFile(a.String(t, 0), a.String(t, 1), octal(t, a.String(t, 2)))
 		case "fsutil.FS.Remove":
-			err = f.Remove(a.String(t, 0))
+			err = f.RemoveFile(a.String(t, 0))
 		case "fsutil.FS.Chown":
-			err = f.Chown(a.String(t, 0), a.String(t, 1))
+			err = f.ChangeOwner(a.String(t, 0), a.String(t, 1))
 		case "fsutil.FS.Chmod":
-			err = f.Chmod(a.String(t, 0), a.String(t, 1))
+			err = f.ChangeMode(a.String(t, 0), a.String(t, 1))
 		case "fsutil.FS.Install":
-			err = f.Install(a.String(t, 0), []byte(a.String(t, 3)), octal(t, a.String(t, 1)), a.String(t, 2))
+			err = f.InstallFile(a.String(t, 0), []byte(a.String(t, 3)), octal(t, a.String(t, 1)), a.String(t, 2))
 		default:
 			t.Fatalf("unknown function %q", c.Context.Function)
 		}

@@ -41,7 +41,7 @@ func (p *ProfileReady) renderTemplates(templates []spec.FileItem, skipSecrets bo
 	var keep []tmplItem
 	var hostDests []string
 	for _, item := range templates {
-		dests := p.templateDests(item)
+		dests := p.resolveTemplateDests(item)
 		if skipSecrets && p.isSecretRefInItem(item) {
 			for _, d := range dests {
 				p.logMsg("render(skip-secrets)", d.path)
@@ -96,17 +96,17 @@ func (p *ProfileReady) isSecretRefInItem(item spec.FileItem) bool {
 		}
 		return render.IsSecretRefPresent([]byte(content))
 	}
-	src, err := os.ReadFile(filepath.Join(p.repoRoot(), item.Rel))
+	src, err := os.ReadFile(filepath.Join(p.resolveRepoRoot(), item.Rel))
 	if err != nil {
 		return false
 	}
 	return render.IsSecretRefPresent(src)
 }
 
-func (p *ProfileReady) templateDests(item spec.FileItem) []tmplDest {
+func (p *ProfileReady) resolveTemplateDests(item spec.FileItem) []tmplDest {
 	if len(item.Dests) == 0 {
-		rel := strings.TrimPrefix(item.Rel, spec.RootPrefix)
-		return []tmplDest{{path: p.toDest(spec.TrimTmplExt(rel)), host: true}}
+		relativePath := strings.TrimPrefix(item.Rel, spec.RootPrefix)
+		return []tmplDest{{path: p.toDest(spec.TrimTmplExt(relativePath)), host: true}}
 	}
 	out := make([]tmplDest, len(item.Dests))
 	for i, d := range item.Dests {
@@ -116,7 +116,7 @@ func (p *ProfileReady) templateDests(item spec.FileItem) []tmplDest {
 		if strings.HasPrefix(path, "/") {
 			out[i] = tmplDest{path: path, host: true, opts: d.Options, header: path}
 		} else {
-			out[i] = tmplDest{path: filepath.Join(p.repoRoot(), path), opts: d.Options, header: d.Path}
+			out[i] = tmplDest{path: filepath.Join(p.resolveRepoRoot(), path), opts: d.Options, header: d.Path}
 		}
 	}
 	return out
@@ -132,14 +132,14 @@ func (p *ProfileReady) renderTemplate(item spec.FileItem, dests []tmplDest) erro
 		}
 		src = []byte(content)
 	} else {
-		tmplPath = filepath.Join(p.repoRoot(), item.Rel)
+		tmplPath = filepath.Join(p.resolveRepoRoot(), item.Rel)
 		var err error
 		src, err = os.ReadFile(tmplPath)
 		if err != nil {
 			return err
 		}
 	}
-	body, err := render.ExecWithCtx(tmplPath, src, p.repoRoot(), item.Ctx)
+	body, err := render.ExecWithCtx(tmplPath, src, p.resolveRepoRoot(), item.Ctx)
 	if err != nil {
 		return err
 	}
@@ -147,14 +147,14 @@ func (p *ProfileReady) renderTemplate(item spec.FileItem, dests []tmplDest) erro
 		return p.placeFile(dests[0].path, body, item)
 	}
 	for _, d := range dests {
-		existing, _ := p.readExisting(d) // absent -> nil (mergeUpsert: defaults only)
+		existing, _ := p.readExistingDest(d) // absent -> nil (mergeUpsert: defaults only)
 		out := render.Compose(render.Composition{
 			Body:       body,
 			Opts:       d.opts,
 			HeaderDest: d.header,
 			TmplName:   item.Rel,
 			Existing:   existing,
-			RepoRoot:   p.repoRoot(),
+			RepoRoot:   p.resolveRepoRoot(),
 		})
 		if d.host {
 			if err := p.placeFile(d.path, out, item); err != nil {
@@ -173,11 +173,11 @@ func (p *ProfileReady) renderTemplate(item spec.FileItem, dests []tmplDest) erro
 	return nil
 }
 
-// readExisting reads a dest's current content for Compose: host dests through
-// the reader (mockable), repo dests straight from disk.
-func (p *ProfileReady) readExisting(d tmplDest) ([]byte, error) {
+// readExistingDest reads a dest's current content for Compose: host dests
+// through the reader (mockable), repo dests straight from disk.
+func (p *ProfileReady) readExistingDest(d tmplDest) ([]byte, error) {
 	if d.host {
-		return p.Reader.ReadFile(d.path)
+		return p.Reader.ReadFileBytes(d.path)
 	}
 	return os.ReadFile(d.path)
 }
@@ -186,7 +186,7 @@ func (p *ProfileReady) readExisting(d tmplDest) ([]byte, error) {
 func (p *ProfileReady) placeFile(dest string, body []byte, item spec.FileItem) error {
 	mode, _ := fsutil.ParseMode(item.Chmod)
 	return p.mutate("render(create)", dest, func() error {
-		return p.FS.Install(dest, body, mode, ownerSpec(item))
+		return p.FS.InstallFile(dest, body, mode, formatOwnerSpec(item))
 	})
 }
 

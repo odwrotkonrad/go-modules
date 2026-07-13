@@ -6,15 +6,18 @@ package options
 import (
 	"cmp"
 	"fmt"
-	"os"
 	"strings"
 )
 
+// LookupEnv is the env-lookup seam Resolve reads instead of the process env:
+// key -> value ("" if unset), fed from the captured launch env by the caller.
+type LookupEnv func(string) string
+
 // Resolve finalizes the options in place, per field most-specific wins: flags
 // > env vars > the user-config file (user) > the local spec's options: block
-// (spec) > defaults; mode values validated.
-func (c *Options) Resolve(user, spec Layer) error {
-	c.DryRun = DryRunMode(strOr(string(c.DryRun), "CHE_DRY_RUN", user.DryRun, spec.DryRun))
+// (spec) > defaults; mode values validated. env supplies the env-var layer.
+func (c *Options) Resolve(env LookupEnv, user, spec Layer) error {
+	c.DryRun = DryRunMode(strOr(env, string(c.DryRun), "CHE_DRY_RUN", user.DryRun, spec.DryRun))
 	switch c.DryRun {
 	case DryRun.Off, DryRun.Delta, DryRun.All:
 	default:
@@ -23,37 +26,37 @@ func (c *Options) Resolve(user, spec Layer) error {
 	// [why] ValidateSpecCLI is the flag/env/user override (empty if none),
 	// overriding each spec's own options.validateSpec per-spec; ValidateSpec
 	// adds the local spec's own layer, then the warn default.
-	c.ValidateSpecCLI = ValidateSpecMode(strOr(string(c.ValidateSpec), "CHE_VALIDATE_SPEC", user.ValidateSpec))
+	c.ValidateSpecCLI = ValidateSpecMode(strOr(env, string(c.ValidateSpec), "CHE_VALIDATE_SPEC", user.ValidateSpec))
 	c.ValidateSpec = ValidateSpecMode(cmp.Or(string(c.ValidateSpecCLI), spec.ValidateSpec, string(ValidateSpec.Warn)))
 	switch c.ValidateSpec {
 	case ValidateSpec.Warn, ValidateSpec.Error:
 	default:
 		return fmt.Errorf("invalid --validate-spec mode %q: want warn or error", c.ValidateSpec)
 	}
-	c.Dir = cmp.Or(c.Dir, os.Getenv("CHE_DIR"))
-	c.WorkingDirectory = cmp.Or(c.WorkingDirectory, os.Getenv("CHE_WORKING_DIRECTORY"), spec.WorkingDirectory)
-	c.Profiles = listOr(c.Profiles, "CHE_PROFILE", user.Profiles, spec.Profiles)
-	c.SkipExecIf = boolOrEnv(c.SkipExecIf, "CHE_SKIP_EXEC_IF")
-	c.SkipRemoteRefs = boolOr(c.SkipRemoteRefs, "CHE_SKIP_REMOTE_REFS", user.SkipRemoteRefs, spec.SkipRemoteRefs)
-	c.Debug = boolOr(c.Debug, "CHE_DEBUG", user.Debug, spec.Debug)
-	c.RenderSkipSecrets = boolOr(c.RenderSkipSecrets, "CHE_RENDER_TEMPLATES_SKIP_SECRETS",
+	c.Dir = cmp.Or(c.Dir, env("CHE_DIR"))
+	c.WorkingDirectory = cmp.Or(c.WorkingDirectory, env("CHE_WORKING_DIRECTORY"), spec.WorkingDirectory)
+	c.Profiles = listOr(env, c.Profiles, "CHE_PROFILE", user.Profiles, spec.Profiles)
+	c.SkipExecIf = boolOrEnv(env, c.SkipExecIf, "CHE_SKIP_EXEC_IF")
+	c.SkipRemoteRefs = boolOr(env, c.SkipRemoteRefs, "CHE_SKIP_REMOTE_REFS", user.SkipRemoteRefs, spec.SkipRemoteRefs)
+	c.Debug = boolOr(env, c.Debug, "CHE_DEBUG", user.Debug, spec.Debug)
+	c.RenderSkipSecrets = boolOr(env, c.RenderSkipSecrets, "CHE_RENDER_TEMPLATES_SKIP_SECRETS",
 		user.RenderTemplates.SkipSecrets, spec.RenderTemplates.SkipSecrets)
 	c.AutoDiscover = user.AutoDiscover
 	return nil
 }
 
 // strOr resolves a string option: flag, else env, else each layer in order.
-func strOr(flag, envKey string, layers ...string) string {
-	return cmp.Or(append([]string{flag, os.Getenv(envKey)}, layers...)...)
+func strOr(env LookupEnv, flag, envKey string, layers ...string) string {
+	return cmp.Or(append([]string{flag, env(envKey)}, layers...)...)
 }
 
 // listOr resolves a []string option: flag if set, else CHE_<key> (comma-split),
 // else the first non-empty layer.
-func listOr(flag []string, envKey string, layers ...[]string) []string {
+func listOr(env LookupEnv, flag []string, envKey string, layers ...[]string) []string {
 	if len(flag) > 0 {
 		return flag
 	}
-	if e := os.Getenv(envKey); e != "" {
+	if e := env(envKey); e != "" {
 		return strings.Split(e, ",")
 	}
 	for _, l := range layers {
@@ -66,8 +69,8 @@ func listOr(flag []string, envKey string, layers ...[]string) []string {
 
 // boolOr is true when the flag is set, the env var is non-empty, or any layer
 // pointer is set true.
-func boolOr(flag bool, envKey string, layers ...*bool) bool {
-	if flag || os.Getenv(envKey) != "" {
+func boolOr(env LookupEnv, flag bool, envKey string, layers ...*bool) bool {
+	if flag || env(envKey) != "" {
 		return true
 	}
 	for _, l := range layers {
@@ -78,8 +81,8 @@ func boolOr(flag bool, envKey string, layers ...*bool) bool {
 	return false
 }
 
-func boolOrEnv(flag bool, key string) bool {
-	return flag || os.Getenv(key) != ""
+func boolOrEnv(env LookupEnv, flag bool, key string) bool {
+	return flag || env(key) != ""
 }
 
 // [<] 🤖🤖

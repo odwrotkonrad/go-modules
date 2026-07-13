@@ -22,17 +22,17 @@ func ParseMode(s string) (os.FileMode, bool) {
 	return os.FileMode(n), true
 }
 
-// PermsDrift reports whether dest's live mode/owner differ from the spec chmod/
+// DetectPermsDrift reports whether dest's live mode/owner differ from the spec chmod/
 // owner. Only set fields are enforced (empty chmod/owner -> no drift). Missing
 // dest -> no drift (the create path handles it).
-func PermsDrift(reader FileSystemReader, dest, chmod, owner string) (needChmod, needChown bool) {
-	fi, err := reader.Lstat(dest)
+func DetectPermsDrift(reader FileSystemReader, dest, chmod, owner string) (needChmod, needChown bool) {
+	fi, err := reader.LstatPath(dest)
 	if err != nil {
 		return false, false
 	}
 	if mode, ok := ParseMode(chmod); ok {
-		mask := modeMask(mode)
-		needChmod = mode&mask != unixMode(fi.Mode())&mask
+		mask := maskMode(mode)
+		needChmod = mode&mask != toUnixMode(fi.Mode())&mask
 	}
 	if owner != "" {
 		needChown = IsOwnerDrifted(fi, owner)
@@ -40,19 +40,19 @@ func PermsDrift(reader FileSystemReader, dest, chmod, owner string) (needChmod, 
 	return needChmod, needChown
 }
 
-// modeMask is the raw-unix bit set the spec controls: perm bits always, plus
+// maskMode is the raw-unix bit set the spec controls: perm bits always, plus
 // setuid/setgid/sticky when the spec mode carries them (>0777, matching mkExtraDir).
-func modeMask(mode os.FileMode) os.FileMode {
+func maskMode(mode os.FileMode) os.FileMode {
 	if mode > 0o777 {
 		return 0o7777
 	}
 	return 0o777
 }
 
-// unixMode maps an os.FileMode's Go-encoded special bits (ModeSetuid/Setgid/
+// toUnixMode maps an os.FileMode's Go-encoded special bits (ModeSetuid/Setgid/
 // Sticky live in high bits, not 0o7000) down to raw-unix perm+special bits, so
 // it compares equal to a ParseMode octal like 0o2775. Perm bits pass through.
-func unixMode(m os.FileMode) os.FileMode {
+func toUnixMode(m os.FileMode) os.FileMode {
 	u := m.Perm()
 	if m&os.ModeSetuid != 0 {
 		u |= 0o4000

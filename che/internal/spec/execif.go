@@ -4,7 +4,6 @@ package spec
 
 import (
 	"fmt"
-	"os"
 	"runtime"
 	"strconv"
 	"strings"
@@ -13,12 +12,16 @@ import (
 	"gitlab.com/konradodwrot/go-modules/che/internal/fsutil"
 )
 
-// NewEvaluator wires the builtin sources: isOs (macos|linux|...), isVirt.
-func NewEvaluator() *Evaluator {
-	return &Evaluator{builtins: map[string]func() string{
-		"isOs":   sync.OnceValue(func() string { return fsutil.NormalizeOS(runtime.GOOS) }),
-		"isVirt": sync.OnceValue(func() string { return strconv.FormatBool(fsutil.IsVirtualized()) }),
-	}}
+// NewEvaluator wires the builtin sources (isOs (macos|linux|...), isVirt) and
+// the env: lookup, which reads the injected launch env.
+func NewEvaluator(lookupEnv func(string) string) *Evaluator {
+	return &Evaluator{
+		builtins: map[string]func() string{
+			"isOs":   sync.OnceValue(func() string { return fsutil.NormalizeOS(runtime.GOOS) }),
+			"isVirt": sync.OnceValue(func() string { return strconv.FormatBool(fsutil.IsVirtualized()) }),
+		},
+		lookupEnv: lookupEnv,
+	}
 }
 
 // EvalExecIf evaluates one expression: `<source>` (truthy: builtin iff "true",
@@ -52,7 +55,7 @@ func (e *Evaluator) resolve(src string) (string, bool, error) {
 		v := fn()
 		return v, v == "true", nil
 	case strings.HasPrefix(src, "env:"):
-		v := os.Getenv(strings.TrimPrefix(src, "env:"))
+		v := e.lookupEnv(strings.TrimPrefix(src, "env:"))
 		return v, v != "", nil
 	default:
 		return "", false, fmt.Errorf("unknown source %q: want builtin:<name> or env:<NAME>", src)

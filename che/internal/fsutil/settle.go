@@ -13,7 +13,7 @@ func IsDirSettled(reader FileSystemReader, dest string, forceAll bool) bool {
 	if forceAll {
 		return false
 	}
-	fi, err := reader.Stat(dest)
+	fi, err := reader.StatPath(dest)
 	return err == nil && fi.IsDir()
 }
 
@@ -23,22 +23,22 @@ func IsLinkSettled(reader FileSystemReader, src, dest string, forceAll bool) boo
 	if forceAll {
 		return false
 	}
-	destResolved, err := reader.EvalSymlinks(dest)
+	destResolved, err := reader.EvaluateSymlinks(dest)
 	if err != nil {
 		return false
 	}
-	srcResolved, err := reader.EvalSymlinks(src)
+	srcResolved, err := reader.EvaluateSymlinks(src)
 	return err == nil && destResolved == srcResolved
 }
 
 // IsSameContent reports whether a and b have byte-identical content (either
 // unreadable -> false).
 func IsSameContent(reader FileSystemReader, a, b string) bool {
-	x, err := reader.ReadFile(a)
+	x, err := reader.ReadFileBytes(a)
 	if err != nil {
 		return false
 	}
-	y, err := reader.ReadFile(b)
+	y, err := reader.ReadFileBytes(b)
 	if err != nil {
 		return false
 	}

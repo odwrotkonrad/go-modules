@@ -20,8 +20,8 @@ const Bin = "che"
 // the XDG backups dir before a mutating op runs (sub = op identity).
 func (p *ProfileReady) archiveBefore(sub string, dests []string) error {
 	ts := time.Now().Format(fsutil.TsLayout)
-	path := fsutil.BackupArchivePath(p.home, Bin, sub, ts)
-	return p.mutate("archive", path, func() error { return p.FS.ArchiveDests(path, dests) })
+	path := fsutil.ResolveBackupArchivePath(p.home, Bin, sub, ts)
+	return p.mutate("archive", path, func() error { return p.FS.ArchiveDestinations(path, dests) })
 }
 
 // failItem logs "<op>(fail): <dest>: <err>" and returns err, the per-item
@@ -53,27 +53,27 @@ func (p *ProfileReady) upsertExtraDir(item spec.FileItem, dest string) error {
 	if fsutil.IsDirSettled(p.Reader, dest, p.isDryRunAll()) {
 		return p.fixPerms("make-dirs", dest, item)
 	}
-	return p.mkExtraDir(item, dest)
+	return p.makeExtraDir(item, dest)
 }
 
-func (p *ProfileReady) ensureConfigDir(rel string) error {
-	dest := p.toDest(rel)
+func (p *ProfileReady) ensureConfigDir(relativePath string) error {
+	dest := p.toDest(relativePath)
 	if fsutil.IsDirSettled(p.Reader, dest, p.isDryRunAll()) {
 		return nil
 	}
-	err := p.mutate("make-dirs(create)", dest, func() error { return p.FS.Mkdir(dest, 0, false) })
+	err := p.mutate("make-dirs(create)", dest, func() error { return p.FS.MakeDir(dest, 0, false) })
 	if err != nil {
 		return p.failItem("make-dirs", dest, err)
 	}
 	return nil
 }
 
-// mkExtraDir creates one extra-dir with -p. Owner applied via chown (not mkdir
+// makeExtraDir creates one extra-dir with -p. Owner applied via chown (not mkdir
 // -u). Mode 0 -> umask. Set-bits (>0777) reapplied via chmod since mkdir -m may
 // drop them.
-func (p *ProfileReady) mkExtraDir(item spec.FileItem, dest string) error {
+func (p *ProfileReady) makeExtraDir(item spec.FileItem, dest string) error {
 	mode, _ := fsutil.ParseMode(item.Chmod)
-	err := p.mutate("make-dirs(create)", dest, func() error { return p.FS.Mkdir(dest, mode, true) })
+	err := p.mutate("make-dirs(create)", dest, func() error { return p.FS.MakeDir(dest, mode, true) })
 	if err != nil {
 		return err
 	}
@@ -86,16 +86,16 @@ func (p *ProfileReady) mkExtraDir(item spec.FileItem, dest string) error {
 }
 
 func (p *ProfileReady) chmod(title string, mode os.FileMode, dest string) error {
-	arg := fsutil.ModeArg(mode)
-	return p.mutate(title, arg+" "+dest, func() error { return p.FS.Chmod(arg, dest) })
+	arg := fsutil.FormatModeArg(mode)
+	return p.mutate(title, arg+" "+dest, func() error { return p.FS.ChangeMode(arg, dest) })
 }
 
 func (p *ProfileReady) chown(title, owner, dest string) error {
-	return p.mutate(title, owner+" "+dest, func() error { return p.FS.Chown(owner, dest) })
+	return p.mutate(title, owner+" "+dest, func() error { return p.FS.ChangeOwner(owner, dest) })
 }
 
 func (p *ProfileReady) chownIfSet(title string, item spec.FileItem, dest string) error {
-	if owner := ownerSpec(item); owner != "" {
+	if owner := formatOwnerSpec(item); owner != "" {
 		return p.chown(title, owner, dest)
 	}
 	return nil
@@ -106,7 +106,7 @@ func (p *ProfileReady) chownIfSet(title string, item spec.FileItem, dest string)
 // these lines report the drift; off they correct it. A settled dest (no drift)
 // emits nothing. Dry-run=all never reaches here (dests are re-created).
 func (p *ProfileReady) fixPerms(op, dest string, item spec.FileItem) error {
-	needChmod, needChown := fsutil.PermsDrift(p.Reader, dest, item.Chmod, ownerSpec(item))
+	needChmod, needChown := fsutil.DetectPermsDrift(p.Reader, dest, item.Chmod, formatOwnerSpec(item))
 	if needChmod {
 		mode, _ := fsutil.ParseMode(item.Chmod)
 		if err := p.chmod(op+"(chmod)", mode, dest); err != nil {
@@ -114,7 +114,7 @@ func (p *ProfileReady) fixPerms(op, dest string, item spec.FileItem) error {
 		}
 	}
 	if needChown {
-		if err := p.chown(op+"(chown)", ownerSpec(item), dest); err != nil {
+		if err := p.chown(op+"(chown)", formatOwnerSpec(item), dest); err != nil {
 			return err
 		}
 	}
@@ -123,12 +123,12 @@ func (p *ProfileReady) fixPerms(op, dest string, item spec.FileItem) error {
 
 // runFileOp is the shared shape of the archiving file ops: ensure config dirs,
 // archive every dest upfront (failure aborts), then settle each item/dest pair.
-func (p *ProfileReady) runFileOp(archiveSub, failOp string, dirRels []string, items []spec.FileItem,
+func (p *ProfileReady) runFileOp(archiveSub, failOp string, dirRelativePaths []string, items []spec.FileItem,
 	destsOf func(spec.FileItem) []string, settle func(spec.FileItem, string) error,
 ) error {
 	var errs []error
-	for _, rel := range dirRels {
-		errs = append(errs, p.ensureConfigDir(rel))
+	for _, relativePath := range dirRelativePaths {
+		errs = append(errs, p.ensureConfigDir(relativePath))
 	}
 	var dests []string
 	for _, item := range items {
@@ -149,42 +149,42 @@ func (p *ProfileReady) runFileOp(archiveSub, failOp string, dirRels []string, it
 
 // makeLinks symlinks each config into its live dest (ln -fhs), archiving existing
 // dests upfront, skipping links already pointing into the repo.
-func (p *ProfileReady) makeLinks(links []spec.FileItem, dirRels []string) error {
-	return p.runFileOp("make-links", "make-links", dirRels, links,
+func (p *ProfileReady) makeLinks(links []spec.FileItem, dirRelativePaths []string) error {
+	return p.runFileOp("make-links", "make-links", dirRelativePaths, links,
 		func(item spec.FileItem) []string { return []string{p.toDest(spec.LinkDestRel(item))} },
-		p.linkOne)
+		p.makeLink)
 }
 
-func (p *ProfileReady) linkOne(item spec.FileItem, dest string) error {
-	src := p.src(item.Rel)
+func (p *ProfileReady) makeLink(item spec.FileItem, dest string) error {
+	src := p.resolveSrc(item.Rel)
 	if fsutil.IsLinkSettled(p.Reader, src, dest, p.isDryRunAll()) {
 		return nil
 	}
-	return p.mutate("make-links(create)", dest, func() error { return p.FS.Symlink(src, dest) })
+	return p.mutate("make-links(create)", dest, func() error { return p.FS.MakeSymlink(src, dest) })
 }
 
 // makeCopies copies each *.ontoHost.cp to its dest(s) (marker stripped, or explicit
 // dest) when contents differ, archiving existing dests upfront, applying spec
 // perms (else default).
-func (p *ProfileReady) makeCopies(copies []spec.FileItem, dirRels []string) error {
-	return p.runFileOp("make-copies", "make-copies", dirRels, copies, p.copyDests, p.copyOne)
+func (p *ProfileReady) makeCopies(copies []spec.FileItem, dirRelativePaths []string) error {
+	return p.runFileOp("make-copies", "make-copies", dirRelativePaths, copies, p.resolveCopyDests, p.makeCopy)
 }
 
-func (p *ProfileReady) copyOne(item spec.FileItem, dest string) error {
-	src := p.src(item.Rel)
+func (p *ProfileReady) makeCopy(item spec.FileItem, dest string) error {
+	src := p.resolveSrc(item.Rel)
 	if !p.isDryRunAll() && fsutil.IsSameContent(p.Reader, src, dest) {
 		return p.fixPerms("make-copies", dest, item)
 	}
 	mode, _ := fsutil.ParseMode(item.Chmod)
-	err := p.mutate("make-copies(create)", dest, func() error { return p.FS.Copy(src, dest, mode) })
+	err := p.mutate("make-copies(create)", dest, func() error { return p.FS.CopyFile(src, dest, mode) })
 	if err != nil {
 		return err
 	}
 	return p.chownIfSet("make-copies(chown)", item, dest)
 }
 
-// copyDests returns the explicit dests (~/ resolved), else the marker-stripped derived dest.
-func (p *ProfileReady) copyDests(item spec.FileItem) []string {
+// resolveCopyDests returns the explicit dests (~/ resolved), else the marker-stripped derived dest.
+func (p *ProfileReady) resolveCopyDests(item spec.FileItem) []string {
 	if len(item.Dests) == 0 {
 		return []string{p.toDest(strings.TrimSuffix(item.Rel, spec.CpExt))}
 	}
@@ -195,8 +195,8 @@ func (p *ProfileReady) copyDests(item spec.FileItem) []string {
 	return out
 }
 
-// ownerSpec combines owner + owner-group into "owner:group" for fs.Chown ("" -> no chown).
-func ownerSpec(item spec.FileItem) string {
+// formatOwnerSpec combines owner + owner-group into "owner:group" for fs.Chown ("" -> no chown).
+func formatOwnerSpec(item spec.FileItem) string {
 	if item.Owner == "" {
 		return ""
 	}
@@ -207,17 +207,17 @@ func ownerSpec(item spec.FileItem) string {
 }
 
 // pruneBrokenLinks removes broken symlinks in config-set dirs (live dests).
-func (p *ProfileReady) pruneBrokenLinks(dirRels []string) error {
-	p.logMsg("prune-links", p.root())
+func (p *ProfileReady) pruneBrokenLinks(dirRelativePaths []string) error {
+	p.logMsg("prune-links", p.resolveRoot())
 	var errs []error
 	seen := map[string]bool{}
-	for _, rel := range dirRels {
-		dest := p.toDest(rel)
+	for _, relativePath := range dirRelativePaths {
+		dest := p.toDest(relativePath)
 		if seen[dest] {
 			continue
 		}
 		seen[dest] = true
-		entries, derr := p.Reader.ReadDir(dest)
+		entries, derr := p.Reader.ReadDirectory(dest)
 		if derr != nil {
 			continue // [why] dir may not exist on host yet
 		}
@@ -226,7 +226,7 @@ func (p *ProfileReady) pruneBrokenLinks(dirRels []string) error {
 			if !p.isBrokenRepoLink(path) {
 				continue
 			}
-			err := p.mutate("rm", path, func() error { return p.FS.Remove(path) })
+			err := p.mutate("rm", path, func() error { return p.FS.RemoveFile(path) })
 			if err != nil {
 				errs = append(errs, p.failItem("prune-links", path, err))
 			}
@@ -237,7 +237,7 @@ func (p *ProfileReady) pruneBrokenLinks(dirRels []string) error {
 
 // isBrokenRepoLink: path is a symlink into root/ whose target is gone.
 func (p *ProfileReady) isBrokenRepoLink(path string) bool {
-	target, err := p.Reader.Readlink(path) // [what] non-symlink -> err
+	target, err := p.Reader.ReadLink(path) // [what] non-symlink -> err
 	if err != nil {
 		return false
 	}
@@ -245,10 +245,10 @@ func (p *ProfileReady) isBrokenRepoLink(path string) bool {
 		target = filepath.Join(filepath.Dir(path), target)
 	}
 	target = filepath.Clean(target)
-	if !fsutil.IsUnder(target, p.root()) {
+	if !fsutil.IsUnder(target, p.resolveRoot()) {
 		return false
 	}
-	_, err = p.Reader.Stat(path) // [what] broken
+	_, err = p.Reader.StatPath(path) // [what] broken
 	return err != nil
 }
 

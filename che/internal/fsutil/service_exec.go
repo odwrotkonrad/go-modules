@@ -19,9 +19,9 @@ const SettleSeconds = 15
 // it to a no-op.
 var Sleep = time.Sleep
 
-// Lctl builds a launchctl command, prefixing sudo iff sudo is set and not
+// BuildLctl builds a launchctl command, prefixing sudo iff sudo is set and not
 // already root. Explicit argv (avoids the zsh empty-runner word-split bug).
-func Lctl(sudo bool, args ...string) execx.Cmd {
+func BuildLctl(sudo bool, args ...string) execx.Cmd {
 	argv := append([]string{"launchctl"}, args...)
 	if sudo && os.Geteuid() != 0 {
 		argv = append([]string{"sudo"}, argv...)
@@ -31,7 +31,7 @@ func Lctl(sudo bool, args ...string) execx.Cmd {
 
 // IsLoaded reports whether target is registered in its launchd domain.
 func IsLoaded(sudo bool, target string) bool {
-	return execx.Default.Exec(Lctl(sudo, "print", target)) == nil
+	return execx.Default.Exec(BuildLctl(sudo, "print", target)) == nil
 }
 
 // WaitGone blocks until target is gone (bootout is async).
@@ -45,9 +45,9 @@ func WaitGone(sudo bool, target string) {
 	}
 }
 
-// PID reads target's live pid from `launchctl print`, or (0,false) if none.
-func PID(sudo bool, target string) (int, bool) {
-	out, err := execx.Default.Output(Lctl(sudo, "print", target))
+// ResolvePID reads target's live pid from `launchctl print`, or (0,false) if none.
+func ResolvePID(sudo bool, target string) (int, bool) {
+	out, err := execx.Default.Output(BuildLctl(sudo, "print", target))
 	if err != nil {
 		return 0, false
 	}

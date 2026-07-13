@@ -349,7 +349,7 @@ func RenderMarkdown(repoRoot, path string, opts ...string) (string, error) {
 // DirsTree prints the plain nested dir tree of repoRoot's git-tracked files:
 // index paths, file leaves dropped, dirs nested + sorted, 2-space indented.
 func DirsTree(repoRoot string) (string, error) {
-	paths, err := fsutil.TrackedFiles(repoRoot)
+	paths, err := fsutil.ListTrackedFiles(repoRoot)
 	if err != nil {
 		return "", err
 	}

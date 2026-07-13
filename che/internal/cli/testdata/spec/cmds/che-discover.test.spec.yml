@@ -1,6 +1,6 @@
 # [>] 🤖
 context:
-  command: che detect
+  command: che discover
   pwd: testdata/fixture/commands/common/sample-tree
   mockedInterfaces:
     execx.CmdExecutor: testutil.CmdMockExecutor

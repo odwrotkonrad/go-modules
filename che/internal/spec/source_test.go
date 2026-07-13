@@ -3,6 +3,7 @@ package spec
 // [>] 🤖🤖
 
 import (
+	"os"
 	"path/filepath"
 	"testing"
 
@@ -64,7 +65,7 @@ func TestExecIfGate(t *testing.T) {
 			if e != nil {
 				return e
 			}
-			ok, e = AllPass(name, rec.Options.ExecIf, false, NewEvaluator().EvalExecIf)
+			ok, e = AllPass(name, rec.Options.ExecIf, false, NewEvaluator(os.Getenv).EvalExecIf)
 			return e
 		})
 		if c.Expected.Check(t, err) {

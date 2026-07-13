@@ -218,7 +218,7 @@ func (m *FileSystemMockWriter) record(parts ...string) error {
 
 func mode(mode os.FileMode) string { return fmt.Sprintf("%04o", mode) }
 
-func (m *FileSystemMockWriter) Mkdir(dest string, md os.FileMode, parents bool) error {
+func (m *FileSystemMockWriter) MakeDir(dest string, md os.FileMode, parents bool) error {
 	parts := []string{"mkdir"}
 	if parents {
 		parts = append(parts, "-p")
@@ -229,27 +229,27 @@ func (m *FileSystemMockWriter) Mkdir(dest string, md os.FileMode, parents bool) 
 	return m.record(append(parts, dest)...)
 }
 
-func (m *FileSystemMockWriter) Chmod(chmodArg, dest string) error {
+func (m *FileSystemMockWriter) ChangeMode(chmodArg, dest string) error {
 	return m.record("chmod", chmodArg, dest)
 }
 
-func (m *FileSystemMockWriter) Symlink(target, dest string) error {
+func (m *FileSystemMockWriter) MakeSymlink(target, dest string) error {
 	return m.record("symlink", target, dest)
 }
 
-func (m *FileSystemMockWriter) Copy(src, dest string, md os.FileMode) error {
+func (m *FileSystemMockWriter) CopyFile(src, dest string, md os.FileMode) error {
 	return m.record("copy", src, dest, mode(md))
 }
 
-func (m *FileSystemMockWriter) Remove(dest string) error {
+func (m *FileSystemMockWriter) RemoveFile(dest string) error {
 	return m.record("remove", dest)
 }
 
-func (m *FileSystemMockWriter) Chown(owner, dest string) error {
+func (m *FileSystemMockWriter) ChangeOwner(owner, dest string) error {
 	return m.record("chown", owner, dest)
 }
 
-func (m *FileSystemMockWriter) Install(dest string, body []byte, md os.FileMode, owner string) error {
+func (m *FileSystemMockWriter) InstallFile(dest string, body []byte, md os.FileMode, owner string) error {
 	parts := []string{"install", dest, mode(md)}
 	if owner != "" {
 		parts = append(parts, owner)
@@ -257,7 +257,7 @@ func (m *FileSystemMockWriter) Install(dest string, body []byte, md os.FileMode,
 	return m.record(parts...)
 }
 
-func (m *FileSystemMockWriter) ArchiveDests(archivePath string, dests []string) error {
+func (m *FileSystemMockWriter) ArchiveDestinations(archivePath string, dests []string) error {
 	return m.record("archive", archivePath)
 }
 
@@ -267,7 +267,7 @@ func (r *FileSystemMockReader) in(path string) bool {
 	})
 }
 
-func (r *FileSystemMockReader) Stat(path string) (os.FileInfo, error) {
+func (r *FileSystemMockReader) StatPath(path string) (os.FileInfo, error) {
 	if r.in(path) {
 		return os.Stat(path)
 	}
@@ -277,21 +277,21 @@ func (r *FileSystemMockReader) Stat(path string) (os.FileInfo, error) {
 	return nil, fs.ErrNotExist
 }
 
-func (r *FileSystemMockReader) Lstat(path string) (os.FileInfo, error) {
+func (r *FileSystemMockReader) LstatPath(path string) (os.FileInfo, error) {
 	if !r.in(path) {
 		return nil, fs.ErrNotExist
 	}
 	return os.Lstat(path)
 }
 
-func (r *FileSystemMockReader) ReadDir(path string) ([]os.DirEntry, error) {
+func (r *FileSystemMockReader) ReadDirectory(path string) ([]os.DirEntry, error) {
 	if !r.in(path) {
 		return nil, fs.ErrNotExist
 	}
 	return os.ReadDir(path)
 }
 
-func (r *FileSystemMockReader) ReadFile(path string) ([]byte, error) {
+func (r *FileSystemMockReader) ReadFileBytes(path string) ([]byte, error) {
 	if r.in(path) {
 		return os.ReadFile(path)
 	}
@@ -301,14 +301,14 @@ func (r *FileSystemMockReader) ReadFile(path string) ([]byte, error) {
 	return nil, fs.ErrNotExist
 }
 
-func (r *FileSystemMockReader) Readlink(path string) (string, error) {
+func (r *FileSystemMockReader) ReadLink(path string) (string, error) {
 	if !r.in(path) {
 		return "", fs.ErrNotExist
 	}
 	return os.Readlink(path)
 }
 
-func (r *FileSystemMockReader) EvalSymlinks(path string) (string, error) {
+func (r *FileSystemMockReader) EvaluateSymlinks(path string) (string, error) {
 	if !r.in(path) {
 		return "", fs.ErrNotExist
 	}

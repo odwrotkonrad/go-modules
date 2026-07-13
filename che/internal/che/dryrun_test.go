@@ -58,7 +58,7 @@ func TestDryRunDelta(t *testing.T) {
 		out, err := testutil.CaptureStdout(t, func() error { return run(p, res) })
 		require.NoErrorf(t, err, "%s dry-run", op)
 		stripped := testutil.StripStamps(testutil.StripANSI(out))
-		vars := map[string]string{"HOME": p.home, "REPO": dir, "ROOT": p.root()}
+		vars := map[string]string{"HOME": p.home, "REPO": dir, "ROOT": p.resolveRoot()}
 		for _, f := range c.Expected.StdOut {
 			testyml.MustMatch(t, stripped, testyml.Expand(f, vars))
 		}
@@ -86,14 +86,14 @@ var settlers = map[string]func(*testing.T, *ProfileReady, spec.OperationRecipes)
 		item := r.MakeLinks.Links[0]
 		dest := p.toDest(item.Rel)
 		require.NoError(t, os.MkdirAll(filepath.Dir(dest), 0o755))
-		require.NoError(t, os.Symlink(p.src(item.Rel), dest))
+		require.NoError(t, os.Symlink(p.resolveSrc(item.Rel), dest))
 		return dest
 	},
 	"make-copies": func(t *testing.T, p *ProfileReady, r spec.OperationRecipes) string {
 		t.Helper()
 		item := r.MakeCopies.Copies[0]
-		dest := p.copyDests(item)[0]
-		src, err := os.ReadFile(p.src(item.Rel))
+		dest := p.resolveCopyDests(item)[0]
+		src, err := os.ReadFile(p.resolveSrc(item.Rel))
 		require.NoError(t, err)
 		require.NoError(t, os.MkdirAll(filepath.Dir(dest), 0o755))
 		require.NoError(t, os.WriteFile(dest, src, 0o644))

@@ -11,6 +11,6 @@ cases:
         - make-dirs
         - prune-links
         - run-scripts
-        - detect
+        - discover
         - services
 # [<] 🤖

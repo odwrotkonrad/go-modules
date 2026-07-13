@@ -133,7 +133,7 @@ You will need to start a new shell for this setup to take effect.
 | --- | --- | --- | --- | --- |
 | `--no-descriptions` |  | `bool` | `false` | disable completion descriptions |
 
-### `$ che detect`
+### `$ che discover`
 
 print the prepared profiles (one per line) and exit.
 

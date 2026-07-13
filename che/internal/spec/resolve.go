@@ -236,7 +236,7 @@ func classify(root string, eff effective, res *resolved) error {
 	if _, err := os.Stat(root); os.IsNotExist(err) {
 		return nil // no root/ subtree: repo-only project (rich template selection only)
 	}
-	tracked, err := fsutil.TrackedFiles(root)
+	tracked, err := fsutil.ListTrackedFiles(root)
 	if err != nil {
 		return err
 	}

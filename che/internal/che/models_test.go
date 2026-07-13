@@ -5,6 +5,7 @@ package che
 import (
 	"embed"
 	"errors"
+	"maps"
 	"os"
 	"path/filepath"
 	"sort"
@@ -25,42 +26,42 @@ import (
 //go:embed all:testdata
 var td embed.FS
 
-// prepEnv anchors a PrepareSpecs test in hostRepo: temp HOME, CHE_* cleared,
-// executor mocked. Returns HOME.
-func prepEnv(t *testing.T, hostRepo string) string {
+// prepEnv anchors a PrepareSpecs test: temp HOME, executor mocked. Returns HOME
+// and the base launch env (HOME set, CHE_*/XDG_* absent) for building the case's
+// appCtx.
+func prepEnv(t *testing.T) (string, map[string]string) {
 	t.Helper()
 	if os.Geteuid() == 0 {
 		t.Skip("non-root path only; build resolves home from $HOME")
 	}
 	home := t.TempDir()
-	t.Chdir(hostRepo)
-	t.Setenv("HOME", home)
+	// [why] clear XDG/CHE base-dir vars so spec-side cache-home resolution
+	// (ambient, out of scope) anchors under the temp HOME, not the real one.
 	for _, k := range []string{
-		"CHE_SKIP_EXEC_IF", "CHE_PROFILE", "CHE_DRY_RUN",
-		"CHE_SKIP_REMOTE_REFS", "CHE_DEBUG", "CHE_VALIDATE_SPEC", "CHE_DIR",
-		"CHE_CACHE_HOME", "CHE_STATE_HOME", "CHE_DATA_HOME",
-		"XDG_CACHE_HOME", "XDG_STATE_HOME", "XDG_DATA_HOME",
+		"CHE_CACHE_HOME", "CHE_STATE_HOME", "CHE_DATA_HOME", "CHE_CONFIG_HOME",
+		"XDG_CACHE_HOME", "XDG_STATE_HOME", "XDG_DATA_HOME", "XDG_CONFIG_HOME",
 	} {
 		t.Setenv(k, "")
+		os.Unsetenv(k)
 	}
 	execx.Swap(t, testutil.NewCmdMockExecutor())
-	return home
+	return home, map[string]string{"HOME": home}
 }
 
-type prepKnobs struct {
-	SkipRemoteRefs bool     `yaml:"skipRemoteRefs"`
-	SampleEnv      string   `yaml:"sampleEnv"`
-	UnsetEnv       []string `yaml:"unsetEnv"`
-	ValidateSpec   string   `yaml:"validateSpec"`
-	Debug          bool     `yaml:"debug"`
+// newContext builds the launch context a case feeds to the real
+// PrepareApplicationOptions/PrepareSpecs: env (base + case), cwd = host repo, euid from
+// the process (the same top-edge construction production does).
+func newContext(env map[string]string, cwd string) appCtx {
+	return appCtx{Env: env, Cwd: cwd, Euid: os.Geteuid()}
 }
 
 type prepWant struct {
 	Profiles      []string            `yaml:"profiles"` // Ref() list, tree order
 	RepoRoot      string              `yaml:"repoRoot"` // sourced profile's directory
 	RepoRootUnder string              `yaml:"repoRootUnder"`
-	Script        string              `yaml:"script"` // rel suffix of a sourced profile's resolved script
-	Env           map[string]string   `yaml:"env"`    // sourced profile's env overlay
+	Script        string              `yaml:"script"`    // rel suffix of a sourced profile's resolved script
+	Env           map[string]string   `yaml:"env"`       // sourced profile's env overlay
+	SampleEnv     string              `yaml:"sampleEnv"` // key sampled from the profile's captured env
 	EnvInOverlay  string              `yaml:"envInOverlay"`
 	LinkDests     map[string][]string `yaml:"linkDests"` // profile name -> its resolved link dests (workingDir + host mapping)
 }
@@ -102,14 +103,23 @@ func sourcedProfile(ps []*ProfileReady) *ProfileReady {
 	return nil
 }
 
+// prepFlags decodes the case's flags arg: the CLI/env inputs that used to be
+// knobs, now driven through the real front door (options flags + appCtx env).
+type prepFlags struct {
+	SkipRemoteRefs bool     `yaml:"skipRemoteRefs"`
+	ValidateSpec   string   `yaml:"validateSpec"`
+	Debug          bool     `yaml:"debug"`
+	UnsetEnv       []string `yaml:"unsetEnv"` // keys omitted from appCtx.Env
+}
+
 func TestPrepareSpecs(t *testing.T) {
 	testyml.Run(t, td, "testdata/spec/funcs/prepare_specs.test.spec.yml",
 		func(t *testing.T, c testyml.Case[prepWant]) {
 			var refFiles, hostFiles map[string]string
-			var knobs prepKnobs
+			var flags prepFlags
 			c.Input.Args.To(t, 0, &refFiles)
 			c.Input.Args.To(t, 1, &hostFiles)
-			c.Input.Args.To(t, 2, &knobs)
+			c.Input.Args.To(t, 2, &flags)
 
 			vars := map[string]string{}
 			if len(refFiles) > 0 {
@@ -120,39 +130,50 @@ func TestPrepareSpecs(t *testing.T) {
 				hostTree[rel] = testyml.Expand(body, vars)
 			}
 			hostRepo := testutil.Repo(t, hostTree)
-			home := prepEnv(t, hostRepo)
+			home, baseEnv := prepEnv(t)
 			vars["HOST_REPO"] = hostRepo
 			vars["HOME"] = home
 			vars["CACHE"] = filepath.Join(home, ".cache/che/sources")
-			for k, v := range c.Context.Env {
-				t.Setenv(k, v)
+
+			// [why] the launch env is built at the top edge exactly like
+			// production: base (HOME) + case env, ref-dir var, unset keys omitted.
+			env := map[string]string{}
+			maps.Copy(env, baseEnv)
+			if d, ok := vars["REF_DIR"]; ok {
+				env["REF_DIR_VAR"] = d
 			}
-			for _, k := range knobs.UnsetEnv {
+			for k, v := range c.Context.Env {
+				env[k] = v
+			}
+			for _, k := range flags.UnsetEnv {
+				delete(env, k)
+			}
+			// [why] spec-side source resolution (URI $VAR expand, XDG cache home)
+			// reads the process env ambiently, outside this refactor's scope; keep
+			// it consistent with the launch ctx so those reads match production.
+			t.Chdir(hostRepo)
+			for _, k := range flags.UnsetEnv {
 				t.Setenv(k, "")
 				os.Unsetenv(k)
 			}
-			if d, ok := vars["REF_DIR"]; ok {
-				t.Setenv("REF_DIR_VAR", d)
+			for k, v := range env {
+				t.Setenv(k, v)
 			}
+			ctx := newContext(env, hostRepo)
 
-			envBefore := map[string]string{}
-			for _, kv := range os.Environ() {
-				k, v, _ := strings.Cut(kv, "=")
-				envBefore[k] = v
-			}
-			vs := options.ValidateSpecMode(testyml.Expand(knobs.ValidateSpec, vars))
+			vs := options.ValidateSpecMode(testyml.Expand(flags.ValidateSpec, vars))
 			opts := options.Options{
-				SkipRemoteRefs:  knobs.SkipRemoteRefs,
+				SkipRemoteRefs:  flags.SkipRemoteRefs,
 				ValidateSpec:    vs,
-				ValidateSpecCLI: vs, // knob models the flag/env override
-				Debug:           knobs.Debug,
+				ValidateSpecCLI: vs, // models the flag/env override
+				Debug:           flags.Debug,
 			}
-			log.SetDebug(knobs.Debug)
+			log.SetDebug(flags.Debug)
 			t.Cleanup(func() { log.SetDebug(false) })
 			var root *SpecReady
 			out, err := testutil.CaptureStdout(t, func() error {
 				var e error
-				root, e = PrepareSpecs(opts, spec.SpecSourceRecipe{})
+				root, e = PrepareSpecs(ctx, opts, spec.SpecSourceRecipe{})
 				return e
 			})
 			if c.Expected.IsErrorWanted() {
@@ -225,39 +246,38 @@ func TestPrepareSpecs(t *testing.T) {
 					assert.Equalf(t, want, linkDests(t, pr), "profile %q link dests\n%s", name, out)
 				}
 			}
-			if knobs.SampleEnv != "" {
-				sampled := ""
-				require.NoError(t, sp.withEnv(func() error {
-					sampled = os.Getenv(knobs.SampleEnv)
-					return nil
-				}))
-				assert.Equal(t, w.EnvInOverlay, sampled, knobs.SampleEnv+" inside the overlay")
-				cur, set := os.LookupEnv(knobs.SampleEnv)
-				prev, had := envBefore[knobs.SampleEnv]
-				assert.Falsef(t, set != had || cur != prev,
-					"%s must not leak into the process env after withEnv", knobs.SampleEnv)
+			if w.SampleEnv != "" {
+				// [why] the profile captured the launch env overlaid with its
+				// env: block; the sampled key reads from that captured env.
+				assert.Equal(t, w.EnvInOverlay, sp.env[w.SampleEnv], w.SampleEnv+" in the captured env")
 			}
 		})
 }
 
-// TestPrepareOptionsPrecedence: flags > env vars > local che.yml options: > defaults.
+// TestPrepareOptionsPrecedence: flags > env vars > local che.yml options: >
+// defaults, driving appCtx.Env instead of the process env.
 func TestPrepareOptionsPrecedence(t *testing.T) {
 	repo := testutil.Repo(t, map[string]string{
 		"che.yml": "options:\n  validateSpec: error\n  debug: true\np:\n  options: {autoDiscover: true}\n",
 	})
-	prepEnv(t, repo)
+	_, baseEnv := prepEnv(t)
+	ctx := func(extra map[string]string) appCtx {
+		env := map[string]string{}
+		maps.Copy(env, baseEnv)
+		maps.Copy(env, extra)
+		return newContext(env, repo)
+	}
 
-	opts, err := PrepareOptions(options.Options{})
+	_, opts, err := PrepareApplicationOptions(ctx(nil), options.Options{})
 	require.NoError(t, err)
 	assert.Equal(t, options.ValidateSpec.Error, opts.ValidateSpec, "yaml layer over default")
 	assert.True(t, opts.Debug, "yaml debug over default")
 
-	t.Setenv("CHE_VALIDATE_SPEC", "warn")
-	opts, err = PrepareOptions(options.Options{})
+	_, opts, err = PrepareApplicationOptions(ctx(map[string]string{"CHE_VALIDATE_SPEC": "warn"}), options.Options{})
 	require.NoError(t, err)
 	assert.Equal(t, options.ValidateSpec.Warn, opts.ValidateSpec, "env var over yaml")
 
-	opts, err = PrepareOptions(options.Options{ValidateSpec: options.ValidateSpec.Error})
+	_, opts, err = PrepareApplicationOptions(ctx(map[string]string{"CHE_VALIDATE_SPEC": "warn"}), options.Options{ValidateSpec: options.ValidateSpec.Error})
 	require.NoError(t, err)
 	assert.Equal(t, options.ValidateSpec.Error, opts.ValidateSpec, "flag over env var")
 }
@@ -269,8 +289,11 @@ func TestPrepareOptionsUserConfig(t *testing.T) {
 	repo := testutil.Repo(t, map[string]string{
 		"che.yml": "options:\n  validateSpec: warn\n  profiles: [spec/only]\np:\n  options: {autoDiscover: true}\n",
 	})
-	prepEnv(t, repo)
+	_, baseEnv := prepEnv(t)
 
+	// [why] XDG_CONFIG_HOME steers UserConfigPath, which resolves the config
+	// base ambiently (out of this refactor's scope); the CHE_* option env goes
+	// through appCtx.Env like production.
 	cfgHome := t.TempDir()
 	t.Setenv("XDG_CONFIG_HOME", cfgHome)
 	t.Setenv("CHE_CONFIG_HOME", "")
@@ -285,8 +308,15 @@ func TestPrepareOptionsUserConfig(t *testing.T) {
 		"renderTemplates:\n  skipSecrets: true\n"
 	require.NoError(t, os.WriteFile(filepath.Join(cfgDir, "config.yml"), []byte(config), 0o644))
 
+	ctx := func(extra map[string]string) appCtx {
+		env := map[string]string{}
+		maps.Copy(env, baseEnv)
+		maps.Copy(env, extra)
+		return newContext(env, repo)
+	}
+
 	// user-config over the local spec + defaults.
-	opts, err := PrepareOptions(options.Options{})
+	_, opts, err := PrepareApplicationOptions(ctx(nil), options.Options{})
 	require.NoError(t, err)
 	assert.Equal(t, options.ValidateSpec.Error, opts.ValidateSpec, "user-config validateSpec over spec")
 	assert.True(t, opts.Debug, "user-config debug")
@@ -298,15 +328,13 @@ func TestPrepareOptionsUserConfig(t *testing.T) {
 	assert.Equal(t, []string{"cfg/a", "cfg/b"}, opts.Profiles, "user-config profiles over spec")
 
 	// env over user-config.
-	t.Setenv("CHE_VALIDATE_SPEC", "warn")
-	t.Setenv("CHE_PROFILE", "env/a,env/b")
-	opts, err = PrepareOptions(options.Options{})
+	_, opts, err = PrepareApplicationOptions(ctx(map[string]string{"CHE_VALIDATE_SPEC": "warn", "CHE_PROFILE": "env/a,env/b"}), options.Options{})
 	require.NoError(t, err)
 	assert.Equal(t, options.ValidateSpec.Warn, opts.ValidateSpec, "env over user-config")
 	assert.Equal(t, []string{"env/a", "env/b"}, opts.Profiles, "CHE_PROFILE over user-config")
 
 	// flags over env + user-config.
-	opts, err = PrepareOptions(options.Options{Profiles: []string{"flag/a"}})
+	_, opts, err = PrepareApplicationOptions(ctx(map[string]string{"CHE_VALIDATE_SPEC": "warn", "CHE_PROFILE": "env/a,env/b"}), options.Options{Profiles: []string{"flag/a"}})
 	require.NoError(t, err)
 	assert.Equal(t, []string{"flag/a"}, opts.Profiles, "flag over env + user-config")
 }
@@ -321,9 +349,9 @@ func TestWorkingDirectoryCascade(t *testing.T) {
 		"spectree/HOME/.config/a": "a\n",
 		"proftree/HOME/.config/b": "b\n",
 	})
-	home := prepEnv(t, repo)
+	home, baseEnv := prepEnv(t)
 
-	root, err := PrepareSpecs(options.Options{SkipExecIf: true}, spec.SpecSourceRecipe{})
+	root, err := PrepareSpecs(newContext(baseEnv, repo), options.Options{SkipExecIf: true}, spec.SpecSourceRecipe{})
 	require.NoError(t, err)
 	byName := map[string]*ProfileReady{}
 	for _, pr := range root.AllProfiles() {
@@ -352,8 +380,8 @@ func TestWorkingDirectoryCascade(t *testing.T) {
 		"che.yml":                "r:\n  options: {autoDiscover: true}\n  include:\n    makeLinks: [HOME/**]\n",
 		"chetree/HOME/.config/c": "c\n",
 	})
-	prepEnv(t, repo2)
-	root2, err := PrepareSpecs(options.Options{SkipExecIf: true, WorkingDirectory: "chetree"}, spec.SpecSourceRecipe{})
+	_, baseEnv2 := prepEnv(t)
+	root2, err := PrepareSpecs(newContext(baseEnv2, repo2), options.Options{SkipExecIf: true, WorkingDirectory: "chetree"}, spec.SpecSourceRecipe{})
 	require.NoError(t, err)
 	wantWD, _ := filepath.EvalSymlinks(filepath.Join(repo2, "chetree"))
 	gotWD, _ := filepath.EvalSymlinks(root2.AllProfiles()[0].workingDir)
@@ -367,10 +395,10 @@ func TestAutoDiscoverGlobal(t *testing.T) {
 		"che.yml": "unset:\n  options: {}\n" +
 			"optout:\n  options: {autoDiscover: false}\n",
 	})
-	prepEnv(t, repo)
+	_, baseEnv := prepEnv(t)
 
 	yes := true
-	root, err := PrepareSpecs(options.Options{SkipExecIf: true, AutoDiscover: &yes}, spec.SpecSourceRecipe{})
+	root, err := PrepareSpecs(newContext(baseEnv, repo), options.Options{SkipExecIf: true, AutoDiscover: &yes}, spec.SpecSourceRecipe{})
 	require.NoError(t, err)
 	var names []string
 	for _, pr := range root.AllProfiles() {
@@ -379,22 +407,16 @@ func TestAutoDiscoverGlobal(t *testing.T) {
 	assert.Equal(t, []string{"unset"}, names, "global autoDiscover picks unset, profile opt-out wins")
 }
 
-// TestWithEnv: overlay shadows, sets, and restores the process env.
-func TestWithEnv(t *testing.T) {
-	t.Setenv("WITHENV_SHADOWED", "host")
-	t.Setenv("WITHENV_ABSENT", "")
-	os.Unsetenv("WITHENV_ABSENT")
-	during := map[string]string{}
-	err := withEnv(map[string]string{"WITHENV_SHADOWED": "ref", "WITHENV_ABSENT": "x"}, func() error {
-		during["WITHENV_SHADOWED"] = os.Getenv("WITHENV_SHADOWED")
-		during["WITHENV_ABSENT"] = os.Getenv("WITHENV_ABSENT")
-		return nil
-	})
-	require.NoError(t, err)
-	assert.Equal(t, map[string]string{"WITHENV_SHADOWED": "ref", "WITHENV_ABSENT": "x"}, during)
-	assert.Equal(t, "host", os.Getenv("WITHENV_SHADOWED"), "shadowed restored")
-	_, set := os.LookupEnv("WITHENV_ABSENT")
-	assert.False(t, set, "absent key unset after withEnv")
+// TestOverlayEnv: the overlay wins over the base, adds absent keys, and leaves
+// the base map untouched (pure derivation, no process mutation).
+func TestOverlayEnv(t *testing.T) {
+	base := map[string]string{"SHADOWED": "host", "KEPT": "base"}
+	got := overlayEnv(base, map[string]string{"SHADOWED": "ref", "ADDED": "x"})
+	assert.Equal(t, map[string]string{"SHADOWED": "ref", "KEPT": "base", "ADDED": "x"}, got)
+	assert.Equal(t, map[string]string{"SHADOWED": "host", "KEPT": "base"}, base, "base map unchanged")
+
+	// empty overlay returns the base unchanged.
+	assert.Equal(t, base, overlayEnv(base, nil))
 }
 
 // stubOperation records execution order for ExecOperations tests.

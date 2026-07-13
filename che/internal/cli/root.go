@@ -20,7 +20,7 @@ var version = "dev"
 // root SpecReady as separately initialized values, read by each RunE.
 type app struct {
 	flags options.Options // cobra flag destinations
-	opts  options.Options // finalized by che.PrepareOptions
+	opts  options.Options // finalized by che.PrepareApplicationOptions
 	root  *che.SpecReady  // prepared by che.PrepareSpecs
 }
 
@@ -65,7 +65,7 @@ sourced profile refs included).`,
 		Use:   "services",
 		Short: "load/unload/verify the profile's launchd services",
 	}
-	root.AddCommand(a.allCmd(), a.detectCmd(), services)
+	root.AddCommand(a.allCmd(), a.discoverCmd(), services)
 	for _, o := range ops() {
 		cmd := a.opCmd(o)
 		if o.parent == "services" {
@@ -77,15 +77,19 @@ sourced profile refs included).`,
 	return root
 }
 
-// init prepares the run: options (flags > env vars > local che.yml options: >
-// defaults), then the whole spec tree.
+// init prepares the run: build the launch context from the process (the one
+// ambient-read site), resolve options (flags > env vars > local che.yml
+// options: > defaults), then the whole spec tree.
 func (a *app) init() error {
-	opts, err := che.PrepareOptions(a.flags)
+	ctx, err := che.NewContext()
 	if err != nil {
 		return err
 	}
-	a.opts = opts
-	a.root, err = che.PrepareSpecs(opts, spec.SpecSourceRecipe{})
+	ctx, a.opts, err = che.PrepareApplicationOptions(ctx, a.flags)
+	if err != nil {
+		return err
+	}
+	a.root, err = che.PrepareSpecs(ctx, a.opts, spec.SpecSourceRecipe{})
 	return err
 }
 
@@ -101,10 +105,10 @@ func (a *app) allCmd() *cobra.Command {
 	}
 }
 
-// detectCmd prints each prepared profile's ref and exits.
-func (a *app) detectCmd() *cobra.Command {
+// discoverCmd prints each prepared profile's ref and exits.
+func (a *app) discoverCmd() *cobra.Command {
 	return &cobra.Command{
-		Use:   "detect",
+		Use:   "discover",
 		Short: "print the prepared profiles (one per line) and exit",
 		RunE: func(cmd *cobra.Command, args []string) error {
 			for _, p := range a.root.AllProfiles() {

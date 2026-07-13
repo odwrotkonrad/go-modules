@@ -133,7 +133,7 @@ func seedBrokenLink(t *testing.T, p *ProfileReady) string {
 	dir := filepath.Join(p.home, ".config/zsh")
 	require.NoError(t, os.MkdirAll(dir, 0o755))
 	dead := filepath.Join(dir, "dead")
-	require.NoError(t, os.Symlink(p.src("HOME/.config/zsh/gone"), dead))
+	require.NoError(t, os.Symlink(p.resolveSrc("HOME/.config/zsh/gone"), dead))
 	return dead
 }
 
@@ -154,7 +154,7 @@ func TestOps(t *testing.T) {
 		applyScenario(t, c.Input.Args, m, p)
 		out, runErr := testutil.CaptureStdout(t, func() error { return op(p, res) })
 		c.Expected.Check(t, runErr)
-		vars := map[string]string{"HOME": p.home, "REPO": dir, "ROOT": p.root()}
+		vars := map[string]string{"HOME": p.home, "REPO": dir, "ROOT": p.resolveRoot()}
 		stripped := testutil.StripStamps(testutil.StripANSI(out))
 		for _, f := range c.Expected.StdOut {
 			testyml.MustMatch(t, stripped, testyml.Expand(f, vars))
