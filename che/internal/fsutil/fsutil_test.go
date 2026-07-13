@@ -59,7 +59,6 @@ func TestUnderHome(t *testing.T) {
 // context.env sets the envs; home is fixed at /h.
 func TestResolveHomes(t *testing.T) {
 	for spec, fn := range map[string]func(string) string{
-		"testdata/spec/funcs/resolve_data_home.test.spec.yml":   ResolveDataHome,
 		"testdata/spec/funcs/resolve_cache_home.test.spec.yml":  ResolveCacheHome,
 		"testdata/spec/funcs/resolve_state_home.test.spec.yml":  ResolveStateHome,
 		"testdata/spec/funcs/resolve_config_home.test.spec.yml": ResolveConfigHome,

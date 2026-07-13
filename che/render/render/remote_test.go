@@ -40,7 +40,7 @@ func TestIsRemoteRef(t *testing.T) {
 func TestRemoteFile(t *testing.T) {
 	testyml.Eq(t, td, "testdata/spec/funcs/remote_file.test.spec.yml", func(t *testing.T, c testyml.Case[string]) (string, error) {
 		url := "file://" + initRemoteFixture(t)
-		return remoteFileResolver()(url + c.Input.Args.String(t, 0))
+		return NewRemoteFetcher()(url + c.Input.Args.String(t, 0))
 	})
 }
 

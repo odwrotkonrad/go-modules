@@ -42,15 +42,16 @@ func slug(url string) string {
 // config and credential helpers apply.
 func EnsureCheckout(home, url, name string) (string, error) {
 	dir := Dir(home, url)
+	title := "source(" + name + ")"
 	if _, err := os.Stat(filepath.Join(dir, ".git")); err != nil {
-		log.Debug("source("+name+")", fmt.Sprintf("clone %s -> %s", url, dir), log.Off)
+		log.Debug(title, fmt.Sprintf("clone %s -> %s", url, dir), log.Off)
 		if err := git("clone", "--quiet", "--depth", "1", "--single-branch", url, dir); err != nil {
 			return "", fmt.Errorf("source clone %s: %w", url, err)
 		}
-		log.Msg("source("+name+")", fmt.Sprintf("cloned %s -> %s", url, dir), log.Off)
+		log.Msg(title, fmt.Sprintf("cloned %s -> %s", url, dir), log.Off)
 		return dir, nil
 	}
-	log.Debug("source("+name+")", fmt.Sprintf("pull %s", dir), log.Off)
+	log.Debug(title, fmt.Sprintf("pull %s", dir), log.Off)
 	before, _ := gitOut("-C", dir, "rev-parse", "HEAD")
 	if err := git("-C", dir, "fetch", "--quiet", "--depth", "1"); err != nil {
 		return "", fmt.Errorf("source fetch %s: %w", dir, err)
@@ -59,7 +60,7 @@ func EnsureCheckout(home, url, name string) (string, error) {
 		return "", fmt.Errorf("source reset %s: %w", dir, err)
 	}
 	if after, _ := gitOut("-C", dir, "rev-parse", "HEAD"); after != before {
-		log.Msg("source("+name+")", fmt.Sprintf("pulled %.7s..%.7s %s", before, after, dir), log.Off)
+		log.Msg(title, fmt.Sprintf("pulled %.7s..%.7s %s", before, after, dir), log.Off)
 	}
 	return dir, nil
 }

@@ -9,13 +9,13 @@ Go monorepo for all user Go modules: `che` (spec-driven dotfile loader, carrying
 
 ## Why It Exists
 
-Four sibling Go repos duplicated toolchain, CI shape, conventions scaffolding, and release flow. One repo carries them all: cross-module changes land in one MR, render-files folded into che (its only consumer).
+Four sibling repos duplicated toolchain, CI, conventions, release flow. One repo carries all: cross-module changes in one MR, render-files folded into che (its only consumer).
 
 ## Goals
 
-- One repo, one pipeline: per-module test and release jobs fire only for changed dirs.
-- Dir-prefixed tags (`<module>/vX.Y.Z`) continue each module's standalone numbering.
-- Same conventions as sibling repos: generated docs, lefthook, Makefile style, one MIT license.
+- One pipeline: per-module test and release jobs fire only for changed dirs.
+- Dir-prefixed tags (`<module>/vX.Y.Z`) continue each module's numbering.
+- Shared conventions: generated docs, lefthook, Makefile style, one MIT license.
 
 # Conventions
 
@@ -62,7 +62,7 @@ CLI printing `<bundle> <uti> <role>` file-handler association lines from `os-ope
 
 ## Why It Exists
 
-macOS file associations belong in config, not clicked together in Finder. The YAML lives in the configs repo.
+macOS file associations belong in config, not clicked in Finder. The YAML lives in the configs repo.
 
 ## Goals
 

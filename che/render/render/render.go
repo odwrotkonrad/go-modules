@@ -52,7 +52,7 @@ func ExecWithCtx(name string, body []byte, repoRoot string, itemCtx map[string]s
 		"frontmatter":          func(path string) (string, error) { return ReadFrontmatter(repoRoot, path) },
 		"readBody":             func(path string) (string, error) { return ReadBody(repoRoot, path) },
 		"renderMarkdown":       func(path string, opts ...string) (string, error) { return RenderMarkdown(repoRoot, path, opts...) },
-		"remoteFile":           remoteFileResolver(),
+		"remoteFile":           NewRemoteFetcher(),
 	}
 	opts := gomplate.RenderOptions{Funcs: funcs, MissingKey: "error"}
 	if len(itemCtx) > 0 {
@@ -336,7 +336,7 @@ func RenderMarkdown(repoRoot, path string, opts ...string) (string, error) {
 		case "strip-comments":
 			body = mdComment.ReplaceAllString(body, "")
 		case "normalize-headings":
-			body = mdHeading.ReplaceAllString(body, "$1#$2")
+			body = demoteHeadings(body, 1)
 		default:
 			return "", fmt.Errorf("renderMarkdown: unknown opt %q", opt)
 		}

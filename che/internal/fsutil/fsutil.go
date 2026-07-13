@@ -96,9 +96,7 @@ func (f FS) MakeSymlink(target, dest string) error {
 }
 
 func (f FS) CopyFile(src, dest string, mode os.FileMode) error {
-	argv := append([]string{"install"}, buildModeFlag(mode)...)
-	argv = append(argv, src, dest)
-	return f.RunPrivileged(dest, argv...)
+	return f.RunPrivileged(dest, buildInstallArgv(mode, "", src, dest)...)
 }
 
 func (f FS) RemoveFile(dest string) error {
@@ -122,13 +120,18 @@ func (f FS) InstallFile(dest string, body []byte, mode os.FileMode, owner string
 		return err
 	}
 
+	return f.RunPrivileged(dest, buildInstallArgv(mode, owner, tmp.Name(), dest)...)
+}
+
+// buildInstallArgv builds an install argv: mode flag, optional -o/-g from
+// owner ("owner:group", "" -> none), then src dest.
+func buildInstallArgv(mode os.FileMode, owner, src, dest string) []string {
 	argv := append([]string{"install"}, buildModeFlag(mode)...)
 	if owner != "" {
 		o, g, _ := strings.Cut(owner, ":")
 		argv = append(argv, "-o", o, "-g", g)
 	}
-	argv = append(argv, tmp.Name(), dest)
-	return f.RunPrivileged(dest, argv...)
+	return append(argv, src, dest)
 }
 
 // RunPrivileged runs argv as root unless dest under Home (user-owned).

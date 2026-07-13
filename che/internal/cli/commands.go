@@ -45,22 +45,21 @@ func ops() []opCmd {
 // profile. run-scripts and render-templates layer their arg filter / flag on top.
 func (a *app) opCmd(o opCmd) *cobra.Command {
 	name := o.displayName()
-	cmd := &cobra.Command{
-		Use:   o.name,
-		Short: o.short,
-		RunE: func(cmd *cobra.Command, args []string) error {
-			return a.root.ExecEach(o.name, func(p *che.ProfileReady) error {
-				return p.ExecOperationNamed(name)
-			})
-		},
-	}
+	cmd := &cobra.Command{Use: o.name, Short: o.short}
 	switch o.name {
-	case "render-templates":
-		cmd.Flags().BoolVar(&a.flags.RenderSkipSecrets, "skip-secrets", false,
-			"skip sources carrying op:// secret refs (logged, dests untouched); env: CHE_RENDER_TEMPLATES_SKIP_SECRETS")
 	case "run-scripts":
 		cmd.Use = "run-scripts [name...]"
 		cmd.RunE = a.runScriptsRunE
+	default:
+		cmd.RunE = func(cmd *cobra.Command, args []string) error {
+			return a.root.ExecEach(o.name, func(p *che.ProfileReady) error {
+				return p.ExecOperationNamed(name)
+			})
+		}
+	}
+	if o.name == "render-templates" {
+		cmd.Flags().BoolVar(&a.flags.RenderSkipSecrets, "skip-secrets", false,
+			"skip sources carrying op:// secret refs (logged, dests untouched); env: CHE_RENDER_TEMPLATES_SKIP_SECRETS")
 	}
 	return cmd
 }

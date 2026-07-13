@@ -36,7 +36,7 @@ func (c *Options) Resolve(env LookupEnv, user, spec Layer) error {
 	c.Dir = cmp.Or(c.Dir, env("CHE_DIR"))
 	c.WorkingDirectory = cmp.Or(c.WorkingDirectory, env("CHE_WORKING_DIRECTORY"), spec.WorkingDirectory)
 	c.Profiles = listOr(env, c.Profiles, "CHE_PROFILE", user.Profiles, spec.Profiles)
-	c.SkipExecIf = boolOrEnv(env, c.SkipExecIf, "CHE_SKIP_EXEC_IF")
+	c.SkipExecIf = boolOr(env, c.SkipExecIf, "CHE_SKIP_EXEC_IF")
 	c.SkipRemoteRefs = boolOr(env, c.SkipRemoteRefs, "CHE_SKIP_REMOTE_REFS", user.SkipRemoteRefs, spec.SkipRemoteRefs)
 	c.Debug = boolOr(env, c.Debug, "CHE_DEBUG", user.Debug, spec.Debug)
 	c.RenderSkipSecrets = boolOr(env, c.RenderSkipSecrets, "CHE_RENDER_TEMPLATES_SKIP_SECRETS",
@@ -79,10 +79,6 @@ func boolOr(env LookupEnv, flag bool, envKey string, layers ...*bool) bool {
 		}
 	}
 	return false
-}
-
-func boolOrEnv(env LookupEnv, flag bool, key string) bool {
-	return flag || env(key) != ""
 }
 
 // [<] 🤖🤖

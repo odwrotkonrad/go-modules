@@ -16,9 +16,4 @@ type Cmd struct {
 
 type Real struct{}
 
-type Mock struct {
-	Stub  func(argv []string) ([]byte, error)
-	calls []string
-}
-
 // [<] 🤖🤖🤖

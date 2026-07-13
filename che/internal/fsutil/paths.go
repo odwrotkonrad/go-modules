@@ -8,13 +8,6 @@ import (
 	"path/filepath"
 )
 
-// ResolveDataHome resolves che's XDG data base dir:
-// CHE_DATA_HOME (che's base directly), else XDG_DATA_HOME/che, else ~/.local/share/che.
-// Reserved: honored by the resolver but no che path uses it today.
-func ResolveDataHome(home string) string {
-	return resolveBaseDir("CHE_DATA_HOME", "XDG_DATA_HOME", home, ".local/share")
-}
-
 // ResolveCacheHome resolves che's XDG cache base dir:
 // CHE_CACHE_HOME (che's base directly), else XDG_CACHE_HOME/che, else ~/.cache/che.
 func ResolveCacheHome(home string) string {

@@ -216,7 +216,7 @@ func (m *FileSystemMockWriter) record(parts ...string) error {
 	return nil
 }
 
-func mode(mode os.FileMode) string { return fmt.Sprintf("%04o", mode) }
+func mode(m os.FileMode) string { return fmt.Sprintf("%04o", m) }
 
 func (m *FileSystemMockWriter) MakeDir(dest string, md os.FileMode, parents bool) error {
 	parts := []string{"mkdir"}
