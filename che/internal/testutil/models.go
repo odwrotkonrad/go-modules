@@ -1,7 +1,5 @@
 package testutil
 
-// TODO: consider redesigning the data model for these types now that they're consolidated in one place.
-
 // [>] 🤖🤖🤖
 
 import (

@@ -1,7 +1,5 @@
 package fsutil
 
-// TODO: consider redesigning the data model for these types now that they're consolidated in one place.
-
 // [>] 🤖🤖
 
 // OSReader reads the live filesystem.

@@ -201,16 +201,6 @@ func withEnv(env map[string]string, fn func() error) error {
 	return fn()
 }
 
-// mergeEnv merges base under overlay (overlay wins).
-func mergeEnv(base, overlay map[string]string) map[string]string {
-	if len(base) == 0 {
-		return overlay
-	}
-	out := maps.Clone(base)
-	maps.Copy(out, overlay)
-	return out
-}
-
 // [<] 🤖🤖
 
 // [>] 🤖🤖 SpecRecipe
@@ -404,7 +394,7 @@ func (r *SpecRecipe) assembleProfiles(p *specsPrep, ready *SpecReady, lookup []s
 		env := r.Env
 		if forced != nil {
 			rec.Options = rec.Options.OverRef(forced.Options)
-			env = mergeEnv(r.Env, forced.Env)
+			env = fsutil.MergeMap(r.Env, forced.Env)
 		}
 		pr, refs, err := r.makeProfileReady(p, rec, lookup, env)
 		if err != nil {

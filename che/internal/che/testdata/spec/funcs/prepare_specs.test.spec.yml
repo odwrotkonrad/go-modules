@@ -359,4 +359,162 @@ cases:
     expected:
       output:
         profiles: [a]
+  - name: ShouldAutoDiscoverAndGateAtLocalSpecLevelWhenExecIfPasses
+    context:
+      env: {SPEC_GATE: "1"}
+    input:
+      args:
+        - refFiles: {}
+        - hostFiles:
+            che.yml: |
+              options:
+                autoDiscover: true
+                execIf: ['env:SPEC_GATE']
+              a: {}
+              b: {}
+        - knobs: {}
+    expected:
+      output:
+        profiles: [a, b]
+  - name: ShouldSkipAllLocalProfilesWhenSpecLevelExecIfFails
+    input:
+      args:
+        - refFiles: {}
+        - hostFiles:
+            che.yml: |
+              options:
+                autoDiscover: true
+                execIf: ['env:SPEC_GATE']
+              a: {}
+              b: {}
+        - knobs:
+            unsetEnv: [SPEC_GATE]
+    expected:
+      output:
+        profiles: []
+  - name: ShouldComposeTwoIncludedSpecsEachWithIncludeExcludeProfiles
+    input:
+      args:
+        - refFiles: {}
+        - hostFiles:
+            che.yml: |
+              include:
+                sources: [./one, ./two]
+              main:
+                options: {autoDiscover: true}
+            one/che.yml: |
+              alpha:
+                options: {autoDiscover: true}
+                include:
+                  link: [HOME/**]
+                exclude:
+                  link: [HOME/.config/skip-a]
+              HOME/.config/keep-a: a
+              HOME/.config/skip-a: a
+            one/HOME/.config/keep-a: keep-a
+            one/HOME/.config/skip-a: skip-a
+            two/che.yml: |
+              beta:
+                options: {autoDiscover: true}
+                include:
+                  link: [HOME/**]
+                exclude:
+                  link: [HOME/.config/skip-b]
+            two/HOME/.config/keep-b: keep-b
+            two/HOME/.config/skip-b: skip-b
+        - knobs: {}
+    expected:
+      output:
+        profiles: [main, ./one/che.yml::alpha, ./two/che.yml::beta]
+        linkDests:
+          alpha: ['${HOME}/.config/keep-a']
+          beta: ['${HOME}/.config/keep-b']
+  - name: ShouldHonorIncludedSpecValidateSpecError
+    input:
+      args:
+        - refFiles:
+            che.yml: |
+              options:
+                validateSpec: error
+              p:
+                includes:
+                  link: [HOME/**]
+        - hostFiles:
+            che.yml: |
+              include:
+                sources: ["${REF_DIR}"]
+              main:
+                options: {autoDiscover: true}
+        - knobs: {}
+    expected:
+      errorOutput: includes
+  - name: ShouldResolveIncludedSpecWorkingDirectoryOption
+    input:
+      args:
+        - refFiles: {}
+        - hostFiles:
+            che.yml: |
+              include:
+                sources: [./sub]
+              main:
+                options: {autoDiscover: true}
+            sub/che.yml: |
+              options:
+                workingDirectory: tree
+              s:
+                options: {autoDiscover: true}
+                include:
+                  link: [HOME/**]
+            sub/tree/HOME/.config/x: x
+        - knobs: {}
+    expected:
+      output:
+        profiles: [main, ./sub/che.yml::s]
+        linkDests:
+          s: ['${HOME}/.config/x']
+  - name: ShouldOverrideRemoteRefEntryWorkingDirectory
+    input:
+      args:
+        - refFiles:
+            che.yml: |
+              gitlabGroup:
+                options: {workingDirectory: default-tree}
+                include:
+                  link: [HOME/**]
+            default-tree/HOME/.config/def: def
+            override-tree/HOME/.config/ovr: ovr
+        - hostFiles:
+            che.yml: |
+              main:
+                options: {autoDiscover: true}
+                include:
+                  profiles:
+                    - source: "@file://${REF_DIR}/che.yml::gitlabGroup"
+                      options: {workingDirectory: override-tree}
+        - knobs: {}
+    expected:
+      output:
+        profiles: [main, "@file://${REF_DIR}/che.yml::gitlabGroup"]
+        linkDests:
+          gitlabGroup: ['${HOME}/.config/ovr']
+  - name: ShouldMapNonHomeDestsToSystemRoot
+    input:
+      args:
+        - refFiles: {}
+        - hostFiles:
+            che.yml: |
+              main:
+                options: {autoDiscover: true}
+                include:
+                  link:
+                    - etc/**
+                    - Library/**
+            etc/zshenv: zshenv
+            Library/LaunchDaemons/x.plist: plist
+        - knobs: {}
+    expected:
+      output:
+        profiles: [main]
+        linkDests:
+          main: ['/Library/LaunchDaemons/x.plist', '/etc/zshenv']
 # [<] 🤖🤖

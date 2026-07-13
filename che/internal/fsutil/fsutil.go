@@ -5,6 +5,7 @@ package fsutil
 
 import (
 	"fmt"
+	"maps"
 	"os"
 	"path/filepath"
 	"runtime"
@@ -161,6 +162,17 @@ func ExpandHome(p, home string) string {
 		return filepath.Join(home, rest)
 	}
 	return p
+}
+
+// MergeMap merges base under overlay (overlay keys win), reusing overlay when
+// base is empty (no clone).
+func MergeMap[K comparable, V any](base, overlay map[K]V) map[K]V {
+	if len(base) == 0 {
+		return overlay
+	}
+	out := maps.Clone(base)
+	maps.Copy(out, overlay)
+	return out
 }
 
 // openRepo opens the git repo containing dir (walking up for .git).

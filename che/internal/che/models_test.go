@@ -7,6 +7,7 @@ import (
 	"errors"
 	"os"
 	"path/filepath"
+	"sort"
 	"strings"
 	"testing"
 
@@ -54,12 +55,41 @@ type prepKnobs struct {
 }
 
 type prepWant struct {
-	Profiles      []string          `yaml:"profiles"` // Ref() list, tree order
-	RepoRoot      string            `yaml:"repoRoot"` // sourced profile's directory
-	RepoRootUnder string            `yaml:"repoRootUnder"`
-	Script        string            `yaml:"script"` // rel suffix of a sourced profile's resolved script
-	Env           map[string]string `yaml:"env"`    // sourced profile's env overlay
-	EnvInOverlay  string            `yaml:"envInOverlay"`
+	Profiles      []string            `yaml:"profiles"` // Ref() list, tree order
+	RepoRoot      string              `yaml:"repoRoot"` // sourced profile's directory
+	RepoRootUnder string              `yaml:"repoRootUnder"`
+	Script        string              `yaml:"script"` // rel suffix of a sourced profile's resolved script
+	Env           map[string]string   `yaml:"env"`    // sourced profile's env overlay
+	EnvInOverlay  string              `yaml:"envInOverlay"`
+	LinkDests     map[string][]string `yaml:"linkDests"` // profile name -> its resolved link dests (workingDir + host mapping)
+}
+
+// profileByName indexes prepared profiles by their bare (unqualified) name.
+func profileByName(ps []*ProfileReady) map[string]*ProfileReady {
+	by := map[string]*ProfileReady{}
+	for _, p := range ps {
+		by[p.Source.GetProfileName()] = p
+	}
+	return by
+}
+
+// linkDests resolves a profile's link items through its own host (workingDir +
+// HOME/system-root mapping), sorted for stable comparison.
+func linkDests(t *testing.T, home string, p *ProfileReady) []string {
+	t.Helper()
+	h := host.New(p.Source.DirectoryPath, p.workingDir, home, "x", options.Options{})
+	var dests []string
+	for _, op := range p.OperationsReady {
+		lo, ok := op.(*LinkOperationReady)
+		if !ok {
+			continue
+		}
+		for _, l := range lo.Links {
+			dests = append(dests, h.ToDest(l.Rel))
+		}
+	}
+	sort.Strings(dests)
+	return dests
 }
 
 // sourcedProfile: the first profile whose ref differs from its bare name.
@@ -92,6 +122,7 @@ func TestPrepareSpecs(t *testing.T) {
 			hostRepo := testutil.Repo(t, hostTree)
 			home := prepEnv(t, hostRepo)
 			vars["HOST_REPO"] = hostRepo
+			vars["HOME"] = home
 			vars["CACHE"] = filepath.Join(home, ".local/share/che/sources")
 			for k, v := range c.Context.Env {
 				t.Setenv(k, v)
@@ -178,6 +209,19 @@ func TestPrepareSpecs(t *testing.T) {
 			}
 			if w.Env != nil {
 				assert.Equal(t, w.Env, sp.Env, "sourced profile env overlay")
+			}
+			if w.LinkDests != nil {
+				by := profileByName(profiles)
+				for name, wantDests := range w.LinkDests {
+					pr := by[name]
+					require.NotNilf(t, pr, "profile %q not prepared\n%s", name, out)
+					var want []string
+					for _, d := range wantDests {
+						want = append(want, testyml.Expand(d, vars))
+					}
+					sort.Strings(want)
+					assert.Equalf(t, want, linkDests(t, home, pr), "profile %q link dests\n%s", name, out)
+				}
 			}
 			if knobs.SampleEnv != "" {
 				sampled := ""

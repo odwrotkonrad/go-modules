@@ -6,7 +6,6 @@ import (
 	"cmp"
 	"errors"
 	"fmt"
-	"maps"
 	"os"
 	"path/filepath"
 	"slices"
@@ -471,20 +470,10 @@ func splitTemplates(entries []entry, globs *globSet, rich *[]FileItem) error {
 			if len(f.Dest) == 0 && !strings.HasPrefix(f.Source, RootPrefix) {
 				return fmt.Errorf("renderTemplates source without dest must be root/-prefixed (derived host dest): %q", f.Source)
 			}
-			*rich = append(*rich, FileItem{Rel: f.Source, Dests: mergeDestOptions(e.Options, f.Dest), Ctx: mergeCtx(e.Ctx, f.Ctx), Perms: e.Perms})
+			*rich = append(*rich, FileItem{Rel: f.Source, Dests: mergeDestOptions(e.Options, f.Dest), Ctx: fsutil.MergeMap(e.Ctx, f.Ctx), Perms: e.Perms})
 		}
 	}
 	return nil
-}
-
-// mergeCtx merges a group-level ctx under an item's: item keys win.
-func mergeCtx(group, item map[string]string) map[string]string {
-	if len(group) == 0 {
-		return item
-	}
-	out := maps.Clone(group)
-	maps.Copy(out, item)
-	return out
 }
 
 // mergeDestOptions merges group-level render options under each dest's own:
