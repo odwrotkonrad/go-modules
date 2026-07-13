@@ -21,11 +21,6 @@ const (
 	CodeNetwork      = 14
 )
 
-type CodedError struct {
-	Code int
-	Msg  string
-}
-
 func (e *CodedError) Error() string { return e.Msg }
 
 func ExitCode(err error) int {

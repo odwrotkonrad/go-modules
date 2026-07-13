@@ -13,12 +13,6 @@ import (
 	"gitlab.com/konradodwrot/go-modules/che/internal/fsutil"
 )
 
-// Evaluator resolves execIf predicate expressions. Builtins are lazy (resolved
-// only when referenced) and cached per run ([why] IsVirtualized shells out).
-type Evaluator struct {
-	builtins map[string]func() string
-}
-
 // NewEvaluator wires the builtin sources: isOs (macos|linux|...), isVirt.
 func NewEvaluator() *Evaluator {
 	return &Evaluator{builtins: map[string]func() string{

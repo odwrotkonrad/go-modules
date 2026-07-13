@@ -1,8 +1,12 @@
 package spec
 
+// TODO: consider redesigning the data model for these types now that they're consolidated in one place.
+
 // [>] 🤖🤖
 
 import (
+	"regexp"
+
 	"gitlab.com/konradodwrot/go-modules/che/render/render"
 )
 
@@ -157,6 +161,47 @@ type Resolved struct {
 	Services  []string    // service names
 	Scripts   []string    // script entries in spec order
 	Plugins   []PluginRef // profile-level plugins entries, composition order
+}
+
+// destRule is a parsed sed-style dest rewrite: pattern, replacement ($1
+// backrefs), global flag (absent -> first match only).
+type destRule struct {
+	re     *regexp.Regexp
+	repl   string
+	global bool
+}
+
+// Evaluator resolves execIf predicate expressions. Builtins are lazy (resolved
+// only when referenced) and cached per run ([why] IsVirtualized shells out).
+type Evaluator struct {
+	builtins map[string]func() string
+}
+
+// globSet is an ordered list of op globs, each carrying its group's perms
+// (zero Perms if none) and an optional link dest rule. Globs are
+// brace-expanded on add.
+type globSet []globPerm
+
+type globPerm struct {
+	glob  string
+	perms Perms
+	rule  *destRule
+}
+
+// effective is the composed additive selection before classification + exclude.
+// Each op's globs carry their group's perms; classify stamps matched files
+// with them (last match wins).
+type effective struct {
+	linkGlobs globSet     // link-op globs (repo-relative under root/)
+	copyGlobs globSet     // copy-op globs
+	tmplGlobs globSet     // render-templates globs (repo-root-relative, root/-prefixed)
+	richCopy  []FileItem  // rich-form copy entries
+	richTmpl  []FileItem  // rich-form render-templates entries (repo-root-relative)
+	dirs      []FileItem  // mkdirs: glob forms expanded to one item per path, rich carry perms
+	scripts   []string    // script paths (order = run order)
+	services  []string    // service names
+	plugins   []PluginRef // profile-level plugin refs (composition order)
+	exclude   excludeSet  // accumulated exclude globs (applied last, wins)
 }
 
 // [<] 🤖🤖

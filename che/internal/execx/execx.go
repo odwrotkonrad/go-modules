@@ -4,19 +4,10 @@ package execx
 // [>] 🤖🤖🤖
 
 import (
-	"io"
 	"os/exec"
 	"strings"
 	"testing"
 )
-
-type Cmd struct {
-	Argv   []string
-	Dir    string
-	Env    []string
-	Stdout io.Writer
-	Stderr io.Writer
-}
 
 type CmdExecutor interface {
 	Exec(c Cmd) error
@@ -24,8 +15,6 @@ type CmdExecutor interface {
 }
 
 var Default CmdExecutor = Real{}
-
-type Real struct{}
 
 // command maps a Cmd onto an exec.Cmd, Stdout left unset (Output owns it).
 func (c Cmd) command() *exec.Cmd {
@@ -42,11 +31,6 @@ func (Real) Exec(c Cmd) error {
 
 func (Real) Output(c Cmd) ([]byte, error) {
 	return c.command().Output()
-}
-
-type Mock struct {
-	Stub  func(argv []string) ([]byte, error)
-	calls []string
 }
 
 func (m *Mock) run(argv []string) ([]byte, error) {

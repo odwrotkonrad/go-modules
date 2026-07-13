@@ -43,14 +43,6 @@ func RequireRegistered(t *testing.T, decl map[string]string) {
 	}
 }
 
-// MockSet is the full safe-double set for a command harness: the executor is
-// already swapped in, the host-scoped doubles wire via WithFS and co.
-type MockSet struct {
-	Exec   *CmdMockExecutor
-	FS     *FileSystemMockWriter
-	Reader *FileSystemMockReader
-}
-
 // ApplyMocks validates decl against the registry and returns the safe-double
 // set with execx.Default swapped to the mock executor. Undeclared seams still
 // get the default double, never a real implementation.
@@ -68,22 +60,6 @@ func ApplyMocks(t *testing.T, decl map[string]string) *MockSet {
 
 // SleepMock is the host.Sleep / render opSleep test double: no pacing.
 func SleepMock(time.Duration) {}
-
-// CmdMockExecutor is the execx.CmdExecutor test double: records every call,
-// nothing spawns, models launchd state and the plugin git CLI.
-type CmdMockExecutor struct {
-	execx.Mock
-	Fail           bool     // every call fails
-	FailCmds       []string // substring-matched commands that fail
-	Out            string   // canned output body
-	NotLoaded      bool     // launchd initial state: service not loaded
-	NoPid          bool     // launchd print reports a pid-less service
-	StubbornPrints int      // prints still reporting present after bootout
-	Bodies         []string // captured install file bodies
-
-	loaded *bool             // launchd state, lazily seeded from NotLoaded
-	clones map[string]string // plugin clone dir -> source url
-}
 
 // NewCmdMockExecutor: the double with its command model wired.
 func NewCmdMockExecutor() *CmdMockExecutor {
@@ -233,12 +209,6 @@ func copyDirAll(src, dest string) error {
 	})
 }
 
-// FileSystemMockWriter is a record-only fsutil.FileSystemWriter: every call
-// appends one formatted line, nothing touches the filesystem, nothing prints.
-type FileSystemMockWriter struct {
-	calls []string
-}
-
 func (m *FileSystemMockWriter) Calls() []string { return m.calls }
 
 func (m *FileSystemMockWriter) record(parts ...string) error {
@@ -289,16 +259,6 @@ func (m *FileSystemMockWriter) Install(dest string, body []byte, md os.FileMode,
 
 func (m *FileSystemMockWriter) ArchiveDests(archivePath string, dests []string) error {
 	return m.record("archive", archivePath)
-}
-
-// FileSystemMockReader is the fsutil.FileSystemReader test double: reads pass
-// through to the live filesystem only under Roots (the test fixture repo +
-// HOME), Files serves Stat/ReadFile from a path->content map, every other
-// path reports absent. The zero value denies all reads, so live host state
-// (/etc, /Library, ...) never leaks into test results.
-type FileSystemMockReader struct {
-	Roots []string
-	Files map[string]string
 }
 
 func (r *FileSystemMockReader) in(path string) bool {
@@ -355,10 +315,6 @@ func (r *FileSystemMockReader) EvalSymlinks(path string) (string, error) {
 	return filepath.EvalSymlinks(path)
 }
 
-// UserMockLookup is the fsutil.UserLookup test double: users served from a
-// map, unknown names error. The zero value knows no one.
-type UserMockLookup map[string]user.User
-
 func (m UserMockLookup) Lookup(name string) (*user.User, error) {
 	u, ok := m[name]
 	if !ok {
@@ -367,10 +323,6 @@ func (m UserMockLookup) Lookup(name string) (*user.User, error) {
 	return &u, nil
 }
 
-// GroupMockLookup is the fsutil.GroupLookup test double: groups served from a
-// map, unknown names error. The zero value knows no group.
-type GroupMockLookup map[string]user.Group
-
 func (m GroupMockLookup) Lookup(name string) (*user.Group, error) {
 	g, ok := m[name]
 	if !ok {
@@ -378,10 +330,6 @@ func (m GroupMockLookup) Lookup(name string) (*user.Group, error) {
 	}
 	return &g, nil
 }
-
-// RemoteMockFetcher is the host.RemoteFetcher test double: ref -> content,
-// no git, unknown refs error.
-type RemoteMockFetcher map[string]string
 
 func (m RemoteMockFetcher) Fetch(ref string) (string, error) {
 	content, ok := m[ref]

@@ -38,13 +38,6 @@ func demoteHeadings(body string, levels int) string {
 	return body
 }
 
-// groupNode: one subgroup dir's direct children. childRepos/childSubgroups are
-// names (basenames) relative to this node's dir. Repos stop recursion (.git present).
-type groupNode struct {
-	childRepos     []string
-	childSubgroups []string
-}
-
 func isRepoDir(dir string) bool {
 	_, err := os.Stat(filepath.Join(dir, ".git"))
 	return err == nil

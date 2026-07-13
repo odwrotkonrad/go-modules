@@ -1,10 +1,13 @@
 package host
 
+// TODO: consider redesigning the data model for these types now that they're consolidated in one place.
+
 // [>] 🤖🤖
 
 import (
 	"gitlab.com/konradodwrot/go-modules/che/internal/config"
 	"gitlab.com/konradodwrot/go-modules/che/internal/fsutil"
+	"gitlab.com/konradodwrot/go-modules/che/internal/spec"
 	"gitlab.com/konradodwrot/go-modules/che/render/render"
 )
 
@@ -60,6 +63,21 @@ type tmplDest struct {
 	host   bool
 	opts   render.Options
 	header string
+}
+
+// gitFetcher is the live RemoteFetcher: shallow in-memory git clones, one
+// clone cache shared across the Host's renders.
+type gitFetcher struct{ fetch func(string) (string, error) }
+
+type scriptResult struct {
+	script string
+	status string // "ok" | "fail"
+}
+
+// tmplItem pairs a resolved template item with its rendered dests.
+type tmplItem struct {
+	item  spec.FileItem
+	dests []tmplDest
 }
 
 // [<] 🤖🤖

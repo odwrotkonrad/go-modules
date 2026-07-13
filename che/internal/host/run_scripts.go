@@ -11,11 +11,6 @@ import (
 	"gitlab.com/konradodwrot/go-modules/che/internal/execx"
 )
 
-type scriptResult struct {
-	script string
-	status string // "ok" | "fail"
-}
-
 // RunScripts runs profile scripts in spec order. A failing script is logged
 // and the rest still run; a per-script status report prints at the end, and
 // the run returns an error if any script failed.

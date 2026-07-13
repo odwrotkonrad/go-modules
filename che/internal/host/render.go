@@ -21,10 +21,6 @@ const repoFileMode = 0o660
 // perms, repo dests written as plain repo files. skipSecrets drops sources
 // carrying op:// refs (logged, dests untouched).
 func (h Host) RenderTemplates(templates []spec.FileItem, skipSecrets bool) error {
-	type tmplItem struct {
-		item  spec.FileItem
-		dests []tmplDest
-	}
 	var keep []tmplItem
 	var hostDests []string
 	for _, item := range templates {

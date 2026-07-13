@@ -16,17 +16,6 @@ import (
 	"gitlab.com/konradodwrot/go-modules/che/render/render"
 )
 
-// globSet is an ordered list of op globs, each carrying its group's perms
-// (zero Perms if none) and an optional link dest rule. Globs are
-// brace-expanded on add.
-type globSet []globPerm
-
-type globPerm struct {
-	glob  string
-	perms Perms
-	rule  *destRule
-}
-
 func (gs *globSet) add(glob string, perms Perms) { gs.addRule(glob, perms, nil) }
 
 func (gs *globSet) addRule(glob string, perms Perms, rule *destRule) {
@@ -48,22 +37,6 @@ func (gs globSet) match(rel string) (globPerm, bool) {
 // isGlobMatch matches rel against an op glob, ignoring a trailing slash.
 func isGlobMatch(glob, rel string) bool {
 	return fsutil.IsGlobMatch(strings.TrimSuffix(glob, "/"), rel)
-}
-
-// effective is the composed additive selection before classification + exclude.
-// Each op's globs carry their group's perms; classify stamps matched files
-// with them (last match wins).
-type effective struct {
-	linkGlobs globSet     // link-op globs (repo-relative under root/)
-	copyGlobs globSet     // copy-op globs
-	tmplGlobs globSet     // render-templates globs (repo-root-relative, root/-prefixed)
-	richCopy  []FileItem  // rich-form copy entries
-	richTmpl  []FileItem  // rich-form render-templates entries (repo-root-relative)
-	dirs      []FileItem  // mkdirs: glob forms expanded to one item per path, rich carry perms
-	scripts   []string    // script paths (order = run order)
-	services  []string    // service names
-	plugins   []PluginRef // profile-level plugin refs (composition order)
-	exclude   excludeSet  // accumulated exclude globs (applied last, wins)
 }
 
 // EligibleProfiles lists the profiles to Resolve, in declaration order:

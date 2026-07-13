@@ -26,27 +26,6 @@ func Generate(path string) (string, error) {
 	return render(sections), nil
 }
 
-type target struct {
-	name  string
-	what  string
-	vals  string // parameter accepted-values hint, rendered as name=vals
-	chain []string
-}
-
-type section struct {
-	heading string
-	level   int
-	targets []target
-}
-
-type frame struct {
-	heading string
-	depth   int
-	level   int
-	kept    bool
-	targets []target
-}
-
 func parse(src []byte) ([]section, error) {
 	parser := sitter.NewParser()
 	if err := parser.SetLanguage(sitter.NewLanguage(tsmake.Language())); err != nil {
@@ -71,7 +50,6 @@ func parse(src []byte) ([]section, error) {
 		return &stack[len(stack)-1]
 	}
 
-	type pendingCmt struct{ what, vals string }
 	var pending pendingCmt
 
 	for i := range root.NamedChildCount() {

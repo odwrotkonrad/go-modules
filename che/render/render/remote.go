@@ -16,13 +16,6 @@ import (
 	"github.com/go-git/go-git/v5/storage/memory"
 )
 
-type remoteRef struct {
-	repoURL string
-	sshURL  string
-	path    string
-	gitRef  string
-}
-
 func (r remoteRef) key() string { return r.repoURL + "?" + r.gitRef }
 
 func parseRemoteRef(ref string) (remoteRef, error) {

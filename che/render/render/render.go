@@ -112,8 +112,6 @@ type secretResolver interface {
 	Resolve(ctx context.Context, ref string) (string, error)
 }
 
-type sdkResolver struct{ client *onepassword.Client }
-
 func (r sdkResolver) Resolve(ctx context.Context, ref string) (string, error) {
 	return r.client.Secrets().Resolve(ctx, ref)
 }
@@ -347,8 +345,6 @@ func RenderMarkdown(repoRoot, path string, opts ...string) (string, error) {
 }
 
 // --- native generators ---
-
-type treeNode map[string]treeNode
 
 // DirsTree prints the plain nested dir tree of repoRoot's git-tracked files:
 // index paths, file leaves dropped, dirs nested + sorted, 2-space indented.

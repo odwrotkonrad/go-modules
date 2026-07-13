@@ -15,10 +15,6 @@ import (
 	"gitlab.com/konradodwrot/go-modules/che/render/render"
 )
 
-// gitFetcher is the live RemoteFetcher: shallow in-memory git clones, one
-// clone cache shared across the Host's renders.
-type gitFetcher struct{ fetch func(string) (string, error) }
-
 func (g gitFetcher) Fetch(ref string) (string, error) { return g.fetch(ref) }
 
 func New(repoRoot, home, profile string, cfg config.Config) Host {

@@ -40,21 +40,12 @@ type FileSystemReader interface {
 	EvalSymlinks(path string) (string, error)
 }
 
-// OSReader reads the live filesystem.
-type OSReader struct{}
-
 func (OSReader) Stat(path string) (os.FileInfo, error)      { return os.Stat(path) }
 func (OSReader) Lstat(path string) (os.FileInfo, error)     { return os.Lstat(path) }
 func (OSReader) ReadDir(path string) ([]os.DirEntry, error) { return os.ReadDir(path) }
 func (OSReader) ReadFile(path string) ([]byte, error)       { return os.ReadFile(path) }
 func (OSReader) Readlink(path string) (string, error)       { return os.Readlink(path) }
 func (OSReader) EvalSymlinks(path string) (string, error)   { return filepath.EvalSymlinks(path) }
-
-// FS runs mutating fs ops, escalating priv per-dest (sudo iff dest outside
-// invoking user's Home). Pure execution: no logging, no dry-run gate.
-type FS struct {
-	Home string
-}
 
 // IsUnder reports path inside the root tree (root itself included).
 func IsUnder(path, root string) bool {
