@@ -1,6 +1,5 @@
-// Package source manages the cache checkouts of remote source repos. The
-// cache stays at ~/.local/share/che/plugins ([why] pre-rename path, avoids
-// re-cloning every managed checkout).
+// Package source manages the cache checkouts of remote source repos, kept at
+// ~/.local/share/che/sources.
 package source
 
 // [>] 🤖🤖
@@ -16,9 +15,9 @@ import (
 )
 
 // Dir is the managed cache checkout path for url:
-// <home>/.local/share/che/plugins/<slug>.
+// <home>/.local/share/che/sources/<slug>.
 func Dir(home, url string) string {
-	return filepath.Join(home, ".local/share/che/plugins", slug(url))
+	return filepath.Join(home, ".local/share/che/sources", slug(url))
 }
 
 // slug sanitizes url into a deterministic dir name: scheme/git@ stripped,

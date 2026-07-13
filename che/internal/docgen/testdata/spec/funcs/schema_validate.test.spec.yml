@@ -35,13 +35,13 @@ cases:
                           - {path: a.md, options: {writeType: bogus}}
     expected:
       output: false
-  - name: ShouldRejectPluginRefWithoutProfile
+  - name: ShouldRejectDroppedPluginsKey
     input:
       args:
         - doc: |
             p:
               plugins:
-                - ./plugin
+                - ./sub
     expected:
       output: false
   - name: ShouldRejectUnknownProfileKey

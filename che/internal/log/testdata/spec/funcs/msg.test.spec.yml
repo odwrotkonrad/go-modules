@@ -48,7 +48,7 @@ cases:
   - name: debugShouldPrintLikeMsg
     context: {function: log.Debug}
     input:
-      args: [title: plugin(p), msg: run x, mode: off]
+      args: [title: profile(p), msg: run x, mode: off]
     expected:
-      output: {type: plugin, subtype: (p), text: run x}
+      output: {type: profile, subtype: (p), text: run x}
 # [<] 🤖🤖

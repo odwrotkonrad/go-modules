@@ -153,7 +153,7 @@ cases:
   - name: ShouldCollectAndDedupeSourcedRefs
     context: {pwd: testdata/fixture/resolve/tree-empty}
     input:
-      args: [spec: plugins, profile: main]
+      args: [spec: sourced-profiles, profile: main]
     expected:
       refs:
         - {source: "@git@gitlab.com:g/r.git", profile: p}

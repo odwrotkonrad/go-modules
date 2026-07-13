@@ -35,9 +35,9 @@ cases:
     input:
       args:
         - entry: |
-            source: ./plugin/che.yml::p
+            source: ./sub/che.yml::p
     expected:
-      output: {source: ./plugin, profile: p, sourceType: filesystem, string: ./plugin/che.yml::p}
+      output: {source: ./sub, profile: p, sourceType: filesystem, string: ./sub/che.yml::p}
   - name: ShouldDecodeNestedDirSourceRef
     input:
       args:

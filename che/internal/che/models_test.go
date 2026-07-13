@@ -92,7 +92,7 @@ func TestPrepareSpecs(t *testing.T) {
 			hostRepo := testutil.Repo(t, hostTree)
 			home := prepEnv(t, hostRepo)
 			vars["HOST_REPO"] = hostRepo
-			vars["CACHE"] = filepath.Join(home, ".local/share/che/plugins")
+			vars["CACHE"] = filepath.Join(home, ".local/share/che/sources")
 			for k, v := range c.Context.Env {
 				t.Setenv(k, v)
 			}
