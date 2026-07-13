@@ -38,7 +38,7 @@ cases:
       copies:
         - HOME/.config/zsh/x.ontoHost.cp
         - Library/LaunchDaemons/otelcol.plist.ontoHost.cp
-      templates: [root/HOME/.config/zsh/y.ontoHost.tpl]
+      templates: [HOME/.config/zsh/y.ontoHost.tpl]
     contains:
       dirs: [HOME, HOME/.config/zsh]
   - name: ShouldErrorOnUndefinedProfile
@@ -90,12 +90,6 @@ cases:
       templateOpts:
         - [{writeType: mergeUpsert}]
         - [{}, {renderReferencedFiles: true}]
-  - name: ShouldErrorOnRepoTemplateGlob
-    context: {pwd: testdata/fixture/resolve/tree-empty}
-    input:
-      args: [spec: repo-template-glob, profile: cli/macos]
-    expected:
-      errorOutput: [renderTemplates glob must be root/-prefixed]
   - name: ShouldAcceptRemoteTemplateSourceWithCtx
     context: {pwd: testdata/fixture/resolve/tree-empty}
     input:

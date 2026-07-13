@@ -82,6 +82,32 @@ func (p *ProfileReady) renderTemplates(templates []spec.FileItem, skipSecrets bo
 	return errors.Join(errs...)
 }
 
+// templateSrcPath resolves a local template source to its absolute path. Host
+// templates (derived-dest glob form, or any host dest) anchor at
+// workingDirectory (like makeCopies + services); repo-doc templates (repo dests
+// only) anchor at the checkout.
+func (p *ProfileReady) templateSrcPath(item spec.FileItem) string {
+	if p.isHostTemplate(item) {
+		return filepath.Join(p.resolveRoot(), item.Rel)
+	}
+	return filepath.Join(p.resolveRepoRoot(), item.Rel)
+}
+
+// isHostTemplate reports whether the item renders to a host dest: derived-dest
+// (no explicit dest) is always host, else any explicit host dest (~/ or
+// absolute) marks it host.
+func (p *ProfileReady) isHostTemplate(item spec.FileItem) bool {
+	if len(item.Dests) == 0 {
+		return true
+	}
+	for _, d := range item.Dests {
+		if strings.HasPrefix(p.expandHome(d.Path), "/") {
+			return true
+		}
+	}
+	return false
+}
+
 // isSecretRefInItem: the item's template source carries an op:// ref. Remote
 // sources scan fetched content, except under dry-run ([why] dry-run stays
 // offline). Unreadable source -> false (render proceeds, errors there).
@@ -96,7 +122,7 @@ func (p *ProfileReady) isSecretRefInItem(item spec.FileItem) bool {
 		}
 		return render.IsSecretRefPresent([]byte(content))
 	}
-	src, err := os.ReadFile(filepath.Join(p.resolveRepoRoot(), item.Rel))
+	src, err := os.ReadFile(p.templateSrcPath(item))
 	if err != nil {
 		return false
 	}
@@ -105,8 +131,7 @@ func (p *ProfileReady) isSecretRefInItem(item spec.FileItem) bool {
 
 func (p *ProfileReady) resolveTemplateDests(item spec.FileItem) []tmplDest {
 	if len(item.Dests) == 0 {
-		relativePath := strings.TrimPrefix(item.Rel, spec.RootPrefix)
-		return []tmplDest{{path: p.toDest(spec.TrimTmplExt(relativePath)), host: true}}
+		return []tmplDest{{path: p.toDest(spec.TrimTmplExt(item.Rel)), host: true}}
 	}
 	out := make([]tmplDest, len(item.Dests))
 	for i, d := range item.Dests {
@@ -132,7 +157,7 @@ func (p *ProfileReady) renderTemplate(item spec.FileItem, dests []tmplDest) erro
 		}
 		src = []byte(content)
 	} else {
-		tmplPath = filepath.Join(p.resolveRepoRoot(), item.Rel)
+		tmplPath = p.templateSrcPath(item)
 		var err error
 		src, err = os.ReadFile(tmplPath)
 		if err != nil {

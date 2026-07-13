@@ -115,7 +115,7 @@ type Options struct {
 	ExecIf           []string        `yaml:"execIf" jsonschema_description:"spec-level predicates: gate every profile of this spec (ANDed with each profile's own); spec-only"`
 	AutoDiscover     *bool           `yaml:"autoDiscover" jsonschema_description:"default for profiles that don't set it"`
 	Debug            *bool           `yaml:"debug" jsonschema_description:"default for profiles that don't set it"`
-	WorkingDirectory string          `yaml:"workingDirectory" jsonschema_description:"the load-ops source tree (absolute, relative to the checkout, ~/, $VAR, env vars expanded); default root; the RootPrefix logical token maps onto it, the HOME/ folder under it maps onto $HOME; spec-only"`
+	WorkingDirectory string          `yaml:"workingDirectory" jsonschema_description:"the load-ops source tree (absolute, relative to the checkout, ~/, $VAR, env vars expanded); default the checkout itself; makeLinks/makeCopies/renderTemplates host sources resolve against it, the HOME/ folder under it maps onto $HOME; spec-only"`
 	ValidateSpec     string          `yaml:"validateSpec" jsonschema:"enum=warn,enum=error" jsonschema_description:"how this spec's schema violations report (per-spec: each included spec honors its own); overridden by the flag and env var"`
 	DryRun           string          `yaml:"dryRun" jsonschema:"enum=delta,enum=all" jsonschema_description:"default dry-run mode: delta (changed dests) | all (every dest); overridden by the flag and env var"`
 	Profiles         []string        `yaml:"profiles" jsonschema_description:"profiles to run (autoDiscover skipped, execIf still enforced); overridden by --profiles and CHE_PROFILE"`
@@ -148,9 +148,9 @@ type ProfileOptions struct {
 // includeSet is the additive payload.
 type includeSet struct {
 	Profiles        []ProfileSourceRecipe `yaml:"profiles" jsonschema_description:"profile refs composed depth-first before this profile's own payload: local profile name scalar, or {source, options, env} where source is <source>/<spec-file>.yml::<profile> locating a profile in another spec (its own checkout anchor)"`
-	MakeLinks       []linkEntry           `yaml:"makeLinks" jsonschema_description:"symlink-op entries, repo-relative under root/: glob string (dest derived 1:1) or {source, dest} sed-style rewrite"`
-	MakeCopies      []entry               `yaml:"makeCopies" jsonschema_description:"*.ontoHost.cp copy-op perm-groups"`
-	RenderTemplates []templateGroup       `yaml:"renderTemplates" jsonschema_description:"*.tpl render-op perm-groups; sources repo-root-relative or remote (@<repo>//<path>[?ref=<ref>], explicit dest required), glob and derived-dest forms must be root/-prefixed"`
+	MakeLinks       []linkEntry           `yaml:"makeLinks" jsonschema_description:"symlink-op entries, workingDirectory-relative: glob string (dest derived 1:1) or {source, dest} sed-style rewrite"`
+	MakeCopies      []entry               `yaml:"makeCopies" jsonschema_description:"*.ontoHost.cp copy-op perm-groups, workingDirectory-relative sources"`
+	RenderTemplates []templateGroup       `yaml:"renderTemplates" jsonschema_description:"*.tpl render-op perm-groups; local host sources workingDirectory-relative, repo-doc sources (repo dest) checkout-relative, or remote (@<repo>//<path>[?ref=<ref>], explicit dest required); glob and derived-dest forms are host sources"`
 	MakeDirs        []dirGroup            `yaml:"makeDirs" jsonschema_description:"extra-dir perm-groups; each item one dir path (brace-expanded)"`
 	Scripts         []string              `yaml:"runScripts" jsonschema_description:"script paths or globs, repo-relative, run in spec order"`
 	Services        []string              `yaml:"runServices" jsonschema_description:"launchd service names"`
@@ -230,10 +230,10 @@ type Perms struct {
 	Chmod      string `yaml:"chmod" jsonschema:"pattern=^[0-7]{3\\,4}$" jsonschema_description:"dest mode, octal string"`
 }
 
-// FileItem is one resolved file: source (templates: repo-root-relative or
-// @-prefixed remote ref, links/copies: under root/), explicit dests
-// (nil -> derived in host), optional perms and template context. MakeDirs items
-// without Dests are ancestor dirs (path in Rel, zero perms).
+// FileItem is one resolved file: source (host sources workingDirectory-relative,
+// repo-doc template sources checkout-relative, or @-prefixed remote ref),
+// explicit dests (nil -> derived in host), optional perms and template context.
+// MakeDirs items without Dests are ancestor dirs (path in Rel, zero perms).
 type FileItem struct {
 	Rel   string
 	Dests []DestSpec
@@ -349,11 +349,11 @@ type globPerm struct {
 // Each op's globs carry their group's perms; classify stamps matched files
 // with them (last match wins).
 type effective struct {
-	linkGlobs globSet               // link-op globs (repo-relative under root/)
-	copyGlobs globSet               // copy-op globs
-	tmplGlobs globSet               // render-templates globs (repo-root-relative, root/-prefixed)
+	linkGlobs globSet               // link-op globs (workingDirectory-relative)
+	copyGlobs globSet               // copy-op globs (workingDirectory-relative)
+	tmplGlobs globSet               // render-templates globs (workingDirectory-relative, host dest derived)
 	richCopy  []FileItem            // rich-form copy entries
-	richTmpl  []FileItem            // rich-form render-templates entries (repo-root-relative)
+	richTmpl  []FileItem            // rich-form render-templates entries
 	dirs      []FileItem            // makeDirs: glob forms expanded to one item per path, rich carry perms
 	scripts   []string              // script paths (order = run order)
 	services  []string              // service names

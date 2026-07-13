@@ -1,9 +1,0 @@
-base:
-  include:
-    renderTemplates:
-      - templates: [templates/**/*.ontoRepo.tpl]
-
-cli/macos:
-  options: {autoDiscover: true}
-  include:
-    profiles: [base]

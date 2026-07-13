@@ -170,7 +170,7 @@
         },
         "workingDirectory": {
           "type": "string",
-          "description": "the load-ops source tree (absolute, relative to the checkout, ~/, $VAR, env vars expanded); default root; the RootPrefix logical token maps onto it, the HOME/ folder under it maps onto $HOME; spec-only"
+          "description": "the load-ops source tree (absolute, relative to the checkout, ~/, $VAR, env vars expanded); default the checkout itself; makeLinks/makeCopies/renderTemplates host sources resolve against it, the HOME/ folder under it maps onto $HOME; spec-only"
         },
         "validateSpec": {
           "type": "string",
@@ -349,14 +349,14 @@
           "properties": {
             "source": {
               "type": "string",
-              "description": "repo-relative source path, or remote ref @\u003crepo\u003e//\u003cpath\u003e[?ref=\u003cref\u003e] (renderTemplates only, explicit dest required)"
+              "description": "source path (host sources workingDirectory-relative, repo-doc sources checkout-relative), or remote ref @\u003crepo\u003e//\u003cpath\u003e[?ref=\u003cref\u003e] (renderTemplates only, explicit dest required)"
             },
             "dest": {
               "items": {
                 "$ref": "#/$defs/DestSpec"
               },
               "type": "array",
-              "description": "dest paths: relative -\u003e repo, ~/ or absolute -\u003e host; omitted -\u003e derived from the root/ source path"
+              "description": "dest paths: relative -\u003e repo, ~/ or absolute -\u003e host; omitted -\u003e derived from the workingDirectory-relative source path"
             },
             "ctx": {
               "additionalProperties": {
@@ -389,21 +389,21 @@
             "$ref": "#/$defs/linkEntry"
           },
           "type": "array",
-          "description": "symlink-op entries, repo-relative under root/: glob string (dest derived 1:1) or {source, dest} sed-style rewrite"
+          "description": "symlink-op entries, workingDirectory-relative: glob string (dest derived 1:1) or {source, dest} sed-style rewrite"
         },
         "makeCopies": {
           "items": {
             "$ref": "#/$defs/entry"
           },
           "type": "array",
-          "description": "*.ontoHost.cp copy-op perm-groups"
+          "description": "*.ontoHost.cp copy-op perm-groups, workingDirectory-relative sources"
         },
         "renderTemplates": {
           "items": {
             "$ref": "#/$defs/templateGroup"
           },
           "type": "array",
-          "description": "*.tpl render-op perm-groups; sources repo-root-relative or remote (@\u003crepo\u003e//\u003cpath\u003e[?ref=\u003cref\u003e], explicit dest required), glob and derived-dest forms must be root/-prefixed"
+          "description": "*.tpl render-op perm-groups; local host sources workingDirectory-relative, repo-doc sources (repo dest) checkout-relative, or remote (@\u003crepo\u003e//\u003cpath\u003e[?ref=\u003cref\u003e], explicit dest required); glob and derived-dest forms are host sources"
         },
         "makeDirs": {
           "items": {
@@ -435,18 +435,18 @@
       "oneOf": [
         {
           "type": "string",
-          "description": "glob over git-tracked files under root/ (brace-expanded), dest derived 1:1"
+          "description": "glob over git-tracked files (brace-expanded), workingDirectory-relative, dest derived 1:1"
         },
         {
           "properties": {
             "source": {
               "type": "string",
-              "description": "file or glob, repo-relative under root/"
+              "description": "file or glob, workingDirectory-relative"
             },
             "dest": {
               "type": "string",
               "pattern": "^s/.+/.*/g?$",
-              "description": "sed-style rewrite s/\u003cpattern\u003e/\u003creplacement\u003e/[g] (Go regexp, $1 backrefs; g: every match, absent: first only), applied to the repo-relative dest path before host mapping"
+              "description": "sed-style rewrite s/\u003cpattern\u003e/\u003creplacement\u003e/[g] (Go regexp, $1 backrefs; g: every match, absent: first only), applied to the workingDirectory-relative dest path before host mapping"
             }
           },
           "additionalProperties": false,
