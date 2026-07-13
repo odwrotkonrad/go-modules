@@ -53,6 +53,7 @@ func (p *ProfileReady) runScripts(scripts []string) error {
 			status = "fail"
 			failed = append(failed, script)
 		}
+		p.tel.CountUnit("script", status, p.command)
 		results = append(results, scriptResult{script, status})
 	}
 

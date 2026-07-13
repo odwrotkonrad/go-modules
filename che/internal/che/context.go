@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"gitlab.com/konradodwrot/go-modules/che/internal/fsutil"
+	"gitlab.com/konradodwrot/go-modules/che/internal/telemetry"
 )
 
 // Context is the launch context: the process world captured once at the CLI
@@ -19,6 +20,9 @@ type Context struct {
 	Euid    int               // replaces os.Geteuid
 	RunID   string            // one TsLayout stamp per invocation: ledger run + backup filenames
 	Command string            // the invoked subcommand (ledger SpecDone.Command), set at the CLI boundary
+	// Tel is the OTLP telemetry handle started at the CLI boundary after options
+	// resolve; nil (tests, disabled) makes every counter/log call a no-op.
+	Tel *telemetry.Telemetry
 }
 
 // NewContext snapshots the process launch world (os.Environ -> map, os.Getwd,

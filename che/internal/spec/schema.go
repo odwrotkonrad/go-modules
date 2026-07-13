@@ -26,6 +26,7 @@ func Schema() *jsonschema.Schema {
 	optDefs := r.Reflect(Options{}).Definitions
 	defs["SpecOptions"] = optDefs["Options"]
 	defs["RenderTemplates"] = optDefs["RenderTemplates"]
+	defs["Otel"] = optDefs["Otel"]
 	defs["DestSpec"] = DestSpec{}.JSONSchema()
 
 	defs["ProfileRecipe"].Description = "one profile block: options self-describe eligibility, include.profiles compose refs in order (local scalars, sourced {source, options, env}), include adds, exclude filters last and wins"

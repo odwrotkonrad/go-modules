@@ -4,13 +4,16 @@ package cli
 // [>] 🤖🤖
 
 import (
+	"context"
 	"fmt"
 
 	"github.com/spf13/cobra"
 
 	"gitlab.com/konradodwrot/go-modules/che/internal/che"
+	"gitlab.com/konradodwrot/go-modules/che/internal/log"
 	"gitlab.com/konradodwrot/go-modules/che/internal/options"
 	"gitlab.com/konradodwrot/go-modules/che/internal/spec"
+	"gitlab.com/konradodwrot/go-modules/che/internal/telemetry"
 )
 
 // version is injected at build time via -ldflags -X.
@@ -19,10 +22,11 @@ var version = "dev"
 // app wires the cobra tree: init (PersistentPreRunE) prepares opts and the
 // root SpecReady as separately initialized values, read by each RunE.
 type app struct {
-	flags options.Options // cobra flag destinations
-	opts  options.Options // finalized by che.PrepareApplicationOptions
-	ctx   che.Context     // captured launch world (env/cwd/runID/command), for spec-less commands (uninstall)
-	root  *che.SpecReady  // prepared by che.PrepareSpecs
+	flags options.Options      // cobra flag destinations
+	opts  options.Options      // finalized by che.PrepareApplicationOptions
+	ctx   che.Context          // captured launch world (env/cwd/runID/command), for spec-less commands (uninstall)
+	root  *che.SpecReady       // prepared by che.PrepareSpecs
+	tel   *telemetry.Telemetry // OTLP telemetry, started in init, flushed in PersistentPostRunE (nil = off)
 }
 
 func New() *app { return &app{} }
@@ -41,6 +45,10 @@ sourced profile refs included).`,
 		SilenceErrors: true,
 		PersistentPreRunE: func(cmd *cobra.Command, args []string) error {
 			return a.init(cmd.Name())
+		},
+		PersistentPostRunE: func(cmd *cobra.Command, args []string) error {
+			a.shutdownTelemetry()
+			return nil
 		},
 	}
 	pf := root.PersistentFlags()
@@ -93,12 +101,44 @@ func (a *app) init(command string) error {
 	if err != nil {
 		return err
 	}
+	a.startTelemetry(ctx)
+	ctx.Tel = a.tel
 	a.ctx = ctx
+	a.tel.CountCommand(command)
 	if command == "uninstall" {
 		return nil
 	}
 	a.root, err = che.PrepareSpecs(ctx, a.opts, spec.SpecSourceRecipe{})
-	return err
+	if err != nil {
+		return err
+	}
+	a.tel.CountSpec()
+	return nil
+}
+
+// startTelemetry starts the OTLP providers from the resolved otel config and
+// registers the log-mirror sink. A start error (unreachable collector is not one:
+// the dial is lazy) degrades to telemetry off, never failing the run.
+func (a *app) startTelemetry(ctx che.Context) {
+	cfg := telemetry.Config(a.opts.Otel)
+	tel, err := telemetry.Start(context.Background(), cfg, ctx.RunID, ctx.Command)
+	if err != nil {
+		log.Debug("otel", "start failed: "+err.Error(), log.Off)
+		return
+	}
+	a.tel = tel
+	if tel != nil {
+		log.SetSink(tel.LogRecord)
+	}
+}
+
+// shutdownTelemetry flushes and closes the providers (bounded), clears the sink.
+// A flush error (unreachable collector) is logged at debug, never surfaced.
+func (a *app) shutdownTelemetry() {
+	log.SetSink(nil)
+	if err := a.tel.Shutdown(context.Background()); err != nil {
+		log.Debug("otel", "shutdown: "+err.Error(), log.Off)
+	}
 }
 
 // allCmd runs every profile's full op sequence, profile by profile. A failing

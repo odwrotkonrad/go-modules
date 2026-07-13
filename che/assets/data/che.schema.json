@@ -67,6 +67,36 @@
       "type": "object",
       "description": "per-dest render options"
     },
+    "Otel": {
+      "properties": {
+        "enabled": {
+          "type": "boolean",
+          "description": "emit OTLP telemetry to the collector; default off; overridden by CHE_OTEL_ENABLED"
+        },
+        "endpoint": {
+          "type": "string",
+          "description": "OTLP collector endpoint (host:port); default localhost:4317 (grpc) / localhost:4318 (http); overridden by CHE_OTEL_ENDPOINT"
+        },
+        "protocol": {
+          "type": "string",
+          "enum": [
+            "grpc",
+            "http"
+          ],
+          "description": "OTLP transport: grpc | http; default grpc; overridden by CHE_OTEL_PROTOCOL"
+        },
+        "metrics": {
+          "type": "boolean",
+          "description": "export metrics; default on when enabled; overridden by CHE_OTEL_METRICS"
+        },
+        "logs": {
+          "type": "boolean",
+          "description": "export che log lines as OTel logs; default on when enabled; overridden by CHE_OTEL_LOGS"
+        }
+      },
+      "additionalProperties": false,
+      "type": "object"
+    },
     "ProfileOptions": {
       "properties": {
         "execIf": {
@@ -202,6 +232,10 @@
         "renderTemplates": {
           "$ref": "#/$defs/RenderTemplates",
           "description": "renderTemplates op defaults"
+        },
+        "otel": {
+          "$ref": "#/$defs/Otel",
+          "description": "OTLP telemetry (metrics + logs) to a local collector; overridden by CHE_OTEL_* env"
         }
       },
       "additionalProperties": false,
