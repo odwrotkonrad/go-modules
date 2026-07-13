@@ -28,7 +28,7 @@ var td embed.FS
 
 // prepEnv anchors a PrepareSpecs test: temp HOME, executor mocked. Returns HOME
 // and the base launch env (HOME set, CHE_*/XDG_* absent) for building the case's
-// appCtx.
+// Context.
 func prepEnv(t *testing.T) (string, map[string]string) {
 	t.Helper()
 	if os.Geteuid() == 0 {
@@ -51,8 +51,8 @@ func prepEnv(t *testing.T) (string, map[string]string) {
 // newContext builds the launch context a case feeds to the real
 // PrepareApplicationOptions/PrepareSpecs: env (base + case), cwd = host repo, euid from
 // the process (the same top-edge construction production does).
-func newContext(env map[string]string, cwd string) appCtx {
-	return appCtx{Env: env, Cwd: cwd, Euid: os.Geteuid()}
+func newContext(env map[string]string, cwd string) Context {
+	return Context{Env: env, Cwd: cwd, Euid: os.Geteuid()}
 }
 
 type prepWant struct {
@@ -104,12 +104,12 @@ func sourcedProfile(ps []*ProfileReady) *ProfileReady {
 }
 
 // prepFlags decodes the case's flags arg: the CLI/env inputs that used to be
-// knobs, now driven through the real front door (options flags + appCtx env).
+// knobs, now driven through the real front door (options flags + Context env).
 type prepFlags struct {
 	SkipRemoteRefs bool     `yaml:"skipRemoteRefs"`
 	ValidateSpec   string   `yaml:"validateSpec"`
 	Debug          bool     `yaml:"debug"`
-	UnsetEnv       []string `yaml:"unsetEnv"` // keys omitted from appCtx.Env
+	UnsetEnv       []string `yaml:"unsetEnv"` // keys omitted from Context.Env
 }
 
 func TestPrepareSpecs(t *testing.T) {
@@ -255,13 +255,13 @@ func TestPrepareSpecs(t *testing.T) {
 }
 
 // TestPrepareOptionsPrecedence: flags > env vars > local che.yml options: >
-// defaults, driving appCtx.Env instead of the process env.
+// defaults, driving Context.Env instead of the process env.
 func TestPrepareOptionsPrecedence(t *testing.T) {
 	repo := testutil.Repo(t, map[string]string{
 		"che.yml": "options:\n  validateSpec: error\n  debug: true\np:\n  options: {autoDiscover: true}\n",
 	})
 	_, baseEnv := prepEnv(t)
-	ctx := func(extra map[string]string) appCtx {
+	ctx := func(extra map[string]string) Context {
 		env := map[string]string{}
 		maps.Copy(env, baseEnv)
 		maps.Copy(env, extra)
@@ -293,7 +293,7 @@ func TestPrepareOptionsUserConfig(t *testing.T) {
 
 	// [why] XDG_CONFIG_HOME steers UserConfigPath, which resolves the config
 	// base ambiently (out of this refactor's scope); the CHE_* option env goes
-	// through appCtx.Env like production.
+	// through Context.Env like production.
 	cfgHome := t.TempDir()
 	t.Setenv("XDG_CONFIG_HOME", cfgHome)
 	t.Setenv("CHE_CONFIG_HOME", "")
@@ -308,7 +308,7 @@ func TestPrepareOptionsUserConfig(t *testing.T) {
 		"renderTemplates:\n  skipSecrets: true\n"
 	require.NoError(t, os.WriteFile(filepath.Join(cfgDir, "config.yml"), []byte(config), 0o644))
 
-	ctx := func(extra map[string]string) appCtx {
+	ctx := func(extra map[string]string) Context {
 		env := map[string]string{}
 		maps.Copy(env, baseEnv)
 		maps.Copy(env, extra)
@@ -386,6 +386,32 @@ func TestWorkingDirectoryCascade(t *testing.T) {
 	wantWD, _ := filepath.EvalSymlinks(filepath.Join(repo2, "chetree"))
 	gotWD, _ := filepath.EvalSymlinks(root2.AllProfiles()[0].workingDir)
 	assert.Equal(t, wantWD, gotWD, "che-level flag default")
+}
+
+// TestCheLevelWorkingDirectoryDoesNotLeakIntoSourcedSpec: the che-level
+// workingDirectory (flag / root spec) seeds only the root spec; a sourced spec
+// resolves against its own checkout, where the root's tree name does not exist.
+func TestCheLevelWorkingDirectoryDoesNotLeakIntoSourcedSpec(t *testing.T) {
+	ref := testutil.Repo(t, map[string]string{
+		"che.yml":        "s:\n  options: {autoDiscover: true}\n  include:\n    makeLinks: [HOME/**]\n",
+		"HOME/.config/x": "x\n",
+	})
+	host := testutil.Repo(t, map[string]string{
+		"che.yml": "main:\n  options: {autoDiscover: true}\n  include:\n    profiles:\n" +
+			"      - source: \"" + ref + "/che.yml::s\"\n",
+		"roottree/HOME/.config/c": "c\n",
+	})
+	_, baseEnv := prepEnv(t)
+
+	// che-level workingDirectory "roottree" exists in host, NOT in ref. Before the
+	// fix it leaked into the sourced spec and failed resolving ref/roottree.
+	root, err := PrepareSpecs(newContext(baseEnv, host), options.Options{SkipExecIf: true, WorkingDirectory: "roottree"}, spec.SpecSourceRecipe{})
+	require.NoError(t, err)
+
+	byName := profileByName(root.AllProfiles())
+	wantRefWD, _ := filepath.EvalSymlinks(ref)
+	gotRefWD, _ := filepath.EvalSymlinks(byName["s"].workingDir)
+	assert.Equal(t, wantRefWD, gotRefWD, "sourced spec anchors at its own checkout, not che-level roottree")
 }
 
 // TestAutoDiscoverGlobal: the user-config global autoDiscover discovers every

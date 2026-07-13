@@ -18,6 +18,7 @@ Available Commands:
     bootin          load each service (bootstrap from plist)
     bootout         unload each service (bootout if loaded, wait until gone)
     ensure          settle then verify each long-running service has a live pid
+  uninstall         back out everything che installed (ledger-driven), restoring pre-install backups
 
 Flags:
       --debug                      print debug-level lines (source announce, clone/pull attempts); env: CHE_DEBUG

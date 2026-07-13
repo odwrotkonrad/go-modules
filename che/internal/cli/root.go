@@ -21,6 +21,7 @@ var version = "dev"
 type app struct {
 	flags options.Options // cobra flag destinations
 	opts  options.Options // finalized by che.PrepareApplicationOptions
+	ctx   che.Context     // captured launch world (env/cwd/runID/command), for spec-less commands (uninstall)
 	root  *che.SpecReady  // prepared by che.PrepareSpecs
 }
 
@@ -39,7 +40,7 @@ sourced profile refs included).`,
 		SilenceUsage:  true,
 		SilenceErrors: true,
 		PersistentPreRunE: func(cmd *cobra.Command, args []string) error {
-			return a.init()
+			return a.init(cmd.Name())
 		},
 	}
 	pf := root.PersistentFlags()
@@ -65,7 +66,7 @@ sourced profile refs included).`,
 		Use:   "services",
 		Short: "load/unload/verify the profile's launchd services",
 	}
-	root.AddCommand(a.allCmd(), a.discoverCmd(), services)
+	root.AddCommand(a.allCmd(), a.discoverCmd(), a.uninstallCmd(), services)
 	for _, o := range ops() {
 		cmd := a.opCmd(o)
 		if o.parent == "services" {
@@ -79,15 +80,22 @@ sourced profile refs included).`,
 
 // init prepares the run: build the launch context from the process (the one
 // ambient-read site), resolve options (flags > env vars > local che.yml
-// options: > defaults), then the whole spec tree.
-func (a *app) init() error {
+// options: > defaults), then the whole spec tree. command names the invoked
+// subcommand, carried to the ledger run (SpecDone.Command). uninstall reads the
+// ledger only, so it skips spec preparation (no che.yml needed).
+func (a *app) init(command string) error {
 	ctx, err := che.NewContext()
 	if err != nil {
 		return err
 	}
+	ctx.Command = command
 	ctx, a.opts, err = che.PrepareApplicationOptions(ctx, a.flags)
 	if err != nil {
 		return err
+	}
+	a.ctx = ctx
+	if command == "uninstall" {
+		return nil
 	}
 	a.root, err = che.PrepareSpecs(ctx, a.opts, spec.SpecSourceRecipe{})
 	return err
@@ -101,6 +109,25 @@ func (a *app) allCmd() *cobra.Command {
 		Short: "run every op each profile selects, profile by profile",
 		RunE: func(cmd *cobra.Command, args []string) error {
 			return a.root.ExecEach("all", (*che.ProfileReady).ExecOperations)
+		},
+	}
+}
+
+// uninstallCmd backs out everything the ledger marks installed onto this host,
+// across every run: restore each dest's pre-install backup or remove it
+// (snapshotting first so uninstall is reversible). Reads the ledger, not the
+// spec, so it does not iterate profiles.
+func (a *app) uninstallCmd() *cobra.Command {
+	return &cobra.Command{
+		Use:   "uninstall",
+		Short: "back out everything che installed (ledger-driven), restoring pre-install backups",
+		RunE: func(cmd *cobra.Command, args []string) error {
+			u, err := che.NewUninstaller(a.ctx, a.opts)
+			if err != nil {
+				return err
+			}
+			defer func() { _ = u.Close() }()
+			return u.Uninstall()
 		},
 	}
 }

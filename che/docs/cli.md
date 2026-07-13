@@ -182,3 +182,7 @@ unload each service (bootout if loaded, wait until gone).
 ### `$ che services ensure`
 
 settle then verify each long-running service has a live pid.
+
+### `$ che uninstall`
+
+back out everything che installed (ledger-driven), restoring pre-install backups.

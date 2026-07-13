@@ -79,6 +79,7 @@ func (p *ProfileReady) renderTemplates(templates []spec.FileItem, skipSecrets bo
 			errs = append(errs, p.failItem("render", t.item.Rel, err))
 		}
 	}
+	errs = append(errs, p.sweepStale("render", hostDests)) // [why] host dests only: repo-doc renders are git-tracked, never swept
 	return errors.Join(errs...)
 }
 
@@ -210,7 +211,8 @@ func (p *ProfileReady) readExistingDest(d tmplDest) ([]byte, error) {
 // placeFile installs body with spec perms (mode 0 -> install default, no chown).
 func (p *ProfileReady) placeFile(dest string, body []byte, item spec.FileItem) error {
 	mode, _ := fsutil.ParseMode(item.Chmod)
-	return p.mutate("render(create)", dest, func() error {
+	info := opInfo{kind: "render", srcRel: item.Rel, mode: item.Chmod, owner: formatOwnerSpec(item)}
+	return p.mutate("render(create)", dest, dest, info, func() error {
 		return p.FS.InstallFile(dest, body, mode, formatOwnerSpec(item))
 	})
 }

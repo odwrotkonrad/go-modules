@@ -11,6 +11,7 @@ import (
 
 	"github.com/stretchr/testify/require"
 
+	"gitlab.com/konradodwrot/go-modules/che/internal/database"
 	"gitlab.com/konradodwrot/go-modules/che/internal/fsutil"
 	"gitlab.com/konradodwrot/go-modules/che/internal/options"
 	"gitlab.com/konradodwrot/go-modules/che/internal/spec"
@@ -33,16 +34,27 @@ func makeOpRecipes(t *testing.T, dir, profile string) spec.OperationRecipes {
 	return ops
 }
 
+// testRunID is the fixed per-run stamp tests use (backup filenames + ledger run).
+const testRunID = "00000000T000000"
+
 // newProfile builds a *ProfileReady anchored at dir/home under cfg, real seams
-// (tests overlay mocks via withSeams).
+// with a fresh on-disk ledger under home's state dir, so tests exercise the real
+// recording/prune/uninstall path against a throwaway DB. A started ledger
+// spec/profile row lets recording ops write.
 func newProfile(dir, home string, cfg options.Options) *ProfileReady {
+	seams := NewSeams(home)
+	specRow, _ := seams.Ledger.StartSpec(testRunID, "", "test")
+	profRow, _ := seams.Ledger.StartProfile(specRow, testutil.CheProfile, testutil.CheProfile, "", dir)
 	return &ProfileReady{
-		Source:     spec.ProfileSourceReady{ProfileName: testutil.CheProfile},
-		ref:        testutil.CheProfile,
-		workingDir: filepath.Join(dir, "root"),
-		opts:       cfg,
-		home:       home,
-		Seams:      NewSeams(home),
+		Source:      spec.ProfileSourceReady{ProfileName: testutil.CheProfile},
+		ref:         testutil.CheProfile,
+		workingDir:  filepath.Join(dir, "root"),
+		opts:        cfg,
+		home:        home,
+		runID:       testRunID,
+		specDone:    specRow,
+		profileDone: profRow,
+		Seams:       seams,
 	}
 }
 
@@ -72,7 +84,7 @@ var ops = map[string]func(*ProfileReady, spec.OperationRecipes) error{
 		return p.renderTemplates(r.RenderTemplates.Templates, false)
 	},
 	"make-dirs":   func(p *ProfileReady, r spec.OperationRecipes) error { return p.makeDirs(r.MakeDirs.Dirs) },
-	"prune-links": func(p *ProfileReady, r spec.OperationRecipes) error { return p.pruneBrokenLinks(r.PruneLinks.Dirs) },
+	"prune-links": func(p *ProfileReady, _ spec.OperationRecipes) error { return p.pruneBrokenLinks() },
 	"run-scripts": func(p *ProfileReady, r spec.OperationRecipes) error {
 		scripts, err := p.resolveScripts(r.RunScripts.Scripts)
 		if err != nil {
@@ -127,13 +139,21 @@ func applyScenario(t *testing.T, a testyml.Args, m *testutil.MockSet, p *Profile
 	}
 }
 
-// seedBrokenLink plants a symlink under HOME pointing at a missing root/ file.
+// seedBrokenLink plants a symlink under HOME pointing at a missing root/ file
+// and records the matching ledger link op (source gone), so ledger-driven
+// prune-links classifies it as broken and removes it.
 func seedBrokenLink(t *testing.T, p *ProfileReady) string {
 	t.Helper()
 	dir := filepath.Join(p.home, ".config/zsh")
 	require.NoError(t, os.MkdirAll(dir, 0o755))
 	dead := filepath.Join(dir, "dead")
-	require.NoError(t, os.Symlink(p.resolveSrc("HOME/.config/zsh/gone"), dead))
+	src := p.resolveSrc("HOME/.config/zsh/gone")
+	require.NoError(t, os.Symlink(src, dead))
+	require.NoError(t, p.Ledger.RecordOperation(p.profileDone, database.OperationDone{
+		OpType: "create", Kind: "link", Dest: dead, Target: src,
+		Prev: database.Object{Kind: "absent"},
+		Next: database.Object{Kind: "link", Present: true, Target: src},
+	}))
 	return dead
 }
 
