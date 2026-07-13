@@ -36,10 +36,10 @@ func (h Host) failItem(op, dest string, err error) error {
 	return err
 }
 
-// MkDirs creates the profile's dirs, one list: items without Dests are
+// MakeDirs creates the profile's dirs, one list: items without Dests are
 // repo-tree ancestor dirs (path in Rel, parents first, umask mode), items with
-// Dests are mkdirs extra-dirs (perms applied, -p).
-func (h Host) MkDirs(dirs []spec.FileItem) error {
+// Dests are makeDirs extra-dirs (perms applied, -p).
+func (h Host) MakeDirs(dirs []spec.FileItem) error {
 	var errs []error
 	for _, item := range dirs {
 		if len(item.Dests) == 0 {
@@ -48,7 +48,7 @@ func (h Host) MkDirs(dirs []spec.FileItem) error {
 		}
 		dest := h.ToDest(item.Dests[0].Path)
 		if err := h.upsertExtraDir(item, dest); err != nil {
-			errs = append(errs, h.failItem("mkdir", dest, err))
+			errs = append(errs, h.failItem("make-dirs", dest, err))
 		}
 	}
 	return errors.Join(errs...)
@@ -56,7 +56,7 @@ func (h Host) MkDirs(dirs []spec.FileItem) error {
 
 func (h Host) upsertExtraDir(item spec.FileItem, dest string) error {
 	if h.isDirSettled(dest) {
-		return h.fixPerms("mkdir", dest, item)
+		return h.fixPerms("make-dirs", dest, item)
 	}
 	return h.mkExtraDir(item, dest)
 }
@@ -76,9 +76,9 @@ func (h Host) ensureConfigDir(rel string) error {
 	if h.isDirSettled(dest) {
 		return nil
 	}
-	err := h.mutate("mkdir(create)", dest, func() error { return h.fs.Mkdir(dest, 0, false) })
+	err := h.mutate("make-dirs(create)", dest, func() error { return h.fs.Mkdir(dest, 0, false) })
 	if err != nil {
-		return h.failItem("mkdir", dest, err)
+		return h.failItem("make-dirs", dest, err)
 	}
 	return nil
 }
@@ -98,16 +98,16 @@ func (h Host) isDirSettled(dest string) bool {
 // drop them.
 func (h Host) mkExtraDir(item spec.FileItem, dest string) error {
 	mode, _ := parseMode(item.Chmod)
-	err := h.mutate("mkdir(create)", dest, func() error { return h.fs.Mkdir(dest, mode, true) })
+	err := h.mutate("make-dirs(create)", dest, func() error { return h.fs.Mkdir(dest, mode, true) })
 	if err != nil {
 		return err
 	}
 	if mode > 0o777 {
-		if err := h.chmod("mkdir(chmod)", mode, dest); err != nil {
+		if err := h.chmod("make-dirs(chmod)", mode, dest); err != nil {
 			return err
 		}
 	}
-	return h.chownIfSet("mkdir(chown)", item, dest)
+	return h.chownIfSet("make-dirs(chown)", item, dest)
 }
 
 func (h Host) chmod(title string, mode os.FileMode, dest string) error {
@@ -242,10 +242,10 @@ func (h Host) runFileOp(archiveSub, failOp string, dirRels []string, items []spe
 	return errors.Join(errs...)
 }
 
-// MkLinks symlinks each config into its live dest (ln -fhs), archiving existing
+// MakeLinks symlinks each config into its live dest (ln -fhs), archiving existing
 // dests upfront, skipping links already pointing into the repo.
-func (h Host) MkLinks(links []spec.FileItem, dirRels []string) error {
-	return h.runFileOp("link", "ln", dirRels, links,
+func (h Host) MakeLinks(links []spec.FileItem, dirRels []string) error {
+	return h.runFileOp("make-links", "make-links", dirRels, links,
 		func(item spec.FileItem) []string { return []string{h.ToDest(spec.LinkDestRel(item))} },
 		h.linkOne)
 }
@@ -255,7 +255,7 @@ func (h Host) linkOne(item spec.FileItem, dest string) error {
 	if h.isLinkSettled(src, dest) {
 		return nil
 	}
-	return h.mutate("ln(create)", dest, func() error { return h.fs.Symlink(src, dest) })
+	return h.mutate("make-links(create)", dest, func() error { return h.fs.Symlink(src, dest) })
 }
 
 // isLinkSettled reports whether dest already resolves to src (skippable). Dry-run=all
@@ -272,24 +272,24 @@ func (h Host) isLinkSettled(src, dest string) bool {
 	return err == nil && destResolved == srcResolved
 }
 
-// MkCopies copies each *.ontoHost.cp to its dest(s) (marker stripped, or explicit
+// MakeCopies copies each *.ontoHost.cp to its dest(s) (marker stripped, or explicit
 // dest) when contents differ, archiving existing dests upfront, applying spec
 // perms (else default).
-func (h Host) MkCopies(copies []spec.FileItem, dirRels []string) error {
-	return h.runFileOp("copy", "cp", dirRels, copies, h.copyDests, h.copyOne)
+func (h Host) MakeCopies(copies []spec.FileItem, dirRels []string) error {
+	return h.runFileOp("make-copies", "make-copies", dirRels, copies, h.copyDests, h.copyOne)
 }
 
 func (h Host) copyOne(item spec.FileItem, dest string) error {
 	src := h.Src(item.Rel)
 	if h.cfg.DryRun != options.DryRun.All && h.isSameContent(src, dest) {
-		return h.fixPerms("cp", dest, item)
+		return h.fixPerms("make-copies", dest, item)
 	}
 	mode, _ := parseMode(item.Chmod)
-	err := h.mutate("cp(create)", dest, func() error { return h.fs.Copy(src, dest, mode) })
+	err := h.mutate("make-copies(create)", dest, func() error { return h.fs.Copy(src, dest, mode) })
 	if err != nil {
 		return err
 	}
-	return h.chownIfSet("cp(chown)", item, dest)
+	return h.chownIfSet("make-copies(chown)", item, dest)
 }
 
 // copyDests returns the explicit dests (~/ resolved), else the marker-stripped derived dest.

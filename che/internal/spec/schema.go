@@ -26,7 +26,7 @@ func Schema() *jsonschema.Schema {
 	defs["DestSpec"] = DestSpec{}.JSONSchema()
 
 	defs["ProfileRecipe"].Description = "one profile block: options self-describe eligibility, include.profiles compose refs in order (local scalars, sourced {source, options, env}), include adds, exclude filters last and wins"
-	defs["includeSet"].Description = "additive payload: profile refs, link globs, copy/renderTemplates/mkdirs perm-groups, script globs, service names"
+	defs["includeSet"].Description = "additive payload: profile refs, makeLinks globs, makeCopies/renderTemplates/makeDirs perm-groups, runScripts globs, runServices names"
 	defs["excludeSet"].Description = "subtractive glob filter, applied last, wins over every include (rich entries too)"
 	defs["SpecOptions"].Description = "reserved top-level options: block: spec-wide defaults (execIf gate, autoDiscover/debug/workingDirectory) + che knobs (validateSpec)"
 	prop(defs["ProfileOptions"], "execIf").Description = "predicate expressions `<source>` or `<source> == <literal>`, sources builtin:*/env:*; empty: always"

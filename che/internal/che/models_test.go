@@ -80,7 +80,7 @@ func linkDests(t *testing.T, home string, p *ProfileReady) []string {
 	h := host.New(p.Source.DirectoryPath, p.workingDir, home, "x", options.Options{})
 	var dests []string
 	for _, op := range p.OperationsReady {
-		lo, ok := op.(*LinkOperationReady)
+		lo, ok := op.(*MakeLinksOperationReady)
 		if !ok {
 			continue
 		}
@@ -140,10 +140,12 @@ func TestPrepareSpecs(t *testing.T) {
 				k, v, _ := strings.Cut(kv, "=")
 				envBefore[k] = v
 			}
+			vs := options.ValidateSpecMode(testyml.Expand(knobs.ValidateSpec, vars))
 			opts := options.Options{
-				SkipRemoteRefs: knobs.SkipRemoteRefs,
-				ValidateSpec:   options.ValidateSpecMode(testyml.Expand(knobs.ValidateSpec, vars)),
-				Debug:          knobs.Debug,
+				SkipRemoteRefs:  knobs.SkipRemoteRefs,
+				ValidateSpec:    vs,
+				ValidateSpecCLI: vs, // knob models the flag/env override
+				Debug:           knobs.Debug,
 			}
 			log.SetDebug(knobs.Debug)
 			t.Cleanup(func() { log.SetDebug(false) })
@@ -265,8 +267,8 @@ func TestPrepareOptionsPrecedence(t *testing.T) {
 func TestWorkingDirectoryCascade(t *testing.T) {
 	repo := testutil.Repo(t, map[string]string{
 		"che.yml": "options:\n  workingDirectory: spectree\n" +
-			"p:\n  options: {autoDiscover: true}\n  include:\n    link: [HOME/**]\n" +
-			"q:\n  options: {autoDiscover: true, workingDirectory: proftree}\n  include:\n    link: [HOME/**]\n",
+			"p:\n  options: {autoDiscover: true}\n  include:\n    makeLinks: [HOME/**]\n" +
+			"q:\n  options: {autoDiscover: true, workingDirectory: proftree}\n  include:\n    makeLinks: [HOME/**]\n",
 		"spectree/HOME/.config/a": "a\n",
 		"proftree/HOME/.config/b": "b\n",
 	})
@@ -287,7 +289,7 @@ func TestWorkingDirectoryCascade(t *testing.T) {
 
 	linkDest := func(pr *ProfileReady) string {
 		for _, op := range pr.OperationsReady {
-			if lo, ok := op.(*LinkOperationReady); ok && len(lo.Links) > 0 {
+			if lo, ok := op.(*MakeLinksOperationReady); ok && len(lo.Links) > 0 {
 				return host.New(pr.Source.DirectoryPath, pr.workingDir, home, "x", options.Options{}).ToDest(lo.Links[0].Rel)
 			}
 		}
@@ -298,7 +300,7 @@ func TestWorkingDirectoryCascade(t *testing.T) {
 
 	// che level (flag) seeds the default when the spec omits it.
 	repo2 := testutil.Repo(t, map[string]string{
-		"che.yml":                "r:\n  options: {autoDiscover: true}\n  include:\n    link: [HOME/**]\n",
+		"che.yml":                "r:\n  options: {autoDiscover: true}\n  include:\n    makeLinks: [HOME/**]\n",
 		"chetree/HOME/.config/c": "c\n",
 	})
 	prepEnv(t, repo2)

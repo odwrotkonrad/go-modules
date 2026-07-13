@@ -133,21 +133,21 @@ You will need to start a new shell for this setup to take effect.
 | --- | --- | --- | --- | --- |
 | `--no-descriptions` |  | `bool` | `false` | disable completion descriptions |
 
-### `$ che copy`
-
-*.ontoHost.cp copy op.
-
 ### `$ che detect`
 
 print the prepared profiles (one per line) and exit.
 
-### `$ che link`
+### `$ che make-copies`
 
-symlink op (configs into system root).
+*.ontoHost.cp copy op.
 
-### `$ che mk-dirs`
+### `$ che make-dirs`
 
 create repo-tree dirs + extra-dirs.
+
+### `$ che make-links`
+
+symlink op (configs into system root).
 
 ### `$ che prune-links`
 

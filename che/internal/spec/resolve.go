@@ -172,8 +172,8 @@ func (r ProfileRecipe) MakeProfile(recipes []ProfileRecipe, workingDir string) (
 }
 
 // operationRecipes maps the resolved selection onto the per-kind operation
-// recipes, in run order. MkDirs carries one list: ancestor dirs (Rel, zero
-// perms) first, then the mkdirs entries.
+// recipes, in run order. MakeDirs carries one list: ancestor dirs (Rel, zero
+// perms) first, then the makeDirs entries.
 func (res resolved) operationRecipes() OperationRecipes {
 	dirs := make([]FileItem, 0, len(res.Dirs)+len(res.ExtraDirs))
 	for _, d := range res.Dirs {
@@ -182,12 +182,12 @@ func (res resolved) operationRecipes() OperationRecipes {
 	dirs = append(dirs, res.ExtraDirs...)
 	return OperationRecipes{
 		PruneLinks:      PruneLinksOperationRecipe{Dirs: res.Dirs},
-		MkDirs:          MkDirsOperationRecipe{Dirs: dirs},
-		Link:            LinkOperationRecipe{Links: res.Links, Dirs: res.Dirs},
-		Copy:            CopyOperationRecipe{Copies: res.Copies, Dirs: res.Dirs},
+		MakeDirs:        MakeDirsOperationRecipe{Dirs: dirs},
+		MakeLinks:       MakeLinksOperationRecipe{Links: res.Links, Dirs: res.Dirs},
+		MakeCopies:      MakeCopiesOperationRecipe{Copies: res.Copies, Dirs: res.Dirs},
 		RenderTemplates: RenderTemplatesOperationRecipe{Templates: res.Templates},
 		RunScripts:      RunScriptsOperationRecipe{Scripts: res.Scripts},
-		Services:        ServicesOperationRecipe{Services: res.Services},
+		RunServices:     RunServicesOperationRecipe{Services: res.Services},
 	}
 }
 
@@ -321,10 +321,10 @@ func isAnyGlobMatch(globs []string, rel string) bool {
 // applyExcludes drops items matching any exclude glob across all keys. Excludes
 // win over everything, including rich include entries.
 func applyExcludes(ex excludeSet, res *resolved) {
-	link := fsutil.ExpandAll(ex.Link)
-	copyG := fsutil.ExpandAll(ex.Copy)
+	link := fsutil.ExpandAll(ex.MakeLinks)
+	copyG := fsutil.ExpandAll(ex.MakeCopies)
 	tmplG := fsutil.ExpandAll(ex.RenderTemplates)
-	dirG := fsutil.ExpandAll(ex.Mkdirs)
+	dirG := fsutil.ExpandAll(ex.MakeDirs)
 	instG := fsutil.ExpandAll(ex.Scripts)
 	svcG := fsutil.ExpandAll(ex.Services)
 
@@ -394,7 +394,7 @@ func mergeRecipe(recipes []ProfileRecipe, eff *effective, ps ProfileRecipe, seen
 		}
 	}
 	in := ps.Include
-	for _, e := range in.Link {
+	for _, e := range in.MakeLinks {
 		if e.glob != "" {
 			eff.linkGlobs.add(e.glob, Perms{})
 			continue
@@ -408,11 +408,11 @@ func mergeRecipe(recipes []ProfileRecipe, eff *effective, ps ProfileRecipe, seen
 		}
 		eff.linkGlobs.addRule(e.Source, Perms{}, rule)
 	}
-	splitEntries(in.Copy, &eff.copyGlobs, &eff.richCopy)
+	splitEntries(in.MakeCopies, &eff.copyGlobs, &eff.richCopy)
 	if err := splitTemplates(in.RenderTemplates, &eff.tmplGlobs, &eff.richTmpl); err != nil {
 		return err
 	}
-	for _, e := range in.Mkdirs {
+	for _, e := range in.MakeDirs {
 		eff.dirs = append(eff.dirs, dirItems(e)...)
 	}
 	eff.scripts = append(eff.scripts, in.Scripts...)
@@ -422,10 +422,10 @@ func mergeRecipe(recipes []ProfileRecipe, eff *effective, ps ProfileRecipe, seen
 }
 
 func (ex *excludeSet) append(o excludeSet) {
-	ex.Link = append(ex.Link, o.Link...)
-	ex.Copy = append(ex.Copy, o.Copy...)
+	ex.MakeLinks = append(ex.MakeLinks, o.MakeLinks...)
+	ex.MakeCopies = append(ex.MakeCopies, o.MakeCopies...)
 	ex.RenderTemplates = append(ex.RenderTemplates, o.RenderTemplates...)
-	ex.Mkdirs = append(ex.Mkdirs, o.Mkdirs...)
+	ex.MakeDirs = append(ex.MakeDirs, o.MakeDirs...)
 	ex.Scripts = append(ex.Scripts, o.Scripts...)
 	ex.Services = append(ex.Services, o.Services...)
 }
@@ -446,7 +446,7 @@ func splitEntries(entries []entry, globs *globSet, rich *[]FileItem) {
 // FileItems. Remote refs (@<repo>//<path>) require an explicit dest, the
 // derived-dest form (glob, or rich without dest) a root/-prefixed source
 // ([why] only root/ paths map to host dests).
-func splitTemplates(entries []entry, globs *globSet, rich *[]FileItem) error {
+func splitTemplates(entries []templateGroup, globs *globSet, rich *[]FileItem) error {
 	for _, e := range entries {
 		for _, f := range e.Files {
 			if f.glob != "" {
@@ -489,7 +489,7 @@ func mergeDestOptions(group render.Options, dests []DestSpec) []DestSpec {
 	return out
 }
 
-// dirItems expands each mkdirs perm-group item into one FileItem per
+// dirItems expands each makeDirs perm-group item into one FileItem per
 // brace-expanded dest path, carrying the group's perms (path in Dests[0]).
 func dirItems(e dirGroup) []FileItem {
 	var out []FileItem

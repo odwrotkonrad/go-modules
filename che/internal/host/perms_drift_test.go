@@ -71,7 +71,7 @@ func TestPermsDrift(t *testing.T) {
 
 		delta := New(home, filepath.Join(home, "root"), home, testutil.CheProfile, options.Options{DryRun: options.DryRun.Delta})
 		deltaRun := func() string {
-			out, err := testutil.CaptureStdout(t, func() error { return delta.MkDirs(items) })
+			out, err := testutil.CaptureStdout(t, func() error { return delta.MakeDirs(items) })
 			require.NoError(t, err)
 			return testutil.StripANSI(out)
 		}
@@ -91,7 +91,7 @@ func TestPermsDrift(t *testing.T) {
 			return
 		}
 		wet := New(home, filepath.Join(home, "root"), home, testutil.CheProfile, options.Options{})
-		_, err = testutil.CaptureStdout(t, func() error { return wet.MkDirs(items) })
+		_, err = testutil.CaptureStdout(t, func() error { return wet.MakeDirs(items) })
 		require.NoError(t, err)
 		fi, err = os.Stat(dest)
 		require.NoError(t, err)

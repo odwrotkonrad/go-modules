@@ -1,7 +1,7 @@
 base:
   include:
     renderTemplates:
-      - files:
+      - templates:
           - source: "@gitlab.com/acme/tools//snippets/agent.md"
             ctx: {repo: Notes}
             dest:

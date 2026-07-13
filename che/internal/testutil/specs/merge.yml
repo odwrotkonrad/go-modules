@@ -1,31 +1,31 @@
 base:
   include:
-    link:
+    makeLinks:
       - etc/zshrc
       - HOME/.config/zsh/**
       - etc/grafana/**
-    copy:
+    makeCopies:
       - chmod: "0600"
         files: [Library/LaunchDaemons/**]
-    mkdirs:
-      - files: [HOME/.cache/zsh]
+    makeDirs:
+      - directories: [HOME/.cache/zsh]
       - chmod: "2775"
-        files:
+        directories:
           - {dest: [/var/log/grafana]}
     runScripts:
       - ci/zsh/scripts/installs/10-brew.zsh
       - ci/zsh/scripts/installs/20-kitty.zsh
-    services: [otelcol, port-exporter, grafana, prometheus]
+    runServices: [otelcol, port-exporter, grafana, prometheus]
 
 base-exclude-desktop:
   exclude:
-    link:
+    makeLinks:
       - etc/grafana/**
-    mkdirs:
+    makeDirs:
       - /var/log/grafana
     runScripts:
       - ci/zsh/scripts/installs/20-kitty.zsh
-    services: [grafana, prometheus]
+    runServices: [grafana, prometheus]
 
 desktop/macos:
   options: {autoDiscover: true}

@@ -1,7 +1,7 @@
 #[>] 🤖🤖
 base:
   include:
-    services: [svc]
+    runServices: [svc]
 main:
   include:
     profiles:

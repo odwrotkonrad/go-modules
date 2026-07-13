@@ -11,7 +11,7 @@ cases:
             che.yml: |
               p:
                 includes:
-                  link: [HOME/**]
+                  makeLinks: [HOME/**]
         - hostFiles:
             che.yml: |
               main:
@@ -33,7 +33,7 @@ cases:
             che.yml: |
               p:
                 includes:
-                  link: [HOME/**]
+                  makeLinks: [HOME/**]
         - hostFiles:
             che.yml: |
               main:
@@ -292,12 +292,12 @@ cases:
               sib:
                 options: {autoDiscover: true}
                 include:
-                  mkdirs:
-                    - files: [HOME/.cache/sib]
+                  makeDirs:
+                    - directories: [HOME/.cache/sib]
               sharedBase:
                 include:
-                  mkdirs:
-                    - files: [HOME/.cache/shared]
+                  makeDirs:
+                    - directories: [HOME/.cache/shared]
         - knobs: {}
     expected:
       output:
@@ -315,8 +315,8 @@ cases:
             sibling/che.yml: |
               main:
                 include:
-                  mkdirs:
-                    - files: [HOME/.cache/sib]
+                  makeDirs:
+                    - directories: [HOME/.cache/sib]
         - knobs: {}
     expected:
       errorOutput: ['profile "main" collides']
@@ -406,20 +406,18 @@ cases:
               alpha:
                 options: {autoDiscover: true}
                 include:
-                  link: [HOME/**]
+                  makeLinks: [HOME/**]
                 exclude:
-                  link: [HOME/.config/skip-a]
-              HOME/.config/keep-a: a
-              HOME/.config/skip-a: a
+                  makeLinks: [HOME/.config/skip-a]
             one/HOME/.config/keep-a: keep-a
             one/HOME/.config/skip-a: skip-a
             two/che.yml: |
               beta:
                 options: {autoDiscover: true}
                 include:
-                  link: [HOME/**]
+                  makeLinks: [HOME/**]
                 exclude:
-                  link: [HOME/.config/skip-b]
+                  makeLinks: [HOME/.config/skip-b]
             two/HOME/.config/keep-b: keep-b
             two/HOME/.config/skip-b: skip-b
         - knobs: {}
@@ -438,7 +436,7 @@ cases:
                 validateSpec: error
               p:
                 includes:
-                  link: [HOME/**]
+                  makeLinks: [HOME/**]
         - hostFiles:
             che.yml: |
               include:
@@ -464,7 +462,7 @@ cases:
               s:
                 options: {autoDiscover: true}
                 include:
-                  link: [HOME/**]
+                  makeLinks: [HOME/**]
             sub/tree/HOME/.config/x: x
         - knobs: {}
     expected:
@@ -480,7 +478,7 @@ cases:
               gitlabGroup:
                 options: {workingDirectory: default-tree}
                 include:
-                  link: [HOME/**]
+                  makeLinks: [HOME/**]
             default-tree/HOME/.config/def: def
             override-tree/HOME/.config/ovr: ovr
         - hostFiles:
@@ -506,7 +504,7 @@ cases:
               main:
                 options: {autoDiscover: true}
                 include:
-                  link:
+                  makeLinks:
                     - etc/**
                     - Library/**
             etc/zshenv: zshenv

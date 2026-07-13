@@ -14,38 +14,38 @@ cases:
       stdOut: |
         all(run): prune-links
         prune-links: ${ROOT}
-        all(run): mk-dirs
-        mkdir(create): ${HOME}/.config
-        mkdir(create): ${HOME}/.config/bar
-        mkdir(create): ${HOME}/.config/zsh
-        mkdir(create): /Library
-        mkdir(create): /Library/LaunchDaemons
-        mkdir(create): /etc
-        mkdir(create): ${HOME}/.cache/zsh
-        mkdir(create): /var/log/che-test-setgid
-        mkdir(chmod): 2775 /var/log/che-test-setgid
-        all(run): link
-        mkdir(create): ${HOME}/.config
-        mkdir(create): ${HOME}/.config/bar
-        mkdir(create): ${HOME}/.config/zsh
-        mkdir(create): /Library
-        mkdir(create): /Library/LaunchDaemons
-        mkdir(create): /etc
-        archive: ${HOME}/.local/share/che/backups/che-link-{{/.*/}}.tar.bz2
-        ln(create): ${HOME}/.config/bar/a
-        ln(create): ${HOME}/.config/zsh/.zshrc
-        ln(create): /etc/zshrc
-        all(run): copy
-        mkdir(create): ${HOME}/.config
-        mkdir(create): ${HOME}/.config/bar
-        mkdir(create): ${HOME}/.config/zsh
-        mkdir(create): /Library
-        mkdir(create): /Library/LaunchDaemons
-        mkdir(create): /etc
-        archive: ${HOME}/.local/share/che/backups/che-copy-{{/.*/}}.tar.bz2
-        cp(create): ${HOME}/.config/zsh/c
-        cp(create): /Library/LaunchDaemons/otelcol.plist
-        cp(chown): root:wheel /Library/LaunchDaemons/otelcol.plist
+        all(run): make-dirs
+        make-dirs(create): ${HOME}/.config
+        make-dirs(create): ${HOME}/.config/bar
+        make-dirs(create): ${HOME}/.config/zsh
+        make-dirs(create): /Library
+        make-dirs(create): /Library/LaunchDaemons
+        make-dirs(create): /etc
+        make-dirs(create): ${HOME}/.cache/zsh
+        make-dirs(create): /var/log/che-test-setgid
+        make-dirs(chmod): 2775 /var/log/che-test-setgid
+        all(run): make-links
+        make-dirs(create): ${HOME}/.config
+        make-dirs(create): ${HOME}/.config/bar
+        make-dirs(create): ${HOME}/.config/zsh
+        make-dirs(create): /Library
+        make-dirs(create): /Library/LaunchDaemons
+        make-dirs(create): /etc
+        archive: ${HOME}/.local/share/che/backups/che-make-links-{{/.*/}}.tar.bz2
+        make-links(create): ${HOME}/.config/bar/a
+        make-links(create): ${HOME}/.config/zsh/.zshrc
+        make-links(create): /etc/zshrc
+        all(run): make-copies
+        make-dirs(create): ${HOME}/.config
+        make-dirs(create): ${HOME}/.config/bar
+        make-dirs(create): ${HOME}/.config/zsh
+        make-dirs(create): /Library
+        make-dirs(create): /Library/LaunchDaemons
+        make-dirs(create): /etc
+        archive: ${HOME}/.local/share/che/backups/che-make-copies-{{/.*/}}.tar.bz2
+        make-copies(create): ${HOME}/.config/zsh/c
+        make-copies(create): /Library/LaunchDaemons/otelcol.plist
+        make-copies(chown): root:wheel /Library/LaunchDaemons/otelcol.plist
         all(run): render-templates
         archive: ${HOME}/.local/share/che/backups/che-render-{{/.*/}}.tar.bz2
         render(create): ${HOME}/.config/zsh/t
@@ -68,17 +68,17 @@ cases:
       stdOut: |
         all(run): prune-links
         prune-links: ${ROOT}
-        all(run): mk-dirs
-        mkdir(create): ${HOME}/.config
-        mkdir(create): ${HOME}/.config/bar
-        all(run): link
-        mkdir(create): ${HOME}/.config
-        mkdir(create): ${HOME}/.config/bar
-        archive: ${HOME}/.local/share/che/backups/che-link-{{/.*/}}.tar.bz2
-        ln(create): ${HOME}/.config/bar/a
+        all(run): make-dirs
+        make-dirs(create): ${HOME}/.config
+        make-dirs(create): ${HOME}/.config/bar
+        all(run): make-links
+        make-dirs(create): ${HOME}/.config
+        make-dirs(create): ${HOME}/.config/bar
+        archive: ${HOME}/.local/share/che/backups/che-make-links-{{/.*/}}.tar.bz2
+        make-links(create): ${HOME}/.config/bar/a
     notExpected:
       stdOut:
-        - 'all(run): copy'
+        - 'all(run): make-copies'
         - 'all(run): render-templates'
         - 'all(run): run-scripts'
         - 'all(run): services'

@@ -168,7 +168,7 @@
             "warn",
             "error"
           ],
-          "description": "top-level only: how schema violations report; overridden by the flag and env var"
+          "description": "how this spec's schema violations report (per-spec: each included spec honors its own); overridden by the flag and env var"
         }
       },
       "additionalProperties": false,
@@ -190,7 +190,7 @@
           "pattern": "^[0-7]{3,4}$",
           "description": "dest mode, octal string"
         },
-        "files": {
+        "directories": {
           "items": {
             "$ref": "#/$defs/dirSpec"
           },
@@ -201,7 +201,7 @@
       "additionalProperties": false,
       "type": "object",
       "required": [
-        "files"
+        "directories"
       ]
     },
     "dirSpec": {
@@ -243,17 +243,6 @@
           "pattern": "^[0-7]{3,4}$",
           "description": "dest mode, octal string"
         },
-        "ctx": {
-          "additionalProperties": {
-            "type": "string"
-          },
-          "type": "object",
-          "description": "renderTemplates only: group-level template context, merged under each item's ctx (item keys win)"
-        },
-        "options": {
-          "$ref": "#/$defs/Options",
-          "description": "renderTemplates only: group-level render options, merged under each explicit dest's options (dest-set fields win)"
-        },
         "files": {
           "items": {
             "$ref": "#/$defs/fileSpec"
@@ -270,14 +259,14 @@
     },
     "excludeSet": {
       "properties": {
-        "link": {
+        "makeLinks": {
           "items": {
             "type": "string"
           },
           "type": "array",
           "description": "drop matching link items"
         },
-        "copy": {
+        "makeCopies": {
           "items": {
             "type": "string"
           },
@@ -291,7 +280,7 @@
           "type": "array",
           "description": "drop matching template items (source or dest)"
         },
-        "mkdirs": {
+        "makeDirs": {
           "items": {
             "type": "string"
           },
@@ -305,7 +294,7 @@
           "type": "array",
           "description": "drop matching scripts (resolved file paths)"
         },
-        "services": {
+        "runServices": {
           "items": {
             "type": "string"
           },
@@ -362,14 +351,14 @@
           "type": "array",
           "description": "profile refs composed depth-first before this profile's own payload: local profile name scalar, or {source, options, env} where source is \u003csource\u003e/\u003cspec-file\u003e.yml::\u003cprofile\u003e locating a profile in another spec (its own checkout anchor)"
         },
-        "link": {
+        "makeLinks": {
           "items": {
             "$ref": "#/$defs/linkEntry"
           },
           "type": "array",
           "description": "symlink-op entries, repo-relative under root/: glob string (dest derived 1:1) or {source, dest} sed-style rewrite"
         },
-        "copy": {
+        "makeCopies": {
           "items": {
             "$ref": "#/$defs/entry"
           },
@@ -378,12 +367,12 @@
         },
         "renderTemplates": {
           "items": {
-            "$ref": "#/$defs/entry"
+            "$ref": "#/$defs/templateGroup"
           },
           "type": "array",
           "description": "*.tpl render-op perm-groups; sources repo-root-relative or remote (@\u003crepo\u003e//\u003cpath\u003e[?ref=\u003cref\u003e], explicit dest required), glob and derived-dest forms must be root/-prefixed"
         },
-        "mkdirs": {
+        "makeDirs": {
           "items": {
             "$ref": "#/$defs/dirGroup"
           },
@@ -397,7 +386,7 @@
           "type": "array",
           "description": "script paths or globs, repo-relative, run in spec order"
         },
-        "services": {
+        "runServices": {
           "items": {
             "type": "string"
           },
@@ -407,7 +396,7 @@
       },
       "additionalProperties": false,
       "type": "object",
-      "description": "additive payload: profile refs, link globs, copy/renderTemplates/mkdirs perm-groups, script globs, service names"
+      "description": "additive payload: profile refs, makeLinks globs, makeCopies/renderTemplates/makeDirs perm-groups, runScripts globs, runServices names"
     },
     "linkEntry": {
       "oneOf": [
@@ -435,6 +424,46 @@
           ],
           "description": "source file or glob with a sed-style dest rewrite"
         }
+      ]
+    },
+    "templateGroup": {
+      "properties": {
+        "owner": {
+          "type": "string",
+          "description": "dest owner user; empty: code default"
+        },
+        "ownerGroup": {
+          "type": "string",
+          "description": "dest owner group; empty: code default"
+        },
+        "chmod": {
+          "type": "string",
+          "pattern": "^[0-7]{3,4}$",
+          "description": "dest mode, octal string"
+        },
+        "ctx": {
+          "additionalProperties": {
+            "type": "string"
+          },
+          "type": "object",
+          "description": "group-level template context, merged under each item's ctx (item keys win)"
+        },
+        "options": {
+          "$ref": "#/$defs/Options",
+          "description": "group-level render options, merged under each explicit dest's options (dest-set fields win)"
+        },
+        "templates": {
+          "items": {
+            "$ref": "#/$defs/fileSpec"
+          },
+          "type": "array",
+          "description": "the group's items, each inheriting the group's perms"
+        }
+      },
+      "additionalProperties": false,
+      "type": "object",
+      "required": [
+        "templates"
       ]
     }
   },

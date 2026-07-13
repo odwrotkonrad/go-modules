@@ -25,7 +25,7 @@ cases:
         - appendSpec: |
             bogusProfile:
               includes:
-                link: [HOME/**]
+                makeLinks: [HOME/**]
     expected:
       output:
         profiles: cli/macos,desktop/macos
@@ -38,7 +38,7 @@ cases:
         - appendSpec: |
             bogusProfile:
               includes:
-                link: [HOME/**]
+                makeLinks: [HOME/**]
     expected:
       errorOutput:
         - schema violations in
@@ -53,7 +53,7 @@ cases:
         - appendSpec: |
             bogusProfile:
               includes:
-                link: [HOME/**]
+                makeLinks: [HOME/**]
     expected:
       errorOutput:
         - schema violations in

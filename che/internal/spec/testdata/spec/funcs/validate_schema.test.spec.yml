@@ -23,7 +23,7 @@ cases:
         - doc: |
             p:
               includes:
-                link: [HOME/**]
+                makeLinks: [HOME/**]
     expected:
       output: includes
   - name: ShouldFlagBogusWriteTypeEnum
@@ -33,7 +33,7 @@ cases:
             p:
               include:
                 renderTemplates:
-                  - files:
+                  - templates:
                       - source: templates/a.tpl
                         dest:
                           - {path: a.md, options: {writeType: bogus}}
@@ -45,9 +45,9 @@ cases:
         - doc: |
             p:
               include:
-                mkdirs:
+                makeDirs:
                   - chmod: rwxr-xr-x
-                    files: [HOME/.cache]
+                    directories: [HOME/.cache]
     expected:
       output: chmod
   - name: ShouldFlagGroupWithoutFiles
@@ -56,7 +56,7 @@ cases:
         - doc: |
             p:
               include:
-                copy:
+                makeCopies:
                   - chmod: "0644"
     expected:
       output: files
@@ -92,7 +92,7 @@ cases:
               sources: ["@https://gitlab.com/g/r.git", ./sibling]
             p:
               include:
-                link: [HOME/**]
+                makeLinks: [HOME/**]
     expected:
       output: ""
   - name: ShouldAcceptIncludeProfilesUnionForms

@@ -30,9 +30,9 @@ func (o opCmd) displayName() string {
 func ops() []opCmd {
 	return []opCmd{
 		{name: "prune-links", short: "delete broken symlinks"},
-		{name: "mk-dirs", short: "create repo-tree dirs + extra-dirs"},
-		{name: "link", short: "symlink op (configs into system root)"},
-		{name: "copy", short: "*.ontoHost.cp copy op"},
+		{name: "make-dirs", short: "create repo-tree dirs + extra-dirs"},
+		{name: "make-links", short: "symlink op (configs into system root)"},
+		{name: "make-copies", short: "*.ontoHost.cp copy op"},
 		{name: "render-templates", short: "render *.tpl sources; each dest path decides target (relative -> repo, ~/ or absolute -> host)"},
 		{name: "run-scripts", short: "run the profile's scripts, optionally filtered by name substring"},
 		{name: "bootout", parent: "services", short: "unload each service (bootout if loaded, wait until gone)"},

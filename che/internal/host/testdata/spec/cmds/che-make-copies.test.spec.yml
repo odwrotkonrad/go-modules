@@ -1,6 +1,6 @@
 # [>] 🤖
 context:
-  command: che copy
+  command: che make-copies
   mockedInterfaces:
     execx.CmdExecutor: testutil.CmdMockExecutor
     fsutil.FileSystemWriter: testutil.FileSystemMockWriter
@@ -10,8 +10,8 @@ cases:
   - name: ShouldCopyMarkerFilesAndChownDaemonPlist
     expected:
       stdOut: |
-        archive: {{/.*/}}che-copy-{{/.*/}}.tar.bz2
-        cp(create): ${HOME}/.config/zsh/c
-        cp(create): /Library/LaunchDaemons/otelcol.plist
-        cp(chown): root:wheel /Library/LaunchDaemons/otelcol.plist
+        archive: {{/.*/}}che-make-copies-{{/.*/}}.tar.bz2
+        make-copies(create): ${HOME}/.config/zsh/c
+        make-copies(create): /Library/LaunchDaemons/otelcol.plist
+        make-copies(chown): root:wheel /Library/LaunchDaemons/otelcol.plist
 # [<] 🤖

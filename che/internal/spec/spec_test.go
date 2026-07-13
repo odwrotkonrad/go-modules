@@ -83,11 +83,11 @@ func destPaths(item FileItem) []string {
 	return out
 }
 
-// extraDirs picks the mkdirs entries out of the merged MkDirs list (the
+// extraDirs picks the mkdirs entries out of the merged MakeDirs list (the
 // ancestor items carry no Dests).
 func extraDirs(ops OperationRecipes) []FileItem {
 	var out []FileItem
-	for _, it := range ops.MkDirs.Dirs {
+	for _, it := range ops.MakeDirs.Dirs {
 		if len(it.Dests) > 0 {
 			out = append(out, it)
 		}
@@ -105,7 +105,7 @@ func extraDirPaths(ops OperationRecipes) []string {
 }
 
 func findItem(ops OperationRecipes, key string) *FileItem {
-	for _, items := range [][]FileItem{ops.Link.Links, ops.Copy.Copies, ops.RenderTemplates.Templates} {
+	for _, items := range [][]FileItem{ops.MakeLinks.Links, ops.MakeCopies.Copies, ops.RenderTemplates.Templates} {
 		if i := slices.IndexFunc(items, func(it FileItem) bool { return it.Rel == key }); i >= 0 {
 			return &items[i]
 		}
@@ -119,13 +119,13 @@ func findItem(ops OperationRecipes, key string) *FileItem {
 
 func projections(ops OperationRecipes) map[string][]string {
 	return map[string][]string{
-		"links":     rels(ops.Link.Links),
-		"copies":    rels(ops.Copy.Copies),
+		"links":     rels(ops.MakeLinks.Links),
+		"copies":    rels(ops.MakeCopies.Copies),
 		"templates": rels(ops.RenderTemplates.Templates),
 		"dirs":      ops.PruneLinks.Dirs,
 		"extraDirs": extraDirPaths(ops),
 		"scripts":   ops.RunScripts.Scripts,
-		"services":  ops.Services.Services,
+		"services":  ops.RunServices.Services,
 	}
 }
 

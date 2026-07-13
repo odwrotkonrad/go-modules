@@ -81,17 +81,17 @@ func TestDryRunDelta(t *testing.T) {
 // settlers put one dest into desired state (link points into repo / copy
 // matches), returning it.
 var settlers = map[string]func(*testing.T, Host, spec.OperationRecipes) string{
-	"link": func(t *testing.T, h Host, r spec.OperationRecipes) string {
+	"make-links": func(t *testing.T, h Host, r spec.OperationRecipes) string {
 		t.Helper()
-		item := r.Link.Links[0]
+		item := r.MakeLinks.Links[0]
 		dest := h.ToDest(item.Rel)
 		require.NoError(t, os.MkdirAll(filepath.Dir(dest), 0o755))
 		require.NoError(t, os.Symlink(h.Src(item.Rel), dest))
 		return dest
 	},
-	"copy": func(t *testing.T, h Host, r spec.OperationRecipes) string {
+	"make-copies": func(t *testing.T, h Host, r spec.OperationRecipes) string {
 		t.Helper()
-		item := r.Copy.Copies[0]
+		item := r.MakeCopies.Copies[0]
 		dest := h.copyDests(item)[0]
 		src, err := os.ReadFile(h.Src(item.Rel))
 		require.NoError(t, err)

@@ -1,21 +1,21 @@
 # [>] 🤖🤖
 cases:
   - name: ShouldOnlyReportLinkCreates
-    context: {command: che link}
+    context: {command: che make-links}
     expected:
-      stdOut: "ln(create,dry-run=delta): ${HOME}/.config/zsh/"
+      stdOut: "make-links(create,dry-run=delta): ${HOME}/.config/zsh/"
   - name: ShouldOnlyReportCopyCreates
-    context: {command: che copy}
+    context: {command: che make-copies}
     expected:
-      stdOut: "cp(create,dry-run=delta): ${HOME}/.config/zsh/"
+      stdOut: "make-copies(create,dry-run=delta): ${HOME}/.config/zsh/"
   - name: ShouldOnlyReportRenderCreates
     context: {command: che render-templates}
     expected:
       stdOut: "render(create,dry-run=delta): ${HOME}/.config/zsh/"
   - name: ShouldOnlyReportMkdirCreates
-    context: {command: che mk-dirs}
+    context: {command: che make-dirs}
     expected:
-      stdOut: "mkdir(create,dry-run=delta): ${HOME}/.config"
+      stdOut: "make-dirs(create,dry-run=delta): ${HOME}/.config"
   - name: ShouldOnlyReportPruneScan
     context: {command: che prune-links}
     expected:

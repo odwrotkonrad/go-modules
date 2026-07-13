@@ -231,7 +231,7 @@ func (r *SpecRecipe) PrepareSpec(anchor, home string) error {
 // recipe with its Source (effective directory in Source.DirectoryPath, option
 // cascade applied: profile > spec).
 func (r *SpecRecipe) PrepareProfileRecipes(opts options.Options) error {
-	if err := r.validateSchema(opts.ValidateSpec); err != nil {
+	if err := r.validateSchema(opts.ValidateSpecCLI); err != nil {
 		return err
 	}
 	doc, err := spec.Load(r.sourceReady.DefinitionURI)
@@ -270,7 +270,7 @@ func workingDir(anchor, directory string) (string, error) {
 	return dir, nil
 }
 
-func (r *SpecRecipe) validateSchema(mode options.ValidateSpecMode) error {
+func (r *SpecRecipe) validateSchema(cli options.ValidateSpecMode) error {
 	b, err := os.ReadFile(r.sourceReady.DefinitionURI)
 	if err != nil {
 		return fmt.Errorf("spec not found: %s", r.sourceReady.DefinitionURI)
@@ -279,6 +279,8 @@ func (r *SpecRecipe) validateSchema(mode options.ValidateSpecMode) error {
 	if len(finds) == 0 {
 		return nil
 	}
+	// [why] flag/env wins over this spec's own options.validateSpec, then warn.
+	mode := options.ValidateSpecMode(cmp.Or(string(cli), specValidateSpec(b), string(options.ValidateSpec.Warn)))
 	if mode == options.ValidateSpec.Error {
 		return fmt.Errorf("schema violations in %s:\n%s", r.sourceReady.DefinitionURI, strings.Join(finds, "\n"))
 	}
@@ -286,6 +288,18 @@ func (r *SpecRecipe) validateSchema(mode options.ValidateSpecMode) error {
 		log.Msg("validate(che.yml)", f, log.Off)
 	}
 	return nil
+}
+
+// specValidateSpec leniently peeks a spec's own options.validateSpec from its
+// bytes ("" if absent or unparseable; the schema check surfaces real errors).
+func specValidateSpec(b []byte) string {
+	var d struct {
+		Options spec.Options `yaml:"options"`
+	}
+	if err := yaml.Unmarshal(b, &d); err != nil {
+		return ""
+	}
+	return d.Options.ValidateSpec
 }
 
 // PrepareProfiles assembles the SpecReady: spec-level execIf gate, top-level
@@ -642,15 +656,15 @@ func prepareOperations(ops spec.OperationRecipes, h host.Host, opts options.Opti
 	if err != nil {
 		return nil, err
 	}
-	services, err := h.ResolveServices(ops.Services.Services)
+	services, err := h.ResolveServices(ops.RunServices.Services)
 	if err != nil {
 		return nil, err
 	}
 	return []operationReady{
 		&PruneLinksOperationReady{Dirs: ops.PruneLinks.Dirs},
-		&MkDirsOperationReady{Dirs: ops.MkDirs.Dirs},
-		&LinkOperationReady{Links: ops.Link.Links, Dirs: ops.Link.Dirs},
-		&CopyOperationReady{Copies: ops.Copy.Copies, Dirs: ops.Copy.Dirs},
+		&MakeDirsOperationReady{Dirs: ops.MakeDirs.Dirs},
+		&MakeLinksOperationReady{Links: ops.MakeLinks.Links, Dirs: ops.MakeLinks.Dirs},
+		&MakeCopiesOperationReady{Copies: ops.MakeCopies.Copies, Dirs: ops.MakeCopies.Dirs},
 		&RenderTemplatesOperationReady{Templates: ops.RenderTemplates.Templates, SkipSecrets: opts.RenderSkipSecrets},
 		&RunScriptsOperationReady{Scripts: scripts},
 		&BootoutOperationReady{Services: services},
@@ -675,37 +689,41 @@ func (o *PruneLinksOperationReady) execOperation(h host.Host) error {
 	return h.PruneBrokenLinks(o.Dirs)
 }
 
-// MkDirsOperationReady creates the profile's dirs (ancestors + mkdirs entries).
-type MkDirsOperationReady struct {
+// MakeDirsOperationReady creates the profile's dirs (ancestors + makeDirs entries).
+type MakeDirsOperationReady struct {
 	OperationReady
 	Dirs []spec.FileItem
 }
 
-func (o *MkDirsOperationReady) Name() string                    { return "mk-dirs" }
-func (o *MkDirsOperationReady) Selected() bool                  { return len(o.Dirs) > 0 }
-func (o *MkDirsOperationReady) execOperation(h host.Host) error { return h.MkDirs(o.Dirs) }
+func (o *MakeDirsOperationReady) Name() string                    { return "make-dirs" }
+func (o *MakeDirsOperationReady) Selected() bool                  { return len(o.Dirs) > 0 }
+func (o *MakeDirsOperationReady) execOperation(h host.Host) error { return h.MakeDirs(o.Dirs) }
 
-// LinkOperationReady symlinks configs into the system root.
-type LinkOperationReady struct {
+// MakeLinksOperationReady symlinks configs into the system root.
+type MakeLinksOperationReady struct {
 	OperationReady
 	Links []spec.FileItem
 	Dirs  []string
 }
 
-func (o *LinkOperationReady) Name() string                    { return "link" }
-func (o *LinkOperationReady) Selected() bool                  { return len(o.Links) > 0 }
-func (o *LinkOperationReady) execOperation(h host.Host) error { return h.MkLinks(o.Links, o.Dirs) }
+func (o *MakeLinksOperationReady) Name() string   { return "make-links" }
+func (o *MakeLinksOperationReady) Selected() bool { return len(o.Links) > 0 }
+func (o *MakeLinksOperationReady) execOperation(h host.Host) error {
+	return h.MakeLinks(o.Links, o.Dirs)
+}
 
-// CopyOperationReady copies *.ontoHost.cp sources onto their dests.
-type CopyOperationReady struct {
+// MakeCopiesOperationReady copies *.ontoHost.cp sources onto their dests.
+type MakeCopiesOperationReady struct {
 	OperationReady
 	Copies []spec.FileItem
 	Dirs   []string
 }
 
-func (o *CopyOperationReady) Name() string                    { return "copy" }
-func (o *CopyOperationReady) Selected() bool                  { return len(o.Copies) > 0 }
-func (o *CopyOperationReady) execOperation(h host.Host) error { return h.MkCopies(o.Copies, o.Dirs) }
+func (o *MakeCopiesOperationReady) Name() string   { return "make-copies" }
+func (o *MakeCopiesOperationReady) Selected() bool { return len(o.Copies) > 0 }
+func (o *MakeCopiesOperationReady) execOperation(h host.Host) error {
+	return h.MakeCopies(o.Copies, o.Dirs)
+}
 
 // RenderTemplatesOperationReady renders *.tpl sources; each dest path decides
 // the target (relative: repo, ~/ or absolute: host).

@@ -2,7 +2,7 @@ base:
   include:
     renderTemplates:
       - ctx: {repo: Workspace, model: fable}
-        files:
+        templates:
           - source: "@gitlab.com/acme/tools//snippets/ro.md"
             dest:
               - {path: .claude/agents/ro.md}

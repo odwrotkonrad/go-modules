@@ -3,6 +3,6 @@ options: {workingDirectory: root}
 cli/macos:
   options: {autoDiscover: true}
   include:
-    link:
+    makeLinks:
       - {source: HOME/.config/foo/**, dest: s/foo/bar/}
 ##[<] 🤖🤖

@@ -18,7 +18,8 @@ func (c *Options) Resolve(l SpecLayer) error {
 	default:
 		return fmt.Errorf("invalid --dry-run mode %q: want delta or all", c.DryRun)
 	}
-	c.ValidateSpec = ValidateSpecMode(cmp.Or(string(c.ValidateSpec), os.Getenv("CHE_VALIDATE_SPEC"), l.ValidateSpec, string(ValidateSpec.Warn)))
+	c.ValidateSpecCLI = ValidateSpecMode(cmp.Or(string(c.ValidateSpec), os.Getenv("CHE_VALIDATE_SPEC")))
+	c.ValidateSpec = ValidateSpecMode(cmp.Or(string(c.ValidateSpecCLI), l.ValidateSpec, string(ValidateSpec.Warn)))
 	switch c.ValidateSpec {
 	case ValidateSpec.Warn, ValidateSpec.Error:
 	default:

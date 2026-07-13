@@ -113,7 +113,7 @@ type Options struct {
 	AutoDiscover     *bool    `yaml:"autoDiscover" jsonschema_description:"default for profiles that don't set it"`
 	Debug            *bool    `yaml:"debug" jsonschema_description:"default for profiles that don't set it"`
 	WorkingDirectory string   `yaml:"workingDirectory" jsonschema_description:"the load-ops source tree (absolute, relative to the checkout, ~/, $VAR, env vars expanded); default root; the RootPrefix logical token maps onto it, the HOME/ folder under it maps onto $HOME"`
-	ValidateSpec     string   `yaml:"validateSpec" jsonschema:"enum=warn,enum=error" jsonschema_description:"top-level only: how schema violations report; overridden by the flag and env var"`
+	ValidateSpec     string   `yaml:"validateSpec" jsonschema:"enum=warn,enum=error" jsonschema_description:"how this spec's schema violations report (per-spec: each included spec honors its own); overridden by the flag and env var"`
 }
 
 // ProfileRecipe is one raw declared profile.
@@ -136,22 +136,22 @@ type ProfileOptions struct {
 // includeSet is the additive payload.
 type includeSet struct {
 	Profiles        []ProfileSourceRecipe `yaml:"profiles" jsonschema_description:"profile refs composed depth-first before this profile's own payload: local profile name scalar, or {source, options, env} where source is <source>/<spec-file>.yml::<profile> locating a profile in another spec (its own checkout anchor)"`
-	Link            []linkEntry           `yaml:"link" jsonschema_description:"symlink-op entries, repo-relative under root/: glob string (dest derived 1:1) or {source, dest} sed-style rewrite"`
-	Copy            []entry               `yaml:"copy" jsonschema_description:"*.ontoHost.cp copy-op perm-groups"`
-	RenderTemplates []entry               `yaml:"renderTemplates" jsonschema_description:"*.tpl render-op perm-groups; sources repo-root-relative or remote (@<repo>//<path>[?ref=<ref>], explicit dest required), glob and derived-dest forms must be root/-prefixed"`
-	Mkdirs          []dirGroup            `yaml:"mkdirs" jsonschema_description:"extra-dir perm-groups; each item one dir path (brace-expanded)"`
+	MakeLinks       []linkEntry           `yaml:"makeLinks" jsonschema_description:"symlink-op entries, repo-relative under root/: glob string (dest derived 1:1) or {source, dest} sed-style rewrite"`
+	MakeCopies      []entry               `yaml:"makeCopies" jsonschema_description:"*.ontoHost.cp copy-op perm-groups"`
+	RenderTemplates []templateGroup       `yaml:"renderTemplates" jsonschema_description:"*.tpl render-op perm-groups; sources repo-root-relative or remote (@<repo>//<path>[?ref=<ref>], explicit dest required), glob and derived-dest forms must be root/-prefixed"`
+	MakeDirs        []dirGroup            `yaml:"makeDirs" jsonschema_description:"extra-dir perm-groups; each item one dir path (brace-expanded)"`
 	Scripts         []string              `yaml:"runScripts" jsonschema_description:"script paths or globs, repo-relative, run in spec order"`
-	Services        []string              `yaml:"services" jsonschema_description:"launchd service names"`
+	Services        []string              `yaml:"runServices" jsonschema_description:"launchd service names"`
 }
 
 // excludeSet is the subtractive payload: flat glob-string lists.
 type excludeSet struct {
-	Link            []string `yaml:"link" jsonschema_description:"drop matching link items"`
-	Copy            []string `yaml:"copy" jsonschema_description:"drop matching copy items (source or dest)"`
+	MakeLinks       []string `yaml:"makeLinks" jsonschema_description:"drop matching link items"`
+	MakeCopies      []string `yaml:"makeCopies" jsonschema_description:"drop matching copy items (source or dest)"`
 	RenderTemplates []string `yaml:"renderTemplates" jsonschema_description:"drop matching template items (source or dest)"`
-	Mkdirs          []string `yaml:"mkdirs" jsonschema_description:"drop matching dirs"`
+	MakeDirs        []string `yaml:"makeDirs" jsonschema_description:"drop matching dirs"`
 	Scripts         []string `yaml:"runScripts" jsonschema_description:"drop matching scripts (resolved file paths)"`
-	Services        []string `yaml:"services" jsonschema_description:"drop matching services"`
+	Services        []string `yaml:"runServices" jsonschema_description:"drop matching services"`
 }
 
 // linkEntry: bare glob string or {source, dest}. glob set iff the glob form.
@@ -161,18 +161,24 @@ type linkEntry struct {
 	Dest   string `yaml:"dest"`
 }
 
-// entry is a copy/template perm-group.
+// entry is a makeCopies perm-group.
 type entry struct {
-	Perms   `yaml:",inline"`
-	Ctx     map[string]string `yaml:"ctx" jsonschema_description:"renderTemplates only: group-level template context, merged under each item's ctx (item keys win)"`
-	Options render.Options    `yaml:"options" jsonschema_description:"renderTemplates only: group-level render options, merged under each explicit dest's options (dest-set fields win)"`
-	Files   []fileSpec        `yaml:"files" jsonschema:"required" jsonschema_description:"the group's items, each inheriting the group's perms"`
+	Perms `yaml:",inline"`
+	Files []fileSpec `yaml:"files" jsonschema:"required" jsonschema_description:"the group's items, each inheriting the group's perms"`
 }
 
-// dirGroup is a mkdirs perm-group.
+// templateGroup is a renderTemplates perm-group.
+type templateGroup struct {
+	Perms   `yaml:",inline"`
+	Ctx     map[string]string `yaml:"ctx" jsonschema_description:"group-level template context, merged under each item's ctx (item keys win)"`
+	Options render.Options    `yaml:"options" jsonschema_description:"group-level render options, merged under each explicit dest's options (dest-set fields win)"`
+	Files   []fileSpec        `yaml:"templates" jsonschema:"required" jsonschema_description:"the group's items, each inheriting the group's perms"`
+}
+
+// dirGroup is a makeDirs perm-group.
 type dirGroup struct {
 	Perms `yaml:",inline"`
-	Files []dirSpec `yaml:"files" jsonschema:"required" jsonschema_description:"the group's items, each inheriting the group's perms"`
+	Files []dirSpec `yaml:"directories" jsonschema:"required" jsonschema_description:"the group's items, each inheriting the group's perms"`
 }
 
 // fileSpec: bare glob string or {source, dest}. glob set iff the glob form.
@@ -214,7 +220,7 @@ type Perms struct {
 
 // FileItem is one resolved file: source (templates: repo-root-relative or
 // @-prefixed remote ref, links/copies: under root/), explicit dests
-// (nil -> derived in host), optional perms and template context. MkDirs items
+// (nil -> derived in host), optional perms and template context. MakeDirs items
 // without Dests are ancestor dirs (path in Rel, zero perms).
 type FileItem struct {
 	Rel   string
@@ -244,16 +250,16 @@ type (
 		OperationRecipe
 		Dirs []string
 	}
-	MkDirsOperationRecipe struct {
+	MakeDirsOperationRecipe struct {
 		OperationRecipe
-		Dirs []FileItem // ancestor dirs (Rel, zero perms) + mkdirs entries (Dests + perms), one list
+		Dirs []FileItem // ancestor dirs (Rel, zero perms) + makeDirs entries (Dests + perms), one list
 	}
-	LinkOperationRecipe struct {
+	MakeLinksOperationRecipe struct {
 		OperationRecipe
 		Links []FileItem
 		Dirs  []string
 	}
-	CopyOperationRecipe struct {
+	MakeCopiesOperationRecipe struct {
 		OperationRecipe
 		Copies []FileItem
 		Dirs   []string
@@ -266,7 +272,7 @@ type (
 		OperationRecipe
 		Scripts []string // repo-relative, run order
 	}
-	ServicesOperationRecipe struct {
+	RunServicesOperationRecipe struct {
 		OperationRecipe
 		Services []string // service names
 	}
@@ -276,12 +282,12 @@ type (
 // MakeProfile output, field order = run order.
 type OperationRecipes struct {
 	PruneLinks      PruneLinksOperationRecipe
-	MkDirs          MkDirsOperationRecipe
-	Link            LinkOperationRecipe
-	Copy            CopyOperationRecipe
+	MakeDirs        MakeDirsOperationRecipe
+	MakeLinks       MakeLinksOperationRecipe
+	MakeCopies      MakeCopiesOperationRecipe
 	RenderTemplates RenderTemplatesOperationRecipe
 	RunScripts      RunScriptsOperationRecipe
-	Services        ServicesOperationRecipe
+	RunServices     RunServicesOperationRecipe
 }
 
 // [<] 🤖🤖
@@ -292,10 +298,10 @@ type OperationRecipes struct {
 // before emitting OperationRecipes.
 type resolved struct {
 	Links     []FileItem // link op: regular files minus templates/copies/.gitkeep
-	Copies    []FileItem // copy op: *.ontoHost.cp
+	Copies    []FileItem // makeCopies op: *.ontoHost.cp
 	Templates []FileItem // render op: *.tpl, dest path decides host vs repo
 	Dirs      []string   // every ancestor dir of links+copies+derived-dest templates
-	ExtraDirs []FileItem // mkdirs only (live dest entries), one per path, carrying perms
+	ExtraDirs []FileItem // makeDirs only (live dest entries), one per path, carrying perms
 	Services  []string   // service names
 	Scripts   []string   // script entries in spec order
 }
@@ -334,7 +340,7 @@ type effective struct {
 	tmplGlobs globSet               // render-templates globs (repo-root-relative, root/-prefixed)
 	richCopy  []FileItem            // rich-form copy entries
 	richTmpl  []FileItem            // rich-form render-templates entries (repo-root-relative)
-	dirs      []FileItem            // mkdirs: glob forms expanded to one item per path, rich carry perms
+	dirs      []FileItem            // makeDirs: glob forms expanded to one item per path, rich carry perms
 	scripts   []string              // script paths (order = run order)
 	services  []string              // service names
 	refs      []ProfileSourceRecipe // sourced include.profiles refs (composition order)

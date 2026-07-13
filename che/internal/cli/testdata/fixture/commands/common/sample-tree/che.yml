@@ -1,11 +1,11 @@
 options: {workingDirectory: root}
 base:
   include:
-    link:
+    makeLinks:
       - HOME/.config/zsh/**
       - etc/zshrc
       - {source: HOME/.config/foo/**, dest: s/foo/bar/}
-    copy:
+    makeCopies:
       - files: [HOME/.config/zsh/**]
       - owner: root
         ownerGroup: wheel
@@ -13,15 +13,15 @@ base:
         files:
           - {source: Library/LaunchDaemons/otelcol.plist.ontoHost.cp, dest: [/Library/LaunchDaemons/otelcol.plist]}
     renderTemplates:
-      - files: [root/HOME/.config/zsh/**]
-    mkdirs:
-      - files: [HOME/.cache/zsh]
+      - templates: [root/HOME/.config/zsh/**]
+    makeDirs:
+      - directories: [HOME/.cache/zsh]
       - chmod: "2775"
-        files:
+        directories:
           - {dest: [/var/log/che-test-setgid]}
     runScripts:
       - install/setup
-    services: [otelcol]
+    runServices: [otelcol]
 
 cli/macos:
   options: {autoDiscover: true, execIf: ['builtin:isOs == macos', 'builtin:isVirt']}
@@ -36,6 +36,6 @@ desktop/macos:
 ontoRepo:
   include:
     renderTemplates:
-      - files:
+      - templates:
           - source: templates/r.ontoRepo.tpl
             dest: [docs/r.md]

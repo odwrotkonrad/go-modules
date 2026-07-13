@@ -25,10 +25,13 @@ var ValidateSpec = struct{ Warn, Error ValidateSpecMode }{"warn", "error"}
 
 // Options carries every runtime option.
 type Options struct {
-	Dir               string
-	WorkingDirectory  string
-	DryRun            DryRunMode
-	ValidateSpec      ValidateSpecMode
+	Dir              string
+	WorkingDirectory string
+	DryRun           DryRunMode
+	ValidateSpec     ValidateSpecMode
+	// ValidateSpecCLI is the flag/env-only validateSpec ("" if neither set),
+	// overriding each spec's own options.validateSpec per-spec.
+	ValidateSpecCLI   ValidateSpecMode
 	Profile           string
 	SkipExecIf        bool
 	SkipRemoteRefs    bool

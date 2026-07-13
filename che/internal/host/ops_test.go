@@ -46,12 +46,14 @@ func setupHost(t *testing.T, cfg options.Options) (Host, spec.OperationRecipes, 
 }
 
 var ops = map[string]func(Host, spec.OperationRecipes) error{
-	"link": func(h Host, r spec.OperationRecipes) error { return h.MkLinks(r.Link.Links, r.Link.Dirs) },
-	"copy": func(h Host, r spec.OperationRecipes) error { return h.MkCopies(r.Copy.Copies, r.Copy.Dirs) },
+	"make-links": func(h Host, r spec.OperationRecipes) error { return h.MakeLinks(r.MakeLinks.Links, r.MakeLinks.Dirs) },
+	"make-copies": func(h Host, r spec.OperationRecipes) error {
+		return h.MakeCopies(r.MakeCopies.Copies, r.MakeCopies.Dirs)
+	},
 	"render-templates": func(h Host, r spec.OperationRecipes) error {
 		return h.RenderTemplates(r.RenderTemplates.Templates, false)
 	},
-	"mk-dirs":     func(h Host, r spec.OperationRecipes) error { return h.MkDirs(r.MkDirs.Dirs) },
+	"make-dirs":   func(h Host, r spec.OperationRecipes) error { return h.MakeDirs(r.MakeDirs.Dirs) },
 	"prune-links": func(h Host, r spec.OperationRecipes) error { return h.PruneBrokenLinks(r.PruneLinks.Dirs) },
 	"run-scripts": func(h Host, r spec.OperationRecipes) error {
 		scripts, err := h.ResolveScripts(r.RunScripts.Scripts)
@@ -61,21 +63,21 @@ var ops = map[string]func(Host, spec.OperationRecipes) error{
 		return h.RunScripts(scripts)
 	},
 	"services-bootout": func(h Host, r spec.OperationRecipes) error {
-		svcs, err := h.ResolveServices(r.Services.Services)
+		svcs, err := h.ResolveServices(r.RunServices.Services)
 		if err != nil {
 			return err
 		}
 		return h.Bootout(svcs)
 	},
 	"services-bootin": func(h Host, r spec.OperationRecipes) error {
-		svcs, err := h.ResolveServices(r.Services.Services)
+		svcs, err := h.ResolveServices(r.RunServices.Services)
 		if err != nil {
 			return err
 		}
 		return h.Bootin(svcs)
 	},
 	"services-ensure": func(h Host, r spec.OperationRecipes) error {
-		svcs, err := h.ResolveServices(r.Services.Services)
+		svcs, err := h.ResolveServices(r.RunServices.Services)
 		if err != nil {
 			return err
 		}
