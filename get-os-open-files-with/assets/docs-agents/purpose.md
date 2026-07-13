@@ -6,7 +6,7 @@ CLI printing `<bundle> <uti> <role>` file-handler association lines from `os-ope
 
 ## Why It Exists
 
-macOS file associations belong in config, not clicked together in Finder. The YAML lives in the configs repo.
+macOS file associations belong in config, not clicked in Finder. The YAML lives in the configs repo.
 
 ## Goals
 
