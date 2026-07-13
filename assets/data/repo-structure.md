@@ -11,6 +11,7 @@ che
     che
       testdata
         spec
+          cmds
           funcs
     cli
       testdata
@@ -45,11 +46,6 @@ che
     fsutil
       testdata
         spec
-          funcs
-    host
-      testdata
-        spec
-          cmds
           funcs
     log
       testdata

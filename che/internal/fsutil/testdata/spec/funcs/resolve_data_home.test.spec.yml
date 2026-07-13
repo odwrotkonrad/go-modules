@@ -1,0 +1,20 @@
+# [>] 🤖🤖
+context:
+  function: fsutil.ResolveDataHome
+cases:
+  - name: ShouldUseCheOverrideDirectlyNoSuffix
+    context:
+      env: {CHE_DATA_HOME: /o, XDG_DATA_HOME: /x}
+    expected:
+      output: /o
+  - name: ShouldAppendCheToXdgBase
+    context:
+      env: {CHE_DATA_HOME: "", XDG_DATA_HOME: /x}
+    expected:
+      output: /x/che
+  - name: ShouldFallBackToHomeLocalShareChe
+    context:
+      env: {CHE_DATA_HOME: "", XDG_DATA_HOME: ""}
+    expected:
+      output: /h/.local/share/che
+# [<] 🤖🤖

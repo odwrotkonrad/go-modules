@@ -15,7 +15,6 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"gitlab.com/konradodwrot/go-modules/che/internal/execx"
-	"gitlab.com/konradodwrot/go-modules/che/internal/host"
 	"gitlab.com/konradodwrot/go-modules/che/internal/log"
 	"gitlab.com/konradodwrot/go-modules/che/internal/options"
 	"gitlab.com/konradodwrot/go-modules/che/internal/spec"
@@ -39,6 +38,8 @@ func prepEnv(t *testing.T, hostRepo string) string {
 	for _, k := range []string{
 		"CHE_SKIP_EXEC_IF", "CHE_PROFILE", "CHE_DRY_RUN",
 		"CHE_SKIP_REMOTE_REFS", "CHE_DEBUG", "CHE_VALIDATE_SPEC", "CHE_DIR",
+		"CHE_CACHE_HOME", "CHE_STATE_HOME", "CHE_DATA_HOME",
+		"XDG_CACHE_HOME", "XDG_STATE_HOME", "XDG_DATA_HOME",
 	} {
 		t.Setenv(k, "")
 	}
@@ -73,11 +74,10 @@ func profileByName(ps []*ProfileReady) map[string]*ProfileReady {
 	return by
 }
 
-// linkDests resolves a profile's link items through its own host (workingDir +
+// linkDests resolves a profile's link items through its own toDest (workingDir +
 // HOME/system-root mapping), sorted for stable comparison.
-func linkDests(t *testing.T, home string, p *ProfileReady) []string {
+func linkDests(t *testing.T, p *ProfileReady) []string {
 	t.Helper()
-	h := host.New(p.Source.DirectoryPath, p.workingDir, home, "x", options.Options{})
 	var dests []string
 	for _, op := range p.OperationsReady {
 		lo, ok := op.(*MakeLinksOperationReady)
@@ -85,7 +85,7 @@ func linkDests(t *testing.T, home string, p *ProfileReady) []string {
 			continue
 		}
 		for _, l := range lo.Links {
-			dests = append(dests, h.ToDest(l.Rel))
+			dests = append(dests, p.toDest(l.Rel))
 		}
 	}
 	sort.Strings(dests)
@@ -123,7 +123,7 @@ func TestPrepareSpecs(t *testing.T) {
 			home := prepEnv(t, hostRepo)
 			vars["HOST_REPO"] = hostRepo
 			vars["HOME"] = home
-			vars["CACHE"] = filepath.Join(home, ".local/share/che/sources")
+			vars["CACHE"] = filepath.Join(home, ".cache/che/sources")
 			for k, v := range c.Context.Env {
 				t.Setenv(k, v)
 			}
@@ -222,7 +222,7 @@ func TestPrepareSpecs(t *testing.T) {
 						want = append(want, testyml.Expand(d, vars))
 					}
 					sort.Strings(want)
-					assert.Equalf(t, want, linkDests(t, home, pr), "profile %q link dests\n%s", name, out)
+					assert.Equalf(t, want, linkDests(t, pr), "profile %q link dests\n%s", name, out)
 				}
 			}
 			if knobs.SampleEnv != "" {
@@ -290,7 +290,7 @@ func TestWorkingDirectoryCascade(t *testing.T) {
 	linkDest := func(pr *ProfileReady) string {
 		for _, op := range pr.OperationsReady {
 			if lo, ok := op.(*MakeLinksOperationReady); ok && len(lo.Links) > 0 {
-				return host.New(pr.Source.DirectoryPath, pr.workingDir, home, "x", options.Options{}).ToDest(lo.Links[0].Rel)
+				return pr.toDest(lo.Links[0].Rel)
 			}
 		}
 		return ""
@@ -340,7 +340,7 @@ type stubOperation struct {
 
 func (o *stubOperation) Name() string   { return o.name }
 func (o *stubOperation) Selected() bool { return o.selected }
-func (o *stubOperation) execOperation(_ host.Host) error {
+func (o *stubOperation) execOperation(_ *ProfileReady) error {
 	*o.ran = append(*o.ran, o.name)
 	return o.fail
 }

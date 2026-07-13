@@ -1,0 +1,19 @@
+# [>] 🤖🤖
+context:
+  function: che.ProfileReady.resolveScripts
+cases:
+  - name: ShouldMapRelsToAbsInSpecOrder
+    input:
+      args:
+        - files: [ci/zsh/scripts/installs/90-kitty.zsh, ci/zsh/scripts/installs/00-ci-deps.zsh]
+        - scripts: [ci/zsh/scripts/installs/90-kitty.zsh, ci/zsh/scripts/installs/00-ci-deps.zsh]
+    expected:
+      output: [ci/zsh/scripts/installs/90-kitty.zsh, ci/zsh/scripts/installs/00-ci-deps.zsh]
+  - name: ShouldErrorOnMissingScript
+    input:
+      args:
+        - files: [ci/zsh/scripts/installs/90-kitty.zsh]
+        - scripts: [ci/zsh/scripts/installs/99-absent.zsh]
+    expected:
+      errorOutput: "run-scripts script not found: ci/zsh/scripts/installs/99-absent.zsh"
+# [<] 🤖🤖

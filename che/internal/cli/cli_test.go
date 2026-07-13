@@ -13,7 +13,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"gitlab.com/konradodwrot/go-modules/che/internal/che"
-	"gitlab.com/konradodwrot/go-modules/che/internal/host"
+	"gitlab.com/konradodwrot/go-modules/che/internal/fsutil"
 	"gitlab.com/konradodwrot/go-modules/che/internal/options"
 	"gitlab.com/konradodwrot/go-modules/che/internal/testutil"
 	"gitlab.com/konradodwrot/go-modules/lib/testyml"
@@ -36,7 +36,8 @@ func repoEnv(t *testing.T, pwd string) (*app, *cobra.Command, string) {
 	a.flags.Dir = dir
 	t.Setenv("CHE_SKIP_EXEC_IF", "1")
 	t.Setenv("HOME", home)
-	t.Setenv("XDG_DATA_HOME", filepath.Join(home, ".local/share"))
+	t.Setenv("XDG_STATE_HOME", filepath.Join(home, ".local/state"))
+	t.Setenv("XDG_CACHE_HOME", filepath.Join(home, ".cache"))
 	return a, root, home
 }
 
@@ -48,11 +49,14 @@ func setupMock(t *testing.T, pwd, profile string, decl map[string]string) (*app,
 	a.flags.Profile = profile
 
 	m := testutil.ApplyMocks(t, decl)
-	testyml.Swap(t, &che.NewHost, func(repoRoot, root, home, profile string, cfg options.Options) host.Host {
-		reader := &testutil.FileSystemMockReader{Roots: []string{repoRoot, home}}
-		return host.New(repoRoot, root, home, profile, cfg).WithFS(m.FS).WithFSReader(reader)
+	realSeams := che.NewSeams
+	testyml.Swap(t, &che.NewSeams, func(home string) che.Seams {
+		s := realSeams(home)
+		s.FS = m.FS
+		s.Reader = &testutil.FileSystemMockReader{Roots: []string{a.flags.Dir, home}}
+		return s
 	})
-	testyml.Swap(t, &host.Sleep, testutil.SleepMock)
+	testyml.Swap(t, &fsutil.Sleep, testutil.SleepMock)
 
 	require.NoError(t, a.init())
 	return a, root, home

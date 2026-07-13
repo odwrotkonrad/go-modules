@@ -26,6 +26,26 @@ func TestSlug(t *testing.T) {
 	})
 }
 
+// TestDir: the cache checkout lives under the resolved CACHE base — default
+// ~/.cache/che/sources, CHE_CACHE_HOME (che's base directly), or
+// XDG_CACHE_HOME/che.
+func TestDir(t *testing.T) {
+	const url = "https://example.com/x.git"
+	for _, tc := range []struct {
+		name, che, xdg, want string
+	}{
+		{"default", "", "", "/h/.cache/che/sources/example.com-x"},
+		{"cheOverride", "/o", "/x", "/o/sources/example.com-x"},
+		{"xdgBase", "", "/x", "/x/che/sources/example.com-x"},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Setenv("CHE_CACHE_HOME", tc.che)
+			t.Setenv("XDG_CACHE_HOME", tc.xdg)
+			assert.Equal(t, tc.want, Dir("/h", url))
+		})
+	}
+}
+
 // ensureWant is ensure's expected.output: silence plus files the checkout
 // must carry.
 type ensureWant struct {

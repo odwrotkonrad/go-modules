@@ -1,7 +1,6 @@
 # [>] 🤖
 context:
   command: che run-scripts
-  pwd: testdata/fixture/commands/common/sample-tree
   mockedInterfaces:
     execx.CmdExecutor: testutil.CmdMockExecutor
     fsutil.FileSystemWriter: testutil.FileSystemMockWriter
@@ -13,20 +12,14 @@ cases:
       stdOut: |
         run-scripts: ${REPO}/install/setup
         run-scripts(report): ok ${REPO}/install/setup
-  - name: ShouldNarrowToMatchingName
-    context:
-      command: che run-scripts setup
-    expected:
-      stdOut: |
-        run-scripts: ${REPO}/install/setup
-  - name: ShouldErrorWhenNameMatchesNothing
-    context:
-      command: che run-scripts nonExistingScript
+  - name: ShouldReportFailAndReturnError
+    input:
+      args: [failCmds: [install/setup]]
     expected:
       exitCode: 1
       stdErr:
-        - 'no script matches: [nonExistingScript]'
-    notExpected:
-      stdOut:
-        - 'run-scripts: '
+        - 'scripts failed: '
+      stdOut: |
+        run-scripts(fail): ${REPO}/install/setup: stub: fail install/setup
+        run-scripts(report): fail ${REPO}/install/setup
 # [<] 🤖

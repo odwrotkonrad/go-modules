@@ -1,18 +1,15 @@
 # [>] 🤖
 context:
-  command: che prune-links
-  pwd: testdata/fixture/commands/common/sample-tree
+  command: che render-templates
   mockedInterfaces:
     execx.CmdExecutor: testutil.CmdMockExecutor
     fsutil.FileSystemWriter: testutil.FileSystemMockWriter
     fsutil.FileSystemReader: testutil.FileSystemMockReader
     fsutil.Sleep: testutil.SleepMock
 cases:
-  - name: ShouldScanRootAndRemoveNothingOnFreshTree
+  - name: ShouldRenderAndInstallHostDest
     expected:
       stdOut: |
-        prune-links: ${ROOT}
-    notExpected:
-      stdOut:
-        - 'rm: '
+        archive: {{/.*/}}che-render-{{/.*/}}.tar.bz2
+        render(create): ${HOME}/.config/zsh/t
 # [<] 🤖

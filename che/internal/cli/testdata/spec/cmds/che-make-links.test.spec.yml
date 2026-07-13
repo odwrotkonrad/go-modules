@@ -6,7 +6,7 @@ context:
     execx.CmdExecutor: testutil.CmdMockExecutor
     fsutil.FileSystemWriter: testutil.FileSystemMockWriter
     fsutil.FileSystemReader: testutil.FileSystemMockReader
-    host.Sleep: testutil.SleepMock
+    fsutil.Sleep: testutil.SleepMock
 cases:
   - name: ShouldSymlinkRepoFilesOntoHomeAndSystem
     expected:
@@ -17,7 +17,7 @@ cases:
         make-dirs(create): /Library
         make-dirs(create): /Library/LaunchDaemons
         make-dirs(create): /etc
-        archive: ${HOME}/.local/share/che/backups/che-make-links-{{/.*/}}.tar.bz2
+        archive: ${HOME}/.local/state/che/backups/che-make-links-{{/.*/}}.tar.bz2
         make-links(create): ${HOME}/.config/bar/a
         make-links(create): ${HOME}/.config/zsh/.zshrc
         make-links(create): /etc/zshrc

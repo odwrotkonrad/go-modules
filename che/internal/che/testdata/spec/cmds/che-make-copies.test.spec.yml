@@ -1,7 +1,6 @@
 # [>] 🤖
 context:
   command: che make-copies
-  pwd: testdata/fixture/commands/common/sample-tree
   mockedInterfaces:
     execx.CmdExecutor: testutil.CmdMockExecutor
     fsutil.FileSystemWriter: testutil.FileSystemMockWriter
@@ -11,13 +10,7 @@ cases:
   - name: ShouldCopyMarkerFilesAndChownDaemonPlist
     expected:
       stdOut: |
-        make-dirs(create): ${HOME}/.config
-        make-dirs(create): ${HOME}/.config/bar
-        make-dirs(create): ${HOME}/.config/zsh
-        make-dirs(create): /Library
-        make-dirs(create): /Library/LaunchDaemons
-        make-dirs(create): /etc
-        archive: ${HOME}/.local/state/che/backups/che-make-copies-{{/.*/}}.tar.bz2
+        archive: {{/.*/}}che-make-copies-{{/.*/}}.tar.bz2
         make-copies(create): ${HOME}/.config/zsh/c
         make-copies(create): /Library/LaunchDaemons/otelcol.plist
         make-copies(chown): root:wheel /Library/LaunchDaemons/otelcol.plist

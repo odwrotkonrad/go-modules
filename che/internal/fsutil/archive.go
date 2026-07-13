@@ -15,15 +15,12 @@ import (
 // TsLayout stamps backup filenames + log lines (one stamp per run).
 const TsLayout = "20060102T150405"
 
-// BackupArchivePath resolves the XDG backups dir + per-run archive filename:
-// $XDG_DATA_HOME/che/backups/<bin>-<sub>-<ts>.tar.bz2 (fallback ~/.local/share).
+// BackupArchivePath resolves the XDG state backups dir + per-run archive
+// filename: <ResolveStateHome>/backups/<bin>-<sub>-<ts>.tar.bz2 (default
+// ~/.local/state/che/backups).
 func BackupArchivePath(home, bin, sub, ts string) string {
-	base := os.Getenv("XDG_DATA_HOME")
-	if base == "" {
-		base = filepath.Join(home, ".local/share")
-	}
 	name := fmt.Sprintf("%s-%s-%s.tar.bz2", bin, sub, ts)
-	return filepath.Join(base, "che", "backups", name)
+	return filepath.Join(ResolveStateHome(home), "backups", name)
 }
 
 // ArchiveDests snapshots each existing dest's contents into a single .tar.bz2

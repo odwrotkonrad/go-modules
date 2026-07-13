@@ -25,8 +25,8 @@ var mockRegistry = map[string]string{
 	"fsutil.FileSystemReader": "testutil.FileSystemMockReader",
 	"fsutil.UserLookup":       "testutil.UserMockLookup",
 	"fsutil.GroupLookup":      "testutil.GroupMockLookup",
-	"host.RemoteFetcher":      "testutil.RemoteMockFetcher",
-	"host.Sleep":              "testutil.SleepMock",
+	"che.RemoteFetcher":       "testutil.RemoteMockFetcher",
+	"fsutil.Sleep":            "testutil.SleepMock",
 }
 
 // RequireRegistered fails on any declared pair the registry does not carry.
@@ -58,7 +58,7 @@ func ApplyMocks(t *testing.T, decl map[string]string) *MockSet {
 	return set
 }
 
-// SleepMock is the host.Sleep / render opSleep test double: no pacing.
+// SleepMock is the fsutil.Sleep / render opSleep test double: no pacing.
 func SleepMock(time.Duration) {}
 
 // NewCmdMockExecutor: the double with its command model wired.

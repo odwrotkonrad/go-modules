@@ -1,0 +1,20 @@
+# [>] 🤖🤖
+context:
+  function: fsutil.ResolveCacheHome
+cases:
+  - name: ShouldUseCheOverrideDirectlyNoSuffix
+    context:
+      env: {CHE_CACHE_HOME: /o, XDG_CACHE_HOME: /x}
+    expected:
+      output: /o
+  - name: ShouldAppendCheToXdgBase
+    context:
+      env: {CHE_CACHE_HOME: "", XDG_CACHE_HOME: /x}
+    expected:
+      output: /x/che
+  - name: ShouldFallBackToHomeCacheChe
+    context:
+      env: {CHE_CACHE_HOME: "", XDG_CACHE_HOME: ""}
+    expected:
+      output: /h/.cache/che
+# [<] 🤖🤖

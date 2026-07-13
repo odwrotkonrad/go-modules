@@ -196,6 +196,33 @@ makeCopies:
 `makeLinks` entries reach `$HOME` through their sed rewrite's replacement side
 (`{source: HOME/**, dest: 's#^HOME#$HOME#'}`).
 
+## Environment
+
+### Runtime options
+
+Every flag has a `CHE_*` env mirror (flag wins). See the Global options table
+in `cli.md` for the full list.
+
+### Paths (XDG)
+
+che's runtime data locations follow the XDG base-dir spec, each base
+overridable by a che-owned env:
+
+| Purpose | Path under base | XDG base (`+/che`) | che override | Fallback |
+| --- | --- | --- | --- | --- |
+| remote source caches | `sources/<slug>` | `XDG_CACHE_HOME` | `CHE_CACHE_HOME` | `~/.cache/che` |
+| per-run backups | `backups/<che-op-ts>.tar.bz2` | `XDG_STATE_HOME` | `CHE_STATE_HOME` | `~/.local/state/che` |
+| (data — reserved, no current use) | — | `XDG_DATA_HOME` | `CHE_DATA_HOME` | `~/.local/share/che` |
+
+Precedence per base, most specific wins: `CHE_<X>_HOME` > `XDG_<X>_HOME/che` >
+fallback. The `CHE_*` override points at che's base directly (no `/che`
+appended); the XDG base gets `/che` appended. Example:
+`CHE_CACHE_HOME=/tmp/c` -> `/tmp/c/sources`; `XDG_CACHE_HOME=/x` ->
+`/x/che/sources`; neither set -> `~/.cache/che/sources`.
+
+The DATA row is honored by the resolver but unused by any che path today
+(reserved for future use).
+
 ## include
 
 Additive. Seven sections:

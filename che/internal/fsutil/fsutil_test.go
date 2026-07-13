@@ -54,6 +54,21 @@ func TestUnderHome(t *testing.T) {
 	})
 }
 
+// TestResolveHomes: each XDG base resolver honors CHE override (che's base
+// directly), else XDG base + /che, else the POSIX ~/<default>/che fallback.
+// context.env sets the envs; home is fixed at /h.
+func TestResolveHomes(t *testing.T) {
+	for spec, fn := range map[string]func(string) string{
+		"testdata/spec/funcs/resolve_data_home.test.spec.yml":  ResolveDataHome,
+		"testdata/spec/funcs/resolve_cache_home.test.spec.yml": ResolveCacheHome,
+		"testdata/spec/funcs/resolve_state_home.test.spec.yml": ResolveStateHome,
+	} {
+		testyml.Eq(t, td, spec, func(t *testing.T, c testyml.Case[string]) (string, error) {
+			return fn("/h"), nil
+		})
+	}
+}
+
 func TestExpandAll(t *testing.T) {
 	testyml.Eq(t, td, "testdata/spec/funcs/expand_all.test.spec.yml", func(t *testing.T, c testyml.Case[[]string]) ([]string, error) {
 		return ExpandAll(c.Input.Args.Strings(t, 0)), nil

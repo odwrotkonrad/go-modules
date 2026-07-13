@@ -1,0 +1,20 @@
+# [>] 🤖🤖
+context:
+  function: fsutil.ResolveStateHome
+cases:
+  - name: ShouldUseCheOverrideDirectlyNoSuffix
+    context:
+      env: {CHE_STATE_HOME: /o, XDG_STATE_HOME: /x}
+    expected:
+      output: /o
+  - name: ShouldAppendCheToXdgBase
+    context:
+      env: {CHE_STATE_HOME: "", XDG_STATE_HOME: /x}
+    expected:
+      output: /x/che
+  - name: ShouldFallBackToHomeLocalStateChe
+    context:
+      env: {CHE_STATE_HOME: "", XDG_STATE_HOME: ""}
+    expected:
+      output: /h/.local/state/che
+# [<] 🤖🤖

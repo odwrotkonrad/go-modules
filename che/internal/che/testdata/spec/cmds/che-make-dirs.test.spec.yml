@@ -1,7 +1,6 @@
 # [>] 🤖
 context:
   command: che make-dirs
-  pwd: testdata/fixture/commands/common/sample-tree
   mockedInterfaces:
     execx.CmdExecutor: testutil.CmdMockExecutor
     fsutil.FileSystemWriter: testutil.FileSystemMockWriter
@@ -12,7 +11,6 @@ cases:
     expected:
       stdOut: |
         make-dirs(create): ${HOME}/.config
-        make-dirs(create): ${HOME}/.config/bar
         make-dirs(create): ${HOME}/.config/zsh
         make-dirs(create): /Library
         make-dirs(create): /Library/LaunchDaemons

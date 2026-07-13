@@ -1,5 +1,5 @@
 // Package source manages the cache checkouts of remote source repos, kept at
-// ~/.local/share/che/sources.
+// ~/.cache/che/sources.
 package source
 
 // [>] 🤖🤖
@@ -11,13 +11,14 @@ import (
 	"strings"
 
 	"gitlab.com/konradodwrot/go-modules/che/internal/execx"
+	"gitlab.com/konradodwrot/go-modules/che/internal/fsutil"
 	"gitlab.com/konradodwrot/go-modules/che/internal/log"
 )
 
 // Dir is the managed cache checkout path for url:
-// <home>/.local/share/che/sources/<slug>.
+// <ResolveCacheHome>/sources/<slug> (default ~/.cache/che/sources).
 func Dir(home, url string) string {
-	return filepath.Join(home, ".local/share/che/sources", slug(url))
+	return filepath.Join(fsutil.ResolveCacheHome(home), "sources", slug(url))
 }
 
 // slug sanitizes url into a deterministic dir name: scheme/git@ stripped,

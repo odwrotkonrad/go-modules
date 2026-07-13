@@ -18,10 +18,10 @@ import (
 	"gopkg.in/yaml.v3"
 
 	"gitlab.com/konradodwrot/go-modules/che/internal/fsutil"
-	"gitlab.com/konradodwrot/go-modules/che/internal/host"
 	"gitlab.com/konradodwrot/go-modules/che/internal/log"
 	"gitlab.com/konradodwrot/go-modules/che/internal/options"
 	"gitlab.com/konradodwrot/go-modules/che/internal/spec"
+	"gitlab.com/konradodwrot/go-modules/che/render/render"
 )
 
 // Domain model:
@@ -33,14 +33,42 @@ import (
 //	ProfileReady  one resolved profile, ready to install onto the OS:
 //	              effective options, env overlay, prepared operations
 //	Operations  per-subcommand Recipe/Ready pairs: a Recipe (spec) carries
-//	            UNRESOLVED subjects, its Ready the RESOLVED (host-bound) ones;
-//	            Host is built at call time and passed in, never stored
+//	            UNRESOLVED subjects, its Ready the RESOLVED ones; execOperation
+//	            runs each op's logic against its owning *ProfileReady
 //
 // cli holds opts (options.Options) and the root *SpecReady as separately
 // initialized values: PrepareOptions, then PrepareSpecs.
 
-// NewHost builds each profile's Host; tests override it to inject a mock fs.
-var NewHost = host.New
+// Seams are the fs surfaces a profile drives to touch the host: mutating
+// writer, dest-facing reader, remote template fetcher. Exported so tests can
+// inject record-only mocks via the NewSeams swap point.
+type Seams struct {
+	FS      fsutil.FileSystemWriter
+	Reader  fsutil.FileSystemReader
+	Fetcher RemoteFetcher
+}
+
+// NewSeams builds a profile's real fs seams (home-anchored writer, OS reader,
+// git remote fetcher); tests swap it to inject record-only mocks.
+var NewSeams = func(home string) Seams {
+	return Seams{
+		FS:      fsutil.FS{Home: home},
+		Reader:  fsutil.OSReader{},
+		Fetcher: gitFetcher{fetch: render.NewRemoteFetcher()},
+	}
+}
+
+// RemoteFetcher fetches a remote template source ref's content
+// (<repo>//<path>[?ref=<ref>], marker stripped).
+type RemoteFetcher interface {
+	Fetch(ref string) (string, error)
+}
+
+// gitFetcher is the live RemoteFetcher: shallow in-memory git clones, one
+// clone cache shared across the profile's renders.
+type gitFetcher struct{ fetch func(string) (string, error) }
+
+func (g gitFetcher) Fetch(ref string) (string, error) { return g.fetch(ref) }
 
 // [<] 🤖🤖
 
@@ -433,8 +461,9 @@ func (r *SpecRecipe) assembleProfiles(p *specsPrep, ready *SpecReady, lookup []s
 }
 
 // makeProfileReady resolves one recipe into an executable profile: MakeProfile
-// emits the operation recipes, a Host anchored at the recipe's directory
-// prepares them (subjects resolved), the env overlay wraps preparation.
+// emits the operation recipes, the profile (anchored at the recipe's directory,
+// its fs seams built) prepares them (subjects resolved), the env overlay wraps
+// preparation.
 func (r *SpecRecipe) makeProfileReady(p *specsPrep, rec spec.ProfileRecipe, lookup []spec.ProfileRecipe, env map[string]string) (*ProfileReady, []spec.ProfileSourceRecipe, error) {
 	name := rec.Source.GetProfileName()
 	var pr *ProfileReady
@@ -461,8 +490,9 @@ func (r *SpecRecipe) makeProfileReady(p *specsPrep, rec spec.ProfileRecipe, look
 			workingDir: wd,
 			opts:       p.opts,
 			home:       p.home,
+			Seams:      NewSeams(p.home),
 		}
-		pr.OperationsReady, err = prepareOperations(ops, pr.newHost(), p.opts)
+		pr.OperationsReady, err = pr.prepareOperations(ops)
 		return err
 	})
 	if err != nil {
@@ -517,9 +547,9 @@ func (s *SpecReady) ExecEach(opName string, fn func(*ProfileReady) error) error 
 
 // [>] 🤖🤖 ProfileReady
 
-// ProfileReady is one resolved profile, ready to install onto the OS. Host is
-// built at execution time, anchored at Source.DirectoryPath, and passed per
-// call — never stored.
+// ProfileReady is one resolved profile, ready to install onto the OS: its
+// effective options, env overlay, prepared operations, and the fs seams the op
+// logic drives. It IS the execution context — op methods hang off it.
 type ProfileReady struct {
 	Source          spec.ProfileSourceReady
 	Options         spec.ProfileOptions        // effective values after the cascade
@@ -530,21 +560,107 @@ type ProfileReady struct {
 	workingDir      string                     // resolved load-ops source tree (options.workingDirectory cascade)
 	opts            options.Options
 	home            string
+	Seams           // fs writer/reader/fetcher, defaulted in prepare, test-injectable
 }
 
 // Ref is the profile's display ref (report lines, detect).
 func (p *ProfileReady) Ref() string { return p.ref }
 
-// newHost builds the op executor anchored at the profile's checkout, its
-// load-ops tree at the resolved working dir. Sourced profiles carry a profile=
-// log subtype ([why] disambiguates interleaved runs).
-func (p *ProfileReady) newHost() host.Host {
-	h := NewHost(p.Source.DirectoryPath, p.workingDir, p.home, p.Source.GetProfileName(), p.opts)
-	if p.ref != p.Source.GetProfileName() {
-		h = h.WithLogSub("profile=" + p.Source.GetProfileName())
+// [>] 🤖🤖 execution-context accessors: options + minimal state, profile-scoped
+
+// repoRoot is the checkout anchor (che.yml + repo-relative scripts/templates).
+func (p *ProfileReady) repoRoot() string { return p.Source.DirectoryPath }
+
+// root is the resolved load-ops source tree (the options.workingDirectory
+// value; the RootPrefix logical token and the HOME/ folder map onto it).
+func (p *ProfileReady) root() string { return p.workingDir }
+
+// profileName is the resolved profile name (CONFIGS_PROFILE, plist domain).
+func (p *ProfileReady) profileName() string { return p.Source.GetProfileName() }
+
+// logSub is the trailing log subtype word: sourced profiles carry "profile=
+// <name>" ([why] disambiguates interleaved runs), local ones none.
+func (p *ProfileReady) logSub() string {
+	if p.ref != p.profileName() {
+		return "profile=" + p.profileName()
 	}
-	return h
+	return ""
 }
+
+// isDryRun reports whether this is any dry run (delta or all).
+func (p *ProfileReady) isDryRun() bool { return p.opts.DryRun != options.DryRun.Off }
+
+// isDryRunAll reports the dry-run=all mode (every dest re-reports, never skips).
+func (p *ProfileReady) isDryRunAll() bool { return p.opts.DryRun == options.DryRun.All }
+
+// logMsg logs title/msg at the profile's dry-run mode, carrying its log subtype.
+func (p *ProfileReady) logMsg(title, msg string) {
+	log.MsgSub(title, msg, logMode(p.opts.DryRun), p.logSub())
+}
+
+// mutate is the one dry-run+log gate for every mutating op: dry run logs only
+// (fs untouched); real run executes fn, then logs.
+func (p *ProfileReady) mutate(title, msg string, fn func() error) error {
+	if !p.isDryRun() {
+		if err := fn(); err != nil {
+			return err
+		}
+	}
+	p.logMsg(title, msg)
+	return nil
+}
+
+func logMode(m options.DryRunMode) log.DryRun {
+	switch m {
+	case options.DryRun.Delta:
+		return log.Delta
+	case options.DryRun.All:
+		return log.All
+	default:
+		return log.Off
+	}
+}
+
+// src maps a repo-relative path (under root/) to its absolute source path.
+func (p *ProfileReady) src(rel string) string { return filepath.Join(p.root(), rel) }
+
+// toDest maps a working-tree rel path to its live dest. Env vars expand first
+// (so specs can write $HOME/... dests), $HOME resolving to the invoking user's
+// home (p.home, correct under sudo where the process $HOME differs). Then: an
+// already-absolute path stays (make-extra-dirs entries, $HOME-rooted dests),
+// the HOME tree folder maps onto p.home, everything else is a system-root path.
+func (p *ProfileReady) toDest(rel string) string {
+	rel = p.expandEnv(rel)
+	if rel == "HOME" {
+		return p.home
+	}
+	if rest, ok := strings.CutPrefix(rel, "HOME/"); ok {
+		return filepath.Join(p.home, rest)
+	}
+	if strings.HasPrefix(rel, "/") {
+		return rel
+	}
+	return "/" + rel
+}
+
+// expandEnv expands env vars in path, with $HOME/${HOME} bound to p.home ([why]
+// the invoking user's home, not the process env, which diverges under sudo).
+func (p *ProfileReady) expandEnv(path string) string {
+	return os.Expand(path, func(k string) string {
+		if k == "HOME" {
+			return p.home
+		}
+		return os.Getenv(k)
+	})
+}
+
+// expandHome expands env vars ($HOME bound to p.home) then the ~/ prefix, so a
+// dest may be written with $VAR / $HOME or ~/.
+func (p *ProfileReady) expandHome(path string) string {
+	return fsutil.ExpandHome(p.expandEnv(path), p.home)
+}
+
+// [<] 🤖🤖
 
 // withEnv runs fn inside the profile's env overlay and effective debug level.
 func (p *ProfileReady) withEnv(fn func() error) error {
@@ -562,7 +678,6 @@ func (p *ProfileReady) withEnv(fn func() error) error {
 // stop the rest.
 func (p *ProfileReady) ExecOperations() error {
 	return p.withEnv(func() error {
-		h := p.newHost()
 		var fails []error
 		for _, op := range p.OperationsReady {
 			if !op.Selected() {
@@ -570,7 +685,7 @@ func (p *ProfileReady) ExecOperations() error {
 				continue
 			}
 			log.Msg("all(run)", op.Name(), log.Off)
-			if err := op.execOperation(h); err != nil {
+			if err := op.execOperation(p); err != nil {
 				fails = append(fails, fmt.Errorf("%s: %w", op.Name(), err))
 			}
 		}
@@ -586,7 +701,7 @@ func (p *ProfileReady) ExecOperation(op operationReady) error {
 			log.Debug("all(skip)", op.Name()+" (nothing selected)", log.Off)
 			return nil
 		}
-		return op.execOperation(p.newHost())
+		return op.execOperation(p)
 	})
 }
 
@@ -613,7 +728,7 @@ func (p *ProfileReady) ExecRunScripts(names []string) (int, error) {
 			}
 			scripts := filterScripts(rs.Scripts, names)
 			matched = len(scripts)
-			return p.newHost().RunScripts(scripts)
+			return p.runScripts(scripts)
 		}
 		return nil
 	})
@@ -638,25 +753,26 @@ func filterScripts(scripts, names []string) []string {
 // [>] 🤖🤖 operation parents
 
 // OperationReady is the shared resolved-operation parent: pure resolved data,
-// NO Host field — the Host is passed in at execution time.
+// NO context field — the owning *ProfileReady is passed in at execution time.
 type OperationReady struct{}
 
 // operationReady is the one interface the heterogeneous ordered run list
-// forces: minimal, unexported.
+// forces: minimal, unexported. execOperation runs the op's logic against its
+// owning profile (the execution context).
 type operationReady interface {
-	execOperation(h host.Host) error
+	execOperation(p *ProfileReady) error
 	Selected() bool
 	Name() string
 }
 
-// prepareOperations resolves each operation recipe's subjects against h,
-// returning the prepared operations in run order.
-func prepareOperations(ops spec.OperationRecipes, h host.Host, opts options.Options) ([]operationReady, error) {
-	scripts, err := h.ResolveScripts(ops.RunScripts.Scripts)
+// prepareOperations resolves each operation recipe's subjects against the
+// profile, returning the prepared operations in run order.
+func (p *ProfileReady) prepareOperations(ops spec.OperationRecipes) ([]operationReady, error) {
+	scripts, err := p.resolveScripts(ops.RunScripts.Scripts)
 	if err != nil {
 		return nil, err
 	}
-	services, err := h.ResolveServices(ops.RunServices.Services)
+	services, err := p.resolveServices(ops.RunServices.Services)
 	if err != nil {
 		return nil, err
 	}
@@ -665,7 +781,7 @@ func prepareOperations(ops spec.OperationRecipes, h host.Host, opts options.Opti
 		&MakeDirsOperationReady{Dirs: ops.MakeDirs.Dirs},
 		&MakeLinksOperationReady{Links: ops.MakeLinks.Links, Dirs: ops.MakeLinks.Dirs},
 		&MakeCopiesOperationReady{Copies: ops.MakeCopies.Copies, Dirs: ops.MakeCopies.Dirs},
-		&RenderTemplatesOperationReady{Templates: ops.RenderTemplates.Templates, SkipSecrets: opts.RenderSkipSecrets},
+		&RenderTemplatesOperationReady{Templates: ops.RenderTemplates.Templates, SkipSecrets: p.opts.RenderSkipSecrets},
 		&RunScriptsOperationReady{Scripts: scripts},
 		&BootoutOperationReady{Services: services},
 		&BootinOperationReady{Services: services},
@@ -685,8 +801,8 @@ type PruneLinksOperationReady struct {
 
 func (o *PruneLinksOperationReady) Name() string   { return "prune-links" }
 func (o *PruneLinksOperationReady) Selected() bool { return len(o.Dirs) > 0 }
-func (o *PruneLinksOperationReady) execOperation(h host.Host) error {
-	return h.PruneBrokenLinks(o.Dirs)
+func (o *PruneLinksOperationReady) execOperation(p *ProfileReady) error {
+	return p.pruneBrokenLinks(o.Dirs)
 }
 
 // MakeDirsOperationReady creates the profile's dirs (ancestors + makeDirs entries).
@@ -695,9 +811,9 @@ type MakeDirsOperationReady struct {
 	Dirs []spec.FileItem
 }
 
-func (o *MakeDirsOperationReady) Name() string                    { return "make-dirs" }
-func (o *MakeDirsOperationReady) Selected() bool                  { return len(o.Dirs) > 0 }
-func (o *MakeDirsOperationReady) execOperation(h host.Host) error { return h.MakeDirs(o.Dirs) }
+func (o *MakeDirsOperationReady) Name() string                        { return "make-dirs" }
+func (o *MakeDirsOperationReady) Selected() bool                      { return len(o.Dirs) > 0 }
+func (o *MakeDirsOperationReady) execOperation(p *ProfileReady) error { return p.makeDirs(o.Dirs) }
 
 // MakeLinksOperationReady symlinks configs into the system root.
 type MakeLinksOperationReady struct {
@@ -708,8 +824,8 @@ type MakeLinksOperationReady struct {
 
 func (o *MakeLinksOperationReady) Name() string   { return "make-links" }
 func (o *MakeLinksOperationReady) Selected() bool { return len(o.Links) > 0 }
-func (o *MakeLinksOperationReady) execOperation(h host.Host) error {
-	return h.MakeLinks(o.Links, o.Dirs)
+func (o *MakeLinksOperationReady) execOperation(p *ProfileReady) error {
+	return p.makeLinks(o.Links, o.Dirs)
 }
 
 // MakeCopiesOperationReady copies *.ontoHost.cp sources onto their dests.
@@ -721,8 +837,8 @@ type MakeCopiesOperationReady struct {
 
 func (o *MakeCopiesOperationReady) Name() string   { return "make-copies" }
 func (o *MakeCopiesOperationReady) Selected() bool { return len(o.Copies) > 0 }
-func (o *MakeCopiesOperationReady) execOperation(h host.Host) error {
-	return h.MakeCopies(o.Copies, o.Dirs)
+func (o *MakeCopiesOperationReady) execOperation(p *ProfileReady) error {
+	return p.makeCopies(o.Copies, o.Dirs)
 }
 
 // RenderTemplatesOperationReady renders *.tpl sources; each dest path decides
@@ -735,8 +851,8 @@ type RenderTemplatesOperationReady struct {
 
 func (o *RenderTemplatesOperationReady) Name() string   { return "render-templates" }
 func (o *RenderTemplatesOperationReady) Selected() bool { return len(o.Templates) > 0 }
-func (o *RenderTemplatesOperationReady) execOperation(h host.Host) error {
-	return h.RenderTemplates(o.Templates, o.SkipSecrets)
+func (o *RenderTemplatesOperationReady) execOperation(p *ProfileReady) error {
+	return p.renderTemplates(o.Templates, o.SkipSecrets)
 }
 
 // RunScriptsOperationReady runs the profile's scripts, absolute paths in run order.
@@ -745,39 +861,41 @@ type RunScriptsOperationReady struct {
 	Scripts []string
 }
 
-func (o *RunScriptsOperationReady) Name() string                    { return "run-scripts" }
-func (o *RunScriptsOperationReady) Selected() bool                  { return len(o.Scripts) > 0 }
-func (o *RunScriptsOperationReady) execOperation(h host.Host) error { return h.RunScripts(o.Scripts) }
+func (o *RunScriptsOperationReady) Name() string   { return "run-scripts" }
+func (o *RunScriptsOperationReady) Selected() bool { return len(o.Scripts) > 0 }
+func (o *RunScriptsOperationReady) execOperation(p *ProfileReady) error {
+	return p.runScripts(o.Scripts)
+}
 
 // BootoutOperationReady unloads each service (bootout if loaded, wait until gone).
 type BootoutOperationReady struct {
 	OperationReady
-	Services []host.Service
+	Services []Service
 }
 
-func (o *BootoutOperationReady) Name() string                    { return "services bootout" }
-func (o *BootoutOperationReady) Selected() bool                  { return len(o.Services) > 0 }
-func (o *BootoutOperationReady) execOperation(h host.Host) error { return h.Bootout(o.Services) }
+func (o *BootoutOperationReady) Name() string                        { return "services bootout" }
+func (o *BootoutOperationReady) Selected() bool                      { return len(o.Services) > 0 }
+func (o *BootoutOperationReady) execOperation(p *ProfileReady) error { return p.bootout(o.Services) }
 
 // BootinOperationReady loads each service (bootstrap from plist).
 type BootinOperationReady struct {
 	OperationReady
-	Services []host.Service
+	Services []Service
 }
 
-func (o *BootinOperationReady) Name() string                    { return "services bootin" }
-func (o *BootinOperationReady) Selected() bool                  { return len(o.Services) > 0 }
-func (o *BootinOperationReady) execOperation(h host.Host) error { return h.Bootin(o.Services) }
+func (o *BootinOperationReady) Name() string                        { return "services bootin" }
+func (o *BootinOperationReady) Selected() bool                      { return len(o.Services) > 0 }
+func (o *BootinOperationReady) execOperation(p *ProfileReady) error { return p.bootin(o.Services) }
 
 // EnsureOperationReady settles then verifies each long-running service has a
 // live pid.
 type EnsureOperationReady struct {
 	OperationReady
-	Services []host.Service
+	Services []Service
 }
 
-func (o *EnsureOperationReady) Name() string                    { return "services ensure" }
-func (o *EnsureOperationReady) Selected() bool                  { return len(o.Services) > 0 }
-func (o *EnsureOperationReady) execOperation(h host.Host) error { return h.Ensure(o.Services) }
+func (o *EnsureOperationReady) Name() string                        { return "services ensure" }
+func (o *EnsureOperationReady) Selected() bool                      { return len(o.Services) > 0 }
+func (o *EnsureOperationReady) execOperation(p *ProfileReady) error { return p.ensure(o.Services) }
 
 // [<] 🤖🤖
