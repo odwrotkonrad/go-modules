@@ -13,7 +13,7 @@ base:
         files:
           - {source: Library/LaunchDaemons/otelcol.plist.ontoHost.cp, dest: [/Library/LaunchDaemons/otelcol.plist]}
     renderTemplates:
-      - templates: [root/HOME/.config/zsh/**]
+      - templates: [HOME/.config/zsh/**]
     makeDirs:
       - directories: [HOME/.cache/zsh]
       - chmod: "2775"

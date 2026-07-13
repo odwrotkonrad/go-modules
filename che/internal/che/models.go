@@ -604,7 +604,7 @@ func (p *ProfileReady) Ref() string { return p.ref }
 func (p *ProfileReady) resolveRepoRoot() string { return p.Source.DirectoryPath }
 
 // resolveRoot is the resolved load-ops source tree (the options.workingDirectory
-// value; the RootPrefix logical token and the HOME/ folder map onto it).
+// value; host op sources resolve against it, the HOME/ folder maps onto it).
 func (p *ProfileReady) resolveRoot() string { return p.workingDir }
 
 // resolveProfileName is the resolved profile name (CONFIGS_PROFILE, plist domain).
@@ -653,7 +653,7 @@ func toLogMode(m options.DryRunMode) log.DryRun {
 	}
 }
 
-// resolveSrc maps a repo-relative path (under root/) to its absolute source path.
+// resolveSrc maps a workingDirectory-relative path to its absolute source path.
 func (p *ProfileReady) resolveSrc(relativePath string) string {
 	return filepath.Join(p.resolveRoot(), relativePath)
 }

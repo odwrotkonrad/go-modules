@@ -29,6 +29,7 @@ Every construct in one spec (schema-validated by the test suite):
 ```yaml
 # yaml-language-server: $schema=https://gitlab.com/konradodwrot/go-modules/-/raw/main/che/assets/data/che.schema.json
 options:
+  workingDirectory: root
   execIf: ['env:CHE_ENABLED']
   autoDiscover: false
   debug: false
@@ -52,12 +53,12 @@ base:
         files:
           - {source: Library/LaunchDaemons/otelcol.plist.ontoHost.cp, dest: [/Library/LaunchDaemons/otelcol.plist]}
     renderTemplates:
-      - templates: [root/HOME/**]
+      - templates: [HOME/**]
       - owner: root
         ownerGroup: "0"
         chmod: "0440"
         templates:
-          - {source: root/etc/sudoers.d/configs.ontoHost.tpl, dest: [/etc/sudoers.d/configs]}
+          - {source: etc/sudoers.d/configs.ontoHost.tpl, dest: [/etc/sudoers.d/configs]}
     makeDirs:
       - directories:
           - HOME/.local/{bin,share}
@@ -75,7 +76,7 @@ base-exclude-cli:
     makeCopies:
       - Library/LaunchDaemons/otelcol.plist*
     renderTemplates:
-      - root/etc/sudoers.d/**
+      - etc/sudoers.d/**
     makeDirs:
       - /var/log/{grafana,prometheus}
     runScripts:
@@ -122,9 +123,9 @@ Spec-wide defaults + che knobs:
 - `autoDiscover`, `debug` (bool): defaults for profiles that don't set them.
 - `workingDirectory` (path): load-ops source tree, default `.` (the checkout).
   Absolute, `~/`, `$VAR`, env vars expand; relative resolves under the
-  checkout. The `root/` token in `include` globs maps onto it; the `HOME/`
-  folder under it maps onto `$HOME`. che.yml lookup and repo-relative paths
-  (scripts, `renderTemplates` sources) stay at the checkout.
+  checkout. makeLinks/makeCopies globs and renderTemplates host sources resolve
+  against it; the `HOME/` folder under it maps onto `$HOME`. che.yml lookup,
+  scripts, and repo-doc template sources (repo dest) stay at the checkout.
 - `validateSpec` (`warn` | `error`): top-level only; flag and env override.
 - `dryRun` (`delta` | `all`): default dry-run mode; flag and env override.
 - `profiles` (string list): profiles to run (autoDiscover skipped, execIf still
@@ -197,7 +198,7 @@ Dest strings expand env vars, `$HOME` bound to the invoking user's home
 ```yaml
 renderTemplates:
   - templates:
-      - {source: root/x.tpl, dest: [$HOME/.config/x]}
+      - {source: HOME/x.tpl, dest: [$HOME/.config/x]}
 makeCopies:
   - files:
       - {source: HOME/foo.ontoHost.cp, dest: [$HOME/.config/foo]}
@@ -339,13 +340,15 @@ makeCopies:
 ### renderTemplates
 
 Perm-groups of `*.tpl` sources rendered through gomplate, op:// 1Password refs
-resolved at render time. Sources repo-root-relative. Dest path decides target:
-relative -> repo, `~/` or absolute -> host. Glob form and rich form without
-`dest` must be `root/`-prefixed (derived dest is a host path).
+resolved at render time. Dest path decides target: relative -> repo, `~/` or
+absolute -> host. Source anchors by dest kind: host sources (glob form, derived
+dest, or any `~/`/absolute dest) are workingDirectory-relative; repo-doc sources
+(repo dest) are checkout-relative. Glob and dest-omitted forms derive a host
+dest.
 
 ```yaml
 renderTemplates:
-  - templates: [root/HOME/**]
+  - templates: [HOME/**]
   - templates:
       - source: templates/1-env/local.env.ontoRepo.tpl
         dest:
@@ -420,7 +423,7 @@ source or any dest drops the item.
 exclude:
   makeLinks: [HOME/Library/**]
   makeCopies: [Library/LaunchDaemons/grafana.plist*]
-  renderTemplates: [root/HOME/.gitlab-runner/**]
+  renderTemplates: [HOME/.gitlab-runner/**]
   makeDirs: [/var/log/grafana]
   runScripts: [ci/zsh/scripts/installs/80-go-host-tools.zsh]
   runServices: [grafana]

@@ -230,11 +230,11 @@ func expandScripts(repoRoot string, entries []string) ([]string, error) {
 
 // classify applies the glob-form ops to git-tracked files under root, bucketing
 // them into Links/Copies/Templates plus ancestor Dirs. Glob copy/template files
-// inherit the matching glob's perms. Template globs are repo-root-relative
-// (root/-prefixed), so tracked rels match with the root/ prefix restored.
+// inherit the matching glob's perms. All globs are workingDirectory-relative,
+// matched against the workingDir-relative tracked rels directly.
 func classify(root string, eff effective, res *resolved) error {
 	if _, err := os.Stat(root); os.IsNotExist(err) {
-		return nil // no root/ subtree: repo-only project (rich template selection only)
+		return nil // no workingDir subtree: repo-only project (rich template selection only)
 	}
 	tracked, err := fsutil.ListTrackedFiles(root)
 	if err != nil {
@@ -242,11 +242,11 @@ func classify(root string, eff effective, res *resolved) error {
 	}
 	rich := richRels(eff) // rich entries win: skip their glob twins
 	for _, rel := range tracked {
-		if rich[rel] || rich[RootPrefix+rel] {
+		if rich[rel] {
 			continue
 		}
 		switch {
-		case IsTmplSrc(rel) && hit(eff.tmplGlobs, RootPrefix+rel, &res.Templates):
+		case IsTmplSrc(rel) && hit(eff.tmplGlobs, rel, &res.Templates):
 		case strings.HasSuffix(rel, CpExt) && hit(eff.copyGlobs, rel, &res.Copies):
 		case filepath.Base(rel) == ".gitkeep":
 			// excluded from every op
@@ -286,8 +286,8 @@ func richRels(eff effective) map[string]bool {
 
 // collectDirs derives every ancestor dir of the file items into res.Dirs.
 // Links contribute their dest rel ([why] rewritten host dirs must exist).
-// Templates contribute only derived-dest (glob-form) items, root/ prefix
-// stripped ([why] rich dests need no pre-created host dirs).
+// Templates contribute only derived-dest (glob-form) items ([why] rich dests
+// need no pre-created host dirs).
 func collectDirs(res *resolved) {
 	dirSeen := map[string]bool{}
 	addRel := func(rel string) {
@@ -307,7 +307,7 @@ func collectDirs(res *resolved) {
 	add(res.Copies)
 	for _, it := range res.Templates {
 		if len(it.Dests) == 0 {
-			addRel(strings.TrimPrefix(it.Rel, RootPrefix))
+			addRel(it.Rel)
 		}
 	}
 	slices.SortFunc(res.Links, byRel)
@@ -447,18 +447,15 @@ func splitEntries(entries []entry, globs *globSet, rich *[]FileItem) {
 }
 
 // splitTemplates: glob items go to globs, {source, dest} items become rich
-// FileItems. Remote refs (@<repo>//<path>) require an explicit dest, the
-// derived-dest form (glob, or rich without dest) a root/-prefixed source
-// ([why] only root/ paths map to host dests).
+// FileItems. Glob and derived-dest sources are workingDirectory-relative (host
+// dest derived from the source path); remote refs (@<repo>//<path>) require an
+// explicit dest.
 func splitTemplates(entries []templateGroup, globs *globSet, rich *[]FileItem) error {
 	for _, e := range entries {
 		for _, f := range e.Files {
 			if f.glob != "" {
 				if IsRemoteSrc(f.glob) {
 					return fmt.Errorf("renderTemplates glob cannot be remote: %q", f.glob)
-				}
-				if !strings.HasPrefix(f.glob, RootPrefix) {
-					return fmt.Errorf("renderTemplates glob must be root/-prefixed (derived host dest): %q", f.glob)
 				}
 				globs.add(f.glob, e.Perms)
 				continue
@@ -470,9 +467,6 @@ func splitTemplates(entries []templateGroup, globs *globSet, rich *[]FileItem) e
 				if len(f.Dest) == 0 {
 					return fmt.Errorf("renderTemplates remote source requires explicit dest: %q", f.Source)
 				}
-			}
-			if len(f.Dest) == 0 && !strings.HasPrefix(f.Source, RootPrefix) {
-				return fmt.Errorf("renderTemplates source without dest must be root/-prefixed (derived host dest): %q", f.Source)
 			}
 			*rich = append(*rich, FileItem{Rel: f.Source, Dests: mergeDestOptions(e.Options, f.Dest), Ctx: fsutil.MergeMap(e.Ctx, f.Ctx), Perms: e.Perms})
 		}

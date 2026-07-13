@@ -101,25 +101,25 @@ const destPathDesc = "dest path: relative -> repo, ~/ or absolute -> host"
 func (linkEntry) JSONSchema() *jsonschema.Schema {
 	o := obj("source file or glob with a sed-style dest rewrite", []string{"source", "dest"})
 	o.Properties.Set("source", &jsonschema.Schema{
-		Description: "file or glob, repo-relative under root/",
+		Description: "file or glob, workingDirectory-relative",
 		Type:        "string",
 	})
 	o.Properties.Set("dest", &jsonschema.Schema{
-		Description: "sed-style rewrite s/<pattern>/<replacement>/[g] (Go regexp, $1 backrefs; g: every match, absent: first only), applied to the repo-relative dest path before host mapping",
+		Description: "sed-style rewrite s/<pattern>/<replacement>/[g] (Go regexp, $1 backrefs; g: every match, absent: first only), applied to the workingDirectory-relative dest path before host mapping",
 		Type:        "string",
 		Pattern:     "^s/.+/.*/g?$",
 	})
-	return scalarOr("glob over git-tracked files under root/ (brace-expanded), dest derived 1:1", o)
+	return scalarOr("glob over git-tracked files (brace-expanded), workingDirectory-relative, dest derived 1:1", o)
 }
 
 func (fileSpec) JSONSchema() *jsonschema.Schema {
 	o := obj("one source fanned out to explicit dests", []string{"source"})
 	o.Properties.Set("source", &jsonschema.Schema{
-		Description: "repo-relative source path, or remote ref @<repo>//<path>[?ref=<ref>] (renderTemplates only, explicit dest required)",
+		Description: "source path (host sources workingDirectory-relative, repo-doc sources checkout-relative), or remote ref @<repo>//<path>[?ref=<ref>] (renderTemplates only, explicit dest required)",
 		Type:        "string",
 	})
 	o.Properties.Set("dest", &jsonschema.Schema{
-		Description: "dest paths: relative -> repo, ~/ or absolute -> host; omitted -> derived from the root/ source path",
+		Description: "dest paths: relative -> repo, ~/ or absolute -> host; omitted -> derived from the workingDirectory-relative source path",
 		Type:        "array",
 		Items:       &jsonschema.Schema{Ref: "#/$defs/DestSpec"},
 	})
