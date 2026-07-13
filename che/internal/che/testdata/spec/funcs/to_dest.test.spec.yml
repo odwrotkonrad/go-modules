@@ -2,16 +2,16 @@
 context:
   function: che.ProfileReady.toDest
 cases:
-  - name: ShouldMapBareHomeTokenToHomeDir
+  - name: ShouldMapBareHomeTokenToSystemRoot
     input:
       args: [rel: HOME]
     expected:
-      output: /Users/x
-  - name: ShouldMapHomePrefixedRelUnderHomeDir
+      output: /HOME
+  - name: ShouldMapHomePrefixedRelToSystemRoot
     input:
       args: [rel: HOME/.config/zsh]
     expected:
-      output: /Users/x/.config/zsh
+      output: /HOME/.config/zsh
   - name: ShouldMapBareRelToRootAbsolutePath
     input:
       args: [rel: etc/zshrc]

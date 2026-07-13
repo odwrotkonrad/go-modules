@@ -12,14 +12,19 @@ cases:
       args: [rule: s/o/0/g, path: HOME/.config/foo/oo]
     expected:
       output: HOME/.c0nfig/f00/00
-  - name: ShouldSupportCaptureGroups
+  - name: ShouldRewriteHomePrefixToHomeVarLiterally
     input:
-      args: [rule: s/(foo)/x$1/, path: HOME/foo/a]
+      args: [rule: 's#^HOME#$HOME#', path: HOME/.config/foo]
     expected:
-      output: HOME/xfoo/a
-  - name: ShouldParseEscapedSlash
+      output: $HOME/.config/foo
+  - name: ShouldTreatReplacementAsLiteralNotBackref
     input:
-      args: [rule: s/foo\/bar/baz/, path: HOME/foo/bar/a]
+      args: [rule: 's/(foo)/x$1/', path: HOME/foo/a]
+    expected:
+      output: HOME/x$1/a
+  - name: ShouldParseEscapedDelimiter
+    input:
+      args: [rule: 's#foo\#bar#baz#', path: HOME/foo#bar/a]
     expected:
       output: HOME/baz/a
   - name: ShouldKeepPathUnchangedWithoutMatch
@@ -31,20 +36,20 @@ cases:
     input:
       args: [rule: "1:1", path: HOME/foo/a]
     expected:
-      errorOutput: [link dest]
+      errorOutput: [dest rule]
   - name: ShouldErrorOnEmptyRule
     input:
       args: [rule: "", path: HOME/foo/a]
     expected:
-      errorOutput: [link dest]
+      errorOutput: [dest rule]
   - name: ShouldErrorOnMalformedRule
     input:
       args: [rule: s/foo/bar, path: HOME/foo/a]
     expected:
-      errorOutput: [link dest]
+      errorOutput: [dest rule]
   - name: ShouldErrorOnInvalidRegex
     input:
       args: [rule: "s/[/x/", path: HOME/foo/a]
     expected:
-      errorOutput: [link dest]
+      errorOutput: [dest rule]
 # [<] 🤖🤖

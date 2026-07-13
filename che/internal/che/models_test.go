@@ -86,7 +86,7 @@ func linkDests(t *testing.T, p *ProfileReady) []string {
 			continue
 		}
 		for _, l := range lo.Links {
-			dests = append(dests, p.toDest(l.Rel))
+			dests = append(dests, p.toDest(spec.DestRel(l)))
 		}
 	}
 	sort.Strings(dests)
@@ -344,8 +344,8 @@ func TestPrepareOptionsUserConfig(t *testing.T) {
 func TestWorkingDirectoryCascade(t *testing.T) {
 	repo := testutil.Repo(t, map[string]string{
 		"che.yml": "options:\n  workingDirectory: spectree\n" +
-			"p:\n  options: {autoDiscover: true}\n  include:\n    makeLinks: [HOME/**]\n" +
-			"q:\n  options: {autoDiscover: true, workingDirectory: proftree}\n  include:\n    makeLinks: [HOME/**]\n",
+			"p:\n  options: {autoDiscover: true}\n  include:\n    makeLinks: [{source: HOME/**, dest: 's#^HOME#$HOME#'}]\n" +
+			"q:\n  options: {autoDiscover: true, workingDirectory: proftree}\n  include:\n    makeLinks: [{source: HOME/**, dest: 's#^HOME#$HOME#'}]\n",
 		"spectree/HOME/.config/a": "a\n",
 		"proftree/HOME/.config/b": "b\n",
 	})
@@ -367,7 +367,7 @@ func TestWorkingDirectoryCascade(t *testing.T) {
 	linkDest := func(pr *ProfileReady) string {
 		for _, op := range pr.OperationsReady {
 			if lo, ok := op.(*MakeLinksOperationReady); ok && len(lo.Links) > 0 {
-				return pr.toDest(lo.Links[0].Rel)
+				return pr.toDest(spec.DestRel(lo.Links[0]))
 			}
 		}
 		return ""

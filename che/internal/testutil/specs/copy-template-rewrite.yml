@@ -1,0 +1,9 @@
+##[>] 🤖🤖
+cli/macos:
+  options: {autoDiscover: true}
+  include:
+    makeCopies:
+      - files: [{source: HOME/.config/foo/**, dest: 's#^HOME#$HOME#'}]
+    renderTemplates:
+      - templates: [{source: HOME/.config/foo/**, dest: 's#^HOME#$HOME#'}]
+##[<] 🤖🤖

@@ -115,7 +115,7 @@ type Options struct {
 	ExecIf           []string        `yaml:"execIf" jsonschema_description:"spec-level predicates: gate every profile of this spec (ANDed with each profile's own); spec-only"`
 	AutoDiscover     *bool           `yaml:"autoDiscover" jsonschema_description:"default for profiles that don't set it"`
 	Debug            *bool           `yaml:"debug" jsonschema_description:"default for profiles that don't set it"`
-	WorkingDirectory string          `yaml:"workingDirectory" jsonschema_description:"the load-ops source tree (absolute, relative to the checkout, ~/, $VAR, env vars expanded); default the checkout itself; makeLinks/makeCopies/renderTemplates host sources resolve against it, the HOME/ folder under it maps onto $HOME; spec-only"`
+	WorkingDirectory string          `yaml:"workingDirectory" jsonschema_description:"the load-ops source tree (absolute, relative to the checkout, ~/, $VAR, env vars expanded); default the checkout itself; makeLinks/makeCopies/renderTemplates host sources resolve against it; home targeting is explicit via a $HOME dest rewrite; spec-only"`
 	ValidateSpec     string          `yaml:"validateSpec" jsonschema:"enum=warn,enum=error" jsonschema_description:"how this spec's schema violations report (per-spec: each included spec honors its own); overridden by the flag and env var"`
 	DryRun           string          `yaml:"dryRun" jsonschema:"enum=delta,enum=all" jsonschema_description:"default dry-run mode: delta (changed dests) | all (every dest); overridden by the flag and env var"`
 	Profiles         []string        `yaml:"profiles" jsonschema_description:"profiles to run (autoDiscover skipped, execIf still enforced); overridden by --profiles and CHE_PROFILE"`
@@ -160,9 +160,9 @@ type ProfileOptions struct {
 // includeSet is the additive payload.
 type includeSet struct {
 	Profiles        []ProfileSourceRecipe `yaml:"profiles" jsonschema_description:"profile refs composed depth-first before this profile's own payload: local profile name scalar, or {source, options, env} where source is <source>/<spec-file>.yml::<profile> locating a profile in another spec (its own checkout anchor)"`
-	MakeLinks       []linkEntry           `yaml:"makeLinks" jsonschema_description:"symlink-op entries, workingDirectory-relative: glob string (dest derived 1:1) or {source, dest} sed-style rewrite"`
-	MakeCopies      []entry               `yaml:"makeCopies" jsonschema_description:"*.ontoHost.cp copy-op perm-groups, workingDirectory-relative sources"`
-	RenderTemplates []templateGroup       `yaml:"renderTemplates" jsonschema_description:"*.tpl render-op perm-groups; local host sources workingDirectory-relative, repo-doc sources (repo dest) checkout-relative, or remote (@<repo>//<path>[?ref=<ref>], explicit dest required); glob and derived-dest forms are host sources"`
+	MakeLinks       []linkEntry           `yaml:"makeLinks" jsonschema_description:"symlink-op entries, workingDirectory-relative: glob string (dest derived 1:1) or {source, dest} sed-style dest rewrite (e.g. s#^HOME#$HOME# to target home)"`
+	MakeCopies      []entry               `yaml:"makeCopies" jsonschema_description:"*.ontoHost.cp copy-op perm-groups, workingDirectory-relative sources; a glob source may carry a {source, dest} sed-style dest rewrite"`
+	RenderTemplates []templateGroup       `yaml:"renderTemplates" jsonschema_description:"*.tpl render-op perm-groups; local host sources workingDirectory-relative, repo-doc sources (repo dest) checkout-relative, or remote (@<repo>//<path>[?ref=<ref>], explicit dest required); glob and derived-dest forms are host sources; a glob source may carry a {source, dest} sed-style dest rewrite"`
 	MakeDirs        []dirGroup            `yaml:"makeDirs" jsonschema_description:"extra-dir perm-groups; each item one dir path (brace-expanded)"`
 	Scripts         []string              `yaml:"runScripts" jsonschema_description:"script paths or globs, repo-relative, run in spec order"`
 	Services        []string              `yaml:"runServices" jsonschema_description:"launchd service names"`
@@ -205,12 +205,15 @@ type dirGroup struct {
 	Files []dirSpec `yaml:"directories" jsonschema:"required" jsonschema_description:"the group's items, each inheriting the group's perms"`
 }
 
-// fileSpec: bare glob string or {source, dest}. glob set iff the glob form.
+// fileSpec: bare glob string, {source, dest: [paths]} (explicit per-file dests),
+// or {source, dest: <rule>} (glob source + sed-style dest rewrite). glob set iff
+// the bare-glob form; DestRule set iff the dest scalar parses as a rewrite rule.
 type fileSpec struct {
-	glob   string
-	Source string            `yaml:"source"`
-	Dest   []DestSpec        `yaml:"dest"`
-	Ctx    map[string]string `yaml:"ctx" jsonschema_description:"renderTemplates only: values exposed as the template's root context (.key)"`
+	glob     string
+	DestRule string
+	Source   string            `yaml:"source"`
+	Dest     []DestSpec        `yaml:"dest"`
+	Ctx      map[string]string `yaml:"ctx" jsonschema_description:"renderTemplates only: values exposed as the template's root context (.key)"`
 }
 
 // dirSpec: bare dir path string or {dest}. glob set iff the path form.
@@ -247,9 +250,10 @@ type Perms struct {
 // explicit dests (nil -> derived in host), optional perms and template context.
 // MakeDirs items without Dests are ancestor dirs (path in Rel, zero perms).
 type FileItem struct {
-	Rel   string
-	Dests []DestSpec
-	Ctx   map[string]string
+	Rel     string
+	Dests   []DestSpec
+	Ctx     map[string]string
+	Derived bool // dest derived from a glob rewrite rule (not a rich explicit dest)
 	Perms
 }
 
@@ -330,8 +334,8 @@ type resolved struct {
 	Scripts   []string   // script entries in spec order
 }
 
-// destRule is a parsed sed-style dest rewrite: pattern, replacement ($1
-// backrefs), global flag (absent -> first match only).
+// destRule is a parsed sed-style dest rewrite: pattern, literal replacement,
+// global flag (absent -> first match only).
 type destRule struct {
 	re     *regexp.Regexp
 	repl   string

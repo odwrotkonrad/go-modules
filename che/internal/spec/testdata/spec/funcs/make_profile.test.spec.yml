@@ -185,7 +185,25 @@ cases:
     input:
       args: [spec: link-rewrite-bad, profile: cli/macos]
     expected:
-      errorOutput: [link dest]
+      errorOutput: [dest rule]
+  - name: ShouldMapCopyAndTemplateMatchesThroughDestRewriteRule
+    context: {pwd: testdata/fixture/resolve/tree-copy-template-rewrite}
+    input:
+      args: [spec: copy-template-rewrite, profile: cli/macos]
+    expected:
+      copies: [HOME/.config/foo/a.ontoHost.cp]
+      templates: [HOME/.config/foo/b.conf.tpl]
+      dests:
+        HOME/.config/foo/a.ontoHost.cp: [$HOME/.config/foo/a]
+        HOME/.config/foo/b.conf.tpl: [$HOME/.config/foo/b.conf]
+  - name: ShouldContributeRewrittenCopyAndTemplateAncestorDirs
+    context: {pwd: testdata/fixture/resolve/tree-copy-template-rewrite}
+    input:
+      args: [spec: copy-template-rewrite, profile: cli/macos]
+    contains:
+      dirs: [$HOME/.config/foo]
+    notExpected:
+      dirs: [HOME/.config/foo]
   - name: ShouldErrorOnLocalRefWithEnv
     context: {pwd: testdata/fixture/resolve/tree-ref-env-local}
     input:

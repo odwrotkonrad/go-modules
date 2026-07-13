@@ -6,6 +6,7 @@ package spec
 import (
 	"fmt"
 	"os"
+	"slices"
 	"strings"
 
 	"gopkg.in/yaml.v3"
@@ -99,13 +100,38 @@ func (d *dirSpec) UnmarshalYAML(value *yaml.Node) error {
 }
 
 func (f *fileSpec) UnmarshalYAML(value *yaml.Node) error {
+	// A scalar dest is a rewrite rule, not a path list: capture it and drop the
+	// key so the alias decode (Dest []DestSpec) does not choke on the scalar.
+	node := value
+	if rule, rest, ok := takeScalarDest(value); ok {
+		f.DestRule = rule
+		node = rest
+	}
 	type alias fileSpec
-	return decodeScalarOr(value, &f.glob, (*alias)(f))
+	return decodeScalarOr(node, &f.glob, (*alias)(f))
 }
 
-// LinkDestRel is a link item's repo-relative dest path: the rewritten
-// Dests[0] when a dest rule applied, else the source Rel (1:1).
-func LinkDestRel(it FileItem) string {
+// takeScalarDest returns a mapping node's scalar `dest` value and a copy of the
+// node with that key removed. ok is false when there is no scalar dest.
+func takeScalarDest(value *yaml.Node) (string, *yaml.Node, bool) {
+	if value.Kind != yaml.MappingNode {
+		return "", nil, false
+	}
+	for i := 0; i+1 < len(value.Content); i += 2 {
+		if value.Content[i].Value != "dest" || value.Content[i+1].Kind != yaml.ScalarNode {
+			continue
+		}
+		rule := value.Content[i+1].Value
+		rest := *value
+		rest.Content = slices.Concat(value.Content[:i], value.Content[i+2:])
+		return rule, &rest, true
+	}
+	return "", nil, false
+}
+
+// DestRel is a file item's pre-host-mapping dest rel: the rewritten Dests[0]
+// when a dest rule applied, else the source Rel (1:1).
+func DestRel(it FileItem) string {
 	if len(it.Dests) > 0 {
 		return it.Dests[0].Path
 	}

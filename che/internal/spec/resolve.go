@@ -246,27 +246,34 @@ func classify(root string, eff effective, res *resolved) error {
 			continue
 		}
 		switch {
-		case IsTmplSrc(rel) && hit(eff.tmplGlobs, rel, &res.Templates):
-		case strings.HasSuffix(rel, CpExt) && hit(eff.copyGlobs, rel, &res.Copies):
+		case IsTmplSrc(rel) && hit(eff.tmplGlobs, rel, TrimTmplExt, &res.Templates):
+		case strings.HasSuffix(rel, CpExt) && hit(eff.copyGlobs, rel, trimCpExt, &res.Copies):
 		case filepath.Base(rel) == ".gitkeep":
 			// excluded from every op
-		case hit(eff.linkGlobs, rel, &res.Links):
+		case hit(eff.linkGlobs, rel, identity, &res.Links):
 		}
 	}
 	collectDirs(res)
 	return nil
 }
 
-// hit: a matched link dest rule that changes rel lands as the item's explicit dest.
-func hit(gs globSet, rel string, items *[]FileItem) bool {
+func identity(rel string) string  { return rel }
+func trimCpExt(rel string) string { return strings.TrimSuffix(rel, CpExt) }
+
+// hit matches rel against gs (the raw source rel). A dest rule rewrites the
+// derived dest (destBase strips the op's marker suffix first, so copies/
+// templates land marker-free) and, when it changes, marks the item Derived.
+func hit(gs globSet, rel string, destBase func(string) string, items *[]FileItem) bool {
 	gp, ok := gs.match(rel)
 	if !ok {
 		return false
 	}
 	it := FileItem{Rel: rel, Perms: gp.perms}
 	if gp.rule != nil {
-		if dest := gp.rule.apply(rel); dest != rel {
+		base := destBase(rel)
+		if dest := gp.rule.apply(base); dest != base {
 			it.Dests = []DestSpec{{Path: dest}}
+			it.Derived = true
 		}
 	}
 	*items = append(*items, it)
@@ -291,23 +298,22 @@ func richRels(eff effective) map[string]bool {
 func collectDirs(res *resolved) {
 	dirSeen := map[string]bool{}
 	addRel := func(rel string) {
-		for d := filepath.Dir(rel); d != "." && !dirSeen[d]; d = filepath.Dir(d) {
+		for d := filepath.Dir(rel); d != "." && d != "/" && !dirSeen[d]; d = filepath.Dir(d) {
 			dirSeen[d] = true
 			res.Dirs = append(res.Dirs, d)
 		}
 	}
 	for _, it := range res.Links {
-		addRel(LinkDestRel(it))
+		addRel(DestRel(it))
 	}
-	add := func(items []FileItem) {
-		for _, it := range items {
-			addRel(it.Rel)
-		}
+	for _, it := range res.Copies {
+		addRel(DestRel(it))
 	}
-	add(res.Copies)
 	for _, it := range res.Templates {
 		if len(it.Dests) == 0 {
 			addRel(it.Rel)
+		} else if it.Derived {
+			addRel(it.Dests[0].Path)
 		}
 	}
 	slices.SortFunc(res.Links, byRel)
@@ -412,9 +418,11 @@ func mergeRecipe(recipes []ProfileRecipe, eff *effective, ps ProfileRecipe, seen
 		}
 		eff.linkGlobs.addRule(e.Source, Perms{}, rule)
 	}
-	splitEntries(in.MakeCopies, &eff.copyGlobs, &eff.richCopy)
+	if err := splitEntries(in.MakeCopies, &eff.copyGlobs, &eff.richCopy); err != nil {
+		return fmt.Errorf("profile %q: %w", name, err)
+	}
 	if err := splitTemplates(in.RenderTemplates, &eff.tmplGlobs, &eff.richTmpl); err != nil {
-		return err
+		return fmt.Errorf("profile %q: %w", name, err)
 	}
 	for _, e := range in.MakeDirs {
 		eff.dirs = append(eff.dirs, dirItems(e)...)
@@ -434,16 +442,25 @@ func (ex *excludeSet) append(o excludeSet) {
 	ex.Services = append(ex.Services, o.Services...)
 }
 
-func splitEntries(entries []entry, globs *globSet, rich *[]FileItem) {
+func splitEntries(entries []entry, globs *globSet, rich *[]FileItem) error {
 	for _, e := range entries {
 		for _, f := range e.Files {
 			if f.glob != "" {
 				globs.add(f.glob, e.Perms)
 				continue
 			}
+			if f.DestRule != "" {
+				rule, err := parseDestRule(f.DestRule)
+				if err != nil {
+					return err
+				}
+				globs.addRule(f.Source, e.Perms, rule)
+				continue
+			}
 			*rich = append(*rich, FileItem{Rel: f.Source, Dests: f.Dest, Perms: e.Perms})
 		}
 	}
+	return nil
 }
 
 // splitTemplates: glob items go to globs, {source, dest} items become rich
@@ -458,6 +475,17 @@ func splitTemplates(entries []templateGroup, globs *globSet, rich *[]FileItem) e
 					return fmt.Errorf("renderTemplates glob cannot be remote: %q", f.glob)
 				}
 				globs.add(f.glob, e.Perms)
+				continue
+			}
+			if f.DestRule != "" {
+				if IsRemoteSrc(f.Source) {
+					return fmt.Errorf("renderTemplates dest rewrite cannot be remote: %q", f.Source)
+				}
+				rule, err := parseDestRule(f.DestRule)
+				if err != nil {
+					return err
+				}
+				globs.addRule(f.Source, e.Perms, rule)
 				continue
 			}
 			if IsRemoteSrc(f.Source) {
