@@ -5,10 +5,9 @@ package che
 import (
 	"errors"
 	"os"
-	"path/filepath"
 	"strings"
-	"time"
 
+	"gitlab.com/konradodwrot/go-modules/che/internal/database"
 	"gitlab.com/konradodwrot/go-modules/che/internal/fsutil"
 	"gitlab.com/konradodwrot/go-modules/che/internal/spec"
 )
@@ -17,11 +16,15 @@ import (
 const Bin = "che"
 
 // archiveBefore snapshots every existing dest into one per-run .tar.bz2 under
-// the XDG backups dir before a mutating op runs (sub = op identity).
+// the XDG backups dir before a mutating op runs (sub = op identity). The archive
+// path/sub are stashed on the profile so the op's following mutate calls
+// reference this run's Backup row. Uses the run's shared TsLayout stamp so the
+// filename and the ledger run line up.
 func (p *ProfileReady) archiveBefore(sub string, dests []string) error {
-	ts := time.Now().Format(fsutil.TsLayout)
-	path := fsutil.ResolveBackupArchivePath(p.home, Bin, sub, ts)
-	return p.mutate("archive", path, func() error { return p.FS.ArchiveDestinations(path, dests) })
+	path := fsutil.ResolveBackupArchivePath(p.home, Bin, sub, p.runID)
+	p.currentArchive = path
+	p.currentSub = sub
+	return p.mutate("archive", path, "", opInfo{}, func() error { return p.FS.ArchiveDestinations(path, dests) })
 }
 
 // failItem logs "<op>(fail): <dest>: <err>" and returns err, the per-item
@@ -61,7 +64,7 @@ func (p *ProfileReady) ensureConfigDir(relativePath string) error {
 	if fsutil.IsDirSettled(p.Reader, dest, p.isDryRunAll()) {
 		return nil
 	}
-	err := p.mutate("make-dirs(create)", dest, func() error { return p.FS.MakeDir(dest, 0, false) })
+	err := p.mutate("make-dirs(create)", dest, dest, opInfo{kind: "dir"}, func() error { return p.FS.MakeDir(dest, 0, false) })
 	if err != nil {
 		return p.failItem("make-dirs", dest, err)
 	}
@@ -73,7 +76,7 @@ func (p *ProfileReady) ensureConfigDir(relativePath string) error {
 // drop them.
 func (p *ProfileReady) makeExtraDir(item spec.FileItem, dest string) error {
 	mode, _ := fsutil.ParseMode(item.Chmod)
-	err := p.mutate("make-dirs(create)", dest, func() error { return p.FS.MakeDir(dest, mode, true) })
+	err := p.mutate("make-dirs(create)", dest, dest, opInfo{kind: "dir", mode: item.Chmod}, func() error { return p.FS.MakeDir(dest, mode, true) })
 	if err != nil {
 		return err
 	}
@@ -87,11 +90,11 @@ func (p *ProfileReady) makeExtraDir(item spec.FileItem, dest string) error {
 
 func (p *ProfileReady) chmod(title string, mode os.FileMode, dest string) error {
 	arg := fsutil.FormatModeArg(mode)
-	return p.mutate(title, arg+" "+dest, func() error { return p.FS.ChangeMode(arg, dest) })
+	return p.mutate(title, arg+" "+dest, dest, opInfo{kind: "chmod", mode: arg}, func() error { return p.FS.ChangeMode(arg, dest) })
 }
 
 func (p *ProfileReady) chown(title, owner, dest string) error {
-	return p.mutate(title, owner+" "+dest, func() error { return p.FS.ChangeOwner(owner, dest) })
+	return p.mutate(title, owner+" "+dest, dest, opInfo{kind: "chown", owner: owner}, func() error { return p.FS.ChangeOwner(owner, dest) })
 }
 
 func (p *ProfileReady) chownIfSet(title string, item spec.FileItem, dest string) error {
@@ -122,8 +125,9 @@ func (p *ProfileReady) fixPerms(op, dest string, item spec.FileItem) error {
 }
 
 // runFileOp is the shared shape of the archiving file ops: ensure config dirs,
-// archive every dest upfront (failure aborts), then settle each item/dest pair.
-func (p *ProfileReady) runFileOp(archiveSub, failOp string, dirRelativePaths []string, items []spec.FileItem,
+// archive every dest upfront (failure aborts), settle each item/dest pair, then
+// ledger-sweep any prior dest of kind this profile no longer produces.
+func (p *ProfileReady) runFileOp(archiveSub, failOp, kind string, dirRelativePaths []string, items []spec.FileItem,
 	destsOf func(spec.FileItem) []string, settle func(spec.FileItem, string) error,
 ) error {
 	var errs []error
@@ -144,13 +148,16 @@ func (p *ProfileReady) runFileOp(archiveSub, failOp string, dirRelativePaths []s
 			}
 		}
 	}
+	if !p.isDryRun() {
+		errs = append(errs, p.sweepStale(kind, dests))
+	}
 	return errors.Join(errs...)
 }
 
 // makeLinks symlinks each config into its live dest (ln -fhs), archiving existing
 // dests upfront, skipping links already pointing into the repo.
 func (p *ProfileReady) makeLinks(links []spec.FileItem, dirRelativePaths []string) error {
-	return p.runFileOp("make-links", "make-links", dirRelativePaths, links,
+	return p.runFileOp("make-links", "make-links", "link", dirRelativePaths, links,
 		func(item spec.FileItem) []string { return []string{p.toDest(spec.LinkDestRel(item))} },
 		p.makeLink)
 }
@@ -160,14 +167,14 @@ func (p *ProfileReady) makeLink(item spec.FileItem, dest string) error {
 	if fsutil.IsLinkSettled(p.Reader, src, dest, p.isDryRunAll()) {
 		return nil
 	}
-	return p.mutate("make-links(create)", dest, func() error { return p.FS.MakeSymlink(src, dest) })
+	return p.mutate("make-links(create)", dest, dest, opInfo{kind: "link", target: src, srcRel: item.Rel}, func() error { return p.FS.MakeSymlink(src, dest) })
 }
 
 // makeCopies copies each *.ontoHost.cp to its dest(s) (marker stripped, or explicit
 // dest) when contents differ, archiving existing dests upfront, applying spec
 // perms (else default).
 func (p *ProfileReady) makeCopies(copies []spec.FileItem, dirRelativePaths []string) error {
-	return p.runFileOp("make-copies", "make-copies", dirRelativePaths, copies, p.resolveCopyDests, p.makeCopy)
+	return p.runFileOp("make-copies", "make-copies", "copy", dirRelativePaths, copies, p.resolveCopyDests, p.makeCopy)
 }
 
 func (p *ProfileReady) makeCopy(item spec.FileItem, dest string) error {
@@ -176,7 +183,7 @@ func (p *ProfileReady) makeCopy(item spec.FileItem, dest string) error {
 		return p.fixPerms("make-copies", dest, item)
 	}
 	mode, _ := fsutil.ParseMode(item.Chmod)
-	err := p.mutate("make-copies(create)", dest, func() error { return p.FS.CopyFile(src, dest, mode) })
+	err := p.mutate("make-copies(create)", dest, dest, opInfo{kind: "copy", srcRel: item.Rel, mode: item.Chmod}, func() error { return p.FS.CopyFile(src, dest, mode) })
 	if err != nil {
 		return err
 	}
@@ -206,50 +213,38 @@ func formatOwnerSpec(item spec.FileItem) string {
 	return item.Owner + ":" + item.OwnerGroup
 }
 
-// pruneBrokenLinks removes broken symlinks in config-set dirs (live dests).
-func (p *ProfileReady) pruneBrokenLinks(dirRelativePaths []string) error {
+// pruneBrokenLinks removes link dests the ledger recorded for this profile whose
+// source (repo file the symlink points at) no longer exists — the ledger, not
+// git, is the source of truth. dry-run / records-off -> nothing pruned.
+func (p *ProfileReady) pruneBrokenLinks() error {
 	p.logMsg("prune-links", p.resolveRoot())
+	if p.Ledger == nil || p.profileDone == nil || p.isDryRun() {
+		return nil
+	}
+	installed, err := p.Ledger.InstalledForProfile(p.ref)
+	if err != nil {
+		return err
+	}
 	var errs []error
-	seen := map[string]bool{}
-	for _, relativePath := range dirRelativePaths {
-		dest := p.toDest(relativePath)
-		if seen[dest] {
+	for _, op := range installed {
+		if op.Kind != "link" || p.linkSourcePresent(op) {
 			continue
 		}
-		seen[dest] = true
-		entries, derr := p.Reader.ReadDirectory(dest)
-		if derr != nil {
-			continue // [why] dir may not exist on host yet
-		}
-		for _, e := range entries {
-			path := filepath.Join(dest, e.Name())
-			if !p.isBrokenRepoLink(path) {
-				continue
-			}
-			err := p.mutate("rm", path, func() error { return p.FS.RemoveFile(path) })
-			if err != nil {
-				errs = append(errs, p.failItem("prune-links", path, err))
-			}
+		if err := p.removeStale(op); err != nil {
+			errs = append(errs, p.failItem("prune-links", op.Dest, err))
 		}
 	}
 	return errors.Join(errs...)
 }
 
-// isBrokenRepoLink: path is a symlink into root/ whose target is gone.
-func (p *ProfileReady) isBrokenRepoLink(path string) bool {
-	target, err := p.Reader.ReadLink(path) // [what] non-symlink -> err
-	if err != nil {
-		return false
+// linkSourcePresent reports whether a recorded link op's source (the symlink
+// target it was created with) still exists on disk.
+func (p *ProfileReady) linkSourcePresent(op database.OperationDone) bool {
+	if op.Target == "" {
+		return true // [why] no recorded source: leave it, only prune known-gone
 	}
-	if !filepath.IsAbs(target) {
-		target = filepath.Join(filepath.Dir(path), target)
-	}
-	target = filepath.Clean(target)
-	if !fsutil.IsUnder(target, p.resolveRoot()) {
-		return false
-	}
-	_, err = p.Reader.StatPath(path) // [what] broken
-	return err != nil
+	_, err := p.Reader.StatPath(op.Target)
+	return err == nil
 }
 
 // [<] 🤖🤖

@@ -17,6 +17,7 @@ import (
 
 	"gopkg.in/yaml.v3"
 
+	"gitlab.com/konradodwrot/go-modules/che/internal/database"
 	"gitlab.com/konradodwrot/go-modules/che/internal/fsutil"
 	"gitlab.com/konradodwrot/go-modules/che/internal/log"
 	"gitlab.com/konradodwrot/go-modules/che/internal/options"
@@ -46,15 +47,24 @@ type Seams struct {
 	FS      fsutil.FileSystemWriter
 	Reader  fsutil.FileSystemReader
 	Fetcher RemoteFetcher
+	Ledger  *database.DB // ops ledger; nil records nothing (tests, closed store)
 }
 
 // NewSeams builds a profile's real fs seams (home-anchored writer, OS reader,
-// git remote fetcher); tests swap it to inject record-only mocks.
+// git remote fetcher, ops ledger); tests swap it to inject record-only mocks
+// with a nil Ledger. A failed ledger Open degrades to nil (recording off), never
+// aborting the run.
 var NewSeams = func(home string) Seams {
+	db, err := database.Open(filepath.Join(fsutil.ResolveStateHome(home), "ops.db"))
+	if err != nil {
+		log.Debug("ledger", "open failed: "+err.Error(), log.Off)
+		db = nil
+	}
 	return Seams{
 		FS:      fsutil.FS{Home: home},
 		Reader:  fsutil.OSReader{},
 		Fetcher: gitFetcher{fetch: render.NewRemoteFetcher()},
+		Ledger:  db,
 	}
 }
 
@@ -78,7 +88,7 @@ func (g gitFetcher) Fetch(ref string) (string, error) { return g.fetch(ref) }
 // then resolve with per-field precedence flags > env vars > the user-config
 // file ($XDG_CONFIG_HOME/che/config.yml) > local che.yml options: > defaults.
 // ctx carries the captured launch world (env/cwd); -C shifts ctx.Cwd forward.
-func PrepareApplicationOptions(ctx appCtx, opts options.Options) (appCtx, options.Options, error) {
+func PrepareApplicationOptions(ctx Context, opts options.Options) (Context, options.Options, error) {
 	resolvedOptions := opts
 	resolvedOptions.Dir = cmp.Or(resolvedOptions.Dir, ctx.Env["CHE_DIR"])
 	if resolvedOptions.Dir != "" {
@@ -151,7 +161,7 @@ func readSpecLayer(path string) options.Layer {
 // include.sources + sourced include.profiles refs), fully recursive,
 // cycle-guarded, deduped by source URI + profile name. ctx carries the captured
 // launch world, held once on specsPrep for the whole prepare pass.
-func PrepareSpecs(ctx appCtx, opts options.Options, src spec.SpecSourceRecipe) (*SpecReady, error) {
+func PrepareSpecs(ctx Context, opts options.Options, src spec.SpecSourceRecipe) (*SpecReady, error) {
 	repoRoot, err := findRepoRoot(ctx)
 	if err != nil {
 		return nil, err
@@ -172,11 +182,27 @@ func PrepareSpecs(ctx appCtx, opts options.Options, src spec.SpecSourceRecipe) (
 
 // specsPrep threads the shared composition state through the recursion.
 type specsPrep struct {
-	ctx       appCtx
+	ctx       Context
 	opts      options.Options
 	home      string
-	seenSpecs map[string]bool // resolved spec dirs (include.sources cycle/dup guard)
-	seenRefs  map[string]bool // <uri>::<profile> (sourced-ref dedup)
+	seenSpecs map[string]bool    // resolved spec dirs (include.sources cycle/dup guard)
+	seenRefs  map[string]bool    // <uri>::<profile> (sourced-ref dedup)
+	specDone  *database.SpecDone // the run's ledger row, created lazily by the first recording profile
+}
+
+// startSpec lazily creates (once per run) the ledger SpecDone row on the shared
+// ledger handle, keyed by the run's TsLayout stamp. Later profiles reuse it.
+func (p *specsPrep) startSpec(db *database.DB, uri string) *database.SpecDone {
+	if p.specDone != nil {
+		return p.specDone
+	}
+	s, err := db.StartSpec(p.ctx.RunID, uri, p.ctx.Command)
+	if err != nil {
+		log.Debug("ledger", "start spec: "+err.Error(), log.Off)
+		return nil
+	}
+	p.specDone = s
+	return s
 }
 
 // prepare runs one spec through the full pipeline. forced pins the spec to a
@@ -210,7 +236,7 @@ func (p *specsPrep) prepare(src spec.SpecSourceRecipe, anchor string, forced *sp
 
 // findRepoRoot: git toplevel of ctx.Cwd, che.yml must live there (che's
 // defining marker).
-func findRepoRoot(ctx appCtx) (string, error) {
+func findRepoRoot(ctx Context) (string, error) {
 	root, err := fsutil.ResolveRepoRoot(ctx.Cwd)
 	if err != nil {
 		return "", err
@@ -224,7 +250,7 @@ func findRepoRoot(ctx appCtx) (string, error) {
 // resolveInvokingHome resolves the invoking user's home. Under sudo (EUID 0,
 // SUDO_USER set), looks up that user's home from passwd so dest paths derive
 // from the real user, not /var/root. Otherwise uses $HOME.
-func resolveInvokingHome(ctx appCtx) (string, error) {
+func resolveInvokingHome(ctx Context) (string, error) {
 	if ctx.Euid == 0 {
 		if name := ctx.Env["SUDO_USER"]; name != "" {
 			h, err := fsutil.ResolveUserHome(name)
@@ -510,20 +536,29 @@ func (r *SpecRecipe) makeProfileReady(p *specsPrep, rec spec.ProfileRecipe, look
 	if err != nil {
 		return nil, nil, fmt.Errorf("profile %q: %w", name, err)
 	}
+	seams := NewSeams(p.home)
+	specDone := p.startSpec(seams.Ledger, r.sourceReady.DefinitionURI)
+	profileDone, err := seams.Ledger.StartProfile(specDone, rec.Source.String(), name, r.sourceReady.DefinitionURI, rec.Source.DirectoryPath)
+	if err != nil {
+		log.Debug("ledger", "start profile: "+err.Error(), log.Off)
+	}
 	pr := &ProfileReady{
 		Source: spec.ProfileSourceReady{
 			SourceReady: spec.SourceReady{DefinitionURI: r.sourceReady.DefinitionURI, DirectoryPath: rec.Source.DirectoryPath},
 			ProfileName: name,
 		},
-		Options:    rec.Options,
-		Env:        env,
-		env:        effectiveEnv,
-		Profiles:   sourced,
-		ref:        rec.Source.String(),
-		workingDir: wd,
-		opts:       p.opts,
-		home:       p.home,
-		Seams:      NewSeams(p.home),
+		Options:     rec.Options,
+		Env:         env,
+		env:         effectiveEnv,
+		Profiles:    sourced,
+		ref:         rec.Source.String(),
+		workingDir:  wd,
+		opts:        p.opts,
+		home:        p.home,
+		runID:       p.ctx.RunID,
+		specDone:    specDone,
+		profileDone: profileDone,
+		Seams:       seams,
 	}
 	pr.OperationsReady, err = pr.prepareOperations(ops)
 	if err != nil {
@@ -591,8 +626,23 @@ type ProfileReady struct {
 	workingDir      string                     // resolved load-ops source tree (options.workingDirectory cascade)
 	opts            options.Options
 	home            string
-	env             map[string]string // captured launch env overlaid with Env, read by expandEnv/buildScriptsEnv
-	Seams                             // fs writer/reader/fetcher, defaulted in prepare, test-injectable
+	env             map[string]string     // captured launch env overlaid with Env, read by expandEnv/buildScriptsEnv
+	runID           string                // the run's TsLayout stamp (backup filenames + ledger run)
+	specDone        *database.SpecDone    // the run's ledger row (nil when not recording)
+	profileDone     *database.ProfileDone // this profile's ledger row (nil when not recording)
+	currentArchive  string                // archive path the in-flight op's archiveBefore wrote ("" -> no backup)
+	currentSub      string                // that archive's sub (Backup.Sub)
+	Seams                                 // fs writer/reader/fetcher, defaulted in prepare, test-injectable
+}
+
+// opInfo carries the kind-specific columns a mutate call fills for its
+// OperationDone row: only the fields the op's Kind uses are set.
+type opInfo struct {
+	kind   string // link | copy | render | dir | chmod | chown | rm
+	target string // link target / render header ("" if n/a)
+	srcRel string // copy/render source rel ("" if n/a)
+	mode   string // octal mode applied ("" if n/a)
+	owner  string // "owner:group" applied ("" if n/a)
 }
 
 // Ref is the profile's display ref (report lines, discover).
@@ -631,15 +681,85 @@ func (p *ProfileReady) logMsg(title, msg string) {
 }
 
 // mutate is the one dry-run+log gate for every mutating op: dry run logs only
-// (fs untouched); real run executes fn, then logs.
-func (p *ProfileReady) mutate(title, msg string, fn func() error) error {
-	if !p.isDryRun() {
-		if err := fn(); err != nil {
-			return err
-		}
+// (fs untouched); real run executes fn, then logs. On a real run it also records
+// the dest mutation into the ops ledger (classify prev before fn, next after),
+// keyed by info.kind. dest "" / dry-run / no ledger -> nothing recorded.
+func (p *ProfileReady) mutate(title, msg, dest string, info opInfo, fn func() error) error {
+	if p.isDryRun() {
+		p.logMsg(title, msg)
+		return nil
+	}
+	prev := p.classifyDest(dest)
+	if err := fn(); err != nil {
+		return err
 	}
 	p.logMsg(title, msg)
+	p.recordOperation(dest, info, prev)
 	return nil
+}
+
+// classifyDest reads a dest's current state (link/file/dir/absent) for the
+// ledger prev/next Object.
+func (p *ProfileReady) classifyDest(dest string) database.Object {
+	if dest == "" {
+		return database.Object{Kind: "absent"}
+	}
+	fi, err := p.Reader.LstatPath(dest)
+	if err != nil {
+		return database.Object{Kind: "absent"}
+	}
+	obj := database.Object{Present: true, Mode: fsutil.FormatModeArg(fi.Mode().Perm())}
+	switch {
+	case fi.Mode()&os.ModeSymlink != 0:
+		obj.Kind = "link"
+		obj.Target, _ = p.Reader.ReadLink(dest)
+	case fi.IsDir():
+		obj.Kind = "dir"
+	default:
+		obj.Kind = "file"
+	}
+	return obj
+}
+
+// recordOperation classifies the dest's post-fn state, derives op_type, resolves
+// the in-flight archive as the Backup, and writes the OperationDone. Guarded off
+// when not recording (nil ledger/profileDone, no dest, no kind).
+func (p *ProfileReady) recordOperation(dest string, info opInfo, prev database.Object) {
+	if p.Ledger == nil || p.profileDone == nil || dest == "" || info.kind == "" {
+		return
+	}
+	next := p.classifyDest(dest)
+	op := database.OperationDone{
+		OpType: deriveOpType(prev, next),
+		Kind:   info.kind,
+		Dest:   dest,
+		Target: info.target,
+		SrcRel: info.srcRel,
+		Mode:   info.mode,
+		Owner:  info.owner,
+		Prev:   prev,
+		Next:   next,
+	}
+	if backup, err := p.Ledger.EnsureBackup(p.specDone, p.currentArchive, p.currentSub); err == nil && backup != nil {
+		op.BackupID = &backup.ID
+	}
+	if err := p.Ledger.RecordOperation(p.profileDone, op); err != nil {
+		log.Debug("ledger", "record op: "+err.Error(), log.Off)
+	}
+}
+
+// deriveOpType maps a prev/next Object pair to the op_type discriminator.
+func deriveOpType(prev, next database.Object) string {
+	switch {
+	case !prev.Present && next.Present:
+		return "create"
+	case prev.Present && !next.Present:
+		return "remove"
+	case prev.Kind == next.Kind && prev.Target == next.Target && prev.Mode == next.Mode:
+		return "noop"
+	default:
+		return "update"
+	}
 }
 
 func toLogMode(m options.DryRunMode) log.DryRun {
@@ -711,13 +831,21 @@ func (p *ProfileReady) withDebugLevel(fn func() error) error {
 
 // ExecOperations executes ALL of the profile's operations, in run order:
 // Selected() gated (all(skip) debug line), errors join, a failing op does not
-// stop the rest.
+// stop the rest. After the ops, it reconciles the ledger: any recorded dest of
+// an install kind (link/copy/render) whose op produced nothing this run — the op
+// was fully emptied and thus deselected — is swept (removed + archived). Ops that
+// ran already swept their own stale dests inline; this covers the emptied-op case
+// so a removed-entirely op still prunes its orphans.
 func (p *ProfileReady) ExecOperations() error {
 	return p.withDebugLevel(func() error {
 		var fails []error
+		skippedKinds := map[string]string{"make-links": "link", "make-copies": "copy", "render-templates": "render"}
 		for _, op := range p.OperationsReady {
 			if !op.Selected() {
 				log.Debug("all(skip)", op.Name()+" (nothing selected)", log.Off)
+				if kind, ok := skippedKinds[op.Name()]; ok && !p.isDryRun() {
+					fails = append(fails, p.sweepStale(kind, nil)) // [why] emptied op: sweep all prior dests of its kind
+				}
 				continue
 			}
 			log.Msg("all(run)", op.Name(), log.Off)
@@ -829,7 +957,8 @@ func (p *ProfileReady) prepareOperations(ops spec.OperationRecipes) ([]operation
 
 // [>] 🤖🤖 per-kind operations
 
-// PruneLinksOperationReady deletes broken symlinks under the profile's dirs.
+// PruneLinksOperationReady removes ledger-recorded link dests whose source is
+// gone. Selected when the profile manages links (declares prune-links dirs).
 type PruneLinksOperationReady struct {
 	OperationReady
 	Dirs []string
@@ -838,7 +967,7 @@ type PruneLinksOperationReady struct {
 func (o *PruneLinksOperationReady) Name() string   { return "prune-links" }
 func (o *PruneLinksOperationReady) Selected() bool { return len(o.Dirs) > 0 }
 func (o *PruneLinksOperationReady) execOperation(p *ProfileReady) error {
-	return p.pruneBrokenLinks(o.Dirs)
+	return p.pruneBrokenLinks()
 }
 
 // MakeDirsOperationReady creates the profile's dirs (ancestors + makeDirs entries).

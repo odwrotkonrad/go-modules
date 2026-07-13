@@ -24,6 +24,7 @@ type FileSystemWriter interface {
 	MakeSymlink(target, dest string) error
 	CopyFile(src, dest string, mode os.FileMode) error
 	RemoveFile(dest string) error
+	RemoveDir(dest string) error
 	ChangeOwner(owner, dest string) error
 	InstallFile(dest string, body []byte, mode os.FileMode, owner string) error
 	ArchiveDestinations(archivePath string, dests []string) error
@@ -101,6 +102,12 @@ func (f FS) CopyFile(src, dest string, mode os.FileMode) error {
 
 func (f FS) RemoveFile(dest string) error {
 	return f.RunPrivileged(dest, "rm", "-f", dest)
+}
+
+// RemoveDir removes an empty dir (rmdir). Non-empty dirs error, the safe
+// guardrail: uninstall leaves dirs that still hold other content.
+func (f FS) RemoveDir(dest string) error {
+	return f.RunPrivileged(dest, "rmdir", dest)
 }
 
 func (f FS) ChangeOwner(owner, dest string) error {

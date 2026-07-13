@@ -56,11 +56,12 @@ func setupMock(t *testing.T, pwd, profile string, decl map[string]string) (*app,
 		s := realSeams(home)
 		s.FS = m.FS
 		s.Reader = &testutil.FileSystemMockReader{Roots: []string{a.flags.Dir, home}}
+		s.Ledger = nil // [why] record-only tests: no ledger side effects
 		return s
 	})
 	testyml.Swap(t, &fsutil.Sleep, testutil.SleepMock)
 
-	require.NoError(t, a.init())
+	require.NoError(t, a.init("all"))
 	return a, root, home
 }
 
@@ -89,7 +90,7 @@ func TestInit(t *testing.T) {
 				require.NoError(t, err)
 				require.NoError(t, f.Close())
 			}
-			err := a.init()
+			err := a.init("all")
 			if c.Expected.Check(t, err) {
 				return
 			}

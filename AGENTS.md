@@ -247,6 +247,7 @@ che
         spec
           cmds
           funcs
+    database
     docgen
       testdata
         spec

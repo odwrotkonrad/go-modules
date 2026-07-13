@@ -245,6 +245,10 @@ func (m *FileSystemMockWriter) RemoveFile(dest string) error {
 	return m.record("remove", dest)
 }
 
+func (m *FileSystemMockWriter) RemoveDir(dest string) error {
+	return m.record("rmdir", dest)
+}
+
 func (m *FileSystemMockWriter) ChangeOwner(owner, dest string) error {
 	return m.record("chown", owner, dest)
 }

@@ -4,7 +4,9 @@ package fsutil
 
 import (
 	"archive/tar"
+	"errors"
 	"fmt"
+	"io"
 	"os"
 	"path/filepath"
 	"strings"
@@ -73,6 +75,41 @@ func archiveDest(tw *tar.Writer, dest string) error {
 	}
 	_, err = tw.Write(body)
 	return err
+}
+
+// ReadFromArchive finds dest's entry (stripped-absolute name) in the .tar.bz2 at
+// archivePath and returns its body + header mode. found=false when the archive
+// holds no such entry (dest pre-existed as absent). Mirror of ArchiveDestinations.
+func ReadFromArchive(archivePath, dest string) (body []byte, mode os.FileMode, found bool, err error) {
+	in, err := os.Open(archivePath)
+	if err != nil {
+		return nil, 0, false, err
+	}
+	defer in.Close()
+	bz, err := bzip2.NewReader(in, nil)
+	if err != nil {
+		return nil, 0, false, err
+	}
+	defer func() { _ = bz.Close() }()
+	want := filepath.ToSlash(strings.TrimPrefix(dest, "/"))
+	tr := tar.NewReader(bz)
+	for {
+		hdr, err := tr.Next()
+		if errors.Is(err, io.EOF) {
+			return nil, 0, false, nil
+		}
+		if err != nil {
+			return nil, 0, false, err
+		}
+		if hdr.Name != want {
+			continue
+		}
+		body, err := io.ReadAll(tr)
+		if err != nil {
+			return nil, 0, false, err
+		}
+		return body, os.FileMode(hdr.Mode), true, nil
+	}
 }
 
 // [<] 🤖🤖

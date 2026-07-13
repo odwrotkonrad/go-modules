@@ -20,5 +20,5 @@ cases:
     expected:
       stdOut: |
         prune-links: ${ROOT}
-        rm: ${HOME}/.config/zsh/dead
+        prune-link: ${HOME}/.config/zsh/dead
 # [<] 🤖
