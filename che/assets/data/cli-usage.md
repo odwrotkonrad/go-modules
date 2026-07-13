@@ -23,7 +23,7 @@ Flags:
       --debug                      print debug-level lines (source announce, clone/pull attempts); env: CHE_DEBUG
   -C, --directory string           change into this directory before resolving the repo; env: CHE_DIR
       --dry-run string[="delta"]   print mutating actions instead of executing them; values: delta (changed dests, bare-flag default) | all (every dest); default: off; env: CHE_DRY_RUN
-      --profile string             run only this profile (autoDiscover skipped, execIf still enforced); env: CHE_PROFILE
+      --profiles strings           run only these profiles (comma-separated or repeated; autoDiscover skipped, execIf still enforced); env: CHE_PROFILE (comma-separated)
       --skip-exec-if               treat every execIf predicate as passing; env: CHE_SKIP_EXEC_IF
       --skip-remote-refs           skip sourced include.profiles refs, load only the local repo's specs; env: CHE_SKIP_REMOTE_REFS
       --validate-spec string       validate each loaded che.yml spec against the JSON Schema; values: warn (log violations) | error (abort on violations); default: warn; env: CHE_VALIDATE_SPEC

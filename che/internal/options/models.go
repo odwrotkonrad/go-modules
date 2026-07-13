@@ -2,12 +2,15 @@ package options
 
 // [>] 🤖🤖
 
+import "gitlab.com/konradodwrot/go-modules/che/internal/spec"
+
 // Domain model:
 //
-//	Options    CLI option values (cobra flag destinations), finalized in place
-//	           by Resolve: flags win over env vars, env vars over the local
-//	           che.yml options: block (SpecLayer), then defaults
-//	SpecLayer  the local che.yml options: knobs feeding Resolve
+//	Options  CLI option values (cobra flag destinations), finalized in place by
+//	         Resolve. Per-field precedence, most specific wins: flags > env vars
+//	         > the user-config file ($XDG_CONFIG_HOME/che/config.yml) > the local
+//	         che.yml options: block > defaults. The user-config and spec layers
+//	         share one shape, spec.Options.
 
 // DryRunMode selects how a dry run reports: off (real run), delta (only dests
 // that would change), all (every dest, as if nothing existed at the destination).
@@ -29,21 +32,21 @@ type Options struct {
 	WorkingDirectory string
 	DryRun           DryRunMode
 	ValidateSpec     ValidateSpecMode
-	// ValidateSpecCLI is the flag/env-only validateSpec ("" if neither set),
+	// ValidateSpecCLI is the flag/env/user-config validateSpec ("" if none set),
 	// overriding each spec's own options.validateSpec per-spec.
 	ValidateSpecCLI   ValidateSpecMode
-	Profile           string
+	Profiles          []string
 	SkipExecIf        bool
 	SkipRemoteRefs    bool
 	Debug             bool
 	RenderSkipSecrets bool
+	// AutoDiscover is the user-config global default for profiles that set
+	// neither profile nor spec autoDiscover (nil: unset).
+	AutoDiscover *bool
 }
 
-// SpecLayer is the local spec's options: contribution to Resolve: applied
-// under flags and env vars, over the defaults.
-type SpecLayer struct {
-	ValidateSpec string
-	Debug        *bool
-}
+// Layer is one options: contribution feeding Resolve (the user-config file or
+// the local spec's options: block), sharing spec.Options' shape.
+type Layer = spec.Options
 
 // [<] 🤖🤖

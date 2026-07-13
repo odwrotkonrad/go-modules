@@ -75,8 +75,8 @@ func (g gitFetcher) Fetch(ref string) (string, error) { return g.fetch(ref) }
 // [>] 🤖🤖 package-level funcs
 
 // PrepareOptions finalizes the runtime options: chdir (-C), locate the repo,
-// then resolve with precedence flags > env vars > local che.yml options: >
-// defaults.
+// then resolve with per-field precedence flags > env vars > the user-config
+// file ($XDG_CONFIG_HOME/che/config.yml) > local che.yml options: > defaults.
 func PrepareOptions(flags options.Options) (options.Options, error) {
 	c := flags
 	c.Dir = cmp.Or(c.Dir, os.Getenv("CHE_DIR"))
@@ -89,27 +89,46 @@ func PrepareOptions(flags options.Options) (options.Options, error) {
 	if err != nil {
 		return c, err
 	}
-	if err := c.Resolve(specLayer(filepath.Join(repoRoot, "che.yml"))); err != nil {
+	home, err := invokingHome()
+	if err != nil {
+		return c, err
+	}
+	if err := c.Resolve(userLayer(fsutil.UserConfigPath(home)), specLayer(filepath.Join(repoRoot, "che.yml"))); err != nil {
 		return c, err
 	}
 	log.SetDebug(c.Debug)
 	return c, nil
 }
 
-// specLayer leniently reads the local spec's options: block ([why] parse
-// errors surface later, at PrepareSpecs).
-func specLayer(path string) options.SpecLayer {
+// userLayer leniently reads the user-config file: a bare options: object
+// ($XDG_CONFIG_HOME/che/config.yml) mirroring the che.yml options: block
+// ([why] absent file -> empty layer; parse errors surface later).
+func userLayer(path string) options.Layer {
 	b, err := os.ReadFile(path)
 	if err != nil {
-		return options.SpecLayer{}
+		return options.Layer{}
+	}
+	var o spec.Options
+	if err := yaml.Unmarshal(b, &o); err != nil {
+		return options.Layer{}
+	}
+	return o
+}
+
+// specLayer leniently reads the local spec's options: block into a resolution
+// layer ([why] absent file / parse errors surface later, at PrepareSpecs).
+func specLayer(path string) options.Layer {
+	b, err := os.ReadFile(path)
+	if err != nil {
+		return options.Layer{}
 	}
 	var d struct {
 		Options spec.Options `yaml:"options"`
 	}
 	if err := yaml.Unmarshal(b, &d); err != nil {
-		return options.SpecLayer{}
+		return options.Layer{}
 	}
-	return options.SpecLayer{ValidateSpec: d.Options.ValidateSpec, Debug: d.Options.Debug}
+	return d.Options
 }
 
 // PrepareSpecs resolves the root spec and its whole Include tree (top-level
@@ -267,9 +286,13 @@ func (r *SpecRecipe) PrepareProfileRecipes(opts options.Options) error {
 		return err
 	}
 	r.Options, r.Env, r.Include = doc.Options, doc.Env, doc.Include
-	// [why] che-level (flag/env) seeds the spec default: profile > spec > che.
+	// [why] che-level (flag/env/user-config) seeds the spec default, cascading
+	// down to each profile: profile > spec > user-config.
 	if r.Options.WorkingDirectory == "" {
 		r.Options.WorkingDirectory = opts.WorkingDirectory
+	}
+	if r.Options.AutoDiscover == nil {
+		r.Options.AutoDiscover = opts.AutoDiscover
 	}
 	for i := range doc.ProfileRecipes {
 		rec := &doc.ProfileRecipes[i]
@@ -410,11 +433,11 @@ func (r *SpecRecipe) eligibleNames(p *specsPrep, forced *spec.ProfileSourceRecip
 		}
 		return []string{forced.ProfileName}, nil
 	}
-	forceOne := ""
+	var forcedProfiles []string
 	if root {
-		forceOne = p.opts.Profile
+		forcedProfiles = p.opts.Profiles
 	}
-	names, err := spec.EligibleRecipes(r.ProfileRecipes, forceOne, p.opts.SkipExecIf, p.eval)
+	names, err := spec.EligibleRecipes(r.ProfileRecipes, forcedProfiles, p.opts.SkipExecIf, p.eval)
 	if err != nil {
 		if !root && errors.Is(err, spec.ErrNoneEligible) {
 			log.Debug("spec(skip)", r.sourceReady.DefinitionURI+" (no eligible profile)", log.Off)

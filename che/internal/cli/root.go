@@ -52,8 +52,8 @@ sourced profile refs included).`,
 	pf.Lookup("dry-run").NoOptDefVal = "delta"
 	pf.StringVar((*string)(&a.flags.ValidateSpec), "validate-spec", "",
 		"validate each loaded che.yml spec against the JSON Schema; values: warn (log violations) | error (abort on violations); default: warn; env: CHE_VALIDATE_SPEC")
-	pf.StringVar(&a.flags.Profile, "profile", "",
-		"run only this profile (autoDiscover skipped, execIf still enforced); env: CHE_PROFILE")
+	pf.StringSliceVar(&a.flags.Profiles, "profiles", nil,
+		"run only these profiles (comma-separated or repeated; autoDiscover skipped, execIf still enforced); env: CHE_PROFILE (comma-separated)")
 	pf.BoolVar(&a.flags.SkipExecIf, "skip-exec-if", false,
 		"treat every execIf predicate as passing; env: CHE_SKIP_EXEC_IF")
 	pf.BoolVar(&a.flags.SkipRemoteRefs, "skip-remote-refs", false,

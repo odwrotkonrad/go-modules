@@ -262,6 +262,55 @@ func TestPrepareOptionsPrecedence(t *testing.T) {
 	assert.Equal(t, options.ValidateSpec.Error, opts.ValidateSpec, "flag over env var")
 }
 
+// TestPrepareOptionsUserConfig: the user-config file ($XDG_CONFIG_HOME/che/
+// config.yml) resolves under env and flags, over the local che.yml options:
+// block. A real config file drives every field.
+func TestPrepareOptionsUserConfig(t *testing.T) {
+	repo := testutil.Repo(t, map[string]string{
+		"che.yml": "options:\n  validateSpec: warn\n  profiles: [spec/only]\np:\n  options: {autoDiscover: true}\n",
+	})
+	prepEnv(t, repo)
+
+	cfgHome := t.TempDir()
+	t.Setenv("XDG_CONFIG_HOME", cfgHome)
+	t.Setenv("CHE_CONFIG_HOME", "")
+	cfgDir := filepath.Join(cfgHome, "che")
+	require.NoError(t, os.MkdirAll(cfgDir, 0o755))
+	config := "validateSpec: error\n" +
+		"debug: true\n" +
+		"dryRun: delta\n" +
+		"skipRemoteRefs: true\n" +
+		"autoDiscover: true\n" +
+		"profiles: [cfg/a, cfg/b]\n" +
+		"renderTemplates:\n  skipSecrets: true\n"
+	require.NoError(t, os.WriteFile(filepath.Join(cfgDir, "config.yml"), []byte(config), 0o644))
+
+	// user-config over the local spec + defaults.
+	opts, err := PrepareOptions(options.Options{})
+	require.NoError(t, err)
+	assert.Equal(t, options.ValidateSpec.Error, opts.ValidateSpec, "user-config validateSpec over spec")
+	assert.True(t, opts.Debug, "user-config debug")
+	assert.Equal(t, options.DryRun.Delta, opts.DryRun, "user-config dryRun")
+	assert.True(t, opts.SkipRemoteRefs, "user-config skipRemoteRefs")
+	assert.True(t, opts.RenderSkipSecrets, "user-config renderTemplates.skipSecrets")
+	require.NotNil(t, opts.AutoDiscover)
+	assert.True(t, *opts.AutoDiscover, "user-config autoDiscover")
+	assert.Equal(t, []string{"cfg/a", "cfg/b"}, opts.Profiles, "user-config profiles over spec")
+
+	// env over user-config.
+	t.Setenv("CHE_VALIDATE_SPEC", "warn")
+	t.Setenv("CHE_PROFILE", "env/a,env/b")
+	opts, err = PrepareOptions(options.Options{})
+	require.NoError(t, err)
+	assert.Equal(t, options.ValidateSpec.Warn, opts.ValidateSpec, "env over user-config")
+	assert.Equal(t, []string{"env/a", "env/b"}, opts.Profiles, "CHE_PROFILE over user-config")
+
+	// flags over env + user-config.
+	opts, err = PrepareOptions(options.Options{Profiles: []string{"flag/a"}})
+	require.NoError(t, err)
+	assert.Equal(t, []string{"flag/a"}, opts.Profiles, "flag over env + user-config")
+}
+
 // TestWorkingDirectoryCascade: profile > spec > che for options.workingDirectory,
 // and the resolved tree feeds classification (links come from it).
 func TestWorkingDirectoryCascade(t *testing.T) {
@@ -309,6 +358,25 @@ func TestWorkingDirectoryCascade(t *testing.T) {
 	wantWD, _ := filepath.EvalSymlinks(filepath.Join(repo2, "chetree"))
 	gotWD, _ := filepath.EvalSymlinks(root2.AllProfiles()[0].workingDir)
 	assert.Equal(t, wantWD, gotWD, "che-level flag default")
+}
+
+// TestAutoDiscoverGlobal: the user-config global autoDiscover discovers every
+// profile that leaves it unset, but a profile's own autoDiscover: false wins.
+func TestAutoDiscoverGlobal(t *testing.T) {
+	repo := testutil.Repo(t, map[string]string{
+		"che.yml": "unset:\n  options: {}\n" +
+			"optout:\n  options: {autoDiscover: false}\n",
+	})
+	prepEnv(t, repo)
+
+	yes := true
+	root, err := PrepareSpecs(options.Options{SkipExecIf: true, AutoDiscover: &yes}, spec.SpecSourceRecipe{})
+	require.NoError(t, err)
+	var names []string
+	for _, pr := range root.AllProfiles() {
+		names = append(names, pr.Source.GetProfileName())
+	}
+	assert.Equal(t, []string{"unset"}, names, "global autoDiscover picks unset, profile opt-out wins")
 }
 
 // TestWithEnv: overlay shadows, sets, and restores the process env.

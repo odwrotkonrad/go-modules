@@ -44,25 +44,29 @@ func isGlobMatch(glob, rel string) bool {
 var ErrNoneEligible = errors.New("no eligible profile")
 
 // EligibleRecipes lists the recipes to MakeProfile, in declaration order:
-//  1. forceOne (--profile by name): only that recipe, autoDiscover skipped,
+//  1. forced (--profiles by name): only those recipes, autoDiscover skipped,
 //     execIf still enforced (forceAll = --skip-exec-if lifts it).
 //  2. else every autoDiscover recipe whose execIf expressions ALL pass
 //     (forceAll makes every execIf pass, it does not lift autoDiscover).
 //  3. zero eligible: ErrNoneEligible.
-func EligibleRecipes(recipes []ProfileRecipe, forceOne string, forceAll bool, eval func(expr string) (bool, error)) ([]string, error) {
-	if forceOne != "" {
-		ps, ok := findRecipe(recipes, forceOne)
-		if !ok {
-			return nil, undefinedProfile(recipes, fmt.Sprintf("--profile %q", forceOne))
+func EligibleRecipes(recipes []ProfileRecipe, forced []string, forceAll bool, eval func(expr string) (bool, error)) ([]string, error) {
+	if len(forced) > 0 {
+		out := make([]string, 0, len(forced))
+		for _, name := range forced {
+			ps, ok := findRecipe(recipes, name)
+			if !ok {
+				return nil, undefinedProfile(recipes, fmt.Sprintf("--profiles %q", name))
+			}
+			pass, err := AllPass(name, ps.Options.ExecIf, forceAll, eval)
+			if err != nil {
+				return nil, err
+			}
+			if !pass {
+				return nil, fmt.Errorf("--profiles %q failed its execIf predicates (pass --skip-exec-if to run it regardless)", name)
+			}
+			out = append(out, name)
 		}
-		pass, err := AllPass(forceOne, ps.Options.ExecIf, forceAll, eval)
-		if err != nil {
-			return nil, err
-		}
-		if !pass {
-			return nil, fmt.Errorf("--profile %q failed its execIf predicates (pass --skip-exec-if to run it regardless)", forceOne)
-		}
-		return []string{forceOne}, nil
+		return out, nil
 	}
 	var out []string
 	for _, ps := range recipes {
@@ -79,7 +83,7 @@ func EligibleRecipes(recipes []ProfileRecipe, forceOne string, forceAll bool, ev
 		}
 	}
 	if len(out) == 0 {
-		return nil, fmt.Errorf("%w: no autoDiscover profile passed its execIf (candidates: %v; use --profile or CHE_SKIP_EXEC_IF)",
+		return nil, fmt.Errorf("%w: no autoDiscover profile passed its execIf (candidates: %v; use --profiles or CHE_SKIP_EXEC_IF)",
 			ErrNoneEligible,
 			names(recipes, func(ps ProfileRecipe) bool { return ps.Options.AutoDiscover != nil && *ps.Options.AutoDiscover }))
 	}
@@ -107,7 +111,7 @@ func findRecipe(recipes []ProfileRecipe, name string) (ProfileRecipe, bool) {
 }
 
 // undefinedProfile is the shared undefined-profile error: ref names the failed
-// lookup ("--profile %q", "profile %q").
+// lookup ("--profiles %q", "profile %q").
 func undefinedProfile(recipes []ProfileRecipe, ref string) error {
 	return fmt.Errorf("%s is not defined in che.yml (defined: %v)", ref, names(recipes, func(ProfileRecipe) bool { return true }))
 }

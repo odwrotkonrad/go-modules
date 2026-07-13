@@ -107,13 +107,25 @@ type Doc struct {
 	ProfileRecipes []ProfileRecipe
 }
 
-// Options is the top-level options: block: spec-wide defaults + che knobs.
+// Options is the options: block, shared by the top-level spec options: (spec-wide
+// defaults + che knobs) and the user-config file ($XDG_CONFIG_HOME/che/config.yml):
+// identical shape, different precedence layer. execIf/workingDirectory are
+// spec-only (ignored in user config).
 type Options struct {
-	ExecIf           []string `yaml:"execIf" jsonschema_description:"spec-level predicates: gate every profile of this spec (ANDed with each profile's own)"`
-	AutoDiscover     *bool    `yaml:"autoDiscover" jsonschema_description:"default for profiles that don't set it"`
-	Debug            *bool    `yaml:"debug" jsonschema_description:"default for profiles that don't set it"`
-	WorkingDirectory string   `yaml:"workingDirectory" jsonschema_description:"the load-ops source tree (absolute, relative to the checkout, ~/, $VAR, env vars expanded); default root; the RootPrefix logical token maps onto it, the HOME/ folder under it maps onto $HOME"`
-	ValidateSpec     string   `yaml:"validateSpec" jsonschema:"enum=warn,enum=error" jsonschema_description:"how this spec's schema violations report (per-spec: each included spec honors its own); overridden by the flag and env var"`
+	ExecIf           []string        `yaml:"execIf" jsonschema_description:"spec-level predicates: gate every profile of this spec (ANDed with each profile's own); spec-only"`
+	AutoDiscover     *bool           `yaml:"autoDiscover" jsonschema_description:"default for profiles that don't set it"`
+	Debug            *bool           `yaml:"debug" jsonschema_description:"default for profiles that don't set it"`
+	WorkingDirectory string          `yaml:"workingDirectory" jsonschema_description:"the load-ops source tree (absolute, relative to the checkout, ~/, $VAR, env vars expanded); default root; the RootPrefix logical token maps onto it, the HOME/ folder under it maps onto $HOME; spec-only"`
+	ValidateSpec     string          `yaml:"validateSpec" jsonschema:"enum=warn,enum=error" jsonschema_description:"how this spec's schema violations report (per-spec: each included spec honors its own); overridden by the flag and env var"`
+	DryRun           string          `yaml:"dryRun" jsonschema:"enum=delta,enum=all" jsonschema_description:"default dry-run mode: delta (changed dests) | all (every dest); overridden by the flag and env var"`
+	Profiles         []string        `yaml:"profiles" jsonschema_description:"profiles to run (autoDiscover skipped, execIf still enforced); overridden by --profiles and CHE_PROFILE"`
+	SkipRemoteRefs   *bool           `yaml:"skipRemoteRefs" jsonschema_description:"skip sourced include.profiles refs; overridden by the flag and env var"`
+	RenderTemplates  RenderTemplates `yaml:"renderTemplates" jsonschema_description:"renderTemplates op defaults"`
+}
+
+// RenderTemplates namespaces renderTemplates-op option defaults.
+type RenderTemplates struct {
+	SkipSecrets *bool `yaml:"skipSecrets" jsonschema_description:"skip op:// secret resolution, render placeholders; overridden by the flag and env var"`
 }
 
 // ProfileRecipe is one raw declared profile.
@@ -128,7 +140,7 @@ type ProfileRecipe struct {
 // fields inherit the level above (profile > spec > che, most nested wins).
 type ProfileOptions struct {
 	ExecIf           []string `yaml:"execIf"`
-	AutoDiscover     *bool    `yaml:"autoDiscover" jsonschema_description:"run on bare che (nil: inherit spec options, then false: runs only via --profile or include.profiles)"`
+	AutoDiscover     *bool    `yaml:"autoDiscover" jsonschema_description:"run on bare che (nil: inherit spec options, then false: runs only via --profiles or include.profiles)"`
 	Debug            *bool    `yaml:"debug" jsonschema_description:"print debug-level lines around this profile (nil: inherit spec options, then che level)"`
 	WorkingDirectory string   `yaml:"workingDirectory" jsonschema_description:"the profile's load-ops source tree (empty: inherit spec options, then che level, then the checkout)"`
 }

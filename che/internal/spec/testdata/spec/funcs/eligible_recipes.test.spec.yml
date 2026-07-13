@@ -14,37 +14,42 @@ cases:
       errorOutput: ['no eligible profile: no autoDiscover profile passed its execIf']
   - name: ShouldStillEnforceExecIfWhenForcingOneProfile
     input:
-      args: [spec: che, os: linux, virt: true, forceOne: desktop/macos]
+      args: [spec: che, os: linux, virt: true, forced: [desktop/macos]]
     expected:
-      errorOutput: ['--profile "desktop/macos" failed its execIf predicates']
+      errorOutput: ['--profiles "desktop/macos" failed its execIf predicates']
   - name: ShouldLiftExecIfWhenForcingOneWithForceAll
     input:
-      args: [spec: che, os: linux, virt: true, forceOne: desktop/macos, forceAll: true]
+      args: [spec: che, os: linux, virt: true, forced: [desktop/macos], forceAll: true]
     expected:
       output: [desktop/macos]
   - name: ShouldSelectForcedProfileWhenExecIfPasses
     input:
-      args: [spec: che, os: macos, virt: false, forceOne: desktop/macos]
+      args: [spec: che, os: macos, virt: false, forced: [desktop/macos]]
     expected:
       output: [desktop/macos]
+  - name: ShouldSelectMultipleForcedProfilesInGivenOrder
+    input:
+      args: [spec: che, os: linux, virt: true, forced: [base, ontoRepo]]
+    expected:
+      output: [base, ontoRepo]
   - name: ShouldSelectForcedNonAutoDiscoverBaseProfile
     input:
-      args: [spec: che, os: linux, virt: true, forceOne: base]
+      args: [spec: che, os: linux, virt: true, forced: [base]]
     expected:
       output: [base]
   - name: ShouldSelectForcedNonAutoDiscoverOntoRepoProfile
     input:
-      args: [spec: che, os: linux, virt: true, forceOne: ontoRepo]
+      args: [spec: che, os: linux, virt: true, forced: [ontoRepo]]
     expected:
       output: [ontoRepo]
   - name: ShouldErrorOnUndefinedForcedProfile
     input:
-      args: [spec: che, os: macos, virt: true, forceOne: cli/linux]
+      args: [spec: che, os: macos, virt: true, forced: [cli/linux]]
     expected:
-      errorOutput: ['--profile "cli/linux" is not defined in che.yml']
+      errorOutput: ['--profiles "cli/linux" is not defined in che.yml']
   - name: ShouldSelectAllAutoDiscoverProfilesWithForceAll
     input:
-      args: [spec: che, os: linux, virt: true, forceOne: "", forceAll: true]
+      args: [spec: che, os: linux, virt: true, forced: [], forceAll: true]
     expected:
       output: [cli/macos, desktop/macos]
   - name: ShouldAlwaysSelectLonePlainProfile

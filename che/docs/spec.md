@@ -128,9 +128,22 @@ Spec-wide defaults + che knobs:
   stay at the checkout.
 - `validateSpec` (`warn` | `error`): top-level only, overridden by the flag
   and env var.
+- `dryRun` (`delta` | `all`): default dry-run mode, overridden by the flag and
+  env var.
+- `profiles` (string list): profiles to run (autoDiscover skipped, execIf still
+  enforced), overridden by `--profiles` and `CHE_PROFILE`.
+- `skipRemoteRefs` (bool): skip sourced `include.profiles` refs, overridden by
+  the flag and env var.
+- `renderTemplates.skipSecrets` (bool): skip `op://` secret resolution (render
+  placeholders), overridden by the flag and env var.
 
 Option cascade, most nested wins: profile options > spec top-level options >
-che level (flags, env vars, the local spec's `options:`) > defaults.
+che level (flags, env vars, the user-config file, the local spec's `options:`)
+> defaults. See [Environment](#environment) for the che-level precedence.
+
+This same `options:` shape is the user-config file
+(`$XDG_CONFIG_HOME/che/config.yml`), a bare options object (no `options:`
+wrapper); `execIf`/`workingDirectory` are spec-only there.
 
 ### env
 
@@ -156,12 +169,12 @@ errors). Duplicates and cycles load once. Fully recursive.
 
 Names free-form (`base`, `cli/macos`, `ontoRepo`). Bare `$ che`: every
 eligible profile runs its full op sequence, profile by profile.
-`$ che --profile <name>`: exactly one.
+`$ che --profiles <name>[,<name>...]`: only those.
 
 ### options
 
 - `autoDiscover` (bool): run on bare `$ che`. Unset: inherit the spec's
-  `options.autoDiscover`, then `false` (runs only via `--profile` or
+  `options.autoDiscover`, then `false` (runs only via `--profiles` or
   `include.profiles`).
 - `execIf` (string list): predicates, ALL must pass. `<source>` (truthy:
   builtin iff `true`, env iff set non-empty) or `<source> == <literal>`
@@ -203,6 +216,35 @@ makeCopies:
 Every flag has a `CHE_*` env mirror (flag wins). See the Global options table
 in `cli.md` for the full list.
 
+Per-field resolution, most specific wins:
+
+```
+flag > CHE_* env > user-config file > local che.yml options: > default
+```
+
+### User-config file
+
+`$XDG_CONFIG_HOME/che/config.yml` (see the Paths table) sets runtime options
+for every che run on this machine, over the repo's `che.yml` `options:` block,
+under env vars and flags. It is a bare options object mirroring the che.yml
+[`options:`](#options) shape (no `options:` wrapper):
+
+```yaml
+# ~/.config/che/config.yml
+debug: true
+validateSpec: error
+dryRun: delta
+autoDiscover: true
+profiles: [cli/macos, work]
+skipRemoteRefs: true
+renderTemplates:
+  skipSecrets: true
+```
+
+`autoDiscover: true` here discovers every profile that sets neither its own nor
+its spec's `autoDiscover` (a profile's `autoDiscover: false` still wins).
+`execIf` and `workingDirectory` are spec-only: ignored in this file.
+
 ### Paths (XDG)
 
 che's runtime data locations follow the XDG base-dir spec, each base
@@ -210,6 +252,7 @@ overridable by a che-owned env:
 
 | Purpose | Path under base | XDG base (`+/che`) | che override | Fallback |
 | --- | --- | --- | --- | --- |
+| user-config file | `config.yml` | `XDG_CONFIG_HOME` | `CHE_CONFIG_HOME` | `~/.config/che` |
 | remote source caches | `sources/<slug>` | `XDG_CACHE_HOME` | `CHE_CACHE_HOME` | `~/.cache/che` |
 | per-run backups | `backups/<che-op-ts>.tar.bz2` | `XDG_STATE_HOME` | `CHE_STATE_HOME` | `~/.local/state/che` |
 | (data — reserved, no current use) | — | `XDG_DATA_HOME` | `CHE_DATA_HOME` | `~/.local/share/che` |

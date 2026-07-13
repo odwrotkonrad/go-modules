@@ -27,6 +27,18 @@ func ResolveStateHome(home string) string {
 	return resolveBaseDir("CHE_STATE_HOME", "XDG_STATE_HOME", home, ".local/state")
 }
 
+// ResolveConfigHome resolves che's XDG config base dir:
+// CHE_CONFIG_HOME (che's base directly), else XDG_CONFIG_HOME/che, else ~/.config/che.
+func ResolveConfigHome(home string) string {
+	return resolveBaseDir("CHE_CONFIG_HOME", "XDG_CONFIG_HOME", home, ".config")
+}
+
+// UserConfigPath is the user-config file: <ResolveConfigHome>/config.yml
+// (default ~/.config/che/config.yml).
+func UserConfigPath(home string) string {
+	return filepath.Join(ResolveConfigHome(home), "config.yml")
+}
+
 // resolveBaseDir applies the per-base precedence: CHE override (che's base
 // directly, no /che suffix), else XDG base + /che, else ~/<defaultRel>/che.
 func resolveBaseDir(cheEnv, xdgEnv, home, defaultRel string) string {

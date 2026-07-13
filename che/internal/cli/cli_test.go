@@ -46,7 +46,9 @@ func setupMock(t *testing.T, pwd, profile string, decl map[string]string) (*app,
 	t.Helper()
 	a, root, home := repoEnv(t, pwd)
 	t.Setenv("CHE_DRY_RUN", "")
-	a.flags.Profile = profile
+	if profile != "" {
+		a.flags.Profiles = []string{profile}
+	}
 
 	m := testutil.ApplyMocks(t, decl)
 	realSeams := che.NewSeams
@@ -76,7 +78,9 @@ func TestInit(t *testing.T) {
 			for k, v := range c.Context.Env {
 				t.Setenv(k, v)
 			}
-			a.flags.Profile = c.Input.Args.String(t, 0)
+			if p := c.Input.Args.String(t, 0); p != "" {
+				a.flags.Profiles = []string{p}
+			}
 			a.flags.ValidateSpec = options.ValidateSpecMode(c.Input.Args.String(t, 1))
 			if extra := c.Input.Args.String(t, 2); extra != "" {
 				f, err := os.OpenFile(filepath.Join(a.flags.Dir, "che.yml"), os.O_APPEND|os.O_WRONLY, 0o644)

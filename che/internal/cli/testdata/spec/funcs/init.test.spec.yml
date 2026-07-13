@@ -16,7 +16,7 @@ cases:
       args:
         - profile: nonexistent
     expected:
-      errorOutput: '--profile "nonexistent" is not defined in che.yml'
+      errorOutput: '--profiles "nonexistent" is not defined in che.yml'
   - name: ShouldWarnNotFailOnSpecViolationByDefault
     input:
       args:

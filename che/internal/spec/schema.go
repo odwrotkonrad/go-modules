@@ -21,14 +21,17 @@ func Schema() *jsonschema.Schema {
 	}
 	defs := r.Reflect(ProfileRecipe{}).Definitions
 	// [why] both spec.Options and render.Options reflect to an "Options" def:
-	// the top-level block lands under its own name.
-	defs["SpecOptions"] = r.Reflect(Options{}).Definitions["Options"]
+	// the top-level block lands under its own name. Options nests RenderTemplates
+	// ($ref), carried over from the same reflection.
+	optDefs := r.Reflect(Options{}).Definitions
+	defs["SpecOptions"] = optDefs["Options"]
+	defs["RenderTemplates"] = optDefs["RenderTemplates"]
 	defs["DestSpec"] = DestSpec{}.JSONSchema()
 
 	defs["ProfileRecipe"].Description = "one profile block: options self-describe eligibility, include.profiles compose refs in order (local scalars, sourced {source, options, env}), include adds, exclude filters last and wins"
 	defs["includeSet"].Description = "additive payload: profile refs, makeLinks globs, makeCopies/renderTemplates/makeDirs perm-groups, runScripts globs, runServices names"
 	defs["excludeSet"].Description = "subtractive glob filter, applied last, wins over every include (rich entries too)"
-	defs["SpecOptions"].Description = "reserved top-level options: block: spec-wide defaults (execIf gate, autoDiscover/debug/workingDirectory) + che knobs (validateSpec)"
+	defs["SpecOptions"].Description = "reserved top-level options: block: spec-wide defaults (execIf gate, autoDiscover/debug/workingDirectory) + che knobs (validateSpec/dryRun/profiles/skipRemoteRefs/renderTemplates.skipSecrets); same shape as the user-config file"
 	prop(defs["ProfileOptions"], "execIf").Description = "predicate expressions `<source>` or `<source> == <literal>`, sources builtin:*/env:*; empty: always"
 
 	root := &jsonschema.Schema{

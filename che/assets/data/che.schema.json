@@ -78,7 +78,7 @@
         },
         "autoDiscover": {
           "type": "boolean",
-          "description": "run on bare che (nil: inherit spec options, then false: runs only via --profile or include.profiles)"
+          "description": "run on bare che (nil: inherit spec options, then false: runs only via --profiles or include.profiles)"
         },
         "debug": {
           "type": "boolean",
@@ -141,6 +141,16 @@
         }
       ]
     },
+    "RenderTemplates": {
+      "properties": {
+        "skipSecrets": {
+          "type": "boolean",
+          "description": "skip op:// secret resolution, render placeholders; overridden by the flag and env var"
+        }
+      },
+      "additionalProperties": false,
+      "type": "object"
+    },
     "SpecOptions": {
       "properties": {
         "execIf": {
@@ -148,7 +158,7 @@
             "type": "string"
           },
           "type": "array",
-          "description": "spec-level predicates: gate every profile of this spec (ANDed with each profile's own)"
+          "description": "spec-level predicates: gate every profile of this spec (ANDed with each profile's own); spec-only"
         },
         "autoDiscover": {
           "type": "boolean",
@@ -160,7 +170,7 @@
         },
         "workingDirectory": {
           "type": "string",
-          "description": "the load-ops source tree (absolute, relative to the checkout, ~/, $VAR, env vars expanded); default root; the RootPrefix logical token maps onto it, the HOME/ folder under it maps onto $HOME"
+          "description": "the load-ops source tree (absolute, relative to the checkout, ~/, $VAR, env vars expanded); default root; the RootPrefix logical token maps onto it, the HOME/ folder under it maps onto $HOME; spec-only"
         },
         "validateSpec": {
           "type": "string",
@@ -169,11 +179,34 @@
             "error"
           ],
           "description": "how this spec's schema violations report (per-spec: each included spec honors its own); overridden by the flag and env var"
+        },
+        "dryRun": {
+          "type": "string",
+          "enum": [
+            "delta",
+            "all"
+          ],
+          "description": "default dry-run mode: delta (changed dests) | all (every dest); overridden by the flag and env var"
+        },
+        "profiles": {
+          "items": {
+            "type": "string"
+          },
+          "type": "array",
+          "description": "profiles to run (autoDiscover skipped, execIf still enforced); overridden by --profiles and CHE_PROFILE"
+        },
+        "skipRemoteRefs": {
+          "type": "boolean",
+          "description": "skip sourced include.profiles refs; overridden by the flag and env var"
+        },
+        "renderTemplates": {
+          "$ref": "#/$defs/RenderTemplates",
+          "description": "renderTemplates op defaults"
         }
       },
       "additionalProperties": false,
       "type": "object",
-      "description": "reserved top-level options: block: spec-wide defaults (execIf gate, autoDiscover/debug/workingDirectory) + che knobs (validateSpec)"
+      "description": "reserved top-level options: block: spec-wide defaults (execIf gate, autoDiscover/debug/workingDirectory) + che knobs (validateSpec/dryRun/profiles/skipRemoteRefs/renderTemplates.skipSecrets); same shape as the user-config file"
     },
     "dirGroup": {
       "properties": {
