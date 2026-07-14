@@ -1,4 +1,4 @@
-// Package render is the shared gomplate engine: template funcs, op:// secret resolution, remoteFile inclusion, frontmatter, markdown transforms, doc generators.
+// Package render is the shared gomplate engine: template funcs, op:// (1Password) and gcp:// (GCP Secret Manager) secret resolution, remoteFile inclusion, frontmatter, markdown transforms, doc generators.
 package render
 
 // [>] 🤖🤖
@@ -18,6 +18,8 @@ import (
 	"text/template"
 	"time"
 
+	secretmanager "cloud.google.com/go/secretmanager/apiv1"
+	secretmanagerpb "cloud.google.com/go/secretmanager/apiv1/secretmanagerpb"
 	onepassword "github.com/1password/onepassword-sdk-go"
 	"github.com/hairyhenderson/gomplate/v4"
 	"github.com/invopop/jsonschema"
@@ -26,12 +28,17 @@ import (
 	"gitlab.com/konradodwrot/go-modules/che/render/lib"
 )
 
-// opRetryDelays: backoff between op-resolve attempts that hit a vault rate limit.
-var opRetryDelays = []time.Duration{
+// secretRetryDelays: backoff between secret-resolve attempts that hit a
+// backend rate limit.
+var secretRetryDelays = []time.Duration{
 	500 * time.Millisecond,
 	1 * time.Second,
 	2 * time.Second,
 }
+
+// secretSchemes: the URI schemes the secret func dispatches on, single source
+// of truth for the dispatcher and IsSecretRefPresent.
+var secretSchemes = []string{"op://", "gcp://"}
 
 // Exec renders body via the gomplate library, built-ins plus the funcs below.
 // name: error messages only.
@@ -45,7 +52,7 @@ func Exec(name string, body []byte, repoRoot string) ([]byte, error) {
 func ExecWithCtx(name string, body []byte, repoRoot string, itemCtx map[string]string) ([]byte, error) {
 	ctx := context.Background()
 	funcs := template.FuncMap{
-		"op":                   opResolver(ctx),
+		"secret":               secretFunc(ctx),
 		"renderDirsTree":       func() (string, error) { return DirsTree(repoRoot) },
 		"renderRepoGroupIndex": RepoGroupIndexDir,
 		"renderMakefileDoc":    MakefileDoc,
@@ -112,13 +119,19 @@ type secretResolver interface {
 	Resolve(ctx context.Context, ref string) (string, error)
 }
 
-func (r sdkResolver) Resolve(ctx context.Context, ref string) (string, error) {
+// --- op backend (1Password, op:// refs) ---
+
+func (r opBackend) Resolve(ctx context.Context, ref string) (string, error) {
 	return r.client.Secrets().Resolve(ctx, ref)
 }
 
-// newSecretResolver constructs the real 1Password client; tests swap in a mock
-// so the SDK never runs.
-var newSecretResolver = func(ctx context.Context, token string) (secretResolver, error) {
+// newOpBackend lazily builds the op backend: OP_SERVICE_ACCOUNT_TOKEN gates it,
+// so it only fires when an op:// ref appears. Tests swap in a mock.
+var newOpBackend = func(ctx context.Context) (secretResolver, error) {
+	token := os.Getenv("OP_SERVICE_ACCOUNT_TOKEN")
+	if token == "" {
+		return nil, fmt.Errorf("OP_SERVICE_ACCOUNT_TOKEN unset")
+	}
 	client, err := onepassword.NewClient(ctx,
 		onepassword.WithServiceAccountToken(token),
 		onepassword.WithIntegrationInfo("che", "1.0.0"),
@@ -126,37 +139,105 @@ var newSecretResolver = func(ctx context.Context, token string) (secretResolver,
 	if err != nil {
 		return nil, err
 	}
-	return sdkResolver{client}, nil
+	return opBackend{client}, nil
 }
 
-// opSleep paces op-resolve retries; tests stub it to a no-op.
-var opSleep = time.Sleep
+// --- gcp backend (GCP Secret Manager, gcp:// refs) ---
 
-// opResolver returns an op(ref) template func that lazily inits one 1Password client
-// (OP_SERVICE_ACCOUNT_TOKEN) on first use and reuses it for the render's references.
-// Resolves retry on vault rate-limit errors.
-func opResolver(ctx context.Context) func(string) (string, error) {
-	var client secretResolver
+// Resolve parses gcp://<project>/<secret>[/<version>] (version default latest),
+// accesses the version, returns its payload bytes.
+func (r gcpBackend) Resolve(ctx context.Context, ref string) (string, error) {
+	project, secret, version, err := parseGCPRef(ref)
+	if err != nil {
+		return "", err
+	}
+	name := fmt.Sprintf("projects/%s/secrets/%s/versions/%s", project, secret, version)
+	resp, err := r.client.AccessSecretVersion(ctx, &secretmanagerpb.AccessSecretVersionRequest{Name: name})
+	if err != nil {
+		return "", err
+	}
+	return string(resp.GetPayload().GetData()), nil
+}
+
+// parseGCPRef splits gcp://<project>/<secret>[/<version>], version default latest.
+func parseGCPRef(ref string) (project, secret, version string, err error) {
+	rest := strings.TrimPrefix(ref, "gcp://")
+	parts := strings.Split(rest, "/")
+	if len(parts) < 2 || parts[0] == "" || parts[1] == "" {
+		return "", "", "", fmt.Errorf("malformed gcp ref %q: want gcp://<project>/<secret>[/<version>]", ref)
+	}
+	version = "latest"
+	if len(parts) >= 3 && parts[2] != "" {
+		version = parts[2]
+	}
+	return parts[0], parts[1], version, nil
+}
+
+// newGCPBackend lazily builds the GCP backend via Application Default
+// Credentials (google ADC chain, no explicit creds). Tests swap in a mock.
+var newGCPBackend = func(ctx context.Context) (secretResolver, error) {
+	client, err := secretmanager.NewClient(ctx)
+	if err != nil {
+		return nil, err
+	}
+	return gcpBackend{client}, nil
+}
+
+// --- dispatcher ---
+
+// secretSleep paces secret-resolve retries; tests stub it to a no-op.
+var secretSleep = time.Sleep
+
+// backendFactory builds the secret backend for a scheme; the two factory vars
+// are swappable in tests.
+func backendFactory(scheme string) func(context.Context) (secretResolver, error) {
+	switch scheme {
+	case "op://":
+		return newOpBackend
+	case "gcp://":
+		return newGCPBackend
+	}
+	return nil
+}
+
+// secretFunc returns a secret(ref) template func: the ref's URI scheme picks the
+// backend (op:// 1Password, gcp:// GCP Secret Manager). Each backend is inited
+// lazily on its first ref and cached for the render. Resolves retry on rate limits.
+func secretFunc(ctx context.Context) func(string) (string, error) {
+	cache := map[string]secretResolver{}
 	return func(ref string) (string, error) {
-		if client == nil {
-			token := os.Getenv("OP_SERVICE_ACCOUNT_TOKEN")
-			if token == "" {
-				return "", fmt.Errorf("op %q: OP_SERVICE_ACCOUNT_TOKEN unset", ref)
-			}
-			c, err := newSecretResolver(ctx, token)
-			if err != nil {
-				return "", fmt.Errorf("op client: %w", err)
-			}
-			client = c
+		scheme := schemeOf(ref)
+		factory := backendFactory(scheme)
+		if factory == nil {
+			return "", fmt.Errorf("secret %q: unknown scheme (want %s)", ref, strings.Join(secretSchemes, ", "))
 		}
-		secret, err := retry(opRetryDelays, opSleep, isRateLimitErr, func() (string, error) {
-			return client.Resolve(ctx, ref)
+		backend := cache[scheme]
+		if backend == nil {
+			b, err := factory(ctx)
+			if err != nil {
+				return "", fmt.Errorf("secret %q: %w", ref, err)
+			}
+			backend = b
+			cache[scheme] = b
+		}
+		secret, err := retry(secretRetryDelays, secretSleep, isRateLimitErr, func() (string, error) {
+			return backend.Resolve(ctx, ref)
 		})
 		if err != nil {
-			return "", fmt.Errorf("op resolve %q: %w", ref, err)
+			return "", fmt.Errorf("secret resolve %q: %w", ref, err)
 		}
 		return secret, nil
 	}
+}
+
+// schemeOf: the secretSchemes prefix ref carries, "" if none.
+func schemeOf(ref string) string {
+	for _, s := range secretSchemes {
+		if strings.HasPrefix(ref, s) {
+			return s
+		}
+	}
+	return ""
 }
 
 // JSONSchema: Options che.yml schema fragment.
@@ -247,9 +328,14 @@ func resolveAtIncludes(repoRoot string, body []byte) []byte {
 	return out.Bytes()
 }
 
-// IsSecretRefPresent: body contains an op:// ref.
+// IsSecretRefPresent: body contains any secretSchemes ref (op:// or gcp://).
 func IsSecretRefPresent(body []byte) bool {
-	return bytes.Contains(body, []byte("op://"))
+	for _, s := range secretSchemes {
+		if bytes.Contains(body, []byte(s)) {
+			return true
+		}
+	}
+	return false
 }
 
 // isAtIncludeLine: line is exactly '@<no-space>', no whitespace.

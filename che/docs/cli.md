@@ -159,7 +159,7 @@ render *.tpl sources; each dest path decides target (relative -> repo, ~/ or abs
 
 | Option | Env | Values | Default | Description |
 | --- | --- | --- | --- | --- |
-| `--skip-secrets` | `CHE_RENDER_TEMPLATES_SKIP_SECRETS` | `bool` | `false` | skip sources carrying op:// secret refs (logged, dests untouched) |
+| `--skip-secrets` | `CHE_RENDER_TEMPLATES_SKIP_SECRETS` | `bool` | `false` | skip sources carrying op:// or gcp:// secret refs (logged, dests untouched) |
 
 ### `$ che run-scripts`
 

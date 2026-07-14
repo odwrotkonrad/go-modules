@@ -179,7 +179,7 @@
       "properties": {
         "skipSecrets": {
           "type": "boolean",
-          "description": "skip op:// secret resolution, render placeholders; overridden by the flag and env var"
+          "description": "skip op:// (1Password) and gcp:// (GCP Secret Manager) secret resolution, render placeholders; overridden by the flag and env var"
         }
       },
       "additionalProperties": false,
