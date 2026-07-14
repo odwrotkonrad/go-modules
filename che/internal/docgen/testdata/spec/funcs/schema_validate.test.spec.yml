@@ -50,7 +50,7 @@ cases:
         - doc: |
             p:
               includes:
-                makeLinks: [HOME/**]
+                makeLinks: [_home/**]
     expected:
       output: false
   - name: ShouldRejectFileEntryWithoutSource
@@ -72,7 +72,7 @@ cases:
               include:
                 makeDirs:
                   - chmod: rwxr-xr-x
-                    directories: [HOME/.cache]
+                    directories: [_home/.cache]
     expected:
       output: false
   - name: ShouldRejectMixinProfilesNotAList

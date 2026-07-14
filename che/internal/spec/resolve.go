@@ -412,7 +412,7 @@ func mergeRecipe(recipes []ProfileRecipe, eff *effective, ps ProfileRecipe, seen
 		if e.Source == "" {
 			return fmt.Errorf("profile %q: link entry missing source", name)
 		}
-		rule, err := parseDestRule(e.Dest)
+		rule, err := ruleFromDest(e.Source, e.Dest)
 		if err != nil {
 			return fmt.Errorf("profile %q: %w", name, err)
 		}
@@ -450,7 +450,7 @@ func splitEntries(entries []entry, globs *globSet, rich *[]FileItem) error {
 				continue
 			}
 			if f.DestRule != "" {
-				rule, err := parseDestRule(f.DestRule)
+				rule, err := ruleFromDest(f.Source, f.DestRule)
 				if err != nil {
 					return err
 				}
@@ -481,7 +481,7 @@ func splitTemplates(entries []templateGroup, globs *globSet, rich *[]FileItem) e
 				if IsRemoteSrc(f.Source) {
 					return fmt.Errorf("renderTemplates dest rewrite cannot be remote: %q", f.Source)
 				}
-				rule, err := parseDestRule(f.DestRule)
+				rule, err := ruleFromDest(f.Source, f.DestRule)
 				if err != nil {
 					return err
 				}

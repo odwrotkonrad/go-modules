@@ -4,14 +4,14 @@ context:
 cases:
   - name: ShouldMapBareHomeTokenToSystemRoot
     input:
-      args: [rel: HOME]
+      args: [rel: _home]
     expected:
-      output: /HOME
+      output: /_home
   - name: ShouldMapHomePrefixedRelToSystemRoot
     input:
-      args: [rel: HOME/.config/zsh]
+      args: [rel: _home/.config/zsh]
     expected:
-      output: /HOME/.config/zsh
+      output: /_home/.config/zsh
   - name: ShouldMapBareRelToRootAbsolutePath
     input:
       args: [rel: etc/zshrc]

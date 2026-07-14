@@ -20,10 +20,10 @@ cases:
   - name: symlinkShouldBuildPlainArgvUnderHome
     context: {function: fsutil.FS.Symlink}
     input:
-      args: [target: /repo/root/HOME/.config/foo, dest: /Users/x/.config/foo]
+      args: [target: /repo/root/_home/.config/foo, dest: /Users/x/.config/foo]
     expected:
       output:
-        argv: ln -fs ${NODEREF} /repo/root/HOME/.config/foo /Users/x/.config/foo
+        argv: ln -fs ${NODEREF} /repo/root/_home/.config/foo /Users/x/.config/foo
   - name: symlinkShouldUseSudoOutsideHome
     context: {function: fsutil.FS.Symlink}
     input:
@@ -34,10 +34,10 @@ cases:
   - name: copyShouldInstallWithModeUnderHome
     context: {function: fsutil.FS.Copy}
     input:
-      args: [src: /repo/root/HOME/.config/foo/f, dest: /Users/x/.config/foo/f, mode: "0644"]
+      args: [src: /repo/root/_home/.config/foo/f, dest: /Users/x/.config/foo/f, mode: "0644"]
     expected:
       output:
-        argv: install -m 0644 /repo/root/HOME/.config/foo/f /Users/x/.config/foo/f
+        argv: install -m 0644 /repo/root/_home/.config/foo/f /Users/x/.config/foo/f
   - name: copyShouldUseSudoAndOmitZeroModeOutsideHome
     context: {function: fsutil.FS.Copy}
     input:

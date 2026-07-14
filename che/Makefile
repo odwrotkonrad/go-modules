@@ -6,9 +6,12 @@ GO ?= go
 GOCOVER_COBERTURA ?= github.com/t-yuki/gocover-cobertura@v0.0.0-20180217150009-aaee18c8195c
 CC ?= clang
 BIN := che
+STATE_HOME := $(or $(CHE_STATE_HOME),$(if $(XDG_STATE_HOME),$(XDG_STATE_HOME)/che),$(HOME)/.local/state/che)
+DB := $(STATE_HOME)/ops.db
+BK_APPDB := $(HOME)/Library/Application Support/beekeeper-studio/app.db
 
 WRAPPERS :=
-COMMANDS := render-docs test test-cover build vet lint install release-check release-darwin release-snapshot
+COMMANDS := render-docs test test-cover build vet lint install release-check release-darwin release-snapshot inspect-db dump-db open-db
 
 .PHONY: $(WRAPPERS) $(COMMANDS)
 
@@ -17,6 +20,27 @@ COMMANDS := render-docs test test-cover build vet lint install release-check rel
 render-docs:
 	CC=$(CC) $(GO) run ./internal/docgen
 ##[<] Docs
+
+##[>] Database [genai-include]
+#[what] open the ops ledger DB (~/.local/state/che/ops.db) in an interactive sqlite3 shell (.tables/.schema, read-only)
+inspect-db:
+	sqlite3 -readonly "file:$(DB)?mode=ro" -header -column
+
+#[what] dump the current installed set: every table's rows to stdout, read-only
+dump-db:
+	sqlite3 -readonly "file:$(DB)?mode=ro" -header -column \
+		".mode box" \
+		"SELECT * FROM spec_dones;" \
+		"SELECT * FROM profile_dones;" \
+		"SELECT * FROM operation_dones;" \
+		"SELECT * FROM backups;"
+
+#[what] register the ops ledger DB as a read-only Beekeeper saved connection (if absent), then launch Beekeeper Studio
+open-db:
+	osascript -e 'quit app "Beekeeper Studio"' 2>/dev/null || true
+	sqlite3 "$(BK_APPDB)" "INSERT INTO saved_connection (version,connectionType,uniqueHash,name,defaultDatabase,options,readOnlyMode,workspaceId) SELECT 2,'sqlite','DEPRECATED','che ops ledger','$(DB)','{ \"connectionMethod\": \"manual\" }',1,-1 WHERE NOT EXISTS (SELECT 1 FROM saved_connection WHERE defaultDatabase='$(DB)' AND workspaceId=-1);"
+	open -a "Beekeeper Studio"
+##[<] Database
 
 ##[>] Go [genai-include]
 #[what] run all tests

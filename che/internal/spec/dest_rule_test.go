@@ -18,4 +18,14 @@ func TestDestRule(t *testing.T) {
 	})
 }
 
+func TestRuleFromDest(t *testing.T) {
+	testyml.Eq(t, td, "testdata/spec/funcs/rule_from_dest.test.spec.yml", func(t *testing.T, c testyml.Case[string]) (string, error) {
+		rule, err := ruleFromDest(c.Input.Args.String(t, 0), c.Input.Args.String(t, 1))
+		if err != nil {
+			return "", err
+		}
+		return rule.apply(c.Input.Args.String(t, 2)), nil
+	})
+}
+
 // [<] 🤖🤖

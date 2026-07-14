@@ -862,6 +862,7 @@ func (p *ProfileReady) ExecOperations() error {
 			log.Msg("all(run)", op.Name(), log.Off)
 			p.tel.CountOperation(op.Name())
 			if err := op.execOperation(p); err != nil {
+				p.tel.CountError(op.Name())
 				fails = append(fails, fmt.Errorf("%s: %w", op.Name(), err))
 			}
 		}

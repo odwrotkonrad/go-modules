@@ -43,17 +43,17 @@ include:
 base:
   include:
     makeLinks:
-      - {source: HOME/**, dest: 's#^HOME#$HOME#'}
+      - {source: _home/**, dest: $HOME/**}
       - etc/{grafana,prometheus}/**
     makeCopies:
-      - files: [{source: HOME/**, dest: 's#^HOME#$HOME#'}]
+      - files: [{source: _home/**, dest: $HOME/**}]
       - owner: root
         ownerGroup: "0"
         chmod: "0644"
         files:
           - {source: Library/LaunchDaemons/otelcol.plist.ontoHost.cp, dest: [/Library/LaunchDaemons/otelcol.plist]}
     renderTemplates:
-      - templates: [{source: HOME/**, dest: 's#^HOME#$HOME#'}]
+      - templates: [{source: _home/**, dest: $HOME/**}]
       - owner: root
         ownerGroup: "0"
         chmod: "0440"
@@ -125,7 +125,7 @@ Spec-wide defaults + che knobs:
   Absolute, `~/`, `$VAR`, env vars expand; relative resolves under the
   checkout. makeLinks/makeCopies globs and renderTemplates host sources resolve
   against it; home targeting is explicit via a `$HOME` dest rewrite (no implicit
-  `HOME/` folder mapping). che.yml lookup, scripts, and repo-doc template
+  `_home/` folder mapping). che.yml lookup, scripts, and repo-doc template
   sources (repo dest) stay at the checkout.
 - `validateSpec` (`warn` | `error`): top-level only; flag and env override.
 - `dryRun` (`delta` | `all`): default dry-run mode; flag and env override.
@@ -189,32 +189,37 @@ profile runs its full op sequence, profile by profile.
 ## Dest Mapping
 
 A working-tree path maps onto its live dest as a system-root path (`etc/x` ->
-`/etc/x`); there is no implicit `HOME/` folder mapping. Home targeting is
+`/etc/x`); there is no implicit `_home/` folder mapping. Home targeting is
 explicit: a dest that resolves to an absolute path (`/...`) or expands `$HOME`
-lands there directly.
+lands there directly. Convention: keep host-home files under a `_home/` folder
+(leading-underscore sentinel, can't collide with a real `home` dir), rewritten
+onto `$HOME`.
 
 Dest strings expand env vars, `$HOME` bound to the invoking user's home
 (correct under sudo, where process `$HOME` differs). State home targeting
-explicitly, either per-file or as a glob sed rewrite:
+explicitly, either per-file, as a glob prefix-swap, or as a glob sed rewrite:
 
 ```yaml
 makeLinks:
-  - {source: HOME/**, dest: 's#^HOME#$HOME#'}
+  - {source: _home/**, dest: $HOME/**}              # prefix-swap sugar
 makeCopies:
   - files:
-      - {source: HOME/**, dest: 's#^HOME#$HOME#'}       # glob + rewrite
-      - {source: HOME/foo.ontoHost.cp, dest: [$HOME/.config/foo]}  # explicit
+      - {source: _home/**, dest: 's:^_home:$HOME:'}  # glob + sed rewrite
+      - {source: _home/foo.ontoHost.cp, dest: [$HOME/.config/foo]}  # explicit
 renderTemplates:
   - templates:
-      - {source: HOME/**, dest: 's#^HOME#$HOME#'}
-      - {source: HOME/x.tpl, dest: [$HOME/.config/x]}
+      - {source: _home/**, dest: $HOME/**}
+      - {source: _home/x.tpl, dest: [$HOME/.config/x]}
 makeDirs:
   - directories: [$HOME/.local/{bin,share}]
 ```
 
-The sed rewrite `s<delim><pattern><delim><replacement><delim>[g]` (any `<delim>`
-after `s`, Go regexp pattern, literal replacement so `$HOME` survives to host
-mapping) rewrites the workingDirectory-relative dest before host mapping.
+The prefix-swap sugar `{source: <src>/**, dest: <dst>/**}` desugars to
+`s:^<src>:<dst>:` (strip both `/**`, graft `<dst>` under `<src>`). The sed
+rewrite `s<delim><pattern><delim><replacement><delim>[g]` (any `<delim>` after
+`s`, `:` the blessed form, Go regexp pattern, literal replacement so `$HOME`
+survives to host mapping) rewrites the workingDirectory-relative dest before
+host mapping.
 
 ## Environment
 

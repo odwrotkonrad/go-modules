@@ -4,27 +4,27 @@ context:
 cases:
   - name: ShouldMatchDirectChildUnderSubtreeGlob
     input:
-      args: [pattern: HOME/.config/zsh/**, path: HOME/.config/zsh/.zshrc]
+      args: [pattern: _home/.config/zsh/**, path: _home/.config/zsh/.zshrc]
     expected:
       output: true
   - name: ShouldMatchNestedPathUnderSubtreeGlob
     input:
-      args: [pattern: HOME/.config/zsh/**, path: HOME/.config/zsh/zshrc.d/auto.d/80-tools.zsh]
+      args: [pattern: _home/.config/zsh/**, path: _home/.config/zsh/zshrc.d/auto.d/80-tools.zsh]
     expected:
       output: true
   - name: ShouldMatchSubtreeGlobRootItself
     input:
-      args: [pattern: HOME/.config/zsh/**, path: HOME/.config/zsh]
+      args: [pattern: _home/.config/zsh/**, path: _home/.config/zsh]
     expected:
       output: true
   - name: ShouldRejectSiblingDirOfSubtreeGlob
     input:
-      args: [pattern: HOME/.config/zsh/**, path: HOME/.config/git/config]
+      args: [pattern: _home/.config/zsh/**, path: _home/.config/git/config]
     expected:
       output: false
   - name: ShouldRejectPrefixOnlySiblingOfSubtreeGlob
     input:
-      args: [pattern: HOME/.config/zsh/**, path: HOME/.config/zshenv]
+      args: [pattern: _home/.config/zsh/**, path: _home/.config/zshenv]
     expected:
       output: false
   - name: ShouldMatchExactPath

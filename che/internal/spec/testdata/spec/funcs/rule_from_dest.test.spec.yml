@@ -1,0 +1,40 @@
+# [>] 🤖🤖
+context:
+  function: spec.ruleFromDest
+cases:
+  - name: ShouldDesugarPrefixSwapToHomeVar
+    input:
+      args: [source: _home/**, dest: $HOME/**, path: _home/.config/foo]
+    expected:
+      output: $HOME/.config/foo
+  - name: ShouldDesugarNestedPrefixSwap
+    input:
+      args: [source: _home/.config/**, dest: $HOME/.config/**, path: _home/.config/foo]
+    expected:
+      output: $HOME/.config/foo
+  - name: ShouldAnchorPrefixSwapAtStart
+    input:
+      args: [source: _home/**, dest: $HOME/**, path: etc/_home/x]
+    expected:
+      output: etc/_home/x
+  - name: ShouldDelegateSedRuleWithColonDelim
+    input:
+      args: [source: _home/**, dest: 's:^_home:$HOME:', path: _home/.config/foo]
+    expected:
+      output: $HOME/.config/foo
+  - name: ShouldDelegateSedRuleWithHashDelim
+    input:
+      args: [source: _home/**, dest: 's#^_home#$HOME#', path: _home/.config/foo]
+    expected:
+      output: $HOME/.config/foo
+  - name: ShouldErrorOnPrefixSwapWithoutGlobSource
+    input:
+      args: [source: _home/foo, dest: $HOME/**, path: _home/foo]
+    expected:
+      errorOutput: [dest]
+  - name: ShouldErrorOnPlainDest
+    input:
+      args: [source: _home/**, dest: $HOME/.config, path: _home/foo]
+    expected:
+      errorOutput: [dest]
+# [<] 🤖🤖

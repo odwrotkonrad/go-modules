@@ -99,14 +99,22 @@ func scalarOr(scalarDesc string, o *jsonschema.Schema) *jsonschema.Schema {
 
 const destPathDesc = "dest path: relative -> repo, ~/ or absolute -> host"
 
-// destRuleSchema is the sed-style dest-rewrite string form shared by makeLinks
-// and makeCopies/renderTemplates glob sources.
+// destRuleSchema is the dest-rewrite string form shared by makeLinks and
+// makeCopies/renderTemplates glob sources: the sed-style rule or the
+// prefix-swap sugar (both desugar to the same anchored rewrite).
 func destRuleSchema() *jsonschema.Schema {
-	return &jsonschema.Schema{
-		Description: "sed-style rewrite s<delim><pattern><delim><replacement><delim>[g] (Go regexp pattern, literal replacement so $HOME survives; g: every match, absent: first only), applied to the workingDirectory-relative dest path before host mapping (e.g. s#^HOME#$HOME# targets the invoking user's home)",
-		Type:        "string",
-		Pattern:     "^s\\W.+\\W(g)?$",
-	}
+	return &jsonschema.Schema{OneOf: []*jsonschema.Schema{
+		{
+			Description: "sed-style rewrite s<delim><pattern><delim><replacement><delim>[g] (Go regexp pattern, literal replacement so $HOME survives; g: every match, absent: first only), applied to the workingDirectory-relative dest path before host mapping (:-delimited is the blessed form; e.g. s:^_home:$HOME: targets the invoking user's home)",
+			Type:        "string",
+			Pattern:     "^s\\W.+\\W(g)?$",
+		},
+		{
+			Description: "prefix-swap sugar <prefix>/**: with source <srcPrefix>/** it desugars to s:^<srcPrefix>:<prefix>: (e.g. dest $HOME/** with source _home/** targets home)",
+			Type:        "string",
+			Pattern:     "/\\*\\*$",
+		},
+	}}
 }
 
 func (linkEntry) JSONSchema() *jsonschema.Schema {

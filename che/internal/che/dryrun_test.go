@@ -92,6 +92,12 @@ var settlers = map[string]func(*testing.T, *ProfileReady, spec.OperationRecipes)
 	"make-copies": func(t *testing.T, p *ProfileReady, r spec.OperationRecipes) string {
 		t.Helper()
 		item := r.MakeCopies.Copies[0]
+		for _, c := range r.MakeCopies.Copies {
+			if strings.HasPrefix(p.resolveCopyDests(c)[0], p.home) {
+				item = c
+				break
+			}
+		}
 		dest := p.resolveCopyDests(item)[0]
 		src, err := os.ReadFile(p.resolveSrc(item.Rel))
 		require.NoError(t, err)

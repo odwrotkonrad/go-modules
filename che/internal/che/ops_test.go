@@ -147,7 +147,7 @@ func seedBrokenLink(t *testing.T, p *ProfileReady) string {
 	dir := filepath.Join(p.home, ".config/zsh")
 	require.NoError(t, os.MkdirAll(dir, 0o755))
 	dead := filepath.Join(dir, "dead")
-	src := p.resolveSrc("HOME/.config/zsh/gone")
+	src := p.resolveSrc("_home/.config/zsh/gone")
 	require.NoError(t, os.Symlink(src, dead))
 	require.NoError(t, p.Ledger.RecordOperation(p.profileDone, database.OperationDone{
 		OpType: "create", Kind: "link", Dest: dead, Target: src,

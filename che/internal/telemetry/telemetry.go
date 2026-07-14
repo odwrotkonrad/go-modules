@@ -51,6 +51,7 @@ type Telemetry struct {
 	profileRuns   metric.Int64Counter
 	operationRuns metric.Int64Counter
 	unitTotal     metric.Int64Counter
+	errors        metric.Int64Counter
 }
 
 // Start builds the OTLP metric + log providers from cfg and the run's resource
@@ -125,7 +126,10 @@ func (t *Telemetry) registerCounters() error {
 	if t.operationRuns, err = m.Int64Counter("che.operation.runs.total"); err != nil {
 		return err
 	}
-	t.unitTotal, err = m.Int64Counter("che.unit.total")
+	if t.unitTotal, err = m.Int64Counter("che.unit.total"); err != nil {
+		return err
+	}
+	t.errors, err = m.Int64Counter("che.errors.total")
 	return err
 }
 
@@ -228,6 +232,14 @@ func (t *Telemetry) CountUnit(kind, opType, command string) {
 		attribute.String("op_type", opType),
 		attribute.String("command", command),
 	))
+}
+
+// CountError records one failed operation, labeled by op name.
+func (t *Telemetry) CountError(op string) {
+	if t == nil || t.errors == nil {
+		return
+	}
+	t.errors.Add(context.Background(), 1, metric.WithAttributes(attribute.String("op", op)))
 }
 
 // [<] 🤖🤖 counters

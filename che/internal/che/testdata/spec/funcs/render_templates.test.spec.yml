@@ -42,14 +42,14 @@ cases:
     input:
       args:
         - tree:
-            root/HOME/env.ontoHost.tpl: |
+            root/_home/env.ontoHost.tpl: |
               B=default
               A=default
             home/.env: |
               B=kept
               C=extra
         - items:
-            - rel: HOME/env.ontoHost.tpl
+            - rel: _home/env.ontoHost.tpl
               dests:
                 - {path: "~/.env", options: {writeType: mergeUpsert}}
     expected:
@@ -63,11 +63,11 @@ cases:
     input:
       args:
         - tree:
-            root/HOME/.config/zsh/t.ontoHost.tpl: |
+            root/_home/.config/zsh/t.ontoHost.tpl: |
               hello {{ "world" }}
         - dirs: [home/.config/zsh]
         - items:
-            - {rel: HOME/.config/zsh/t.ontoHost.tpl, dests: [$HOME/.config/zsh/t], derived: true}
+            - {rel: _home/.config/zsh/t.ontoHost.tpl, dests: [$HOME/.config/zsh/t], derived: true}
     expected:
       output:
         files:

@@ -65,9 +65,9 @@ type svcWant struct {
 func servicesProfile(t *testing.T) *ProfileReady {
 	t.Helper()
 	dir := testutil.Tree(t, map[string]string{
-		"root/Library/LaunchDaemons/otelcol.plist.ontoHost.cp":                   "<plist/>\n",
-		"root/Library/LaunchAgents/gitlab-runner.plist.ontoHost.tpl":             "<plist/>\n",
-		"root/HOME/Library/LaunchAgents/load-defaults-config.plist.ontoHost.tpl": "<plist/>\n",
+		"root/Library/LaunchDaemons/otelcol.plist.ontoHost.cp":                    "<plist/>\n",
+		"root/Library/LaunchAgents/gitlab-runner.plist.ontoHost.tpl":              "<plist/>\n",
+		"root/_home/Library/LaunchAgents/load-defaults-config.plist.ontoHost.tpl": "<plist/>\n",
 	})
 	p := newProfile(dir, "/Users/x", options.Options{}).withDir(dir)
 	p.Source.ProfileName = "desktop/macos"

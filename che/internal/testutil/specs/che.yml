@@ -1,17 +1,17 @@
 base:
   include:
     makeLinks:
-      - {source: HOME/.config/zsh/**, dest: 's#^HOME#$HOME#'}
+      - {source: _home/.config/zsh/**, dest: 's:^_home:$HOME:'}
       - etc/zshrc
     makeCopies:
-      - files: [{source: HOME/.config/zsh/**, dest: 's#^HOME#$HOME#'}]
+      - files: [{source: _home/.config/zsh/**, dest: 's:^_home:$HOME:'}]
       - owner: root
         ownerGroup: wheel
         chmod: "0644"
         files:
           - {source: Library/LaunchDaemons/otelcol.plist.ontoHost.cp, dest: [/Library/LaunchDaemons/otelcol.plist]}
     renderTemplates:
-      - templates: [{source: HOME/.config/zsh/**, dest: 's#^HOME#$HOME#'}]
+      - templates: [{source: _home/.config/zsh/**, dest: 's:^_home:$HOME:'}]
     makeDirs:
       - directories: [$HOME/.cache/zsh]
       - chmod: "2775"
