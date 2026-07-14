@@ -113,15 +113,24 @@ func listOr(env LookupEnv, flag []string, envKey string, layers ...[]string) []s
 	return nil
 }
 
-// boolOr is true when the flag is set, the env var is non-empty, or any layer
-// pointer is set true.
+// boolOr is true when the flag is set, else parses the env var (0/false/off/no
+// -> false, any other non-empty -> true), else the first set layer pointer,
+// else false.
 func boolOr(env LookupEnv, flag bool, envKey string, layers ...*bool) bool {
-	if flag || env(envKey) != "" {
+	if flag {
 		return true
 	}
-	for _, l := range layers {
-		if l != nil && *l {
+	if e := env(envKey); e != "" {
+		switch strings.ToLower(e) {
+		case "0", "false", "off", "no":
+			return false
+		default:
 			return true
+		}
+	}
+	for _, l := range layers {
+		if l != nil {
+			return *l
 		}
 	}
 	return false
