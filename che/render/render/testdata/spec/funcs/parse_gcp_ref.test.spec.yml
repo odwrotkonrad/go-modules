@@ -1,0 +1,30 @@
+# [>] 🤖🤖
+context:
+  function: render.parseGCPRef
+cases:
+  - name: ShouldParseWithExplicitVersion
+    input:
+      args: [ref: gcp://project_main/my-secret/3]
+    expected:
+      output: {project: project_main, secret: my-secret, version: "3"}
+  - name: ShouldDefaultVersionToLatest
+    input:
+      args: [ref: gcp://project_main/my-secret]
+    expected:
+      output: {project: project_main, secret: my-secret, version: latest}
+  - name: ShouldDefaultVersionOnTrailingSlash
+    input:
+      args: [ref: "gcp://project_main/my-secret/"]
+    expected:
+      output: {project: project_main, secret: my-secret, version: latest}
+  - name: ShouldErrorOnMissingSecret
+    input:
+      args: [ref: gcp://project_main]
+    expected:
+      errorOutput: ['malformed gcp ref']
+  - name: ShouldErrorOnEmptyProject
+    input:
+      args: [ref: "gcp:///my-secret"]
+    expected:
+      errorOutput: ['malformed gcp ref']
+# [<] 🤖🤖

@@ -3,6 +3,7 @@ package render
 // [>] 🤖🤖
 
 import (
+	secretmanager "cloud.google.com/go/secretmanager/apiv1"
 	onepassword "github.com/1password/onepassword-sdk-go"
 )
 
@@ -41,7 +42,9 @@ type remoteRef struct {
 	gitRef  string
 }
 
-type sdkResolver struct{ client *onepassword.Client }
+type opBackend struct{ client *onepassword.Client }
+
+type gcpBackend struct{ client *secretmanager.Client }
 
 // groupNode: one subgroup dir's direct children. childRepos/childSubgroups are
 // names (basenames) relative to this node's dir. Repos stop recursion (.git present).

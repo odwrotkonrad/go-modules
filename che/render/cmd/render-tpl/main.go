@@ -1,4 +1,4 @@
-// Render-tpl renders one gomplate template to stdout or dests: op:// secrets, remoteFile inclusion, frontmatter, markdown transforms.
+// Render-tpl renders one gomplate template to stdout or dests: op:// (1Password) and gcp:// (GCP Secret Manager) secrets, remoteFile inclusion, frontmatter, markdown transforms.
 package main
 
 // [>] 🤖🤖
@@ -13,8 +13,9 @@ import (
 
 const usage = `usage: render-tpl -f <template>
 
-Render <template> with the shared engine (gomplate built-ins + op:// secrets +
-frontmatter/readBody + native generators), env vars visible via env.Getenv, to
+Render <template> with the shared engine (gomplate built-ins + op:// (1Password)
+and gcp:// (GCP Secret Manager) secrets + frontmatter/readBody + native
+generators), env vars visible via env.Getenv, to
 stdout. Drop-in for 'gomplate -f'. Paths in frontmatter/readBody/renderDirsTree
 resolve against the cwd.
 `

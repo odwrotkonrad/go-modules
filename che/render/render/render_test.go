@@ -39,6 +39,23 @@ func TestIsAtInclude(t *testing.T) {
 	})
 }
 
+func TestIsSecretRefPresent(t *testing.T) {
+	testyml.Eq(t, td, "testdata/spec/funcs/is_secret_ref_present.test.spec.yml", func(t *testing.T, c testyml.Case[bool]) (bool, error) {
+		return IsSecretRefPresent([]byte(c.Input.Args.String(t, 0))), nil
+	})
+}
+
+func TestParseGCPRef(t *testing.T) {
+	testyml.Run(t, td, "testdata/spec/funcs/parse_gcp_ref.test.spec.yml", func(t *testing.T, c testyml.Case[parseGCPWant]) {
+		project, secret, version, err := parseGCPRef(c.Input.Args.String(t, 0))
+		if !c.Expected.Check(t, err) {
+			assert.Equal(t, c.Expected.Output.Project, project, "project")
+			assert.Equal(t, c.Expected.Output.Secret, secret, "secret")
+			assert.Equal(t, c.Expected.Output.Version, version, "version")
+		}
+	})
+}
+
 func TestCompose(t *testing.T) {
 	testyml.Eq(t, td, "testdata/spec/funcs/compose.test.spec.yml", func(t *testing.T, c testyml.Case[string]) (string, error) {
 		a := c.Input.Args
@@ -76,6 +93,12 @@ func TestMergeUpsertEnv(t *testing.T) {
 type splitWant struct {
 	FrontFile string `yaml:"frontFile"`
 	BodyFile  string `yaml:"bodyFile"`
+}
+
+type parseGCPWant struct {
+	Project string `yaml:"project"`
+	Secret  string `yaml:"secret"`
+	Version string `yaml:"version"`
 }
 
 func TestSplitFrontmatter(t *testing.T) {

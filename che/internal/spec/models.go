@@ -126,7 +126,7 @@ type Options struct {
 
 // RenderTemplates namespaces renderTemplates-op option defaults.
 type RenderTemplates struct {
-	SkipSecrets *bool `yaml:"skipSecrets" jsonschema_description:"skip op:// secret resolution, render placeholders; overridden by the flag and env var"`
+	SkipSecrets *bool `yaml:"skipSecrets" jsonschema_description:"skip op:// (1Password) and gcp:// (GCP Secret Manager) secret resolution, render placeholders; overridden by the flag and env var"`
 }
 
 // Otel namespaces the OTLP telemetry options: push run + operation metrics and
@@ -262,7 +262,7 @@ type FileItem struct {
 
 // OperationOptions is the shared per-op recipe knob set.
 type OperationOptions struct {
-	SkipSecrets bool // render: skip sources carrying op:// secret refs
+	SkipSecrets bool // render: skip sources carrying op:// or gcp:// secret refs
 }
 
 // OperationRecipe is the shared operation-recipe parent: pure data, no Host.

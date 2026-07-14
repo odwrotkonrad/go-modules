@@ -36,7 +36,7 @@ type tmplItem struct {
 // explicit dest) render raw to the derived host path, rich items fan out
 // across their dests through render.Compose, host dests placed with spec
 // perms, repo dests written as plain repo files. skipSecrets drops sources
-// carrying op:// refs (logged, dests untouched).
+// carrying op:// or gcp:// refs (logged, dests untouched).
 func (p *ProfileReady) renderTemplates(templates []spec.FileItem, skipSecrets bool) error {
 	var keep []tmplItem
 	var hostDests []string
@@ -109,7 +109,7 @@ func (p *ProfileReady) isHostTemplate(item spec.FileItem) bool {
 	return false
 }
 
-// isSecretRefInItem: the item's template source carries an op:// ref. Remote
+// isSecretRefInItem: the item's template source carries an op:// or gcp:// ref. Remote
 // sources scan fetched content, except under dry-run ([why] dry-run stays
 // offline). Unreadable source -> false (render proceeds, errors there).
 func (p *ProfileReady) isSecretRefInItem(item spec.FileItem) bool {
