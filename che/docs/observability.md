@@ -81,6 +81,22 @@ Observed values per label, curated from the emission sites in `internal/che` (no
 | `services bootin` | the `services bootin` per-op command |
 | `services ensure` | the `services ensure` per-op command |
 
+## Traces
+
+When `otel.traces` is on, che emits spans on tracer `che`. The tree nests `che run` > `prepare-specs` / `<command>` > `profile` > `<operation>` > external-call spans (`fetch-remote`, `run-script`, `service-*`). Counters record under the active span ctx, so metric exemplars link back to the trace.
+
+| Span | Attributes | Description |
+| --- | --- | --- |
+| `che run` | `che.command`, `che.run_id` | root span for the whole invocation |
+| `prepare-specs` |  | spec tree resolution (include.sources + sourced refs, recursive) |
+| `<command>` | `op` | one per CLI command run over the profile tree (name is the op/command) |
+| `profile` | `profile` | one per resolved profile executed |
+| `<operation>` | `op` | one per operation run over a profile (name is the op) |
+| `fetch-remote` | `ref` | one per remote template ref fetched (git clone) |
+| `run-script` | `script` | one per profile script executed |
+| `service-bootout` | `service` | one per service unload |
+| `service-bootin` | `service` | one per service load |
+
 ## Logs
 
 When `otel.logs` is on, each che log line is mirrored as an OTLP log record via the log bridge (`Telemetry.LogRecord`): the log title becomes the record event name, the message becomes the body, and the level maps to severity (`debug` -> Debug, everything else -> Info).
@@ -96,3 +112,4 @@ The `telemetry.Config` knobs, driven by the `otel:` spec block and `CHE_OTEL_*` 
 | `protocol` | `CHE_OTEL_PROTOCOL` | `grpc` | OTLP transport: `grpc` \| `http` |
 | `metrics` | `CHE_OTEL_METRICS` | `true` | export the metrics above |
 | `logs` | `CHE_OTEL_LOGS` | `true` | export che log lines as OTLP logs |
+| `traces` | `CHE_OTEL_TRACES` | `true` | export the spans above |

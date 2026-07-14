@@ -7,6 +7,7 @@ package che
 
 import (
 	"cmp"
+	"context"
 	"errors"
 	"fmt"
 	"maps"
@@ -15,6 +16,7 @@ import (
 	"slices"
 	"strings"
 
+	"go.opentelemetry.io/otel/attribute"
 	"gopkg.in/yaml.v3"
 
 	"gitlab.com/konradodwrot/go-modules/che/internal/database"
@@ -80,6 +82,18 @@ type RemoteFetcher interface {
 type gitFetcher struct{ fetch func(string) (string, error) }
 
 func (g gitFetcher) Fetch(ref string) (string, error) { return g.fetch(ref) }
+
+// fetchRemote fetches ref under a "fetch-remote" span (child of the active op
+// ctx), recording the ref and any error.
+func (p *ProfileReady) fetchRemote(ref string) (string, error) {
+	_, span := p.tel.Span(p.opContext(), "fetch-remote", attribute.String("ref", ref))
+	defer span.End()
+	content, err := p.Fetcher.Fetch(ref)
+	if err != nil {
+		span.RecordError(err)
+	}
+	return content, err
+}
 
 // [<] 🤖🤖
 
@@ -163,8 +177,11 @@ func readSpecLayer(path string) options.Layer {
 // cycle-guarded, deduped by source URI + profile name. ctx carries the captured
 // launch world, held once on specsPrep for the whole prepare pass.
 func PrepareSpecs(ctx Context, opts options.Options, src spec.SpecSourceRecipe) (*SpecReady, error) {
+	_, span := ctx.Tel.Span(ctx.runContext(), "prepare-specs")
+	defer span.End()
 	repoRoot, err := findRepoRoot(ctx)
 	if err != nil {
+		span.RecordError(err)
 		return nil, err
 	}
 	home, err := resolveInvokingHome(ctx)
@@ -601,22 +618,27 @@ func (s *SpecReady) AllProfiles() []*ProfileReady {
 	return out
 }
 
-// ExecEach runs fn over every profile in the tree. It first prints a discovery
-// header naming each resolved profile. A failing profile does not stop the
-// rest: failures collect (ref-wrapped), report as
-// "<op>(report): fail <ref>: <err>" lines after all profiles, and join into
-// the returned error.
-func (s *SpecReady) ExecEach(opName string, fn func(*ProfileReady) error) error {
+// ExecEach runs fn over every profile in the tree, each under its own span
+// (child of ctx). It first prints a discovery header naming each resolved
+// profile. A failing profile does not stop the rest: failures collect
+// (ref-wrapped), report as "<op>(report): fail <ref>: <err>" lines after all
+// profiles, and join into the returned error.
+func (s *SpecReady) ExecEach(ctx context.Context, opName string, fn func(context.Context, *ProfileReady) error) error {
+	ctx, span := s.tel.Span(ctx, opName, attribute.String("op", opName))
+	defer span.End()
 	profiles := s.AllProfiles()
 	for _, p := range profiles {
 		log.Msg(opName+"(discover)", p.Ref(), log.Off)
 	}
 	var fails []error
 	for _, p := range profiles {
-		s.tel.CountProfile(p.Ref())
-		if err := fn(p); err != nil {
+		pctx, pspan := s.tel.Span(ctx, "profile", attribute.String("profile", p.Ref()))
+		s.tel.CountProfile(pctx, p.Ref())
+		if err := fn(pctx, p); err != nil {
+			pspan.RecordError(err)
 			fails = append(fails, fmt.Errorf("%s: %w", p.Ref(), err))
 		}
+		pspan.End()
 	}
 	for _, err := range fails {
 		log.Msg(opName+"(report)", "fail "+err.Error(), log.Off)
@@ -644,6 +666,7 @@ type ProfileReady struct {
 	env             map[string]string     // captured launch env overlaid with Env, read by expandEnv/buildScriptsEnv
 	runID           string                // the run's TsLayout stamp (backup filenames + ledger run)
 	tel             *telemetry.Telemetry  // OTLP counters (nil = no-op), emitted at mutate + scripts/services
+	opCtx           context.Context       // active operation span ctx, set at execOperation entry, read by leaf mutate/fetch/exec
 	command         string                // the invoked subcommand, the CountUnit command label
 	specDone        *database.SpecDone    // the run's ledger row (nil when not recording)
 	profileDone     *database.ProfileDone // this profile's ledger row (nil when not recording)
@@ -713,9 +736,18 @@ func (p *ProfileReady) mutate(title, msg, dest string, info opInfo, fn func() er
 	p.logMsg(title, msg)
 	p.recordOperation(dest, info, prev)
 	if info.kind != "" && dest != "" {
-		p.tel.CountUnit(info.kind, deriveOpType(prev, p.classifyDest(dest)), p.command)
+		p.tel.CountUnit(p.opContext(), info.kind, deriveOpType(prev, p.classifyDest(dest)), p.command)
 	}
 	return nil
+}
+
+// opContext returns the active operation span ctx, or Background when no op span
+// is in flight (per-op subcommands set it at execOperation entry).
+func (p *ProfileReady) opContext() context.Context {
+	if p.opCtx != nil {
+		return p.opCtx
+	}
+	return context.Background()
 }
 
 // classifyDest reads a dest's current state (link/file/dir/absent) for the
@@ -852,7 +884,7 @@ func (p *ProfileReady) withDebugLevel(fn func() error) error {
 // was fully emptied and thus deselected — is swept (removed + archived). Ops that
 // ran already swept their own stale dests inline; this covers the emptied-op case
 // so a removed-entirely op still prunes its orphans.
-func (p *ProfileReady) ExecOperations() error {
+func (p *ProfileReady) ExecOperations(ctx context.Context) error {
 	return p.withDebugLevel(func() error {
 		var fails []error
 		skippedKinds := map[string]string{"make-links": "link", "make-copies": "copy", "render-templates": "render"}
@@ -865,9 +897,7 @@ func (p *ProfileReady) ExecOperations() error {
 				continue
 			}
 			log.Msg("all(run)", op.Name(), log.Off)
-			p.tel.CountOperation(op.Name())
-			if err := op.execOperation(p); err != nil {
-				p.tel.CountError(op.Name())
+			if err := p.execOp(ctx, op); err != nil {
 				fails = append(fails, fmt.Errorf("%s: %w", op.Name(), err))
 			}
 		}
@@ -875,25 +905,42 @@ func (p *ProfileReady) ExecOperations() error {
 	})
 }
 
+// execOp runs one selected operation under its own span (child of ctx), setting
+// p.opCtx so leaf mutate/fetch/exec calls parent onto it. Counts the run, and
+// the error on failure.
+func (p *ProfileReady) execOp(ctx context.Context, op operationReady) error {
+	ctx, span := p.tel.Span(ctx, op.Name(), attribute.String("op", op.Name()))
+	defer span.End()
+	prev := p.opCtx
+	p.opCtx = ctx
+	defer func() { p.opCtx = prev }()
+	p.tel.CountOperation(ctx, op.Name())
+	err := op.execOperation(p)
+	if err != nil {
+		span.RecordError(err)
+		p.tel.CountError(ctx, op.Name())
+	}
+	return err
+}
+
 // ExecOperation executes one prepared operation (per-op subcommands): same
 // debug level and Selected() gating.
-func (p *ProfileReady) ExecOperation(op operationReady) error {
+func (p *ProfileReady) ExecOperation(ctx context.Context, op operationReady) error {
 	return p.withDebugLevel(func() error {
 		if !op.Selected() {
 			log.Debug("all(skip)", op.Name()+" (nothing selected)", log.Off)
 			return nil
 		}
-		p.tel.CountOperation(op.Name())
-		return op.execOperation(p)
+		return p.execOp(ctx, op)
 	})
 }
 
 // ExecOperationNamed executes the profile's operation named name (no-op if
 // the profile prepared none).
-func (p *ProfileReady) ExecOperationNamed(name string) error {
+func (p *ProfileReady) ExecOperationNamed(ctx context.Context, name string) error {
 	for _, op := range p.OperationsReady {
 		if op.Name() == name {
-			return p.ExecOperation(op)
+			return p.ExecOperation(ctx, op)
 		}
 	}
 	return nil
@@ -901,7 +948,7 @@ func (p *ProfileReady) ExecOperationNamed(name string) error {
 
 // ExecRunScripts runs the profile's scripts filtered by name substrings,
 // returning how many matched.
-func (p *ProfileReady) ExecRunScripts(names []string) (int, error) {
+func (p *ProfileReady) ExecRunScripts(ctx context.Context, names []string) (int, error) {
 	matched := 0
 	err := p.withDebugLevel(func() error {
 		for _, op := range p.OperationsReady {
@@ -909,6 +956,11 @@ func (p *ProfileReady) ExecRunScripts(names []string) (int, error) {
 			if !ok {
 				continue
 			}
+			sctx, span := p.tel.Span(ctx, "run-scripts", attribute.String("op", "run-scripts"))
+			defer span.End()
+			prev := p.opCtx
+			p.opCtx = sctx
+			defer func() { p.opCtx = prev }()
 			scripts := filterScriptsByName(rs.Scripts, names)
 			matched = len(scripts)
 			return p.runScripts(scripts)

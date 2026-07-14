@@ -10,6 +10,8 @@ import (
 	"strings"
 	"time"
 
+	"go.opentelemetry.io/otel/attribute"
+
 	"gitlab.com/konradodwrot/go-modules/che/internal/execx"
 	"gitlab.com/konradodwrot/go-modules/che/internal/fsutil"
 )
@@ -92,9 +94,13 @@ func (p *ProfileReady) bootout(services []Service) error {
 			continue
 		}
 		p.logMsg("bootout", s.formatTarget())
-		_ = execx.Default.Exec(fsutil.BuildLctl(s.Sudo, "bootout", s.formatTarget())) // async, ignore exit
+		bctx, span := p.tel.Span(p.opContext(), "service-bootout", attribute.String("service", s.formatTarget()))
+		c := fsutil.BuildLctl(s.Sudo, "bootout", s.formatTarget())
+		c.Ctx = bctx
+		_ = execx.Default.Exec(c) // async, ignore exit
 		fsutil.WaitGone(s.Sudo, s.formatTarget())
-		p.tel.CountUnit("service", "bootout", p.command)
+		p.tel.CountUnit(bctx, "service", "bootout", p.command)
+		span.End()
 		p.logMsg("bootout(done)", s.formatTarget())
 	}
 	return nil
@@ -109,16 +115,21 @@ func (p *ProfileReady) bootin(services []Service) error {
 			continue
 		}
 		p.logMsg("bootstrap", s.formatTarget())
+		bctx, span := p.tel.Span(p.opContext(), "service-bootin", attribute.String("service", s.formatTarget()))
 		c := fsutil.BuildLctl(s.Sudo, "bootstrap", s.Domain, s.Plist)
+		c.Ctx = bctx
 		c.Stdout, c.Stderr = os.Stdout, os.Stderr
 		if err := execx.Default.Exec(c); err != nil {
 			err = fmt.Errorf("bootstrap %s: %w", s.formatTarget(), err)
+			span.RecordError(err)
 			p.logMsg("bootstrap(fail)", err.Error())
-			p.tel.CountUnit("service", "bootin-fail", p.command)
+			p.tel.CountUnit(bctx, "service", "bootin-fail", p.command)
+			span.End()
 			errs = append(errs, err)
 			continue
 		}
-		p.tel.CountUnit("service", "bootin", p.command)
+		p.tel.CountUnit(bctx, "service", "bootin", p.command)
+		span.End()
 		p.logMsg("bootstrap(done)", s.formatTarget())
 	}
 	return errors.Join(errs...)
@@ -144,10 +155,10 @@ func (p *ProfileReady) ensure(services []Service) error {
 			continue
 		}
 		if pid, ok := fsutil.ResolvePID(s.Sudo, s.formatTarget()); ok {
-			p.tel.CountUnit("service", "ensure", p.command)
+			p.tel.CountUnit(p.opContext(), "service", "ensure", p.command)
 			p.logMsg("running", fmt.Sprintf("%s (pid %d)", s.formatTarget(), pid))
 		} else {
-			p.tel.CountUnit("service", "ensure-fail", p.command)
+			p.tel.CountUnit(p.opContext(), "service", "ensure-fail", p.command)
 			p.logMsg("error", s.formatTarget()+" has no running process")
 			missing++
 		}

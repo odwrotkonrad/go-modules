@@ -55,6 +55,7 @@ type Otel struct {
 	Protocol string // grpc | http
 	Metrics  bool
 	Logs     bool
+	Traces   bool
 }
 
 // Layer is one options: contribution feeding Resolve (the user-config file or

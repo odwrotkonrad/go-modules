@@ -4,6 +4,7 @@ package execx
 // [>] 🤖🤖🤖
 
 import (
+	"context"
 	"os/exec"
 )
 
@@ -15,8 +16,14 @@ type CmdExecutor interface {
 var Default CmdExecutor = Real{}
 
 // command maps a Cmd onto an exec.Cmd, Stdout left unset (Output owns it).
+// Cmd.Ctx (nil -> Background) binds the child process's lifetime, so a cancelled
+// ctx kills it.
 func (c Cmd) command() *exec.Cmd {
-	cmd := exec.Command(c.Argv[0], c.Argv[1:]...)
+	ctx := c.Ctx
+	if ctx == nil {
+		ctx = context.Background()
+	}
+	cmd := exec.CommandContext(ctx, c.Argv[0], c.Argv[1:]...)
 	cmd.Dir, cmd.Env, cmd.Stderr = c.Dir, c.Env, c.Stderr
 	return cmd
 }

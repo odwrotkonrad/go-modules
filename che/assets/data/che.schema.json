@@ -92,6 +92,10 @@
         "logs": {
           "type": "boolean",
           "description": "export che log lines as OTel logs; default on when enabled; overridden by CHE_OTEL_LOGS"
+        },
+        "traces": {
+          "type": "boolean",
+          "description": "export spans for command/spec/profile/operation runs and external calls; default on when enabled; overridden by CHE_OTEL_TRACES"
         }
       },
       "additionalProperties": false,

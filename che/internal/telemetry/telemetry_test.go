@@ -17,15 +17,19 @@ import (
 // tolerate without panicking.
 func TestNilTelemetryIsNoOp(t *testing.T) {
 	var tel *Telemetry
+	ctx := context.Background()
 	assert.NotPanics(t, func() {
-		tel.CountCommand("all")
-		tel.CountSpec()
-		tel.CountProfile("cli")
-		tel.CountOperation("make-links")
-		tel.CountUnit("link", "create", "all")
-		tel.CountError("make-links")
+		tel.CountCommand(ctx, "all")
+		tel.CountSpec(ctx)
+		tel.CountProfile(ctx, "cli")
+		tel.CountOperation(ctx, "make-links")
+		tel.CountUnit(ctx, "link", "create", "all")
+		tel.CountError(ctx, "make-links")
 		tel.LogRecord("make-links", "linked foo", "info")
-		_ = tel.Shutdown(context.Background())
+		sctx, span := tel.Span(ctx, "op")
+		assert.Equal(t, ctx, sctx)
+		span.End()
+		_ = tel.Shutdown(ctx)
 	})
 }
 
@@ -40,13 +44,15 @@ func TestStartDisabled(t *testing.T) {
 // (lazy dial), counters run, Shutdown flushes under the bounded timeout without
 // failing the caller's run (an error may surface, but never a panic/block).
 func TestStartUnreachableDegrades(t *testing.T) {
-	cfg := Config{Enabled: true, Endpoint: "127.0.0.1:1", Protocol: "grpc", Metrics: true, Logs: true}
+	cfg := Config{Enabled: true, Endpoint: "127.0.0.1:1", Protocol: "grpc", Metrics: true, Logs: true, Traces: true}
 	tel, err := Start(context.Background(), cfg, "run", "all")
 	require.NoError(t, err)
 	require.NotNil(t, tel)
 	assert.NotPanics(t, func() {
-		tel.CountUnit("link", "create", "all")
+		ctx, span := tel.Span(context.Background(), "che run")
+		tel.CountUnit(ctx, "link", "create", "all")
 		tel.LogRecord("make-links", "linked foo", "info")
+		span.End()
 		_ = tel.Shutdown(context.Background())
 	})
 }
@@ -58,14 +64,15 @@ func TestCountersWiring(t *testing.T) {
 	tel := &Telemetry{meterProvider: sdkmetric.NewMeterProvider(sdkmetric.WithReader(reader))}
 	require.NoError(t, tel.registerCounters())
 
-	tel.CountCommand("all")
-	tel.CountSpec()
-	tel.CountProfile("cli")
-	tel.CountOperation("make-links")
-	tel.CountUnit("link", "create", "all")
-	tel.CountUnit("link", "create", "all")
-	tel.CountUnit("link", "noop", "all")
-	tel.CountError("make-links")
+	ctx := context.Background()
+	tel.CountCommand(ctx, "all")
+	tel.CountSpec(ctx)
+	tel.CountProfile(ctx, "cli")
+	tel.CountOperation(ctx, "make-links")
+	tel.CountUnit(ctx, "link", "create", "all")
+	tel.CountUnit(ctx, "link", "create", "all")
+	tel.CountUnit(ctx, "link", "noop", "all")
+	tel.CountError(ctx, "make-links")
 
 	var rm metricdata.ResourceMetrics
 	require.NoError(t, reader.Collect(context.Background(), &rm))

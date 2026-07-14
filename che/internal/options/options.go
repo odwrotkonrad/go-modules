@@ -47,7 +47,8 @@ func (c *Options) Resolve(env LookupEnv, user, spec Layer) error {
 
 // resolveOtel finalizes the OTLP telemetry group: env > user-config > spec >
 // defaults. enabled off (default) -> the provider is a no-op regardless of the
-// rest; metrics/logs default on when enabled. protocol validated (grpc default).
+// rest; metrics/logs/traces default on when enabled. protocol validated (grpc
+// default).
 func (c *Options) resolveOtel(env LookupEnv, user, spec Layer) error {
 	c.Otel.Enabled = boolOr(env, false, "CHE_OTEL_ENABLED", user.Otel.Enabled, spec.Otel.Enabled)
 	c.Otel.Protocol = cmp.Or(env("CHE_OTEL_PROTOCOL"), user.Otel.Protocol, spec.Otel.Protocol, "grpc")
@@ -59,6 +60,7 @@ func (c *Options) resolveOtel(env LookupEnv, user, spec Layer) error {
 	c.Otel.Endpoint = cmp.Or(env("CHE_OTEL_ENDPOINT"), user.Otel.Endpoint, spec.Otel.Endpoint, defaultOtelEndpoint(c.Otel.Protocol))
 	c.Otel.Metrics = boolDefaultTrue(env, "CHE_OTEL_METRICS", user.Otel.Metrics, spec.Otel.Metrics)
 	c.Otel.Logs = boolDefaultTrue(env, "CHE_OTEL_LOGS", user.Otel.Logs, spec.Otel.Logs)
+	c.Otel.Traces = boolDefaultTrue(env, "CHE_OTEL_TRACES", user.Otel.Traces, spec.Otel.Traces)
 	return nil
 }
 

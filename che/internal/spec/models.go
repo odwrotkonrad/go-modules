@@ -138,6 +138,7 @@ type Otel struct {
 	Protocol string `yaml:"protocol" jsonschema:"enum=grpc,enum=http" jsonschema_description:"OTLP transport: grpc | http; default grpc; overridden by CHE_OTEL_PROTOCOL"`
 	Metrics  *bool  `yaml:"metrics" jsonschema_description:"export metrics; default on when enabled; overridden by CHE_OTEL_METRICS"`
 	Logs     *bool  `yaml:"logs" jsonschema_description:"export che log lines as OTel logs; default on when enabled; overridden by CHE_OTEL_LOGS"`
+	Traces   *bool  `yaml:"traces" jsonschema_description:"export spans for command/spec/profile/operation runs and external calls; default on when enabled; overridden by CHE_OTEL_TRACES"`
 }
 
 // ProfileRecipe is one raw declared profile.

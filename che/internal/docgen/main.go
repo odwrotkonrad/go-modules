@@ -251,6 +251,17 @@ func observabilityDoc() string {
 		}
 	}
 
+	b.WriteString("\n## Traces\n\n")
+	b.WriteString("When `otel.traces` is on, che emits spans on tracer `che`. The tree nests `che run` > `prepare-specs` / `<command>` > `profile` > `<operation>` > external-call spans (`fetch-remote`, `run-script`, `service-*`). Counters record under the active span ctx, so metric exemplars link back to the trace.\n\n")
+	b.WriteString("| Span | Attributes | Description |\n| --- | --- | --- |\n")
+	for _, s := range telemetry.Spans {
+		var attrs []string
+		for _, a := range s.Attrs {
+			attrs = append(attrs, tick(a))
+		}
+		fmt.Fprintf(&b, "| `%s` | %s | %s |\n", s.Name, strings.Join(attrs, ", "), s.Help)
+	}
+
 	b.WriteString("\n## Logs\n\n")
 	b.WriteString("When `otel.logs` is on, each che log line is mirrored as an OTLP log record via the log bridge (`Telemetry.LogRecord`): the log title becomes the record event name, the message becomes the body, and the level maps to severity (`debug` -> Debug, everything else -> Info).\n")
 
@@ -262,6 +273,7 @@ func observabilityDoc() string {
 	b.WriteString("| `protocol` | `CHE_OTEL_PROTOCOL` | `grpc` | OTLP transport: `grpc` \\| `http` |\n")
 	b.WriteString("| `metrics` | `CHE_OTEL_METRICS` | `true` | export the metrics above |\n")
 	b.WriteString("| `logs` | `CHE_OTEL_LOGS` | `true` | export che log lines as OTLP logs |\n")
+	b.WriteString("| `traces` | `CHE_OTEL_TRACES` | `true` | export the spans above |\n")
 	return b.String()
 }
 
