@@ -10,6 +10,8 @@ import (
 	"slices"
 	"strings"
 
+	"go.opentelemetry.io/otel/attribute"
+
 	"gitlab.com/konradodwrot/go-modules/che/internal/execx"
 	"gitlab.com/konradodwrot/go-modules/che/internal/fsutil"
 )
@@ -46,14 +48,17 @@ func (p *ProfileReady) runScripts(scripts []string) error {
 		if p.isDryRun() {
 			continue
 		}
-		c := execx.Cmd{Argv: []string{script}, Env: env, Stdout: os.Stdout, Stderr: os.Stderr}
+		sctx, span := p.tel.Span(p.opContext(), "run-script", attribute.String("script", script))
+		c := execx.Cmd{Ctx: sctx, Argv: []string{script}, Env: env, Stdout: os.Stdout, Stderr: os.Stderr}
 		status := "ok"
 		if err := execx.Default.Exec(c); err != nil {
+			span.RecordError(err)
 			p.logMsg("run-scripts(fail)", fmt.Sprintf("%s: %v", script, err))
 			status = "fail"
 			failed = append(failed, script)
 		}
-		p.tel.CountUnit("script", status, p.command)
+		span.End()
+		p.tel.CountUnit(sctx, "script", status, p.command)
 		results = append(results, scriptResult{script, status})
 	}
 

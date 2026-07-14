@@ -3,6 +3,8 @@ package cli
 // [>] 🤖🤖
 
 import (
+	"context"
+
 	"github.com/spf13/cobra"
 
 	"gitlab.com/konradodwrot/go-modules/che/internal/che"
@@ -52,8 +54,8 @@ func (a *app) opCmd(o opCmd) *cobra.Command {
 		cmd.RunE = a.runScriptsRunE
 	default:
 		cmd.RunE = func(cmd *cobra.Command, args []string) error {
-			return a.root.ExecEach(o.name, func(p *che.ProfileReady) error {
-				return p.ExecOperationNamed(name)
+			return a.root.ExecEach(a.runCtx, o.name, func(ctx context.Context, p *che.ProfileReady) error {
+				return p.ExecOperationNamed(ctx, name)
 			})
 		}
 	}

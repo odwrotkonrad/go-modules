@@ -3,6 +3,7 @@ package che
 // [>] 🤖🤖
 
 import (
+	"context"
 	"embed"
 	"errors"
 	"maps"
@@ -474,7 +475,7 @@ func TestExecOperations(t *testing.T) {
 			&stubOperation{name: "last", selected: true, ran: &ran},
 		},
 	}
-	out, err := testutil.CaptureStdout(t, p.ExecOperations)
+	out, err := testutil.CaptureStdout(t, func() error { return p.ExecOperations(context.Background()) })
 	require.ErrorIs(t, err, boom)
 	assert.Equal(t, []string{"one", "failing", "last"}, ran, "run order, failure does not stop")
 	assert.Contains(t, testutil.StripANSI(out), "all(run): one")

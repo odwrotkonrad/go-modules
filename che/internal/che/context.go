@@ -3,6 +3,7 @@ package che
 // [>] 🤖🤖
 
 import (
+	"context"
 	"os"
 	"strings"
 	"time"
@@ -23,6 +24,17 @@ type Context struct {
 	// Tel is the OTLP telemetry handle started at the CLI boundary after options
 	// resolve; nil (tests, disabled) makes every counter/log call a no-op.
 	Tel *telemetry.Telemetry
+	// RunCtx is the run root span ctx, opened at the CLI boundary; prepare/exec
+	// spans parent onto it. nil (tests) -> spans fall back to Background.
+	RunCtx context.Context
+}
+
+// runContext returns the run root span ctx, or Background when unset (tests).
+func (c Context) runContext() context.Context {
+	if c.RunCtx != nil {
+		return c.RunCtx
+	}
+	return context.Background()
 }
 
 // NewContext snapshots the process launch world (os.Environ -> map, os.Getwd,

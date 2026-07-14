@@ -8,6 +8,8 @@ import (
 	"fmt"
 
 	"github.com/spf13/cobra"
+	"go.opentelemetry.io/otel/attribute"
+	"go.opentelemetry.io/otel/trace"
 
 	"gitlab.com/konradodwrot/go-modules/che/internal/che"
 	"gitlab.com/konradodwrot/go-modules/che/internal/log"
@@ -22,11 +24,13 @@ var version = "dev"
 // app wires the cobra tree: init (PersistentPreRunE) prepares opts and the
 // root SpecReady as separately initialized values, read by each RunE.
 type app struct {
-	flags options.Options      // cobra flag destinations
-	opts  options.Options      // finalized by che.PrepareApplicationOptions
-	ctx   che.Context          // captured launch world (env/cwd/runID/command), for spec-less commands (uninstall)
-	root  *che.SpecReady       // prepared by che.PrepareSpecs
-	tel   *telemetry.Telemetry // OTLP telemetry, started in init, flushed in PersistentPostRunE (nil = off)
+	flags   options.Options      // cobra flag destinations
+	opts    options.Options      // finalized by che.PrepareApplicationOptions
+	ctx     che.Context          // captured launch world (env/cwd/runID/command), for spec-less commands (uninstall)
+	root    *che.SpecReady       // prepared by che.PrepareSpecs
+	tel     *telemetry.Telemetry // OTLP telemetry, started in init, flushed in PersistentPostRunE (nil = off)
+	runCtx  context.Context      // run root span ctx, opened in init, parent of every command span
+	runSpan trace.Span           // the run root span, ended in shutdownTelemetry
 }
 
 func New() *app { return &app{} }
@@ -103,8 +107,11 @@ func (a *app) init(command string) error {
 	}
 	a.startTelemetry(ctx)
 	ctx.Tel = a.tel
+	a.runCtx, a.runSpan = a.tel.Span(context.Background(), "che run",
+		attribute.String("che.command", command), attribute.String("che.run_id", ctx.RunID))
+	ctx.RunCtx = a.runCtx
 	a.ctx = ctx
-	a.tel.CountCommand(command)
+	a.tel.CountCommand(a.runCtx, command)
 	if command == "uninstall" {
 		return nil
 	}
@@ -112,7 +119,7 @@ func (a *app) init(command string) error {
 	if err != nil {
 		return err
 	}
-	a.tel.CountSpec()
+	a.tel.CountSpec(a.runCtx)
 	return nil
 }
 
@@ -135,6 +142,9 @@ func (a *app) startTelemetry(ctx che.Context) {
 // shutdownTelemetry flushes and closes the providers (bounded), clears the sink.
 // A flush error (unreachable collector) is logged at debug, never surfaced.
 func (a *app) shutdownTelemetry() {
+	if a.runSpan != nil {
+		a.runSpan.End()
+	}
 	log.SetSink(nil)
 	if err := a.tel.Shutdown(context.Background()); err != nil {
 		log.Debug("otel", "shutdown: "+err.Error(), log.Off)
@@ -148,7 +158,9 @@ func (a *app) allCmd() *cobra.Command {
 		Use:   "all",
 		Short: "run every op each profile selects, profile by profile",
 		RunE: func(cmd *cobra.Command, args []string) error {
-			return a.root.ExecEach("all", (*che.ProfileReady).ExecOperations)
+			return a.root.ExecEach(a.runCtx, "all", func(ctx context.Context, p *che.ProfileReady) error {
+				return p.ExecOperations(ctx)
+			})
 		},
 	}
 }
@@ -190,8 +202,8 @@ func (a *app) discoverCmd() *cobra.Command {
 // filter and a no-match check across all profiles.
 func (a *app) runScriptsRunE(cmd *cobra.Command, args []string) error {
 	total := 0
-	err := a.root.ExecEach(cmd.Name(), func(p *che.ProfileReady) error {
-		n, err := p.ExecRunScripts(args)
+	err := a.root.ExecEach(a.runCtx, cmd.Name(), func(ctx context.Context, p *che.ProfileReady) error {
+		n, err := p.ExecRunScripts(ctx, args)
 		total += n
 		return err
 	})

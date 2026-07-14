@@ -117,7 +117,7 @@ func (p *ProfileReady) isSecretRefInItem(item spec.FileItem) bool {
 		if p.isDryRun() {
 			return false
 		}
-		content, err := p.Fetcher.Fetch(spec.RemoteSrcRef(item.Rel))
+		content, err := p.fetchRemote(spec.RemoteSrcRef(item.Rel))
 		if err != nil {
 			return false
 		}
@@ -155,7 +155,7 @@ func (p *ProfileReady) renderTemplate(item spec.FileItem, dests []tmplDest) erro
 	var src []byte
 	tmplPath := item.Rel
 	if spec.IsRemoteSrc(item.Rel) {
-		content, err := p.Fetcher.Fetch(spec.RemoteSrcRef(item.Rel))
+		content, err := p.fetchRemote(spec.RemoteSrcRef(item.Rel))
 		if err != nil {
 			return err
 		}
