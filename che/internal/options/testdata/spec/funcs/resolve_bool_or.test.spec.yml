@@ -1,0 +1,69 @@
+# [>] 🤖🤖
+context:
+  function: options.boolOr
+cases:
+  - name: ShouldBeOffWhenUnsetWithNoLayers
+    expected:
+      output: false
+  - name: ShouldResolveEnv0Off
+    context: {env: {CHE_BOOL: "0"}}
+    expected:
+      output: false
+  - name: ShouldResolveEnvFalseOff
+    context: {env: {CHE_BOOL: "false"}}
+    expected:
+      output: false
+  - name: ShouldResolveEnvOffOff
+    context: {env: {CHE_BOOL: "off"}}
+    expected:
+      output: false
+  - name: ShouldResolveEnvNoOff
+    context: {env: {CHE_BOOL: "no"}}
+    expected:
+      output: false
+  - name: ShouldResolveEnv1On
+    context: {env: {CHE_BOOL: "1"}}
+    expected:
+      output: true
+  - name: ShouldResolveEnvTrueOn
+    context: {env: {CHE_BOOL: "true"}}
+    expected:
+      output: true
+  - name: ShouldResolveSpecLayerTrueOn
+    input:
+      args: [user: null, spec: true]
+    expected:
+      output: true
+  - name: ShouldLetUserFalseOverrideSpecTrue
+    input:
+      args: [user: false, spec: true]
+    expected:
+      output: false
+  - name: ShouldLetEnv0BeatSpecTrue
+    context: {env: {CHE_BOOL: "0"}}
+    input:
+      args: [user: null, spec: true]
+    expected:
+      output: false
+
+  - name: ShouldDefaultOnWhenUnset
+    context: {function: options.boolDefaultTrue}
+    expected:
+      output: true
+  - name: ShouldResolveDefaultTrueEnvOffOff
+    context: {function: options.boolDefaultTrue, env: {CHE_BOOL: "off"}}
+    expected:
+      output: false
+  - name: ShouldLetDefaultTrueUserFalseOverride
+    context: {function: options.boolDefaultTrue}
+    input:
+      args: [user: false]
+    expected:
+      output: false
+  - name: ShouldLetDefaultTrueEnvOnBeatUserFalse
+    context: {function: options.boolDefaultTrue, env: {CHE_BOOL: "1"}}
+    input:
+      args: [user: false]
+    expected:
+      output: true
+# [<] 🤖🤖
