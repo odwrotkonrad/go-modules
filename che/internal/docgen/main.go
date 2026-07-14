@@ -164,7 +164,7 @@ type labelValue struct{ Value, Meaning string }
 
 // labelValues is the hand-curated vocabulary of the che.* metric labels,
 // sourced from the emission sites in internal/che (Operation.Name(),
-// opInfo.kind, deriveOpType, run_scripts.go, service.go) and the CLI commands.
+// opInfo.kind, deriveOpType, run_scripts.go) and the CLI commands.
 // Kept in sync by hand: these are observed values, not an enforced enum.
 var labelValues = []struct {
 	Label  string
@@ -177,9 +177,6 @@ var labelValues = []struct {
 		{"make-copies", "copy *.ontoHost.cp sources onto their dests"},
 		{"render-templates", "render *.tpl sources onto repo/home/host"},
 		{"run-scripts", "run the profile's scripts"},
-		{"services bootout", "unload each service"},
-		{"services bootin", "load each service"},
-		{"services ensure", "verify each long-running service has a live pid"},
 	}},
 	{"kind", []labelValue{
 		{"link", "a symlink dest"},
@@ -190,7 +187,6 @@ var labelValues = []struct {
 		{"chown", "an owner change"},
 		{"rm", "a removed dest"},
 		{"script", "a run-scripts script execution"},
-		{"service", "a service phase (bootout/bootin/ensure)"},
 	}},
 	{"op_type", []labelValue{
 		{"create", "dest went from absent to present"},
@@ -199,11 +195,6 @@ var labelValues = []struct {
 		{"noop", "dest already at the desired state"},
 		{"ok", "script ran successfully (kind=script)"},
 		{"fail", "script failed (kind=script)"},
-		{"bootout", "service unloaded (kind=service)"},
-		{"bootin", "service loaded (kind=service)"},
-		{"bootin-fail", "service load failed (kind=service)"},
-		{"ensure", "service verified live (kind=service)"},
-		{"ensure-fail", "service verify failed (kind=service)"},
 	}},
 	{"command", []labelValue{
 		{"all", "the `all` full-install command"},
@@ -215,9 +206,6 @@ var labelValues = []struct {
 		{"make-copies", "the `make-copies` per-op command"},
 		{"render-templates", "the `render-templates` per-op command"},
 		{"run-scripts", "the `run-scripts` per-op command"},
-		{"services bootout", "the `services bootout` per-op command"},
-		{"services bootin", "the `services bootin` per-op command"},
-		{"services ensure", "the `services ensure` per-op command"},
 	}},
 }
 
@@ -252,7 +240,7 @@ func observabilityDoc() string {
 	}
 
 	b.WriteString("\n## Traces\n\n")
-	b.WriteString("When `otel.traces` is on, che emits spans on tracer `che`. The tree nests `che run` > `prepare-specs` / `<command>` > `profile` > `<operation>` > external-call spans (`fetch-remote`, `run-script`, `service-*`). Counters record under the active span ctx, so metric exemplars link back to the trace.\n\n")
+	b.WriteString("When `otel.traces` is on, che emits spans on tracer `che`. The tree nests `che run` > `prepare-specs` / `<command>` > `profile` > `<operation>` > external-call spans (`fetch-remote`, `run-script`). Counters record under the active span ctx, so metric exemplars link back to the trace.\n\n")
 	b.WriteString("| Span | Attributes | Description |\n| --- | --- | --- |\n")
 	for _, s := range telemetry.Spans {
 		var attrs []string

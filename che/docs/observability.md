@@ -13,7 +13,7 @@ Every metric is an Int64 monotonic counter on meter `che`.
 | `che.spec.runs.total` | counter |  | one increment per spec resolution (one per invocation) |
 | `che.profile.runs.total` | counter | `profile` | one increment per resolved profile executed, labeled by profile ref |
 | `che.operation.runs.total` | counter | `op` | one increment per operation run over a profile, labeled by op name |
-| `che.unit.total` | counter | `kind`, `op_type`, `command` | one increment per smallest-unit mutation (link/copy/render/dir/chmod/chown, script, service phase) |
+| `che.unit.total` | counter | `kind`, `op_type`, `command` | one increment per smallest-unit mutation (link/copy/render/dir/chmod/chown, script) |
 | `che.errors.total` | counter | `op` | one increment per failed operation, labeled by op name |
 
 ## Label values
@@ -30,9 +30,6 @@ Observed values per label, curated from the emission sites in `internal/che` (no
 | `make-copies` | copy *.ontoHost.cp sources onto their dests |
 | `render-templates` | render *.tpl sources onto repo/home/host |
 | `run-scripts` | run the profile's scripts |
-| `services bootout` | unload each service |
-| `services bootin` | load each service |
-| `services ensure` | verify each long-running service has a live pid |
 
 ### `kind`
 
@@ -46,7 +43,6 @@ Observed values per label, curated from the emission sites in `internal/che` (no
 | `chown` | an owner change |
 | `rm` | a removed dest |
 | `script` | a run-scripts script execution |
-| `service` | a service phase (bootout/bootin/ensure) |
 
 ### `op_type`
 
@@ -58,11 +54,6 @@ Observed values per label, curated from the emission sites in `internal/che` (no
 | `noop` | dest already at the desired state |
 | `ok` | script ran successfully (kind=script) |
 | `fail` | script failed (kind=script) |
-| `bootout` | service unloaded (kind=service) |
-| `bootin` | service loaded (kind=service) |
-| `bootin-fail` | service load failed (kind=service) |
-| `ensure` | service verified live (kind=service) |
-| `ensure-fail` | service verify failed (kind=service) |
 
 ### `command`
 
@@ -77,13 +68,10 @@ Observed values per label, curated from the emission sites in `internal/che` (no
 | `make-copies` | the `make-copies` per-op command |
 | `render-templates` | the `render-templates` per-op command |
 | `run-scripts` | the `run-scripts` per-op command |
-| `services bootout` | the `services bootout` per-op command |
-| `services bootin` | the `services bootin` per-op command |
-| `services ensure` | the `services ensure` per-op command |
 
 ## Traces
 
-When `otel.traces` is on, che emits spans on tracer `che`. The tree nests `che run` > `prepare-specs` / `<command>` > `profile` > `<operation>` > external-call spans (`fetch-remote`, `run-script`, `service-*`). Counters record under the active span ctx, so metric exemplars link back to the trace.
+When `otel.traces` is on, che emits spans on tracer `che`. The tree nests `che run` > `prepare-specs` / `<command>` > `profile` > `<operation>` > external-call spans (`fetch-remote`, `run-script`). Counters record under the active span ctx, so metric exemplars link back to the trace.
 
 | Span | Attributes | Description |
 | --- | --- | --- |
@@ -94,8 +82,6 @@ When `otel.traces` is on, che emits spans on tracer `che`. The tree nests `che r
 | `<operation>` | `op` | one per operation run over a profile (name is the op) |
 | `fetch-remote` | `ref` | one per remote template ref fetched (git clone) |
 | `run-script` | `script` | one per profile script executed |
-| `service-bootout` | `service` | one per service unload |
-| `service-bootin` | `service` | one per service load |
 
 ## Logs
 

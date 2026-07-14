@@ -15,7 +15,6 @@ base:
     runScripts:
       - ci/zsh/scripts/installs/10-brew.zsh
       - ci/zsh/scripts/installs/20-kitty.zsh
-    runServices: [otelcol, port-exporter, grafana, prometheus]
 
 base-exclude-desktop:
   exclude:
@@ -25,7 +24,6 @@ base-exclude-desktop:
       - /var/log/grafana
     runScripts:
       - ci/zsh/scripts/installs/20-kitty.zsh
-    runServices: [grafana, prometheus]
 
 desktop/macos:
   options: {autoDiscover: true}

@@ -12,7 +12,6 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"gitlab.com/konradodwrot/go-modules/che/internal/database"
-	"gitlab.com/konradodwrot/go-modules/che/internal/fsutil"
 	"gitlab.com/konradodwrot/go-modules/che/internal/options"
 	"gitlab.com/konradodwrot/go-modules/che/internal/spec"
 	"gitlab.com/konradodwrot/go-modules/che/internal/testutil"
@@ -92,27 +91,6 @@ var ops = map[string]func(*ProfileReady, spec.OperationRecipes) error{
 		}
 		return p.runScripts(scripts)
 	},
-	"services-bootout": func(p *ProfileReady, r spec.OperationRecipes) error {
-		svcs, err := p.resolveServices(r.RunServices.Services)
-		if err != nil {
-			return err
-		}
-		return p.bootout(svcs)
-	},
-	"services-bootin": func(p *ProfileReady, r spec.OperationRecipes) error {
-		svcs, err := p.resolveServices(r.RunServices.Services)
-		if err != nil {
-			return err
-		}
-		return p.bootin(svcs)
-	},
-	"services-ensure": func(p *ProfileReady, r spec.OperationRecipes) error {
-		svcs, err := p.resolveServices(r.RunServices.Services)
-		if err != nil {
-			return err
-		}
-		return p.ensure(svcs)
-	},
 }
 
 // applyScenario feeds the case's named scenario args to the generic mocks
@@ -123,12 +101,6 @@ func applyScenario(t *testing.T, a testyml.Args, m *testutil.MockSet, p *Profile
 		switch name := a.Name(i); name {
 		case "failCmds":
 			a.To(t, i, &m.Exec.FailCmds)
-		case "notLoaded":
-			a.To(t, i, &m.Exec.NotLoaded)
-		case "noPid":
-			a.To(t, i, &m.Exec.NoPid)
-		case "stubbornPrints":
-			a.To(t, i, &m.Exec.StubbornPrints)
 		case "brokenLink":
 			if a.Bool(t, i) {
 				seedBrokenLink(t, p)
@@ -170,7 +142,6 @@ func TestOps(t *testing.T) {
 		m := testutil.ApplyMocks(t, c.Context.MockedInterfaces)
 		m.Reader.Roots = []string{dir}
 		p.FS, p.Reader = m.FS, m.Reader
-		testyml.Swap(t, &fsutil.Sleep, testutil.SleepMock)
 		applyScenario(t, c.Input.Args, m, p)
 		out, runErr := testutil.CaptureStdout(t, func() error { return op(p, res) })
 		c.Expected.Check(t, runErr)

@@ -364,13 +364,6 @@
           },
           "type": "array",
           "description": "drop matching scripts (resolved file paths)"
-        },
-        "runServices": {
-          "items": {
-            "type": "string"
-          },
-          "type": "array",
-          "description": "drop matching services"
         }
       },
       "additionalProperties": false,
@@ -474,18 +467,11 @@
           },
           "type": "array",
           "description": "script paths or globs, repo-relative, run in spec order"
-        },
-        "runServices": {
-          "items": {
-            "type": "string"
-          },
-          "type": "array",
-          "description": "launchd service names"
         }
       },
       "additionalProperties": false,
       "type": "object",
-      "description": "additive payload: profile refs, makeLinks globs, makeCopies/renderTemplates/makeDirs perm-groups, runScripts globs, runServices names"
+      "description": "additive payload: profile refs, makeLinks globs, makeCopies/renderTemplates/makeDirs perm-groups, runScripts globs"
     },
     "linkEntry": {
       "oneOf": [

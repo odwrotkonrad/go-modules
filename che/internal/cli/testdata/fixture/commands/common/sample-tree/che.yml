@@ -21,7 +21,6 @@ base:
           - {dest: [/var/log/che-test-setgid]}
     runScripts:
       - install/setup
-    runServices: [otelcol]
 
 cli/macos:
   options: {autoDiscover: true, execIf: ['builtin:isOs == macos', 'builtin:isVirt']}

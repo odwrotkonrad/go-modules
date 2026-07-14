@@ -48,7 +48,6 @@ type wantSet struct {
 	Dirs          []string                     `yaml:"dirs"`
 	ExtraDirs     []string                     `yaml:"extraDirs"`
 	Scripts       []string                     `yaml:"scripts"`
-	Services      []string                     `yaml:"services"`
 	Perms         map[string]permWant          `yaml:"perms"`
 	Dests         map[string][]string          `yaml:"dests"`
 	Ctx           map[string]map[string]string `yaml:"ctx"`
@@ -125,7 +124,6 @@ func projections(ops OperationRecipes) map[string][]string {
 		"dirs":      ops.PruneLinks.Dirs,
 		"extraDirs": extraDirPaths(ops),
 		"scripts":   ops.RunScripts.Scripts,
-		"services":  ops.RunServices.Services,
 	}
 }
 
@@ -137,7 +135,6 @@ func (w wantSet) lists() map[string][]string {
 		"dirs":      w.Dirs,
 		"extraDirs": w.ExtraDirs,
 		"scripts":   w.Scripts,
-		"services":  w.Services,
 	}
 }
 

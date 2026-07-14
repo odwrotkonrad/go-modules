@@ -74,18 +74,9 @@ sourced profile refs included).`,
 	pf.BoolVar(&a.flags.Debug, "debug", false,
 		"print debug-level lines (source announce, clone/pull attempts); env: CHE_DEBUG")
 
-	services := &cobra.Command{
-		Use:   "services",
-		Short: "load/unload/verify the profile's launchd services",
-	}
-	root.AddCommand(a.allCmd(), a.discoverCmd(), a.uninstallCmd(), services)
+	root.AddCommand(a.allCmd(), a.discoverCmd(), a.uninstallCmd())
 	for _, o := range ops() {
-		cmd := a.opCmd(o)
-		if o.parent == "services" {
-			services.AddCommand(cmd)
-		} else {
-			root.AddCommand(cmd)
-		}
+		root.AddCommand(a.opCmd(o))
 	}
 	return root
 }

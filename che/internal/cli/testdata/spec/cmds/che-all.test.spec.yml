@@ -5,7 +5,6 @@ context:
     execx.CmdExecutor: testutil.CmdMockExecutor
     fsutil.FileSystemWriter: testutil.FileSystemMockWriter
     fsutil.FileSystemReader: testutil.FileSystemMockReader
-    fsutil.Sleep: testutil.SleepMock
 cases:
   - name: ShouldRunEveryOpSelectedInSpec
     context:
@@ -53,15 +52,6 @@ cases:
         all(run): run-scripts
         run-scripts: ${REPO}/install/setup
         run-scripts(report): ok ${REPO}/install/setup
-        all(run): services bootout
-        bootout: system/otelcol
-        bootout(done): system/otelcol
-        all(run): services bootin
-        bootstrap: system/otelcol
-        bootstrap(done): system/otelcol
-        all(run): services ensure
-        settle: 15s before pid check
-        running: system/otelcol (pid 4242)
   - name: ShouldSkipOpsWithoutSelection
     context:
       pwd: testdata/fixture/commands/all/sample-tree-only-links
