@@ -26,7 +26,6 @@ var mockRegistry = map[string]string{
 	"fsutil.UserLookup":       "testutil.UserMockLookup",
 	"fsutil.GroupLookup":      "testutil.GroupMockLookup",
 	"che.RemoteFetcher":       "testutil.RemoteMockFetcher",
-	"fsutil.Sleep":            "testutil.SleepMock",
 }
 
 // RequireRegistered fails on any declared pair the registry does not carry.
@@ -58,7 +57,7 @@ func ApplyMocks(t *testing.T, decl map[string]string) *MockSet {
 	return set
 }
 
-// SleepMock is the fsutil.Sleep / render opSleep test double: no pacing.
+// SleepMock is the render opSleep test double: no pacing.
 func SleepMock(time.Duration) {}
 
 // NewCmdMockExecutor: the double with its command model wired.
@@ -79,10 +78,7 @@ func (m *CmdMockExecutor) model(argv []string) ([]byte, error) {
 		return nil, errors.New("stub: exec fail")
 	}
 	m.captureInstallBody(argv)
-	switch {
-	case strings.Contains(cmd, "launchctl"):
-		return m.launchctl(cmd)
-	case argv[0] == "git":
+	if argv[0] == "git" {
 		return m.git(argv[1:])
 	}
 	return []byte(m.Out), nil
@@ -101,34 +97,6 @@ func (m *CmdMockExecutor) captureInstallBody(argv []string) {
 	if b, err := os.ReadFile(cmd[len(cmd)-2]); err == nil {
 		m.Bodies = append(m.Bodies, string(b))
 	}
-}
-
-// launchctl models launchd state across the executor calls of one case:
-// bootout unloads, bootstrap loads, print reports per loaded/NoPid.
-func (m *CmdMockExecutor) launchctl(cmd string) ([]byte, error) {
-	if m.loaded == nil {
-		v := !m.NotLoaded
-		m.loaded = &v
-	}
-	switch {
-	case strings.Contains(cmd, "launchctl bootout"):
-		*m.loaded = false
-	case strings.Contains(cmd, "launchctl bootstrap"):
-		*m.loaded = true
-	case strings.Contains(cmd, "launchctl print"):
-		if !*m.loaded {
-			if m.StubbornPrints > 0 {
-				m.StubbornPrints--
-				return []byte("state = running\n"), nil
-			}
-			return nil, errors.New("stub: not loaded")
-		}
-		if m.NoPid {
-			return []byte("state = running\n"), nil
-		}
-		return []byte("\tpid = 4242\n"), nil
-	}
-	return nil, nil
 }
 
 // git models the source-checkout CLI calls (clone / rev-parse / fetch / reset) without

@@ -61,7 +61,7 @@ var Metrics = []metricSpec{
 	{"che.spec.runs.total", "one increment per spec resolution (one per invocation)", nil},
 	{"che.profile.runs.total", "one increment per resolved profile executed, labeled by profile ref", []string{"profile"}},
 	{"che.operation.runs.total", "one increment per operation run over a profile, labeled by op name", []string{"op"}},
-	{"che.unit.total", "one increment per smallest-unit mutation (link/copy/render/dir/chmod/chown, script, service phase)", []string{"kind", "op_type", "command"}},
+	{"che.unit.total", "one increment per smallest-unit mutation (link/copy/render/dir/chmod/chown, script)", []string{"kind", "op_type", "command"}},
 	{"che.errors.total", "one increment per failed operation, labeled by op name", []string{"op"}},
 }
 
@@ -83,8 +83,6 @@ var Spans = []spanSpec{
 	{"<operation>", "one per operation run over a profile (name is the op)", []string{"op"}},
 	{"fetch-remote", "one per remote template ref fetched (git clone)", []string{"ref"}},
 	{"run-script", "one per profile script executed", []string{"script"}},
-	{"service-bootout", "one per service unload", []string{"service"}},
-	{"service-bootin", "one per service load", []string{"service"}},
 }
 
 // [<] 🤖🤖 registry
@@ -311,7 +309,7 @@ func (t *Telemetry) CountOperation(ctx context.Context, op string) {
 
 // CountUnit records one smallest-unit mutation, labeled by kind, op_type, and
 // the invoking command (link created, file copied, render, dir, chmod/chown/rm,
-// script run, service phase).
+// script run).
 func (t *Telemetry) CountUnit(ctx context.Context, kind, opType, command string) {
 	t.count(ctx, "che.unit.total",
 		attribute.String("kind", kind),

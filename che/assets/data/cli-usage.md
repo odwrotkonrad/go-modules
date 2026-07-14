@@ -14,10 +14,6 @@ Available Commands:
   prune-links       delete broken symlinks
   render-templates  render *.tpl sources; each dest path decides target (relative -> repo, ~/ or absolute -> host)
   run-scripts       run the profile's scripts, optionally filtered by name substring
-  services          load/unload/verify the profile's launchd services
-    bootin          load each service (bootstrap from plist)
-    bootout         unload each service (bootout if loaded, wait until gone)
-    ensure          settle then verify each long-running service has a live pid
   uninstall         back out everything che installed (ledger-driven), restoring pre-install backups
 
 Flags:

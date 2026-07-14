@@ -21,18 +21,6 @@ func TestPrependEnvVar(t *testing.T) {
 	})
 }
 
-type pidWant struct {
-	Pid int  `yaml:"pid"`
-	Ok  bool `yaml:"ok"`
-}
-
-func TestParsePID(t *testing.T) {
-	testyml.Eq(t, td, "testdata/spec/funcs/parse_pid.test.spec.yml", func(t *testing.T, c testyml.Case[pidWant]) (pidWant, error) {
-		pid, ok := ParsePID(c.Input.Args.String(t, 0))
-		return pidWant{pid, ok}, nil
-	})
-}
-
 // fakeInfo is an os.FileInfo whose Sys() is test-crafted (a *syscall.Stat_t or nil).
 type fakeInfo struct{ sys any }
 

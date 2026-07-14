@@ -164,7 +164,6 @@ func (r ProfileRecipe) MakeProfile(recipes []ProfileRecipe, workingDir string) (
 	res := resolved{
 		ExtraDirs: eff.dirs,
 		Scripts:   scripts,
-		Services:  fsutil.ExpandAll(eff.services),
 		Copies:    eff.richCopy,
 		Templates: eff.richTmpl,
 	}
@@ -191,7 +190,6 @@ func (res resolved) operationRecipes() OperationRecipes {
 		MakeCopies:      MakeCopiesOperationRecipe{Copies: res.Copies, Dirs: res.Dirs},
 		RenderTemplates: RenderTemplatesOperationRecipe{Templates: res.Templates},
 		RunScripts:      RunScriptsOperationRecipe{Scripts: res.Scripts},
-		RunServices:     RunServicesOperationRecipe{Services: res.Services},
 	}
 }
 
@@ -336,14 +334,12 @@ func applyExcludes(ex excludeSet, res *resolved) {
 	tmplG := fsutil.ExpandAll(ex.RenderTemplates)
 	dirG := fsutil.ExpandAll(ex.MakeDirs)
 	instG := fsutil.ExpandAll(ex.Scripts)
-	svcG := fsutil.ExpandAll(ex.Services)
 
 	res.Links = dropFiles(res.Links, link)
 	res.Copies = dropFiles(res.Copies, copyG)
 	res.Templates = dropFiles(res.Templates, tmplG)
 	res.ExtraDirs = dropFiles(res.ExtraDirs, dirG)
 	res.Scripts = dropStrings(res.Scripts, instG)
-	res.Services = dropStrings(res.Services, svcG)
 
 	res.Dirs = nil
 	collectDirs(res)
@@ -428,7 +424,6 @@ func mergeRecipe(recipes []ProfileRecipe, eff *effective, ps ProfileRecipe, seen
 		eff.dirs = append(eff.dirs, dirItems(e)...)
 	}
 	eff.scripts = append(eff.scripts, in.Scripts...)
-	eff.services = append(eff.services, in.Services...)
 	eff.exclude.append(ps.Exclude)
 	return nil
 }
@@ -439,7 +434,6 @@ func (ex *excludeSet) append(o excludeSet) {
 	ex.RenderTemplates = append(ex.RenderTemplates, o.RenderTemplates...)
 	ex.MakeDirs = append(ex.MakeDirs, o.MakeDirs...)
 	ex.Scripts = append(ex.Scripts, o.Scripts...)
-	ex.Services = append(ex.Services, o.Services...)
 }
 
 func splitEntries(entries []entry, globs *globSet, rich *[]FileItem) error {

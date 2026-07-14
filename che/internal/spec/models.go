@@ -166,7 +166,6 @@ type includeSet struct {
 	RenderTemplates []templateGroup       `yaml:"renderTemplates" jsonschema_description:"*.tpl render-op perm-groups; local host sources workingDirectory-relative, repo-doc sources (repo dest) checkout-relative, or remote (@<repo>//<path>[?ref=<ref>], explicit dest required); glob and derived-dest forms are host sources; a glob source may carry a {source, dest} dest rewrite (sed-style s:^_home:$HOME: or prefix-swap sugar _home/** -> $HOME/**)"`
 	MakeDirs        []dirGroup            `yaml:"makeDirs" jsonschema_description:"extra-dir perm-groups; each item one dir path (brace-expanded)"`
 	Scripts         []string              `yaml:"runScripts" jsonschema_description:"script paths or globs, repo-relative, run in spec order"`
-	Services        []string              `yaml:"runServices" jsonschema_description:"launchd service names"`
 }
 
 // excludeSet is the subtractive payload: flat glob-string lists.
@@ -176,7 +175,6 @@ type excludeSet struct {
 	RenderTemplates []string `yaml:"renderTemplates" jsonschema_description:"drop matching template items (source or dest)"`
 	MakeDirs        []string `yaml:"makeDirs" jsonschema_description:"drop matching dirs"`
 	Scripts         []string `yaml:"runScripts" jsonschema_description:"drop matching scripts (resolved file paths)"`
-	Services        []string `yaml:"runServices" jsonschema_description:"drop matching services"`
 }
 
 // linkEntry: bare glob string or {source, dest}. glob set iff the glob form.
@@ -301,10 +299,6 @@ type (
 		OperationRecipe
 		Scripts []string // repo-relative, run order
 	}
-	RunServicesOperationRecipe struct {
-		OperationRecipe
-		Services []string // service names
-	}
 )
 
 // OperationRecipes is the ordered per-kind recipe set one profile selects:
@@ -316,7 +310,6 @@ type OperationRecipes struct {
 	MakeCopies      MakeCopiesOperationRecipe
 	RenderTemplates RenderTemplatesOperationRecipe
 	RunScripts      RunScriptsOperationRecipe
-	RunServices     RunServicesOperationRecipe
 }
 
 // [<] 🤖🤖
@@ -331,7 +324,6 @@ type resolved struct {
 	Templates []FileItem // render op: *.tpl, dest path decides host vs repo
 	Dirs      []string   // every ancestor dir of links+copies+derived-dest templates
 	ExtraDirs []FileItem // makeDirs only (live dest entries), one per path, carrying perms
-	Services  []string   // service names
 	Scripts   []string   // script entries in spec order
 }
 
@@ -373,7 +365,6 @@ type effective struct {
 	richTmpl  []FileItem            // rich-form render-templates entries
 	dirs      []FileItem            // makeDirs: glob forms expanded to one item per path, rich carry perms
 	scripts   []string              // script paths (order = run order)
-	services  []string              // service names
 	refs      []ProfileSourceRecipe // sourced include.profiles refs (composition order)
 	exclude   excludeSet            // accumulated exclude globs (applied last, wins)
 }

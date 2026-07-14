@@ -6,7 +6,6 @@ context:
     execx.CmdExecutor: testutil.CmdMockExecutor
     fsutil.FileSystemWriter: testutil.FileSystemMockWriter
     fsutil.FileSystemReader: testutil.FileSystemMockReader
-    fsutil.Sleep: testutil.SleepMock
 cases:
   - name: ShouldSymlinkRepoFilesOntoHomeAndSystem
     expected:

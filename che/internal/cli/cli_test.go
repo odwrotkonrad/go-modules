@@ -13,7 +13,6 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"gitlab.com/konradodwrot/go-modules/che/internal/che"
-	"gitlab.com/konradodwrot/go-modules/che/internal/fsutil"
 	"gitlab.com/konradodwrot/go-modules/che/internal/options"
 	"gitlab.com/konradodwrot/go-modules/che/internal/testutil"
 	"gitlab.com/konradodwrot/go-modules/lib/testyml"
@@ -59,7 +58,6 @@ func setupMock(t *testing.T, pwd, profile string, decl map[string]string) (*app,
 		s.Ledger = nil // [why] record-only tests: no ledger side effects
 		return s
 	})
-	testyml.Swap(t, &fsutil.Sleep, testutil.SleepMock)
 
 	require.NoError(t, a.init("all"))
 	return a, root, home

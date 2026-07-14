@@ -17,18 +17,14 @@ type MockSet struct {
 }
 
 // CmdMockExecutor is the execx.CmdExecutor test double: records every call,
-// nothing spawns, models launchd state and the source-checkout git CLI.
+// nothing spawns, models the source-checkout git CLI.
 type CmdMockExecutor struct {
 	execx.Mock
-	Fail           bool     // every call fails
-	FailCmds       []string // substring-matched commands that fail
-	Out            string   // canned output body
-	NotLoaded      bool     // launchd initial state: service not loaded
-	NoPid          bool     // launchd print reports a pid-less service
-	StubbornPrints int      // prints still reporting present after bootout
-	Bodies         []string // captured install file bodies
+	Fail     bool     // every call fails
+	FailCmds []string // substring-matched commands that fail
+	Out      string   // canned output body
+	Bodies   []string // captured install file bodies
 
-	loaded *bool             // launchd state, lazily seeded from NotLoaded
 	clones map[string]string // source clone dir -> source url
 }
 

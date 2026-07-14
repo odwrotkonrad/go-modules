@@ -12,5 +12,4 @@ cases:
         - prune-links
         - run-scripts
         - discover
-        - services
 # [<] 🤖

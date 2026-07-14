@@ -24,18 +24,4 @@ cases:
     context: {command: che run-scripts}
     expected:
       stdOut: "run-scripts(dry-run=delta): ${REPO}/install/setup"
-  - name: ShouldOnlyReportServiceBootouts
-    context: {command: che services bootout}
-    expected:
-      stdOut: "bootout(dry-run=delta): system/otelcol"
-  - name: ShouldOnlyReportServiceBootstraps
-    context: {command: che services bootin}
-    expected:
-      stdOut: "bootstrap(dry-run=delta): system/otelcol"
-  - name: ShouldOnlyReportServiceEnsures
-    context: {command: che services ensure}
-    expected:
-      stdOut:
-        - "settle(dry-run=delta): 15s before pid check"
-        - "ensure(dry-run=delta): system/otelcol"
 # [<] 🤖🤖

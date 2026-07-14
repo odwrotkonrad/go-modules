@@ -8,7 +8,6 @@ cases:
       args: [spec: merge, profile: desktop/macos]
     expected:
       scripts: [ci/zsh/scripts/installs/10-brew.zsh, ci/zsh/scripts/installs/20-kitty.zsh]
-      services: [otelcol, port-exporter, grafana, prometheus]
       perms:
         /var/log/grafana: {chmod: "2775"}
         Library/LaunchDaemons/otelcol.plist.ontoHost.cp: {chmod: "0600"}
@@ -21,7 +20,6 @@ cases:
       args: [spec: merge, profile: cli/macos]
     expected:
       scripts: [ci/zsh/scripts/installs/10-brew.zsh]
-      services: [otelcol, port-exporter]
     notExpected:
       extraDirs: [/var/log/grafana]
       links: [etc/grafana/grafana.ini]
@@ -60,12 +58,10 @@ cases:
     contains:
       links: [_home/.config/extra/x, etc/zshrc]
       scripts: [ci/zsh/scripts/installs/10-brew.zsh]
-      services: [otelcol]
     notExpected:
       links: [etc/zsh/zshenv]
       copies: [_home/.config/zsh/c.ontoHost.cp]
       scripts: [ci/zsh/scripts/installs/20-foo.zsh]
-      services: [grafana]
   - name: ShouldExcludeScriptsMatchingGlob
     context: {pwd: testdata/fixture/resolve/tree-exclude-script-glob}
     input:
@@ -153,7 +149,6 @@ cases:
         - {source: "@git@gitlab.com:g/r.git", profile: p}
         - {source: "@https://gitlab.com/g/r2.git", profile: q, env: {GITLAB_GROUP: konradodwrot}}
     contains:
-      services: [svc]
   - name: ShouldMapLinkMatchesThroughSedRewriteRule
     context: {pwd: testdata/fixture/resolve/tree-link-rewrite}
     input:

@@ -1007,10 +1007,6 @@ func (p *ProfileReady) prepareOperations(ops spec.OperationRecipes) ([]operation
 	if err != nil {
 		return nil, err
 	}
-	services, err := p.resolveServices(ops.RunServices.Services)
-	if err != nil {
-		return nil, err
-	}
 	return []operationReady{
 		&PruneLinksOperationReady{Dirs: ops.PruneLinks.Dirs},
 		&MakeDirsOperationReady{Dirs: ops.MakeDirs.Dirs},
@@ -1018,9 +1014,6 @@ func (p *ProfileReady) prepareOperations(ops spec.OperationRecipes) ([]operation
 		&MakeCopiesOperationReady{Copies: ops.MakeCopies.Copies, Dirs: ops.MakeCopies.Dirs},
 		&RenderTemplatesOperationReady{Templates: ops.RenderTemplates.Templates, SkipSecrets: p.opts.RenderSkipSecrets},
 		&RunScriptsOperationReady{Scripts: scripts},
-		&BootoutOperationReady{Services: services},
-		&BootinOperationReady{Services: services},
-		&EnsureOperationReady{Services: services},
 	}, nil
 }
 
@@ -1102,36 +1095,5 @@ func (o *RunScriptsOperationReady) Selected() bool { return len(o.Scripts) > 0 }
 func (o *RunScriptsOperationReady) execOperation(p *ProfileReady) error {
 	return p.runScripts(o.Scripts)
 }
-
-// BootoutOperationReady unloads each service (bootout if loaded, wait until gone).
-type BootoutOperationReady struct {
-	OperationReady
-	Services []Service
-}
-
-func (o *BootoutOperationReady) Name() string                        { return "services bootout" }
-func (o *BootoutOperationReady) Selected() bool                      { return len(o.Services) > 0 }
-func (o *BootoutOperationReady) execOperation(p *ProfileReady) error { return p.bootout(o.Services) }
-
-// BootinOperationReady loads each service (bootstrap from plist).
-type BootinOperationReady struct {
-	OperationReady
-	Services []Service
-}
-
-func (o *BootinOperationReady) Name() string                        { return "services bootin" }
-func (o *BootinOperationReady) Selected() bool                      { return len(o.Services) > 0 }
-func (o *BootinOperationReady) execOperation(p *ProfileReady) error { return p.bootin(o.Services) }
-
-// EnsureOperationReady settles then verifies each long-running service has a
-// live pid.
-type EnsureOperationReady struct {
-	OperationReady
-	Services []Service
-}
-
-func (o *EnsureOperationReady) Name() string                        { return "services ensure" }
-func (o *EnsureOperationReady) Selected() bool                      { return len(o.Services) > 0 }
-func (o *EnsureOperationReady) execOperation(p *ProfileReady) error { return p.ensure(o.Services) }
 
 // [<] 🤖🤖

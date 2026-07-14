@@ -67,7 +67,6 @@ base:
           - {dest: ["/var/log/{grafana,prometheus}"]}
     runScripts:
       - ci/zsh/scripts/installs/*.zsh
-    runServices: [otelcol, grafana, prometheus]
 
 base-exclude-cli:
   exclude:
@@ -81,7 +80,6 @@ base-exclude-cli:
       - /var/log/{grafana,prometheus}
     runScripts:
       - ci/zsh/scripts/installs/80-desktop-tools.zsh
-    runServices: [grafana, prometheus]
 
 desktop/macos:
   options: {autoDiscover: true, execIf: ['builtin:isOs == macos', 'builtin:isVirt == false']}
@@ -426,18 +424,10 @@ runScripts:
   - ci/zsh/scripts/installs/*.zsh
 ```
 
-### runServices
-
-launchd service names, driven by `$ che services bootin|bootout|ensure`.
-
-```yaml
-runServices: [otelcol, grafana]
-```
-
 ## exclude
 
 Subtractive glob filter, applied last, wins over every include (rich entries
-too). Six flat string-list keys mirroring include's op sections. A match on
+too). Five flat string-list keys mirroring include's op sections. A match on
 source or any dest drops the item.
 
 ```yaml
@@ -447,7 +437,6 @@ exclude:
   renderTemplates: [HOME/.gitlab-runner/**]
   makeDirs: [/var/log/grafana]
   runScripts: [ci/zsh/scripts/installs/80-go-host-tools.zsh]
-  runServices: [grafana]
 ```
 
 ## Perms Cascade

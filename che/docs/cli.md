@@ -167,22 +167,6 @@ run the profile's scripts, optionally filtered by name substring.
 
 Usage: `che run-scripts [name...]`
 
-### `$ che services`
-
-load/unload/verify the profile's launchd services.
-
-### `$ che services bootin`
-
-load each service (bootstrap from plist).
-
-### `$ che services bootout`
-
-unload each service (bootout if loaded, wait until gone).
-
-### `$ che services ensure`
-
-settle then verify each long-running service has a live pid.
-
 ### `$ che uninstall`
 
 back out everything che installed (ledger-driven), restoring pre-install backups.

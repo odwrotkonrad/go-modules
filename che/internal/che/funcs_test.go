@@ -3,8 +3,6 @@ package che
 // [>] 🤖🤖
 
 import (
-	"fmt"
-	"os"
 	"path/filepath"
 	"testing"
 
@@ -48,47 +46,6 @@ func TestResolveScripts(t *testing.T) {
 		want := make([]string, len(c.Expected.Output))
 		for i, rel := range c.Expected.Output {
 			want[i] = filepath.Join(dir, rel)
-		}
-		assert.Equal(t, want, got)
-	})
-}
-
-// svcWant mirrors Service for spec equality; "${GUI}" expands to gui/<uid>.
-type svcWant struct {
-	Domain      string `yaml:"domain"`
-	Sudo        bool   `yaml:"sudo"`
-	Plist       string `yaml:"plist"`
-	LongRunning bool   `yaml:"longRunning"`
-}
-
-// servicesProfile: one plist per service kind (system daemon, system agent, user agent).
-func servicesProfile(t *testing.T) *ProfileReady {
-	t.Helper()
-	dir := testutil.Tree(t, map[string]string{
-		"root/Library/LaunchDaemons/otelcol.plist.ontoHost.cp":                    "<plist/>\n",
-		"root/Library/LaunchAgents/gitlab-runner.plist.ontoHost.tpl":              "<plist/>\n",
-		"root/_home/Library/LaunchAgents/load-defaults-config.plist.ontoHost.tpl": "<plist/>\n",
-	})
-	p := newProfile(dir, "/Users/x", options.Options{}).withDir(dir)
-	p.Source.ProfileName = "desktop/macos"
-	p.ref = "desktop/macos"
-	return p
-}
-
-func TestResolveServices(t *testing.T) {
-	testyml.Run(t, td, "testdata/spec/funcs/resolve_services.test.spec.yml", func(t *testing.T, c testyml.Case[[]svcWant]) {
-		svcs, err := servicesProfile(t).resolveServices(c.Input.Args.Strings(t, 0))
-		if c.Expected.Check(t, err) {
-			return
-		}
-		vars := map[string]string{"GUI": fmt.Sprintf("gui/%d", os.Getuid())}
-		want := c.Expected.Output
-		for i := range want {
-			want[i].Domain = testyml.Expand(want[i].Domain, vars)
-		}
-		got := make([]svcWant, len(svcs))
-		for i, s := range svcs {
-			got[i] = svcWant{s.Domain, s.Sudo, s.Plist, s.LongRunning}
 		}
 		assert.Equal(t, want, got)
 	})
