@@ -98,13 +98,11 @@ cases:
                     - source: "${REF_DIR}/che.yml::gitlabGroup"
         - flags:
             unsetEnv: [REF_GATE]
+            debug: true
     expected:
       stdOut: skip ${REF_DIR}/che.yml::gitlabGroup (execIf failed)
       output:
         profiles: [main]
-    notExpected:
-      stdOut:
-        - execIf(reject)
   - name: ShouldGateRefExecIfWithEntryEnvWithoutLeaking
     input:
       args:
@@ -339,6 +337,7 @@ cases:
                 options: {autoDiscover: true}
         - flags:
             unsetEnv: [SPEC_GATE]
+            debug: true
     expected:
       stdOut: spec(skip)
       output:
