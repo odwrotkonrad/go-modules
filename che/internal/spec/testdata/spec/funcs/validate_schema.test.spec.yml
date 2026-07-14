@@ -23,7 +23,7 @@ cases:
         - doc: |
             p:
               includes:
-                makeLinks: [HOME/**]
+                makeLinks: [_home/**]
     expected:
       output: includes
   - name: ShouldFlagBogusWriteTypeEnum
@@ -47,7 +47,7 @@ cases:
               include:
                 makeDirs:
                   - chmod: rwxr-xr-x
-                    directories: [HOME/.cache]
+                    directories: [_home/.cache]
     expected:
       output: chmod
   - name: ShouldFlagGroupWithoutFiles
@@ -92,7 +92,7 @@ cases:
               sources: ["@https://gitlab.com/g/r.git", ./sibling]
             p:
               include:
-                makeLinks: [HOME/**]
+                makeLinks: [_home/**]
     expected:
       output: ""
   - name: ShouldAcceptIncludeProfilesUnionForms

@@ -11,7 +11,7 @@ cases:
             che.yml: |
               p:
                 includes:
-                  makeLinks: [HOME/**]
+                  makeLinks: [_home/**]
         - hostFiles:
             che.yml: |
               main:
@@ -33,7 +33,7 @@ cases:
             che.yml: |
               p:
                 includes:
-                  makeLinks: [HOME/**]
+                  makeLinks: [_home/**]
         - hostFiles:
             che.yml: |
               main:
@@ -128,7 +128,6 @@ cases:
         - flags:
             unsetEnv: [REF_GATE]
     expected:
-      stdOut: 'execIf(pass): profile gitlabGroup: env:REF_GATE'
       output:
         profiles: [main, "${REF_DIR}/che.yml::gitlabGroup"]
         env: {REF_GATE: "1"}
@@ -293,11 +292,11 @@ cases:
                 options: {autoDiscover: true}
                 include:
                   makeDirs:
-                    - directories: [HOME/.cache/sib]
+                    - directories: [_home/.cache/sib]
               sharedBase:
                 include:
                   makeDirs:
-                    - directories: [HOME/.cache/shared]
+                    - directories: [_home/.cache/shared]
         - flags: {}
     expected:
       output:
@@ -316,7 +315,7 @@ cases:
               main:
                 include:
                   makeDirs:
-                    - directories: [HOME/.cache/sib]
+                    - directories: [_home/.cache/sib]
         - flags: {}
     expected:
       errorOutput: ['profile "main" collides']
@@ -406,20 +405,20 @@ cases:
               alpha:
                 options: {autoDiscover: true}
                 include:
-                  makeLinks: [{source: HOME/**, dest: 's#^HOME#$HOME#'}]
+                  makeLinks: [{source: _home/**, dest: 's:^_home:$HOME:'}]
                 exclude:
-                  makeLinks: [HOME/.config/skip-a]
-            one/HOME/.config/keep-a: keep-a
-            one/HOME/.config/skip-a: skip-a
+                  makeLinks: [_home/.config/skip-a]
+            one/_home/.config/keep-a: keep-a
+            one/_home/.config/skip-a: skip-a
             two/che.yml: |
               beta:
                 options: {autoDiscover: true}
                 include:
-                  makeLinks: [{source: HOME/**, dest: 's#^HOME#$HOME#'}]
+                  makeLinks: [{source: _home/**, dest: 's:^_home:$HOME:'}]
                 exclude:
-                  makeLinks: [HOME/.config/skip-b]
-            two/HOME/.config/keep-b: keep-b
-            two/HOME/.config/skip-b: skip-b
+                  makeLinks: [_home/.config/skip-b]
+            two/_home/.config/keep-b: keep-b
+            two/_home/.config/skip-b: skip-b
         - flags: {}
     expected:
       output:
@@ -436,7 +435,7 @@ cases:
                 validateSpec: error
               p:
                 includes:
-                  makeLinks: [HOME/**]
+                  makeLinks: [_home/**]
         - hostFiles:
             che.yml: |
               include:
@@ -462,8 +461,8 @@ cases:
               s:
                 options: {autoDiscover: true}
                 include:
-                  makeLinks: [{source: HOME/**, dest: 's#^HOME#$HOME#'}]
-            sub/tree/HOME/.config/x: x
+                  makeLinks: [{source: _home/**, dest: 's:^_home:$HOME:'}]
+            sub/tree/_home/.config/x: x
         - flags: {}
     expected:
       output:
@@ -478,9 +477,9 @@ cases:
               gitlabGroup:
                 options: {workingDirectory: default-tree}
                 include:
-                  makeLinks: [{source: HOME/**, dest: 's#^HOME#$HOME#'}]
-            default-tree/HOME/.config/def: def
-            override-tree/HOME/.config/ovr: ovr
+                  makeLinks: [{source: _home/**, dest: 's:^_home:$HOME:'}]
+            default-tree/_home/.config/def: def
+            override-tree/_home/.config/ovr: ovr
         - hostFiles:
             che.yml: |
               main:

@@ -37,6 +37,29 @@ type Config struct {
 
 // [<] 🤖🤖 config
 
+// [>] 🤖🤖 registry
+
+// metricSpec declares one che.* counter: its instrument name, one-line help,
+// and the label keys it carries.
+type metricSpec struct {
+	Name   string
+	Help   string
+	Labels []string
+}
+
+// Metrics is the complete che metric surface: the single source docgen renders
+// and registerCounters wires. Order is doc order.
+var Metrics = []metricSpec{
+	{"che.command.runs.total", "one increment per CLI command run, labeled by subcommand", []string{"command"}},
+	{"che.spec.runs.total", "one increment per spec resolution (one per invocation)", nil},
+	{"che.profile.runs.total", "one increment per resolved profile executed, labeled by profile ref", []string{"profile"}},
+	{"che.operation.runs.total", "one increment per operation run over a profile, labeled by op name", []string{"op"}},
+	{"che.unit.total", "one increment per smallest-unit mutation (link/copy/render/dir/chmod/chown, script, service phase)", []string{"kind", "op_type", "command"}},
+	{"che.errors.total", "one increment per failed operation, labeled by op name", []string{"op"}},
+}
+
+// [<] 🤖🤖 registry
+
 // [>] 🤖🤖 lifecycle
 
 // Telemetry owns the OTLP providers, the meter's counters, and the logger the
@@ -46,11 +69,7 @@ type Telemetry struct {
 	loggerProvider *sdklog.LoggerProvider
 	logger         otellog.Logger
 
-	commandRuns   metric.Int64Counter
-	specRuns      metric.Int64Counter
-	profileRuns   metric.Int64Counter
-	operationRuns metric.Int64Counter
-	unitTotal     metric.Int64Counter
+	counters map[string]metric.Int64Counter // keyed by metricSpec.Name
 }
 
 // Start builds the OTLP metric + log providers from cfg and the run's resource
@@ -109,24 +128,19 @@ func (t *Telemetry) startLogs(ctx context.Context, cfg Config, res *resource.Res
 	return nil
 }
 
-// registerCounters creates the che.* Int64 counters on the meter provider.
+// registerCounters creates every Metrics counter on the meter provider, keyed
+// by name for the Count* methods to look up.
 func (t *Telemetry) registerCounters() error {
 	m := t.meterProvider.Meter("che")
-	var err error
-	if t.commandRuns, err = m.Int64Counter("che.command.runs.total"); err != nil {
-		return err
+	t.counters = make(map[string]metric.Int64Counter, len(Metrics))
+	for _, spec := range Metrics {
+		c, err := m.Int64Counter(spec.Name, metric.WithDescription(spec.Help))
+		if err != nil {
+			return err
+		}
+		t.counters[spec.Name] = c
 	}
-	if t.specRuns, err = m.Int64Counter("che.spec.runs.total"); err != nil {
-		return err
-	}
-	if t.profileRuns, err = m.Int64Counter("che.profile.runs.total"); err != nil {
-		return err
-	}
-	if t.operationRuns, err = m.Int64Counter("che.operation.runs.total"); err != nil {
-		return err
-	}
-	t.unitTotal, err = m.Int64Counter("che.unit.total")
-	return err
+	return nil
 }
 
 // Shutdown force-flushes and closes both providers under a bounded timeout: an
@@ -184,50 +198,53 @@ func newLogExporter(ctx context.Context, cfg Config) (sdklog.Exporter, error) {
 
 // [>] 🤖🤖 counters
 
-// CountCommand records one command run, labeled by subcommand.
-func (t *Telemetry) CountCommand(command string) {
-	if t == nil || t.commandRuns == nil {
+// count adds 1 to the named counter with attrs, no-op when off (nil handle or
+// counter absent).
+func (t *Telemetry) count(name string, attrs ...attribute.KeyValue) {
+	if t == nil {
 		return
 	}
-	t.commandRuns.Add(context.Background(), 1, metric.WithAttributes(attribute.String("command", command)))
+	c := t.counters[name]
+	if c == nil {
+		return
+	}
+	c.Add(context.Background(), 1, metric.WithAttributes(attrs...))
+}
+
+// CountCommand records one command run, labeled by subcommand.
+func (t *Telemetry) CountCommand(command string) {
+	t.count("che.command.runs.total", attribute.String("command", command))
 }
 
 // CountSpec records one spec run (one per invocation).
 func (t *Telemetry) CountSpec() {
-	if t == nil || t.specRuns == nil {
-		return
-	}
-	t.specRuns.Add(context.Background(), 1)
+	t.count("che.spec.runs.total")
 }
 
 // CountProfile records one profile run, labeled by profile ref.
 func (t *Telemetry) CountProfile(ref string) {
-	if t == nil || t.profileRuns == nil {
-		return
-	}
-	t.profileRuns.Add(context.Background(), 1, metric.WithAttributes(attribute.String("profile", ref)))
+	t.count("che.profile.runs.total", attribute.String("profile", ref))
 }
 
 // CountOperation records one operation run, labeled by op name.
 func (t *Telemetry) CountOperation(op string) {
-	if t == nil || t.operationRuns == nil {
-		return
-	}
-	t.operationRuns.Add(context.Background(), 1, metric.WithAttributes(attribute.String("op", op)))
+	t.count("che.operation.runs.total", attribute.String("op", op))
 }
 
 // CountUnit records one smallest-unit mutation, labeled by kind, op_type, and
 // the invoking command (link created, file copied, render, dir, chmod/chown/rm,
 // script run, service phase).
 func (t *Telemetry) CountUnit(kind, opType, command string) {
-	if t == nil || t.unitTotal == nil {
-		return
-	}
-	t.unitTotal.Add(context.Background(), 1, metric.WithAttributes(
+	t.count("che.unit.total",
 		attribute.String("kind", kind),
 		attribute.String("op_type", opType),
 		attribute.String("command", command),
-	))
+	)
+}
+
+// CountError records one failed operation, labeled by op name.
+func (t *Telemetry) CountError(op string) {
+	t.count("che.errors.total", attribute.String("op", op))
 }
 
 // [<] 🤖🤖 counters

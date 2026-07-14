@@ -8,8 +8,36 @@ import (
 	"strings"
 )
 
+// ruleFromDest builds a destRule from a scalar dest, accepting two forms: the
+// sed-style rewrite (delegated to parseDestRule) or the prefix-swap sugar
+// {source: <src>/**, dest: <dst>/**}, which desugars to an anchored rewrite
+// s:^<src>:<dst>: (strip the trailing /** from both, graft dst under the src
+// prefix). $HOME in dst stays literal, expanded later at host mapping.
+func ruleFromDest(source, dest string) (*destRule, error) {
+	if len(dest) >= 2 && dest[0] == 's' && dest[1] != '\\' && !isWord(dest[1]) {
+		return parseDestRule(dest)
+	}
+	const sfx = "/**"
+	if strings.HasSuffix(source, sfx) && strings.HasSuffix(dest, sfx) {
+		srcPrefix := strings.TrimSuffix(source, sfx)
+		dstPrefix := strings.TrimSuffix(dest, sfx)
+		re, err := regexp.Compile("^" + regexp.QuoteMeta(srcPrefix))
+		if err != nil {
+			return nil, fmt.Errorf("dest sugar %q: %w", dest, err)
+		}
+		return &destRule{re: re, repl: dstPrefix, global: false}, nil
+	}
+	return nil, fmt.Errorf("dest %q: want s<delim><pattern><delim><replacement><delim>[g] or <prefix>/** with source <prefix>/**", dest)
+}
+
+// isWord reports whether b is a regexp \w char, matching the schema pattern
+// that gates the sed-style form (s followed by a non-word delimiter).
+func isWord(b byte) bool {
+	return b == '_' || (b >= '0' && b <= '9') || (b >= 'a' && b <= 'z') || (b >= 'A' && b <= 'Z')
+}
+
 // parseDestRule parses a dest rewrite "s<delim><pattern><delim><replacement><delim>[g]",
-// where <delim> is the single char following the leading "s" (e.g. s#^HOME#$HOME#).
+// where <delim> is the single char following the leading "s" (e.g. s:^_home:$HOME:).
 // The replacement is a literal string (no $ backref expansion), so dests like
 // $HOME survive to host mapping. `\<delim>` escapes a literal delimiter char.
 // Anything not starting with "s" + a delim errors: the 1:1 form is the bare glob

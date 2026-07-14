@@ -4,52 +4,52 @@ context:
 cases:
   - name: ShouldRewriteFirstMatchWithoutGFlag
     input:
-      args: [rule: s/o/0/, path: HOME/.config/foo/oo]
+      args: [rule: s/o/0/, path: _home/.config/foo/oo]
     expected:
-      output: HOME/.c0nfig/foo/oo
+      output: _h0me/.config/foo/oo
   - name: ShouldRewriteEveryMatchWithGFlag
     input:
-      args: [rule: s/o/0/g, path: HOME/.config/foo/oo]
+      args: [rule: s/o/0/g, path: _home/.config/foo/oo]
     expected:
-      output: HOME/.c0nfig/f00/00
+      output: _h0me/.c0nfig/f00/00
   - name: ShouldRewriteHomePrefixToHomeVarLiterally
     input:
-      args: [rule: 's#^HOME#$HOME#', path: HOME/.config/foo]
+      args: [rule: 's:^_home:$HOME:', path: _home/.config/foo]
     expected:
       output: $HOME/.config/foo
   - name: ShouldTreatReplacementAsLiteralNotBackref
     input:
-      args: [rule: 's/(foo)/x$1/', path: HOME/foo/a]
+      args: [rule: 's/(foo)/x$1/', path: _home/foo/a]
     expected:
-      output: HOME/x$1/a
+      output: _home/x$1/a
   - name: ShouldParseEscapedDelimiter
     input:
-      args: [rule: 's#foo\#bar#baz#', path: HOME/foo#bar/a]
+      args: [rule: 's#foo\#bar#baz#', path: _home/foo#bar/a]
     expected:
-      output: HOME/baz/a
+      output: _home/baz/a
   - name: ShouldKeepPathUnchangedWithoutMatch
     input:
-      args: [rule: s/zzz/x/, path: HOME/foo/a]
+      args: [rule: s/zzz/x/, path: _home/foo/a]
     expected:
-      output: HOME/foo/a
+      output: _home/foo/a
   - name: ShouldErrorOnOneToOneValue
     input:
-      args: [rule: "1:1", path: HOME/foo/a]
+      args: [rule: "1:1", path: _home/foo/a]
     expected:
       errorOutput: [dest rule]
   - name: ShouldErrorOnEmptyRule
     input:
-      args: [rule: "", path: HOME/foo/a]
+      args: [rule: "", path: _home/foo/a]
     expected:
       errorOutput: [dest rule]
   - name: ShouldErrorOnMalformedRule
     input:
-      args: [rule: s/foo/bar, path: HOME/foo/a]
+      args: [rule: s/foo/bar, path: _home/foo/a]
     expected:
       errorOutput: [dest rule]
   - name: ShouldErrorOnInvalidRegex
     input:
-      args: [rule: "s/[/x/", path: HOME/foo/a]
+      args: [rule: "s/[/x/", path: _home/foo/a]
     expected:
       errorOutput: [dest rule]
 # [<] 🤖🤖

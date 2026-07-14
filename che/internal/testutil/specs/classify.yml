@@ -1,14 +1,14 @@
 base:
   include:
     makeLinks:
-      - HOME/.config/zsh/**
-      - HOME/.config/git/**
+      - _home/.config/zsh/**
+      - _home/.config/git/**
       - etc/zshrc
       - etc/zsh/**
     makeCopies:
-      - files: [HOME/.config/zsh/**, Library/LaunchDaemons/otelcol.plist*]
+      - files: [_home/.config/zsh/**, Library/LaunchDaemons/otelcol.plist*]
     renderTemplates:
-      - templates: [HOME/.config/zsh/**]
+      - templates: [_home/.config/zsh/**]
 
 cli/macos:
   options: {autoDiscover: true}

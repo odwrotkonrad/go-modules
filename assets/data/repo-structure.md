@@ -20,19 +20,19 @@ che
             all
               sample-tree-only-links
                 root
-                  HOME
+                  _home
                     .config
                       foo
             common
               sample-tree
                 install
                 root
-                  HOME
+                  Library
+                    LaunchDaemons
+                  _home
                     .config
                       foo
                       zsh
-                  Library
-                    LaunchDaemons
                   etc
                 templates
         spec
@@ -63,18 +63,18 @@ che
           resolve
             tree-classify
               root
-                HOME
+                Library
+                  LaunchDaemons
+                _home
                   .config
                     git
                     zsh
-                Library
-                  LaunchDaemons
                 etc
                   grafana
                   zsh
             tree-copy-template-rewrite
               root
-                HOME
+                _home
                   .config
                     foo
                 etc
@@ -92,7 +92,7 @@ che
                   scripts
                     installs
               root
-                HOME
+                _home
                   .config
                     extra
                     oneoff
@@ -101,7 +101,7 @@ che
                   zsh
             tree-link-rewrite
               root
-                HOME
+                _home
                   .config
                     foo
                 etc
@@ -111,11 +111,11 @@ che
                   scripts
                     installs
               root
-                HOME
-                  .config
-                    zsh
                 Library
                   LaunchDaemons
+                _home
+                  .config
+                    zsh
                 etc
                   grafana
             tree-ref-env-local
@@ -132,11 +132,11 @@ che
         tree-che-repo
           install
           root
-            HOME
-              .config
-                zsh
             Library
               LaunchDaemons
+            _home
+              .config
+                zsh
             etc
           templates
   render

@@ -13,7 +13,7 @@ cases:
         /var/log/grafana: {chmod: "2775"}
         Library/LaunchDaemons/otelcol.plist.ontoHost.cp: {chmod: "0600"}
     contains:
-      extraDirs: [/var/log/grafana, HOME/.cache/zsh]
+      extraDirs: [/var/log/grafana, _home/.cache/zsh]
       links: [etc/grafana/grafana.ini]
   - name: ShouldExcludeDesktopEntriesForCliProfile
     context: {pwd: testdata/fixture/resolve/tree-merge}
@@ -31,16 +31,16 @@ cases:
       args: [spec: classify, profile: cli/macos]
     expected:
       links:
-        - HOME/.config/git/config
-        - HOME/.config/zsh/.zshrc
+        - _home/.config/git/config
+        - _home/.config/zsh/.zshrc
         - etc/zsh/zshenv
         - etc/zshrc
       copies:
-        - HOME/.config/zsh/x.ontoHost.cp
         - Library/LaunchDaemons/otelcol.plist.ontoHost.cp
-      templates: [HOME/.config/zsh/y.ontoHost.tpl]
+        - _home/.config/zsh/x.ontoHost.cp
+      templates: [_home/.config/zsh/y.ontoHost.tpl]
     contains:
-      dirs: [HOME, HOME/.config/zsh]
+      dirs: [_home, _home/.config/zsh]
   - name: ShouldErrorOnUndefinedProfile
     context: {pwd: testdata/fixture/resolve/tree-merge}
     input:
@@ -58,12 +58,12 @@ cases:
     input:
       args: [spec: include-exclude, profile: cli/macos]
     contains:
-      links: [HOME/.config/extra/x, etc/zshrc]
+      links: [_home/.config/extra/x, etc/zshrc]
       scripts: [ci/zsh/scripts/installs/10-brew.zsh]
       services: [otelcol]
     notExpected:
       links: [etc/zsh/zshenv]
-      copies: [HOME/.config/zsh/c.ontoHost.cp]
+      copies: [_home/.config/zsh/c.ontoHost.cp]
       scripts: [ci/zsh/scripts/installs/20-foo.zsh]
       services: [grafana]
   - name: ShouldExcludeScriptsMatchingGlob
@@ -159,27 +159,27 @@ cases:
     input:
       args: [spec: link-rewrite, profile: cli/macos]
     expected:
-      links: [HOME/.config/foo/a, HOME/.config/foo/b, etc/zshrc]
+      links: [_home/.config/foo/a, _home/.config/foo/b, etc/zshrc]
       dests:
-        HOME/.config/foo/a: [HOME/.config/bar/a]
-        HOME/.config/foo/b: [HOME/.config/bar/b]
+        _home/.config/foo/a: [_home/.config/bar/a]
+        _home/.config/foo/b: [_home/.config/bar/b]
         etc/zshrc: []
   - name: ShouldContributeRewrittenLinkAncestorDirs
     context: {pwd: testdata/fixture/resolve/tree-link-rewrite}
     input:
       args: [spec: link-rewrite, profile: cli/macos]
     contains:
-      dirs: [HOME/.config/bar]
+      dirs: [_home/.config/bar]
     notExpected:
-      dirs: [HOME/.config/foo]
+      dirs: [_home/.config/foo]
   - name: ShouldExcludeLinkByRewrittenDest
     context: {pwd: testdata/fixture/resolve/tree-link-rewrite}
     input:
       args: [spec: link-rewrite, profile: exclude-rewritten]
     contains:
-      links: [HOME/.config/foo/a]
+      links: [_home/.config/foo/a]
     notExpected:
-      links: [HOME/.config/foo/b]
+      links: [_home/.config/foo/b]
   - name: ShouldErrorOnMalformedLinkDestRule
     context: {pwd: testdata/fixture/resolve/tree-link-rewrite}
     input:
@@ -191,11 +191,11 @@ cases:
     input:
       args: [spec: copy-template-rewrite, profile: cli/macos]
     expected:
-      copies: [HOME/.config/foo/a.ontoHost.cp]
-      templates: [HOME/.config/foo/b.conf.tpl]
+      copies: [_home/.config/foo/a.ontoHost.cp]
+      templates: [_home/.config/foo/b.conf.tpl]
       dests:
-        HOME/.config/foo/a.ontoHost.cp: [$HOME/.config/foo/a]
-        HOME/.config/foo/b.conf.tpl: [$HOME/.config/foo/b.conf]
+        _home/.config/foo/a.ontoHost.cp: [$HOME/.config/foo/a]
+        _home/.config/foo/b.conf.tpl: [$HOME/.config/foo/b.conf]
   - name: ShouldContributeRewrittenCopyAndTemplateAncestorDirs
     context: {pwd: testdata/fixture/resolve/tree-copy-template-rewrite}
     input:
@@ -203,7 +203,7 @@ cases:
     contains:
       dirs: [$HOME/.config/foo]
     notExpected:
-      dirs: [HOME/.config/foo]
+      dirs: [_home/.config/foo]
   - name: ShouldErrorOnLocalRefWithEnv
     context: {pwd: testdata/fixture/resolve/tree-ref-env-local}
     input:

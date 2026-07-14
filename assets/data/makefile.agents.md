@@ -33,6 +33,12 @@
 
 `render-docs` generate docs/cli.md + assets/data/{che.schema.json,cli-usage.md} from the Go source
 
+### Database:
+
+`inspect-db` open the ops ledger DB (~/.local/state/che/ops.db) in an interactive sqlite3 shell (.tables/.schema, read-only)
+`dump-db` dump the current installed set: every table's rows to stdout, read-only
+`open-db` register the ops ledger DB as a read-only Beekeeper saved connection (if absent), then launch Beekeeper Studio
+
 ### Go:
 
 `test` run all tests

@@ -3,11 +3,11 @@ base:
     makeLinks:
       - etc/zshrc
       - etc/zsh/**
-      - HOME/.config/extra/**
-      - HOME/.config/oneoff/**
+      - _home/.config/extra/**
+      - _home/.config/oneoff/**
     makeCopies:
       - files:
-          - {source: HOME/.config/zsh/c.ontoHost.cp, dest: [~/.config/zsh/c]}
+          - {source: _home/.config/zsh/c.ontoHost.cp, dest: [~/.config/zsh/c]}
     runScripts:
       - ci/zsh/scripts/installs/10-brew.zsh
       - ci/zsh/scripts/installs/20-foo.zsh
@@ -21,7 +21,7 @@ cli/macos:
     makeLinks:
       - etc/zsh/**
     makeCopies:
-      - HOME/.config/zsh/c.ontoHost.cp
+      - _home/.config/zsh/c.ontoHost.cp
     runScripts:
       - ci/zsh/scripts/installs/20-foo.zsh
     runServices: [graf*]

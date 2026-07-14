@@ -23,6 +23,7 @@ func TestNilTelemetryIsNoOp(t *testing.T) {
 		tel.CountProfile("cli")
 		tel.CountOperation("make-links")
 		tel.CountUnit("link", "create", "all")
+		tel.CountError("make-links")
 		tel.LogRecord("make-links", "linked foo", "info")
 		_ = tel.Shutdown(context.Background())
 	})
@@ -64,6 +65,7 @@ func TestCountersWiring(t *testing.T) {
 	tel.CountUnit("link", "create", "all")
 	tel.CountUnit("link", "create", "all")
 	tel.CountUnit("link", "noop", "all")
+	tel.CountError("make-links")
 
 	var rm metricdata.ResourceMetrics
 	require.NoError(t, reader.Collect(context.Background(), &rm))
@@ -75,6 +77,7 @@ func TestCountersWiring(t *testing.T) {
 	assert.Equal(t, int64(1), sums["che.operation.runs.total|op=make-links"])
 	assert.Equal(t, int64(2), sums["che.unit.total|command=all,kind=link,op_type=create"])
 	assert.Equal(t, int64(1), sums["che.unit.total|command=all,kind=link,op_type=noop"])
+	assert.Equal(t, int64(1), sums["che.errors.total|op=make-links"])
 }
 
 // collectSums flattens every int64 sum data point to "<metric>|<sorted labels>"

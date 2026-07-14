@@ -395,9 +395,18 @@
                   "description": "dest paths: relative -\u003e repo, ~/ or absolute -\u003e host; omitted -\u003e derived from the workingDirectory-relative source path"
                 },
                 {
-                  "type": "string",
-                  "pattern": "^s\\W.+\\W(g)?$",
-                  "description": "sed-style rewrite s\u003cdelim\u003e\u003cpattern\u003e\u003cdelim\u003e\u003creplacement\u003e\u003cdelim\u003e[g] (Go regexp pattern, literal replacement so $HOME survives; g: every match, absent: first only), applied to the workingDirectory-relative dest path before host mapping (e.g. s#^HOME#$HOME# targets the invoking user's home)"
+                  "oneOf": [
+                    {
+                      "type": "string",
+                      "pattern": "^s\\W.+\\W(g)?$",
+                      "description": "sed-style rewrite s\u003cdelim\u003e\u003cpattern\u003e\u003cdelim\u003e\u003creplacement\u003e\u003cdelim\u003e[g] (Go regexp pattern, literal replacement so $HOME survives; g: every match, absent: first only), applied to the workingDirectory-relative dest path before host mapping (:-delimited is the blessed form; e.g. s:^_home:$HOME: targets the invoking user's home)"
+                    },
+                    {
+                      "type": "string",
+                      "pattern": "/\\*\\*$",
+                      "description": "prefix-swap sugar \u003cprefix\u003e/**: with source \u003csrcPrefix\u003e/** it desugars to s:^\u003csrcPrefix\u003e:\u003cprefix\u003e: (e.g. dest $HOME/** with source _home/** targets home)"
+                    }
+                  ]
                 }
               ]
             },
@@ -432,21 +441,21 @@
             "$ref": "#/$defs/linkEntry"
           },
           "type": "array",
-          "description": "symlink-op entries, workingDirectory-relative: glob string (dest derived 1:1) or {source, dest} sed-style dest rewrite (e.g. s#^HOME#$HOME# to target home)"
+          "description": "symlink-op entries, workingDirectory-relative: glob string (dest derived 1:1) or {source, dest} dest rewrite (sed-style s:^_home:$HOME: or prefix-swap sugar {source: _home/**, dest: $HOME/**} to target home)"
         },
         "makeCopies": {
           "items": {
             "$ref": "#/$defs/entry"
           },
           "type": "array",
-          "description": "*.ontoHost.cp copy-op perm-groups, workingDirectory-relative sources; a glob source may carry a {source, dest} sed-style dest rewrite"
+          "description": "*.ontoHost.cp copy-op perm-groups, workingDirectory-relative sources; a glob source may carry a {source, dest} dest rewrite (sed-style s:^_home:$HOME: or prefix-swap sugar _home/** -\u003e $HOME/**)"
         },
         "renderTemplates": {
           "items": {
             "$ref": "#/$defs/templateGroup"
           },
           "type": "array",
-          "description": "*.tpl render-op perm-groups; local host sources workingDirectory-relative, repo-doc sources (repo dest) checkout-relative, or remote (@\u003crepo\u003e//\u003cpath\u003e[?ref=\u003cref\u003e], explicit dest required); glob and derived-dest forms are host sources; a glob source may carry a {source, dest} sed-style dest rewrite"
+          "description": "*.tpl render-op perm-groups; local host sources workingDirectory-relative, repo-doc sources (repo dest) checkout-relative, or remote (@\u003crepo\u003e//\u003cpath\u003e[?ref=\u003cref\u003e], explicit dest required); glob and derived-dest forms are host sources; a glob source may carry a {source, dest} dest rewrite (sed-style s:^_home:$HOME: or prefix-swap sugar _home/** -\u003e $HOME/**)"
         },
         "makeDirs": {
           "items": {
@@ -487,9 +496,18 @@
               "description": "file or glob, workingDirectory-relative"
             },
             "dest": {
-              "type": "string",
-              "pattern": "^s\\W.+\\W(g)?$",
-              "description": "sed-style rewrite s\u003cdelim\u003e\u003cpattern\u003e\u003cdelim\u003e\u003creplacement\u003e\u003cdelim\u003e[g] (Go regexp pattern, literal replacement so $HOME survives; g: every match, absent: first only), applied to the workingDirectory-relative dest path before host mapping (e.g. s#^HOME#$HOME# targets the invoking user's home)"
+              "oneOf": [
+                {
+                  "type": "string",
+                  "pattern": "^s\\W.+\\W(g)?$",
+                  "description": "sed-style rewrite s\u003cdelim\u003e\u003cpattern\u003e\u003cdelim\u003e\u003creplacement\u003e\u003cdelim\u003e[g] (Go regexp pattern, literal replacement so $HOME survives; g: every match, absent: first only), applied to the workingDirectory-relative dest path before host mapping (:-delimited is the blessed form; e.g. s:^_home:$HOME: targets the invoking user's home)"
+                },
+                {
+                  "type": "string",
+                  "pattern": "/\\*\\*$",
+                  "description": "prefix-swap sugar \u003cprefix\u003e/**: with source \u003csrcPrefix\u003e/** it desugars to s:^\u003csrcPrefix\u003e:\u003cprefix\u003e: (e.g. dest $HOME/** with source _home/** targets home)"
+                }
+              ]
             }
           },
           "additionalProperties": false,

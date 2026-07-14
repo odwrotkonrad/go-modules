@@ -116,7 +116,7 @@ func undefinedProfile(recipes []ProfileRecipe, ref string) error {
 	return fmt.Errorf("%s is not defined in che.yml (defined: %v)", ref, names(recipes, func(ProfileRecipe) bool { return true }))
 }
 
-// AllPass logs each pass, rejects at debug level only.
+// AllPass logs each pass and reject at debug level only.
 func AllPass(name string, exprs []string, forceAll bool, eval func(expr string) (bool, error)) (bool, error) {
 	if forceAll {
 		return true, nil
@@ -130,7 +130,7 @@ func AllPass(name string, exprs []string, forceAll bool, eval func(expr string) 
 			log.Debug("execIf(reject)", fmt.Sprintf("profile %s: %s", name, expr), log.Off)
 			return false, nil
 		}
-		log.Msg("execIf(pass)", fmt.Sprintf("profile %s: %s", name, expr), log.Off)
+		log.Debug("execIf(pass)", fmt.Sprintf("profile %s: %s", name, expr), log.Off)
 	}
 	return true, nil
 }
@@ -412,7 +412,7 @@ func mergeRecipe(recipes []ProfileRecipe, eff *effective, ps ProfileRecipe, seen
 		if e.Source == "" {
 			return fmt.Errorf("profile %q: link entry missing source", name)
 		}
-		rule, err := parseDestRule(e.Dest)
+		rule, err := ruleFromDest(e.Source, e.Dest)
 		if err != nil {
 			return fmt.Errorf("profile %q: %w", name, err)
 		}
@@ -450,7 +450,7 @@ func splitEntries(entries []entry, globs *globSet, rich *[]FileItem) error {
 				continue
 			}
 			if f.DestRule != "" {
-				rule, err := parseDestRule(f.DestRule)
+				rule, err := ruleFromDest(f.Source, f.DestRule)
 				if err != nil {
 					return err
 				}
@@ -481,7 +481,7 @@ func splitTemplates(entries []templateGroup, globs *globSet, rich *[]FileItem) e
 				if IsRemoteSrc(f.Source) {
 					return fmt.Errorf("renderTemplates dest rewrite cannot be remote: %q", f.Source)
 				}
-				rule, err := parseDestRule(f.DestRule)
+				rule, err := ruleFromDest(f.Source, f.DestRule)
 				if err != nil {
 					return err
 				}

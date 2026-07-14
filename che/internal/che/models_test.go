@@ -344,10 +344,10 @@ func TestPrepareOptionsUserConfig(t *testing.T) {
 func TestWorkingDirectoryCascade(t *testing.T) {
 	repo := testutil.Repo(t, map[string]string{
 		"che.yml": "options:\n  workingDirectory: spectree\n" +
-			"p:\n  options: {autoDiscover: true}\n  include:\n    makeLinks: [{source: HOME/**, dest: 's#^HOME#$HOME#'}]\n" +
-			"q:\n  options: {autoDiscover: true, workingDirectory: proftree}\n  include:\n    makeLinks: [{source: HOME/**, dest: 's#^HOME#$HOME#'}]\n",
-		"spectree/HOME/.config/a": "a\n",
-		"proftree/HOME/.config/b": "b\n",
+			"p:\n  options: {autoDiscover: true}\n  include:\n    makeLinks: [{source: _home/**, dest: 's:^_home:$HOME:'}]\n" +
+			"q:\n  options: {autoDiscover: true, workingDirectory: proftree}\n  include:\n    makeLinks: [{source: _home/**, dest: 's:^_home:$HOME:'}]\n",
+		"spectree/_home/.config/a": "a\n",
+		"proftree/_home/.config/b": "b\n",
 	})
 	home, baseEnv := prepEnv(t)
 
@@ -377,8 +377,8 @@ func TestWorkingDirectoryCascade(t *testing.T) {
 
 	// che level (flag) seeds the default when the spec omits it.
 	repo2 := testutil.Repo(t, map[string]string{
-		"che.yml":                "r:\n  options: {autoDiscover: true}\n  include:\n    makeLinks: [HOME/**]\n",
-		"chetree/HOME/.config/c": "c\n",
+		"che.yml":                 "r:\n  options: {autoDiscover: true}\n  include:\n    makeLinks: [_home/**]\n",
+		"chetree/_home/.config/c": "c\n",
 	})
 	_, baseEnv2 := prepEnv(t)
 	root2, err := PrepareSpecs(newContext(baseEnv2, repo2), options.Options{SkipExecIf: true, WorkingDirectory: "chetree"}, spec.SpecSourceRecipe{})
@@ -393,13 +393,13 @@ func TestWorkingDirectoryCascade(t *testing.T) {
 // resolves against its own checkout, where the root's tree name does not exist.
 func TestCheLevelWorkingDirectoryDoesNotLeakIntoSourcedSpec(t *testing.T) {
 	ref := testutil.Repo(t, map[string]string{
-		"che.yml":        "s:\n  options: {autoDiscover: true}\n  include:\n    makeLinks: [HOME/**]\n",
-		"HOME/.config/x": "x\n",
+		"che.yml":         "s:\n  options: {autoDiscover: true}\n  include:\n    makeLinks: [_home/**]\n",
+		"_home/.config/x": "x\n",
 	})
 	host := testutil.Repo(t, map[string]string{
 		"che.yml": "main:\n  options: {autoDiscover: true}\n  include:\n    profiles:\n" +
 			"      - source: \"" + ref + "/che.yml::s\"\n",
-		"roottree/HOME/.config/c": "c\n",
+		"roottree/_home/.config/c": "c\n",
 	})
 	_, baseEnv := prepEnv(t)
 

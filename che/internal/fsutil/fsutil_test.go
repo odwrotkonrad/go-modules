@@ -83,9 +83,9 @@ func TestTrackedFiles(t *testing.T) {
 			"che.yml":                                        "profiles:\n",
 			"root/etc/zshrc":                                 "z\n",
 			"root/etc/zsh/zshenv":                            "e\n",
-			"root/HOME/.config/zsh/.zshrc":                   "hidden\n",
-			"root/HOME/.config/zsh/.gitkeep":                 "",
-			"root/HOME/.config/git/config.ontoHost.tpl":      "tpl\n",
+			"root/_home/.config/zsh/.zshrc":                  "hidden\n",
+			"root/_home/.config/zsh/.gitkeep":                "",
+			"root/_home/.config/git/config.ontoHost.tpl":     "tpl\n",
 			"root/Library/LaunchDaemons/x.plist.ontoHost.cp": "cp\n",
 		})
 		require.NoError(t, os.WriteFile(filepath.Join(dir, "untracked"), []byte("x"), 0o644))

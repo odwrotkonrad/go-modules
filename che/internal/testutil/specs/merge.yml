@@ -2,13 +2,13 @@ base:
   include:
     makeLinks:
       - etc/zshrc
-      - HOME/.config/zsh/**
+      - _home/.config/zsh/**
       - etc/grafana/**
     makeCopies:
       - chmod: "0600"
         files: [Library/LaunchDaemons/**]
     makeDirs:
-      - directories: [HOME/.cache/zsh]
+      - directories: [_home/.cache/zsh]
       - chmod: "2775"
         directories:
           - {dest: [/var/log/grafana]}

@@ -71,7 +71,7 @@ func (p *ProfileReady) locatePlist(name string) (plistSource, bool) {
 	candidates := []plistSource{
 		{"Library/LaunchDaemons/" + name + ".plist.ontoHost.cp", ".ontoHost.cp", true, ""},
 		{"Library/LaunchAgents/" + name + ".plist.ontoHost.tpl", ".ontoHost.tpl", false, ""},
-		{"HOME/Library/LaunchAgents/" + name + ".plist.ontoHost.tpl", ".ontoHost.tpl", false, "HOME/"},
+		{"_home/Library/LaunchAgents/" + name + ".plist.ontoHost.tpl", ".ontoHost.tpl", false, "_home/"},
 	}
 	for _, c := range candidates {
 		if _, err := os.Stat(filepath.Join(p.resolveRoot(), c.relativePath)); err == nil {

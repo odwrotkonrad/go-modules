@@ -3,7 +3,7 @@ base:
   include:
     makeLinks:
       - etc/zshrc
-      - {source: HOME/.config/foo/**, dest: s/foo/bar/}
+      - {source: _home/.config/foo/**, dest: s/foo/bar/}
 
 cli/macos:
   options: {autoDiscover: true}
@@ -15,5 +15,5 @@ exclude-rewritten:
     profiles: [base]
   exclude:
     makeLinks:
-      - HOME/.config/bar/b
+      - _home/.config/bar/b
 ##[<] 🤖🤖

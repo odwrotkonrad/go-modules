@@ -3,5 +3,5 @@ cli/macos:
   options: {autoDiscover: true}
   include:
     makeLinks:
-      - {source: HOME/.config/foo/**, dest: "s/[/x/"}
+      - {source: _home/.config/foo/**, dest: "s/[/x/"}
 ##[<] 🤖🤖
