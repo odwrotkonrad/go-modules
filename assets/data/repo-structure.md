@@ -53,6 +53,9 @@ che
         spec
           funcs
     options
+      testdata
+        spec
+          funcs
     source
       testdata
         spec

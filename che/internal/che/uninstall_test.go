@@ -84,13 +84,16 @@ func TestUninstallSkipsDrift(t *testing.T) {
 	require.NoError(t, p.mutate("make-copies(create)", dest, dest, opInfo{kind: "copy"}, func() error {
 		return os.WriteFile(dest, []byte("che"), 0o644)
 	}))
-	require.NoError(t, os.Chmod(dest, 0o600)) // drift: mode changed from recorded next (0644)
+	recorded, err := os.Stat(dest) // che records the umask-masked on-disk mode, not 0644
+	require.NoError(t, err)
+	drifted := recorded.Mode().Perm() ^ 0o100 // flip owner-execute: real drift under any umask
+	require.NoError(t, os.Chmod(dest, drifted))
 
 	require.NoError(t, uninstallerOver(t, p).Uninstall())
 	require.FileExists(t, dest) // drifted dest left untouched, not removed
 	fi, err := os.Stat(dest)
 	require.NoError(t, err)
-	require.Equal(t, os.FileMode(0o600), fi.Mode().Perm())
+	require.Equal(t, drifted, fi.Mode().Perm())
 }
 
 func TestUninstallInverseExcludesFromInstalled(t *testing.T) {
