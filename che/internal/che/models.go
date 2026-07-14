@@ -423,7 +423,7 @@ func (r *SpecRecipe) PrepareProfiles(p *specsPrep, forced *spec.ProfileSourceRec
 		return nil, err
 	}
 	if !pass {
-		log.Msg("spec(skip)", r.sourceReady.DefinitionURI+" (execIf failed)", log.Off)
+		log.Debug("spec(skip)", r.sourceReady.DefinitionURI+" (execIf failed)", log.Off)
 		return ready, nil
 	}
 	lookup, err := r.composeIncludes(p, ready)
@@ -488,7 +488,7 @@ func (r *SpecRecipe) selectEligibleNames(p *specsPrep, forced *spec.ProfileSourc
 			return nil, fmt.Errorf("ref %s: %w", forced, err)
 		}
 		if !pass {
-			log.Msg("source("+forced.ProfileName+")", fmt.Sprintf("skip %s (execIf failed)", forced), log.Off)
+			log.Debug("source("+forced.ProfileName+")", fmt.Sprintf("skip %s (execIf failed)", forced), log.Off)
 			return nil, nil
 		}
 		return []string{forced.ProfileName}, nil
