@@ -12,6 +12,7 @@ cases:
       pwd: testdata/fixture/commands/common/sample-tree
     expected:
       stdOut: |
+        all(discover): cli/macos
         all(run): prune-links
         prune-links: ${ROOT}
         all(run): make-dirs
@@ -66,6 +67,7 @@ cases:
       pwd: testdata/fixture/commands/all/sample-tree-only-links
     expected:
       stdOut: |
+        all(discover): cli/macos
         all(run): prune-links
         prune-links: ${ROOT}
         all(run): make-dirs

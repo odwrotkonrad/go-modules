@@ -128,7 +128,6 @@ cases:
         - flags:
             unsetEnv: [REF_GATE]
     expected:
-      stdOut: 'execIf(pass): profile gitlabGroup: env:REF_GATE'
       output:
         profiles: [main, "${REF_DIR}/che.yml::gitlabGroup"]
         env: {REF_GATE: "1"}

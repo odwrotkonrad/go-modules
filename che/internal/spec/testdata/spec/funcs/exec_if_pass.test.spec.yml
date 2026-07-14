@@ -19,11 +19,20 @@ cases:
     expected:
       output: false
       stdOut: ["execIf(reject): profile p: env:X"]
-  - name: ShouldPassAndLogOnSetEnv
+  - name: ShouldPassSilentlyOnSetEnvAtNormalLevel
     context:
       env: {X: "1"}
     input:
       args: [profile: p, debug: false]
+    expected:
+      output: true
+    notExpected:
+      stdOut: ["execIf(pass)"]
+  - name: ShouldPassAndLogOnSetEnvAtDebugLevel
+    context:
+      env: {X: "1"}
+    input:
+      args: [profile: p, debug: true]
     expected:
       output: true
       stdOut: ["execIf(pass): profile p: env:X"]

@@ -116,7 +116,7 @@ func undefinedProfile(recipes []ProfileRecipe, ref string) error {
 	return fmt.Errorf("%s is not defined in che.yml (defined: %v)", ref, names(recipes, func(ProfileRecipe) bool { return true }))
 }
 
-// AllPass logs each pass, rejects at debug level only.
+// AllPass logs each pass and reject at debug level only.
 func AllPass(name string, exprs []string, forceAll bool, eval func(expr string) (bool, error)) (bool, error) {
 	if forceAll {
 		return true, nil
@@ -130,7 +130,7 @@ func AllPass(name string, exprs []string, forceAll bool, eval func(expr string) 
 			log.Debug("execIf(reject)", fmt.Sprintf("profile %s: %s", name, expr), log.Off)
 			return false, nil
 		}
-		log.Msg("execIf(pass)", fmt.Sprintf("profile %s: %s", name, expr), log.Off)
+		log.Debug("execIf(pass)", fmt.Sprintf("profile %s: %s", name, expr), log.Off)
 	}
 	return true, nil
 }

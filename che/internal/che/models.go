@@ -601,13 +601,18 @@ func (s *SpecReady) AllProfiles() []*ProfileReady {
 	return out
 }
 
-// ExecEach runs fn over every profile in the tree. A failing profile does not
-// stop the rest: failures collect (ref-wrapped), report as
+// ExecEach runs fn over every profile in the tree. It first prints a discovery
+// header naming each resolved profile. A failing profile does not stop the
+// rest: failures collect (ref-wrapped), report as
 // "<op>(report): fail <ref>: <err>" lines after all profiles, and join into
 // the returned error.
 func (s *SpecReady) ExecEach(opName string, fn func(*ProfileReady) error) error {
+	profiles := s.AllProfiles()
+	for _, p := range profiles {
+		log.Msg(opName+"(discover)", p.Ref(), log.Off)
+	}
 	var fails []error
-	for _, p := range s.AllProfiles() {
+	for _, p := range profiles {
 		s.tel.CountProfile(p.Ref())
 		if err := fn(p); err != nil {
 			fails = append(fails, fmt.Errorf("%s: %w", p.Ref(), err))
