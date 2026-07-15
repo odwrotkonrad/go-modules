@@ -25,11 +25,11 @@ func capture(t *testing.T, fn func()) string {
 
 var plainRe = regexp.MustCompile(`^([^(:]+)(\([^:]*\))?: (.*)\n$`)
 
-// plain splits one stamped log line into type/subtype/text.
+// plain splits one log line into type/subtype/text.
 func plain(t *testing.T, line string) []string {
 	t.Helper()
-	m := plainRe.FindStringSubmatch(testutil.StripANSI(line[len("00:00:00.000: "):]))
-	require.NotNilf(t, m, "output %q does not match HH:MM:SS.mmm: type(subtype): msg", line)
+	m := plainRe.FindStringSubmatch(testutil.StripANSI(line))
+	require.NotNilf(t, m, "output %q does not match type(subtype): msg", line)
 	return m
 }
 

@@ -9,6 +9,6 @@ cases:
   - name: ShouldRenderAndInstallHostDest
     expected:
       stdOut: |
-        archive: {{/.*/}}che-render-{{/.*/}}.tar.bz2
+        backup: {{/.*/}}che-render-{{/.*/}}.tar.bz2
         render(create): ${HOME}/.config/zsh/t
 # [<] 🤖

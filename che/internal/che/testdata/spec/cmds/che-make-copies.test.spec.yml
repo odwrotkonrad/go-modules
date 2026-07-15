@@ -9,7 +9,7 @@ cases:
   - name: ShouldCopyMarkerFilesAndChownDaemonPlist
     expected:
       stdOut: |
-        archive: {{/.*/}}che-make-copies-{{/.*/}}.tar.bz2
+        backup: {{/.*/}}che-make-copies-{{/.*/}}.tar.bz2
         make-copies(create): /Library/LaunchDaemons/otelcol.plist
         make-copies(chown): root:wheel /Library/LaunchDaemons/otelcol.plist
         make-copies(create): ${HOME}/.config/zsh/c

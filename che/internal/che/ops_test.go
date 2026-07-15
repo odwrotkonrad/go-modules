@@ -146,7 +146,7 @@ func TestOps(t *testing.T) {
 		out, runErr := testutil.CaptureStdout(t, func() error { return op(p, res) })
 		c.Expected.Check(t, runErr)
 		vars := map[string]string{"HOME": p.home, "REPO": dir, "ROOT": p.resolveRoot()}
-		stripped := testutil.StripStamps(testutil.StripANSI(out))
+		stripped := testutil.StripANSI(out)
 		for _, f := range c.Expected.StdOut {
 			testyml.MustMatch(t, stripped, testyml.Expand(f, vars))
 		}

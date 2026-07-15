@@ -61,7 +61,7 @@ sourced profile refs included).`,
 	pf.StringVar(&a.flags.WorkingDirectory, "working-directory", "",
 		"the load-ops source tree (che level; spec/profile options.workingDirectory override); default root; env: CHE_WORKING_DIRECTORY")
 	pf.StringVar((*string)(&a.flags.DryRun), "dry-run", "",
-		"print mutating actions instead of executing them; values: delta (changed dests, bare-flag default) | all (every dest); default: off; env: CHE_DRY_RUN")
+		"print mutating actions instead of executing them; values: delta (changed dests, bare-flag default) | all (every dest) | true (alias for all); default: off; env: CHE_DRY_RUN")
 	pf.Lookup("dry-run").NoOptDefVal = "delta"
 	pf.StringVar((*string)(&a.flags.ValidateSpec), "validate-spec", "",
 		"validate each loaded che.yml spec against the JSON Schema; values: warn (log violations) | error (abort on violations); default: warn; env: CHE_VALIDATE_SPEC")

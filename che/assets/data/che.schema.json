@@ -218,9 +218,10 @@
           "type": "string",
           "enum": [
             "delta",
-            "all"
+            "all",
+            "true"
           ],
-          "description": "default dry-run mode: delta (changed dests) | all (every dest); overridden by the flag and env var"
+          "description": "default dry-run mode: delta (changed dests) | all (every dest) | true (alias for all); overridden by the flag and env var"
         },
         "profiles": {
           "items": {

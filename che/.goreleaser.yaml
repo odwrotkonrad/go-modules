@@ -79,7 +79,7 @@ builds:
 
 archives:
   - id: che
-    ids: [che-linux]
+    ids: [che-linux, render-tpl-linux, render-dirs-tree-linux, render-makefile-doc-linux, render-repo-group-index-linux]
     formats: [tar.gz]
     name_template: 'che_{{ .Version }}_{{ .Os }}_{{ .Arch }}'
   - id: render-tpl

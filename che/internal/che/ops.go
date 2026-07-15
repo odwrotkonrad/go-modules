@@ -24,7 +24,7 @@ func (p *ProfileReady) archiveBefore(sub string, dests []string) error {
 	path := fsutil.ResolveBackupArchivePath(p.home, Bin, sub, p.runID)
 	p.currentArchive = path
 	p.currentSub = sub
-	return p.mutate("archive", path, "", opInfo{}, func() error { return p.FS.ArchiveDestinations(path, dests) })
+	return p.mutate("backup", path, "", opInfo{}, func() error { return p.FS.ArchiveDestinations(path, dests) })
 }
 
 // failItem logs "<op>(fail): <dest>: <err>" and returns err, the per-item

@@ -16,7 +16,7 @@ cases:
         make-dirs(create): /Library
         make-dirs(create): /Library/LaunchDaemons
         make-dirs(create): /etc
-        archive: ${HOME}/.local/state/che/backups/che-make-links-{{/.*/}}.tar.bz2
+        backup: ${HOME}/.local/state/che/backups/che-make-links-{{/.*/}}.tar.bz2
         make-links(create): ${HOME}/.config/bar/a
         make-links(create): ${HOME}/.config/zsh/.zshrc
         make-links(create): /etc/zshrc

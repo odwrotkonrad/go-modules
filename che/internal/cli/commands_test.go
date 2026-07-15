@@ -59,7 +59,7 @@ func TestCommands(t *testing.T) {
 		cmd, rest := findCmd(t, root, args)
 		out, runErr := testutil.CaptureStdout(t, func() error { return cmd.RunE(cmd, rest) })
 		c.Expected.Check(t, runErr)
-		stripped := testutil.StripStamps(testutil.StripANSI(out))
+		stripped := testutil.StripANSI(out)
 		for _, f := range c.Expected.StdOut {
 			testyml.MustMatch(t, stripped, testyml.Expand(f, vars))
 		}

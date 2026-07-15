@@ -289,6 +289,81 @@ goreleaser-linux-che:
       - che/dist/*.tar.gz
     expire_in: 1 day
 
+prerelease-darwin-che:
+  stage: release
+  tags:
+    - saas-macos-medium-m1
+  image: macos-26-xcode-26
+  rules:
+    - if: $CI_PIPELINE_SOURCE == "merge_request_event"
+      changes: [che/**/*, lib/**/*]
+      when: manual
+      allow_failure: true
+  variables:
+    MODULE_VERSION: 0.0.0-mr${CI_MERGE_REQUEST_IID}
+    GOPATH: $CI_PROJECT_DIR/.cache/go-path
+    GO_VERSION: 1.26.4
+    GO_SHA256_DARWIN_ARM64: b62ad2b6d7d2464f12a5bcad7ff47f19d08325773b5efd21610e445a05a9bf53
+    GORELEASER_VERSION: 2.16.0
+    GORELEASER_SHA256_DARWIN_ARM64: 8f6898256f35531165d90f2db581c5ee0d32bda83ebc25ac231ff5bdb9d2071a
+  cache:
+    - key: go-mod-che
+      paths:
+        - .cache/go-mod
+      policy: pull-push
+    - key: go-build-che-darwin
+      paths:
+        - .cache/go-build
+      policy: pull-push
+  before_script:
+    - curl -fsSL -o /tmp/go.tar.gz "https://go.dev/dl/go${GO_VERSION}.darwin-arm64.tar.gz"
+    - echo "$GO_SHA256_DARWIN_ARM64  /tmp/go.tar.gz" | shasum -a 256 -c -
+    - tar -C "$HOME" -xzf /tmp/go.tar.gz
+    - curl -fsSL -o /tmp/goreleaser.tar.gz "https://github.com/goreleaser/goreleaser/releases/download/v${GORELEASER_VERSION}/goreleaser_Darwin_arm64.tar.gz"
+    - echo "$GORELEASER_SHA256_DARWIN_ARM64  /tmp/goreleaser.tar.gz" | shasum -a 256 -c -
+    - mkdir -p "$HOME/bin"
+    - tar -C "$HOME/bin" -xzf /tmp/goreleaser.tar.gz goreleaser
+    - export PATH="$HOME/go/bin:$HOME/bin:$PATH"
+    - go version
+    - goreleaser --version
+  script:
+    - cd che && goreleaser release --verbose --snapshot --clean -f .goreleaser.darwin.yaml
+  artifacts:
+    expose_as: che darwin prerelease
+    paths:
+      - che/darwin-dist/
+    expire_in: 1 week
+
+prerelease-linux-che:
+  stage: release
+  image: $CI_IMAGE
+  rules:
+    - if: $CI_PIPELINE_SOURCE == "merge_request_event"
+      changes: [che/**/*, lib/**/*]
+      when: manual
+      allow_failure: true
+  variables:
+    MODULE_VERSION: 0.0.0-mr${CI_MERGE_REQUEST_IID}
+    ARCH: amd64
+  cache:
+    - key: go-mod
+      paths:
+        - .cache/go-mod
+      policy: pull
+    - key: go-build-che-zig-amd64
+      paths:
+        - .cache/go-build
+      policy: pull-push
+  script:
+    - cd che
+    - yq '.builds[].goarch = [strenv(ARCH)]' .goreleaser.yaml > ".goreleaser.linux-$ARCH.yaml"
+    - goreleaser release --verbose --snapshot --clean -f ".goreleaser.linux-$ARCH.yaml"
+  artifacts:
+    expose_as: che linux prerelease
+    paths:
+      - che/dist/
+    expire_in: 1 week
+
 publish-che:
   stage: publish
   image: $CI_IMAGE
