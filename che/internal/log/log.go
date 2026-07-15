@@ -1,4 +1,4 @@
-// Package log prints che's timestamped op log lines, dry-run mode folded into subtypes.
+// Package log prints che's op log lines, dry-run mode folded into subtypes.
 package log
 
 // [>] 🤖🤖
@@ -6,7 +6,6 @@ package log
 import (
 	"fmt"
 	"strings"
-	"time"
 
 	"github.com/fatih/color"
 )
@@ -64,7 +63,7 @@ func Debug(title, msg string, dr DryRun) {
 	print(title, msg, dr, "")
 }
 
-// Msg prints 'HH:MM:SS.mmm: <title>: <msg>', matching zsh fn-log-msg.
+// Msg prints '<title>: <msg>', matching zsh fn-log-msg.
 // Title formats as type(subtype): type bold, "(subtype)" plain, the dry-run
 // mode comma-joined onto any existing subtype.
 func Msg(title, msg string, dr DryRun) { MsgSub(title, msg, dr, "") }
@@ -80,8 +79,7 @@ func MsgSub(title, msg string, dr DryRun, sub string) {
 
 // print writes the formatted line to stdout (the sink mirror is the caller's).
 func print(title, msg string, dr DryRun, sub string) {
-	stamp := time.Now().Format("15:04:05.000")
-	fmt.Printf("%s: %s: %s\n", stamp, formatTitle(title, dr, sub), msg)
+	fmt.Printf("%s: %s\n", formatTitle(title, dr, sub), msg)
 }
 
 func formatTitle(title string, dr DryRun, sub string) string {

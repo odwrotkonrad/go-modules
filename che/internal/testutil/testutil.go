@@ -26,11 +26,6 @@ var ansiRe = regexp.MustCompile(`\x1b\[[0-9;]*m`)
 // StripANSI removes SGR escape sequences so assertions stay style-agnostic.
 func StripANSI(s string) string { return ansiRe.ReplaceAllString(s, "") }
 
-var stampRe = regexp.MustCompile(`(?m)^\d{2}:\d{2}:\d{2}\.\d{3}: `)
-
-// StripStamps removes per-line log timestamps so adjacent lines assert as one block.
-func StripStamps(s string) string { return stampRe.ReplaceAllString(s, "") }
-
 //go:embed specs/*.yml
 var specsFS embed.FS
 

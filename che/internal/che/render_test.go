@@ -75,7 +75,7 @@ func TestRenderTemplates(t *testing.T) {
 
 		out, err := renderOnce()
 		c.Expected.Check(t, err)
-		stripped := testutil.StripStamps(testutil.StripANSI(out))
+		stripped := testutil.StripANSI(out)
 		vars := map[string]string{"ROOT": root}
 		for _, f := range c.Expected.StdOut {
 			testyml.MustMatch(t, stripped, testyml.Expand(f, vars))

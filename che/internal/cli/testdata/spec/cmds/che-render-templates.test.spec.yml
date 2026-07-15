@@ -10,7 +10,7 @@ cases:
   - name: ShouldRenderOnlyHostDestsForHostProfile
     expected:
       stdOut: |
-        archive: ${HOME}/.local/state/che/backups/che-render-{{/.*/}}.tar.bz2
+        backup: ${HOME}/.local/state/che/backups/che-render-{{/.*/}}.tar.bz2
         render(create): ${HOME}/.config/zsh/t
   - name: ShouldRenderOnlyRepoDestsForOntoRepoProfile
     context:

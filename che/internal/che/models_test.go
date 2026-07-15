@@ -182,7 +182,7 @@ func TestPrepareSpecs(t *testing.T) {
 			} else {
 				require.NoErrorf(t, err, "PrepareSpecs\n%s", out)
 			}
-			stripped := testutil.StripStamps(testutil.StripANSI(out))
+			stripped := testutil.StripANSI(out)
 			for _, m := range c.Expected.StdOut {
 				testyml.MustMatch(t, stripped, testyml.Expand(m, vars))
 			}
@@ -338,6 +338,11 @@ func TestPrepareOptionsUserConfig(t *testing.T) {
 	_, opts, err = PrepareApplicationOptions(ctx(map[string]string{"CHE_VALIDATE_SPEC": "warn", "CHE_PROFILE": "env/a,env/b"}), options.Options{Profiles: []string{"flag/a"}})
 	require.NoError(t, err)
 	assert.Equal(t, []string{"flag/a"}, opts.Profiles, "flag over env + user-config")
+
+	// --dry-run=true aliases all.
+	_, opts, err = PrepareApplicationOptions(ctx(map[string]string{"CHE_DRY_RUN": "true"}), options.Options{})
+	require.NoError(t, err)
+	assert.Equal(t, options.DryRun.All, opts.DryRun, "dry-run true aliases all")
 }
 
 // TestWorkingDirectoryCascade: profile > spec > che for options.workingDirectory,

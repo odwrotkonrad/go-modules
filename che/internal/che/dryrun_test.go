@@ -57,7 +57,7 @@ func TestDryRunDelta(t *testing.T) {
 		before := snapshotTree(t, dir)
 		out, err := testutil.CaptureStdout(t, func() error { return run(p, res) })
 		require.NoErrorf(t, err, "%s dry-run", op)
-		stripped := testutil.StripStamps(testutil.StripANSI(out))
+		stripped := testutil.StripANSI(out)
 		vars := map[string]string{"HOME": p.home, "REPO": dir, "ROOT": p.resolveRoot()}
 		for _, f := range c.Expected.StdOut {
 			testyml.MustMatch(t, stripped, testyml.Expand(f, vars))

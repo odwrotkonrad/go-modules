@@ -18,10 +18,13 @@ type LookupEnv func(string) string
 // (spec) > defaults; mode values validated. env supplies the env-var layer.
 func (c *Options) Resolve(env LookupEnv, user, spec Layer) error {
 	c.DryRun = DryRunMode(strOr(env, string(c.DryRun), "CHE_DRY_RUN", user.DryRun, spec.DryRun))
+	if c.DryRun == "true" {
+		c.DryRun = DryRun.All
+	}
 	switch c.DryRun {
 	case DryRun.Off, DryRun.Delta, DryRun.All:
 	default:
-		return fmt.Errorf("invalid --dry-run mode %q: want delta or all", c.DryRun)
+		return fmt.Errorf("invalid --dry-run mode %q: want delta, all, or true (alias for all)", c.DryRun)
 	}
 	// [why] ValidateSpecCLI is the flag/env/user override (empty if none),
 	// overriding each spec's own options.validateSpec per-spec; ValidateSpec

@@ -117,7 +117,7 @@ type Options struct {
 	Debug            *bool           `yaml:"debug" jsonschema_description:"default for profiles that don't set it"`
 	WorkingDirectory string          `yaml:"workingDirectory" jsonschema_description:"the load-ops source tree (absolute, relative to the checkout, ~/, $VAR, env vars expanded); default the checkout itself; makeLinks/makeCopies/renderTemplates host sources resolve against it; home targeting is explicit via a $HOME dest rewrite; spec-only"`
 	ValidateSpec     string          `yaml:"validateSpec" jsonschema:"enum=warn,enum=error" jsonschema_description:"how this spec's schema violations report (per-spec: each included spec honors its own); overridden by the flag and env var"`
-	DryRun           string          `yaml:"dryRun" jsonschema:"enum=delta,enum=all" jsonschema_description:"default dry-run mode: delta (changed dests) | all (every dest); overridden by the flag and env var"`
+	DryRun           string          `yaml:"dryRun" jsonschema:"enum=delta,enum=all,enum=true" jsonschema_description:"default dry-run mode: delta (changed dests) | all (every dest) | true (alias for all); overridden by the flag and env var"`
 	Profiles         []string        `yaml:"profiles" jsonschema_description:"profiles to run (autoDiscover skipped, execIf still enforced); overridden by --profiles and CHE_PROFILE"`
 	SkipRemoteRefs   *bool           `yaml:"skipRemoteRefs" jsonschema_description:"skip sourced include.profiles refs; overridden by the flag and env var"`
 	RenderTemplates  RenderTemplates `yaml:"renderTemplates" jsonschema_description:"renderTemplates op defaults"`

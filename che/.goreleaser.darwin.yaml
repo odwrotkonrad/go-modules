@@ -81,7 +81,7 @@ builds:
 
 archives:
   - id: che
-    ids: [che-darwin]
+    ids: [che-darwin, render-tpl-darwin, render-dirs-tree-darwin, render-makefile-doc-darwin, render-repo-group-index-darwin]
     formats: [tar.gz]
     name_template: 'che_{{ .Version }}_{{ .Os }}_{{ .Arch }}'
   - id: render-tpl
