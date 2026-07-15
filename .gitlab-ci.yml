@@ -329,9 +329,9 @@ prerelease-darwin-che:
   script:
     - cd che && goreleaser release --verbose --snapshot --clean -f .goreleaser.darwin.yaml
   artifacts:
-    expose_as: che prerelease
+    expose_as: che darwin prerelease
     paths:
-      - che/darwin-dist/*.tar.gz
+      - che/darwin-dist/
     expire_in: 1 week
 
 prerelease-linux-che:
@@ -359,9 +359,9 @@ prerelease-linux-che:
     - yq '.builds[].goarch = [strenv(ARCH)]' .goreleaser.yaml > ".goreleaser.linux-$ARCH.yaml"
     - goreleaser release --verbose --snapshot --clean -f ".goreleaser.linux-$ARCH.yaml"
   artifacts:
-    expose_as: che prerelease
+    expose_as: che linux prerelease
     paths:
-      - che/dist/*.tar.gz
+      - che/dist/
     expire_in: 1 week
 
 publish-che:
