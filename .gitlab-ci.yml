@@ -55,7 +55,7 @@ verify-precommit-all:
         - .cache/go-build
       policy: pull
   script:
-    - make run-repo-ci-precommit-all
+    - make repo-ci-precommit-all
     - git diff --exit-code HEAD
 
 .test-module:

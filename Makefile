@@ -5,7 +5,7 @@ SHELL := zsh
 MODULES := che get-os-open-files-with get-term-open-files-with lib
 
 WRAPPERS :=
-COMMANDS := render-templates render-docs run-repo-ci-prepare-hooks run-repo-ci-precommit-all test test-cover build vet lint install create-tag publish release-check release-snapshot
+COMMANDS := render-templates render-docs repo-ci-prepare-hooks repo-ci-precommit-all test test-cover build vet lint install create-tag publish release-check release-snapshot
 
 .PHONY: $(WRAPPERS) $(COMMANDS)
 
@@ -22,11 +22,11 @@ render-docs:
 
 ##[>] CI [genai-include]
 #[what] install lefthook git hooks
-run-repo-ci-prepare-hooks:
+repo-ci-prepare-hooks:
 	@lefthook install --force
 
 #[what] run pre-commit hooks over all files
-run-repo-ci-precommit-all: run-repo-ci-prepare-hooks
+repo-ci-precommit-all: repo-ci-prepare-hooks
 	@lefthook run pre-commit --all-files --force
 ##[<] CI
 
