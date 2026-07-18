@@ -6,11 +6,13 @@ package climain
 import (
 	"fmt"
 	"os"
+	"runtime/debug"
 
 	"gitlab.com/konradodwrot/go-modules/lib/yamlcfg"
 )
 
 func Run(name, version, usage string, run func(args []string) (string, error)) {
+	version = resolveVersion(version)
 	if out, done := HelpVersion(os.Args[1:], usage, name, version); done {
 		Exit(out, nil)
 	}
@@ -26,6 +28,19 @@ func RunRaw(run func(args []string) (string, error)) {
 		os.Exit(0)
 	}
 	Exit("", err)
+}
+
+// resolveVersion prefers the goreleaser-baked ldflag version; on a plain
+// `go install` (version still "dev"/empty) it falls back to the module tag Go
+// stamps into the binary's build info.
+func resolveVersion(version string) string {
+	if version != "" && version != "dev" {
+		return version
+	}
+	if bi, ok := debug.ReadBuildInfo(); ok && bi.Main.Version != "" {
+		return bi.Main.Version
+	}
+	return version
 }
 
 func HelpVersion(args []string, usage, name, version string) (out string, done bool) {
