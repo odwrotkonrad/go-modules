@@ -22,10 +22,10 @@ cases:
         make-copies(create): ${HOME}/.config/zsh/c
   - name: ShouldNoOpWhenGloballySkipped
     context:
-      env: {CHE_SKIP_OPS: make-copies}
+      env: {CHE_SKIP_OPS: make-copies, CHE_DEBUG: "1"}
     expected:
-      stdOut: |
-        all(skip): make-copies (skipped by config)
+      stdOut:
+        - 'all(skip): make-copies'
     notExpected:
       stdOut:
         - make-copies(create

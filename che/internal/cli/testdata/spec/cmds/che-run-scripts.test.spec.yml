@@ -30,20 +30,20 @@ cases:
         - 'run-scripts: '
   - name: ShouldNoOpWhenGloballySkipped
     context:
-      env: {CHE_SKIP_OPS: run-scripts}
+      env: {CHE_SKIP_OPS: run-scripts, CHE_DEBUG: "1"}
     expected:
-      stdOut: |
-        all(skip): run-scripts (skipped by config)
+      stdOut:
+        - 'all(skip): run-scripts'
     notExpected:
       stdOut:
         - 'run-scripts: '
   - name: ShouldNotErrorOnNameFilterWhenGloballySkipped
     context:
       command: che run-scripts nonExistingScript
-      env: {CHE_SKIP_OPS: run-scripts}
+      env: {CHE_SKIP_OPS: run-scripts, CHE_DEBUG: "1"}
     expected:
-      stdOut: |
-        all(skip): run-scripts (skipped by config)
+      stdOut:
+        - 'all(skip): run-scripts'
     notExpected:
       stdOut:
         - 'run-scripts: '

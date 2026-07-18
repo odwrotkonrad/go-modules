@@ -893,7 +893,7 @@ func (p *ProfileReady) ExecOperations(ctx context.Context) error {
 			// [why] a config-skipped op is a plain skip, never a sweep: skipping
 			// render-templates must not prune its previously rendered dests.
 			if slices.Contains(skipOps, op.Name()) {
-				log.Msg("all(skip)", op.Name()+" (skipped by config)", log.Off)
+				log.Debug("all(skip)", op.Name(), log.Off)
 				continue
 			}
 			if !op.Selected() {
@@ -946,7 +946,7 @@ func (p *ProfileReady) ExecOperation(ctx context.Context, op operationReady) err
 // the profile prepared none).
 func (p *ProfileReady) ExecOperationNamed(ctx context.Context, name string) error {
 	if slices.Contains(p.opts.SkipOps, name) {
-		log.Msg("all(skip)", name+" (skipped by config)", log.Off)
+		log.Debug("all(skip)", name, log.Off)
 		return nil
 	}
 	for _, op := range p.OperationsReady {
@@ -961,7 +961,7 @@ func (p *ProfileReady) ExecOperationNamed(ctx context.Context, name string) erro
 // returning how many matched.
 func (p *ProfileReady) ExecRunScripts(ctx context.Context, names []string) (int, error) {
 	if slices.Contains(p.opts.SkipOps, "run-scripts") {
-		log.Msg("all(skip)", "run-scripts (skipped by config)", log.Off)
+		log.Debug("all(skip)", "run-scripts", log.Off)
 		return 0, nil
 	}
 	matched := 0

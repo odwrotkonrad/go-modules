@@ -80,10 +80,10 @@ cases:
   - name: ShouldSkipOpsListedInAllSkipOpsEnv
     context:
       pwd: testdata/fixture/commands/common/sample-tree
-      env: {CHE_ALL_SKIP_OPS: run-scripts}
+      env: {CHE_ALL_SKIP_OPS: run-scripts, CHE_DEBUG: "1"}
     expected:
-      stdOut: |
-        all(skip): run-scripts (skipped by config)
+      stdOut:
+        - 'all(skip): run-scripts'
     notExpected:
       stdOut:
         - 'all(run): run-scripts'
@@ -91,11 +91,11 @@ cases:
   - name: ShouldSkipOpsListedInSkipOpsEnv
     context:
       pwd: testdata/fixture/commands/common/sample-tree
-      env: {CHE_SKIP_OPS: "run-scripts,make-copies"}
+      env: {CHE_SKIP_OPS: "run-scripts,make-copies", CHE_DEBUG: "1"}
     expected:
-      stdOut: |
-        all(skip): make-copies (skipped by config)
-        all(run): render-templates
+      stdOut:
+        - 'all(skip): make-copies'
+        - 'all(run): render-templates'
     notExpected:
       stdOut:
         - 'all(run): run-scripts'
