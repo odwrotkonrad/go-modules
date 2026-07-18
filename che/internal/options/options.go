@@ -6,6 +6,7 @@ package options
 import (
 	"cmp"
 	"fmt"
+	"slices"
 	"strings"
 )
 
@@ -39,6 +40,13 @@ func (c *Options) Resolve(env LookupEnv, user, spec Layer) error {
 	c.Dir = cmp.Or(c.Dir, env("CHE_DIR"))
 	c.WorkingDirectory = cmp.Or(c.WorkingDirectory, env("CHE_WORKING_DIRECTORY"), spec.WorkingDirectory)
 	c.Profiles = listOr(env, c.Profiles, "CHE_PROFILE", user.Profiles, spec.Profiles)
+	c.SkipOps = listOr(env, c.SkipOps, "CHE_SKIP_OPS", user.SkipOps, spec.SkipOps)
+	c.AllSkipOps = listOr(env, c.AllSkipOps, "CHE_ALL_SKIP_OPS", user.All.SkipOps, spec.All.SkipOps)
+	for _, name := range slices.Concat(c.SkipOps, c.AllSkipOps) {
+		if !slices.Contains(OpNames, name) {
+			return fmt.Errorf("invalid skip-ops op %q: want one of %s", name, strings.Join(OpNames, ", "))
+		}
+	}
 	c.SkipExecIf = boolOr(env, c.SkipExecIf, "CHE_SKIP_EXEC_IF")
 	c.SkipRemoteRefs = boolOr(env, c.SkipRemoteRefs, "CHE_SKIP_REMOTE_REFS", user.SkipRemoteRefs, spec.SkipRemoteRefs)
 	c.Debug = boolOr(env, c.Debug, "CHE_DEBUG", user.Debug, spec.Debug)

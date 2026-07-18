@@ -487,4 +487,26 @@ func TestExecOperations(t *testing.T) {
 	assert.NotContains(t, testutil.StripANSI(out), "all(run): skipped")
 }
 
+// TestExecOperationsSkipOps: config-skipped ops (global + all-only union) never
+// run; a skipped deselected op takes the skip branch, not the emptied-op sweep.
+func TestExecOperationsSkipOps(t *testing.T) {
+	var ran []string
+	p := &ProfileReady{
+		ref:  "p",
+		opts: options.Options{SkipOps: []string{"render-templates"}, AllSkipOps: []string{"run-scripts"}},
+		OperationsReady: []operationReady{
+			&stubOperation{name: "render-templates", selected: false, ran: &ran},
+			&stubOperation{name: "run-scripts", selected: true, ran: &ran},
+			&stubOperation{name: "make-dirs", selected: true, ran: &ran},
+		},
+	}
+	out, err := testutil.CaptureStdout(t, func() error { return p.ExecOperations(context.Background()) })
+	require.NoError(t, err)
+	assert.Equal(t, []string{"make-dirs"}, ran, "only the unskipped op runs")
+	stripped := testutil.StripANSI(out)
+	assert.Contains(t, stripped, "all(skip): render-templates (skipped by config)")
+	assert.Contains(t, stripped, "all(skip): run-scripts (skipped by config)")
+	assert.NotContains(t, stripped, "(nothing selected)", "skip wins over the deselected sweep branch")
+}
+
 // [<] 🤖🤖

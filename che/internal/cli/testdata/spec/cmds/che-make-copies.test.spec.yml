@@ -20,4 +20,13 @@ cases:
         make-copies(create): /Library/LaunchDaemons/otelcol.plist
         make-copies(chown): root:wheel /Library/LaunchDaemons/otelcol.plist
         make-copies(create): ${HOME}/.config/zsh/c
+  - name: ShouldNoOpWhenGloballySkipped
+    context:
+      env: {CHE_SKIP_OPS: make-copies}
+    expected:
+      stdOut: |
+        all(skip): make-copies (skipped by config)
+    notExpected:
+      stdOut:
+        - make-copies(create
 # [<] 🤖

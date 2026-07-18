@@ -888,7 +888,14 @@ func (p *ProfileReady) ExecOperations(ctx context.Context) error {
 	return p.withDebugLevel(func() error {
 		var fails []error
 		skippedKinds := map[string]string{"make-links": "link", "make-copies": "copy", "render-templates": "render"}
+		skipOps := slices.Concat(p.opts.SkipOps, p.opts.AllSkipOps)
 		for _, op := range p.OperationsReady {
+			// [why] a config-skipped op is a plain skip, never a sweep: skipping
+			// render-templates must not prune its previously rendered dests.
+			if slices.Contains(skipOps, op.Name()) {
+				log.Msg("all(skip)", op.Name()+" (skipped by config)", log.Off)
+				continue
+			}
 			if !op.Selected() {
 				log.Debug("all(skip)", op.Name()+" (nothing selected)", log.Off)
 				if kind, ok := skippedKinds[op.Name()]; ok && !p.isDryRun() {
@@ -938,6 +945,10 @@ func (p *ProfileReady) ExecOperation(ctx context.Context, op operationReady) err
 // ExecOperationNamed executes the profile's operation named name (no-op if
 // the profile prepared none).
 func (p *ProfileReady) ExecOperationNamed(ctx context.Context, name string) error {
+	if slices.Contains(p.opts.SkipOps, name) {
+		log.Msg("all(skip)", name+" (skipped by config)", log.Off)
+		return nil
+	}
 	for _, op := range p.OperationsReady {
 		if op.Name() == name {
 			return p.ExecOperation(ctx, op)
@@ -949,6 +960,10 @@ func (p *ProfileReady) ExecOperationNamed(ctx context.Context, name string) erro
 // ExecRunScripts runs the profile's scripts filtered by name substrings,
 // returning how many matched.
 func (p *ProfileReady) ExecRunScripts(ctx context.Context, names []string) (int, error) {
+	if slices.Contains(p.opts.SkipOps, "run-scripts") {
+		log.Msg("all(skip)", "run-scripts (skipped by config)", log.Off)
+		return 0, nil
+	}
 	matched := 0
 	err := p.withDebugLevel(func() error {
 		for _, op := range p.OperationsReady {

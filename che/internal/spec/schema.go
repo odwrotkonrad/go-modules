@@ -25,6 +25,7 @@ func Schema() *jsonschema.Schema {
 	// ($ref), carried over from the same reflection.
 	optDefs := r.Reflect(Options{}).Definitions
 	defs["SpecOptions"] = optDefs["Options"]
+	defs["All"] = optDefs["All"]
 	defs["RenderTemplates"] = optDefs["RenderTemplates"]
 	defs["Otel"] = optDefs["Otel"]
 	defs["DestSpec"] = DestSpec{}.JSONSchema()

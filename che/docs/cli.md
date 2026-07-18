@@ -14,6 +14,7 @@ sourced profile refs included).
 | `--dry-run` | `CHE_DRY_RUN` | `delta (changed dests, bare-flag default)` \| `all (every dest)` \| `true (alias for all)` | `off` | print mutating actions instead of executing them |
 | `--profiles` | `CHE_PROFILE (comma-separated)` | `stringSlice` | `[]` | run only these profiles (comma-separated or repeated; autoDiscover skipped, execIf still enforced) |
 | `--skip-exec-if` | `CHE_SKIP_EXEC_IF` | `bool` | `false` | treat every execIf predicate as passing |
+| `--skip-ops` | `CHE_SKIP_OPS` | `prune-links` \| `make-dirs` \| `make-links` \| `make-copies` \| `render-templates` \| `run-scripts` | `[]` | skip these ops everywhere (comma-separated or repeated; dropped from the all sequence, direct op subcommands become logged no-ops) |
 | `--skip-remote-refs` | `CHE_SKIP_REMOTE_REFS` | `bool` | `false` | skip sourced include.profiles refs, load only the local repo's specs |
 | `--validate-spec` | `CHE_VALIDATE_SPEC` | `warn (log violations)` \| `error (abort on violations)` | `warn` | validate each loaded che.yml spec against the JSON Schema |
 | `--working-directory` | `CHE_WORKING_DIRECTORY` | `string` |  | the load-ops source tree (che level; spec/profile options.workingDirectory override); default root |
@@ -23,6 +24,10 @@ sourced profile refs included).
 ### `$ che all`
 
 run every op each profile selects, profile by profile.
+
+| Option | Env | Values | Default | Description |
+| --- | --- | --- | --- | --- |
+| `--skip-ops` | `CHE_ALL_SKIP_OPS` | `prune-links` \| `make-dirs` \| `make-links` \| `make-copies` \| `render-templates` \| `run-scripts` | `[]` | skip these ops in the all sequence only (comma-separated or repeated) |
 
 ### `$ che completion`
 

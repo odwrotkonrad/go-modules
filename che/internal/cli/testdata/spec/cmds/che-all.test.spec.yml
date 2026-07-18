@@ -77,4 +77,28 @@ cases:
         - cp(create
         - render(create
         - bootout
+  - name: ShouldSkipOpsListedInAllSkipOpsEnv
+    context:
+      pwd: testdata/fixture/commands/common/sample-tree
+      env: {CHE_ALL_SKIP_OPS: run-scripts}
+    expected:
+      stdOut: |
+        all(skip): run-scripts (skipped by config)
+    notExpected:
+      stdOut:
+        - 'all(run): run-scripts'
+        - 'run-scripts: '
+  - name: ShouldSkipOpsListedInSkipOpsEnv
+    context:
+      pwd: testdata/fixture/commands/common/sample-tree
+      env: {CHE_SKIP_OPS: "run-scripts,make-copies"}
+    expected:
+      stdOut: |
+        all(skip): make-copies (skipped by config)
+        all(run): render-templates
+    notExpected:
+      stdOut:
+        - 'all(run): run-scripts'
+        - 'all(run): make-copies'
+        - cp(create
 # [<] 🤖

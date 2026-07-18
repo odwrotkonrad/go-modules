@@ -120,8 +120,15 @@ type Options struct {
 	DryRun           string          `yaml:"dryRun" jsonschema:"enum=delta,enum=all,enum=true" jsonschema_description:"default dry-run mode: delta (changed dests) | all (every dest) | true (alias for all); overridden by the flag and env var"`
 	Profiles         []string        `yaml:"profiles" jsonschema_description:"profiles to run (autoDiscover skipped, execIf still enforced); overridden by --profiles and CHE_PROFILE"`
 	SkipRemoteRefs   *bool           `yaml:"skipRemoteRefs" jsonschema_description:"skip sourced include.profiles refs; overridden by the flag and env var"`
+	SkipOps          []string        `yaml:"skipOps" jsonschema:"enum=prune-links,enum=make-dirs,enum=make-links,enum=make-copies,enum=render-templates,enum=run-scripts" jsonschema_description:"ops skipped everywhere: dropped from the all sequence, direct op subcommands become logged no-ops; overridden by --skip-ops and CHE_SKIP_OPS"`
+	All              All             `yaml:"all" jsonschema_description:"all-command options"`
 	RenderTemplates  RenderTemplates `yaml:"renderTemplates" jsonschema_description:"renderTemplates op defaults"`
 	Otel             Otel            `yaml:"otel" jsonschema_description:"OTLP telemetry (metrics + logs) to a local collector; overridden by CHE_OTEL_* env"`
+}
+
+// All namespaces all-command option defaults.
+type All struct {
+	SkipOps []string `yaml:"skipOps" jsonschema:"enum=prune-links,enum=make-dirs,enum=make-links,enum=make-copies,enum=render-templates,enum=run-scripts" jsonschema_description:"ops skipped in the all sequence only (direct op subcommands unaffected); overridden by che all --skip-ops and CHE_ALL_SKIP_OPS"`
 }
 
 // RenderTemplates namespaces renderTemplates-op option defaults.

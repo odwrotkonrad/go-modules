@@ -6,6 +6,7 @@ package cli
 import (
 	"context"
 	"fmt"
+	"slices"
 
 	"github.com/spf13/cobra"
 	"go.opentelemetry.io/otel/attribute"
@@ -67,6 +68,8 @@ sourced profile refs included).`,
 		"validate each loaded che.yml spec against the JSON Schema; values: warn (log violations) | error (abort on violations); default: warn; env: CHE_VALIDATE_SPEC")
 	pf.StringSliceVar(&a.flags.Profiles, "profiles", nil,
 		"run only these profiles (comma-separated or repeated; autoDiscover skipped, execIf still enforced); env: CHE_PROFILE (comma-separated)")
+	pf.StringSliceVar(&a.flags.SkipOps, "skip-ops", nil,
+		"skip these ops everywhere (comma-separated or repeated; dropped from the all sequence, direct op subcommands become logged no-ops); values: prune-links | make-dirs | make-links | make-copies | render-templates | run-scripts; env: CHE_SKIP_OPS")
 	pf.BoolVar(&a.flags.SkipExecIf, "skip-exec-if", false,
 		"treat every execIf predicate as passing; env: CHE_SKIP_EXEC_IF")
 	pf.BoolVar(&a.flags.SkipRemoteRefs, "skip-remote-refs", false,
@@ -145,7 +148,7 @@ func (a *app) shutdownTelemetry() {
 // allCmd runs every profile's full op sequence, profile by profile. A failing
 // profile does not stop the rest: failures collect, report, and join.
 func (a *app) allCmd() *cobra.Command {
-	return &cobra.Command{
+	cmd := &cobra.Command{
 		Use:   "all",
 		Short: "run every op each profile selects, profile by profile",
 		RunE: func(cmd *cobra.Command, args []string) error {
@@ -154,6 +157,9 @@ func (a *app) allCmd() *cobra.Command {
 			})
 		},
 	}
+	cmd.Flags().StringSliceVar(&a.flags.AllSkipOps, "skip-ops", nil,
+		"skip these ops in the all sequence only (comma-separated or repeated); values: prune-links | make-dirs | make-links | make-copies | render-templates | run-scripts; env: CHE_ALL_SKIP_OPS")
+	return cmd
 }
 
 // uninstallCmd backs out everything the ledger marks installed onto this host,
@@ -201,7 +207,7 @@ func (a *app) runScriptsRunE(cmd *cobra.Command, args []string) error {
 	if err != nil {
 		return err
 	}
-	if len(args) > 0 && total == 0 {
+	if len(args) > 0 && total == 0 && !slices.Contains(a.opts.SkipOps, "run-scripts") {
 		return fmt.Errorf("no script matches: %v", args)
 	}
 	return nil

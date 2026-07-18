@@ -22,6 +22,7 @@ Flags:
       --dry-run string[="delta"]   print mutating actions instead of executing them; values: delta (changed dests, bare-flag default) | all (every dest) | true (alias for all); default: off; env: CHE_DRY_RUN
       --profiles strings           run only these profiles (comma-separated or repeated; autoDiscover skipped, execIf still enforced); env: CHE_PROFILE (comma-separated)
       --skip-exec-if               treat every execIf predicate as passing; env: CHE_SKIP_EXEC_IF
+      --skip-ops strings           skip these ops everywhere (comma-separated or repeated; dropped from the all sequence, direct op subcommands become logged no-ops); values: prune-links | make-dirs | make-links | make-copies | render-templates | run-scripts; env: CHE_SKIP_OPS
       --skip-remote-refs           skip sourced include.profiles refs, load only the local repo's specs; env: CHE_SKIP_REMOTE_REFS
       --validate-spec string       validate each loaded che.yml spec against the JSON Schema; values: warn (log violations) | error (abort on violations); default: warn; env: CHE_VALIDATE_SPEC
       --working-directory string   the load-ops source tree (che level; spec/profile options.workingDirectory override); default root; env: CHE_WORKING_DIRECTORY

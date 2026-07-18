@@ -28,4 +28,23 @@ cases:
     notExpected:
       stdOut:
         - 'run-scripts: '
+  - name: ShouldNoOpWhenGloballySkipped
+    context:
+      env: {CHE_SKIP_OPS: run-scripts}
+    expected:
+      stdOut: |
+        all(skip): run-scripts (skipped by config)
+    notExpected:
+      stdOut:
+        - 'run-scripts: '
+  - name: ShouldNotErrorOnNameFilterWhenGloballySkipped
+    context:
+      command: che run-scripts nonExistingScript
+      env: {CHE_SKIP_OPS: run-scripts}
+    expected:
+      stdOut: |
+        all(skip): run-scripts (skipped by config)
+    notExpected:
+      stdOut:
+        - 'run-scripts: '
 # [<] 🤖

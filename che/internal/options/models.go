@@ -26,6 +26,10 @@ type ValidateSpecMode string
 // ValidateSpec namespaces the ValidateSpecMode values.
 var ValidateSpec = struct{ Warn, Error ValidateSpecMode }{"warn", "error"}
 
+// OpNames lists every op name in run order: the canonical set skip-ops
+// values validate against (cobra subcommand wiring lives in cli.ops).
+var OpNames = []string{"prune-links", "make-dirs", "make-links", "make-copies", "render-templates", "run-scripts"}
+
 // Options carries every runtime option.
 type Options struct {
 	Dir              string
@@ -34,8 +38,13 @@ type Options struct {
 	ValidateSpec     ValidateSpecMode
 	// ValidateSpecCLI is the flag/env/user-config validateSpec ("" if none set),
 	// overriding each spec's own options.validateSpec per-spec.
-	ValidateSpecCLI   ValidateSpecMode
-	Profiles          []string
+	ValidateSpecCLI ValidateSpecMode
+	Profiles        []string
+	// SkipOps skips ops everywhere: dropped from the all sequence, direct op
+	// subcommands become logged no-ops.
+	SkipOps []string
+	// AllSkipOps skips ops in the all sequence only.
+	AllSkipOps        []string
 	SkipExecIf        bool
 	SkipRemoteRefs    bool
 	Debug             bool

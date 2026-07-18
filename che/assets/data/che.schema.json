@@ -2,6 +2,27 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://gitlab.com/konradodwrot/go-modules/-/raw/main/che/assets/data/che.schema.json",
   "$defs": {
+    "All": {
+      "properties": {
+        "skipOps": {
+          "items": {
+            "type": "string",
+            "enum": [
+              "prune-links",
+              "make-dirs",
+              "make-links",
+              "make-copies",
+              "render-templates",
+              "run-scripts"
+            ]
+          },
+          "type": "array",
+          "description": "ops skipped in the all sequence only (direct op subcommands unaffected); overridden by che all --skip-ops and CHE_ALL_SKIP_OPS"
+        }
+      },
+      "additionalProperties": false,
+      "type": "object"
+    },
     "DestSpec": {
       "oneOf": [
         {
@@ -233,6 +254,25 @@
         "skipRemoteRefs": {
           "type": "boolean",
           "description": "skip sourced include.profiles refs; overridden by the flag and env var"
+        },
+        "skipOps": {
+          "items": {
+            "type": "string",
+            "enum": [
+              "prune-links",
+              "make-dirs",
+              "make-links",
+              "make-copies",
+              "render-templates",
+              "run-scripts"
+            ]
+          },
+          "type": "array",
+          "description": "ops skipped everywhere: dropped from the all sequence, direct op subcommands become logged no-ops; overridden by --skip-ops and CHE_SKIP_OPS"
+        },
+        "all": {
+          "$ref": "#/$defs/All",
+          "description": "all-command options"
         },
         "renderTemplates": {
           "$ref": "#/$defs/RenderTemplates",
