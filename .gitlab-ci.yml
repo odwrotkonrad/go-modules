@@ -8,7 +8,8 @@ workflow:
 stages:
   - warm
   - verify
-  - test
+  - test-unit
+  - test-e2e
   - release
   - publish
 
@@ -60,7 +61,7 @@ verify-precommit-all:
 
 .test-module:
   image: $CI_IMAGE
-  stage: test
+  stage: test-unit
   needs:
     - job: warm-go
       optional: true
@@ -94,9 +95,9 @@ test-che:
 
 test-e2e-che:
   image: $CI_IMAGE
-  stage: test
+  stage: test-e2e
   needs:
-    - job: warm-go
+    - job: test-che
       optional: true
   cache:
     - key: go-mod
