@@ -378,6 +378,17 @@ publish-che:
   script:
     - make publish
 
+##[>] 🤖🤖
+rebuild-ci-image:
+  stage: publish
+  needs: [publish-che]
+  rules:
+    - if: $CI_COMMIT_TAG =~ /^che\/v/
+  trigger:
+    project: konradodwrot/infra/oci-images
+    branch: main
+##[<] 🤖🤖
+
 publish-get-os-open-files-with:
   stage: publish
   image: $CI_IMAGE
