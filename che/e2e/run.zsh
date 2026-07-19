@@ -7,7 +7,10 @@ bin=$e2e_dir/../dist/che
 work=${$(mktemp -d):A}
 
 fail() { print -u2 "FAIL: $1 (workdir kept: $work)"; exit 1 }
-step() { print "== $1" }
+step() {
+  local rule=${(l:64::━:):-}
+  print -- $'\n\e[1;36m'$rule$'\n'"  $1"$'\n'$rule$'\e[0m'
+}
 
 assert_file() { [[ -f $1 ]] || fail "missing file $1" }
 assert_dir() { [[ -d $1 ]] || fail "missing dir $1" }
