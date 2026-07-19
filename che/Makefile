@@ -11,7 +11,7 @@ DB := $(STATE_HOME)/ops.db
 BK_APPDB := $(HOME)/Library/Application Support/beekeeper-studio/app.db
 
 WRAPPERS :=
-COMMANDS := render-docs test test-cover build vet lint install release-check release-darwin release-snapshot inspect-db dump-db open-db
+COMMANDS := render-docs test test-cover e2e build vet lint install release-check release-darwin release-snapshot inspect-db dump-db open-db
 
 .PHONY: $(WRAPPERS) $(COMMANDS)
 
@@ -53,6 +53,10 @@ test-cover:
 	@$(GO) run $(GOCOVER_COBERTURA) < coverage.out > coverage.xml
 	@sed -i.bak 's|filename="gitlab.com/konradodwrot/go-modules/|filename="|g' coverage.xml && rm coverage.xml.bak
 	@$(GO) tool cover -func=coverage.out | tail -1
+
+#[what] run the real binary through the full command flow over the e2e fixture (hermetic temp HOME)
+e2e: build
+	zsh e2e/run.zsh
 
 #[what] build the binary into ./dist
 build:

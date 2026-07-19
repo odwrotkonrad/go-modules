@@ -26,7 +26,7 @@ const Bin = "che"
 // archive and points its records at the stage archive.
 func (p *ProfileReady) archiveBefore(sub string, dests []string) error {
 	if p.backedUp {
-		p.currentArchive = fsutil.ResolveBackupArchivePath(p.home, Bin, "backup", p.runID)
+		p.currentArchive = p.backupArchive // [why] "" when the stage archived nothing: records carry no backup ref
 		p.currentSub = "backup"
 		return nil
 	}
@@ -107,6 +107,7 @@ func (p *ProfileReady) execBackup(dests []string) error {
 	if err := p.FS.ArchiveDestinations(path, dests); err != nil {
 		return err
 	}
+	p.backupArchive = path
 	p.logMsg("backup(created)", humanSize(archiveSize(path))+", "+path)
 	return nil
 }

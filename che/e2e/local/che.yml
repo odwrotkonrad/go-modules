@@ -1,0 +1,59 @@
+##[>] 🤖🤖
+options: {profileWorkingDirectory: root}
+
+ops-plain:
+  include:
+    makeLinks:
+      - {source: plain/link.txt, dest: 's:^plain:$HOME/plain:'}
+    makeCopies:
+      - files: [{source: plain/copy.ontoHost.cp, dest: 's:^plain:$HOME/plain:'}]
+    renderTemplates:
+      - templates: [{source: plain/tpl.ontoHost.tpl, dest: 's:^plain:$HOME/plain:'}]
+    makeDirs:
+      - directories: [$HOME/plain/made-dir]
+    runScripts:
+      - install/plain-marker
+
+ops-conditional:
+  include:
+    makeLinks:
+      - {source: conditional/link.txt, dest: 's:^conditional:$HOME/conditional:'}
+    makeCopies:
+      - files: [{source: conditional/copy.ontoHost.cp, dest: 's:^conditional:$HOME/conditional:'}]
+    renderTemplates:
+      - templates: [{source: conditional/tpl.ontoHost.tpl, dest: 's:^conditional:$HOME/conditional:'}]
+    makeDirs:
+      - directories: [$HOME/conditional/made-dir]
+    runScripts:
+      - install/conditional-marker
+
+ops-dropped:
+  include:
+    makeLinks:
+      - {source: dropped/link.txt, dest: 's:^dropped:$HOME/dropped:'}
+    makeCopies:
+      - files: [{source: dropped/copy.ontoHost.cp, dest: 's:^dropped:$HOME/dropped:'}]
+    renderTemplates:
+      - templates: [{source: dropped/tpl.ontoHost.tpl, dest: 's:^dropped:$HOME/dropped:'}]
+    makeDirs:
+      - directories: [$HOME/dropped/made-dir]
+    runScripts:
+      - install/dropped-marker
+
+dropped:
+  options: {autoDiscover: true, runIf: ['env:CHE_E2E_DROPPED']}
+  include: {profiles: [ops-dropped]}
+
+plain:
+  options: {autoDiscover: true}
+  include: {profiles: [ops-plain]}
+
+conditional:
+  options: {autoDiscover: true, runIf: ['env:CHE_E2E == 1']}
+  include: {profiles: [ops-conditional]}
+
+remote:
+  options: {autoDiscover: true}
+  include:
+    profiles: [{source: "@file://__REMOTE_DIR__/che.yml::ops-remote"}]
+##[<] 🤖🤖

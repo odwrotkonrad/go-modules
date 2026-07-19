@@ -742,6 +742,7 @@ type ProfileReady struct {
 	specDone        *database.SpecDone    // the run's ledger row (nil when not recording)
 	profileDone     *database.ProfileDone // this profile's ledger row (nil when not recording)
 	backedUp        bool                  // the run backup stage archived every op dest: ops skip their own archives
+	backupArchive   string                // the archive the run backup stage actually wrote ("" -> nothing existed, no archive)
 	currentArchive  string                // archive path the in-flight op's archiveBefore wrote ("" -> no backup)
 	currentSub      string                // that archive's sub (Backup.Sub)
 	Seams                                 // fs writer/reader/fetcher, defaulted in prepare, test-injectable

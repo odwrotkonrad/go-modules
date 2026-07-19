@@ -1,0 +1,1 @@
+{{ "rendered-remote" | strings.ToUpper }}

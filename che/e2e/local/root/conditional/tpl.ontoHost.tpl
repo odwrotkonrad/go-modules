@@ -1,0 +1,1 @@
+{{ "rendered-conditional" | strings.ToUpper }}

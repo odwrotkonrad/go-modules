@@ -43,6 +43,7 @@
 
 `test` run all tests
 `test-cover` run all tests with coverage, print the per-package and total percentages
+`e2e`: `build` run the real binary through the full command flow over the e2e fixture (hermetic temp HOME)
 `build` build the binary into ./dist
 `lint` golangci-lint all packages
 `vet` go vet all packages

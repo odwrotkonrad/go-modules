@@ -7,6 +7,17 @@ che
     data
     docs-agents
   docs
+  e2e
+    local
+      install
+      root
+        conditional
+        dropped
+        plain
+    remote
+      install
+      root
+        remote
   internal
     che
       testdata
