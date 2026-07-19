@@ -18,8 +18,8 @@ import (
 // execution surface (FS writer, reader, ledger recording), so its inverse ops
 // record in the same normalized shape as installs.
 type Uninstaller struct {
-	p     *ProfileReady
-	dryun bool
+	p      *ProfileReady
+	dryRun bool
 }
 
 // NewUninstaller builds an Uninstaller: resolve the invoking home, open the
@@ -33,11 +33,11 @@ func NewUninstaller(ctx Context, opts options.Options) (*Uninstaller, error) {
 	seams := NewSeams(home)
 	spec, err := seams.Ledger.StartSpec(ctx.RunID, "", "uninstall")
 	if err != nil {
-		log.Debug("ledger", "uninstall start spec: "+err.Error(), log.Off)
+		log.Debug("ledger", "uninstall start spec: "+err.Error())
 	}
 	prof, err := seams.Ledger.StartProfile(spec, "uninstall", "uninstall", "", home)
 	if err != nil {
-		log.Debug("ledger", "uninstall start profile: "+err.Error(), log.Off)
+		log.Debug("ledger", "uninstall start profile: "+err.Error())
 	}
 	p := &ProfileReady{
 		ref:         "uninstall",
@@ -48,7 +48,7 @@ func NewUninstaller(ctx Context, opts options.Options) (*Uninstaller, error) {
 		profileDone: prof,
 		Seams:       seams,
 	}
-	return &Uninstaller{p: p, dryun: opts.DryRun != options.DryRun.Off}, nil
+	return &Uninstaller{p: p, dryRun: opts.DryRun != options.DryRun.Off}, nil
 }
 
 // Uninstall reverts every ledger-installed dest, newest-first (so nested dests
@@ -67,7 +67,7 @@ func (u *Uninstaller) Uninstall() error {
 		}
 	}
 	for _, err := range errs {
-		log.Msg("uninstall(report)", "fail "+err.Error(), log.Off)
+		log.Msg("uninstall(report)", "fail "+err.Error())
 	}
 	return errors.Join(errs...)
 }
@@ -82,7 +82,7 @@ func (u *Uninstaller) revert(op database.OperationDone) error {
 		p.logMsg("uninstall(drift)", op.Dest)
 		return nil
 	}
-	if u.dryun {
+	if u.dryRun {
 		p.logMsg("uninstall", op.Dest)
 		return nil
 	}

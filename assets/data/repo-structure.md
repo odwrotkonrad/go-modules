@@ -244,6 +244,8 @@ lib
         load_config
       spec
         funcs
+spec
+  che
 templates
   2-data
   3-audience

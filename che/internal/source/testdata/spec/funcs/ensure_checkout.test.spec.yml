@@ -7,20 +7,25 @@ cases:
       args: [priorEnsures: 0, commitExtra: false]
     expected:
       output: {files: [che.yml]}
-      stdOut: ["source(p): cloned ${URL} -> ${DIR}"]
+      stdOut: ["init-remote-sources(cloneRemote): ${URL} -> ${DIR}"]
     notExpected:
       stdOut: ["clone ${URL}"]
-  - name: ShouldStaySilentOnNoChangePull
+  - name: ShouldLogNoopOnNoChangePull
     input:
       args: [priorEnsures: 1, commitExtra: false]
     expected:
-      output: {silent: true}
+      stdOut: ['init-remote-sources(update, skippedDue[RemoteUpToDate]): ${URL} -> ${DIR}']
+  - name: ShouldWarnAndUseCacheWhenFetchFails
+    input:
+      args: [priorEnsures: 1, commitExtra: false, debug: false, upstreamGone: true]
+    expected:
+      stdOut: ['using cached checkout ${DIR}']
   - name: ShouldHardResetAndLogPulledOnUpstreamChange
     input:
       args: [priorEnsures: 1, commitExtra: true]
     expected:
       output: {files: [extra.txt]}
-      stdOut: ['source(p): pulled {{/[0-9a-f]{7}\.\.[0-9a-f]{7}/}} ${DIR}']
+      stdOut: ['init-remote-sources(updateRemote): ${URL} -> ${DIR}']
     notExpected:
       stdOut: ["pull ${DIR}"]
 # [<] 🤖🤖

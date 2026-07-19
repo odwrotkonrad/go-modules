@@ -32,11 +32,12 @@ func repoEnv(t *testing.T, pwd string) (*app, *cobra.Command, string) {
 	require.NoError(t, os.MkdirAll(home, 0o755))
 	a := New()
 	root := a.Root()
-	a.flags.Dir = dir
-	t.Setenv("CHE_SKIP_EXEC_IF", "1")
+	a.flags.CheWorkingDirectory = dir
+	t.Setenv("CHE_SKIP_RUN_IF", "1")
 	t.Setenv("HOME", home)
 	t.Setenv("XDG_STATE_HOME", filepath.Join(home, ".local/state"))
 	t.Setenv("XDG_CACHE_HOME", filepath.Join(home, ".cache"))
+	t.Setenv("XDG_CONFIG_HOME", filepath.Join(home, ".config"))
 	return a, root, home
 }
 
@@ -46,7 +47,7 @@ func setupMock(t *testing.T, pwd, profile string, decl map[string]string) (*app,
 	a, root, home := repoEnv(t, pwd)
 	t.Setenv("CHE_DRY_RUN", "")
 	if profile != "" {
-		a.flags.Profiles = []string{profile}
+		a.flags.Profiles = strings.Split(profile, ",")
 	}
 
 	m := testutil.ApplyMocks(t, decl)
@@ -54,7 +55,7 @@ func setupMock(t *testing.T, pwd, profile string, decl map[string]string) (*app,
 	testyml.Swap(t, &che.NewSeams, func(home string) che.Seams {
 		s := realSeams(home)
 		s.FS = m.FS
-		s.Reader = &testutil.FileSystemMockReader{Roots: []string{a.flags.Dir, home}}
+		s.Reader = &testutil.FileSystemMockReader{Roots: []string{a.flags.CheWorkingDirectory, home}}
 		s.Ledger = nil // [why] record-only tests: no ledger side effects
 		return s
 	})
@@ -82,7 +83,7 @@ func TestInit(t *testing.T) {
 			}
 			a.flags.ValidateSpec = options.ValidateSpecMode(c.Input.Args.String(t, 1))
 			if extra := c.Input.Args.String(t, 2); extra != "" {
-				f, err := os.OpenFile(filepath.Join(a.flags.Dir, "che.yml"), os.O_APPEND|os.O_WRONLY, 0o644)
+				f, err := os.OpenFile(filepath.Join(a.flags.CheWorkingDirectory, "che.yml"), os.O_APPEND|os.O_WRONLY, 0o644)
 				require.NoError(t, err)
 				_, err = f.WriteString("\n" + extra)
 				require.NoError(t, err)

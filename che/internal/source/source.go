@@ -1,5 +1,5 @@
 // Package source manages the cache checkouts of remote source repos, kept at
-// ~/.cache/che/sources.
+// ~/.cache/che/remote-sources.
 package source
 
 // [>] 🤖🤖
@@ -16,9 +16,9 @@ import (
 )
 
 // Dir is the managed cache checkout path for url:
-// <ResolveCacheHome>/sources/<slug> (default ~/.cache/che/sources).
+// <ResolveCacheHome>/remote-sources/<slug> (default ~/.cache/che/remote-sources).
 func Dir(home, url string) string {
-	return filepath.Join(fsutil.ResolveCacheHome(home), "sources", slug(url))
+	return filepath.Join(fsutil.ResolveCacheHome(home), "remote-sources", slug(url))
 }
 
 // slug sanitizes url into a deterministic dir name: scheme/git@ stripped,
@@ -38,29 +38,54 @@ func slug(url string) string {
 // branch only) or updates it to the remote tip (shallow fetch + hard reset:
 // [why] a shallow --ff-only pull fails once the fetched history is truncated;
 // the dir is a managed cache, never edited in place), returning the checkout
-// path. name subtypes the logs. Shells out to system git so the user's ssh
+// path. Shells out to system git so the user's ssh
 // config and credential helpers apply.
-func EnsureCheckout(home, url, name string) (string, error) {
+// checkouts caches ensured URLs for the run: the init stage clones/pulls,
+// later resolutions reuse the checkout silently (one fetch per URL per run).
+var checkouts = map[string]string{}
+
+// ResetCache clears the per-run checkout cache (tests simulating fresh runs).
+func ResetCache() { checkouts = map[string]string{} }
+
+func EnsureCheckout(home, url string) (string, error) {
+	if dir, ok := checkouts[url]; ok {
+		return dir, nil
+	}
+	dir, err := ensureCheckout(home, url)
+	if err == nil {
+		checkouts[url] = dir
+	}
+	return dir, err
+}
+
+// ensureCheckout logs one "<git-url> -> <os-path>" line per source
+// (spec/che/InitCmdBehavior.md): cloneRemote, updateRemote and
+// skipDueRemoteUpToDate (up to date) all at info.
+func ensureCheckout(home, url string) (string, error) {
 	dir := Dir(home, url)
-	title := "source(" + name + ")"
+	line := url + " -> " + dir
 	if _, err := os.Stat(filepath.Join(dir, ".git")); err != nil {
-		log.Debug(title, fmt.Sprintf("clone %s -> %s", url, dir), log.Off)
 		if err := git("clone", "--quiet", "--depth", "1", "--single-branch", url, dir); err != nil {
 			return "", fmt.Errorf("source clone %s: %w", url, err)
 		}
-		log.Msg(title, fmt.Sprintf("cloned %s -> %s", url, dir), log.Off)
+		log.Msg("init-remote-sources(cloneRemote)", line)
 		return dir, nil
 	}
-	log.Debug(title, fmt.Sprintf("pull %s", dir), log.Off)
 	before, _ := gitOut("-C", dir, "rev-parse", "HEAD")
+	// [why] a failing update with a cached checkout is survivable: warn and use
+	// the cache; only a missing checkout is fatal (spec/che/InitCmdBehavior.md).
 	if err := git("-C", dir, "fetch", "--quiet", "--depth", "1"); err != nil {
-		return "", fmt.Errorf("source fetch %s: %w", dir, err)
+		log.Msg("init-remote-sources(warning)", fmt.Sprintf("fetch failed, using cached checkout %s: %v", dir, err))
+		return dir, nil
 	}
 	if err := git("-C", dir, "reset", "--hard", "--quiet", "FETCH_HEAD"); err != nil {
-		return "", fmt.Errorf("source reset %s: %w", dir, err)
+		log.Msg("init-remote-sources(warning)", fmt.Sprintf("update failed, using cached checkout %s: %v", dir, err))
+		return dir, nil
 	}
 	if after, _ := gitOut("-C", dir, "rev-parse", "HEAD"); after != before {
-		log.Msg(title, fmt.Sprintf("pulled %.7s..%.7s %s", before, after, dir), log.Off)
+		log.Msg("init-remote-sources(updateRemote)", line)
+	} else {
+		log.Msg("init-remote-sources(update, skippedDue[RemoteUpToDate])", line)
 	}
 	return dir, nil
 }

@@ -1,0 +1,36 @@
+# [>] 🤖🤖
+context:
+  function: options.Options.Resolve
+cases:
+  - name: ShouldReportOnlyDefaultsAsEmptyDelta
+    expected:
+      output:
+        delta: "[]"
+  - name: ShouldReportFlagEnvConfigSpecSources
+    context:
+      env: {CHE_DEBUG: "1"}
+    input:
+      args:
+        - flags: {dryRun: delta}
+        - user: {skipRemoteRefs: true}
+        - spec: {profileWorkingDirectory: root}
+    expected:
+      output:
+        delta: "[dryRun=delta(cliFlag),profileWorkingDirectory=root(specFile),skipRemoteRefs=true(config-file),debug=true(env)]"
+  - name: ShouldReportEveryOptionWithSourceInAll
+    input:
+      args:
+        - flags: {}
+        - user: {}
+        - spec: {}
+    expected:
+      output:
+        allContains:
+          - "dryRun=false(default)"
+          - "skipOps=[](default)"
+          - "autoDiscover=true(default)"
+          - "validateSpec=warn(default)"
+          - "otel.protocol=grpc(default)"
+          - "otel.endpoint=localhost:4317(default)"
+          - "otel.metrics=true(default)"
+# [<] 🤖🤖

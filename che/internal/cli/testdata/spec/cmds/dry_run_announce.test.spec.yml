@@ -1,0 +1,43 @@
+# [>] 🤖🤖
+context:
+  command: che run
+  pwd: testdata/fixture/commands/all/sample-tree-only-links
+  mockedInterfaces:
+    execx.CmdExecutor: testutil.CmdMockExecutor
+    fsutil.FileSystemWriter: testutil.FileSystemMockWriter
+    fsutil.FileSystemReader: testutil.FileSystemMockReader
+cases:
+  - name: ShouldAnnounceDeltaModeFirstAndOnce
+    context: {env: {CHE_DRY_RUN: delta}}
+    expected:
+      output: delta
+      stdOut: |
+        dry-run(config.dryRun=delta): no actual operations will be performed, reporting only dests that would change
+      stdOutCounts: {'dry-run(': 1}
+    notExpected:
+      stdOut:
+        - ',dry-run='
+        - '(dry-run='
+  - name: ShouldAliasTrueToDelta
+    context: {env: {CHE_DRY_RUN: "true"}}
+    expected:
+      output: delta
+      stdOut: |
+        dry-run(config.dryRun=delta): no actual operations will be performed, reporting only dests that would change
+      stdOutCounts: {'dry-run(': 1}
+    notExpected:
+      stdOut:
+        - ',dry-run='
+        - '(dry-run='
+  - name: ShouldAnnounceAllModeFirstAndOnce
+    context: {env: {CHE_DRY_RUN: all}}
+    expected:
+      output: all
+      stdOut: |
+        dry-run(config.dryRun=all): no actual operations will be performed, reporting every dest's state
+      stdOutCounts: {'dry-run(': 1}
+    notExpected:
+      stdOut:
+        - ',dry-run='
+        - '(dry-run='
+# [<] 🤖🤖

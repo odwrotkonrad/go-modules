@@ -25,14 +25,14 @@ func stubEvaluator(osName string, virt bool) *Evaluator {
 	}
 }
 
-func TestEvalExecIf(t *testing.T) {
+func TestEvalRunIf(t *testing.T) {
 	e := stubEvaluator("macos", false)
-	testyml.Eq(t, td, "testdata/spec/funcs/eval_exec_if.test.spec.yml", func(t *testing.T, c testyml.Case[bool]) (bool, error) {
-		return e.EvalExecIf(c.Input.Args.String(t, 0))
+	testyml.Eq(t, td, "testdata/spec/funcs/eval_run_if.test.spec.yml", func(t *testing.T, c testyml.Case[bool]) (bool, error) {
+		return e.EvalRunIf(c.Input.Args.String(t, 0))
 	})
 }
 
-// builtinsWant is exec_if_builtins' expected.output: the eval result plus the
+// builtinsWant is run_if_builtins' expected.output: the eval result plus the
 // executor call count (isVirt must cache: one exec across two evals).
 type builtinsWant struct {
 	Value     bool `yaml:"value"`
@@ -50,9 +50,9 @@ func TestNewEvaluatorBuiltins(t *testing.T) {
 		e := NewEvaluator(os.Getenv)
 		expr := c.Input.Args.String(t, 0)
 		for range 2 {
-			got, err := e.EvalExecIf(expr)
-			require.NoErrorf(t, err, "EvalExecIf(%q)", expr)
-			assert.Equal(t, c.Expected.Output.Value, got, "EvalExecIf(%q)", expr)
+			got, err := e.EvalRunIf(expr)
+			require.NoErrorf(t, err, "EvalRunIf(%q)", expr)
+			assert.Equal(t, c.Expected.Output.Value, got, "EvalRunIf(%q)", expr)
 		}
 		assert.Len(t, m.Exec.Calls(), c.Expected.Output.ExecCalls, "builtin must cache")
 	})

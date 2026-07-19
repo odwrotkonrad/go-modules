@@ -47,6 +47,9 @@ func TestCommands(t *testing.T) {
 	require.NoError(t, err)
 	require.NotEmpty(t, specs)
 	run := func(t *testing.T, c testyml.Case[struct{}]) {
+		for k, v := range c.Context.Env {
+			t.Setenv(k, v)
+		}
 		args, profile := splitProfileArg(c.Context.CommandArgs())
 		a, root, home := setupMock(t, c.Context.Pwd, profile, c.Context.MockedInterfaces)
 		require.NotEmpty(t, a.root.AllProfiles())
@@ -65,6 +68,9 @@ func TestCommands(t *testing.T) {
 		}
 		for _, f := range c.NotExpected.StdOut {
 			testyml.MustNotMatch(t, stripped, testyml.Expand(f, vars))
+		}
+		for sub, n := range c.Expected.StdOutCounts {
+			testyml.MustCount(t, stripped, testyml.Expand(sub, vars), n)
 		}
 	}
 	for _, spec := range specs {

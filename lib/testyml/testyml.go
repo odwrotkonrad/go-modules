@@ -189,6 +189,14 @@ func MustNotMatch(t *testing.T, s, matcher string) {
 	}
 }
 
+// MustCount asserts s contains substr (literal) exactly n times.
+func MustCount(t *testing.T, s, substr string, n int) {
+	t.Helper()
+	if got := strings.Count(s, substr); got != n {
+		t.Errorf("output contains %q %d times, want %d:\n--- got ---\n%s", substr, got, n, s)
+	}
+}
+
 // Run decodes path's spec file ({context?, cases}), strict-decodes each case
 // into C, runs fn per case as a named subtest.
 func Run[C any](t *testing.T, fsys fs.FS, path string, fn func(t *testing.T, c C)) {

@@ -16,7 +16,7 @@ import (
 // boundary. It is the ONLY sanctioned ambient-read site; downstream methods
 // read receiver fields, not the process.
 type Context struct {
-	Env     map[string]string // CHE_*/HOME/SUDO_USER/execIf env, snapshot at entry
+	Env     map[string]string // CHE_*/HOME/SUDO_USER/runIf env, snapshot at entry
 	Cwd     string            // replaces os.Getwd
 	Euid    int               // replaces os.Geteuid
 	RunID   string            // one TsLayout stamp per invocation: ledger run + backup filenames

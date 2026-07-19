@@ -1,0 +1,32 @@
+# [>] 🤖🤖
+context:
+  command: che backup
+  mockedInterfaces:
+    execx.CmdExecutor: testutil.CmdMockExecutor
+    fsutil.FileSystemWriter: testutil.FileSystemMockWriter
+    fsutil.FileSystemReader: testutil.FileSystemMockReader
+cases:
+  - name: ShouldLogOnlyShowDeltaWithoutExistingDests
+    expected:
+      stdOut: |
+        backup(showDelta): {{/.*/}}
+    notExpected:
+      stdOut:
+        - 'backup(created'
+  - name: ShouldLogOnlyShowDeltaForSettledDests
+    input:
+      args: [settleLink: true]
+    expected:
+      stdOut: |
+        backup(showDelta): make-links(1),make-copies(2),render-templates(1)
+    notExpected:
+      stdOut:
+        - 'backup(created'
+  - name: ShouldArchiveOnlyDestsThatWouldChange
+    input:
+      args: [driftLink: true]
+    expected:
+      stdOut: |
+        backup(showDelta): {{/.*/}}make-links({{/[0-9]+/}}),make-copies({{/[0-9]+/}}),render-templates({{/[0-9]+/}})
+        backup(created): {{/.*/}}B, ${HOME}/.local/state/che/backups/che-backup-{{/.*/}}.tar.bz2
+# [<] 🤖🤖

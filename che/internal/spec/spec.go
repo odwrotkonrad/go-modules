@@ -17,7 +17,7 @@ import (
 const (
 	TmplExt = ".tpl"
 	CpExt   = ".ontoHost.cp"
-	// DefaultWorkingDir is the load-ops source tree when options.workingDirectory
+	// DefaultWorkingDir is the load-ops source tree when options.profileWorkingDirectory
 	// is unset: the checkout itself.
 	DefaultWorkingDir = "."
 )
@@ -35,6 +35,28 @@ const RemoteSrcPrefix = "@"
 
 // IsRemoteSrc reports whether source is a remote template source.
 func IsRemoteSrc(source string) bool { return strings.HasPrefix(source, RemoteSrcPrefix) }
+
+// IncludedProfileRefs lists every include.profiles entry the recipe composes,
+// by display name (local bare names, sourced refs remote:<repo>:<name>).
+func (r ProfileRecipe) IncludedProfileRefs() []string {
+	var out []string
+	for _, ref := range r.Include.Profiles {
+		out = append(out, ref.DisplayRef())
+	}
+	return out
+}
+
+// SourcedRefs lists the recipe's include.profiles entries referencing another
+// spec (URI set): the remote/filesystem refs the init stage prefetches.
+func (r ProfileRecipe) SourcedRefs() []ProfileSourceRecipe {
+	var out []ProfileSourceRecipe
+	for _, ref := range r.Include.Profiles {
+		if ref.URI != "" {
+			out = append(out, ref)
+		}
+	}
+	return out
+}
 
 // RemoteSrcRef strips the remote marker, yielding the fetchable ref.
 func RemoteSrcRef(source string) string { return strings.TrimPrefix(source, RemoteSrcPrefix) }

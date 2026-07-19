@@ -3,25 +3,34 @@ cases:
   - name: ShouldOnlyReportLinkCreates
     context: {command: che make-links}
     expected:
-      stdOut: "make-links(create,dry-run=delta): ${HOME}/.config/zsh/"
+      stdOut: "make-links(create, skippedDue[config.dryRun=delta]): ${HOME}/.config/zsh/"
   - name: ShouldOnlyReportCopyCreates
     context: {command: che make-copies}
     expected:
-      stdOut: "make-copies(create,dry-run=delta): ${HOME}/.config/zsh/"
+      stdOut: "make-copies(create, skippedDue[config.dryRun=delta]): ${HOME}/.config/zsh/"
   - name: ShouldOnlyReportRenderCreates
     context: {command: che render-templates}
     expected:
-      stdOut: "render(create,dry-run=delta): ${HOME}/.config/zsh/"
+      stdOut: "render-templates(create, skippedDue[config.dryRun=delta]): ${HOME}/.config/zsh/"
   - name: ShouldOnlyReportMkdirCreates
     context: {command: che make-dirs}
     expected:
-      stdOut: "make-dirs(create,dry-run=delta): ${HOME}/.config"
-  - name: ShouldOnlyReportPruneScan
-    context: {command: che prune-links}
+      stdOut: "make-dirs(create, skippedDue[config.dryRun=delta]): ${HOME}/.config"
+  - name: ShouldReportBackupArchivePrediction
+    context: {command: che backup}
+    input:
+      args: [driftLink: true]
     expected:
-      stdOut: "prune-links(dry-run=delta): ${ROOT}"
+      stdOut: |
+        backup(showDelta): {{/.*/}}
+        backup(created): {{/.*/}}che-backup-{{/.*/}}.tar.bz2
+  - name: ShouldReportNothingForPrune
+    context: {command: che prune-broken-links}
+    notExpected:
+      stdOut:
+        - 'prune-link'
   - name: ShouldOnlyReportScriptRuns
     context: {command: che run-scripts}
     expected:
-      stdOut: "run-scripts(dry-run=delta): ${REPO}/install/setup"
+      stdOut: "run-scripts: ${REPO}/install/setup"
 # [<] 🤖🤖

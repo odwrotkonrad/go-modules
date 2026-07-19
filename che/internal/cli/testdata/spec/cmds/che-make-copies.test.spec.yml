@@ -10,14 +10,23 @@ cases:
   - name: ShouldCopyMarkerFilesAndChownDaemonPlist
     expected:
       stdOut: |
-        make-dirs(create): ${HOME}/.config
-        make-dirs(create): ${HOME}/.config/bar
-        make-dirs(create): ${HOME}/.config/zsh
-        make-dirs(create): /Library
-        make-dirs(create): /Library/LaunchDaemons
-        make-dirs(create): /etc
+        make-dirs(created): ${HOME}/.config
+        make-dirs(created): ${HOME}/.config/bar
+        make-dirs(created): ${HOME}/.config/zsh
+        make-dirs(created): /Library
+        make-dirs(created): /Library/LaunchDaemons
+        make-dirs(created): /etc
         backup: ${HOME}/.local/state/che/backups/che-make-copies-{{/.*/}}.tar.bz2
-        make-copies(create): /Library/LaunchDaemons/otelcol.plist
+        make-copies(created): /Library/LaunchDaemons/otelcol.plist
         make-copies(chown): root:wheel /Library/LaunchDaemons/otelcol.plist
-        make-copies(create): ${HOME}/.config/zsh/c
+        make-copies(created): ${HOME}/.config/zsh/c
+  - name: ShouldNoOpWhenGloballySkipped
+    context:
+      env: {CHE_SKIP_OPS: make-copies, CHE_DEBUG: "1"}
+    expected:
+      stdOut:
+        - 'make-copies(runProfile, skippedDue[config.skipOps]): cli/macos'
+    notExpected:
+      stdOut:
+        - make-copies(create
 # [<] 🤖

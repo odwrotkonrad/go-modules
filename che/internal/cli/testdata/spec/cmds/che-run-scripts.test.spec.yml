@@ -28,4 +28,23 @@ cases:
     notExpected:
       stdOut:
         - 'run-scripts: '
+  - name: ShouldNoOpWhenGloballySkipped
+    context:
+      env: {CHE_SKIP_OPS: run-scripts, CHE_DEBUG: "1"}
+    expected:
+      stdOut:
+        - 'run-scripts(runProfile, skippedDue[config.skipOps]): cli/macos'
+    notExpected:
+      stdOut:
+        - 'run-scripts: '
+  - name: ShouldNotErrorOnNameFilterWhenGloballySkipped
+    context:
+      command: che run-scripts nonExistingScript
+      env: {CHE_SKIP_OPS: run-scripts, CHE_DEBUG: "1"}
+    expected:
+      stdOut:
+        - 'run-scripts(runProfile, skippedDue[config.skipOps]): cli/macos'
+    notExpected:
+      stdOut:
+        - 'run-scripts: '
 # [<] 🤖

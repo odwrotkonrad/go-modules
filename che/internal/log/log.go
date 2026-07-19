@@ -1,4 +1,4 @@
-// Package log prints che's op log lines, dry-run mode folded into subtypes.
+// Package log prints che's op log lines.
 package log
 
 // [>] 🤖🤖
@@ -17,27 +17,6 @@ var boldC = func() *color.Color {
 	return c
 }()
 
-// DryRun is the dry-run mode folded into a log subtype, label words matching
-// the --dry-run flag.
-type DryRun int
-
-const (
-	Off DryRun = iota
-	Delta
-	All
-)
-
-func (d DryRun) subtype() string {
-	switch d {
-	case Delta:
-		return "dry-run=delta"
-	case All:
-		return "dry-run=all"
-	default:
-		return ""
-	}
-}
-
 var debugOn bool
 
 // SetDebug flips the package-level debug gate (--debug / CHE_DEBUG).
@@ -51,45 +30,39 @@ var sink func(title, msg, level string)
 // registers; stdout output is unchanged either way.
 func SetSink(fn func(title, msg, level string)) { sink = fn }
 
-// Debug: Msg, gated by SetDebug. Always mirrored to the sink (level "debug"),
+// Debug: Msg, gated by SetDebug, the printed line prefixed with "debug "
+// (info lines carry no prefix). Always mirrored to the sink (level "debug"),
 // even when the stdout gate is off.
-func Debug(title, msg string, dr DryRun) {
+func Debug(title, msg string) {
 	if sink != nil {
 		sink(title, msg, "debug")
 	}
 	if !debugOn {
 		return
 	}
-	print(title, msg, dr, "")
+	fmt.Printf("debug %s: %s\n", formatTitle(title, ""), msg)
 }
 
-// Msg prints '<title>: <msg>', matching zsh fn-log-msg.
-// Title formats as type(subtype): type bold, "(subtype)" plain, the dry-run
-// mode comma-joined onto any existing subtype.
-func Msg(title, msg string, dr DryRun) { MsgSub(title, msg, dr, "") }
+// Msg prints '<title>: <msg>', title formatted as type(subtype): type bold,
+// "(subtype)" plain.
+func Msg(title, msg string) { MsgSub(title, msg, "") }
 
 // MsgSub: Msg with an extra trailing subtype word (e.g. "profile=<name>"),
 // comma-joined last.
-func MsgSub(title, msg string, dr DryRun, sub string) {
+func MsgSub(title, msg, sub string) {
 	if sink != nil {
 		sink(title, msg, "info")
 	}
-	print(title, msg, dr, sub)
+	fmt.Printf("%s: %s\n", formatTitle(title, sub), msg)
 }
 
-// print writes the formatted line to stdout (the sink mirror is the caller's).
-func print(title, msg string, dr DryRun, sub string) {
-	fmt.Printf("%s: %s\n", formatTitle(title, dr, sub), msg)
-}
-
-func formatTitle(title string, dr DryRun, sub string) string {
+// formatTitle renders type(subtype); the dry-run mode is never folded in: dry
+// run announces once at output start instead (spec/che/LogBehavior.md).
+func formatTitle(title, sub string) string {
 	t, subt, _ := strings.Cut(strings.TrimSuffix(title, ")"), "(")
 	var subts []string
 	if subt != "" {
 		subts = append(subts, subt)
-	}
-	if s := dr.subtype(); s != "" {
-		subts = append(subts, s)
 	}
 	if sub != "" {
 		subts = append(subts, sub)

@@ -1,14 +1,15 @@
 # [>] 🤖
 context:
-  command: che discover
+  command: che prune-broken-links
   pwd: testdata/fixture/commands/common/sample-tree
   mockedInterfaces:
     execx.CmdExecutor: testutil.CmdMockExecutor
     fsutil.FileSystemWriter: testutil.FileSystemMockWriter
     fsutil.FileSystemReader: testutil.FileSystemMockReader
 cases:
-  - name: ShouldPrintOnlyTheResolvedProfile
-    expected:
-      stdOut: |
-        cli/macos
+  - name: ShouldRemoveNothingOnFreshTree
+    notExpected:
+      stdOut:
+        - 'rm: '
+        - 'prune-link'
 # [<] 🤖

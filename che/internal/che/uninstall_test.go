@@ -118,7 +118,7 @@ func TestUninstallDryRunWritesNothing(t *testing.T) {
 		return os.WriteFile(dest, []byte("x"), 0o644)
 	}))
 	u := uninstallerOver(t, p)
-	u.dryun = true
+	u.dryRun = true
 	u.p.opts = options.Options{DryRun: options.DryRun.Delta}
 
 	require.NoError(t, u.Uninstall())

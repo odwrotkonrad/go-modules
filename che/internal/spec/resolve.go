@@ -39,34 +39,42 @@ func isGlobMatch(glob, rel string) bool {
 	return fsutil.IsGlobMatch(strings.TrimSuffix(glob, "/"), rel)
 }
 
-// ErrNoneEligible: no autoDiscover recipe passed its execIf. The root spec
+// ErrNoneEligible: no autoDiscover recipe passed its runIf. The root spec
 // treats it fatal, composed specs skip.
 var ErrNoneEligible = errors.New("no eligible profile")
 
-// EligibleRecipes lists the recipes to MakeProfile, in declaration order:
+// Rejection is one runIf-rejected candidate: its ref and the condition that
+// rejected it.
+type Rejection struct {
+	Ref  string
+	Cond string
+}
+
+// EligibleRecipes lists the recipes to MakeProfile, in declaration order,
+// plus the rejected candidates (runIf failed):
 //  1. forced (--profiles by name): only those recipes, autoDiscover skipped,
-//     execIf still enforced (forceAll = --skip-exec-if lifts it).
-//  2. else every autoDiscover recipe whose execIf expressions ALL pass
-//     (forceAll makes every execIf pass, it does not lift autoDiscover).
+//     runIf still enforced (forceAll = --skip-run-if lifts it).
+//  2. else every autoDiscover recipe whose runIf expressions ALL pass
+//     (forceAll makes every runIf pass, it does not lift autoDiscover).
 //  3. zero eligible: ErrNoneEligible.
-func EligibleRecipes(recipes []ProfileRecipe, forced []string, forceAll bool, eval func(expr string) (bool, error)) ([]string, error) {
+func EligibleRecipes(recipes []ProfileRecipe, forced []string, forceAll bool, eval func(expr string) (bool, error)) (eligible []string, rejected []Rejection, err error) {
 	if len(forced) > 0 {
 		out := make([]string, 0, len(forced))
 		for _, name := range forced {
 			ps, ok := findRecipe(recipes, name)
 			if !ok {
-				return nil, undefinedProfile(recipes, fmt.Sprintf("--profiles %q", name))
+				return nil, nil, undefinedProfile(recipes, fmt.Sprintf("--profiles %q", name))
 			}
-			pass, err := AllPass(name, ps.Options.ExecIf, forceAll, eval)
+			pass, _, err := AllPass(name, ps.Options.RunIf, forceAll, eval)
 			if err != nil {
-				return nil, err
+				return nil, nil, err
 			}
 			if !pass {
-				return nil, fmt.Errorf("--profiles %q failed its execIf predicates (pass --skip-exec-if to run it regardless)", name)
+				return nil, nil, fmt.Errorf("--profiles %q failed its runIf predicates (pass --skip-run-if to run it regardless)", name)
 			}
 			out = append(out, name)
 		}
-		return out, nil
+		return out, nil, nil
 	}
 	var out []string
 	for _, ps := range recipes {
@@ -74,20 +82,22 @@ func EligibleRecipes(recipes []ProfileRecipe, forced []string, forceAll bool, ev
 			continue
 		}
 		name := ps.Source.GetProfileName()
-		ok, err := AllPass(name, ps.Options.ExecIf, forceAll, eval)
+		ok, failed, err := AllPass(name, ps.Options.RunIf, forceAll, eval)
 		if err != nil {
-			return nil, err
+			return nil, nil, err
 		}
 		if ok {
 			out = append(out, name)
+		} else {
+			rejected = append(rejected, Rejection{Ref: name, Cond: failed})
 		}
 	}
 	if len(out) == 0 {
-		return nil, fmt.Errorf("%w: no autoDiscover profile passed its execIf (candidates: %v; use --profiles or CHE_SKIP_EXEC_IF)",
+		return nil, rejected, fmt.Errorf("%w: no autoDiscover profile passed its runIf (candidates: %v; use --profiles or CHE_SKIP_RUN_IF)",
 			ErrNoneEligible,
 			names(recipes, func(ps ProfileRecipe) bool { return ps.Options.AutoDiscover != nil && *ps.Options.AutoDiscover }))
 	}
-	return out, nil
+	return out, rejected, nil
 }
 
 // FindRecipe returns the named ProfileRecipe, erroring with the defined set
@@ -116,23 +126,25 @@ func undefinedProfile(recipes []ProfileRecipe, ref string) error {
 	return fmt.Errorf("%s is not defined in che.yml (defined: %v)", ref, names(recipes, func(ProfileRecipe) bool { return true }))
 }
 
-// AllPass logs each pass and reject at debug level only.
-func AllPass(name string, exprs []string, forceAll bool, eval func(expr string) (bool, error)) (bool, error) {
+// AllPass logs each condition evaluation at debug level only, under the
+// discover scope (spec/che/LogBehavior.md). failed names the first rejecting
+// expression ("" when all pass).
+func AllPass(name string, exprs []string, forceAll bool, eval func(expr string) (bool, error)) (pass bool, failed string, err error) {
 	if forceAll {
-		return true, nil
+		return true, "", nil
 	}
 	for _, expr := range exprs {
 		ok, err := eval(expr)
 		if err != nil {
-			return false, fmt.Errorf("profile %q execIf %q: %w", name, expr, err)
+			return false, expr, fmt.Errorf("profile %q runIf %q: %w", name, expr, err)
 		}
 		if !ok {
-			log.Debug("execIf(reject)", fmt.Sprintf("profile %s: %s", name, expr), log.Off)
-			return false, nil
+			log.Debug("discover-profiles(evaluating["+name+"], noPass)", expr)
+			return false, expr, nil
 		}
-		log.Debug("execIf(pass)", fmt.Sprintf("profile %s: %s", name, expr), log.Off)
+		log.Debug("discover-profiles(evaluating["+name+"], pass)", expr)
 	}
-	return true, nil
+	return true, "", nil
 }
 
 func names(recipes []ProfileRecipe, keep func(ProfileRecipe) bool) []string {
@@ -535,8 +547,8 @@ func (o ProfileOptions) Over(spec Options) ProfileOptions {
 	if o.Debug == nil {
 		o.Debug = spec.Debug
 	}
-	if o.WorkingDirectory == "" {
-		o.WorkingDirectory = spec.WorkingDirectory
+	if o.ProfileWorkingDirectory == "" {
+		o.ProfileWorkingDirectory = spec.ProfileWorkingDirectory
 	}
 	return o
 }
@@ -544,8 +556,8 @@ func (o ProfileOptions) Over(spec Options) ProfileOptions {
 // OverRef applies an include.profiles entry's option overrides onto the
 // referenced profile's own options (entry-set fields win, most nested wins).
 func (o ProfileOptions) OverRef(entry ProfileOptions) ProfileOptions {
-	if entry.ExecIf != nil {
-		o.ExecIf = entry.ExecIf
+	if entry.RunIf != nil {
+		o.RunIf = entry.RunIf
 	}
 	if entry.AutoDiscover != nil {
 		o.AutoDiscover = entry.AutoDiscover
@@ -553,8 +565,8 @@ func (o ProfileOptions) OverRef(entry ProfileOptions) ProfileOptions {
 	if entry.Debug != nil {
 		o.Debug = entry.Debug
 	}
-	if entry.WorkingDirectory != "" {
-		o.WorkingDirectory = entry.WorkingDirectory
+	if entry.ProfileWorkingDirectory != "" {
+		o.ProfileWorkingDirectory = entry.ProfileWorkingDirectory
 	}
 	return o
 }

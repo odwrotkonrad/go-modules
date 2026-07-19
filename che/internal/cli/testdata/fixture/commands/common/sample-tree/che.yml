@@ -1,4 +1,4 @@
-options: {workingDirectory: root}
+options: {profileWorkingDirectory: root}
 base:
   include:
     makeLinks:
@@ -23,12 +23,12 @@ base:
       - install/setup
 
 cli/macos:
-  options: {autoDiscover: true, execIf: ['builtin:isOs == macos', 'builtin:isVirt']}
+  options: {autoDiscover: true, runIf: ['builtin:isOs == macos', 'builtin:isVirt']}
   include:
     profiles: [base]
 
 desktop/macos:
-  options: {autoDiscover: true, execIf: ['builtin:isOs == macos', 'builtin:isVirt == false']}
+  options: {autoDiscover: true, runIf: ['builtin:isOs == macos', 'builtin:isVirt == false']}
   include:
     profiles: [base]
 

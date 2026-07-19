@@ -11,6 +11,7 @@
 - `conventions/templates/convention.md`: generating repo docs with che templates: `templates/1-env|2-data|3-audience`, `che.yml` wiring, `make render-templates`.
 - `conventions/ci/convention.md`: lefthook pre-commit hooks (minimal: docs generation check), re-run in a minimal CI validate job.
 - `conventions/license/convention.md`: every public repo carries `LICENSE` (unmodified MIT, creation-year copyright).
+- `conventions/spec-scenarios/convention.md`: behavior specs as markdown feature files: Gherkin-style scenarios, each with a `Status:` line (`todo | implemented | tested`), statuses kept accurate.
 - `conventions/claude-agents/convention.md`: per-repo `RO-<Repo>`/`RW-<Repo>` claude agents, che-rendered into `.claude/` on virt only: shared snippets in `configs`, fetched as remote renderTemplates sources (`@<repo>//<path>` + `ctx`), rendered outputs never committed.
 
 Each convention dir carries a runnable `example/`. This repo itself follows all of these conventions.

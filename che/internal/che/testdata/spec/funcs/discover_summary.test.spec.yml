@@ -1,0 +1,34 @@
+# [>] 🤖🤖
+context:
+  function: che.ProfileReady.discoverSummary
+cases:
+  - name: ShouldCountScriptsAlwaysAsDelta
+    expected:
+      output: {run-scripts: "delta=1,all=1"}
+  - name: ShouldCountRenderAsDeltaWithoutCache
+    expected:
+      output: {render-templates: "delta=1,all=1"}
+  - name: ShouldCountZeroPruneWithoutRecordedLinks
+    expected:
+      output: {prune-broken-links: "delta=0,all=0"}
+  - name: ShouldCountAllRecordedLinksAndBrokenAsDelta
+    input:
+      args: [healthyLink: true, brokenLink: true]
+    expected:
+      output: {prune-broken-links: "delta=1,all=2"}
+  - name: ShouldDropLinkDeltaForSettledLink
+    input:
+      args: [settleLink: true]
+    expected:
+      output: {make-links: "delta=1,all=2"}
+  - name: ShouldRedeltaRenderAfterTemplateChange
+    input:
+      args: [realRender: true, modifyTemplate: true]
+    expected:
+      output: {render-templates: "delta=1,all=1"}
+  - name: ShouldRefreshRenderCacheOnRealRender
+    input:
+      args: [realRender: true]
+    expected:
+      output: {render-templates: "delta=0,all=1"}
+# [<] 🤖🤖

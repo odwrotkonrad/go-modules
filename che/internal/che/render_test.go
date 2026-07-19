@@ -10,6 +10,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
+	"gitlab.com/konradodwrot/go-modules/che/internal/log"
 	"gitlab.com/konradodwrot/go-modules/che/internal/options"
 	"gitlab.com/konradodwrot/go-modules/che/internal/spec"
 	"gitlab.com/konradodwrot/go-modules/che/internal/testutil"
@@ -32,6 +33,7 @@ type renderWant struct {
 	NotContains map[string][]string `yaml:"notContains"`
 	Absent      []string            `yaml:"absent"`
 	Rerun       bool                `yaml:"rerun"`
+	RerunStdOut []string            `yaml:"rerunStdOut"`
 }
 
 // TestRenderTemplates: tree/dirs seed the fixture root, items decode straight
@@ -73,6 +75,8 @@ func TestRenderTemplates(t *testing.T) {
 			return testutil.CaptureStdout(t, func() error { return p.renderTemplates(items, skipSecrets) })
 		}
 
+		log.SetDebug(true)
+		t.Cleanup(func() { log.SetDebug(false) })
 		out, err := renderOnce()
 		c.Expected.Check(t, err)
 		stripped := testutil.StripANSI(out)
@@ -89,9 +93,12 @@ func TestRenderTemplates(t *testing.T) {
 		}
 		checkFiles()
 		if w.Rerun {
-			_, err := renderOnce()
+			out2, err := renderOnce()
 			require.NoError(t, err)
 			checkFiles()
+			for _, f := range w.RerunStdOut {
+				testyml.MustMatch(t, testutil.StripANSI(out2), testyml.Expand(f, vars))
+			}
 		}
 		for rel, frags := range w.Contains {
 			body := readDest(t, root, rel)

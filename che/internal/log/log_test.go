@@ -40,24 +40,20 @@ type msgWant struct {
 	Text    string `yaml:"text"`
 }
 
-var modes = map[string]DryRun{"off": Off, "delta": Delta, "all": All}
-
 func TestMsg(t *testing.T) {
 	testyml.Run(t, td, "testdata/spec/funcs/msg.test.spec.yml", func(t *testing.T, c testyml.Case[msgWant]) {
 		a := c.Input.Args
 		title, msg := a.String(t, 0), a.String(t, 1)
-		mode, ok := modes[a.String(t, 2)]
-		require.Truef(t, ok, "unknown mode %q", a.String(t, 2))
 		var out string
 		switch c.Context.Function {
 		case "log.Msg":
-			out = capture(t, func() { Msg(title, msg, mode) })
+			out = capture(t, func() { Msg(title, msg) })
 		case "log.MsgSub":
-			out = capture(t, func() { MsgSub(title, msg, mode, a.String(t, 3)) })
+			out = capture(t, func() { MsgSub(title, msg, a.String(t, 2)) })
 		case "log.Debug":
 			SetDebug(true)
 			t.Cleanup(func() { SetDebug(false) })
-			out = capture(t, func() { Debug(title, msg, mode) })
+			out = capture(t, func() { Debug(title, msg) })
 		default:
 			t.Fatalf("unknown function %q", c.Context.Function)
 		}
@@ -71,16 +67,14 @@ func TestMsg(t *testing.T) {
 func TestMsgRaw(t *testing.T) {
 	testyml.Run(t, td, "testdata/spec/funcs/msg_raw.test.spec.yml", func(t *testing.T, c testyml.Case[string]) {
 		a := c.Input.Args
-		mode, ok := modes[a.String(t, 2)]
-		require.Truef(t, ok, "unknown mode %q", a.String(t, 2))
 		var out string
 		switch c.Context.Function {
 		case "log.Msg":
-			out = capture(t, func() { Msg(a.String(t, 0), a.String(t, 1), mode) })
+			out = capture(t, func() { Msg(a.String(t, 0), a.String(t, 1)) })
 		case "log.Debug":
 			t.Cleanup(func() { SetDebug(false) })
 			SetDebug(false)
-			out = capture(t, func() { Debug(a.String(t, 0), a.String(t, 1), mode) })
+			out = capture(t, func() { Debug(a.String(t, 0), a.String(t, 1)) })
 		default:
 			t.Fatalf("unknown function %q", c.Context.Function)
 		}

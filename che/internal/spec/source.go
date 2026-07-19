@@ -36,11 +36,11 @@ func (r SourceRecipe) IsValid() error {
 // prepare resolves the source into its local directory (remote: clone/pull
 // the cache checkout; filesystem: expand ~/, $VAR, relative -> repoRoot;
 // "" local -> DirectoryPath or repoRoot) and locates its che.yml.
-func (r SourceRecipe) prepare(repoRoot, home, name string) (SourceReady, error) {
+func (r SourceRecipe) prepare(repoRoot, home string) (SourceReady, error) {
 	if err := r.IsValid(); err != nil {
 		return SourceReady{}, err
 	}
-	dir, err := r.resolveDir(repoRoot, home, name)
+	dir, err := r.resolveDir(repoRoot, home)
 	if err != nil {
 		return SourceReady{}, err
 	}
@@ -52,9 +52,9 @@ func (r SourceRecipe) prepare(repoRoot, home, name string) (SourceReady, error) 
 	return SourceReady{DefinitionURI: def, DirectoryPath: dir}, nil
 }
 
-func (r SourceRecipe) resolveDir(repoRoot, home, name string) (string, error) {
+func (r SourceRecipe) resolveDir(repoRoot, home string) (string, error) {
 	if r.GetSourceType() == SourceTypes.Remote {
-		return source.EnsureCheckout(home, RemoteSrcRef(r.URI), name)
+		return source.EnsureCheckout(home, RemoteSrcRef(r.URI))
 	}
 	if r.URI == "" {
 		if r.DirectoryPath != "" {
@@ -87,13 +87,13 @@ func expandDir(ref, repoRoot, home string) (string, error) {
 // PrepareSource resolves the spec source: isValid, then resolve into
 // DirectoryPath; the target must hold a valid che.yml.
 func (r SpecSourceRecipe) PrepareSource(repoRoot, home string) (SpecSourceReady, error) {
-	ready, err := r.prepare(repoRoot, home, "spec")
+	ready, err := r.prepare(repoRoot, home)
 	return SpecSourceReady{ready}, err
 }
 
 // PrepareSource resolves the containing spec of the referenced profile.
 func (r ProfileSourceRecipe) PrepareSource(repoRoot, home string) (ProfileSourceReady, error) {
-	ready, err := r.prepare(repoRoot, home, r.ProfileName)
+	ready, err := r.prepare(repoRoot, home)
 	return ProfileSourceReady{SourceReady: ready, ProfileName: r.ProfileName}, err
 }
 
@@ -110,6 +110,28 @@ func (r ProfileSourceRecipe) String() string {
 		return r.ProfileName
 	}
 	return r.URI + "/" + cmp.Or(r.SpecFile, "che.yml") + "::" + r.ProfileName
+}
+
+// DisplayRef is the profile's log display name: the bare name local, a remote
+// source rendered "remote:<reponame>:<name>" (repo = the git url's last path
+// segment, .git stripped), a filesystem source the canonical ref.
+func (r ProfileSourceRecipe) DisplayRef() string {
+	if r.URI == "" {
+		return r.ProfileName
+	}
+	if IsRemoteSrc(r.URI) {
+		return "remote:" + repoName(RemoteSrcRef(r.URI)) + ":" + r.ProfileName
+	}
+	return r.String()
+}
+
+// repoName derives a git url's repo name: the last path segment, .git stripped.
+func repoName(url string) string {
+	s := strings.TrimSuffix(strings.TrimSuffix(url, "/"), ".git")
+	if i := strings.LastIndexAny(s, "/:"); i >= 0 {
+		s = s[i+1:]
+	}
+	return s
 }
 
 // UnmarshalYAML decodes an include.profiles entry: a scalar is a local profile

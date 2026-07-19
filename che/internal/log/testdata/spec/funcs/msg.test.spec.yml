@@ -4,51 +4,42 @@ context:
 cases:
   - name: msgShouldSplitPlainTitleIntoTypeAndText
     input:
-      args: [title: ln, msg: /etc/zshrc, mode: off]
+      args: [title: ln, msg: /etc/zshrc]
     expected:
       output: {type: ln, subtype: "", text: /etc/zshrc}
   - name: msgShouldExtractParenthesizedSubtype
     input:
-      args: [title: render(skip-secrets), msg: /x, mode: off]
+      args: [title: render-templates(skip-secrets), msg: /x]
     expected:
-      output: {type: render, subtype: (skip-secrets), text: /x}
-  - name: msgShouldAppendDryRunDeltaSubtype
-    input:
-      args: [title: cp, msg: /x, mode: delta]
-    expected:
-      output: {type: cp, subtype: (dry-run=delta), text: /x}
-  - name: msgShouldAppendDryRunAllSubtype
-    input:
-      args: [title: cp, msg: /x, mode: all]
-    expected:
-      output: {type: cp, subtype: (dry-run=all), text: /x}
-  - name: msgShouldCombineTitleSubtypeWithDryRun
-    input:
-      args: [title: render(skip-secrets), msg: /x, mode: delta]
-    expected:
-      output: {type: render, subtype: "(skip-secrets,dry-run=delta)", text: /x}
-  - name: msgSubShouldAppendSubAfterDryRun
+      output: {type: render-templates, subtype: (skip-secrets), text: /x}
+  - name: msgSubShouldAppendSub
     context: {function: log.MsgSub}
     input:
-      args: [title: run-scripts, msg: /x, mode: all, sub: profile=gitlabGroup]
+      args: [title: run-scripts, msg: /x, sub: profile=gitlabGroup]
     expected:
-      output: {type: run-scripts, subtype: "(dry-run=all,profile=gitlabGroup)", text: /x}
+      output: {type: run-scripts, subtype: "(profile=gitlabGroup)", text: /x}
   - name: msgSubShouldAppendSubAfterTitleSubtype
     context: {function: log.MsgSub}
     input:
-      args: [title: make-dirs(create), msg: /x, mode: off, sub: profile=p]
+      args: [title: make-dirs(create), msg: /x, sub: profile=p]
     expected:
       output: {type: make-dirs, subtype: "(create,profile=p)", text: /x}
   - name: msgSubShouldIgnoreEmptySub
     context: {function: log.MsgSub}
     input:
-      args: [title: ln, msg: /x, mode: off, sub: ""]
+      args: [title: ln, msg: /x, sub: ""]
     expected:
       output: {type: ln, subtype: "", text: /x}
-  - name: debugShouldPrintLikeMsg
+  - name: debugShouldPrefixLineWithDebugWord
     context: {function: log.Debug}
     input:
-      args: [title: profile(p), msg: run x, mode: off]
+      args: [title: profile(p), msg: run x]
     expected:
-      output: {type: profile, subtype: (p), text: run x}
+      output: {type: debug profile, subtype: (p), text: run x}
+  - name: debugShouldPrefixBareTitleLine
+    context: {function: log.Debug}
+    input:
+      args: [title: ledger, msg: run x]
+    expected:
+      output: {type: debug ledger, subtype: "", text: run x}
 # [<] 🤖🤖

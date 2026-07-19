@@ -26,24 +26,40 @@ type ValidateSpecMode string
 // ValidateSpec namespaces the ValidateSpecMode values.
 var ValidateSpec = struct{ Warn, Error ValidateSpecMode }{"warn", "error"}
 
+// OpNames lists every op name in run order: the canonical set skip-ops
+// values validate against (cobra subcommand wiring lives in cli.ops).
+var OpNames = []string{"prune-broken-links", "make-dirs", "make-links", "make-copies", "render-templates", "run-scripts"}
+
 // Options carries every runtime option.
 type Options struct {
-	Dir              string
-	WorkingDirectory string
-	DryRun           DryRunMode
-	ValidateSpec     ValidateSpecMode
+	// CheWorkingDirectory is -C: chdir here before resolving the repo.
+	CheWorkingDirectory string
+	// ProfileWorkingDirectory is the che-level default load-ops source tree
+	// (spec/profile options.profileWorkingDirectory override it).
+	ProfileWorkingDirectory string
+	DryRun                  DryRunMode
+	ValidateSpec            ValidateSpecMode
 	// ValidateSpecCLI is the flag/env/user-config validateSpec ("" if none set),
 	// overriding each spec's own options.validateSpec per-spec.
-	ValidateSpecCLI   ValidateSpecMode
-	Profiles          []string
-	SkipExecIf        bool
+	ValidateSpecCLI ValidateSpecMode
+	Profiles        []string
+	// SkipOps skips ops everywhere: dropped from the all sequence, direct op
+	// subcommands become logged no-ops.
+	SkipOps []string
+	// RunSkipOps skips ops in the run sequence only.
+	RunSkipOps        []string
+	SkipRunIf         bool
 	SkipRemoteRefs    bool
 	Debug             bool
 	RenderSkipSecrets bool
-	// AutoDiscover is the user-config global default for profiles that set
-	// neither profile nor spec autoDiscover (nil: unset).
-	AutoDiscover *bool
+	// AutoDiscover is the auto-discovery master switch (default true): whether
+	// profiles marked autoDiscover run on bare che; false leaves only
+	// --profiles and include.profiles refs.
+	AutoDiscover bool
 	Otel         Otel
+	// Settings is the resolution report: every option's final value and the
+	// layer that decided it, in Resolve order (the config log renders it).
+	Settings []Setting
 }
 
 // Otel is the resolved OTLP telemetry config: the finalized runtime shape the

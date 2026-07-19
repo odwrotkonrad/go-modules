@@ -1,0 +1,163 @@
+# [>] 🤖
+context:
+  command: che run
+  mockedInterfaces:
+    execx.CmdExecutor: testutil.CmdMockExecutor
+    fsutil.FileSystemWriter: testutil.FileSystemMockWriter
+    fsutil.FileSystemReader: testutil.FileSystemMockReader
+cases:
+  - name: ShouldRunEveryOpSelectedInSpec
+    context:
+      pwd: testdata/fixture/commands/common/sample-tree
+    expected:
+      stdOut: |
+        discover-profiles(match): cli/macos: profileWorkingDirectory: {{/[^,]*/}}, ops: [{{/.*/}}]
+        run(runProfile): cli/macos: [{{/.*/}}]
+        run(runOp, skippedDue[NoDelta]): backup
+        backup(showDelta): {{/.*/}}
+        run(runOp, skippedDue[NoDelta]): prune-broken-links
+        run(runOp): make-dirs
+        make-dirs(created): ${HOME}/.config
+        make-dirs(created): ${HOME}/.config/bar
+        make-dirs(created): ${HOME}/.config/zsh
+        make-dirs(created): /Library
+        make-dirs(created): /Library/LaunchDaemons
+        make-dirs(created): /etc
+        make-dirs(created): ${HOME}/.cache/zsh
+        make-dirs(created): /var/log/che-test-setgid
+        make-dirs(chmod): 2775 /var/log/che-test-setgid
+        run(runOp): make-links
+        make-dirs(created): ${HOME}/.config
+        make-dirs(created): ${HOME}/.config/bar
+        make-dirs(created): ${HOME}/.config/zsh
+        make-dirs(created): /Library
+        make-dirs(created): /Library/LaunchDaemons
+        make-dirs(created): /etc
+        make-links(created): ${HOME}/.config/bar/a
+        make-links(created): ${HOME}/.config/zsh/.zshrc
+        make-links(created): /etc/zshrc
+        run(runOp): make-copies
+        make-dirs(created): ${HOME}/.config
+        make-dirs(created): ${HOME}/.config/bar
+        make-dirs(created): ${HOME}/.config/zsh
+        make-dirs(created): /Library
+        make-dirs(created): /Library/LaunchDaemons
+        make-dirs(created): /etc
+        make-copies(created): /Library/LaunchDaemons/otelcol.plist
+        make-copies(chown): root:wheel /Library/LaunchDaemons/otelcol.plist
+        make-copies(created): ${HOME}/.config/zsh/c
+        run(runOp): render-templates
+        render-templates(created): ${HOME}/.config/zsh/t
+        run(runOp): run-scripts
+        run-scripts: ${REPO}/install/setup
+        run-scripts(report): ok ${REPO}/install/setup
+  - name: ShouldSkipOpsWithoutSelection
+    context:
+      pwd: testdata/fixture/commands/all/sample-tree-only-links
+    expected:
+      stdOut: |
+        run(runProfile): cli/macos: [{{/.*/}}]
+        run(runOp, skippedDue[NoDelta]): backup
+        backup(showDelta): {{/.*/}}
+        run(runOp, skippedDue[NoDelta]): prune-broken-links
+        run(runOp): make-dirs
+        make-dirs(created): ${HOME}/.config
+        make-dirs(created): ${HOME}/.config/bar
+        run(runOp): make-links
+        make-dirs(created): ${HOME}/.config
+        make-dirs(created): ${HOME}/.config/bar
+        make-links(created): ${HOME}/.config/bar/a
+    notExpected:
+      stdOut:
+        - 'run(runOp): make-copies'
+        - 'run(runOp): render-templates'
+        - 'run(runOp): run-scripts'
+        - 'run(runOp): services'
+        - cp(create
+        - render(create
+        - bootout
+  - name: ShouldSkipOpsListedInAllSkipOpsEnv
+    context:
+      pwd: testdata/fixture/commands/common/sample-tree
+      env: {CHE_RUN_SKIP_OPS: run-scripts, CHE_DEBUG: "1"}
+    expected:
+      stdOut:
+        - 'run(runOp, skippedDue[config.run.skipOps]): run-scripts'
+    notExpected:
+      stdOut:
+        - 'run(runOp): run-scripts'
+        - 'run-scripts: '
+  - name: ShouldSkipOpsListedInSkipOpsEnv
+    context:
+      pwd: testdata/fixture/commands/common/sample-tree
+      env: {CHE_SKIP_OPS: "run-scripts,make-copies", CHE_DEBUG: "1"}
+    expected:
+      stdOut:
+        - 'run(runOp, skippedDue[config.skipOps]): make-copies'
+        - 'run(runOp): render-templates'
+    notExpected:
+      stdOut:
+        - 'run(runOp): run-scripts'
+        - 'run(runOp): make-copies'
+        - 'make-copies(delta='
+        - 'run-scripts(delta='
+        - cp(create
+  - name: ShouldLogDiscoverySummaryBeforeExecution
+    context:
+      pwd: testdata/fixture/commands/all/sample-tree-only-links
+    expected:
+      stdOutCounts:
+        'discover-profiles(match): ': 1
+      stdOut: |
+        discover-profiles(match): cli/macos: profileWorkingDirectory: {{/[^,]*/}}, ops: [{{/.*/}}make-links(delta=1,all=1)]
+        run(runProfile): cli/macos: [{{/.*/}}make-links(1)]
+  - name: ShouldLogDiscoveryOnceWithDebug
+    context:
+      pwd: testdata/fixture/commands/all/sample-tree-only-links
+      env: {CHE_DEBUG: "1"}
+    expected:
+      stdOutCounts:
+        'discover-profiles(match): ': 1
+      stdOut: |
+        discover-profiles(match): cli/macos: profileWorkingDirectory: {{/[^,]*/}}, ops: [{{/.*/}}make-links(delta=1,all=1)]
+  - name: ShouldAnnounceZeroDeltaOpsAsSkipped
+    context:
+      pwd: testdata/fixture/commands/all/sample-tree-only-links
+    expected:
+      stdOut:
+        - |
+          run(runOp, skippedDue[NoDelta]): backup
+          backup(showDelta): {{/.*/}}
+          run(runOp, skippedDue[NoDelta]): prune-broken-links
+        - 'run(runOp): make-links'
+    notExpected:
+      stdOut:
+        - 'run(runOp): prune-broken-links'
+  - name: ShouldExecuteProfilesSequentiallyInDiscoveryOrder
+    context:
+      command: che run --profile cli/macos,ontoRepo
+      pwd: testdata/fixture/commands/common/sample-tree
+    expected:
+      stdOutCounts:
+        'run(runProfile): ': 2
+      stdOut: |
+        discover-profiles(match): cli/macos: profileWorkingDirectory: {{/[^,]*/}}, ops: [{{/.*/}}]
+        discover-profiles(match): ontoRepo: profileWorkingDirectory: {{/[^,]*/}}, ops: [render-templates(delta=1,all=1)]
+        run(runProfile): cli/macos: [{{/.*/}}]
+  - name: ShouldRunSecondProfileOpsAfterFirstProfileFinished
+    context:
+      command: che run --profile cli/macos,ontoRepo
+      pwd: testdata/fixture/commands/common/sample-tree
+    expected:
+      stdOut: |
+        run-scripts(report): ok ${REPO}/install/setup
+        run(runProfile): ontoRepo: [render-templates(1)]
+        run(runOp, skippedDue[NoDelta]): backup
+        backup(showDelta): render-templates(1)
+        run(runOp, skippedDue[NoDef]): prune-broken-links
+        run(runOp, skippedDue[NoDef]): make-dirs
+        run(runOp, skippedDue[NoDef]): make-links
+        run(runOp, skippedDue[NoDef]): make-copies
+        run(runOp): render-templates
+        render-templates(created): ${REPO}/docs/r.md
+# [<] 🤖

@@ -11,12 +11,12 @@ cases:
     input:
       args: [spec: che, os: linux, virt: true]
     expected:
-      errorOutput: ['no eligible profile: no autoDiscover profile passed its execIf']
+      errorOutput: ['no eligible profile: no autoDiscover profile passed its runIf']
   - name: ShouldStillEnforceExecIfWhenForcingOneProfile
     input:
       args: [spec: che, os: linux, virt: true, forced: [desktop/macos]]
     expected:
-      errorOutput: ['--profiles "desktop/macos" failed its execIf predicates']
+      errorOutput: ['--profiles "desktop/macos" failed its runIf predicates']
   - name: ShouldLiftExecIfWhenForcingOneWithForceAll
     input:
       args: [spec: che, os: linux, virt: true, forced: [desktop/macos], forceAll: true]

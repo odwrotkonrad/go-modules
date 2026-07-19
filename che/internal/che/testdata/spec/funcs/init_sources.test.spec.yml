@@ -1,0 +1,79 @@
+# [>] 🤖🤖
+context:
+  function: che.InitSources
+cases:
+  - name: ShouldCloneRemoteRefSpecSources
+    input:
+      args:
+        - refFiles:
+            che.yml: |
+              gitlabGroup:
+                include:
+                  runScripts: [scripts/bootstrap.zsh]
+            scripts/bootstrap.zsh: "#!/bin/zsh\n"
+        - hostFiles:
+            che.yml: |
+              main:
+                options: {autoDiscover: true}
+                include:
+                  profiles:
+                    - source: "@file://${REF_DIR}/che.yml::gitlabGroup"
+        - flags: {prepareAfter: true}
+    expected:
+      stdOut:
+        - 'debug init-remote-sources(detectedRemoteInSpec): profile=gitlabGroup @file://${REF_DIR}/che.yml::gitlabGroup'
+        - 'init-remote-sources(cloneRemote): file://${REF_DIR}'
+  - name: ShouldFetchRefEvenWhenItsConditionFails
+    input:
+      args:
+        - refFiles:
+            che.yml: |
+              gitlabGroup:
+                options:
+                  runIf: ['env:REF_GATE']
+        - hostFiles:
+            che.yml: |
+              main:
+                options: {autoDiscover: true}
+                include:
+                  profiles:
+                    - source: "@file://${REF_DIR}/che.yml::gitlabGroup"
+    expected:
+      stdOut:
+        - 'init-remote-sources(cloneRemote): file://${REF_DIR}'
+    notExpected:
+      stdOut:
+        - 'conditionEvaluated'
+  - name: ShouldSkipRemoteRefsWithOptionSet
+    input:
+      args:
+        - refFiles:
+            che.yml: |
+              gitlabGroup: {}
+        - hostFiles:
+            che.yml: |
+              main:
+                options: {autoDiscover: true}
+                include:
+                  profiles:
+                    - source: "@file://${REF_DIR}/che.yml::gitlabGroup"
+        - flags: {skipRemoteRefs: true}
+    notExpected:
+      stdOut:
+        - 'cloneRemote'
+  - name: ShouldAbortOnUnreachableRemoteWithoutCache
+    input:
+      args:
+        - refFiles:
+            che.yml: |
+              gitlabGroup: {}
+        - hostFiles:
+            che.yml: |
+              main:
+                options: {autoDiscover: true}
+                include:
+                  profiles:
+                    - source: "@file:///nonexistent-che-src/che.yml::gitlabGroup"
+    expected:
+      errorOutput: 'init-remote-sources gitlabGroup: '
+# [<] 🤖🤖

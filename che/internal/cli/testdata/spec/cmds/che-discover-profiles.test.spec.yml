@@ -1,0 +1,21 @@
+# [>] 🤖
+context:
+  command: che discover-profiles
+  pwd: testdata/fixture/commands/common/sample-tree
+  mockedInterfaces:
+    execx.CmdExecutor: testutil.CmdMockExecutor
+    fsutil.FileSystemWriter: testutil.FileSystemMockWriter
+    fsutil.FileSystemReader: testutil.FileSystemMockReader
+cases:
+  - name: ShouldLogDiscoveredProfileWithOpCounts
+    expected:
+      stdOut: |
+        discover-profiles(match): cli/macos: profileWorkingDirectory: {{/[^,]*/}}, ops: [prune-broken-links(delta=0,all=0),make-dirs(delta=8,all=9),make-links(delta=3,all=3),make-copies(delta=2,all=2),render-templates(delta=1,all=1),run-scripts(delta=1,all=1)]
+  - name: ShouldLogEveryDiscoveredProfileInOrder
+    context:
+      command: che discover-profiles --profile cli/macos,ontoRepo
+    expected:
+      stdOut: |
+        discover-profiles(match): cli/macos: profileWorkingDirectory: {{/[^,]*/}}, ops: [{{/.*/}}run-scripts(delta=1,all=1)]
+        discover-profiles(match): ontoRepo: profileWorkingDirectory: {{/[^,]*/}}, ops: [render-templates(delta=1,all=1)]
+# [<] 🤖

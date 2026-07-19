@@ -8,21 +8,13 @@ import (
 )
 
 // IsDirSettled reports whether dest already exists as a dir and may be skipped.
-// forceAll (dry-run=all) forces every dest to report, so it never skips.
-func IsDirSettled(reader FileSystemReader, dest string, forceAll bool) bool {
-	if forceAll {
-		return false
-	}
+func IsDirSettled(reader FileSystemReader, dest string) bool {
 	fi, err := reader.StatPath(dest)
 	return err == nil && fi.IsDir()
 }
 
 // IsLinkSettled reports whether dest already resolves to src (skippable).
-// forceAll (dry-run=all) forces every dest to report, so it never skips.
-func IsLinkSettled(reader FileSystemReader, src, dest string, forceAll bool) bool {
-	if forceAll {
-		return false
-	}
+func IsLinkSettled(reader FileSystemReader, src, dest string) bool {
 	destResolved, err := reader.EvaluateSymlinks(dest)
 	if err != nil {
 		return false

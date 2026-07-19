@@ -50,9 +50,23 @@ func Exec(name string, body []byte, repoRoot string) ([]byte, error) {
 // becomes the template's root context (`.key`), fed to gomplate as a temp
 // JSON context datasource aliased `.`.
 func ExecWithCtx(name string, body []byte, repoRoot string, itemCtx map[string]string) ([]byte, error) {
+	return execWithCtx(name, body, repoRoot, itemCtx, nil)
+}
+
+// ExecWithCtxMockSecrets is ExecWithCtx with secret refs resolving to a
+// deterministic "mock:<ref>" placeholder, no backend touched: the render-delta
+// mock render (che discover counts).
+func ExecWithCtxMockSecrets(name string, body []byte, repoRoot string, itemCtx map[string]string) ([]byte, error) {
+	return execWithCtx(name, body, repoRoot, itemCtx, func(ref string) (string, error) { return "mock:" + ref, nil })
+}
+
+func execWithCtx(name string, body []byte, repoRoot string, itemCtx map[string]string, secret func(string) (string, error)) ([]byte, error) {
 	ctx := context.Background()
+	if secret == nil {
+		secret = secretFunc(ctx)
+	}
 	funcs := template.FuncMap{
-		"secret":               secretFunc(ctx),
+		"secret":               secret,
 		"renderDirsTree":       func() (string, error) { return DirsTree(repoRoot) },
 		"renderRepoGroupIndex": RepoGroupIndexDir,
 		"renderMakefileDoc":    MakefileDoc,
