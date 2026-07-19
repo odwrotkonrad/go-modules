@@ -62,10 +62,11 @@ for repo in local remote; do
   git -C $work/$repo -c user.email=e2e@invalid -c user.name=e2e commit -qm init
 done
 
-che() { $bin -C $work/local "$@" }
+che() { print -r -- "\$ che $*"; $bin -C $work/local "$@" }
 
 step "discover-profiles"
 out=$(che discover-profiles 2>&1)
+print -r -- $out
 assert_out discover '(match): plain:' $out
 assert_out discover '(match): conditional:' $out
 assert_out discover 'ops-remote' $out
@@ -73,11 +74,11 @@ assert_out discover 'noMatchDue[env:CHE_E2E_DROPPED]): dropped' $out
 assert_not_out discover '(match): dropped:' $out
 
 step "run --dry-run=all"
-che run --dry-run=all >/dev/null
+che run --dry-run=all
 assert_clean
 
 step "run"
-che run >/dev/null
+che run
 for ns in $NS; do
   assert_link $HOME/$ns/link.txt "*/root/$ns/link.txt"
   assert_content $HOME/$ns/copy "copy-$ns"
@@ -89,7 +90,7 @@ assert_link $HOME/plain/link.txt $work/local/root/plain/link.txt
 assert_absent $HOME/dropped
 
 step "uninstall --dry-run"
-che uninstall --dry-run >/dev/null
+che uninstall --dry-run
 for ns in $NS; do
   assert_file $HOME/$ns/copy
   assert_link $HOME/$ns/link.txt "*/root/$ns/link.txt"
@@ -97,64 +98,64 @@ done
 
 step "uninstall"
 for ns in $NS; do rm $HOME/$ns/script-marker; done
-che uninstall >/dev/null
+che uninstall
 assert_clean
 for ns in $NS; do assert_absent $HOME/$ns; done
 
 step "make-dirs cycle"
-che make-dirs --dry-run=all >/dev/null
+che make-dirs --dry-run=all
 assert_ns_absent
-che make-dirs >/dev/null
+che make-dirs
 for ns in $NS; do assert_dir $HOME/$ns/made-dir; done
-che uninstall >/dev/null
+che uninstall
 assert_ns_absent
 
 step "make-links cycle"
-che make-links --dry-run=all >/dev/null
+che make-links --dry-run=all
 assert_ns_absent
-che make-links >/dev/null
+che make-links
 for ns in $NS; do assert_link $HOME/$ns/link.txt "*/root/$ns/link.txt"; done
-che uninstall >/dev/null
+che uninstall
 assert_ns_absent
 
 step "make-copies cycle"
-che make-copies --dry-run=all >/dev/null
+che make-copies --dry-run=all
 assert_ns_absent
-che make-copies >/dev/null
+che make-copies
 for ns in $NS; do assert_content $HOME/$ns/copy "copy-$ns"; done
-che uninstall >/dev/null
+che uninstall
 assert_ns_absent
 
 step "render-templates cycle"
-che render-templates --dry-run=all >/dev/null
+che render-templates --dry-run=all
 assert_ns_absent
-che make-dirs >/dev/null
-che render-templates >/dev/null
+che make-dirs
+che render-templates
 for ns in $NS; do assert_content $HOME/$ns/tpl "RENDERED-${(U)ns}"; done
-che uninstall >/dev/null
+che uninstall
 assert_ns_absent
 
 step "run-scripts cycle"
-che run-scripts --dry-run=all >/dev/null
+che run-scripts --dry-run=all
 for ns in $NS; do assert_absent $HOME/$ns/script-marker; done
-che run-scripts >/dev/null
+che run-scripts
 for ns in $NS; do assert_content $HOME/$ns/script-marker "marker-$ns"; done
-che uninstall >/dev/null
+che uninstall
 for ns in $NS; do rm $HOME/$ns/script-marker; rmdir $HOME/$ns 2>/dev/null || true; done
 assert_clean
 
 step "prune-broken-links cycle"
-che make-links >/dev/null
+che make-links
 for ns in $NS; do assert_link $HOME/$ns/link.txt "*/root/$ns/link.txt"; done
 rm $work/local/root/plain/link.txt
-che prune-broken-links --dry-run=all >/dev/null
+che prune-broken-links --dry-run=all
 [[ -L $HOME/plain/link.txt ]] || fail "dry-run pruned $HOME/plain/link.txt"
-che prune-broken-links >/dev/null
+che prune-broken-links
 assert_absent $HOME/plain/link.txt
 assert_link $HOME/conditional/link.txt "*/root/conditional/link.txt"
 assert_link $HOME/remote/link.txt "*/root/remote/link.txt"
 git -C $work/local checkout -q -- root/plain/link.txt
-che uninstall >/dev/null
+che uninstall
 assert_ns_absent
 
 step "PASS"
