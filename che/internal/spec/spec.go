@@ -4,7 +4,6 @@ package spec
 // [>] 🤖🤖
 
 import (
-	"cmp"
 	"fmt"
 	"os"
 	"slices"
@@ -36,13 +35,6 @@ const RemoteSrcPrefix = "@"
 
 // IsRemoteSrc reports whether source is a remote template source.
 func IsRemoteSrc(source string) bool { return strings.HasPrefix(source, RemoteSrcPrefix) }
-
-// PWD is Options' effective profileWorkingDirectory: the canonical key, the
-// deprecated workingDirectory alias as fallback.
-func (o Options) PWD() string { return cmp.Or(o.ProfileWorkingDirectory, o.WorkingDirectory) }
-
-// PWD is ProfileOptions' effective profileWorkingDirectory (alias folded).
-func (o ProfileOptions) PWD() string { return cmp.Or(o.ProfileWorkingDirectory, o.WorkingDirectory) }
 
 // IncludedProfileRefs lists every include.profiles entry the recipe composes,
 // by display name (local bare names, sourced refs remote:<repo>:<name>).

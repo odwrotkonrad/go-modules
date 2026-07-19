@@ -457,7 +457,7 @@ cases:
                 options: {autoDiscover: true}
             sub/che.yml: |
               options:
-                workingDirectory: tree
+                profileWorkingDirectory: tree
               s:
                 options: {autoDiscover: true}
                 include:
@@ -475,7 +475,7 @@ cases:
         - refFiles:
             che.yml: |
               gitlabGroup:
-                options: {workingDirectory: default-tree}
+                options: {profileWorkingDirectory: default-tree}
                 include:
                   makeLinks: [{source: _home/**, dest: 's:^_home:$HOME:'}]
             default-tree/_home/.config/def: def
@@ -487,7 +487,7 @@ cases:
                 include:
                   profiles:
                     - source: "@file://${REF_DIR}/che.yml::gitlabGroup"
-                      options: {workingDirectory: override-tree}
+                      options: {profileWorkingDirectory: override-tree}
         - flags: {}
     expected:
       output:

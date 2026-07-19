@@ -24,9 +24,9 @@ func TestResolveBoolOr(t *testing.T) {
 		envVal := c.Context.Env["CHE_BOOL"]
 		switch c.Context.Function {
 		case "options.boolOr":
-			return o.resolveBool("k", false, envVal, boolLayer{user, "config-file"}, boolLayer{spec, "specFile"}), nil
+			return o.resolveBool("k", false, envVal, false, boolLayer{user, "config-file"}, boolLayer{spec, "specFile"}), nil
 		case "options.boolDefaultTrue":
-			return o.resolveBoolDefaultTrue("k", envVal, boolLayer{user, "config-file"}, boolLayer{spec, "specFile"}), nil
+			return o.resolveBool("k", false, envVal, true, boolLayer{user, "config-file"}, boolLayer{spec, "specFile"}), nil
 		default:
 			t.Fatalf("unknown function %q", c.Context.Function)
 			return false, nil

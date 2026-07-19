@@ -37,6 +37,7 @@ func repoEnv(t *testing.T, pwd string) (*app, *cobra.Command, string) {
 	t.Setenv("HOME", home)
 	t.Setenv("XDG_STATE_HOME", filepath.Join(home, ".local/state"))
 	t.Setenv("XDG_CACHE_HOME", filepath.Join(home, ".cache"))
+	t.Setenv("XDG_CONFIG_HOME", filepath.Join(home, ".config"))
 	return a, root, home
 }
 

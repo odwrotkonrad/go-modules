@@ -149,9 +149,9 @@ func humanSize(n int64) string {
 // like the other wrapped ops (skippedDue[NoDelta] when nothing needs backing up).
 func (p *ProfileReady) ExecBackupStage() error {
 	if p.existingBackupDests() == 0 {
-		log.Msg(skipTitle("run", "runOp", "NoDelta"), "backup", log.Off)
+		log.Msg(skipTitle("run", "runOp", "NoDelta"), "backup")
 	} else {
-		log.Msg("run(runOp)", "backup", log.Off)
+		log.Msg("run(runOp)", "backup")
 	}
 	return p.ExecBackup()
 }

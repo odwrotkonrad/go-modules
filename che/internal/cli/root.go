@@ -109,10 +109,10 @@ func (a *app) init(command string) error {
 			if a.opts.DryRun == options.DryRun.All {
 				desc = "no actual operations will be performed, reporting every dest's state"
 			}
-			log.Msg("dry-run(config.dryRun="+string(a.opts.DryRun)+")", desc, log.Off)
+			log.Msg("dry-run(config.dryRun="+string(a.opts.DryRun)+")", desc)
 		}
-		log.Msg("config(show, noDefaults)", options.FormatSettings(a.opts.SettingsDelta()), log.Off)
-		log.Debug("config(show)", options.FormatSettings(a.opts.Settings), log.Off)
+		log.Msg("config(show, noDefaults)", options.FormatSettings(a.opts.SettingsDelta()))
+		log.Debug("config(show)", options.FormatSettings(a.opts.Settings))
 	}
 	a.startTelemetry(ctx)
 	ctx.Tel = a.tel
@@ -127,7 +127,7 @@ func (a *app) init(command string) error {
 	// [why] the init stage prefetches every remote spec source before
 	// discovery; all announces both stages like its other wrapped ops.
 	if command == "run" {
-		log.Msg("run(runOp)", "init-remote-sources", log.Off)
+		log.Msg("run(runOp)", "init-remote-sources")
 	}
 	if err := che.InitSources(ctx, a.opts); err != nil {
 		return err
@@ -136,7 +136,7 @@ func (a *app) init(command string) error {
 		return nil
 	}
 	if command == "run" {
-		log.Msg("run(runOp)", "discover-profiles", log.Off)
+		log.Msg("run(runOp)", "discover-profiles")
 	}
 	a.root, err = che.PrepareSpecs(ctx, a.opts, spec.SpecSourceRecipe{})
 	if err != nil {
@@ -153,7 +153,7 @@ func (a *app) startTelemetry(ctx che.Context) {
 	cfg := telemetry.Config(a.opts.Otel)
 	tel, err := telemetry.Start(context.Background(), cfg, ctx.RunID, ctx.Command)
 	if err != nil {
-		log.Debug("otel", "start failed: "+err.Error(), log.Off)
+		log.Debug("otel", "start failed: "+err.Error())
 		return
 	}
 	a.tel = tel
@@ -170,7 +170,7 @@ func (a *app) shutdownTelemetry() {
 	}
 	log.SetSink(nil)
 	if err := a.tel.Shutdown(context.Background()); err != nil {
-		log.Debug("otel", "shutdown: "+err.Error(), log.Off)
+		log.Debug("otel", "shutdown: "+err.Error())
 	}
 }
 
@@ -248,7 +248,7 @@ func (a *app) discoverCmd() *cobra.Command {
 		RunE: func(cmd *cobra.Command, args []string) error {
 			a.root.LogRejected()
 			for _, p := range a.root.AllProfiles() {
-				log.Msg("discover-profiles(match)", p.DiscoverSummary(), log.Off)
+				log.Msg("discover-profiles(match)", p.DiscoverSummary())
 			}
 			return nil
 		},

@@ -60,7 +60,7 @@ type Seams struct {
 var NewSeams = func(home string) Seams {
 	db, err := database.Open(filepath.Join(fsutil.ResolveStateHome(home), "ops.db"))
 	if err != nil {
-		log.Debug("ledger", "open failed: "+err.Error(), log.Off)
+		log.Debug("ledger", "open failed: "+err.Error())
 		db = nil
 	}
 	return Seams{
@@ -224,7 +224,7 @@ func (p *specsPrep) startSpec(db *database.DB, uri string) *database.SpecDone {
 	}
 	s, err := db.StartSpec(p.ctx.RunID, uri, p.ctx.Command)
 	if err != nil {
-		log.Debug("ledger", "start spec: "+err.Error(), log.Off)
+		log.Debug("ledger", "start spec: "+err.Error())
 		return nil
 	}
 	p.specDone = s
@@ -245,12 +245,12 @@ func (p *specsPrep) prepare(src spec.SpecSourceRecipe, anchor string, forced *sp
 		// referenced under different relative URIs across hops.
 		key := recipe.sourceReady.DirectoryPath + "::" + forced.ProfileName
 		if p.seenRefs[key] {
-			log.Debug("init-remote-sources(skip)", forced.ProfileName+": duplicate "+forced.String(), log.Off)
+			log.Debug("init-remote-sources(skip)", forced.ProfileName+": duplicate "+forced.String())
 			return nil, nil
 		}
 		p.seenRefs[key] = true
 	} else if !root && p.seenSpecs[recipe.sourceReady.DirectoryPath] {
-		log.Debug("init-remote-sources(skip)", "spec: duplicate "+recipe.sourceReady.DirectoryPath, log.Off)
+		log.Debug("init-remote-sources(skip)", "spec: duplicate "+recipe.sourceReady.DirectoryPath)
 		return nil, nil
 	}
 	p.seenSpecs[recipe.sourceReady.DirectoryPath] = true
@@ -349,7 +349,7 @@ func (r *SpecRecipe) PrepareProfileRecipes(opts options.Options, root bool) erro
 	// [why] che-level (flag/env/user-config) seeds the spec default, cascading
 	// down to each profile: profile > spec > user-config. workingDirectory seeds
 	// the root spec only: a sourced spec resolves it against its own checkout.
-	if root && r.Options.PWD() == "" {
+	if root && r.Options.ProfileWorkingDirectory == "" {
 		r.Options.ProfileWorkingDirectory = opts.ProfileWorkingDirectory
 	}
 	for i := range doc.ProfileRecipes {
@@ -396,7 +396,7 @@ func (r *SpecRecipe) validateSchema(cli options.ValidateSpecMode) error {
 		return fmt.Errorf("schema violations in %s:\n%s", r.sourceReady.DefinitionURI, strings.Join(finds, "\n"))
 	}
 	for _, f := range finds {
-		log.Msg("validate(che.yml)", f, log.Off)
+		log.Msg("validate(che.yml)", f)
 	}
 	return nil
 }
@@ -439,17 +439,17 @@ func (r *SpecRecipe) PrepareProfiles(p *specsPrep, forced *spec.ProfileSourceRec
 	ready := &SpecReady{Source: r.sourceReady, Options: r.Options, Env: r.Env, recipes: r.ProfileRecipes, tel: p.tel}
 	if root { // [why] candidates log once, for the invoked spec only
 		all, auto := r.candidateSummary()
-		log.Debug("discover-profiles(showCandidates, all)", all, log.Off)
-		log.Debug("discover-profiles(showCandidates, autoDiscoverable)", auto, log.Off)
+		log.Debug("discover-profiles(showCandidates, all)", all)
+		log.Debug("discover-profiles(showCandidates, autoDiscoverable)", auto)
 	}
 	// [why] the spec-level env: overlay gates this spec's own runIf.
 	eval := p.evalWith(r.Env)
-	pass, _, err := spec.AllPass("spec "+r.sourceReady.DefinitionURI, r.Options.RunIfAll(), p.opts.SkipRunIf, eval)
+	pass, _, err := spec.AllPass("spec "+r.sourceReady.DefinitionURI, r.Options.RunIf, p.opts.SkipRunIf, eval)
 	if err != nil {
 		return nil, err
 	}
 	if !pass {
-		log.Debug("spec(skip)", r.sourceReady.DefinitionURI+" (runIf failed)", log.Off)
+		log.Debug("spec(skip)", r.sourceReady.DefinitionURI+" (runIf failed)")
 		return ready, nil
 	}
 	lookup, err := r.composeIncludes(p, ready)
@@ -509,7 +509,7 @@ func (r *SpecRecipe) selectEligibleNames(p *specsPrep, forced *spec.ProfileSourc
 			return nil, fmt.Errorf("ref %s: %w", forced, err)
 		}
 		// [why] the ref entry's env overlays the launch env for its runIf gate.
-		pass, failed, err := spec.AllPass(forced.ProfileName, rec.Options.OverRef(forced.Options).RunIfAll(), p.opts.SkipRunIf, p.evalWith(forced.Env))
+		pass, failed, err := spec.AllPass(forced.ProfileName, rec.Options.OverRef(forced.Options).RunIf, p.opts.SkipRunIf, p.evalWith(forced.Env))
 		if err != nil {
 			return nil, fmt.Errorf("ref %s: %w", forced, err)
 		}
@@ -529,14 +529,14 @@ func (r *SpecRecipe) selectEligibleNames(p *specsPrep, forced *spec.ProfileSourc
 		if root {
 			return nil, fmt.Errorf("auto-discovery is disabled (options.autoDiscover=false): pass --profiles")
 		}
-		log.Debug("spec(skip)", r.sourceReady.DefinitionURI+" (autoDiscover disabled)", log.Off)
+		log.Debug("spec(skip)", r.sourceReady.DefinitionURI+" (autoDiscover disabled)")
 		return nil, nil
 	}
 	names, rejected, err := spec.EligibleRecipes(r.ProfileRecipes, forcedProfiles, p.opts.SkipRunIf, p.evalWith(r.Env))
 	p.rejected = append(p.rejected, rejected...)
 	if err != nil {
 		if !root && errors.Is(err, spec.ErrNoneEligible) {
-			log.Debug("spec(skip)", r.sourceReady.DefinitionURI+" (no eligible profile)", log.Off)
+			log.Debug("spec(skip)", r.sourceReady.DefinitionURI+" (no eligible profile)")
 			return nil, nil
 		}
 		return nil, err
@@ -586,7 +586,7 @@ func (r *SpecRecipe) assembleProfiles(p *specsPrep, ready *SpecReady, lookup []s
 func (r *SpecRecipe) makeProfileReady(p *specsPrep, rec spec.ProfileRecipe, lookup []spec.ProfileRecipe, env map[string]string) (*ProfileReady, []spec.ProfileSourceRecipe, error) {
 	name := rec.Source.GetProfileName()
 	effectiveEnv := overlayEnv(p.ctx.Env, env)
-	wd, err := resolveWorkingDir(effectiveEnv, rec.Source.DirectoryPath, rec.Options.PWD())
+	wd, err := resolveWorkingDir(effectiveEnv, rec.Source.DirectoryPath, rec.Options.ProfileWorkingDirectory)
 	if err != nil {
 		return nil, nil, fmt.Errorf("profile %q: %w", name, err)
 	}
@@ -598,7 +598,7 @@ func (r *SpecRecipe) makeProfileReady(p *specsPrep, rec spec.ProfileRecipe, look
 	specDone := p.startSpec(seams.Ledger, r.sourceReady.DefinitionURI)
 	profileDone, err := seams.Ledger.StartProfile(specDone, rec.Source.String(), name, r.sourceReady.DefinitionURI, rec.Source.DirectoryPath)
 	if err != nil {
-		log.Debug("ledger", "start profile: "+err.Error(), log.Off)
+		log.Debug("ledger", "start profile: "+err.Error())
 	}
 	pr := &ProfileReady{
 		Source: spec.ProfileSourceReady{
@@ -651,7 +651,7 @@ type SpecReady struct {
 // rejected logs nothing.
 func (s *SpecReady) LogRejected() {
 	for _, r := range s.Rejected {
-		log.Msg("discover-profiles(noMatchDue["+r.Cond+"])", r.Ref, log.Off)
+		log.Msg("discover-profiles(noMatchDue["+r.Cond+"])", r.Ref)
 	}
 }
 
@@ -677,7 +677,7 @@ func (s *SpecReady) ExecEach(ctx context.Context, opName string, fn func(context
 	profiles := s.AllProfiles()
 	s.LogRejected()
 	for _, p := range profiles {
-		log.Msg("discover-profiles(match)", p.discoverSummary(), log.Off)
+		log.Msg("discover-profiles(match)", p.discoverSummary())
 	}
 	var fails []error
 	for _, p := range profiles {
@@ -694,17 +694,17 @@ func (s *SpecReady) ExecEach(ctx context.Context, opName string, fn func(context
 					}
 				}
 			}
-			log.Msg(skipTitle(opName, "runProfile", reasons...), p.runProfileSummary(opName), log.Off)
+			log.Msg(skipTitle(opName, "runProfile", reasons...), p.runProfileSummary(opName))
 			continue
 		} else if p.commandDelta(opName) == 0 && !p.isDryRunAll() {
 			// [why] dry-run=all wants every dest's true state, so it bypasses
 			// the zero-delta profile skip.
-			log.Msg(skipTitle(opName, "runProfile", "NoDelta"), p.runProfileSummary(opName), log.Off)
+			log.Msg(skipTitle(opName, "runProfile", "NoDelta"), p.runProfileSummary(opName))
 			continue
 		}
 		pctx, pspan := s.tel.Span(ctx, "profile", attribute.String("profile", p.Ref()))
 		s.tel.CountProfile(pctx, p.Ref())
-		log.Msg(opName+"(runProfile)", p.runProfileSummary(opName), log.Off)
+		log.Msg(opName+"(runProfile)", p.runProfileSummary(opName))
 		if err := fn(pctx, p); err != nil {
 			pspan.RecordError(err)
 			fails = append(fails, fmt.Errorf("%s: %w", p.Ref(), err))
@@ -712,7 +712,7 @@ func (s *SpecReady) ExecEach(ctx context.Context, opName string, fn func(context
 		pspan.End()
 	}
 	for _, err := range fails {
-		log.Msg(opName+"(report)", "fail "+err.Error(), log.Off)
+		log.Msg(opName+"(report)", "fail "+err.Error())
 	}
 	return errors.Join(fails...)
 }
@@ -789,7 +789,7 @@ func (p *ProfileReady) isDryRunAll() bool { return p.opts.DryRun == options.DryR
 
 // logMsg logs title/msg at the profile's dry-run mode, carrying its log subtype.
 func (p *ProfileReady) logMsg(title, msg string) {
-	log.MsgSub(title, msg, toLogMode(p.opts.DryRun), p.buildLogSubtype())
+	log.MsgSub(title, msg, p.buildLogSubtype())
 }
 
 // mutate is the one dry-run+log gate for every mutating op: dry run logs only
@@ -877,7 +877,7 @@ func (p *ProfileReady) recordOperation(dest string, info opInfo, prev database.O
 		op.BackupID = &backup.ID
 	}
 	if err := p.Ledger.RecordOperation(p.profileDone, op); err != nil {
-		log.Debug("ledger", "record op: "+err.Error(), log.Off)
+		log.Debug("ledger", "record op: "+err.Error())
 	}
 }
 
@@ -1032,17 +1032,6 @@ func deriveOpType(prev, next database.Object) string {
 	}
 }
 
-func toLogMode(m options.DryRunMode) log.DryRun {
-	switch m {
-	case options.DryRun.Delta:
-		return log.Delta
-	case options.DryRun.All:
-		return log.All
-	default:
-		return log.Off
-	}
-}
-
 // resolveSrc maps a workingDirectory-relative path to its absolute source path.
 func (p *ProfileReady) resolveSrc(relativePath string) string {
 	return filepath.Join(p.resolveRoot(), relativePath)
@@ -1111,11 +1100,11 @@ func (p *ProfileReady) ExecOperations(ctx context.Context) error {
 			// [why] a config-skipped op is a plain skip, never a sweep: skipping
 			// render-templates must not prune its previously rendered dests.
 			if slices.Contains(skipOps, op.Name()) {
-				log.Msg(skipTitle("run", "runOp", p.skipOpsReason(op.Name())), op.Name(), log.Off)
+				log.Msg(skipTitle("run", "runOp", p.skipOpsReason(op.Name())), op.Name())
 				continue
 			}
 			if !op.Selected() {
-				log.Msg(skipTitle("run", "runOp", "NoDef"), op.Name(), log.Off)
+				log.Msg(skipTitle("run", "runOp", "NoDef"), op.Name())
 				if kind, ok := skippedKinds[op.Name()]; ok && !p.isDryRun() {
 					fails = append(fails, p.sweepStale(kind, nil)) // [why] emptied op: sweep all prior dests of its kind
 				}
@@ -1124,9 +1113,9 @@ func (p *ProfileReady) ExecOperations(ctx context.Context) error {
 			// [why] a zero-delta op still runs (idempotent, sweeps included), its
 			// announce marking that nothing would change (spec/che/LogBehavior.md).
 			if _, delta := op.counts(p); delta == 0 {
-				log.Msg(skipTitle("run", "runOp", "NoDelta"), op.Name(), log.Off)
+				log.Msg(skipTitle("run", "runOp", "NoDelta"), op.Name())
 			} else {
-				log.Msg("run(runOp)", op.Name(), log.Off)
+				log.Msg("run(runOp)", op.Name())
 			}
 			if err := p.execOp(ctx, op); err != nil {
 				fails = append(fails, fmt.Errorf("%s: %w", op.Name(), err))
@@ -1159,7 +1148,7 @@ func (p *ProfileReady) execOp(ctx context.Context, op operationReady) error {
 func (p *ProfileReady) ExecOperation(ctx context.Context, op operationReady) error {
 	return p.withDebugLevel(func() error {
 		if !op.Selected() {
-			log.Msg(skipTitle("run", "runOp", "NoDef"), op.Name(), log.Off)
+			log.Msg(skipTitle("run", "runOp", "NoDef"), op.Name())
 			return nil
 		}
 		return p.execOp(ctx, op)
@@ -1170,7 +1159,7 @@ func (p *ProfileReady) ExecOperation(ctx context.Context, op operationReady) err
 // the profile prepared none).
 func (p *ProfileReady) ExecOperationNamed(ctx context.Context, name string) error {
 	if slices.Contains(p.opts.SkipOps, name) {
-		log.Msg(skipTitle("run", "runOp", p.skipOpsReason(name)), name, log.Off)
+		log.Msg(skipTitle("run", "runOp", p.skipOpsReason(name)), name)
 		return nil
 	}
 	for _, op := range p.OperationsReady {
@@ -1185,7 +1174,7 @@ func (p *ProfileReady) ExecOperationNamed(ctx context.Context, name string) erro
 // returning how many matched.
 func (p *ProfileReady) ExecRunScripts(ctx context.Context, names []string) (int, error) {
 	if slices.Contains(p.opts.SkipOps, "run-scripts") {
-		log.Msg(skipTitle("run", "runOp", p.skipOpsReason("run-scripts")), "run-scripts", log.Off)
+		log.Msg(skipTitle("run", "runOp", p.skipOpsReason("run-scripts")), "run-scripts")
 		return 0, nil
 	}
 	matched := 0

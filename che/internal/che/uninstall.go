@@ -33,11 +33,11 @@ func NewUninstaller(ctx Context, opts options.Options) (*Uninstaller, error) {
 	seams := NewSeams(home)
 	spec, err := seams.Ledger.StartSpec(ctx.RunID, "", "uninstall")
 	if err != nil {
-		log.Debug("ledger", "uninstall start spec: "+err.Error(), log.Off)
+		log.Debug("ledger", "uninstall start spec: "+err.Error())
 	}
 	prof, err := seams.Ledger.StartProfile(spec, "uninstall", "uninstall", "", home)
 	if err != nil {
-		log.Debug("ledger", "uninstall start profile: "+err.Error(), log.Off)
+		log.Debug("ledger", "uninstall start profile: "+err.Error())
 	}
 	p := &ProfileReady{
 		ref:         "uninstall",
@@ -67,7 +67,7 @@ func (u *Uninstaller) Uninstall() error {
 		}
 	}
 	for _, err := range errs {
-		log.Msg("uninstall(report)", "fail "+err.Error(), log.Off)
+		log.Msg("uninstall(report)", "fail "+err.Error())
 	}
 	return errors.Join(errs...)
 }

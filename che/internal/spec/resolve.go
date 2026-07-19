@@ -65,7 +65,7 @@ func EligibleRecipes(recipes []ProfileRecipe, forced []string, forceAll bool, ev
 			if !ok {
 				return nil, nil, undefinedProfile(recipes, fmt.Sprintf("--profiles %q", name))
 			}
-			pass, _, err := AllPass(name, ps.Options.RunIfAll(), forceAll, eval)
+			pass, _, err := AllPass(name, ps.Options.RunIf, forceAll, eval)
 			if err != nil {
 				return nil, nil, err
 			}
@@ -82,7 +82,7 @@ func EligibleRecipes(recipes []ProfileRecipe, forced []string, forceAll bool, ev
 			continue
 		}
 		name := ps.Source.GetProfileName()
-		ok, failed, err := AllPass(name, ps.Options.RunIfAll(), forceAll, eval)
+		ok, failed, err := AllPass(name, ps.Options.RunIf, forceAll, eval)
 		if err != nil {
 			return nil, nil, err
 		}
@@ -139,10 +139,10 @@ func AllPass(name string, exprs []string, forceAll bool, eval func(expr string) 
 			return false, expr, fmt.Errorf("profile %q runIf %q: %w", name, expr, err)
 		}
 		if !ok {
-			log.Debug("discover-profiles(evaluating["+name+"], noPass)", expr, log.Off)
+			log.Debug("discover-profiles(evaluating["+name+"], noPass)", expr)
 			return false, expr, nil
 		}
-		log.Debug("discover-profiles(evaluating["+name+"], pass)", expr, log.Off)
+		log.Debug("discover-profiles(evaluating["+name+"], pass)", expr)
 	}
 	return true, "", nil
 }
@@ -547,8 +547,8 @@ func (o ProfileOptions) Over(spec Options) ProfileOptions {
 	if o.Debug == nil {
 		o.Debug = spec.Debug
 	}
-	if o.PWD() == "" {
-		o.ProfileWorkingDirectory = spec.PWD()
+	if o.ProfileWorkingDirectory == "" {
+		o.ProfileWorkingDirectory = spec.ProfileWorkingDirectory
 	}
 	return o
 }
@@ -559,17 +559,14 @@ func (o ProfileOptions) OverRef(entry ProfileOptions) ProfileOptions {
 	if entry.RunIf != nil {
 		o.RunIf = entry.RunIf
 	}
-	if entry.ExecIf != nil {
-		o.ExecIf = entry.ExecIf
-	}
 	if entry.AutoDiscover != nil {
 		o.AutoDiscover = entry.AutoDiscover
 	}
 	if entry.Debug != nil {
 		o.Debug = entry.Debug
 	}
-	if entry.PWD() != "" {
-		o.ProfileWorkingDirectory = entry.PWD()
+	if entry.ProfileWorkingDirectory != "" {
+		o.ProfileWorkingDirectory = entry.ProfileWorkingDirectory
 	}
 	return o
 }

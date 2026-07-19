@@ -4,47 +4,42 @@ context:
 cases:
   - name: msgShouldSplitPlainTitleIntoTypeAndText
     input:
-      args: [title: ln, msg: /etc/zshrc, mode: off]
+      args: [title: ln, msg: /etc/zshrc]
     expected:
       output: {type: ln, subtype: "", text: /etc/zshrc}
   - name: msgShouldExtractParenthesizedSubtype
     input:
-      args: [title: render-templates(skip-secrets), msg: /x, mode: off]
+      args: [title: render-templates(skip-secrets), msg: /x]
     expected:
       output: {type: render-templates, subtype: (skip-secrets), text: /x}
-  - name: msgShouldIgnoreDryRunModeInTitle
-    input:
-      args: [title: render-templates(skip-secrets), msg: /x, mode: delta]
-    expected:
-      output: {type: render-templates, subtype: "(skip-secrets)", text: /x}
-  - name: msgSubShouldAppendSubIgnoringDryRun
+  - name: msgSubShouldAppendSub
     context: {function: log.MsgSub}
     input:
-      args: [title: run-scripts, msg: /x, mode: all, sub: profile=gitlabGroup]
+      args: [title: run-scripts, msg: /x, sub: profile=gitlabGroup]
     expected:
       output: {type: run-scripts, subtype: "(profile=gitlabGroup)", text: /x}
   - name: msgSubShouldAppendSubAfterTitleSubtype
     context: {function: log.MsgSub}
     input:
-      args: [title: make-dirs(create), msg: /x, mode: off, sub: profile=p]
+      args: [title: make-dirs(create), msg: /x, sub: profile=p]
     expected:
       output: {type: make-dirs, subtype: "(create,profile=p)", text: /x}
   - name: msgSubShouldIgnoreEmptySub
     context: {function: log.MsgSub}
     input:
-      args: [title: ln, msg: /x, mode: off, sub: ""]
+      args: [title: ln, msg: /x, sub: ""]
     expected:
       output: {type: ln, subtype: "", text: /x}
   - name: debugShouldPrefixLineWithDebugWord
     context: {function: log.Debug}
     input:
-      args: [title: profile(p), msg: run x, mode: off]
+      args: [title: profile(p), msg: run x]
     expected:
       output: {type: debug profile, subtype: (p), text: run x}
   - name: debugShouldPrefixBareTitleLine
     context: {function: log.Debug}
     input:
-      args: [title: ledger, msg: run x, mode: off]
+      args: [title: ledger, msg: run x]
     expected:
       output: {type: debug ledger, subtype: "", text: run x}
 # [<] 🤖🤖

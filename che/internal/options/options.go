@@ -124,32 +124,15 @@ func (c *Options) fillDefault(key, value string) {
 func (c *Options) FillDefaultSetting(key, value string) { c.fillDefault(key, value) }
 
 // resolveBool: a set flag wins, else the env var parses (0/false/off/no ->
-// false), else the first set layer pointer, else false; recorded either way.
-func (c *Options) resolveBool(key string, flagVal bool, envVal string, layers ...boolLayer) bool {
-	v, src := false, "default"
+// false), else the first set layer pointer, else def; recorded either way.
+func (c *Options) resolveBool(key string, flagVal bool, envVal string, def bool, layers ...boolLayer) bool {
+	v, src := def, "default"
 	switch {
 	case flagVal:
 		v, src = true, "cliFlag"
 	case envVal != "":
 		v, src = parseBoolWord(envVal), "env"
 	default:
-		for _, l := range layers {
-			if l.val != nil {
-				v, src = *l.val, l.src
-				break
-			}
-		}
-	}
-	c.record(key, strconv.FormatBool(v), src)
-	return v
-}
-
-// resolveBoolDefaultTrue is resolveBool for on-by-default knobs without a flag.
-func (c *Options) resolveBoolDefaultTrue(key, envVal string, layers ...boolLayer) bool {
-	v, src := true, "default"
-	if envVal != "" {
-		v, src = parseBoolWord(envVal), "env"
-	} else {
 		for _, l := range layers {
 			if l.val != nil {
 				v, src = *l.val, l.src
@@ -210,7 +193,7 @@ func (c *Options) Resolve(env LookupEnv, user, spec Layer) error {
 	c.CheWorkingDirectory = c.resolveStr("cheWorkingDirectory", "",
 		flagStr(c.CheWorkingDirectory), envStr(env("CHE_WORKING_DIRECTORY")))
 	c.ProfileWorkingDirectory = c.resolveStr("profileWorkingDirectory", "",
-		flagStr(c.ProfileWorkingDirectory), envStr(env("CHE_PROFILE_WORKING_DIRECTORY")), layer(spec.PWD(), "specFile"))
+		flagStr(c.ProfileWorkingDirectory), envStr(env("CHE_PROFILE_WORKING_DIRECTORY")), layer(spec.ProfileWorkingDirectory, "specFile"))
 	c.Profiles = c.resolveList("profiles",
 		layerList(c.Profiles, "cliFlag"), envStr(env("CHE_PROFILE")), layerList(user.Profiles, "config-file"), layerList(spec.Profiles, "specFile"))
 	c.SkipOps = c.resolveList("skipOps",
@@ -222,14 +205,14 @@ func (c *Options) Resolve(env LookupEnv, user, spec Layer) error {
 			return fmt.Errorf("invalid skip-ops op %q: want one of %s", name, strings.Join(OpNames, ", "))
 		}
 	}
-	c.SkipRunIf = c.resolveBool("skipRunIf", c.SkipRunIf, env("CHE_SKIP_RUN_IF"))
-	c.SkipRemoteRefs = c.resolveBool("skipRemoteRefs", c.SkipRemoteRefs, env("CHE_SKIP_REMOTE_REFS"),
+	c.SkipRunIf = c.resolveBool("skipRunIf", c.SkipRunIf, env("CHE_SKIP_RUN_IF"), false)
+	c.SkipRemoteRefs = c.resolveBool("skipRemoteRefs", c.SkipRemoteRefs, env("CHE_SKIP_REMOTE_REFS"), false,
 		boolLayer{user.SkipRemoteRefs, "config-file"}, boolLayer{spec.SkipRemoteRefs, "specFile"})
-	c.Debug = c.resolveBool("debug", c.Debug, env("CHE_DEBUG"),
+	c.Debug = c.resolveBool("debug", c.Debug, env("CHE_DEBUG"), false,
 		boolLayer{user.Debug, "config-file"}, boolLayer{spec.Debug, "specFile"})
-	c.RenderSkipSecrets = c.resolveBool("renderTemplates.skipSecrets", c.RenderSkipSecrets, env("CHE_RENDER_TEMPLATES_SKIP_SECRETS"),
+	c.RenderSkipSecrets = c.resolveBool("renderTemplates.skipSecrets", c.RenderSkipSecrets, env("CHE_RENDER_TEMPLATES_SKIP_SECRETS"), false,
 		boolLayer{user.RenderTemplates.SkipSecrets, "config-file"}, boolLayer{spec.RenderTemplates.SkipSecrets, "specFile"})
-	c.AutoDiscover = c.resolveBoolDefaultTrue("autoDiscover", env("CHE_AUTO_DISCOVER"),
+	c.AutoDiscover = c.resolveBool("autoDiscover", false, env("CHE_AUTO_DISCOVER"), true,
 		boolLayer{user.AutoDiscover, "config-file"})
 	return c.resolveOtel(env, user, spec)
 }
@@ -239,7 +222,7 @@ func (c *Options) Resolve(env LookupEnv, user, spec Layer) error {
 // rest; metrics/logs/traces default on when enabled. protocol validated (grpc
 // default).
 func (c *Options) resolveOtel(env LookupEnv, user, spec Layer) error {
-	c.Otel.Enabled = c.resolveBool("otel.enabled", false, env("CHE_OTEL_ENABLED"),
+	c.Otel.Enabled = c.resolveBool("otel.enabled", false, env("CHE_OTEL_ENABLED"), false,
 		boolLayer{user.Otel.Enabled, "config-file"}, boolLayer{spec.Otel.Enabled, "specFile"})
 	c.Otel.Protocol = c.resolveStr("otel.protocol", "grpc",
 		envStr(env("CHE_OTEL_PROTOCOL")), layer(user.Otel.Protocol, "config-file"), layer(spec.Otel.Protocol, "specFile"))
@@ -250,11 +233,11 @@ func (c *Options) resolveOtel(env LookupEnv, user, spec Layer) error {
 	}
 	c.Otel.Endpoint = c.resolveStr("otel.endpoint", defaultOtelEndpoint(c.Otel.Protocol),
 		envStr(env("CHE_OTEL_ENDPOINT")), layer(user.Otel.Endpoint, "config-file"), layer(spec.Otel.Endpoint, "specFile"))
-	c.Otel.Metrics = c.resolveBoolDefaultTrue("otel.metrics", env("CHE_OTEL_METRICS"),
+	c.Otel.Metrics = c.resolveBool("otel.metrics", false, env("CHE_OTEL_METRICS"), true,
 		boolLayer{user.Otel.Metrics, "config-file"}, boolLayer{spec.Otel.Metrics, "specFile"})
-	c.Otel.Logs = c.resolveBoolDefaultTrue("otel.logs", env("CHE_OTEL_LOGS"),
+	c.Otel.Logs = c.resolveBool("otel.logs", false, env("CHE_OTEL_LOGS"), true,
 		boolLayer{user.Otel.Logs, "config-file"}, boolLayer{spec.Otel.Logs, "specFile"})
-	c.Otel.Traces = c.resolveBoolDefaultTrue("otel.traces", env("CHE_OTEL_TRACES"),
+	c.Otel.Traces = c.resolveBool("otel.traces", false, env("CHE_OTEL_TRACES"), true,
 		boolLayer{user.Otel.Traces, "config-file"}, boolLayer{spec.Otel.Traces, "specFile"})
 	return nil
 }

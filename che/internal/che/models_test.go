@@ -364,13 +364,13 @@ func TestPrepareOptionsUserConfig(t *testing.T) {
 	assert.Equal(t, options.DryRun.Delta, opts.DryRun, "dry-run true aliases delta")
 }
 
-// TestWorkingDirectoryCascade: profile > spec > che for options.workingDirectory,
+// TestWorkingDirectoryCascade: profile > spec > che for options.profileWorkingDirectory,
 // and the resolved tree feeds classification (links come from it).
 func TestWorkingDirectoryCascade(t *testing.T) {
 	repo := testutil.Repo(t, map[string]string{
-		"che.yml": "options:\n  workingDirectory: spectree\n" +
+		"che.yml": "options:\n  profileWorkingDirectory: spectree\n" +
 			"p:\n  options: {autoDiscover: true}\n  include:\n    makeLinks: [{source: _home/**, dest: 's:^_home:$HOME:'}]\n" +
-			"q:\n  options: {autoDiscover: true, workingDirectory: proftree}\n  include:\n    makeLinks: [{source: _home/**, dest: 's:^_home:$HOME:'}]\n",
+			"q:\n  options: {autoDiscover: true, profileWorkingDirectory: proftree}\n  include:\n    makeLinks: [{source: _home/**, dest: 's:^_home:$HOME:'}]\n",
 		"spectree/_home/.config/a": "a\n",
 		"proftree/_home/.config/b": "b\n",
 	})

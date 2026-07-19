@@ -109,7 +109,7 @@ type Doc struct {
 
 // Options is the options: block, shared by the top-level spec options: (spec-wide
 // defaults + che knobs) and the user-config file ($XDG_CONFIG_HOME/che/config.yml):
-// identical shape, different precedence layer. execIf/workingDirectory are
+// identical shape, different precedence layer. runIf/profileWorkingDirectory are
 // spec-only (ignored in user config).
 type Options struct {
 	RunIf                   []string        `yaml:"runIf" jsonschema_description:"spec-level predicates: gate every profile of this spec (ANDed with each profile's own); spec-only"`
@@ -168,16 +168,6 @@ type ProfileOptions struct {
 	ProfileWorkingDirectory string   `yaml:"profileWorkingDirectory" jsonschema_description:"the profile's load-ops source tree (empty: inherit spec options, then che level, then the checkout)"`
 	WorkingDirectory        string   `yaml:"workingDirectory" jsonschema_description:"deprecated alias of profileWorkingDirectory"`
 }
-
-// RunIfAll is the profile's effective predicates: runIf plus the deprecated
-// execIf alias.
-func (o ProfileOptions) RunIfAll() []string {
-	return append(append([]string{}, o.RunIf...), o.ExecIf...)
-}
-
-// RunIfAll is the spec's effective predicates: runIf plus the deprecated
-// execIf alias.
-func (o Options) RunIfAll() []string { return append(append([]string{}, o.RunIf...), o.ExecIf...) }
 
 // includeSet is the additive payload.
 type includeSet struct {

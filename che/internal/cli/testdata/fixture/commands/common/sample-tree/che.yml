@@ -1,4 +1,4 @@
-options: {workingDirectory: root}
+options: {profileWorkingDirectory: root}
 base:
   include:
     makeLinks:

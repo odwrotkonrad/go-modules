@@ -46,7 +46,7 @@ func (p *ProfileReady) renderTemplates(templates []spec.FileItem, skipSecrets bo
 		dests := p.resolveTemplateDests(item)
 		if skipSecrets && p.isSecretRefInItem(item) {
 			for _, d := range dests {
-				log.Debug(skipTitle("render-templates", p.wouldAction(d.path), p.skipReasons("config.renderTemplates.skipSecrets")...), d.path, log.Off)
+				log.Debug(skipTitle("render-templates", p.wouldAction(d.path), p.skipReasons("config.renderTemplates.skipSecrets")...), d.path)
 			}
 			continue
 		}
@@ -207,7 +207,7 @@ func (p *ProfileReady) renderTemplate(item spec.FileItem, dests []tmplDest) erro
 		}
 		current, err := os.ReadFile(d.path)
 		if err == nil && bytes.Equal(current, out) {
-			log.Debug(skipTitle("render-templates", "overwrite", "SameContent"), d.path, log.Off)
+			log.Debug(skipTitle("render-templates", "overwrite", "SameContent"), d.path)
 			continue
 		}
 		p.logMsg(resolveCreateTitle("render-templates(create)", err == nil), d.path)
@@ -235,7 +235,7 @@ func (p *ProfileReady) readExistingDest(d tmplDest) ([]byte, error) {
 // (overwrite, skippedDue[SameContent]) line, perms drift still corrected.
 func (p *ProfileReady) placeFile(dest string, body []byte, item spec.FileItem) error {
 	if cur, err := p.Reader.ReadFileBytes(dest); err == nil && bytes.Equal(cur, body) {
-		log.Debug(skipTitle("render-templates", "overwrite", "SameContent"), dest, log.Off)
+		log.Debug(skipTitle("render-templates", "overwrite", "SameContent"), dest)
 		return p.fixPerms("render-templates", dest, item)
 	}
 	mode, _ := fsutil.ParseMode(item.Chmod)

@@ -18,6 +18,8 @@ cases:
       stdOut: "make-dirs(create, skippedDue[config.dryRun=delta]): ${HOME}/.config"
   - name: ShouldReportBackupArchivePrediction
     context: {command: che backup}
+    input:
+      args: [driftLink: true]
     expected:
       stdOut: |
         backup(showDelta): {{/.*/}}

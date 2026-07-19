@@ -54,6 +54,7 @@ func TestDryRunDelta(t *testing.T) {
 		require.Truef(t, ok, "unknown command %q", c.Context.Command)
 		covered[op] = true
 		p, res, dir := setupProfile(t, options.Options{DryRun: options.DryRun.Delta})
+		applyScenario(t, c.Input.Args, &testutil.MockSet{}, p)
 		before := snapshotTree(t, dir)
 		out, err := testutil.CaptureStdout(t, func() error { return run(p, res) })
 		require.NoErrorf(t, err, "%s dry-run", op)

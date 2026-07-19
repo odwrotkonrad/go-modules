@@ -5,12 +5,12 @@ cases:
   - name: ShouldEmitNothingWithDebugGateOff
     context: {function: log.Debug}
     input:
-      args: [title: profile(p), msg: run x, mode: off]
+      args: [title: profile(p), msg: run x]
     expected:
       output: ""
   - name: ShouldBoldTheType
     input:
-      args: [title: ln, msg: /x, mode: off]
+      args: [title: ln, msg: /x]
     expected:
       stdOut: ["\e[1mln\e["]
 # [<] 🤖🤖

@@ -68,24 +68,24 @@ func ensureCheckout(home, url string) (string, error) {
 		if err := git("clone", "--quiet", "--depth", "1", "--single-branch", url, dir); err != nil {
 			return "", fmt.Errorf("source clone %s: %w", url, err)
 		}
-		log.Msg("init-remote-sources(cloneRemote)", line, log.Off)
+		log.Msg("init-remote-sources(cloneRemote)", line)
 		return dir, nil
 	}
 	before, _ := gitOut("-C", dir, "rev-parse", "HEAD")
 	// [why] a failing update with a cached checkout is survivable: warn and use
 	// the cache; only a missing checkout is fatal (spec/che/InitCmdBehavior.md).
 	if err := git("-C", dir, "fetch", "--quiet", "--depth", "1"); err != nil {
-		log.Msg("init-remote-sources(warning)", fmt.Sprintf("fetch failed, using cached checkout %s: %v", dir, err), log.Off)
+		log.Msg("init-remote-sources(warning)", fmt.Sprintf("fetch failed, using cached checkout %s: %v", dir, err))
 		return dir, nil
 	}
 	if err := git("-C", dir, "reset", "--hard", "--quiet", "FETCH_HEAD"); err != nil {
-		log.Msg("init-remote-sources(warning)", fmt.Sprintf("update failed, using cached checkout %s: %v", dir, err), log.Off)
+		log.Msg("init-remote-sources(warning)", fmt.Sprintf("update failed, using cached checkout %s: %v", dir, err))
 		return dir, nil
 	}
 	if after, _ := gitOut("-C", dir, "rev-parse", "HEAD"); after != before {
-		log.Msg("init-remote-sources(updateRemote)", line, log.Off)
+		log.Msg("init-remote-sources(updateRemote)", line)
 	} else {
-		log.Msg("init-remote-sources(update, skippedDue[RemoteUpToDate])", line, log.Off)
+		log.Msg("init-remote-sources(update, skippedDue[RemoteUpToDate])", line)
 	}
 	return dir, nil
 }

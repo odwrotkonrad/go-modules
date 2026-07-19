@@ -13,7 +13,7 @@ cases:
       args:
         - flags: {dryRun: delta}
         - user: {skipRemoteRefs: true}
-        - spec: {workingDirectory: root}
+        - spec: {profileWorkingDirectory: root}
     expected:
       output:
         delta: "[dryRun=delta(cliFlag),profileWorkingDirectory=root(specFile),skipRemoteRefs=true(config-file),debug=true(env)]"
