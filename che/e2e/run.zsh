@@ -105,7 +105,7 @@ che uninstall
 assert_clean
 for ns in $NS; do assert_absent $HOME/$ns; done
 
-step "make-dirs cycle"
+step "make-dirs"
 che make-dirs --dry-run=all
 assert_ns_absent
 che make-dirs
@@ -113,7 +113,7 @@ for ns in $NS; do assert_dir $HOME/$ns/made-dir; done
 che uninstall
 assert_ns_absent
 
-step "make-links cycle"
+step "make-links"
 che make-links --dry-run=all
 assert_ns_absent
 che make-links
@@ -121,7 +121,7 @@ for ns in $NS; do assert_link $HOME/$ns/link.txt "*/root/$ns/link.txt"; done
 che uninstall
 assert_ns_absent
 
-step "make-copies cycle"
+step "make-copies"
 che make-copies --dry-run=all
 assert_ns_absent
 che make-copies
@@ -129,7 +129,7 @@ for ns in $NS; do assert_content $HOME/$ns/copy "copy-$ns"; done
 che uninstall
 assert_ns_absent
 
-step "render-templates cycle"
+step "render-templates"
 che render-templates --dry-run=all
 assert_ns_absent
 che make-dirs
@@ -138,7 +138,7 @@ for ns in $NS; do assert_content $HOME/$ns/tpl "RENDERED-${(U)ns}"; done
 che uninstall
 assert_ns_absent
 
-step "run-scripts cycle"
+step "run-scripts"
 che run-scripts --dry-run=all
 for ns in $NS; do assert_absent $HOME/$ns/script-marker; done
 che run-scripts
@@ -147,7 +147,7 @@ che uninstall
 for ns in $NS; do rm $HOME/$ns/script-marker; rmdir $HOME/$ns 2>/dev/null || true; done
 assert_clean
 
-step "prune-broken-links cycle"
+step "prune-broken-links"
 che make-links
 for ns in $NS; do assert_link $HOME/$ns/link.txt "*/root/$ns/link.txt"; done
 rm $work/local/root/plain/link.txt
@@ -160,6 +160,39 @@ assert_link $HOME/remote/link.txt "*/root/remote/link.txt"
 git -C $work/local checkout -q -- root/plain/link.txt
 che uninstall
 assert_ns_absent
+
+step "backup"
+backups=$XDG_STATE_HOME/che/backups
+rm -rf $backups
+che make-copies
+print -r -- tampered > $HOME/plain/copy
+che backup --dry-run=all
+typeset -a archives=($backups/che-backup-*.tar.bz2(N))
+(( $#archives == 0 )) || fail "dry-run backup wrote an archive"
+out=$(che backup 2>&1)
+print -r -- $out
+assert_out backup '(created)' $out
+archives=($backups/che-backup-*.tar.bz2(N))
+(( $#archives == 1 )) || fail "want 1 backup archive, got $#archives"
+mkdir -p $work/restore
+tar -xjf $archives[1] -C $work/restore
+assert_content $work/restore$HOME/plain/copy "tampered"
+assert_absent $work/restore$HOME/conditional/copy
+che make-copies
+out=$(che backup 2>&1)
+print -r -- $out
+assert_not_out backup-settled '(created)' $out
+print -r -- tampered > $HOME/plain/copy
+out=$(che run 2>&1)
+print -r -- $out
+assert_out run-backup 'runOp): backup' $out
+assert_content $HOME/plain/copy "copy-plain"
+for ns in $NS; do rm $HOME/$ns/script-marker; done
+che uninstall
+assert_content $HOME/plain/copy "tampered"
+rm $HOME/plain/copy
+rmdir $HOME/plain 2>/dev/null || true
+assert_clean
 
 step "PASS"
 rm -rf $work
