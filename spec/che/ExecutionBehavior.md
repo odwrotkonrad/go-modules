@@ -2,8 +2,6 @@
 
 <!-- [>] 🤖🤖 -->
 
-Statuses: todo | implemented | tested (implemented, tests in place).
-
 Scenario: profiles execute in discovery order
   Status: tested
   When a che command executes
@@ -26,13 +24,8 @@ Scenario: each che profile execution announces itself
   When a profile starts executing
   Then an info line announces the profile, before its commands log
 
-Scenario: each che command announces itself
-  Status: todo
-  When a che command starts executing within a profile
-  Then an info line announces it
-
 Scenario: dry run announces itself once
-  Status: implemented
+  Status: tested
   When a che command executes with dry run enabled
   Then one line opens the whole output: `dry-run(config.dryRun=<mode>): <desc>`
   And delta's desc says only dests that would change report, all's that every dest reports its state

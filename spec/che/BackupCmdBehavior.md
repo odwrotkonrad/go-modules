@@ -5,8 +5,6 @@
 `backup`: archive every existing op dest that would change (unsettled links,
 differing copies, differing renders) into the per-run backup archive.
 
-Statuses: todo | implemented | tested (implemented, tests in place).
-
 Scenario: backup runs before the other ops in run
   Status: tested
   When `run` executes a profile
@@ -48,6 +46,4 @@ Scenario: the backup stage announces delta-gated
   Then an info line `run(runOp): backup` announces it when any dest exists
   And nothing to back up announces `run(runOp, skippedDue[NoDelta]): backup` at info
 
----
-Definitions: [Definitions.md](Definitions.md).
 <!-- [<] 🤖🤖 -->

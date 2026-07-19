@@ -2,8 +2,6 @@
 
 <!-- [>] 🤖🤖 -->
 
-Statuses: todo | implemented | tested (implemented, tests in place).
-
 Line format, one per discovered profile, profileWorkingDirectory first, ops in
 execution order:
 
@@ -117,6 +115,4 @@ Scenario: render-templates delta comes from a mock-render cache
   And a differing or absent hash counts as delta
   And the cache stores the most recent hash only, keyed by dest, written on real renders only
 
----
-Definitions: [Definitions.md](Definitions.md).
 <!-- [<] 🤖🤖 -->

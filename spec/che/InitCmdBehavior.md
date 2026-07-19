@@ -4,8 +4,6 @@
 
 `init-remote-sources`: prefetch the remote spec sources into the run cache.
 
-Statuses: todo | implemented | tested (implemented, tests in place).
-
 Scenario: init fetches every remote spec source
   Status: tested
   When I invoke `init-remote-sources` standalone or any command that resolves specs
@@ -57,6 +55,4 @@ Scenario: skip-remote-refs skips remote fetches
   When init runs
   Then no remote source fetches
 
----
-Definitions: [Definitions.md](Definitions.md).
 <!-- [<] 🤖🤖 -->

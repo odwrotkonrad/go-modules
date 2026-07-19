@@ -2,9 +2,11 @@
 
 <!-- [>] 🤖🤖 -->
 
-`discover`: expose the resolved runtime spec `che run` would execute.
+`discover-profiles`: expose the resolved runtime spec `che run` would execute.
 
-Statuses: todo | implemented | tested (implemented, tests in place).
+An os-mutating che command mutates os state: `run`, `backup`, `prune-broken-links`,
+`make-dirs`, `make-links`, `make-copies`, `render-templates`, `run-scripts`,
+`uninstall` (ledger-driven, no discovery).
 
 Scenario: discover precedes every os-mutating che command
   Status: tested
@@ -62,6 +64,4 @@ Scenario: auto-discovery can be disabled
   Then discovery is disabled and the command errors, asking for --profiles
   And forced profiles and sourced refs still run
 
----
-Definitions: [Definitions.md](Definitions.md).
 <!-- [<] 🤖🤖 -->
