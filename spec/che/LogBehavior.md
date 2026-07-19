@@ -108,11 +108,11 @@ Scenario: rejected profiles log before the match lines
   And remote profiles display as `remote:<reponame>:<profile>`
   And nothing rejected logs no line
 
-Scenario: render-templates delta comes from a mock-render cache
+Scenario: render-templates delta comes from a mock-render content compare
   Status: tested
   When discovery counts render-templates deltas
-  Then each template renders with mocked secret values and the output hash compares against the stored hash of the previous run
-  And a differing or absent hash counts as delta
+  Then each secret-free template's mock render composes per dest and byte-compares against the dest's current content, differing or absent counts as delta
+  And each secret-bearing template's mock-render hash compares against the stored hash of the previous run instead
   And the cache stores the most recent hash only, keyed by dest, written on real renders only
 
 <!-- [<] 🤖🤖 -->

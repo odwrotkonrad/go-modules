@@ -61,12 +61,9 @@ func (p *ProfileReady) backupDests() []string {
 			}
 		case *RenderTemplatesOperationReady:
 			for _, item := range o.Templates {
-				hash, err := p.mockRenderHash(item)
+				settled := p.renderSettled(item)
 				for _, d := range p.resolveTemplateDests(item) {
-					if !d.host {
-						continue
-					}
-					if err != nil || p.readRenderHash(d.path) != hash {
+					if d.host && !settled[d.path] {
 						out = append(out, d.path)
 					}
 				}
@@ -103,8 +100,8 @@ func (p *ProfileReady) execBackup(dests []string) error {
 	path := fsutil.ResolveBackupArchivePath(p.home, Bin, "backup", p.runID)
 	p.currentArchive = path
 	p.currentSub = "backup"
-	if p.isDryRun() {
-		p.logMsg("backup(created)", path)
+	if p.isDryRun() { // [why] prediction only: no archive is written
+		p.logMsg(skipTitle("backup", "create", p.dryRunReasons()...), path)
 		return nil
 	}
 	if err := p.FS.ArchiveDestinations(path, dests); err != nil {
