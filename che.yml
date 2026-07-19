@@ -20,7 +20,7 @@ ontoRepo:
               - {path: README.md}
 
 claude-agents:
-  options: {autoDiscover: true, execIf: ['builtin:isVirt']}
+  options: {autoDiscover: true, runIf: ['builtin:isVirt']}
   include:
     renderTemplates:
       - ctx: {repo: GoModules}

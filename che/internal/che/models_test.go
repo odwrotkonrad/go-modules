@@ -58,6 +58,7 @@ func newContext(env map[string]string, cwd string) Context {
 
 type prepWant struct {
 	Profiles      []string            `yaml:"profiles"` // Ref() list, tree order
+	Rejected      map[string]string   `yaml:"rejected"` // runIf-rejected ref -> rejecting condition
 	RepoRoot      string              `yaml:"repoRoot"` // sourced profile's directory
 	RepoRootUnder string              `yaml:"repoRootUnder"`
 	Script        string              `yaml:"script"`    // rel suffix of a sourced profile's resolved script
@@ -125,6 +126,7 @@ func TestPrepareSpecs(t *testing.T) {
 			vars := map[string]string{}
 			if len(refFiles) > 0 {
 				vars["REF_DIR"] = testutil.Repo(t, refFiles)
+				vars["REF_NAME"] = filepath.Base(vars["REF_DIR"])
 			}
 			hostTree := map[string]string{}
 			for rel, body := range hostFiles {
@@ -134,7 +136,7 @@ func TestPrepareSpecs(t *testing.T) {
 			home, baseEnv := prepEnv(t)
 			vars["HOST_REPO"] = hostRepo
 			vars["HOME"] = home
-			vars["CACHE"] = filepath.Join(home, ".cache/che/sources")
+			vars["CACHE"] = filepath.Join(home, ".cache/che/remote-sources")
 
 			// [why] the launch env is built at the top edge exactly like
 			// production: base (HOME) + case env, ref-dir var, unset keys omitted.
@@ -164,6 +166,7 @@ func TestPrepareSpecs(t *testing.T) {
 
 			vs := options.ValidateSpecMode(testyml.Expand(flags.ValidateSpec, vars))
 			opts := options.Options{
+				AutoDiscover:    true,
 				SkipRemoteRefs:  flags.SkipRemoteRefs,
 				ValidateSpec:    vs,
 				ValidateSpecCLI: vs, // models the flag/env override
@@ -205,6 +208,23 @@ func TestPrepareSpecs(t *testing.T) {
 					want = append(want, testyml.Expand(x, vars))
 				}
 				assert.Equal(t, want, refs, "profile refs\n%s", out)
+			}
+			if w.Rejected != nil {
+				want := map[string]string{}
+				for ref, cond := range w.Rejected {
+					want[testyml.Expand(ref, vars)] = cond
+				}
+				got := map[string]string{}
+				for _, r := range root.Rejected {
+					got[r.Ref] = r.Cond
+				}
+				assert.Equal(t, want, got, "rejected profiles\n%s", out)
+				line, err := testutil.CaptureStdout(t, func() error { root.LogRejected(); return nil })
+				require.NoError(t, err)
+				for ref, cond := range want {
+					assert.Contains(t, testutil.StripANSI(line),
+						"discover-profiles(noMatchDue["+cond+"]): "+ref, "per-profile noMatch line")
+				}
 			}
 			sp := sourcedProfile(profiles)
 			if w.RepoRoot != "" || w.RepoRootUnder != "" || w.Script != "" || w.Env != nil || w.EnvInOverlay != "" {
@@ -324,8 +344,7 @@ func TestPrepareOptionsUserConfig(t *testing.T) {
 	assert.Equal(t, options.DryRun.Delta, opts.DryRun, "user-config dryRun")
 	assert.True(t, opts.SkipRemoteRefs, "user-config skipRemoteRefs")
 	assert.True(t, opts.RenderSkipSecrets, "user-config renderTemplates.skipSecrets")
-	require.NotNil(t, opts.AutoDiscover)
-	assert.True(t, *opts.AutoDiscover, "user-config autoDiscover")
+	assert.True(t, opts.AutoDiscover, "user-config autoDiscover")
 	assert.Equal(t, []string{"cfg/a", "cfg/b"}, opts.Profiles, "user-config profiles over spec")
 
 	// env over user-config.
@@ -339,10 +358,10 @@ func TestPrepareOptionsUserConfig(t *testing.T) {
 	require.NoError(t, err)
 	assert.Equal(t, []string{"flag/a"}, opts.Profiles, "flag over env + user-config")
 
-	// --dry-run=true aliases all.
+	// --dry-run=true aliases delta.
 	_, opts, err = PrepareApplicationOptions(ctx(map[string]string{"CHE_DRY_RUN": "true"}), options.Options{})
 	require.NoError(t, err)
-	assert.Equal(t, options.DryRun.All, opts.DryRun, "dry-run true aliases all")
+	assert.Equal(t, options.DryRun.Delta, opts.DryRun, "dry-run true aliases delta")
 }
 
 // TestWorkingDirectoryCascade: profile > spec > che for options.workingDirectory,
@@ -357,7 +376,7 @@ func TestWorkingDirectoryCascade(t *testing.T) {
 	})
 	home, baseEnv := prepEnv(t)
 
-	root, err := PrepareSpecs(newContext(baseEnv, repo), options.Options{SkipExecIf: true}, spec.SpecSourceRecipe{})
+	root, err := PrepareSpecs(newContext(baseEnv, repo), options.Options{SkipRunIf: true, AutoDiscover: true}, spec.SpecSourceRecipe{})
 	require.NoError(t, err)
 	byName := map[string]*ProfileReady{}
 	for _, pr := range root.AllProfiles() {
@@ -387,7 +406,7 @@ func TestWorkingDirectoryCascade(t *testing.T) {
 		"chetree/_home/.config/c": "c\n",
 	})
 	_, baseEnv2 := prepEnv(t)
-	root2, err := PrepareSpecs(newContext(baseEnv2, repo2), options.Options{SkipExecIf: true, WorkingDirectory: "chetree"}, spec.SpecSourceRecipe{})
+	root2, err := PrepareSpecs(newContext(baseEnv2, repo2), options.Options{SkipRunIf: true, AutoDiscover: true, ProfileWorkingDirectory: "chetree"}, spec.SpecSourceRecipe{})
 	require.NoError(t, err)
 	wantWD, _ := filepath.EvalSymlinks(filepath.Join(repo2, "chetree"))
 	gotWD, _ := filepath.EvalSymlinks(root2.AllProfiles()[0].workingDir)
@@ -411,7 +430,7 @@ func TestCheLevelWorkingDirectoryDoesNotLeakIntoSourcedSpec(t *testing.T) {
 
 	// che-level workingDirectory "roottree" exists in host, NOT in ref. Before the
 	// fix it leaked into the sourced spec and failed resolving ref/roottree.
-	root, err := PrepareSpecs(newContext(baseEnv, host), options.Options{SkipExecIf: true, WorkingDirectory: "roottree"}, spec.SpecSourceRecipe{})
+	root, err := PrepareSpecs(newContext(baseEnv, host), options.Options{SkipRunIf: true, AutoDiscover: true, ProfileWorkingDirectory: "roottree"}, spec.SpecSourceRecipe{})
 	require.NoError(t, err)
 
 	byName := profileByName(root.AllProfiles())
@@ -420,23 +439,24 @@ func TestCheLevelWorkingDirectoryDoesNotLeakIntoSourcedSpec(t *testing.T) {
 	assert.Equal(t, wantRefWD, gotRefWD, "sourced spec anchors at its own checkout, not che-level roottree")
 }
 
-// TestAutoDiscoverGlobal: the user-config global autoDiscover discovers every
-// profile that leaves it unset, but a profile's own autoDiscover: false wins.
-func TestAutoDiscoverGlobal(t *testing.T) {
+// TestAutoDiscoverSwitch: autoDiscover=false disables discovery wholesale:
+// bare runs error, forced profiles still work.
+func TestAutoDiscoverSwitch(t *testing.T) {
 	repo := testutil.Repo(t, map[string]string{
-		"che.yml": "unset:\n  options: {}\n" +
-			"optout:\n  options: {autoDiscover: false}\n",
+		"che.yml": "marked:\n  options: {autoDiscover: true}\n",
 	})
 	_, baseEnv := prepEnv(t)
 
-	yes := true
-	root, err := PrepareSpecs(newContext(baseEnv, repo), options.Options{SkipExecIf: true, AutoDiscover: &yes}, spec.SpecSourceRecipe{})
+	_, err := PrepareSpecs(newContext(baseEnv, repo), options.Options{SkipRunIf: true}, spec.SpecSourceRecipe{})
+	require.ErrorContains(t, err, "auto-discovery is disabled", "default-false zero value models autoDiscover=false")
+
+	root, err := PrepareSpecs(newContext(baseEnv, repo), options.Options{SkipRunIf: true, AutoDiscover: true}, spec.SpecSourceRecipe{})
 	require.NoError(t, err)
-	var names []string
-	for _, pr := range root.AllProfiles() {
-		names = append(names, pr.Source.GetProfileName())
-	}
-	assert.Equal(t, []string{"unset"}, names, "global autoDiscover picks unset, profile opt-out wins")
+	require.Len(t, root.AllProfiles(), 1, "autoDiscover=true discovers marked profiles")
+
+	root, err = PrepareSpecs(newContext(baseEnv, repo), options.Options{SkipRunIf: true, Profiles: []string{"marked"}}, spec.SpecSourceRecipe{})
+	require.NoError(t, err)
+	require.Len(t, root.AllProfiles(), 1, "forced profiles bypass the disabled discovery")
 }
 
 // TestOverlayEnv: the overlay wins over the base, adds absent keys, and leaves
@@ -456,12 +476,14 @@ type stubOperation struct {
 	OperationReady
 	name     string
 	selected bool
+	delta    int
 	fail     error
 	ran      *[]string
 }
 
-func (o *stubOperation) Name() string   { return o.name }
-func (o *stubOperation) Selected() bool { return o.selected }
+func (o *stubOperation) Name() string                      { return o.name }
+func (o *stubOperation) Selected() bool                    { return o.selected }
+func (o *stubOperation) counts(_ *ProfileReady) (int, int) { return 1, o.delta }
 func (o *stubOperation) execOperation(_ *ProfileReady) error {
 	*o.ran = append(*o.ran, o.name)
 	return o.fail
@@ -474,17 +496,17 @@ func TestExecOperations(t *testing.T) {
 	p := &ProfileReady{
 		ref: "p",
 		OperationsReady: []operationReady{
-			&stubOperation{name: "one", selected: true, ran: &ran},
+			&stubOperation{name: "one", selected: true, delta: 1, ran: &ran},
 			&stubOperation{name: "skipped", selected: false, ran: &ran},
-			&stubOperation{name: "failing", selected: true, fail: boom, ran: &ran},
-			&stubOperation{name: "last", selected: true, ran: &ran},
+			&stubOperation{name: "failing", selected: true, delta: 1, fail: boom, ran: &ran},
+			&stubOperation{name: "last", selected: true, delta: 1, ran: &ran},
 		},
 	}
 	out, err := testutil.CaptureStdout(t, func() error { return p.ExecOperations(context.Background()) })
 	require.ErrorIs(t, err, boom)
 	assert.Equal(t, []string{"one", "failing", "last"}, ran, "run order, failure does not stop")
-	assert.Contains(t, testutil.StripANSI(out), "all(run): one")
-	assert.NotContains(t, testutil.StripANSI(out), "all(run): skipped")
+	assert.Contains(t, testutil.StripANSI(out), "run(runOp): one")
+	assert.NotContains(t, testutil.StripANSI(out), "run(runOp): skipped")
 }
 
 // TestExecOperationsSkipOpsNoSweep: a skipped deselected op takes the skip
@@ -504,8 +526,33 @@ func TestExecOperationsSkipOpsNoSweep(t *testing.T) {
 	require.NoError(t, err)
 	assert.Empty(t, ran)
 	stripped := testutil.StripANSI(out)
-	assert.Contains(t, stripped, "all(skip): render-templates")
+	assert.Contains(t, stripped, "run(runOp, skippedDue[config.skipOps]): render-templates")
 	assert.NotContains(t, stripped, "(nothing selected)", "skip wins over the deselected sweep branch")
+}
+
+// TestExecEachSkipsZeroDeltaProfile: a profile whose command ops carry no
+// delta is skipped wholesale, announced skippedDueNoDelta; profiles with delta
+// still run.
+func TestExecEachSkipsZeroDeltaProfile(t *testing.T) {
+	var ran []string
+	mk := func(ref string, delta int) *ProfileReady {
+		return &ProfileReady{ref: ref, OperationsReady: []operationReady{
+			&stubOperation{name: "make-links", selected: true, delta: delta, ran: &ran},
+		}}
+	}
+	s := &SpecReady{Profiles: []*ProfileReady{mk("settled", 0), mk("drifted", 1)}}
+	var executed []string
+	out, err := testutil.CaptureStdout(t, func() error {
+		return s.ExecEach(context.Background(), "run", func(_ context.Context, p *ProfileReady) error {
+			executed = append(executed, p.Ref())
+			return nil
+		})
+	})
+	require.NoError(t, err)
+	assert.Equal(t, []string{"drifted"}, executed, "zero-delta profile not executed")
+	stripped := testutil.StripANSI(out)
+	assert.Contains(t, stripped, "run(runProfile, skippedDue[NoDelta]): settled: [make-links(0)]")
+	assert.Contains(t, stripped, "run(runProfile): drifted: [make-links(1)]")
 }
 
 // [<] 🤖🤖

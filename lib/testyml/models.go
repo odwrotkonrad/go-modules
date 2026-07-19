@@ -42,13 +42,15 @@ type Args []arg
 
 // Expected is the canonical expectation set: function tests use
 // output/errorOutput, command tests use stdOut/stdErr/exitCode/files.
+// StdOutCounts pins exact occurrence counts of literal substrings.
 type Expected[W any] struct {
-	Output      W        `yaml:"output"`
-	ErrorOutput Matchers `yaml:"errorOutput"`
-	StdOut      Matchers `yaml:"stdOut"`
-	StdErr      Matchers `yaml:"stdErr"`
-	ExitCode    int      `yaml:"exitCode"`
-	Files       string   `yaml:"files"`
+	Output       W              `yaml:"output"`
+	ErrorOutput  Matchers       `yaml:"errorOutput"`
+	StdOut       Matchers       `yaml:"stdOut"`
+	StdOutCounts map[string]int `yaml:"stdOutCounts"`
+	StdErr       Matchers       `yaml:"stdErr"`
+	ExitCode     int            `yaml:"exitCode"`
+	Files        string         `yaml:"files"`
 }
 
 type Case[W any] struct {

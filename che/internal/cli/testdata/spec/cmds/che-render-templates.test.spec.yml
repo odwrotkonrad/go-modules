@@ -11,13 +11,13 @@ cases:
     expected:
       stdOut: |
         backup: ${HOME}/.local/state/che/backups/che-render-{{/.*/}}.tar.bz2
-        render(create): ${HOME}/.config/zsh/t
+        render-templates(created): ${HOME}/.config/zsh/t
   - name: ShouldRenderOnlyRepoDestsForOntoRepoProfile
     context:
       command: che render-templates --profile ontoRepo
     expected:
       stdOut: |
-        render(create): ${REPO}/docs/r.md
+        render-templates(created): ${REPO}/docs/r.md
     notExpected:
       stdOut:
         - ${HOME}/.config/zsh/t

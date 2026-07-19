@@ -53,7 +53,7 @@ cases:
             che.yml: |
               gitlabGroup:
                 options:
-                  execIf: ['env:REF_GATE']
+                  runIf: ['env:REF_GATE']
                 include:
                   runScripts: [scripts/bootstrap.zsh]
             scripts/bootstrap.zsh: "#!/bin/zsh\n"
@@ -69,11 +69,12 @@ cases:
         - flags: {debug: true}
     expected:
       stdOut:
-        - run @file://${REF_DIR}/che.yml::gitlabGroup
-        - cloned file://${REF_DIR}
-        - 'execIf(pass): profile gitlabGroup: env:REF_GATE'
+        - 'init-remote-sources(cloneRemote): file://${REF_DIR}'
+        - 'debug discover-profiles(showCandidates, all): [main[remote:${REF_NAME}:gitlabGroup]]'
+        - 'debug discover-profiles(showCandidates, autoDiscoverable): [main]'
+        - 'debug discover-profiles(evaluating[gitlabGroup], pass): env:REF_GATE'
       output:
-        profiles: [main, "@file://${REF_DIR}/che.yml::gitlabGroup"]
+        profiles: [main, "remote:${REF_NAME}:gitlabGroup"]
         repoRootUnder: ${CACHE}
         script: scripts/bootstrap.zsh
   - name: ShouldSkipRefWhenExecIfFails
@@ -85,7 +86,7 @@ cases:
             che.yml: |
               gitlabGroup:
                 options:
-                  execIf: ['env:REF_GATE']
+                  runIf: ['env:REF_GATE']
                 include:
                   runScripts: [scripts/bootstrap.zsh]
             scripts/bootstrap.zsh: "#!/bin/zsh\n"
@@ -100,9 +101,9 @@ cases:
             unsetEnv: [REF_GATE]
             debug: true
     expected:
-      stdOut: skip ${REF_DIR}/che.yml::gitlabGroup (execIf failed)
       output:
         profiles: [main]
+        rejected: {"${REF_DIR}/che.yml::gitlabGroup": "env:REF_GATE"}
   - name: ShouldGateRefExecIfWithEntryEnvWithoutLeaking
     input:
       args:
@@ -110,7 +111,7 @@ cases:
             che.yml: |
               gitlabGroup:
                 options:
-                  execIf: ['env:REF_GATE']
+                  runIf: ['env:REF_GATE']
                 include:
                   runScripts: [scripts/bootstrap.zsh]
             scripts/bootstrap.zsh: "#!/bin/zsh\n"
@@ -323,7 +324,7 @@ cases:
         - refFiles:
             che.yml: |
               options:
-                execIf: ['env:SPEC_GATE']
+                runIf: ['env:SPEC_GATE']
               p:
                 options: {autoDiscover: true}
                 include:
@@ -339,7 +340,7 @@ cases:
             unsetEnv: [SPEC_GATE]
             debug: true
     expected:
-      stdOut: spec(skip)
+      stdOut: debug spec(skip)
       output:
         profiles: [main]
   - name: ShouldInheritSpecAutoDiscoverDefault
@@ -367,7 +368,7 @@ cases:
             che.yml: |
               options:
                 autoDiscover: true
-                execIf: ['env:SPEC_GATE']
+                runIf: ['env:SPEC_GATE']
               a: {}
               b: {}
         - flags: {}
@@ -382,7 +383,7 @@ cases:
             che.yml: |
               options:
                 autoDiscover: true
-                execIf: ['env:SPEC_GATE']
+                runIf: ['env:SPEC_GATE']
               a: {}
               b: {}
         - flags:
@@ -490,7 +491,7 @@ cases:
         - flags: {}
     expected:
       output:
-        profiles: [main, "@file://${REF_DIR}/che.yml::gitlabGroup"]
+        profiles: [main, "remote:${REF_NAME}:gitlabGroup"]
         linkDests:
           gitlabGroup: ['${HOME}/.config/ovr']
   - name: ShouldMapNonHomeDestsToSystemRoot

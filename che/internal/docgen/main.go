@@ -171,7 +171,7 @@ var labelValues = []struct {
 	Values []labelValue
 }{
 	{"op", []labelValue{
-		{"prune-links", "remove ledger-recorded links whose source is gone"},
+		{"prune-broken-links", "remove ledger-recorded links whose source is gone"},
 		{"make-dirs", "create repo-tree dirs + extra-dirs"},
 		{"make-links", "symlink configs into the system root"},
 		{"make-copies", "copy *.ontoHost.cp sources onto their dests"},
@@ -197,10 +197,10 @@ var labelValues = []struct {
 		{"fail", "script failed (kind=script)"},
 	}},
 	{"command", []labelValue{
-		{"all", "the `all` full-install command"},
+		{"run", "the `run` full-install command"},
 		{"uninstall", "the `uninstall` command"},
 		{"discover", "the `discover` command"},
-		{"prune-links", "the `prune-links` per-op command"},
+		{"prune-broken-links", "the `prune-broken-links` per-op command"},
 		{"make-dirs", "the `make-dirs` per-op command"},
 		{"make-links", "the `make-links` per-op command"},
 		{"make-copies", "the `make-copies` per-op command"},

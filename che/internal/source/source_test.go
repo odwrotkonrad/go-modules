@@ -13,6 +13,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"gitlab.com/konradodwrot/go-modules/che/internal/execx"
+	"gitlab.com/konradodwrot/go-modules/che/internal/log"
 	"gitlab.com/konradodwrot/go-modules/che/internal/testutil"
 	"gitlab.com/konradodwrot/go-modules/lib/testyml"
 )
@@ -27,16 +28,16 @@ func TestSlug(t *testing.T) {
 }
 
 // TestDir: the cache checkout lives under the resolved CACHE base — default
-// ~/.cache/che/sources, CHE_CACHE_HOME (che's base directly), or
+// ~/.cache/che/remote-sources, CHE_CACHE_HOME (che's base directly), or
 // XDG_CACHE_HOME/che.
 func TestDir(t *testing.T) {
 	const url = "https://example.com/x.git"
 	for _, tc := range []struct {
 		name, che, xdg, want string
 	}{
-		{"default", "", "", "/h/.cache/che/sources/example.com-x"},
-		{"cheOverride", "/o", "/x", "/o/sources/example.com-x"},
-		{"xdgBase", "", "/x", "/x/che/sources/example.com-x"},
+		{"default", "", "", "/h/.cache/che/remote-sources/example.com-x"},
+		{"cheOverride", "/o", "/x", "/o/remote-sources/example.com-x"},
+		{"xdgBase", "", "/x", "/x/che/remote-sources/example.com-x"},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			t.Setenv("CHE_CACHE_HOME", tc.che)
@@ -53,32 +54,40 @@ type ensureWant struct {
 	Files  []string `yaml:"files"`
 }
 
-// TestEnsure: a first call clones into the cache dir (logged as cloned), a
+// TestEnsure: a first call clones into the cache dir (logged as cloneRemote), a
 // later one hard-resets to new upstream commits (logged as pulled); a
 // no-change pull stays silent (attempt lines are debug-gated). The git CLI
 // runs through the mock executor's go-git model: nothing spawns.
 func TestEnsure(t *testing.T) {
 	testyml.Run(t, td, "testdata/spec/funcs/ensure_checkout.test.spec.yml", func(t *testing.T, c testyml.Case[ensureWant]) {
 		execx.Swap(t, testutil.NewCmdMockExecutor())
+		ResetCache()
+		t.Cleanup(ResetCache)
+		log.SetDebug(c.Input.Args.Bool(t, 2))
+		t.Cleanup(func() { log.SetDebug(false) })
 		up := testutil.Repo(t, map[string]string{"che.yml": "p: {}\n"})
 		home := t.TempDir()
 		url := "file://" + up
 		a := c.Input.Args
 		for range a.Int(t, 0) {
 			_, err := testutil.CaptureStdout(t, func() error {
-				_, e := EnsureCheckout(home, url, "p")
+				_, e := EnsureCheckout(home, url)
 				return e
 			})
 			require.NoError(t, err, "prior EnsureCheckout")
+			ResetCache()
 		}
 		if a.Bool(t, 1) {
 			testutil.WriteTree(t, up, map[string]string{"extra.txt": "x\n"})
 			testutil.GitRepo(t, up)
 		}
+		if a.Bool(t, 3) {
+			require.NoError(t, os.RemoveAll(up))
+		}
 		var dir string
 		out, err := testutil.CaptureStdout(t, func() error {
 			var e error
-			dir, e = EnsureCheckout(home, url, "p")
+			dir, e = EnsureCheckout(home, url)
 			return e
 		})
 		require.NoError(t, err)

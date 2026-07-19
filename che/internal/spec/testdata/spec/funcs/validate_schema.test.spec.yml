@@ -82,7 +82,7 @@ cases:
       args:
         - doc: |
             options:
-              execIf: ['env:X']
+              runIf: ['env:X']
               autoDiscover: true
               debug: false
               validateSpec: warn

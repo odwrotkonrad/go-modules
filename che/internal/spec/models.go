@@ -112,23 +112,25 @@ type Doc struct {
 // identical shape, different precedence layer. execIf/workingDirectory are
 // spec-only (ignored in user config).
 type Options struct {
-	ExecIf           []string        `yaml:"execIf" jsonschema_description:"spec-level predicates: gate every profile of this spec (ANDed with each profile's own); spec-only"`
-	AutoDiscover     *bool           `yaml:"autoDiscover" jsonschema_description:"default for profiles that don't set it"`
-	Debug            *bool           `yaml:"debug" jsonschema_description:"default for profiles that don't set it"`
-	WorkingDirectory string          `yaml:"workingDirectory" jsonschema_description:"the load-ops source tree (absolute, relative to the checkout, ~/, $VAR, env vars expanded); default the checkout itself; makeLinks/makeCopies/renderTemplates host sources resolve against it; home targeting is explicit via a $HOME dest rewrite; spec-only"`
-	ValidateSpec     string          `yaml:"validateSpec" jsonschema:"enum=warn,enum=error" jsonschema_description:"how this spec's schema violations report (per-spec: each included spec honors its own); overridden by the flag and env var"`
-	DryRun           string          `yaml:"dryRun" jsonschema:"enum=delta,enum=all,enum=true" jsonschema_description:"default dry-run mode: delta (changed dests) | all (every dest) | true (alias for all); overridden by the flag and env var"`
-	Profiles         []string        `yaml:"profiles" jsonschema_description:"profiles to run (autoDiscover skipped, execIf still enforced); overridden by --profiles and CHE_PROFILE"`
-	SkipRemoteRefs   *bool           `yaml:"skipRemoteRefs" jsonschema_description:"skip sourced include.profiles refs; overridden by the flag and env var"`
-	SkipOps          []string        `yaml:"skipOps" jsonschema:"enum=prune-links,enum=make-dirs,enum=make-links,enum=make-copies,enum=render-templates,enum=run-scripts" jsonschema_description:"ops skipped everywhere: dropped from the all sequence, direct op subcommands become logged no-ops; overridden by --skip-ops and CHE_SKIP_OPS"`
-	All              All             `yaml:"all" jsonschema_description:"all-command options"`
-	RenderTemplates  RenderTemplates `yaml:"renderTemplates" jsonschema_description:"renderTemplates op defaults"`
-	Otel             Otel            `yaml:"otel" jsonschema_description:"OTLP telemetry (metrics + logs) to a local collector; overridden by CHE_OTEL_* env"`
+	RunIf                   []string        `yaml:"runIf" jsonschema_description:"spec-level predicates: gate every profile of this spec (ANDed with each profile's own); spec-only"`
+	ExecIf                  []string        `yaml:"execIf" jsonschema_description:"deprecated alias of runIf"`
+	AutoDiscover            *bool           `yaml:"autoDiscover" jsonschema_description:"spec block: default for profiles that don't set it; user config: auto-discovery master switch (default true, false: only --profiles and include.profiles refs run); overridden by CHE_AUTO_DISCOVER"`
+	Debug                   *bool           `yaml:"debug" jsonschema_description:"default for profiles that don't set it"`
+	ProfileWorkingDirectory string          `yaml:"profileWorkingDirectory" jsonschema_description:"the load-ops source tree (absolute, relative to the checkout, ~/, $VAR, env vars expanded); default the checkout itself; makeLinks/makeCopies/renderTemplates host sources resolve against it; home targeting is explicit via a $HOME dest rewrite; spec-only"`
+	WorkingDirectory        string          `yaml:"workingDirectory" jsonschema_description:"deprecated alias of profileWorkingDirectory"`
+	ValidateSpec            string          `yaml:"validateSpec" jsonschema:"enum=warn,enum=error" jsonschema_description:"how this spec's schema violations report (per-spec: each included spec honors its own); overridden by the flag and env var"`
+	DryRun                  string          `yaml:"dryRun" jsonschema:"enum=delta,enum=all,enum=true" jsonschema_description:"default dry-run mode: delta (changed dests) | all (every dest) | true (alias for delta); overridden by the flag and env var"`
+	Profiles                []string        `yaml:"profiles" jsonschema_description:"profiles to run (autoDiscover skipped, runIf still enforced); overridden by --profiles and CHE_PROFILE"`
+	SkipRemoteRefs          *bool           `yaml:"skipRemoteRefs" jsonschema_description:"skip sourced include.profiles refs; overridden by the flag and env var"`
+	SkipOps                 []string        `yaml:"skipOps" jsonschema:"enum=prune-broken-links,enum=make-dirs,enum=make-links,enum=make-copies,enum=render-templates,enum=run-scripts" jsonschema_description:"ops skipped everywhere: dropped from the run sequence, direct op subcommands become logged no-ops; overridden by --skip-ops and CHE_SKIP_OPS"`
+	Run                     Run             `yaml:"run" jsonschema_description:"run-command options"`
+	RenderTemplates         RenderTemplates `yaml:"renderTemplates" jsonschema_description:"renderTemplates op defaults"`
+	Otel                    Otel            `yaml:"otel" jsonschema_description:"OTLP telemetry (metrics + logs) to a local collector; overridden by CHE_OTEL_* env"`
 }
 
-// All namespaces all-command option defaults.
-type All struct {
-	SkipOps []string `yaml:"skipOps" jsonschema:"enum=prune-links,enum=make-dirs,enum=make-links,enum=make-copies,enum=render-templates,enum=run-scripts" jsonschema_description:"ops skipped in the all sequence only (direct op subcommands unaffected); overridden by che all --skip-ops and CHE_ALL_SKIP_OPS"`
+// Run namespaces run-command option defaults.
+type Run struct {
+	SkipOps []string `yaml:"skipOps" jsonschema:"enum=prune-broken-links,enum=make-dirs,enum=make-links,enum=make-copies,enum=render-templates,enum=run-scripts" jsonschema_description:"ops skipped in the run sequence only (direct op subcommands unaffected); overridden by che run --skip-ops and CHE_RUN_SKIP_OPS"`
 }
 
 // RenderTemplates namespaces renderTemplates-op option defaults.
@@ -151,7 +153,7 @@ type Otel struct {
 // ProfileRecipe is one raw declared profile.
 type ProfileRecipe struct {
 	Source  ProfileSourceRecipe `yaml:"-" jsonschema:"-"`
-	Options ProfileOptions      `yaml:"options" jsonschema_description:"when the profile runs: autoDiscover opts in to bare-che runs, execIf predicates must ALL pass; debug/workingDirectory cascade (most nested wins)"`
+	Options ProfileOptions      `yaml:"options" jsonschema_description:"when the profile runs: autoDiscover opts in to bare-che runs, runIf predicates must ALL pass; debug/workingDirectory cascade (most nested wins)"`
 	Include includeSet          `yaml:"include"`
 	Exclude excludeSet          `yaml:"exclude"`
 }
@@ -159,11 +161,23 @@ type ProfileRecipe struct {
 // ProfileOptions self-describes when and where a profile runs. Pointer/zero
 // fields inherit the level above (profile > spec > che, most nested wins).
 type ProfileOptions struct {
-	ExecIf           []string `yaml:"execIf"`
-	AutoDiscover     *bool    `yaml:"autoDiscover" jsonschema_description:"run on bare che (nil: inherit spec options, then false: runs only via --profiles or include.profiles)"`
-	Debug            *bool    `yaml:"debug" jsonschema_description:"print debug-level lines around this profile (nil: inherit spec options, then che level)"`
-	WorkingDirectory string   `yaml:"workingDirectory" jsonschema_description:"the profile's load-ops source tree (empty: inherit spec options, then che level, then the checkout)"`
+	RunIf                   []string `yaml:"runIf" jsonschema_description:"predicates that must ALL pass for the profile to run"`
+	ExecIf                  []string `yaml:"execIf" jsonschema_description:"deprecated alias of runIf"`
+	AutoDiscover            *bool    `yaml:"autoDiscover" jsonschema_description:"run on bare che (nil: inherit spec options, then false: runs only via --profiles or include.profiles)"`
+	Debug                   *bool    `yaml:"debug" jsonschema_description:"print debug-level lines around this profile (nil: inherit spec options, then che level)"`
+	ProfileWorkingDirectory string   `yaml:"profileWorkingDirectory" jsonschema_description:"the profile's load-ops source tree (empty: inherit spec options, then che level, then the checkout)"`
+	WorkingDirectory        string   `yaml:"workingDirectory" jsonschema_description:"deprecated alias of profileWorkingDirectory"`
 }
+
+// RunIfAll is the profile's effective predicates: runIf plus the deprecated
+// execIf alias.
+func (o ProfileOptions) RunIfAll() []string {
+	return append(append([]string{}, o.RunIf...), o.ExecIf...)
+}
+
+// RunIfAll is the spec's effective predicates: runIf plus the deprecated
+// execIf alias.
+func (o Options) RunIfAll() []string { return append(append([]string{}, o.RunIf...), o.ExecIf...) }
 
 // includeSet is the additive payload.
 type includeSet struct {

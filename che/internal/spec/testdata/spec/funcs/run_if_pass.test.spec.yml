@@ -10,7 +10,7 @@ cases:
     expected:
       output: false
     notExpected:
-      stdOut: ["execIf(reject)"]
+      stdOut: ["noPass"]
   - name: ShouldLogRejectAtDebugLevel
     context:
       env: {X: ""}
@@ -18,7 +18,7 @@ cases:
       args: [profile: p, debug: true]
     expected:
       output: false
-      stdOut: ["execIf(reject): profile p: env:X"]
+      stdOut: ["debug discover-profiles(evaluating[p], noPass): env:X"]
   - name: ShouldPassSilentlyOnSetEnvAtNormalLevel
     context:
       env: {X: "1"}
@@ -27,7 +27,7 @@ cases:
     expected:
       output: true
     notExpected:
-      stdOut: ["execIf(pass)"]
+      stdOut: ["evaluating["]
   - name: ShouldPassAndLogOnSetEnvAtDebugLevel
     context:
       env: {X: "1"}
@@ -35,7 +35,7 @@ cases:
       args: [profile: p, debug: true]
     expected:
       output: true
-      stdOut: ["execIf(pass): profile p: env:X"]
+      stdOut: ["debug discover-profiles(evaluating[p], pass): env:X"]
   - name: ShouldErrorOnUndefinedProfile
     input:
       args: [profile: nope, debug: false]

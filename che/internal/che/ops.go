@@ -4,11 +4,13 @@ package che
 
 import (
 	"errors"
+	"fmt"
 	"os"
 	"strings"
 
 	"gitlab.com/konradodwrot/go-modules/che/internal/database"
 	"gitlab.com/konradodwrot/go-modules/che/internal/fsutil"
+	"gitlab.com/konradodwrot/go-modules/che/internal/log"
 	"gitlab.com/konradodwrot/go-modules/che/internal/spec"
 )
 
@@ -19,12 +21,139 @@ const Bin = "che"
 // the XDG backups dir before a mutating op runs (sub = op identity). The archive
 // path/sub are stashed on the profile so the op's following mutate calls
 // reference this run's Backup row. Uses the run's shared TsLayout stamp so the
-// filename and the ledger run line up.
+// filename and the ledger run line up. Under `run` the backup stage already
+// archived every op dest (spec/che/BackupCmdBehavior.md): the op skips its own
+// archive and points its records at the stage archive.
 func (p *ProfileReady) archiveBefore(sub string, dests []string) error {
+	if p.backedUp {
+		p.currentArchive = fsutil.ResolveBackupArchivePath(p.home, Bin, "backup", p.runID)
+		p.currentSub = "backup"
+		return nil
+	}
 	path := fsutil.ResolveBackupArchivePath(p.home, Bin, sub, p.runID)
 	p.currentArchive = path
 	p.currentSub = sub
 	return p.mutate("backup", path, "", opInfo{}, func() error { return p.FS.ArchiveDestinations(path, dests) })
+}
+
+// backupDests lists the dests the profile's file ops WOULD CHANGE (unsettled
+// links, differing copies, differing renders), run order: only they need a
+// pre-mutation snapshot, settled dests are untouched.
+func (p *ProfileReady) backupDests() []string {
+	var out []string
+	for _, op := range p.commandOps("backup") {
+		switch o := op.(type) {
+		case *MakeLinksOperationReady:
+			for _, item := range o.Links {
+				dest := p.toDest(spec.DestRel(item))
+				if !fsutil.IsLinkSettled(p.Reader, p.resolveSrc(item.Rel), dest) {
+					out = append(out, dest)
+				}
+			}
+		case *MakeCopiesOperationReady:
+			for _, item := range o.Copies {
+				src := p.resolveSrc(item.Rel)
+				for _, dest := range p.resolveCopyDests(item) {
+					if !fsutil.IsSameContent(p.Reader, src, dest) {
+						out = append(out, dest)
+					}
+				}
+			}
+		case *RenderTemplatesOperationReady:
+			for _, item := range o.Templates {
+				hash, err := p.mockRenderHash(item)
+				for _, d := range p.resolveTemplateDests(item) {
+					if !d.host {
+						continue
+					}
+					if err != nil || p.readRenderHash(d.path) != hash {
+						out = append(out, d.path)
+					}
+				}
+			}
+		}
+	}
+	return out
+}
+
+// existingBackupDests counts the backup dests currently present on the host.
+func (p *ProfileReady) existingBackupDests() int {
+	n := 0
+	for _, dest := range p.backupDests() {
+		if _, err := p.Reader.LstatPath(dest); err == nil {
+			n++
+		}
+	}
+	return n
+}
+
+// ExecBackup archives every existing would-change dest into one per-run backup
+// archive and marks the profile backed up, so the following ops skip their own
+// archives. The showDelta line always logs (spec/che/BackupCmdBehavior.md);
+// the created line reports the written archive with its size, nothing to back
+// up writes and logs nothing more.
+func (p *ProfileReady) ExecBackup() error {
+	defer func() { p.backedUp = true }()
+	p.logMsg("backup(showDelta)", p.backupDeltaSummary())
+	if p.existingBackupDests() == 0 {
+		return nil
+	}
+	dests := p.backupDests()
+	path := fsutil.ResolveBackupArchivePath(p.home, Bin, "backup", p.runID)
+	p.currentArchive = path
+	p.currentSub = "backup"
+	if p.isDryRun() {
+		p.logMsg("backup(created)", path)
+		return nil
+	}
+	if err := p.FS.ArchiveDestinations(path, dests); err != nil {
+		return err
+	}
+	p.logMsg("backup(created)", humanSize(archiveSize(path))+", "+path)
+	return nil
+}
+
+// backupDeltaSummary lists the backed-up file ops with their discover deltas:
+// "op(delta),op(delta)".
+func (p *ProfileReady) backupDeltaSummary() string {
+	var parts []string
+	for _, op := range p.commandOps("backup") {
+		_, delta := op.counts(p)
+		parts = append(parts, fmt.Sprintf("%s(%d)", op.Name(), delta))
+	}
+	return strings.Join(parts, ",")
+}
+
+// archiveSize is the written archive's size in bytes (0 when unreadable, e.g.
+// record-only test writers).
+func archiveSize(path string) int64 {
+	fi, err := os.Stat(path)
+	if err != nil {
+		return 0
+	}
+	return fi.Size()
+}
+
+// humanSize renders bytes human-readable (B/KB/MB, one decimal above KB).
+func humanSize(n int64) string {
+	switch {
+	case n >= 1<<20:
+		return fmt.Sprintf("%.1fMB", float64(n)/(1<<20))
+	case n >= 1<<10:
+		return fmt.Sprintf("%.1fKB", float64(n)/(1<<10))
+	}
+	return fmt.Sprintf("%dB", n)
+}
+
+// ExecBackupStage is ExecBackup as the run sequence's backup stage: announced
+// like the other wrapped ops (skippedDue[NoDelta] when nothing needs backing up).
+func (p *ProfileReady) ExecBackupStage() error {
+	if p.existingBackupDests() == 0 {
+		log.Msg(skipTitle("run", "runOp", "NoDelta"), "backup", log.Off)
+	} else {
+		log.Msg("run(runOp)", "backup", log.Off)
+	}
+	return p.ExecBackup()
 }
 
 // failItem logs "<op>(fail): <dest>: <err>" and returns err, the per-item
@@ -53,7 +182,10 @@ func (p *ProfileReady) makeDirs(dirs []spec.FileItem) error {
 }
 
 func (p *ProfileReady) upsertExtraDir(item spec.FileItem, dest string) error {
-	if fsutil.IsDirSettled(p.Reader, dest, p.isDryRunAll()) {
+	if fsutil.IsDirSettled(p.Reader, dest) {
+		if p.isDryRunAll() {
+			p.logMsg(skipTitle("make-dirs", p.wouldAction(dest), p.skipReasons("AlreadyExists")...), dest)
+		}
 		return p.fixPerms("make-dirs", dest, item)
 	}
 	return p.makeExtraDir(item, dest)
@@ -61,7 +193,10 @@ func (p *ProfileReady) upsertExtraDir(item spec.FileItem, dest string) error {
 
 func (p *ProfileReady) ensureConfigDir(relativePath string) error {
 	dest := p.toDest(relativePath)
-	if fsutil.IsDirSettled(p.Reader, dest, p.isDryRunAll()) {
+	if fsutil.IsDirSettled(p.Reader, dest) {
+		if p.isDryRunAll() {
+			p.logMsg(skipTitle("make-dirs", p.wouldAction(dest), p.skipReasons("AlreadyExists")...), dest)
+		}
 		return nil
 	}
 	err := p.mutate("make-dirs(create)", dest, dest, opInfo{kind: "dir"}, func() error { return p.FS.MakeDir(dest, 0, false) })
@@ -107,7 +242,8 @@ func (p *ProfileReady) chownIfSet(title string, item spec.FileItem, dest string)
 // fixPerms applies spec mode/owner to an existing dest when they drift, labeling
 // the fixes with the owning op ("<op>(chmod)" / "<op>(chown)"). In dry-run=delta
 // these lines report the drift; off they correct it. A settled dest (no drift)
-// emits nothing. Dry-run=all never reaches here (dests are re-created).
+// emits nothing, except under dry-run=all, where the already-set state logs
+// (spec/che/LogBehavior.md).
 func (p *ProfileReady) fixPerms(op, dest string, item spec.FileItem) error {
 	needChmod, needChown := fsutil.DetectPermsDrift(p.Reader, dest, item.Chmod, formatOwnerSpec(item))
 	if needChmod {
@@ -115,11 +251,15 @@ func (p *ProfileReady) fixPerms(op, dest string, item spec.FileItem) error {
 		if err := p.chmod(op+"(chmod)", mode, dest); err != nil {
 			return err
 		}
+	} else if p.isDryRunAll() && item.Chmod != "" {
+		p.logMsg(skipTitle(op, "chmod", p.skipReasons("AlreadySet")...), dest)
 	}
 	if needChown {
 		if err := p.chown(op+"(chown)", formatOwnerSpec(item), dest); err != nil {
 			return err
 		}
+	} else if p.isDryRunAll() && formatOwnerSpec(item) != "" {
+		p.logMsg(skipTitle(op, "chown", p.skipReasons("AlreadySet")...), dest)
 	}
 	return nil
 }
@@ -164,7 +304,10 @@ func (p *ProfileReady) makeLinks(links []spec.FileItem, dirRelativePaths []strin
 
 func (p *ProfileReady) makeLink(item spec.FileItem, dest string) error {
 	src := p.resolveSrc(item.Rel)
-	if fsutil.IsLinkSettled(p.Reader, src, dest, p.isDryRunAll()) {
+	if fsutil.IsLinkSettled(p.Reader, src, dest) {
+		if p.isDryRunAll() {
+			p.logMsg(skipTitle("make-links", p.wouldAction(dest), p.skipReasons("AlreadyLinked")...), dest)
+		}
 		return nil
 	}
 	return p.mutate("make-links(create)", dest, dest, opInfo{kind: "link", target: src, srcRel: item.Rel}, func() error { return p.FS.MakeSymlink(src, dest) })
@@ -179,7 +322,10 @@ func (p *ProfileReady) makeCopies(copies []spec.FileItem, dirRelativePaths []str
 
 func (p *ProfileReady) makeCopy(item spec.FileItem, dest string) error {
 	src := p.resolveSrc(item.Rel)
-	if !p.isDryRunAll() && fsutil.IsSameContent(p.Reader, src, dest) {
+	if fsutil.IsSameContent(p.Reader, src, dest) {
+		if p.isDryRunAll() {
+			p.logMsg(skipTitle("make-copies", p.wouldAction(dest), p.skipReasons("SameContent")...), dest)
+		}
 		return p.fixPerms("make-copies", dest, item)
 	}
 	mode, _ := fsutil.ParseMode(item.Chmod)
@@ -216,25 +362,56 @@ func formatOwnerSpec(item spec.FileItem) string {
 	return item.Owner + ":" + item.OwnerGroup
 }
 
+// installedLinks lists the link dests the ledger recorded for this profile.
+// Records-off (nil ledger) -> empty.
+func (p *ProfileReady) installedLinks() ([]database.OperationDone, error) {
+	if p.Ledger == nil || p.profileDone == nil {
+		return nil, nil
+	}
+	installed, err := p.Ledger.InstalledForProfile(p.ref)
+	if err != nil {
+		return nil, err
+	}
+	var links []database.OperationDone
+	for _, op := range installed {
+		if op.Kind == "link" {
+			links = append(links, op)
+		}
+	}
+	return links, nil
+}
+
+// scanBrokenLinks lists the recorded links whose source (repo file the symlink
+// points at) no longer exists.
+func (p *ProfileReady) scanBrokenLinks() ([]database.OperationDone, error) {
+	links, err := p.installedLinks()
+	if err != nil {
+		return nil, err
+	}
+	var broken []database.OperationDone
+	for _, op := range links {
+		if !p.linkSourcePresent(op) {
+			broken = append(broken, op)
+		}
+	}
+	return broken, nil
+}
+
 // pruneBrokenLinks removes link dests the ledger recorded for this profile whose
 // source (repo file the symlink points at) no longer exists — the ledger, not
 // git, is the source of truth. dry-run / records-off -> nothing pruned.
 func (p *ProfileReady) pruneBrokenLinks() error {
-	p.logMsg("prune-links", p.resolveRoot())
 	if p.Ledger == nil || p.profileDone == nil || p.isDryRun() {
 		return nil
 	}
-	installed, err := p.Ledger.InstalledForProfile(p.ref)
+	broken, err := p.scanBrokenLinks()
 	if err != nil {
 		return err
 	}
 	var errs []error
-	for _, op := range installed {
-		if op.Kind != "link" || p.linkSourcePresent(op) {
-			continue
-		}
+	for _, op := range broken {
 		if err := p.removeStale(op); err != nil {
-			errs = append(errs, p.failItem("prune-links", op.Dest, err))
+			errs = append(errs, p.failItem("prune-broken-links", op.Dest, err))
 		}
 	}
 	return errors.Join(errs...)

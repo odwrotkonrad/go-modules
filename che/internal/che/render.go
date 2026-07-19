@@ -3,12 +3,14 @@ package che
 // [>] 🤖🤖
 
 import (
+	"bytes"
 	"errors"
 	"os"
 	"path/filepath"
 	"strings"
 
 	"gitlab.com/konradodwrot/go-modules/che/internal/fsutil"
+	"gitlab.com/konradodwrot/go-modules/che/internal/log"
 	"gitlab.com/konradodwrot/go-modules/che/internal/spec"
 	"gitlab.com/konradodwrot/go-modules/che/render/render"
 )
@@ -44,7 +46,7 @@ func (p *ProfileReady) renderTemplates(templates []spec.FileItem, skipSecrets bo
 		dests := p.resolveTemplateDests(item)
 		if skipSecrets && p.isSecretRefInItem(item) {
 			for _, d := range dests {
-				p.logMsg("render(skip-secrets)", d.path)
+				log.Debug(skipTitle("render-templates", p.wouldAction(d.path), p.skipReasons("config.renderTemplates.skipSecrets")...), d.path, log.Off)
 			}
 			continue
 		}
@@ -61,13 +63,21 @@ func (p *ProfileReady) renderTemplates(templates []spec.FileItem, skipSecrets bo
 		}
 	}
 	var errs []error
-	if p.isDryRun() { // [why] dry-run logs dests only: no gomplate render, no @-include resolve
+	if p.isDryRun() { // [why] dry-run predicts via the mock-render cache: no real render, no secret resolve
 		for _, t := range keep {
+			hash, herr := p.mockRenderHash(t.item)
 			for _, d := range t.dests {
-				p.logMsg("render(create)", d.path)
+				settled := herr == nil && p.readRenderHash(d.path) == hash
+				switch {
+				case settled && p.isDryRunAll():
+					p.logMsg(skipTitle("render-templates", p.wouldAction(d.path), p.skipReasons("SameContent")...), d.path)
+				case settled: // [why] delta mode: an unchanged render logs nothing
+				default:
+					p.logMsg(skipTitle("render-templates", p.wouldAction(d.path), p.dryRunReasons()...), d.path)
+				}
 				if d.host {
-					if err := p.fixPerms("render", d.path, t.item); err != nil {
-						errs = append(errs, p.failItem("render", d.path, err))
+					if err := p.fixPerms("render-templates", d.path, t.item); err != nil {
+						errs = append(errs, p.failItem("render-templates", d.path, err))
 					}
 				}
 			}
@@ -76,7 +86,7 @@ func (p *ProfileReady) renderTemplates(templates []spec.FileItem, skipSecrets bo
 	}
 	for _, t := range keep {
 		if err := p.renderTemplate(t.item, t.dests); err != nil {
-			errs = append(errs, p.failItem("render", t.item.Rel, err))
+			errs = append(errs, p.failItem("render-templates", t.item.Rel, err))
 		}
 	}
 	errs = append(errs, p.sweepStale("render", hostDests)) // [why] host dests only: repo-doc renders are git-tracked, never swept
@@ -151,27 +161,31 @@ func (p *ProfileReady) resolveTemplateDests(item spec.FileItem) []tmplDest {
 	return out
 }
 
-func (p *ProfileReady) renderTemplate(item spec.FileItem, dests []tmplDest) error {
-	var src []byte
-	tmplPath := item.Rel
+// readTemplateSrc reads the item's template source (remote fetched, local from
+// disk), returning the bytes and the template path (error messages, engine name).
+func (p *ProfileReady) readTemplateSrc(item spec.FileItem) ([]byte, string, error) {
 	if spec.IsRemoteSrc(item.Rel) {
 		content, err := p.fetchRemote(spec.RemoteSrcRef(item.Rel))
 		if err != nil {
-			return err
+			return nil, item.Rel, err
 		}
-		src = []byte(content)
-	} else {
-		tmplPath = p.templateSrcPath(item)
-		var err error
-		src, err = os.ReadFile(tmplPath)
-		if err != nil {
-			return err
-		}
+		return []byte(content), item.Rel, nil
+	}
+	tmplPath := p.templateSrcPath(item)
+	src, err := os.ReadFile(tmplPath)
+	return src, tmplPath, err
+}
+
+func (p *ProfileReady) renderTemplate(item spec.FileItem, dests []tmplDest) error {
+	src, tmplPath, err := p.readTemplateSrc(item)
+	if err != nil {
+		return err
 	}
 	body, err := render.ExecWithCtx(tmplPath, src, p.resolveRepoRoot(), item.Ctx)
 	if err != nil {
 		return err
 	}
+	p.storeRenderHashes(item, dests, tmplPath, src, body)
 	if len(item.Dests) == 0 || item.Derived { // derived host dest: raw body, no Compose header
 		return p.placeFile(dests[0].path, body, item)
 	}
@@ -191,7 +205,12 @@ func (p *ProfileReady) renderTemplate(item spec.FileItem, dests []tmplDest) erro
 			}
 			continue
 		}
-		p.logMsg("render(create)", d.path)
+		current, err := os.ReadFile(d.path)
+		if err == nil && bytes.Equal(current, out) {
+			log.Debug(skipTitle("render-templates", "overwrite", "SameContent"), d.path, log.Off)
+			continue
+		}
+		p.logMsg(resolveCreateTitle("render-templates(create)", err == nil), d.path)
 		if err := os.MkdirAll(filepath.Dir(d.path), 0o755); err != nil {
 			return err
 		}
@@ -212,10 +231,16 @@ func (p *ProfileReady) readExistingDest(d tmplDest) ([]byte, error) {
 }
 
 // placeFile installs body with spec perms (mode 0 -> install default, no chown).
+// An unchanged dest (byte-identical content) skips the write: a debug
+// (overwrite, skippedDue[SameContent]) line, perms drift still corrected.
 func (p *ProfileReady) placeFile(dest string, body []byte, item spec.FileItem) error {
+	if cur, err := p.Reader.ReadFileBytes(dest); err == nil && bytes.Equal(cur, body) {
+		log.Debug(skipTitle("render-templates", "overwrite", "SameContent"), dest, log.Off)
+		return p.fixPerms("render-templates", dest, item)
+	}
 	mode, _ := fsutil.ParseMode(item.Chmod)
 	info := opInfo{kind: "render", srcRel: item.Rel, mode: item.Chmod, owner: formatOwnerSpec(item)}
-	return p.mutate("render(create)", dest, dest, info, func() error {
+	return p.mutate("render-templates(create)", dest, dest, info, func() error {
 		return p.FS.InstallFile(dest, body, mode, formatOwnerSpec(item))
 	})
 }

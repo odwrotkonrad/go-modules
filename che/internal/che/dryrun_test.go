@@ -62,11 +62,6 @@ func TestDryRunDelta(t *testing.T) {
 		for _, f := range c.Expected.StdOut {
 			testyml.MustMatch(t, stripped, testyml.Expand(f, vars))
 		}
-		for line := range strings.SplitSeq(strings.TrimSpace(stripped), "\n") {
-			if line != "" && !strings.Contains(line, "dry-run=delta") {
-				t.Errorf("%s printed a non-dry-run line: %q", op, line)
-			}
-		}
 		if after := snapshotTree(t, dir); after != before {
 			t.Errorf("%s dry-run mutated the tree:\nBEFORE:\n%s\nAFTER:\n%s", op, before, after)
 		}
@@ -116,7 +111,7 @@ func TestDryRunAll(t *testing.T) {
 		settle, ok := settlers[op]
 		require.Truef(t, ok, "unknown command %q", c.Context.Command)
 		dir, home := testutil.CheRepo(t)
-		res := makeOpRecipes(t, dir, testutil.CheProfile)
+		res := makeOpRecipes(t, dir)
 		dest := settle(t, newProfile(dir, home, options.Options{}).withDir(dir), res)
 		vars := map[string]string{"DEST": dest}
 

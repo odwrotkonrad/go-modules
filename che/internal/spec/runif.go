@@ -24,10 +24,10 @@ func NewEvaluator(lookupEnv func(string) string) *Evaluator {
 	}
 }
 
-// EvalExecIf evaluates one expression: `<source>` (truthy: builtin iff "true",
+// EvalRunIf evaluates one expression: `<source>` (truthy: builtin iff "true",
 // env iff set non-empty) or `<source> == <literal>` (string compare, builtins
 // render as true/false).
-func (e *Evaluator) EvalExecIf(expr string) (bool, error) {
+func (e *Evaluator) EvalRunIf(expr string) (bool, error) {
 	parts := strings.Split(expr, "==")
 	switch len(parts) {
 	case 1:

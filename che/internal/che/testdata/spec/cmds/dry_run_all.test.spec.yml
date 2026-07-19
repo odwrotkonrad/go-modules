@@ -1,15 +1,15 @@
 # [>] 🤖🤖
 cases:
-  - name: ShouldReportSettledLinkDestOnlyUnderAll
+  - name: ShouldReportSettledLinkAsSkippedOnlyUnderAll
     context: {command: che make-links}
     expected:
-      stdOut: "${DEST}"
+      stdOut: "make-links(overwrite, skippedDue[AlreadyLinked,config.dryRun=all]): ${DEST}"
     notExpected:
       stdOut: "${DEST}"
-  - name: ShouldReportSettledCopyDestOnlyUnderAll
+  - name: ShouldReportSettledCopyAsSkippedOnlyUnderAll
     context: {command: che make-copies}
     expected:
-      stdOut: "${DEST}"
+      stdOut: "make-copies(overwrite, skippedDue[SameContent,config.dryRun=all]): ${DEST}"
     notExpected:
       stdOut: "${DEST}"
 # [<] 🤖🤖

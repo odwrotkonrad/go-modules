@@ -33,7 +33,7 @@ cases:
       env: {CHE_SKIP_OPS: run-scripts, CHE_DEBUG: "1"}
     expected:
       stdOut:
-        - 'all(skip): run-scripts'
+        - 'run-scripts(runProfile, skippedDue[config.skipOps]): cli/macos'
     notExpected:
       stdOut:
         - 'run-scripts: '
@@ -43,7 +43,7 @@ cases:
       env: {CHE_SKIP_OPS: run-scripts, CHE_DEBUG: "1"}
     expected:
       stdOut:
-        - 'all(skip): run-scripts'
+        - 'run-scripts(runProfile, skippedDue[config.skipOps]): cli/macos'
     notExpected:
       stdOut:
         - 'run-scripts: '

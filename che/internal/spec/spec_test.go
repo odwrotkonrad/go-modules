@@ -268,7 +268,8 @@ func TestEligibleRecipes(t *testing.T) {
 		dir := testutil.Tree(t, map[string]string{"che.yml": testutil.Spec(t, a.String(t, 0))})
 		d, err := Load(filepath.Join(dir, "che.yml"))
 		require.NoError(t, err)
-		return EligibleRecipes(d.ProfileRecipes, a.Strings(t, 3), a.Bool(t, 4), stubEvaluator(a.String(t, 1), a.Bool(t, 2)).EvalExecIf)
+		eligible, _, err := EligibleRecipes(d.ProfileRecipes, a.Strings(t, 3), a.Bool(t, 4), stubEvaluator(a.String(t, 1), a.Bool(t, 2)).EvalRunIf)
+		return eligible, err
 	})
 }
 

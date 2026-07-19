@@ -44,10 +44,10 @@ func TestProfileSourceDecode(t *testing.T) {
 	})
 }
 
-// AllPass gates on a profile's execIf; FindRecipe errors on undefined names.
+// AllPass gates on a profile's runIf; FindRecipe errors on undefined names.
 // A pass logs at normal level, a reject only at debug level.
-func TestExecIfGate(t *testing.T) {
-	testyml.Run(t, td, "testdata/spec/funcs/exec_if_pass.test.spec.yml", func(t *testing.T, c testyml.Case[bool]) {
+func TestRunIfGate(t *testing.T) {
+	testyml.Run(t, td, "testdata/spec/funcs/run_if_pass.test.spec.yml", func(t *testing.T, c testyml.Case[bool]) {
 		for k, v := range c.Context.Env {
 			t.Setenv(k, v)
 		}
@@ -55,7 +55,7 @@ func TestExecIfGate(t *testing.T) {
 			log.SetDebug(true)
 			t.Cleanup(func() { log.SetDebug(false) })
 		}
-		dir := testutil.Tree(t, map[string]string{"che.yml": "p:\n  options:\n    execIf: ['env:X']\n"})
+		dir := testutil.Tree(t, map[string]string{"che.yml": "p:\n  options:\n    runIf: ['env:X']\n"})
 		d, err := Load(filepath.Join(dir, "che.yml"))
 		require.NoError(t, err)
 		var ok bool
@@ -65,7 +65,7 @@ func TestExecIfGate(t *testing.T) {
 			if e != nil {
 				return e
 			}
-			ok, e = AllPass(name, rec.Options.ExecIf, false, NewEvaluator(os.Getenv).EvalExecIf)
+			ok, _, e = AllPass(name, rec.Options.RunIf, false, NewEvaluator(os.Getenv).EvalRunIf)
 			return e
 		})
 		if c.Expected.Check(t, err) {

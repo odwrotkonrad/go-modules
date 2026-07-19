@@ -69,6 +69,9 @@ func TestCommands(t *testing.T) {
 		for _, f := range c.NotExpected.StdOut {
 			testyml.MustNotMatch(t, stripped, testyml.Expand(f, vars))
 		}
+		for sub, n := range c.Expected.StdOutCounts {
+			testyml.MustCount(t, stripped, testyml.Expand(sub, vars), n)
+		}
 	}
 	for _, spec := range specs {
 		testyml.Run(t, td, spec, run)

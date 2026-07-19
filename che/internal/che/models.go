@@ -105,9 +105,9 @@ func (p *ProfileReady) fetchRemote(ref string) (string, error) {
 // ctx carries the captured launch world (env/cwd); -C shifts ctx.Cwd forward.
 func PrepareApplicationOptions(ctx Context, opts options.Options) (Context, options.Options, error) {
 	resolvedOptions := opts
-	resolvedOptions.Dir = cmp.Or(resolvedOptions.Dir, ctx.Env["CHE_DIR"])
-	if resolvedOptions.Dir != "" {
-		next, err := changeDir(ctx.Cwd, resolvedOptions.Dir)
+	resolvedOptions.CheWorkingDirectory = cmp.Or(resolvedOptions.CheWorkingDirectory, ctx.Env["CHE_WORKING_DIRECTORY"])
+	if resolvedOptions.CheWorkingDirectory != "" {
+		next, err := changeDir(ctx.Cwd, resolvedOptions.CheWorkingDirectory)
 		if err != nil {
 			return ctx, resolvedOptions, fmt.Errorf("-C: %w", err)
 		}
@@ -125,6 +125,7 @@ func PrepareApplicationOptions(ctx Context, opts options.Options) (Context, opti
 		return ctx, resolvedOptions, err
 	}
 	log.SetDebug(resolvedOptions.Debug)
+	resolvedOptions.FillDefaultSetting("cheWorkingDirectory", ctx.Cwd)
 	return ctx, resolvedOptions, nil
 }
 
@@ -196,7 +197,11 @@ func PrepareSpecs(ctx Context, opts options.Options, src spec.SpecSourceRecipe) 
 		seenSpecs: map[string]bool{},
 		seenRefs:  map[string]bool{},
 	}
-	return p.prepare(src, repoRoot, nil, true)
+	root, err := p.prepare(src, repoRoot, nil, true)
+	if root != nil {
+		root.Rejected = p.rejected
+	}
+	return root, err
 }
 
 // specsPrep threads the shared composition state through the recursion.
@@ -207,6 +212,7 @@ type specsPrep struct {
 	tel       *telemetry.Telemetry // OTLP counters/logs (nil = no-op), threaded onto each ProfileReady
 	seenSpecs map[string]bool      // resolved spec dirs (include.sources cycle/dup guard)
 	seenRefs  map[string]bool      // <uri>::<profile> (sourced-ref dedup)
+	rejected  []spec.Rejection     // profiles whose runIf rejected them, discovery order
 	specDone  *database.SpecDone   // the run's ledger row, created lazily by the first recording profile
 }
 
@@ -239,12 +245,12 @@ func (p *specsPrep) prepare(src spec.SpecSourceRecipe, anchor string, forced *sp
 		// referenced under different relative URIs across hops.
 		key := recipe.sourceReady.DirectoryPath + "::" + forced.ProfileName
 		if p.seenRefs[key] {
-			log.Debug("source("+forced.ProfileName+")", "skip duplicate "+forced.String(), log.Off)
+			log.Debug("init-remote-sources(skip)", forced.ProfileName+": duplicate "+forced.String(), log.Off)
 			return nil, nil
 		}
 		p.seenRefs[key] = true
 	} else if !root && p.seenSpecs[recipe.sourceReady.DirectoryPath] {
-		log.Debug("source(spec)", "skip duplicate "+recipe.sourceReady.DirectoryPath, log.Off)
+		log.Debug("init-remote-sources(skip)", "spec: duplicate "+recipe.sourceReady.DirectoryPath, log.Off)
 		return nil, nil
 	}
 	p.seenSpecs[recipe.sourceReady.DirectoryPath] = true
@@ -343,11 +349,8 @@ func (r *SpecRecipe) PrepareProfileRecipes(opts options.Options, root bool) erro
 	// [why] che-level (flag/env/user-config) seeds the spec default, cascading
 	// down to each profile: profile > spec > user-config. workingDirectory seeds
 	// the root spec only: a sourced spec resolves it against its own checkout.
-	if root && r.Options.WorkingDirectory == "" {
-		r.Options.WorkingDirectory = opts.WorkingDirectory
-	}
-	if r.Options.AutoDiscover == nil {
-		r.Options.AutoDiscover = opts.AutoDiscover
+	if root && r.Options.PWD() == "" {
+		r.Options.ProfileWorkingDirectory = opts.ProfileWorkingDirectory
 	}
 	for i := range doc.ProfileRecipes {
 		rec := &doc.ProfileRecipes[i]
@@ -373,7 +376,7 @@ func resolveWorkingDir(env map[string]string, anchor, directory string) (string,
 		dir = filepath.Join(anchor, dir)
 	}
 	if !fsutil.IsDir(dir) {
-		return "", fmt.Errorf("options.workingDirectory not found: %s (from %q)", dir, directory)
+		return "", fmt.Errorf("options.profileWorkingDirectory not found: %s (from %q)", dir, directory)
 	}
 	return dir, nil
 }
@@ -410,20 +413,43 @@ func peekSpecValidateMode(b []byte) string {
 	return d.Options.ValidateSpec
 }
 
-// PrepareProfiles assembles the SpecReady: spec-level execIf gate, top-level
+// candidateSummary lists the spec's candidate profiles (each with the profiles
+// it is assembled from) and the autoDiscoverable subset
+// (spec/che/LogBehavior.md).
+func (r *SpecRecipe) candidateSummary() (all, autoDiscoverable string) {
+	var profs, auto []string
+	for _, rec := range r.ProfileRecipes {
+		name := rec.Source.GetProfileName()
+		if incs := rec.IncludedProfileRefs(); len(incs) > 0 {
+			name += "[" + strings.Join(incs, ",") + "]"
+		}
+		profs = append(profs, name)
+		if rec.Options.AutoDiscover != nil && *rec.Options.AutoDiscover {
+			auto = append(auto, rec.Source.GetProfileName())
+		}
+	}
+	return "[" + strings.Join(profs, ",") + "]", "[" + strings.Join(auto, ",") + "]"
+}
+
+// PrepareProfiles assembles the SpecReady: spec-level runIf gate, top-level
 // include.sources composed (their recipes joining the local-ref lookup),
 // per-recipe eligibility, one MakeProfile per eligible recipe, sourced refs
 // spawning nested SpecReadys (recursive).
 func (r *SpecRecipe) PrepareProfiles(p *specsPrep, forced *spec.ProfileSourceRecipe, root bool) (*SpecReady, error) {
 	ready := &SpecReady{Source: r.sourceReady, Options: r.Options, Env: r.Env, recipes: r.ProfileRecipes, tel: p.tel}
-	// [why] the spec-level env: overlay gates this spec's own execIf.
+	if root { // [why] candidates log once, for the invoked spec only
+		all, auto := r.candidateSummary()
+		log.Debug("discover-profiles(showCandidates, all)", all, log.Off)
+		log.Debug("discover-profiles(showCandidates, autoDiscoverable)", auto, log.Off)
+	}
+	// [why] the spec-level env: overlay gates this spec's own runIf.
 	eval := p.evalWith(r.Env)
-	pass, err := spec.AllPass("spec "+r.sourceReady.DefinitionURI, r.Options.ExecIf, p.opts.SkipExecIf, eval)
+	pass, _, err := spec.AllPass("spec "+r.sourceReady.DefinitionURI, r.Options.RunIfAll(), p.opts.SkipRunIf, eval)
 	if err != nil {
 		return nil, err
 	}
 	if !pass {
-		log.Debug("spec(skip)", r.sourceReady.DefinitionURI+" (execIf failed)", log.Off)
+		log.Debug("spec(skip)", r.sourceReady.DefinitionURI+" (runIf failed)", log.Off)
 		return ready, nil
 	}
 	lookup, err := r.composeIncludes(p, ready)
@@ -440,12 +466,12 @@ func (r *SpecRecipe) PrepareProfiles(p *specsPrep, forced *spec.ProfileSourceRec
 	return ready, nil
 }
 
-// evalWith builds an execIf evaluator whose env: source reads the captured
+// evalWith builds an runIf evaluator whose env: source reads the captured
 // launch env overlaid with the given profile/spec/ref env ([why] the overlay
 // wins, matching the old process-env shadowing without mutating it).
 func (p *specsPrep) evalWith(overlay map[string]string) func(string) (bool, error) {
 	env := overlayEnv(p.ctx.Env, overlay)
-	return spec.NewEvaluator(func(k string) string { return env[k] }).EvalExecIf
+	return spec.NewEvaluator(func(k string) string { return env[k] }).EvalRunIf
 }
 
 // composeIncludes prepares each include.sources spec (own anchor, own env
@@ -474,7 +500,7 @@ func (r *SpecRecipe) composeIncludes(p *specsPrep, ready *SpecReady) ([]spec.Pro
 }
 
 // selectEligibleNames picks this spec's own profiles to assemble: the forced
-// ref's one profile (execIf gated inside its env overlay, skip on fail), or
+// ref's one profile (runIf gated inside its env overlay, skip on fail), or
 // EligibleRecipes (zero eligible fatal only at the root spec).
 func (r *SpecRecipe) selectEligibleNames(p *specsPrep, forced *spec.ProfileSourceRecipe, root bool) ([]string, error) {
 	if forced != nil {
@@ -482,13 +508,13 @@ func (r *SpecRecipe) selectEligibleNames(p *specsPrep, forced *spec.ProfileSourc
 		if err != nil {
 			return nil, fmt.Errorf("ref %s: %w", forced, err)
 		}
-		// [why] the ref entry's env overlays the launch env for its execIf gate.
-		pass, err := spec.AllPass(forced.ProfileName, rec.Options.OverRef(forced.Options).ExecIf, p.opts.SkipExecIf, p.evalWith(forced.Env))
+		// [why] the ref entry's env overlays the launch env for its runIf gate.
+		pass, failed, err := spec.AllPass(forced.ProfileName, rec.Options.OverRef(forced.Options).RunIfAll(), p.opts.SkipRunIf, p.evalWith(forced.Env))
 		if err != nil {
 			return nil, fmt.Errorf("ref %s: %w", forced, err)
 		}
 		if !pass {
-			log.Debug("source("+forced.ProfileName+")", fmt.Sprintf("skip %s (execIf failed)", forced), log.Off)
+			p.rejected = append(p.rejected, spec.Rejection{Ref: forced.DisplayRef(), Cond: failed})
 			return nil, nil
 		}
 		return []string{forced.ProfileName}, nil
@@ -497,7 +523,17 @@ func (r *SpecRecipe) selectEligibleNames(p *specsPrep, forced *spec.ProfileSourc
 	if root {
 		forcedProfiles = p.opts.Profiles
 	}
-	names, err := spec.EligibleRecipes(r.ProfileRecipes, forcedProfiles, p.opts.SkipExecIf, p.evalWith(r.Env))
+	// [why] autoDiscover=false disables the discovery mechanism itself: only
+	// forced profiles and sourced refs run.
+	if len(forcedProfiles) == 0 && !p.opts.AutoDiscover {
+		if root {
+			return nil, fmt.Errorf("auto-discovery is disabled (options.autoDiscover=false): pass --profiles")
+		}
+		log.Debug("spec(skip)", r.sourceReady.DefinitionURI+" (autoDiscover disabled)", log.Off)
+		return nil, nil
+	}
+	names, rejected, err := spec.EligibleRecipes(r.ProfileRecipes, forcedProfiles, p.opts.SkipRunIf, p.evalWith(r.Env))
+	p.rejected = append(p.rejected, rejected...)
 	if err != nil {
 		if !root && errors.Is(err, spec.ErrNoneEligible) {
 			log.Debug("spec(skip)", r.sourceReady.DefinitionURI+" (no eligible profile)", log.Off)
@@ -530,7 +566,6 @@ func (r *SpecRecipe) assembleProfiles(p *specsPrep, ready *SpecReady, lookup []s
 			continue
 		}
 		for _, ref := range refs {
-			log.Debug("source("+ref.ProfileName+")", "run "+ref.String(), log.Off)
 			child, err := p.prepare(spec.SpecSourceRecipe{SourceRecipe: spec.SourceRecipe{URI: ref.URI, SpecFile: ref.SpecFile}}, r.sourceReady.DirectoryPath, &ref, false)
 			if err != nil {
 				return fmt.Errorf("ref %s: %w", ref, err)
@@ -551,7 +586,7 @@ func (r *SpecRecipe) assembleProfiles(p *specsPrep, ready *SpecReady, lookup []s
 func (r *SpecRecipe) makeProfileReady(p *specsPrep, rec spec.ProfileRecipe, lookup []spec.ProfileRecipe, env map[string]string) (*ProfileReady, []spec.ProfileSourceRecipe, error) {
 	name := rec.Source.GetProfileName()
 	effectiveEnv := overlayEnv(p.ctx.Env, env)
-	wd, err := resolveWorkingDir(effectiveEnv, rec.Source.DirectoryPath, rec.Options.WorkingDirectory)
+	wd, err := resolveWorkingDir(effectiveEnv, rec.Source.DirectoryPath, rec.Options.PWD())
 	if err != nil {
 		return nil, nil, fmt.Errorf("profile %q: %w", name, err)
 	}
@@ -574,7 +609,7 @@ func (r *SpecRecipe) makeProfileReady(p *specsPrep, rec spec.ProfileRecipe, look
 		Env:         env,
 		env:         effectiveEnv,
 		Profiles:    sourced,
-		ref:         rec.Source.String(),
+		ref:         rec.Source.DisplayRef(),
 		workingDir:  wd,
 		opts:        p.opts,
 		home:        p.home,
@@ -604,8 +639,20 @@ type SpecReady struct {
 	Options  spec.Options
 	Env      map[string]string
 	Profiles []*ProfileReady
+	// Rejected lists the profiles whose runIf rejected them (root spec only,
+	// discovery order), the discover-profiles noMatch lines.
+	Rejected []spec.Rejection
 	recipes  []spec.ProfileRecipe // this spec's recipes, joining the includer's lookup
 	tel      *telemetry.Telemetry // OTLP counters (nil = no-op), for the per-profile ExecEach count
+}
+
+// LogRejected logs each runIf-rejected profile before the match lines, its
+// rejecting condition as the reason (spec/che/LogBehavior.md); nothing
+// rejected logs nothing.
+func (s *SpecReady) LogRejected() {
+	for _, r := range s.Rejected {
+		log.Msg("discover-profiles(noMatchDue["+r.Cond+"])", r.Ref, log.Off)
+	}
 }
 
 // AllProfiles flattens the tree depth-first: own profiles, then each composed
@@ -619,21 +666,45 @@ func (s *SpecReady) AllProfiles() []*ProfileReady {
 }
 
 // ExecEach runs fn over every profile in the tree, each under its own span
-// (child of ctx). It first prints a discovery header naming each resolved
-// profile. A failing profile does not stop the rest: failures collect
-// (ref-wrapped), report as "<op>(report): fail <ref>: <err>" lines after all
-// profiles, and join into the returned error.
+// (child of ctx). It first logs the discovery summary: one
+// "discover-profiles(discovered)" info line per profile with per-op all/delta counts
+// (spec/che/LogBehavior.md). A failing profile does not stop the rest: failures
+// collect (ref-wrapped), report as "<op>(report): fail <ref>: <err>" lines
+// after all profiles, and join into the returned error.
 func (s *SpecReady) ExecEach(ctx context.Context, opName string, fn func(context.Context, *ProfileReady) error) error {
 	ctx, span := s.tel.Span(ctx, opName, attribute.String("op", opName))
 	defer span.End()
 	profiles := s.AllProfiles()
+	s.LogRejected()
 	for _, p := range profiles {
-		log.Msg(opName+"(discover)", p.Ref(), log.Off)
+		log.Msg("discover-profiles(match)", p.discoverSummary(), log.Off)
 	}
 	var fails []error
 	for _, p := range profiles {
+		// [why] a profile whose command ops carry no delta at all is skipped
+		// wholesale: nothing would change (spec/che/ExecutionBehavior.md). The
+		// skip reason distinguishes config-skipped and undefined op sets.
+		if ops := p.commandOps(opName); len(ops) == 0 {
+			reasons := []string{"NoDef"}
+			if scoped := p.commandScopedOps(opName); len(scoped) > 0 {
+				reasons = nil
+				for _, op := range scoped {
+					if r := p.skipOpsReason(op.Name()); !slices.Contains(reasons, r) {
+						reasons = append(reasons, r)
+					}
+				}
+			}
+			log.Msg(skipTitle(opName, "runProfile", reasons...), p.runProfileSummary(opName), log.Off)
+			continue
+		} else if p.commandDelta(opName) == 0 && !p.isDryRunAll() {
+			// [why] dry-run=all wants every dest's true state, so it bypasses
+			// the zero-delta profile skip.
+			log.Msg(skipTitle(opName, "runProfile", "NoDelta"), p.runProfileSummary(opName), log.Off)
+			continue
+		}
 		pctx, pspan := s.tel.Span(ctx, "profile", attribute.String("profile", p.Ref()))
 		s.tel.CountProfile(pctx, p.Ref())
+		log.Msg(opName+"(runProfile)", p.runProfileSummary(opName), log.Off)
 		if err := fn(pctx, p); err != nil {
 			pspan.RecordError(err)
 			fails = append(fails, fmt.Errorf("%s: %w", p.Ref(), err))
@@ -670,6 +741,7 @@ type ProfileReady struct {
 	command         string                // the invoked subcommand, the CountUnit command label
 	specDone        *database.SpecDone    // the run's ledger row (nil when not recording)
 	profileDone     *database.ProfileDone // this profile's ledger row (nil when not recording)
+	backedUp        bool                  // the run backup stage archived every op dest: ops skip their own archives
 	currentArchive  string                // archive path the in-flight op's archiveBefore wrote ("" -> no backup)
 	currentSub      string                // that archive's sub (Backup.Sub)
 	Seams                                 // fs writer/reader/fetcher, defaulted in prepare, test-injectable
@@ -725,11 +797,20 @@ func (p *ProfileReady) logMsg(title, msg string) {
 // the dest mutation into the ops ledger (classify prev before fn, next after),
 // keyed by info.kind. dest "" / dry-run / no ledger -> nothing recorded.
 func (p *ProfileReady) mutate(title, msg, dest string, info opInfo, fn func() error) error {
+	prev := p.classifyDest(dest)
 	if p.isDryRun() {
-		p.logMsg(title, msg)
+		scope, sub, _ := strings.Cut(strings.TrimSuffix(title, ")"), "(")
+		action := sub
+		if action == "" || action == "create" {
+			action = "create"
+			if prev.Present {
+				action = "overwrite"
+			}
+		}
+		p.logMsg(skipTitle(scope, action, p.dryRunReasons()...), msg)
 		return nil
 	}
-	prev := p.classifyDest(dest)
+	title = resolveCreateTitle(title, prev.Present)
 	if err := fn(); err != nil {
 		return err
 	}
@@ -798,6 +879,143 @@ func (p *ProfileReady) recordOperation(dest string, info opInfo, prev database.O
 	if err := p.Ledger.RecordOperation(p.profileDone, op); err != nil {
 		log.Debug("ledger", "record op: "+err.Error(), log.Off)
 	}
+}
+
+// skippedOps is the config-skipped op set (--skip-ops everywhere plus the run
+// sequence's), excluded from discovery output and profile-delta decisions.
+func (p *ProfileReady) skippedOps() []string {
+	return slices.Concat(p.opts.SkipOps, p.opts.RunSkipOps)
+}
+
+// discoverSummary builds the profile's discovered line details:
+// workingDirectory first, then the selected, non-skipped ops with delta/all
+// counts, execution order (spec/che/LogBehavior.md). Discovery never writes
+// the render-delta cache: only real renders do ([why] a cache refresh without
+// applying would zero the delta and skip the profile before it converges).
+func (p *ProfileReady) discoverSummary() string {
+	skips := p.skippedOps()
+	var parts []string
+	for _, op := range p.OperationsReady {
+		if !op.Selected() || slices.Contains(skips, op.Name()) {
+			continue
+		}
+		all, delta := op.counts(p)
+		parts = append(parts, fmt.Sprintf("%s(delta=%d,all=%d)", op.Name(), delta, all))
+	}
+	return fmt.Sprintf("%s: profileWorkingDirectory: %s, ops: [%s]", p.Ref(), p.workingDir, strings.Join(parts, ","))
+}
+
+// commandOps lists the selected, non-skipped ops the invoked command will run
+// over this profile: all of them for `run`, the file ops for `backup`, else
+// the command's own op.
+func (p *ProfileReady) commandOps(opName string) []operationReady {
+	skips := p.skippedOps()
+	var out []operationReady
+	for _, op := range p.commandScopedOps(opName) {
+		if !slices.Contains(skips, op.Name()) {
+			out = append(out, op)
+		}
+	}
+	return out
+}
+
+// commandScopedOps lists the selected ops within the command's scope,
+// config-skips ignored.
+func (p *ProfileReady) commandScopedOps(opName string) []operationReady {
+	var out []operationReady
+	for _, op := range p.OperationsReady {
+		if !op.Selected() {
+			continue
+		}
+		switch opName {
+		case "run":
+		case "backup":
+			switch op.(type) {
+			case *MakeLinksOperationReady, *MakeCopiesOperationReady, *RenderTemplatesOperationReady:
+			default:
+				continue
+			}
+		default:
+			if op.Name() != opName {
+				continue
+			}
+		}
+		out = append(out, op)
+	}
+	return out
+}
+
+// commandDelta sums the invoked command's op deltas over this profile: the
+// profile-skip decision (spec/che/ExecutionBehavior.md).
+func (p *ProfileReady) commandDelta(opName string) int {
+	total := 0
+	for _, op := range p.commandOps(opName) {
+		_, delta := op.counts(p)
+		total += delta
+	}
+	return total
+}
+
+// runProfileSummary builds the profile-announce details for the invoked
+// command: the profile ref plus the ops the command will run with their
+// discover deltas (spec/che/LogBehavior.md).
+func (p *ProfileReady) runProfileSummary(opName string) string {
+	var parts []string
+	for _, op := range p.commandOps(opName) {
+		_, delta := op.counts(p)
+		parts = append(parts, fmt.Sprintf("%s(%d)", op.Name(), delta))
+	}
+	return fmt.Sprintf("%s: [%s]", p.Ref(), strings.Join(parts, ","))
+}
+
+// DiscoverSummary is the exported discoverSummary (standalone discover-profiles).
+func (p *ProfileReady) DiscoverSummary() string { return p.discoverSummary() }
+
+// resolveCreateTitle resolves a "(create)" title against the dest's prior
+// state: absent -> "(created)", present -> "(overwritten)".
+func resolveCreateTitle(title string, existed bool) string {
+	action := "(created)"
+	if existed {
+		action = "(overwritten)"
+	}
+	return strings.Replace(title, "(create)", action, 1)
+}
+
+// skipTitle renders a skipped action's title:
+// "<scope>(<action>, skippedDue[<reason>,<reason>])" (spec/che/LogBehavior.md).
+func skipTitle(scope, action string, reasons ...string) string {
+	return scope + "(" + action + ", skippedDue[" + strings.Join(reasons, ",") + "])"
+}
+
+// dryRunReasons is the active dry-run mode as a skip reason list (empty when
+// off), config-key notation matching the config log line.
+func (p *ProfileReady) dryRunReasons() []string {
+	if p.opts.DryRun == options.DryRun.Off {
+		return nil
+	}
+	return []string{"config.dryRun=" + string(p.opts.DryRun)}
+}
+
+// skipOpsReason names the config key that skipped op, config-key notation.
+func (p *ProfileReady) skipOpsReason(op string) string {
+	if slices.Contains(p.opts.SkipOps, op) {
+		return "config.skipOps"
+	}
+	return "config.run.skipOps"
+}
+
+// wouldAction is the would-be mutation action for dest: create when absent,
+// overwrite when present.
+func (p *ProfileReady) wouldAction(dest string) string {
+	if _, err := p.Reader.LstatPath(dest); err == nil {
+		return "overwrite"
+	}
+	return "create"
+}
+
+// skipReasons appends the dry-run reason to base reasons.
+func (p *ProfileReady) skipReasons(reasons ...string) []string {
+	return append(reasons, p.dryRunReasons()...)
 }
 
 // deriveOpType maps a prev/next Object pair to the op_type discriminator.
@@ -888,22 +1106,28 @@ func (p *ProfileReady) ExecOperations(ctx context.Context) error {
 	return p.withDebugLevel(func() error {
 		var fails []error
 		skippedKinds := map[string]string{"make-links": "link", "make-copies": "copy", "render-templates": "render"}
-		skipOps := slices.Concat(p.opts.SkipOps, p.opts.AllSkipOps)
+		skipOps := slices.Concat(p.opts.SkipOps, p.opts.RunSkipOps)
 		for _, op := range p.OperationsReady {
 			// [why] a config-skipped op is a plain skip, never a sweep: skipping
 			// render-templates must not prune its previously rendered dests.
 			if slices.Contains(skipOps, op.Name()) {
-				log.Debug("all(skip)", op.Name(), log.Off)
+				log.Msg(skipTitle("run", "runOp", p.skipOpsReason(op.Name())), op.Name(), log.Off)
 				continue
 			}
 			if !op.Selected() {
-				log.Debug("all(skip)", op.Name()+" (nothing selected)", log.Off)
+				log.Msg(skipTitle("run", "runOp", "NoDef"), op.Name(), log.Off)
 				if kind, ok := skippedKinds[op.Name()]; ok && !p.isDryRun() {
 					fails = append(fails, p.sweepStale(kind, nil)) // [why] emptied op: sweep all prior dests of its kind
 				}
 				continue
 			}
-			log.Msg("all(run)", op.Name(), log.Off)
+			// [why] a zero-delta op still runs (idempotent, sweeps included), its
+			// announce marking that nothing would change (spec/che/LogBehavior.md).
+			if _, delta := op.counts(p); delta == 0 {
+				log.Msg(skipTitle("run", "runOp", "NoDelta"), op.Name(), log.Off)
+			} else {
+				log.Msg("run(runOp)", op.Name(), log.Off)
+			}
 			if err := p.execOp(ctx, op); err != nil {
 				fails = append(fails, fmt.Errorf("%s: %w", op.Name(), err))
 			}
@@ -935,7 +1159,7 @@ func (p *ProfileReady) execOp(ctx context.Context, op operationReady) error {
 func (p *ProfileReady) ExecOperation(ctx context.Context, op operationReady) error {
 	return p.withDebugLevel(func() error {
 		if !op.Selected() {
-			log.Debug("all(skip)", op.Name()+" (nothing selected)", log.Off)
+			log.Msg(skipTitle("run", "runOp", "NoDef"), op.Name(), log.Off)
 			return nil
 		}
 		return p.execOp(ctx, op)
@@ -946,7 +1170,7 @@ func (p *ProfileReady) ExecOperation(ctx context.Context, op operationReady) err
 // the profile prepared none).
 func (p *ProfileReady) ExecOperationNamed(ctx context.Context, name string) error {
 	if slices.Contains(p.opts.SkipOps, name) {
-		log.Debug("all(skip)", name, log.Off)
+		log.Msg(skipTitle("run", "runOp", p.skipOpsReason(name)), name, log.Off)
 		return nil
 	}
 	for _, op := range p.OperationsReady {
@@ -961,7 +1185,7 @@ func (p *ProfileReady) ExecOperationNamed(ctx context.Context, name string) erro
 // returning how many matched.
 func (p *ProfileReady) ExecRunScripts(ctx context.Context, names []string) (int, error) {
 	if slices.Contains(p.opts.SkipOps, "run-scripts") {
-		log.Debug("all(skip)", "run-scripts", log.Off)
+		log.Msg(skipTitle("run", "runOp", p.skipOpsReason("run-scripts")), "run-scripts", log.Off)
 		return 0, nil
 	}
 	matched := 0
@@ -1013,6 +1237,10 @@ type operationReady interface {
 	execOperation(p *ProfileReady) error
 	Selected() bool
 	Name() string
+	// counts reports the op's discovery numbers against the owning profile:
+	// all os-mutating operations declared, delta of those that would change os
+	// state now.
+	counts(p *ProfileReady) (all, delta int)
 }
 
 // prepareOperations resolves each operation recipe's subjects against the
@@ -1037,16 +1265,30 @@ func (p *ProfileReady) prepareOperations(ops spec.OperationRecipes) ([]operation
 // [>] 🤖🤖 per-kind operations
 
 // PruneLinksOperationReady removes ledger-recorded link dests whose source is
-// gone. Selected when the profile manages links (declares prune-links dirs).
+// gone. Selected when the profile manages links (declares prune-broken-links dirs).
 type PruneLinksOperationReady struct {
 	OperationReady
 	Dirs []string
 }
 
-func (o *PruneLinksOperationReady) Name() string   { return "prune-links" }
+func (o *PruneLinksOperationReady) Name() string   { return "prune-broken-links" }
 func (o *PruneLinksOperationReady) Selected() bool { return len(o.Dirs) > 0 }
 func (o *PruneLinksOperationReady) execOperation(p *ProfileReady) error {
 	return p.pruneBrokenLinks()
+}
+
+func (o *PruneLinksOperationReady) counts(p *ProfileReady) (int, int) {
+	links, err := p.installedLinks()
+	if err != nil {
+		return 0, 0
+	}
+	broken := 0
+	for _, op := range links {
+		if !p.linkSourcePresent(op) {
+			broken++
+		}
+	}
+	return len(links), broken
 }
 
 // MakeDirsOperationReady creates the profile's dirs (ancestors + makeDirs entries).
@@ -1058,6 +1300,21 @@ type MakeDirsOperationReady struct {
 func (o *MakeDirsOperationReady) Name() string                        { return "make-dirs" }
 func (o *MakeDirsOperationReady) Selected() bool                      { return len(o.Dirs) > 0 }
 func (o *MakeDirsOperationReady) execOperation(p *ProfileReady) error { return p.makeDirs(o.Dirs) }
+
+func (o *MakeDirsOperationReady) counts(p *ProfileReady) (int, int) {
+	all, delta := 0, 0
+	for _, item := range o.Dirs {
+		dest := p.toDest(item.Rel)
+		if len(item.Dests) > 0 {
+			dest = p.toDest(item.Dests[0].Path)
+		}
+		all++
+		if !fsutil.IsDirSettled(p.Reader, dest) {
+			delta++
+		}
+	}
+	return all, delta
+}
 
 // MakeLinksOperationReady symlinks configs into the system root.
 type MakeLinksOperationReady struct {
@@ -1072,6 +1329,17 @@ func (o *MakeLinksOperationReady) execOperation(p *ProfileReady) error {
 	return p.makeLinks(o.Links, o.Dirs)
 }
 
+func (o *MakeLinksOperationReady) counts(p *ProfileReady) (int, int) {
+	all, delta := 0, 0
+	for _, item := range o.Links {
+		all++
+		if !fsutil.IsLinkSettled(p.Reader, p.resolveSrc(item.Rel), p.toDest(spec.DestRel(item))) {
+			delta++
+		}
+	}
+	return all, delta
+}
+
 // MakeCopiesOperationReady copies *.ontoHost.cp sources onto their dests.
 type MakeCopiesOperationReady struct {
 	OperationReady
@@ -1083,6 +1351,20 @@ func (o *MakeCopiesOperationReady) Name() string   { return "make-copies" }
 func (o *MakeCopiesOperationReady) Selected() bool { return len(o.Copies) > 0 }
 func (o *MakeCopiesOperationReady) execOperation(p *ProfileReady) error {
 	return p.makeCopies(o.Copies, o.Dirs)
+}
+
+func (o *MakeCopiesOperationReady) counts(p *ProfileReady) (int, int) {
+	all, delta := 0, 0
+	for _, item := range o.Copies {
+		src := p.resolveSrc(item.Rel)
+		for _, dest := range p.resolveCopyDests(item) {
+			all++
+			if !fsutil.IsSameContent(p.Reader, src, dest) {
+				delta++
+			}
+		}
+	}
+	return all, delta
 }
 
 // RenderTemplatesOperationReady renders *.tpl sources; each dest path decides
@@ -1099,6 +1381,10 @@ func (o *RenderTemplatesOperationReady) execOperation(p *ProfileReady) error {
 	return p.renderTemplates(o.Templates, o.SkipSecrets)
 }
 
+func (o *RenderTemplatesOperationReady) counts(p *ProfileReady) (int, int) {
+	return p.renderCounts(o.Templates)
+}
+
 // RunScriptsOperationReady runs the profile's scripts, absolute paths in run order.
 type RunScriptsOperationReady struct {
 	OperationReady
@@ -1109,6 +1395,10 @@ func (o *RunScriptsOperationReady) Name() string   { return "run-scripts" }
 func (o *RunScriptsOperationReady) Selected() bool { return len(o.Scripts) > 0 }
 func (o *RunScriptsOperationReady) execOperation(p *ProfileReady) error {
 	return p.runScripts(o.Scripts)
+}
+
+func (o *RunScriptsOperationReady) counts(_ *ProfileReady) (int, int) {
+	return len(o.Scripts), len(o.Scripts)
 }
 
 // [<] 🤖🤖

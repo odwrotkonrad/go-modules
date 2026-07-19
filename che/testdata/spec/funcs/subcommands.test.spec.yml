@@ -9,7 +9,9 @@ cases:
         - make-copies
         - render-templates
         - make-dirs
-        - prune-links
+        - prune-broken-links
         - run-scripts
-        - discover
+        - discover-profiles
+        - init-remote-sources
+        - backup
 # [<] 🤖

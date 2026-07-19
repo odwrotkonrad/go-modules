@@ -7,26 +7,26 @@ cases:
       output: {}
   - name: ShouldResolveSpecLayer
     input:
-      args: [flag: [], allFlag: [], user: {}, spec: {skipOps: [run-scripts], all: {skipOps: [prune-links]}}]
+      args: [flag: [], allFlag: [], user: {}, spec: {skipOps: [run-scripts], run: {skipOps: [prune-broken-links]}}]
     expected:
-      output: {skipOps: [run-scripts], allSkipOps: [prune-links]}
+      output: {skipOps: [run-scripts], allSkipOps: [prune-broken-links]}
   - name: ShouldLetUserBeatSpec
     input:
       args:
         - flag: []
         - allFlag: []
-        - user: {skipOps: [make-links], all: {skipOps: [make-dirs]}}
-        - spec: {skipOps: [run-scripts], all: {skipOps: [prune-links]}}
+        - user: {skipOps: [make-links], run: {skipOps: [make-dirs]}}
+        - spec: {skipOps: [run-scripts], run: {skipOps: [prune-broken-links]}}
     expected:
       output: {skipOps: [make-links], allSkipOps: [make-dirs]}
   - name: ShouldLetEnvBeatUserCommaSplit
-    context: {env: {CHE_SKIP_OPS: "run-scripts,render-templates", CHE_ALL_SKIP_OPS: "make-copies"}}
+    context: {env: {CHE_SKIP_OPS: "run-scripts,render-templates", CHE_RUN_SKIP_OPS: "make-copies"}}
     input:
-      args: [flag: [], allFlag: [], user: {skipOps: [make-links], all: {skipOps: [make-dirs]}}]
+      args: [flag: [], allFlag: [], user: {skipOps: [make-links], run: {skipOps: [make-dirs]}}]
     expected:
       output: {skipOps: [run-scripts, render-templates], allSkipOps: [make-copies]}
   - name: ShouldLetFlagBeatEnv
-    context: {env: {CHE_SKIP_OPS: "run-scripts", CHE_ALL_SKIP_OPS: "make-copies"}}
+    context: {env: {CHE_SKIP_OPS: "run-scripts", CHE_RUN_SKIP_OPS: "make-copies"}}
     input:
       args: [flag: [make-links], allFlag: [render-templates]]
     expected:
@@ -36,9 +36,9 @@ cases:
       args: [flag: [foo]]
     expected:
       errorOutput:
-        - 'invalid skip-ops op "foo": want one of prune-links, make-dirs, make-links, make-copies, render-templates, run-scripts'
+        - 'invalid skip-ops op "foo": want one of prune-broken-links, make-dirs, make-links, make-copies, render-templates, run-scripts'
   - name: ShouldErrorOnUnknownAllOnlyOp
-    context: {env: {CHE_ALL_SKIP_OPS: "bar"}}
+    context: {env: {CHE_RUN_SKIP_OPS: "bar"}}
     expected:
       errorOutput:
         - 'invalid skip-ops op "bar"'

@@ -21,7 +21,7 @@ type opCmd struct {
 // construction (run order itself lives in che.prepareOperations).
 func ops() []opCmd {
 	return []opCmd{
-		{name: "prune-links", short: "delete broken symlinks"},
+		{name: "prune-broken-links", short: "delete broken symlinks"},
 		{name: "make-dirs", short: "create repo-tree dirs + extra-dirs"},
 		{name: "make-links", short: "symlink op (configs into system root)"},
 		{name: "make-copies", short: "*.ontoHost.cp copy op"},

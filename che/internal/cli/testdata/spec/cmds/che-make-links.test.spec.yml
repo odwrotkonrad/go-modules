@@ -10,18 +10,24 @@ cases:
   - name: ShouldSymlinkRepoFilesOntoHomeAndSystem
     expected:
       stdOut: |
-        make-dirs(create): ${HOME}/.config
-        make-dirs(create): ${HOME}/.config/bar
-        make-dirs(create): ${HOME}/.config/zsh
-        make-dirs(create): /Library
-        make-dirs(create): /Library/LaunchDaemons
-        make-dirs(create): /etc
+        make-dirs(created): ${HOME}/.config
+        make-dirs(created): ${HOME}/.config/bar
+        make-dirs(created): ${HOME}/.config/zsh
+        make-dirs(created): /Library
+        make-dirs(created): /Library/LaunchDaemons
+        make-dirs(created): /etc
         backup: ${HOME}/.local/state/che/backups/che-make-links-{{/.*/}}.tar.bz2
-        make-links(create): ${HOME}/.config/bar/a
-        make-links(create): ${HOME}/.config/zsh/.zshrc
-        make-links(create): /etc/zshrc
+        make-links(created): ${HOME}/.config/bar/a
+        make-links(created): ${HOME}/.config/zsh/.zshrc
+        make-links(created): /etc/zshrc
   - name: ShouldRewriteDestPathWithSedRule
     expected:
       stdOut: |
-        make-links(create): ${HOME}/.config/bar/a
+        make-links(created): ${HOME}/.config/bar/a
+  - name: ShouldLogDiscoveryBeforeDirectOp
+    expected:
+      stdOut: |
+        discover-profiles(match): cli/macos: profileWorkingDirectory: {{/[^,]*/}}, ops: [{{/.*/}}]
+        make-links(runProfile): cli/macos: [make-links(3)]
+        make-dirs(created): ${HOME}/.config
 # [<] 🤖

@@ -57,27 +57,27 @@ sourced profile refs included).`,
 		},
 	}
 	pf := root.PersistentFlags()
-	pf.StringVarP(&a.flags.Dir, "directory", "C", "",
-		"change into this directory before resolving the repo; env: CHE_DIR")
-	pf.StringVar(&a.flags.WorkingDirectory, "working-directory", "",
-		"the load-ops source tree (che level; spec/profile options.workingDirectory override); default root; env: CHE_WORKING_DIRECTORY")
+	pf.StringVarP(&a.flags.CheWorkingDirectory, "che-working-directory", "C", "",
+		"change into this directory before resolving the repo; env: CHE_WORKING_DIRECTORY")
+	pf.StringVar(&a.flags.ProfileWorkingDirectory, "profile-working-directory", "",
+		"the load-ops source tree (che level; spec/profile options.profileWorkingDirectory override); default root; env: CHE_PROFILE_WORKING_DIRECTORY")
 	pf.StringVar((*string)(&a.flags.DryRun), "dry-run", "",
-		"print mutating actions instead of executing them; values: delta (changed dests, bare-flag default) | all (every dest) | true (alias for all); default: off; env: CHE_DRY_RUN")
+		"print mutating actions instead of executing them; values: delta (changed dests, bare-flag default) | all (every dest) | true (alias for delta); default: off; env: CHE_DRY_RUN")
 	pf.Lookup("dry-run").NoOptDefVal = "delta"
 	pf.StringVar((*string)(&a.flags.ValidateSpec), "validate-spec", "",
 		"validate each loaded che.yml spec against the JSON Schema; values: warn (log violations) | error (abort on violations); default: warn; env: CHE_VALIDATE_SPEC")
 	pf.StringSliceVar(&a.flags.Profiles, "profiles", nil,
-		"run only these profiles (comma-separated or repeated; autoDiscover skipped, execIf still enforced); env: CHE_PROFILE (comma-separated)")
+		"run only these profiles (comma-separated or repeated; autoDiscover skipped, runIf still enforced); env: CHE_PROFILE (comma-separated)")
 	pf.StringSliceVar(&a.flags.SkipOps, "skip-ops", nil,
-		"skip these ops everywhere (comma-separated or repeated; dropped from the all sequence, direct op subcommands become logged no-ops); values: prune-links | make-dirs | make-links | make-copies | render-templates | run-scripts; env: CHE_SKIP_OPS")
-	pf.BoolVar(&a.flags.SkipExecIf, "skip-exec-if", false,
-		"treat every execIf predicate as passing; env: CHE_SKIP_EXEC_IF")
+		"skip these ops everywhere (comma-separated or repeated; dropped from the run sequence, direct op subcommands become logged no-ops); values: prune-broken-links | make-dirs | make-links | make-copies | render-templates | run-scripts; env: CHE_SKIP_OPS")
+	pf.BoolVar(&a.flags.SkipRunIf, "skip-run-if", false,
+		"treat every runIf predicate as passing; env: CHE_SKIP_RUN_IF")
 	pf.BoolVar(&a.flags.SkipRemoteRefs, "skip-remote-refs", false,
 		"skip sourced include.profiles refs, load only the local repo's specs; env: CHE_SKIP_REMOTE_REFS")
 	pf.BoolVar(&a.flags.Debug, "debug", false,
 		"print debug-level lines (source announce, clone/pull attempts); env: CHE_DEBUG")
 
-	root.AddCommand(a.allCmd(), a.discoverCmd(), a.uninstallCmd())
+	root.AddCommand(a.runCmd(), a.initCmd(), a.backupCmd(), a.discoverCmd(), a.uninstallCmd())
 	for _, o := range ops() {
 		root.AddCommand(a.opCmd(o))
 	}
@@ -99,6 +99,21 @@ func (a *app) init(command string) error {
 	if err != nil {
 		return err
 	}
+	// [why] the dry-run announce opens the whole output, then the config log:
+	// the non-default options with their deciding source, the full set at
+	// debug (spec/che/LogBehavior.md). Completion commands print to stdout for
+	// shell eval, so they stay silent.
+	if command != "completion" && command != "__complete" {
+		if a.opts.DryRun != options.DryRun.Off {
+			desc := "no actual operations will be performed, reporting only dests that would change"
+			if a.opts.DryRun == options.DryRun.All {
+				desc = "no actual operations will be performed, reporting every dest's state"
+			}
+			log.Msg("dry-run(config.dryRun="+string(a.opts.DryRun)+")", desc, log.Off)
+		}
+		log.Msg("config(show, noDefaults)", options.FormatSettings(a.opts.SettingsDelta()), log.Off)
+		log.Debug("config(show)", options.FormatSettings(a.opts.Settings), log.Off)
+	}
 	a.startTelemetry(ctx)
 	ctx.Tel = a.tel
 	a.runCtx, a.runSpan = a.tel.Span(context.Background(), "che run",
@@ -108,6 +123,20 @@ func (a *app) init(command string) error {
 	a.tel.CountCommand(a.runCtx, command)
 	if command == "uninstall" {
 		return nil
+	}
+	// [why] the init stage prefetches every remote spec source before
+	// discovery; all announces both stages like its other wrapped ops.
+	if command == "run" {
+		log.Msg("run(runOp)", "init-remote-sources", log.Off)
+	}
+	if err := che.InitSources(ctx, a.opts); err != nil {
+		return err
+	}
+	if command == "init-remote-sources" {
+		return nil
+	}
+	if command == "run" {
+		log.Msg("run(runOp)", "discover-profiles", log.Off)
 	}
 	a.root, err = che.PrepareSpecs(ctx, a.opts, spec.SpecSourceRecipe{})
 	if err != nil {
@@ -147,18 +176,23 @@ func (a *app) shutdownTelemetry() {
 
 // allCmd runs every profile's full op sequence, profile by profile. A failing
 // profile does not stop the rest: failures collect, report, and join.
-func (a *app) allCmd() *cobra.Command {
+func (a *app) runCmd() *cobra.Command {
 	cmd := &cobra.Command{
-		Use:   "all",
+		Use:   "run",
 		Short: "run every op each profile selects, profile by profile",
 		RunE: func(cmd *cobra.Command, args []string) error {
-			return a.root.ExecEach(a.runCtx, "all", func(ctx context.Context, p *che.ProfileReady) error {
+			return a.root.ExecEach(a.runCtx, "run", func(ctx context.Context, p *che.ProfileReady) error {
+				// [why] the backup stage archives every op dest once, before the
+				// other ops; they skip their own archives.
+				if err := p.ExecBackupStage(); err != nil {
+					return err
+				}
 				return p.ExecOperations(ctx)
 			})
 		},
 	}
-	cmd.Flags().StringSliceVar(&a.flags.AllSkipOps, "skip-ops", nil,
-		"skip these ops in the all sequence only (comma-separated or repeated); values: prune-links | make-dirs | make-links | make-copies | render-templates | run-scripts; env: CHE_ALL_SKIP_OPS")
+	cmd.Flags().StringSliceVar(&a.flags.RunSkipOps, "skip-ops", nil,
+		"skip these ops in the run sequence only (comma-separated or repeated); values: prune-broken-links | make-dirs | make-links | make-copies | render-templates | run-scripts; env: CHE_RUN_SKIP_OPS")
 	return cmd
 }
 
@@ -181,14 +215,40 @@ func (a *app) uninstallCmd() *cobra.Command {
 	}
 }
 
-// discoverCmd prints each prepared profile's ref and exits.
+// initCmd runs only the init stage: prefetch every remote spec source
+// (clone/pull the run cache) and exit; the fetch itself happens in init().
+func (a *app) initCmd() *cobra.Command {
+	return &cobra.Command{
+		Use:   "init-remote-sources",
+		Short: "fetch the remote spec sources (clone/pull the cache checkouts) and exit",
+		RunE:  func(cmd *cobra.Command, args []string) error { return nil },
+	}
+}
+
+// backupCmd archives every op dest of every profile into the per-run backup
+// archive and exits.
+func (a *app) backupCmd() *cobra.Command {
+	return &cobra.Command{
+		Use:   "backup",
+		Short: "archive every op dest (links, copies, host renders) into the per-run backup archive and exit",
+		RunE: func(cmd *cobra.Command, args []string) error {
+			return a.root.ExecEach(a.runCtx, "backup", func(ctx context.Context, p *che.ProfileReady) error {
+				return p.ExecBackup()
+			})
+		},
+	}
+}
+
+// discoverCmd logs each prepared profile's discovered line (per-op all/delta
+// counts) and exits.
 func (a *app) discoverCmd() *cobra.Command {
 	return &cobra.Command{
-		Use:   "discover",
-		Short: "print the prepared profiles (one per line) and exit",
+		Use:   "discover-profiles",
+		Short: "log the prepared profiles with per-op all/delta counts (one per line) and exit",
 		RunE: func(cmd *cobra.Command, args []string) error {
+			a.root.LogRejected()
 			for _, p := range a.root.AllProfiles() {
-				fmt.Println(p.Ref())
+				log.Msg("discover-profiles(match)", p.DiscoverSummary(), log.Off)
 			}
 			return nil
 		},

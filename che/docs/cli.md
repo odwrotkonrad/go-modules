@@ -9,25 +9,21 @@ sourced profile refs included).
 
 | Option | Env | Values | Default | Description |
 | --- | --- | --- | --- | --- |
+| `-C`, `--che-working-directory` | `CHE_WORKING_DIRECTORY` | `string` |  | change into this directory before resolving the repo |
 | `--debug` | `CHE_DEBUG` | `bool` | `false` | print debug-level lines (source announce, clone/pull attempts) |
-| `-C`, `--directory` | `CHE_DIR` | `string` |  | change into this directory before resolving the repo |
-| `--dry-run` | `CHE_DRY_RUN` | `delta (changed dests, bare-flag default)` \| `all (every dest)` \| `true (alias for all)` | `off` | print mutating actions instead of executing them |
-| `--profiles` | `CHE_PROFILE (comma-separated)` | `stringSlice` | `[]` | run only these profiles (comma-separated or repeated; autoDiscover skipped, execIf still enforced) |
-| `--skip-exec-if` | `CHE_SKIP_EXEC_IF` | `bool` | `false` | treat every execIf predicate as passing |
-| `--skip-ops` | `CHE_SKIP_OPS` | `prune-links` \| `make-dirs` \| `make-links` \| `make-copies` \| `render-templates` \| `run-scripts` | `[]` | skip these ops everywhere (comma-separated or repeated; dropped from the all sequence, direct op subcommands become logged no-ops) |
+| `--dry-run` | `CHE_DRY_RUN` | `delta (changed dests, bare-flag default)` \| `all (every dest)` \| `true (alias for delta)` | `off` | print mutating actions instead of executing them |
+| `--profile-working-directory` | `CHE_PROFILE_WORKING_DIRECTORY` | `string` |  | the load-ops source tree (che level; spec/profile options.profileWorkingDirectory override); default root |
+| `--profiles` | `CHE_PROFILE (comma-separated)` | `stringSlice` | `[]` | run only these profiles (comma-separated or repeated; autoDiscover skipped, runIf still enforced) |
+| `--skip-ops` | `CHE_SKIP_OPS` | `prune-broken-links` \| `make-dirs` \| `make-links` \| `make-copies` \| `render-templates` \| `run-scripts` | `[]` | skip these ops everywhere (comma-separated or repeated; dropped from the run sequence, direct op subcommands become logged no-ops) |
 | `--skip-remote-refs` | `CHE_SKIP_REMOTE_REFS` | `bool` | `false` | skip sourced include.profiles refs, load only the local repo's specs |
+| `--skip-run-if` | `CHE_SKIP_RUN_IF` | `bool` | `false` | treat every runIf predicate as passing |
 | `--validate-spec` | `CHE_VALIDATE_SPEC` | `warn (log violations)` \| `error (abort on violations)` | `warn` | validate each loaded che.yml spec against the JSON Schema |
-| `--working-directory` | `CHE_WORKING_DIRECTORY` | `string` |  | the load-ops source tree (che level; spec/profile options.workingDirectory override); default root |
 
 ## Commands
 
-### `$ che all`
+### `$ che backup`
 
-run every op each profile selects, profile by profile.
-
-| Option | Env | Values | Default | Description |
-| --- | --- | --- | --- | --- |
-| `--skip-ops` | `CHE_ALL_SKIP_OPS` | `prune-links` \| `make-dirs` \| `make-links` \| `make-copies` \| `render-templates` \| `run-scripts` | `[]` | skip these ops in the all sequence only (comma-separated or repeated) |
+archive every op dest (links, copies, host renders) into the per-run backup archive and exit.
 
 ### `$ che completion`
 
@@ -138,9 +134,13 @@ You will need to start a new shell for this setup to take effect.
 | --- | --- | --- | --- | --- |
 | `--no-descriptions` |  | `bool` | `false` | disable completion descriptions |
 
-### `$ che discover`
+### `$ che discover-profiles`
 
-print the prepared profiles (one per line) and exit.
+log the prepared profiles with per-op all/delta counts (one per line) and exit.
+
+### `$ che init-remote-sources`
+
+fetch the remote spec sources (clone/pull the cache checkouts) and exit.
 
 ### `$ che make-copies`
 
@@ -154,7 +154,7 @@ create repo-tree dirs + extra-dirs.
 
 symlink op (configs into system root).
 
-### `$ che prune-links`
+### `$ che prune-broken-links`
 
 delete broken symlinks.
 
@@ -165,6 +165,14 @@ render *.tpl sources; each dest path decides target (relative -> repo, ~/ or abs
 | Option | Env | Values | Default | Description |
 | --- | --- | --- | --- | --- |
 | `--skip-secrets` | `CHE_RENDER_TEMPLATES_SKIP_SECRETS` | `bool` | `false` | skip sources carrying op:// or gcp:// secret refs (logged, dests untouched) |
+
+### `$ che run`
+
+run every op each profile selects, profile by profile.
+
+| Option | Env | Values | Default | Description |
+| --- | --- | --- | --- | --- |
+| `--skip-ops` | `CHE_RUN_SKIP_OPS` | `prune-broken-links` \| `make-dirs` \| `make-links` \| `make-copies` \| `render-templates` \| `run-scripts` | `[]` | skip these ops in the run sequence only (comma-separated or repeated) |
 
 ### `$ che run-scripts`
 
