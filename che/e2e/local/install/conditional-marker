@@ -1,0 +1,5 @@
+#!/bin/sh
+##[>] 🤖🤖
+mkdir -p "$HOME/conditional"
+printf 'marker-conditional\n' > "$HOME/conditional/script-marker"
+##[<] 🤖🤖

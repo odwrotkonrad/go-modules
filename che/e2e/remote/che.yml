@@ -1,0 +1,16 @@
+##[>] 🤖🤖
+options: {profileWorkingDirectory: root}
+
+ops-remote:
+  include:
+    makeLinks:
+      - {source: remote/link.txt, dest: 's:^remote:$HOME/remote:'}
+    makeCopies:
+      - files: [{source: remote/copy.ontoHost.cp, dest: 's:^remote:$HOME/remote:'}]
+    renderTemplates:
+      - templates: [{source: remote/tpl.ontoHost.tpl, dest: 's:^remote:$HOME/remote:'}]
+    makeDirs:
+      - directories: [$HOME/remote/made-dir]
+    runScripts:
+      - install/remote-marker
+##[<] 🤖🤖

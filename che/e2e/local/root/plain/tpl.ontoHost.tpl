@@ -1,0 +1,1 @@
+{{ "rendered-plain" | strings.ToUpper }}

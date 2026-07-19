@@ -1,0 +1,1 @@
+{{ "rendered-dropped" | strings.ToUpper }}

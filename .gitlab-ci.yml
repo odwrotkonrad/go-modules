@@ -92,6 +92,29 @@ test-che:
     - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
       changes: [che/**/*, lib/**/*, go.work, .gitlab-ci.yml]
 
+test-e2e-che:
+  image: $CI_IMAGE
+  stage: test
+  needs:
+    - job: warm-go
+      optional: true
+  cache:
+    - key: go-mod
+      paths:
+        - .cache/go-mod
+      policy: pull
+    - key: go-build
+      paths:
+        - .cache/go-build
+      policy: pull
+  script:
+    - make -C che e2e
+  rules:
+    - if: $CI_PIPELINE_SOURCE == "merge_request_event"
+      changes: [che/**/*, lib/**/*, go.work, .gitlab-ci.yml]
+    - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
+      changes: [che/**/*, lib/**/*, go.work, .gitlab-ci.yml]
+
 test-get-os-open-files-with:
   extends: .test-module
   variables:
