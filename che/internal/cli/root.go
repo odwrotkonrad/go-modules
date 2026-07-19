@@ -43,7 +43,7 @@ func (a *app) Root() *cobra.Command {
 		Use:     "che",
 		Version: version,
 		Short:   "Spec-driven config loader",
-		Long: `che resolves every eligible profile in che.yml (execIf predicates), then
+		Long: `che resolves every eligible profile in che.yml (runIf predicates), then
 runs each profile's full op sequence, profile by profile (composed specs and
 sourced profile refs included).`,
 		SilenceUsage:  true,
@@ -174,7 +174,7 @@ func (a *app) shutdownTelemetry() {
 	}
 }
 
-// allCmd runs every profile's full op sequence, profile by profile. A failing
+// runCmd runs every profile's full op sequence, profile by profile. A failing
 // profile does not stop the rest: failures collect, report, and join.
 func (a *app) runCmd() *cobra.Command {
 	cmd := &cobra.Command{

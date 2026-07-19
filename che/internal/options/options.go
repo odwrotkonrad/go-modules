@@ -151,7 +151,6 @@ func (c *Options) resolveBool(key string, flagVal bool, envVal string, def bool,
 // the config log.
 func (c *Options) Resolve(env LookupEnv, user, spec Layer) error {
 	c.Settings = nil
-	c.Settings = nil
 	c.DryRun = DryRunMode(c.resolveStr("dryRun", "",
 		flagStr(string(c.DryRun)), envStr(env("CHE_DRY_RUN")), layer(user.DryRun, "config-file"), layer(spec.DryRun, "specFile")))
 	c.fillDefault("dryRun", "false")

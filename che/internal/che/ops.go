@@ -76,10 +76,10 @@ func (p *ProfileReady) backupDests() []string {
 	return out
 }
 
-// existingBackupDests counts the backup dests currently present on the host.
-func (p *ProfileReady) existingBackupDests() int {
+// existingDests counts the dests currently present on the host.
+func (p *ProfileReady) existingDests(dests []string) int {
 	n := 0
-	for _, dest := range p.backupDests() {
+	for _, dest := range dests {
 		if _, err := p.Reader.LstatPath(dest); err == nil {
 			n++
 		}
@@ -92,13 +92,14 @@ func (p *ProfileReady) existingBackupDests() int {
 // archives. The showDelta line always logs (spec/che/BackupCmdBehavior.md);
 // the created line reports the written archive with its size, nothing to back
 // up writes and logs nothing more.
-func (p *ProfileReady) ExecBackup() error {
+func (p *ProfileReady) ExecBackup() error { return p.execBackup(p.backupDests()) }
+
+func (p *ProfileReady) execBackup(dests []string) error {
 	defer func() { p.backedUp = true }()
-	p.logMsg("backup(showDelta)", p.backupDeltaSummary())
-	if p.existingBackupDests() == 0 {
+	p.logMsg("backup(showDelta)", p.opDeltaList("backup"))
+	if p.existingDests(dests) == 0 {
 		return nil
 	}
-	dests := p.backupDests()
 	path := fsutil.ResolveBackupArchivePath(p.home, Bin, "backup", p.runID)
 	p.currentArchive = path
 	p.currentSub = "backup"
@@ -111,17 +112,6 @@ func (p *ProfileReady) ExecBackup() error {
 	}
 	p.logMsg("backup(created)", humanSize(archiveSize(path))+", "+path)
 	return nil
-}
-
-// backupDeltaSummary lists the backed-up file ops with their discover deltas:
-// "op(delta),op(delta)".
-func (p *ProfileReady) backupDeltaSummary() string {
-	var parts []string
-	for _, op := range p.commandOps("backup") {
-		_, delta := op.counts(p)
-		parts = append(parts, fmt.Sprintf("%s(%d)", op.Name(), delta))
-	}
-	return strings.Join(parts, ",")
 }
 
 // archiveSize is the written archive's size in bytes (0 when unreadable, e.g.
@@ -148,12 +138,13 @@ func humanSize(n int64) string {
 // ExecBackupStage is ExecBackup as the run sequence's backup stage: announced
 // like the other wrapped ops (skippedDue[NoDelta] when nothing needs backing up).
 func (p *ProfileReady) ExecBackupStage() error {
-	if p.existingBackupDests() == 0 {
-		log.Msg(skipTitle("run", "runOp", "NoDelta"), "backup")
-	} else {
-		log.Msg("run(runOp)", "backup")
+	dests := p.backupDests()
+	title := "run(runOp)"
+	if p.existingDests(dests) == 0 {
+		title = skipTitle("run", "runOp", "NoDelta")
 	}
-	return p.ExecBackup()
+	log.Msg(title, "backup")
+	return p.execBackup(dests)
 }
 
 // failItem logs "<op>(fail): <dest>: <err>" and returns err, the per-item

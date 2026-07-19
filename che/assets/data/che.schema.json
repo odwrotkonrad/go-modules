@@ -110,13 +110,6 @@
           "type": "array",
           "description": "predicate expressions `\u003csource\u003e` or `\u003csource\u003e == \u003cliteral\u003e`, sources builtin:*/env:*; empty: always"
         },
-        "execIf": {
-          "items": {
-            "type": "string"
-          },
-          "type": "array",
-          "description": "deprecated alias of runIf"
-        },
         "autoDiscover": {
           "type": "boolean",
           "description": "run on bare che (nil: inherit spec options, then false: runs only via --profiles or include.profiles)"
@@ -128,10 +121,6 @@
         "profileWorkingDirectory": {
           "type": "string",
           "description": "the profile's load-ops source tree (empty: inherit spec options, then che level, then the checkout)"
-        },
-        "workingDirectory": {
-          "type": "string",
-          "description": "deprecated alias of profileWorkingDirectory"
         }
       },
       "additionalProperties": false,
@@ -141,7 +130,7 @@
       "properties": {
         "options": {
           "$ref": "#/$defs/ProfileOptions",
-          "description": "when the profile runs: autoDiscover opts in to bare-che runs, runIf predicates must ALL pass; debug/workingDirectory cascade (most nested wins)"
+          "description": "when the profile runs: autoDiscover opts in to bare-che runs, runIf predicates must ALL pass; debug/profileWorkingDirectory cascade (most nested wins)"
         },
         "include": {
           "$ref": "#/$defs/includeSet"
@@ -226,13 +215,6 @@
           "type": "array",
           "description": "spec-level predicates: gate every profile of this spec (ANDed with each profile's own); spec-only"
         },
-        "execIf": {
-          "items": {
-            "type": "string"
-          },
-          "type": "array",
-          "description": "deprecated alias of runIf"
-        },
         "autoDiscover": {
           "type": "boolean",
           "description": "spec block: default for profiles that don't set it; user config: auto-discovery master switch (default true, false: only --profiles and include.profiles refs run); overridden by CHE_AUTO_DISCOVER"
@@ -244,10 +226,6 @@
         "profileWorkingDirectory": {
           "type": "string",
           "description": "the load-ops source tree (absolute, relative to the checkout, ~/, $VAR, env vars expanded); default the checkout itself; makeLinks/makeCopies/renderTemplates host sources resolve against it; home targeting is explicit via a $HOME dest rewrite; spec-only"
-        },
-        "workingDirectory": {
-          "type": "string",
-          "description": "deprecated alias of profileWorkingDirectory"
         },
         "validateSpec": {
           "type": "string",

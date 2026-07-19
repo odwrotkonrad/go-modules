@@ -17,7 +17,7 @@ import (
 const (
 	TmplExt = ".tpl"
 	CpExt   = ".ontoHost.cp"
-	// DefaultWorkingDir is the load-ops source tree when options.workingDirectory
+	// DefaultWorkingDir is the load-ops source tree when options.profileWorkingDirectory
 	// is unset: the checkout itself.
 	DefaultWorkingDir = "."
 )

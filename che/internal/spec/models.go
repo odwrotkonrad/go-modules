@@ -16,7 +16,7 @@ import (
 //	  include  sources: other specs composed in (SpecSourceRecipe list)
 //	  ProfileRecipe  raw declared profile
 //	    Source          ProfileSourceRecipe stamped at parse
-//	    ProfileOptions  eligibility + cascade: autoDiscover, execIf, debug, workingDirectory
+//	    ProfileOptions  eligibility + cascade: autoDiscover, runIf, debug, profileWorkingDirectory
 //	    includeSet      additive payload per op, plus profiles: profile refs
 //	      linkEntry / entry / dirGroup   perm-groups (Perms cascade to items)
 //	        fileSpec / dirSpec           scalar-or-object union items
@@ -113,11 +113,9 @@ type Doc struct {
 // spec-only (ignored in user config).
 type Options struct {
 	RunIf                   []string        `yaml:"runIf" jsonschema_description:"spec-level predicates: gate every profile of this spec (ANDed with each profile's own); spec-only"`
-	ExecIf                  []string        `yaml:"execIf" jsonschema_description:"deprecated alias of runIf"`
 	AutoDiscover            *bool           `yaml:"autoDiscover" jsonschema_description:"spec block: default for profiles that don't set it; user config: auto-discovery master switch (default true, false: only --profiles and include.profiles refs run); overridden by CHE_AUTO_DISCOVER"`
 	Debug                   *bool           `yaml:"debug" jsonschema_description:"default for profiles that don't set it"`
 	ProfileWorkingDirectory string          `yaml:"profileWorkingDirectory" jsonschema_description:"the load-ops source tree (absolute, relative to the checkout, ~/, $VAR, env vars expanded); default the checkout itself; makeLinks/makeCopies/renderTemplates host sources resolve against it; home targeting is explicit via a $HOME dest rewrite; spec-only"`
-	WorkingDirectory        string          `yaml:"workingDirectory" jsonschema_description:"deprecated alias of profileWorkingDirectory"`
 	ValidateSpec            string          `yaml:"validateSpec" jsonschema:"enum=warn,enum=error" jsonschema_description:"how this spec's schema violations report (per-spec: each included spec honors its own); overridden by the flag and env var"`
 	DryRun                  string          `yaml:"dryRun" jsonschema:"enum=delta,enum=all,enum=true" jsonschema_description:"default dry-run mode: delta (changed dests) | all (every dest) | true (alias for delta); overridden by the flag and env var"`
 	Profiles                []string        `yaml:"profiles" jsonschema_description:"profiles to run (autoDiscover skipped, runIf still enforced); overridden by --profiles and CHE_PROFILE"`
@@ -153,7 +151,7 @@ type Otel struct {
 // ProfileRecipe is one raw declared profile.
 type ProfileRecipe struct {
 	Source  ProfileSourceRecipe `yaml:"-" jsonschema:"-"`
-	Options ProfileOptions      `yaml:"options" jsonschema_description:"when the profile runs: autoDiscover opts in to bare-che runs, runIf predicates must ALL pass; debug/workingDirectory cascade (most nested wins)"`
+	Options ProfileOptions      `yaml:"options" jsonschema_description:"when the profile runs: autoDiscover opts in to bare-che runs, runIf predicates must ALL pass; debug/profileWorkingDirectory cascade (most nested wins)"`
 	Include includeSet          `yaml:"include"`
 	Exclude excludeSet          `yaml:"exclude"`
 }
@@ -162,11 +160,9 @@ type ProfileRecipe struct {
 // fields inherit the level above (profile > spec > che, most nested wins).
 type ProfileOptions struct {
 	RunIf                   []string `yaml:"runIf" jsonschema_description:"predicates that must ALL pass for the profile to run"`
-	ExecIf                  []string `yaml:"execIf" jsonschema_description:"deprecated alias of runIf"`
 	AutoDiscover            *bool    `yaml:"autoDiscover" jsonschema_description:"run on bare che (nil: inherit spec options, then false: runs only via --profiles or include.profiles)"`
 	Debug                   *bool    `yaml:"debug" jsonschema_description:"print debug-level lines around this profile (nil: inherit spec options, then che level)"`
 	ProfileWorkingDirectory string   `yaml:"profileWorkingDirectory" jsonschema_description:"the profile's load-ops source tree (empty: inherit spec options, then che level, then the checkout)"`
-	WorkingDirectory        string   `yaml:"workingDirectory" jsonschema_description:"deprecated alias of profileWorkingDirectory"`
 }
 
 // includeSet is the additive payload.
@@ -346,7 +342,7 @@ type destRule struct {
 	global bool
 }
 
-// Evaluator resolves execIf predicate expressions. Builtins are lazy (resolved
+// Evaluator resolves runIf predicate expressions. Builtins are lazy (resolved
 // only when referenced) and cached per run ([why] IsVirtualized shells out).
 // lookupEnv reads the env: source from the injected launch env.
 type Evaluator struct {

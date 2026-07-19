@@ -18,8 +18,8 @@ import (
 // execution surface (FS writer, reader, ledger recording), so its inverse ops
 // record in the same normalized shape as installs.
 type Uninstaller struct {
-	p     *ProfileReady
-	dryun bool
+	p      *ProfileReady
+	dryRun bool
 }
 
 // NewUninstaller builds an Uninstaller: resolve the invoking home, open the
@@ -48,7 +48,7 @@ func NewUninstaller(ctx Context, opts options.Options) (*Uninstaller, error) {
 		profileDone: prof,
 		Seams:       seams,
 	}
-	return &Uninstaller{p: p, dryun: opts.DryRun != options.DryRun.Off}, nil
+	return &Uninstaller{p: p, dryRun: opts.DryRun != options.DryRun.Off}, nil
 }
 
 // Uninstall reverts every ledger-installed dest, newest-first (so nested dests
@@ -82,7 +82,7 @@ func (u *Uninstaller) revert(op database.OperationDone) error {
 		p.logMsg("uninstall(drift)", op.Dest)
 		return nil
 	}
-	if u.dryun {
+	if u.dryRun {
 		p.logMsg("uninstall", op.Dest)
 		return nil
 	}

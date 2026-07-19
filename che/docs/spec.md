@@ -29,8 +29,8 @@ Every construct in one spec (schema-validated by the test suite):
 ```yaml
 # yaml-language-server: $schema=https://gitlab.com/konradodwrot/go-modules/-/raw/main/che/assets/data/che.schema.json
 options:
-  workingDirectory: root
-  execIf: ['env:CHE_ENABLED']
+  profileWorkingDirectory: root
+  runIf: ['env:CHE_ENABLED']
   autoDiscover: false
   debug: false
   validateSpec: warn
@@ -82,7 +82,7 @@ base-exclude-cli:
       - ci/zsh/scripts/installs/80-desktop-tools.zsh
 
 desktop/macos:
-  options: {autoDiscover: true, execIf: ['builtin:isOs == macos', 'builtin:isVirt == false']}
+  options: {autoDiscover: true, runIf: ['builtin:isOs == macos', 'builtin:isVirt == false']}
   include:
     profiles:
       - base
@@ -92,7 +92,7 @@ desktop/macos:
           SOME_VAR: value
 
 cli/linux:
-  options: {autoDiscover: true, execIf: ['builtin:isOs == linux']}
+  options: {autoDiscover: true, runIf: ['builtin:isOs == linux']}
   include:
     profiles: [base, base-exclude-cli]
 
@@ -116,10 +116,10 @@ ontoRepo:
 
 Spec-wide defaults + che knobs:
 
-- `execIf` (string list): gates every profile of this spec (profile execIf
+- `runIf` (string list): gates every profile of this spec (profile runIf
   grammar).
 - `autoDiscover`, `debug` (bool): defaults for profiles that don't set them.
-- `workingDirectory` (path): load-ops source tree, default `.` (the checkout).
+- `profileWorkingDirectory` (path): load-ops source tree, default `.` (the checkout).
   Absolute, `~/`, `$VAR`, env vars expand; relative resolves under the
   checkout. makeLinks/makeCopies globs and renderTemplates host sources resolve
   against it; home targeting is explicit via a `$HOME` dest rewrite (no implicit
@@ -127,7 +127,7 @@ Spec-wide defaults + che knobs:
   sources (repo dest) stay at the checkout.
 - `validateSpec` (`warn` | `error`): top-level only; flag and env override.
 - `dryRun` (`delta` | `all`): default dry-run mode; flag and env override.
-- `profiles` (string list): profiles to run (autoDiscover skipped, execIf still
+- `profiles` (string list): profiles to run (autoDiscover skipped, runIf still
   enforced); `--profiles` and `CHE_PROFILE` override.
 - `skipRemoteRefs` (bool): skip sourced `include.profiles` refs; flag and env
   override.
@@ -139,7 +139,7 @@ Cascade, most nested wins: profile options > spec top-level options > che level
 [Environment](#environment).
 
 The user-config file (`$XDG_CONFIG_HOME/che/config.yml`) is this same shape as a
-bare object (no `options:` wrapper); `execIf`/`workingDirectory` are spec-only
+bare object (no `options:` wrapper); `runIf`/`profileWorkingDirectory` are spec-only
 there.
 
 ### env
@@ -159,7 +159,7 @@ cycles load once. Recursive.
 
 ```yaml
 <profile-name>:
-  options: {autoDiscover: true, execIf: ['builtin:isOs == macos']}
+  options: {autoDiscover: true, runIf: ['builtin:isOs == macos']}
   include: {...}
   exclude: {...}
 ```
@@ -173,14 +173,14 @@ profile runs its full op sequence, profile by profile.
 - `autoDiscover` (bool): run on bare `$ che`. Unset: inherit spec
   `options.autoDiscover`, then `false` (runs only via `--profiles` or
   `include.profiles`).
-- `execIf` (string list): predicates, ALL must pass. `<source>` (truthy:
+- `runIf` (string list): predicates, ALL must pass. `<source>` (truthy:
   builtin iff `true`, env iff set non-empty) or `<source> == <literal>`
   (string compare). Sources: `builtin:isOs` (`macos`/`linux`), `builtin:isVirt`
   (`true`/`false`), `env:<NAME>`. Empty: always. `--skip-exec-if` (env
   `CHE_SKIP_EXEC_IF`): all pass.
 - `debug` (bool): debug lines around this profile. Unset: inherit spec, then
   che level.
-- `workingDirectory` (path): the profile's load-ops source tree. Unset: inherit
+- `profileWorkingDirectory` (path): the profile's load-ops source tree. Unset: inherit
   spec, then che level (`--working-directory` / `CHE_WORKING_DIRECTORY`), then
   `.`.
 
@@ -216,7 +216,7 @@ The prefix-swap sugar `{source: <src>/**, dest: <dst>/**}` desugars to
 `s:^<src>:<dst>:` (strip both `/**`, graft `<dst>` under `<src>`). The sed
 rewrite `s<delim><pattern><delim><replacement><delim>[g]` (any `<delim>` after
 `s`, `:` the blessed form, Go regexp pattern, literal replacement so `$HOME`
-survives to host mapping) rewrites the workingDirectory-relative dest before
+survives to host mapping) rewrites the profileWorkingDirectory-relative dest before
 host mapping.
 
 ## Environment
@@ -253,7 +253,7 @@ renderTemplates:
 
 `autoDiscover: true` here discovers every profile that sets neither its own nor
 its spec's `autoDiscover` (a profile's `autoDiscover: false` still wins).
-`execIf` and `workingDirectory` are spec-only: ignored here.
+`runIf` and `profileWorkingDirectory` are spec-only: ignored here.
 
 ### Paths (XDG)
 
@@ -357,7 +357,7 @@ makeCopies:
 Perm-groups of `*.tpl` sources rendered through gomplate, op:// 1Password refs
 resolved at render time. Dest path decides target: relative -> repo, `~/` or
 absolute -> host. Source anchors by dest kind: host sources (glob form, derived
-dest, or any `~/`/absolute dest) are workingDirectory-relative; repo-doc sources
+dest, or any `~/`/absolute dest) are profileWorkingDirectory-relative; repo-doc sources
 (repo dest) are checkout-relative. Glob and dest-omitted forms derive a host
 dest.
 

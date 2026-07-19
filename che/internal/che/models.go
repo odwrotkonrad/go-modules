@@ -362,7 +362,7 @@ func (r *SpecRecipe) PrepareProfileRecipes(opts options.Options, root bool) erro
 	return nil
 }
 
-// resolveWorkingDir resolves a profile's effective options.workingDirectory
+// resolveWorkingDir resolves a profile's effective options.profileWorkingDirectory
 // onto the checkout anchor: empty -> the checkout itself, else env-expanded
 // (~/, $VAR, env vars against env), relative -> under the checkout. Must be an
 // existing dir.
@@ -731,7 +731,7 @@ type ProfileReady struct {
 	Profiles        []spec.ProfileSourceRecipe // sourced refs, consumed by PrepareSpecs
 	OperationsReady []operationReady           // prepared, in run order
 	ref             string                     // display ref: bare name local, <source>::<name> sourced
-	workingDir      string                     // resolved load-ops source tree (options.workingDirectory cascade)
+	workingDir      string                     // resolved load-ops source tree (options.profileWorkingDirectory cascade)
 	opts            options.Options
 	home            string
 	env             map[string]string     // captured launch env overlaid with Env, read by expandEnv/buildScriptsEnv
@@ -765,7 +765,7 @@ func (p *ProfileReady) Ref() string { return p.ref }
 // resolveRepoRoot is the checkout anchor (che.yml + repo-relative scripts/templates).
 func (p *ProfileReady) resolveRepoRoot() string { return p.Source.DirectoryPath }
 
-// resolveRoot is the resolved load-ops source tree (the options.workingDirectory
+// resolveRoot is the resolved load-ops source tree (the options.profileWorkingDirectory
 // value; host op sources resolve against it).
 func (p *ProfileReady) resolveRoot() string { return p.workingDir }
 
@@ -893,12 +893,8 @@ func (p *ProfileReady) skippedOps() []string {
 // the render-delta cache: only real renders do ([why] a cache refresh without
 // applying would zero the delta and skip the profile before it converges).
 func (p *ProfileReady) discoverSummary() string {
-	skips := p.skippedOps()
 	var parts []string
-	for _, op := range p.OperationsReady {
-		if !op.Selected() || slices.Contains(skips, op.Name()) {
-			continue
-		}
+	for _, op := range p.commandOps("run") {
 		all, delta := op.counts(p)
 		parts = append(parts, fmt.Sprintf("%s(delta=%d,all=%d)", op.Name(), delta, all))
 	}
@@ -960,12 +956,18 @@ func (p *ProfileReady) commandDelta(opName string) int {
 // command: the profile ref plus the ops the command will run with their
 // discover deltas (spec/che/LogBehavior.md).
 func (p *ProfileReady) runProfileSummary(opName string) string {
+	return fmt.Sprintf("%s: [%s]", p.Ref(), p.opDeltaList(opName))
+}
+
+// opDeltaList lists the invoked command's ops with their discover deltas:
+// "op(delta),op(delta)".
+func (p *ProfileReady) opDeltaList(opName string) string {
 	var parts []string
 	for _, op := range p.commandOps(opName) {
 		_, delta := op.counts(p)
 		parts = append(parts, fmt.Sprintf("%s(%d)", op.Name(), delta))
 	}
-	return fmt.Sprintf("%s: [%s]", p.Ref(), strings.Join(parts, ","))
+	return strings.Join(parts, ",")
 }
 
 // DiscoverSummary is the exported discoverSummary (standalone discover-profiles).
