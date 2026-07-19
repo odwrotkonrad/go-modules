@@ -27,6 +27,7 @@ Scenario: backup logs its delta summary and the created archive
   Then a line `backup(showDelta): <op>(<delta>),<op>(<delta>)` always lists the covered file ops with their deltas
   And a line `backup(created): <filesize>, <file>` reports the written archive
   And nothing to back up writes and logs nothing more
+  And dry run writes no archive, predicting `backup(create, skippedDue[config.dryRun=<mode>]): <file>` instead
 
 Scenario: standalone backup archives only dests that would change
   Status: tested

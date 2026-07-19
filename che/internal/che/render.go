@@ -65,9 +65,9 @@ func (p *ProfileReady) renderTemplates(templates []spec.FileItem, skipSecrets bo
 	var errs []error
 	if p.isDryRun() { // [why] dry-run predicts via the mock-render cache: no real render, no secret resolve
 		for _, t := range keep {
-			hash, herr := p.mockRenderHash(t.item)
+			settledMap := p.renderSettled(t.item)
 			for _, d := range t.dests {
-				settled := herr == nil && p.readRenderHash(d.path) == hash
+				settled := settledMap[d.path]
 				switch {
 				case settled && p.isDryRunAll():
 					p.logMsg(skipTitle("render-templates", p.wouldAction(d.path), p.skipReasons("SameContent")...), d.path)
@@ -190,15 +190,7 @@ func (p *ProfileReady) renderTemplate(item spec.FileItem, dests []tmplDest) erro
 		return p.placeFile(dests[0].path, body, item)
 	}
 	for _, d := range dests {
-		existing, _ := p.readExistingDest(d) // absent -> nil (mergeUpsert: defaults only)
-		out := render.Compose(render.Composition{
-			Body:       body,
-			Opts:       d.opts,
-			HeaderDest: d.header,
-			TmplName:   item.Rel,
-			Existing:   existing,
-			RepoRoot:   p.resolveRepoRoot(),
-		})
+		out := p.composeDest(item, d, body)
 		if d.host {
 			if err := p.placeFile(d.path, out, item); err != nil {
 				return err
@@ -219,6 +211,24 @@ func (p *ProfileReady) renderTemplate(item spec.FileItem, dests []tmplDest) erro
 		}
 	}
 	return nil
+}
+
+// composeDest is the final byte content a render places at d: the raw body for
+// derived/glob-form items, else Compose over the dest's current content
+// (mergeUpsert, header stamping).
+func (p *ProfileReady) composeDest(item spec.FileItem, d tmplDest, body []byte) []byte {
+	if len(item.Dests) == 0 || item.Derived {
+		return body
+	}
+	existing, _ := p.readExistingDest(d) // absent -> nil (mergeUpsert: defaults only)
+	return render.Compose(render.Composition{
+		Body:       body,
+		Opts:       d.opts,
+		HeaderDest: d.header,
+		TmplName:   item.Rel,
+		Existing:   existing,
+		RepoRoot:   p.resolveRepoRoot(),
+	})
 }
 
 // readExistingDest reads a dest's current content for Compose: host dests

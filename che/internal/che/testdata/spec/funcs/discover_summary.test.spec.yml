@@ -26,9 +26,14 @@ cases:
       args: [realRender: true, modifyTemplate: true]
     expected:
       output: {render-templates: "delta=1,all=1"}
-  - name: ShouldRefreshRenderCacheOnRealRender
+  - name: ShouldSettleRenderAfterRealRender
     input:
       args: [realRender: true]
+    expected:
+      output: {render-templates: "delta=0,all=1"}
+  - name: ShouldCountSettledRenderWithoutCache
+    input:
+      args: [seedRenderedDest: true]
     expected:
       output: {render-templates: "delta=0,all=1"}
 # [<] 🤖🤖

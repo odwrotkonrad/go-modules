@@ -23,7 +23,10 @@ cases:
     expected:
       stdOut: |
         backup(showDelta): {{/.*/}}
-        backup(created): {{/.*/}}che-backup-{{/.*/}}.tar.bz2
+        backup(create, skippedDue[config.dryRun=delta]): {{/.*/}}che-backup-{{/.*/}}.tar.bz2
+    notExpected:
+      stdOut:
+        - 'backup(created'
   - name: ShouldReportNothingForPrune
     context: {command: che prune-broken-links}
     notExpected:

@@ -13,6 +13,7 @@ import (
 
 	"gitlab.com/konradodwrot/go-modules/che/internal/database"
 	"gitlab.com/konradodwrot/go-modules/che/internal/options"
+	"gitlab.com/konradodwrot/go-modules/che/internal/spec"
 	"gitlab.com/konradodwrot/go-modules/che/internal/testutil"
 	"gitlab.com/konradodwrot/go-modules/lib/testyml"
 )
@@ -37,9 +38,21 @@ func recordHealthyLink(t *testing.T, p *ProfileReady) {
 	}))
 }
 
+// seedRenderedDest writes the first template's rendered content at its dest
+// (plain template: renders to its source bytes), a settled render.
+func seedRenderedDest(t *testing.T, p *ProfileReady, res spec.OperationRecipes) {
+	t.Helper()
+	item := res.RenderTemplates.Templates[0]
+	body, err := os.ReadFile(p.templateSrcPath(item))
+	require.NoError(t, err)
+	dest := p.resolveTemplateDests(item)[0].path
+	require.NoError(t, os.MkdirAll(filepath.Dir(dest), 0o755))
+	require.NoError(t, os.WriteFile(dest, body, 0o644))
+}
+
 // TestDiscoverSummary: per-op all/delta counts over a tree mixing settled and
-// unsettled dests, the ledger prune scan, and the render-delta mock-render
-// cache — each case applies its named setup steps IN ORDER, then asserts
+// unsettled dests, the ledger prune scan, and the render-delta content compare
+// — each case applies its named setup steps IN ORDER, then asserts
 // discoverSummary's op segments.
 func TestDiscoverSummary(t *testing.T) {
 	testyml.Run(t, td, "testdata/spec/funcs/discover_summary.test.spec.yml", func(t *testing.T, c testyml.Case[map[string]string]) {
@@ -63,15 +76,24 @@ func TestDiscoverSummary(t *testing.T) {
 				tpl := filepath.Join(dir, "root/_home/.config/zsh/t.ontoHost.tpl")
 				require.NoError(t, os.WriteFile(tpl, []byte("changed\n"), 0o644))
 			case "realRender":
+				// [why] record-only writer keeps OS perms commands out; the landed
+				// dest content is seeded by hand (delta compares mock render
+				// against the dest's current content).
 				m := testutil.ApplyMocks(t, map[string]string{
+					"execx.CmdExecutor":       "testutil.CmdMockExecutor",
 					"fsutil.FileSystemWriter": "testutil.FileSystemMockWriter",
 					"fsutil.FileSystemReader": "testutil.FileSystemMockReader",
 				})
+				fs, reader := p.FS, p.Reader
 				p.FS, p.Reader = m.FS, m.Reader
 				_, err := testutil.CaptureStdout(t, func() error {
 					return p.renderTemplates(res.RenderTemplates.Templates, false)
 				})
 				require.NoError(t, err)
+				p.FS, p.Reader = fs, reader
+				seedRenderedDest(t, p, res)
+			case "seedRenderedDest":
+				seedRenderedDest(t, p, res)
 			default:
 				t.Fatalf("unknown step %q", name)
 			}
