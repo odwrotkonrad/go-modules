@@ -17,26 +17,18 @@ import (
 
 // TestDryRunAnnounce: dry run announces itself once, as the whole output's
 // first line, mode-specific desc, no other line carrying a dry-run marker;
-// --dry-run=true aliases delta (spec/che/ExecutionBehavior.md).
+// --dry-run=true aliases delta (spec/che/ExecutionBehavior.md). Cases in
+// dry_run_announce.test.spec.yml: expected.output pins the resolved mode,
+// stdOut the announce line, stdOutCounts its once-ness.
 func TestDryRunAnnounce(t *testing.T) {
-	cases := []struct {
-		mode, wantLine string
-		wantMode       options.DryRunMode
-	}{
-		{"delta", "dry-run(config.dryRun=delta): no actual operations will be performed, reporting only dests that would change", options.DryRun.Delta},
-		{"true", "dry-run(config.dryRun=delta): no actual operations will be performed, reporting only dests that would change", options.DryRun.Delta},
-		{"all", "dry-run(config.dryRun=all): no actual operations will be performed, reporting every dest's state", options.DryRun.All},
-	}
-	for _, tc := range cases {
-		t.Run(tc.mode, func(t *testing.T) {
-			a, root, _ := repoEnv(t, "testdata/fixture/commands/all/sample-tree-only-links")
-			t.Setenv("CHE_DRY_RUN", tc.mode)
+	testyml.Run(t, td, "testdata/spec/cmds/dry_run_announce.test.spec.yml",
+		func(t *testing.T, c testyml.Case[string]) {
+			a, root, _ := repoEnv(t, c.Context.Pwd)
+			for k, v := range c.Context.Env {
+				t.Setenv(k, v)
+			}
 			a.flags.Profiles = []string{testutil.CheProfile}
-			m := testutil.ApplyMocks(t, map[string]string{
-				"execx.CmdExecutor":       "testutil.CmdMockExecutor",
-				"fsutil.FileSystemWriter": "testutil.FileSystemMockWriter",
-				"fsutil.FileSystemReader": "testutil.FileSystemMockReader",
-			})
+			m := testutil.ApplyMocks(t, c.Context.MockedInterfaces)
 			realSeams := che.NewSeams
 			testyml.Swap(t, &che.NewSeams, func(home string) che.Seams {
 				s := realSeams(home)
@@ -53,16 +45,19 @@ func TestDryRunAnnounce(t *testing.T) {
 				return cmd.RunE(cmd, rest)
 			})
 			require.NoError(t, err)
-			assert.Equal(t, tc.wantMode, a.opts.DryRun, "resolved mode")
+			assert.Equal(t, options.DryRunMode(c.Expected.Output), a.opts.DryRun, "resolved mode")
 			stripped := testutil.StripANSI(out)
 			lines := strings.Split(stripped, "\n")
 			require.NotEmpty(t, lines)
-			assert.Equal(t, tc.wantLine, lines[0], "announce opens the whole output")
-			assert.Equal(t, 1, strings.Count(stripped, "dry-run("), "announced exactly once")
-			assert.NotContains(t, stripped, ",dry-run=", "no per-line dry-run marker")
-			assert.NotContains(t, stripped, "(dry-run=", "no per-line dry-run marker")
+			assert.Equal(t, strings.TrimSuffix(testyml.Expand(c.Expected.StdOut[0], nil), "\n"), lines[0],
+				"announce opens the whole output")
+			for sub, n := range c.Expected.StdOutCounts {
+				testyml.MustCount(t, stripped, sub, n)
+			}
+			for _, sub := range c.NotExpected.StdOut {
+				testyml.MustNotMatch(t, stripped, sub)
+			}
 		})
-	}
 }
 
 // [<] 🤖🤖
