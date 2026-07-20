@@ -12,7 +12,7 @@ ops-plain:
     makeDirs:
       - directories: [$HOME/plain/made-dir]
     runScripts:
-      - install/plain-marker
+      - install/plain-script
 
 ops-conditional:
   include:
@@ -25,7 +25,7 @@ ops-conditional:
     makeDirs:
       - directories: [$HOME/conditional/made-dir]
     runScripts:
-      - install/conditional-marker
+      - install/conditional-script
 
 ops-dropped:
   include:
@@ -38,7 +38,7 @@ ops-dropped:
     makeDirs:
       - directories: [$HOME/dropped/made-dir]
     runScripts:
-      - install/dropped-marker
+      - install/dropped-script
 
 dropped:
   options: {autoDiscover: true, runIf: ['env:CHE_E2E_DROPPED']}

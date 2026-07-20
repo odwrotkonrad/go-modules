@@ -11,7 +11,7 @@ DB := $(STATE_HOME)/ops.db
 BK_APPDB := $(HOME)/Library/Application Support/beekeeper-studio/app.db
 
 WRAPPERS :=
-COMMANDS := render-docs test test-cover e2e build vet lint install release-check release-darwin release-snapshot inspect-db dump-db open-db
+COMMANDS := render-docs test test-cover cover-report e2e e2e-dryrun e2e-run build build-cover vet lint install release-check release-darwin release-snapshot inspect-db dump-db open-db
 
 .PHONY: $(WRAPPERS) $(COMMANDS)
 
@@ -47,16 +47,43 @@ open-db:
 test:
 	CC=$(CC) $(GO) test -v ./...
 
-#[what] run all tests with coverage, print the per-package and total percentages
+#[what] run all tests with coverage (binary covdata into ./cover-unit), print the per-package and total percentages
 test-cover:
-	CC=$(CC) $(GO) test -v -coverprofile=coverage.out -coverpkg=./... ./...
+	if [[ -e cover-unit ]] rm -rf cover-unit; mkdir -p cover-unit
+	CC=$(CC) $(GO) test -v -cover -coverpkg=./... ./... -args -test.gocoverdir=$(CURDIR)/cover-unit
+	@$(GO) tool covdata textfmt -i=cover-unit -o coverage.out
+	@sed -i.bak '\|/che/e2e/|d' coverage.out && rm coverage.out.bak
 	@$(GO) run $(GOCOVER_COBERTURA) < coverage.out > coverage.xml
 	@sed -i.bak 's|filename="gitlab.com/konradodwrot/go-modules/|filename="|g' coverage.xml && rm coverage.xml.bak
 	@$(GO) tool cover -func=coverage.out | tail -1
 
-#[what] run the real binary through the full command flow over the e2e fixture (hermetic temp HOME)
-e2e: build
-	zsh e2e/run.zsh
+#[what] merge every present cover-* covdata dir into coverage.out/coverage.xml, print the combined total
+cover-report:
+	@dirs=$$(print -l cover-unit(N) cover-e2e-dryrun(N) cover-e2e-run(N) | paste -sd, -); \
+		[[ -n $$dirs ]] || { print "no cover-* covdata dirs"; exit 1 }; \
+		print "merging covdata: $$dirs"; \
+		$(GO) tool covdata textfmt -i=$$dirs -o coverage.out
+	@sed -i.bak '\|/che/e2e/|d' coverage.out && rm coverage.out.bak
+	@$(GO) run $(GOCOVER_COBERTURA) < coverage.out > coverage.xml
+	@sed -i.bak 's|filename="gitlab.com/konradodwrot/go-modules/|filename="|g' coverage.xml && rm coverage.xml.bak
+	@$(GO) tool cover -func=coverage.out | tail -1
+
+#[what] build the coverage-instrumented binary into ./dist (e2e prerequisite)
+build-cover:
+	CC=$(CC) $(GO) build -cover -coverpkg=./... -o dist/$(BIN) .
+
+#[what] dry-run e2e flow (every command --dry-run=all, CHE_DEBUG=1), binary covdata into ./cover-e2e-dryrun
+e2e-dryrun: build-cover
+	if [[ -e cover-e2e-dryrun ]] rm -rf cover-e2e-dryrun; mkdir -p cover-e2e-dryrun
+	E2E_BIN=$(CURDIR)/dist/$(BIN) E2E_GOCOVERDIR=$(CURDIR)/cover-e2e-dryrun CC=$(CC) $(GO) test -v -run TestE2EDryRun ./e2e
+
+#[what] real full-flow e2e (CHE_DEBUG=0), binary covdata into ./cover-e2e-run
+e2e-run: build-cover
+	if [[ -e cover-e2e-run ]] rm -rf cover-e2e-run; mkdir -p cover-e2e-run
+	E2E_BIN=$(CURDIR)/dist/$(BIN) E2E_GOCOVERDIR=$(CURDIR)/cover-e2e-run CC=$(CC) $(GO) test -v -run TestE2ERun ./e2e
+
+#[what] run both e2e flows
+e2e: e2e-dryrun e2e-run
 
 #[what] build the binary into ./dist
 build:

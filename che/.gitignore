@@ -8,4 +8,7 @@
 /docs/assets/
 /coverage.out
 /coverage.xml
+/cover-unit/
+/cover-e2e-dryrun/
+/cover-e2e-run/
 ##[<] 🤖

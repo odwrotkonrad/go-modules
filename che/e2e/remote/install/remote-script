@@ -1,5 +1,5 @@
 #!/bin/sh
 ##[>] 🤖🤖
 mkdir -p "$HOME/remote"
-printf 'marker-remote\n' > "$HOME/remote/script-marker"
+printf 'script-output-remote\n' > "$HOME/remote/script-output"
 ##[<] 🤖🤖

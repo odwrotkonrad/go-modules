@@ -158,7 +158,7 @@ func (m *Matchers) UnmarshalYAML(node *yaml.Node) error {
 
 var holeRe = regexp.MustCompile(`\{\{/(.*?)/\}\}`)
 
-func compileMatcher(matcher string) *regexp.Regexp {
+func matcherPattern(matcher string) string {
 	var b strings.Builder
 	last := 0
 	for _, loc := range holeRe.FindAllStringSubmatchIndex(matcher, -1) {
@@ -167,12 +167,22 @@ func compileMatcher(matcher string) *regexp.Regexp {
 		last = loc[1]
 	}
 	b.WriteString(regexp.QuoteMeta(matcher[last:]))
-	return regexp.MustCompile(b.String())
+	return b.String()
+}
+
+func compileMatcher(matcher string) *regexp.Regexp {
+	return regexp.MustCompile(matcherPattern(matcher))
 }
 
 // IsMatch reports whether s matches the literal-with-holes matcher.
 func IsMatch(s, matcher string) bool {
 	return compileMatcher(matcher).MatchString(s)
+}
+
+// IsMatchFull reports whether s wholly matches (anchored) the
+// literal-with-holes matcher.
+func IsMatchFull(s, matcher string) bool {
+	return regexp.MustCompile(`\A` + matcherPattern(matcher) + `\z`).MatchString(s)
 }
 
 func MustMatch(t *testing.T, s, matcher string) {
@@ -210,9 +220,7 @@ func Run[C any](t *testing.T, fsys fs.FS, path string, fn func(t *testing.T, c C
 		Context yaml.Node   `yaml:"context"`
 		Cases   []yaml.Node `yaml:"cases"`
 	}
-	dec := yaml.NewDecoder(bytes.NewReader(raw))
-	dec.KnownFields(true)
-	require.NoErrorf(t, dec.Decode(&file), "decode cases %s", path)
+	require.NoErrorf(t, StrictDecode(raw, &file), "decode cases %s", path)
 	require.NotEmptyf(t, file.Cases, "%s: no cases", path)
 	seen := map[string]bool{}
 	for i := range file.Cases {
@@ -222,18 +230,26 @@ func Run[C any](t *testing.T, fsys fs.FS, path string, fn func(t *testing.T, c C
 		seen[name] = true
 		requireWantKey(t, path, name, node)
 		mergeCaseContext(t, path, name, &file.Context, node)
-		enc, err := yaml.Marshal(node)
-		require.NoErrorf(t, err, "%s: case %q: re-encode", path, name)
 		var c C
-		require.NoErrorf(t, strictDecode(enc, &c), "%s: case %q", path, name)
+		require.NoErrorf(t, StrictDecodeNode(node, &c), "%s: case %q", path, name)
 		t.Run(name, func(t *testing.T) { fn(t, c) })
 	}
 }
 
-func strictDecode(raw []byte, out any) error {
+// StrictDecode decodes raw YAML into out, rejecting unknown fields.
+func StrictDecode(raw []byte, out any) error {
 	dec := yaml.NewDecoder(bytes.NewReader(raw))
 	dec.KnownFields(true)
 	return dec.Decode(out)
+}
+
+// StrictDecodeNode re-encodes node and strict-decodes it into out.
+func StrictDecodeNode(node *yaml.Node, out any) error {
+	enc, err := yaml.Marshal(node)
+	if err != nil {
+		return err
+	}
+	return StrictDecode(enc, out)
 }
 
 func caseName(t *testing.T, path string, i int, node *yaml.Node) string {
@@ -262,9 +278,7 @@ func mergeCaseContext(t *testing.T, path, name string, fileCtx, node *yaml.Node)
 	merged := mergeNode(cloneNode(t, fileCtx), mapValue(node, "context"))
 	var ctx Context
 	if merged != nil {
-		enc, err := yaml.Marshal(merged)
-		require.NoErrorf(t, err, "%s: case %q: context re-encode", path, name)
-		require.NoErrorf(t, strictDecode(enc, &ctx), "%s: case %q: context", path, name)
+		require.NoErrorf(t, StrictDecodeNode(merged, &ctx), "%s: case %q: context", path, name)
 	}
 	if ctx.Function == "" && ctx.Command == "" {
 		t.Fatalf("%s: case %q: context names neither function nor command", path, name)

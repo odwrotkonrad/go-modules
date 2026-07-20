@@ -1,5 +1,5 @@
 #!/bin/sh
 ##[>] 🤖🤖
 mkdir -p "$HOME/plain"
-printf 'marker-plain\n' > "$HOME/plain/script-marker"
+printf 'script-output-plain\n' > "$HOME/plain/script-output"
 ##[<] 🤖🤖
