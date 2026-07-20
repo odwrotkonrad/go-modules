@@ -1,5 +1,5 @@
 #!/bin/sh
 ##[>] 🤖🤖
 mkdir -p "$HOME/dropped"
-printf 'marker-dropped\n' > "$HOME/dropped/script-marker"
+printf 'script-output-dropped\n' > "$HOME/dropped/script-output"
 ##[<] 🤖🤖

@@ -10,6 +10,7 @@ stages:
   - verify
   - test-unit
   - test-e2e
+  - coverage
   - release
   - publish
 
@@ -87,13 +88,18 @@ test-che:
   extends: .test-module
   variables:
     MODULE: che
+  coverage: null
+  artifacts:
+    reports: null
+    paths:
+      - che/cover-unit/
   rules:
     - if: $CI_PIPELINE_SOURCE == "merge_request_event"
       changes: [che/**/*, lib/**/*, go.work, .gitlab-ci.yml]
     - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
       changes: [che/**/*, lib/**/*, go.work, .gitlab-ci.yml]
 
-test-e2e-che:
+.test-e2e-che:
   image: $CI_IMAGE
   stage: test-e2e
   needs:
@@ -108,8 +114,49 @@ test-e2e-che:
       paths:
         - .cache/go-build
       policy: pull
+  rules:
+    - if: $CI_PIPELINE_SOURCE == "merge_request_event"
+      changes: [che/**/*, lib/**/*, go.work, .gitlab-ci.yml]
+    - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
+      changes: [che/**/*, lib/**/*, go.work, .gitlab-ci.yml]
+
+test-e2e-che-dryrun:
+  extends: .test-e2e-che
   script:
-    - make -C che e2e
+    - make -C che e2e-dryrun
+  artifacts:
+    paths:
+      - che/cover-e2e-dryrun/
+
+test-e2e-che-run:
+  extends: .test-e2e-che
+  script:
+    - make -C che e2e-run
+  artifacts:
+    paths:
+      - che/cover-e2e-run/
+
+coverage-che:
+  image: $CI_IMAGE
+  stage: coverage
+  needs: [test-che, test-e2e-che-dryrun, test-e2e-che-run]
+  cache:
+    - key: go-mod
+      paths:
+        - .cache/go-mod
+      policy: pull
+    - key: go-build
+      paths:
+        - .cache/go-build
+      policy: pull
+  script:
+    - make -C che cover-report
+  coverage: '/total:\s+\(statements\)\s+\d+\.\d+%/'
+  artifacts:
+    reports:
+      coverage_report:
+        coverage_format: cobertura
+        path: che/coverage.xml
   rules:
     - if: $CI_PIPELINE_SOURCE == "merge_request_event"
       changes: [che/**/*, lib/**/*, go.work, .gitlab-ci.yml]

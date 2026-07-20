@@ -1,0 +1,5 @@
+#!/bin/sh
+##[>] 🤖🤖
+mkdir -p "$HOME/conditional"
+printf 'script-output-conditional\n' > "$HOME/conditional/script-output"
+##[<] 🤖🤖

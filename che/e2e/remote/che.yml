@@ -12,5 +12,5 @@ ops-remote:
     makeDirs:
       - directories: [$HOME/remote/made-dir]
     runScripts:
-      - install/remote-marker
+      - install/remote-script
 ##[<] 🤖🤖

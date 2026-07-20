@@ -1,0 +1,335 @@
+##[>] 🤖🤖
+context:
+  env: {CHE_DEBUG: "0"}
+
+defs:
+  profilePlainLinkExists: &profilePlainLinkExists {path: "${HOME}/plain/link.txt", exists: true}
+  profilePlainLinkAccurate: &profilePlainLinkAccurate {path: "${HOME}/plain/link.txt", exists: true, type: symlink, symlinkTo: "${LOCAL}/root/plain/link.txt"}
+  profilePlainCopyExists: &profilePlainCopyExists {path: "${HOME}/plain/copy", exists: true}
+  profilePlainCopyAccurate: &profilePlainCopyAccurate {path: "${HOME}/plain/copy", exists: true, type: file, content: copy-plain}
+  profilePlainTemplateExists: &profilePlainTemplateExists {path: "${HOME}/plain/tpl", exists: true}
+  profilePlainTemplateAccurate: &profilePlainTemplateAccurate {path: "${HOME}/plain/tpl", exists: true, type: file, content: RENDERED-PLAIN}
+  profilePlainDirExists: &profilePlainDirExists {path: "${HOME}/plain/made-dir", exists: true}
+  profilePlainDirAccurate: &profilePlainDirAccurate {path: "${HOME}/plain/made-dir", exists: true, type: dir}
+  profilePlainScriptOutputExists: &profilePlainScriptOutputExists {path: "${HOME}/plain/script-output", exists: true}
+  profilePlainScriptOutputAccurate: &profilePlainScriptOutputAccurate {path: "${HOME}/plain/script-output", exists: true, type: file, content: script-output-plain}
+  profilePlainHomeDirExists: &profilePlainHomeDirExists {path: "${HOME}/plain", exists: true}
+
+  profileConditionalLinkExists: &profileConditionalLinkExists {path: "${HOME}/conditional/link.txt", exists: true}
+  profileConditionalLinkAccurate: &profileConditionalLinkAccurate {path: "${HOME}/conditional/link.txt", exists: true, type: symlink, symlinkTo: "${LOCAL}/root/conditional/link.txt"}
+  profileConditionalCopyExists: &profileConditionalCopyExists {path: "${HOME}/conditional/copy", exists: true}
+  profileConditionalCopyAccurate: &profileConditionalCopyAccurate {path: "${HOME}/conditional/copy", exists: true, type: file, content: copy-conditional}
+  profileConditionalTemplateExists: &profileConditionalTemplateExists {path: "${HOME}/conditional/tpl", exists: true}
+  profileConditionalTemplateAccurate: &profileConditionalTemplateAccurate {path: "${HOME}/conditional/tpl", exists: true, type: file, content: RENDERED-CONDITIONAL}
+  profileConditionalDirExists: &profileConditionalDirExists {path: "${HOME}/conditional/made-dir", exists: true}
+  profileConditionalDirAccurate: &profileConditionalDirAccurate {path: "${HOME}/conditional/made-dir", exists: true, type: dir}
+  profileConditionalScriptOutputExists: &profileConditionalScriptOutputExists {path: "${HOME}/conditional/script-output", exists: true}
+  profileConditionalScriptOutputAccurate: &profileConditionalScriptOutputAccurate {path: "${HOME}/conditional/script-output", exists: true, type: file, content: script-output-conditional}
+  profileConditionalHomeDirExists: &profileConditionalHomeDirExists {path: "${HOME}/conditional", exists: true}
+
+  profileRemoteLinkExists: &profileRemoteLinkExists {path: "${HOME}/remote/link.txt", exists: true}
+  profileRemoteLinkAccurate: &profileRemoteLinkAccurate {path: "${HOME}/remote/link.txt", exists: true, type: symlink, symlinkTo: "{{/.*/}}/root/remote/link.txt"}
+  profileRemoteCopyExists: &profileRemoteCopyExists {path: "${HOME}/remote/copy", exists: true}
+  profileRemoteCopyAccurate: &profileRemoteCopyAccurate {path: "${HOME}/remote/copy", exists: true, type: file, content: copy-remote}
+  profileRemoteTemplateExists: &profileRemoteTemplateExists {path: "${HOME}/remote/tpl", exists: true}
+  profileRemoteTemplateAccurate: &profileRemoteTemplateAccurate {path: "${HOME}/remote/tpl", exists: true, type: file, content: RENDERED-REMOTE}
+  profileRemoteDirExists: &profileRemoteDirExists {path: "${HOME}/remote/made-dir", exists: true}
+  profileRemoteDirAccurate: &profileRemoteDirAccurate {path: "${HOME}/remote/made-dir", exists: true, type: dir}
+  profileRemoteScriptOutputExists: &profileRemoteScriptOutputExists {path: "${HOME}/remote/script-output", exists: true}
+  profileRemoteScriptOutputAccurate: &profileRemoteScriptOutputAccurate {path: "${HOME}/remote/script-output", exists: true, type: file, content: script-output-remote}
+  profileRemoteHomeDirExists: &profileRemoteHomeDirExists {path: "${HOME}/remote", exists: true}
+
+  profileDroppedHomeDirExists: &profileDroppedHomeDirExists {path: "${HOME}/dropped", exists: true}
+
+  allProfilesLinksExists: &allProfilesLinksExists [*profilePlainLinkExists, *profileConditionalLinkExists, *profileRemoteLinkExists]
+  allProfilesLinksAccurate: &allProfilesLinksAccurate [*profilePlainLinkAccurate, *profileConditionalLinkAccurate, *profileRemoteLinkAccurate]
+  allProfilesCopiesExists: &allProfilesCopiesExists [*profilePlainCopyExists, *profileConditionalCopyExists, *profileRemoteCopyExists]
+  allProfilesCopiesAccurate: &allProfilesCopiesAccurate [*profilePlainCopyAccurate, *profileConditionalCopyAccurate, *profileRemoteCopyAccurate]
+  allProfilesTemplatesExists: &allProfilesTemplatesExists [*profilePlainTemplateExists, *profileConditionalTemplateExists, *profileRemoteTemplateExists]
+  allProfilesTemplatesAccurate: &allProfilesTemplatesAccurate [*profilePlainTemplateAccurate, *profileConditionalTemplateAccurate, *profileRemoteTemplateAccurate]
+  allProfilesDirsExists: &allProfilesDirsExists [*profilePlainDirExists, *profileConditionalDirExists, *profileRemoteDirExists]
+  allProfilesDirsAccurate: &allProfilesDirsAccurate [*profilePlainDirAccurate, *profileConditionalDirAccurate, *profileRemoteDirAccurate]
+  allProfilesScriptOutputsExists: &allProfilesScriptOutputsExists [*profilePlainScriptOutputExists, *profileConditionalScriptOutputExists, *profileRemoteScriptOutputExists]
+  allProfilesScriptOutputsAccurate: &allProfilesScriptOutputsAccurate [*profilePlainScriptOutputAccurate, *profileConditionalScriptOutputAccurate, *profileRemoteScriptOutputAccurate]
+  allProfilesHomeDirsExists: &allProfilesHomeDirsExists [*profilePlainHomeDirExists, *profileConditionalHomeDirExists, *profileRemoteHomeDirExists]
+  allProfilesAllFilesExists: &allProfilesAllFilesExists [*allProfilesLinksExists, *allProfilesCopiesExists, *allProfilesTemplatesExists, *allProfilesDirsExists, *allProfilesScriptOutputsExists, *allProfilesHomeDirsExists, *profileDroppedHomeDirExists]
+  allProfilesAllFilesAccurate: &allProfilesAllFilesAccurate [*allProfilesLinksAccurate, *allProfilesCopiesAccurate, *allProfilesTemplatesAccurate, *allProfilesDirsAccurate, *allProfilesScriptOutputsAccurate]
+
+steps:
+  - name: DiscoverProfiles
+    command: che discover-profiles
+    expected:
+      stdOutFull: |
+        config(show, noDefaults): [validateSpec=error(env),cheWorkingDirectory=${LOCAL}(cliFlag),profileWorkingDirectory=root(specFile),debug=false(env)]
+        init-remote-sources(cloneRemote): file://${REMOTE} -> ${XDG_CACHE_HOME}/che/remote-sources/{{/[A-Za-z0-9.-]+/}}
+        discover-profiles(noMatchDue[env:CHE_E2E_DROPPED]): dropped
+        discover-profiles(match): plain: profileWorkingDirectory: ${LOCAL}/root, ops: [prune-broken-links(delta=0,all=0),make-dirs(delta=2,all=3),make-links(delta=1,all=1),make-copies(delta=1,all=1),render-templates(delta=1,all=1),run-scripts(delta=1,all=1)]
+        discover-profiles(match): conditional: profileWorkingDirectory: ${LOCAL}/root, ops: [prune-broken-links(delta=0,all=0),make-dirs(delta=2,all=3),make-links(delta=1,all=1),make-copies(delta=1,all=1),render-templates(delta=1,all=1),run-scripts(delta=1,all=1)]
+        discover-profiles(match): remote: profileWorkingDirectory: ${LOCAL}/root, ops: []
+        discover-profiles(match): remote:remote:ops-remote: profileWorkingDirectory: ${XDG_CACHE_HOME}/che/remote-sources/{{/[A-Za-z0-9.-]+/}}/root, ops: [prune-broken-links(delta=0,all=0),make-dirs(delta=2,all=3),make-links(delta=1,all=1),make-copies(delta=1,all=1),render-templates(delta=1,all=1),run-scripts(delta=1,all=1)]
+
+  - name: Run
+    command: che run
+    expected:
+      files: *allProfilesAllFilesAccurate
+    notExpected:
+      stdOut: ["debug "]
+      files: *profileDroppedHomeDirExists
+
+  - name: RemoveScriptOutputs
+    remove:
+      paths:
+        - "${HOME}/plain/script-output"
+        - "${HOME}/conditional/script-output"
+        - "${HOME}/remote/script-output"
+
+  - name: Uninstall
+    command: che uninstall
+    notExpected:
+      stdOut: ["debug "]
+      files: *allProfilesAllFilesExists
+
+  - name: MakeDirs
+    command: che make-dirs
+    expected:
+      files: *allProfilesDirsAccurate
+    notExpected:
+      stdOut: ["debug "]
+
+  - name: MakeDirsUninstall
+    command: che uninstall
+    notExpected:
+      stdOut: ["debug "]
+      files: *allProfilesDirsExists
+
+  - name: MakeLinks
+    command: che make-links
+    expected:
+      files: *allProfilesLinksAccurate
+    notExpected:
+      stdOut: ["debug "]
+
+  - name: MakeLinksUninstall
+    command: che uninstall
+    notExpected:
+      stdOut: ["debug "]
+      files: *allProfilesLinksExists
+
+  - name: MakeCopies
+    command: che make-copies
+    expected:
+      files: *allProfilesCopiesAccurate
+    notExpected:
+      stdOut: ["debug "]
+
+  - name: MakeCopiesUninstall
+    command: che uninstall
+    notExpected:
+      stdOut: ["debug "]
+      files: *allProfilesCopiesExists
+
+  - name: RenderTemplatesMakeDirs
+    command: che make-dirs
+    expected:
+      files: *allProfilesDirsAccurate
+    notExpected:
+      stdOut: ["debug "]
+
+  - name: RenderTemplates
+    command: che render-templates
+    expected:
+      files: *allProfilesTemplatesAccurate
+    notExpected:
+      stdOut: ["debug "]
+
+  - name: RenderTemplatesUninstall
+    command: che uninstall
+    notExpected:
+      stdOut: ["debug "]
+      files: [*allProfilesTemplatesExists, *allProfilesDirsExists]
+
+  - name: RunScripts
+    command: che run-scripts
+    expected:
+      files: *allProfilesScriptOutputsAccurate
+    notExpected:
+      stdOut: ["debug "]
+
+  - name: RunScriptsUninstall
+    command: che uninstall
+    notExpected:
+      stdOut: ["debug "]
+
+  - name: RunScriptsCleanup
+    remove:
+      paths:
+        - "${HOME}/plain/script-output"
+        - "${HOME}/conditional/script-output"
+        - "${HOME}/remote/script-output"
+        - "${HOME}/plain"
+        - "${HOME}/conditional"
+        - "${HOME}/remote"
+    notExpected:
+      files: *allProfilesAllFilesExists
+
+  - name: AccumulateMakeDirs
+    command: che make-dirs
+    expected:
+      files: *allProfilesDirsAccurate
+    notExpected:
+      stdOut: ["debug "]
+      files: [*allProfilesLinksExists, *allProfilesCopiesExists, *allProfilesTemplatesExists, *allProfilesScriptOutputsExists]
+
+  - name: AccumulateMakeLinks
+    command: che make-links
+    expected:
+      files: [*allProfilesDirsAccurate, *allProfilesLinksAccurate]
+    notExpected:
+      stdOut: ["debug "]
+      files: [*allProfilesCopiesExists, *allProfilesTemplatesExists, *allProfilesScriptOutputsExists]
+
+  - name: AccumulateMakeCopies
+    command: che make-copies
+    expected:
+      files: [*allProfilesDirsAccurate, *allProfilesLinksAccurate, *allProfilesCopiesAccurate]
+    notExpected:
+      stdOut: ["debug "]
+      files: [*allProfilesTemplatesExists, *allProfilesScriptOutputsExists]
+
+  - name: AccumulateRenderTemplates
+    command: che render-templates
+    expected:
+      files: [*allProfilesDirsAccurate, *allProfilesLinksAccurate, *allProfilesCopiesAccurate, *allProfilesTemplatesAccurate]
+    notExpected:
+      stdOut: ["debug "]
+      files: *allProfilesScriptOutputsExists
+
+  - name: AccumulateRunScripts
+    command: che run-scripts
+    expected:
+      files: *allProfilesAllFilesAccurate
+    notExpected:
+      stdOut: ["debug "]
+
+  - name: AccumulateRemoveScriptOutputs
+    remove:
+      paths:
+        - "${HOME}/plain/script-output"
+        - "${HOME}/conditional/script-output"
+        - "${HOME}/remote/script-output"
+
+  - name: AccumulateUninstall
+    command: che uninstall
+    notExpected:
+      stdOut: ["debug "]
+      files: *allProfilesAllFilesExists
+
+  - name: PruneMakeLinks
+    command: che make-links
+    expected:
+      files: *allProfilesLinksAccurate
+    notExpected:
+      stdOut: ["debug "]
+
+  - name: PruneRemoveLinkSource
+    remove:
+      paths: ["${LOCAL}/root/plain/link.txt"]
+
+  - name: Prune
+    command: che prune-broken-links
+    expected:
+      files: [*profileConditionalLinkAccurate, *profileRemoteLinkAccurate]
+    notExpected:
+      stdOut: ["debug "]
+      files: *profilePlainLinkExists
+
+  - name: PruneRestoreLinkSource
+    gitRestore: {repo: "${LOCAL}", path: "root/plain/link.txt"}
+
+  - name: PruneUninstall
+    command: che uninstall
+    notExpected:
+      stdOut: ["debug "]
+      files: *allProfilesLinksExists
+
+  - name: BackupRemoveState
+    remove:
+      paths: ["${XDG_STATE_HOME}/che/backups"]
+
+  - name: BackupMakeCopies
+    command: che make-copies
+    expected:
+      files: *allProfilesCopiesAccurate
+    notExpected:
+      stdOut: ["debug "]
+
+  - name: BackupTamperCopy
+    write: {path: "${HOME}/plain/copy", content: tampered}
+
+  - name: Backup
+    command: che backup
+    expected:
+      stdOut: ["(created)"]
+      files:
+        - {countGlob: "${XDG_STATE_HOME}/che/backups/che-backup-*.tar.bz2", count: 1}
+    notExpected:
+      stdOut: ["debug "]
+
+  - name: BackupExtract
+    extract:
+      archiveGlob: "${XDG_STATE_HOME}/che/backups/che-backup-*.tar.bz2"
+      dest: "${WORK}/restore"
+    expected:
+      files:
+        - {path: "${WORK}/restore${HOME}/plain/copy", exists: true, type: file, content: tampered}
+    notExpected:
+      files:
+        - {path: "${WORK}/restore${HOME}/conditional/copy", exists: true}
+
+  - name: BackupSettleCopies
+    command: che make-copies
+    expected:
+      files: *allProfilesCopiesAccurate
+    notExpected:
+      stdOut: ["debug "]
+
+  - name: BackupSettled
+    command: che backup
+    notExpected:
+      stdOut: ["(created)", "debug "]
+
+  - name: BackupTamperAgain
+    write: {path: "${HOME}/plain/copy", content: tampered}
+
+  - name: BackupRunRestores
+    command: che run
+    expected:
+      stdOut: ["runOp): backup"]
+      files:
+        - {path: "${HOME}/plain/copy", exists: true, type: file, content: copy-plain}
+    notExpected:
+      stdOut: ["debug "]
+
+  - name: BackupRemoveScriptOutputs
+    remove:
+      paths:
+        - "${HOME}/plain/script-output"
+        - "${HOME}/conditional/script-output"
+        - "${HOME}/remote/script-output"
+
+  - name: BackupUninstall
+    command: che uninstall
+    expected:
+      files:
+        - {path: "${HOME}/plain/copy", exists: true, type: file, content: tampered}
+    notExpected:
+      stdOut: ["debug "]
+
+  - name: BackupCleanup
+    remove:
+      paths:
+        - "${HOME}/plain/copy"
+        - "${HOME}/plain"
+    notExpected:
+      files: *allProfilesAllFilesExists
+##[<] 🤖🤖

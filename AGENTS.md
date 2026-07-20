@@ -152,8 +152,12 @@ config loaders and main-shape boilerplate.
 ### Go:
 
 `test` run all tests
-`test-cover` run all tests with coverage, print the per-package and total percentages
-`e2e`: `build` run the real binary through the full command flow over the e2e fixture (hermetic temp HOME)
+`test-cover` run all tests with coverage (binary covdata into ./cover-unit), print the per-package and total percentages
+`cover-report` merge every present cover-* covdata dir into coverage.out/coverage.xml, print the combined total
+`build-cover` build the coverage-instrumented binary into ./dist (e2e prerequisite)
+`e2e-dryrun`: `build-cover` dry-run e2e flow (every command --dry-run=all, CHE_DEBUG=1), binary covdata into ./cover-e2e-dryrun
+`e2e-run`: `build-cover` real full-flow e2e (CHE_DEBUG=0), binary covdata into ./cover-e2e-run
+`e2e`: `e2e-dryrun -> e2e-run` run both e2e flows
 `build` build the binary into ./dist
 `lint` golangci-lint all packages
 `vet` go vet all packages
