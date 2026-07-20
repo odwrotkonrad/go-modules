@@ -411,6 +411,8 @@ rebuild-ci-image:
   trigger:
     project: konradodwrot/infra/oci-images
     branch: main
+    forward:
+      yaml_variables: false
 ##[<] 🤖🤖
 
 publish-get-os-open-files-with:
