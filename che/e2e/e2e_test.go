@@ -22,9 +22,9 @@ import (
 	"gitlab.com/konradodwrot/go-modules/lib/testyml"
 )
 
-func TestE2EDryRun(t *testing.T) { runSpec(t, "dryrun.e2e.spec.yml") }
+func TestE2EDryRun(t *testing.T) { runCase(t, "dry-run-e2e") }
 
-func TestE2ERun(t *testing.T) { runSpec(t, "e2e.spec.yml") }
+func TestE2ERun(t *testing.T) { runCase(t, "e2e") }
 
 type world struct {
 	bin                       string
@@ -48,12 +48,12 @@ func binPath(t *testing.T) string {
 	return abs
 }
 
-func runSpec(t *testing.T, path string) {
+func runCase(t *testing.T, name string) {
 	bin := binPath(t)
-	spec := loadSpec(t, path)
-	w := setup(t, spec.Context.Env)
+	c := loadCase(t, "e2e.spec.yml", name)
+	w := setup(t, c.Context.Env)
 	w.bin = bin
-	for _, s := range spec.Steps {
+	for _, s := range c.Steps {
 		printHeader(s.Name)
 		out, code := w.act(t, s)
 		if s.Command != "" {
@@ -68,24 +68,34 @@ func runSpec(t *testing.T, path string) {
 	os.RemoveAll(w.work)
 }
 
-func loadSpec(t *testing.T, path string) specFile {
+func loadCase(t *testing.T, path, name string) testCase {
 	t.Helper()
 	raw, err := os.ReadFile(path)
 	require.NoErrorf(t, err, "read spec %s", path)
 	var f specFile
 	require.NoErrorf(t, testyml.StrictDecode(raw, &f), "decode spec %s", path)
-	require.NotEmptyf(t, f.Steps, "%s: no steps", path)
-	for i, s := range f.Steps {
-		require.NotEmptyf(t, s.Name, "%s: step %d: missing name", path, i)
-		require.Equalf(t, 1, s.countActions(), "%s: step %q: exactly one action", path, s.Name)
-		for _, e := range s.Expected.Files {
-			require.Truef(t, e.CountGlob != "" || e.Exists, "%s: step %q: files entries are positive (exists: true)", path, s.Name)
-		}
-		for _, e := range s.NotExpected.Files {
-			require.Truef(t, e.Exists, "%s: step %q: notExpected files entries assert absence of exists: true", path, s.Name)
+	require.NotEmptyf(t, f.TestCases, "%s: no testCases", path)
+	for _, c := range f.TestCases {
+		require.NotEmptyf(t, c.Name, "%s: testCase missing name", path)
+		require.NotEmptyf(t, c.Steps, "%s: testCase %q: no steps", path, c.Name)
+		for i, s := range c.Steps {
+			require.NotEmptyf(t, s.Name, "%s: %s: step %d: missing name", path, c.Name, i)
+			require.Equalf(t, 1, s.countActions(), "%s: %s: step %q: exactly one action", path, c.Name, s.Name)
+			for _, e := range s.Expected.Files {
+				require.Truef(t, e.CountGlob != "" || e.Exists, "%s: %s: step %q: files entries are positive (exists: true)", path, c.Name, s.Name)
+			}
+			for _, e := range s.NotExpected.Files {
+				require.Truef(t, e.Exists, "%s: %s: step %q: notExpected files entries assert absence of exists: true", path, c.Name, s.Name)
+			}
 		}
 	}
-	return f
+	for _, c := range f.TestCases {
+		if c.Name == name {
+			return c
+		}
+	}
+	t.Fatalf("%s: no testCase named %q", path, name)
+	return testCase{}
 }
 
 func setup(t *testing.T, specEnv map[string]string) *world {

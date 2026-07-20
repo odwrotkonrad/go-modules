@@ -1,6 +1,5 @@
 // Package e2e drives the built che binary through YAML-declared command flows
-// (e2e.spec.yml, dryrun.e2e.spec.yml) over the local/remote fixtures in a
-// hermetic temp HOME.
+// (e2e.spec.yml) over the local/remote fixtures in a hermetic temp HOME.
 package e2e
 
 // [>] 🤖🤖
@@ -16,9 +15,10 @@ import (
 // Domain model (the e2e spec schema):
 //
 //	specFile
-//	  context.env   extra env for every che invocation (e.g. CHE_DEBUG)
-//	  defs          anchor scratch space, ignored by the runner
-//	  steps         ordered, fail-fast, sharing one workdir + HOME
+//	  defs          anchor scratch space shared by all cases, ignored by the runner
+//	  testCases     named flows; each carries context.env (extra env for every
+//	                che invocation, e.g. CHE_DEBUG) and its ordered steps,
+//	                fail-fast, sharing one fresh workdir + HOME per case
 //	step: exactly one action (command | write | remove | gitRestore | extract).
 //	expected: stdOut substring matchers (literal with {{/regex/}} holes),
 //	stdOutFull (whole ANSI-stripped output, anchored), exitCode, files
@@ -30,8 +30,13 @@ import (
 //	${REMOTE} ${XDG_STATE_HOME} ${XDG_CACHE_HOME}.
 
 type specFile struct {
+	Defs      any        `yaml:"defs"`
+	TestCases []testCase `yaml:"testCases"`
+}
+
+type testCase struct {
+	Name    string      `yaml:"name"`
 	Context specContext `yaml:"context"`
-	Defs    any         `yaml:"defs"`
 	Steps   []step      `yaml:"steps"`
 }
 
