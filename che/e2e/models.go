@@ -6,7 +6,6 @@ package e2e
 // [>] 🤖🤖
 
 import (
-	"bytes"
 	"fmt"
 
 	"gopkg.in/yaml.v3"
@@ -20,20 +19,19 @@ import (
 //	  context.env   extra env for every che invocation (e.g. CHE_DEBUG)
 //	  defs          anchor scratch space, ignored by the runner
 //	  steps         ordered, fail-fast, sharing one workdir + HOME
-//	step: exactly one action (command | write | remove | gitRestore | extract),
-//	expected/notExpected allowed on any step. stdOut matchers are substring
-//	(literal with {{/regex/}} holes); stdOutFull (expected only) asserts the
-//	whole ANSI-stripped output. files entries are positive-only
-//	(exists: true); absence is asserted by listing the entry under
-//	notExpected.files. files takes one mapping or a sequence; an item may
-//	itself be a sequence (a def anchor) and nested sequences flatten, so
-//	lists assemble from defs without repeating entries. Paths and matchers
-//	expand ${WORK} ${HOME} ${LOCAL} ${REMOTE} ${XDG_STATE_HOME}
-//	${XDG_CACHE_HOME}.
+//	step: exactly one action (command | write | remove | gitRestore | extract).
+//	expected: stdOut substring matchers (literal with {{/regex/}} holes),
+//	stdOutFull (whole ANSI-stripped output, anchored), exitCode, files
+//	(exists: true entries with type/symlinkTo/content/countGlob).
+//	notExpected: stdOut matchers plus bare {path, exists: true} entries
+//	asserting absence. A files value is one mapping or a sequence; nested
+//	sequences (def anchors) flatten, so lists assemble from defs without
+//	repeating entries. Paths and matchers expand ${WORK} ${HOME} ${LOCAL}
+//	${REMOTE} ${XDG_STATE_HOME} ${XDG_CACHE_HOME}.
 
 type specFile struct {
 	Context specContext `yaml:"context"`
-	Defs    yaml.Node   `yaml:"defs"`
+	Defs    any         `yaml:"defs"`
 	Steps   []step      `yaml:"steps"`
 }
 
@@ -49,7 +47,18 @@ type step struct {
 	GitRestore  *gitSpec     `yaml:"gitRestore"`
 	Extract     *extractSpec `yaml:"extract"`
 	Expected    want         `yaml:"expected"`
-	NotExpected want         `yaml:"notExpected"`
+	NotExpected notWant      `yaml:"notExpected"`
+}
+
+// countActions counts the step's declared actions (exactly one is valid).
+func (s step) countActions() int {
+	n := 0
+	for _, set := range []bool{s.Command != "", s.Write != nil, s.Remove != nil, s.GitRestore != nil, s.Extract != nil} {
+		if set {
+			n++
+		}
+	}
+	return n
 }
 
 type writeSpec struct {
@@ -72,66 +81,15 @@ type extractSpec struct {
 }
 
 type want struct {
-	StdOut     testyml.Matchers `yaml:"stdOut"`
-	StdOutFull string           `yaml:"stdOutFull"`
-	ExitCode   int              `yaml:"exitCode"`
-	Files      fileAsserts      `yaml:"files"`
+	StdOut     testyml.Matchers  `yaml:"stdOut"`
+	StdOutFull string            `yaml:"stdOutFull"`
+	ExitCode   int               `yaml:"exitCode"`
+	Files      files[fileAssert] `yaml:"files"`
 }
 
-// fileAsserts accepts a single mapping or a sequence, flattening nested
-// sequences (def anchors spliced into a files list), strict-decoding each
-// entry.
-type fileAsserts []fileAssert
-
-func (f *fileAsserts) UnmarshalYAML(node *yaml.Node) error {
-	if node.Kind == yaml.AliasNode {
-		node = node.Alias
-	}
-	switch node.Kind {
-	case yaml.MappingNode:
-		one, err := decodeFileAssert(node)
-		if err != nil {
-			return err
-		}
-		*f = fileAsserts{one}
-		return nil
-	case yaml.SequenceNode:
-	default:
-		return fmt.Errorf("files: want a mapping or sequence, got kind %v", node.Kind)
-	}
-	out := fileAsserts{}
-	for _, item := range node.Content {
-		if item.Kind == yaml.AliasNode {
-			item = item.Alias
-		}
-		if item.Kind == yaml.SequenceNode {
-			var nested fileAsserts
-			if err := item.Decode(&nested); err != nil {
-				return err
-			}
-			out = append(out, nested...)
-			continue
-		}
-		one, err := decodeFileAssert(item)
-		if err != nil {
-			return err
-		}
-		out = append(out, one)
-	}
-	*f = out
-	return nil
-}
-
-func decodeFileAssert(node *yaml.Node) (fileAssert, error) {
-	var one fileAssert
-	enc, err := yaml.Marshal(node)
-	if err != nil {
-		return one, err
-	}
-	dec := yaml.NewDecoder(bytes.NewReader(enc))
-	dec.KnownFields(true)
-	err = dec.Decode(&one)
-	return one, err
+type notWant struct {
+	StdOut testyml.Matchers    `yaml:"stdOut"`
+	Files  files[absentAssert] `yaml:"files"`
 }
 
 type fileAssert struct {
@@ -142,6 +100,51 @@ type fileAssert struct {
 	Content   string `yaml:"content"`
 	CountGlob string `yaml:"countGlob"`
 	Count     int    `yaml:"count"`
+}
+
+type absentAssert struct {
+	Path   string `yaml:"path"`
+	Exists bool   `yaml:"exists"`
+}
+
+// files accepts a single mapping or a sequence, flattening nested sequences
+// (def anchors spliced into a list), strict-decoding each entry.
+type files[T any] []T
+
+func (f *files[T]) UnmarshalYAML(node *yaml.Node) error {
+	node = derefAlias(node)
+	if node.Kind == yaml.MappingNode {
+		node = &yaml.Node{Kind: yaml.SequenceNode, Content: []*yaml.Node{node}}
+	}
+	if node.Kind != yaml.SequenceNode {
+		return fmt.Errorf("files: want a mapping or sequence, got kind %v", node.Kind)
+	}
+	out := files[T]{}
+	for _, item := range node.Content {
+		item = derefAlias(item)
+		if item.Kind == yaml.SequenceNode {
+			var nested files[T]
+			if err := item.Decode(&nested); err != nil {
+				return err
+			}
+			out = append(out, nested...)
+			continue
+		}
+		var one T
+		if err := testyml.StrictDecodeNode(item, &one); err != nil {
+			return err
+		}
+		out = append(out, one)
+	}
+	*f = out
+	return nil
+}
+
+func derefAlias(n *yaml.Node) *yaml.Node {
+	if n.Kind == yaml.AliasNode {
+		return n.Alias
+	}
+	return n
 }
 
 // [<] 🤖🤖

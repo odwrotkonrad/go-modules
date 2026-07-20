@@ -12,14 +12,13 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
-	"regexp"
 	"strings"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-	"gopkg.in/yaml.v3"
 
+	"gitlab.com/konradodwrot/go-modules/che/internal/testutil"
 	"gitlab.com/konradodwrot/go-modules/lib/testyml"
 )
 
@@ -44,9 +43,8 @@ func binPath(t *testing.T) string {
 	}
 	abs, err := filepath.Abs(bin)
 	require.NoError(t, err)
-	if _, err := os.Stat(abs); err != nil {
-		t.Fatalf("E2E_BIN %s: %v", bin, err)
-	}
+	_, err = os.Stat(abs)
+	require.NoErrorf(t, err, "E2E_BIN %s", bin)
 	return abs
 }
 
@@ -57,9 +55,12 @@ func runSpec(t *testing.T, path string) {
 	w.bin = bin
 	for _, s := range spec.Steps {
 		printHeader(s.Name)
-		out := w.act(t, s)
-		w.assertWant(t, s.Name, out, s.Expected, true)
-		w.assertWant(t, s.Name, out, s.NotExpected, false)
+		out, code := w.act(t, s)
+		if s.Command != "" {
+			assert.Equalf(t, s.Expected.ExitCode, code, "step %s: exit code, output:\n%s", s.Name, out)
+		}
+		w.assertExpected(t, s.Name, out, s.Expected)
+		w.assertNotExpected(t, s.Name, out, s.NotExpected)
 		if t.Failed() {
 			t.Fatalf("step %s failed (workdir kept: %s)", s.Name, w.work)
 		}
@@ -71,26 +72,17 @@ func loadSpec(t *testing.T, path string) specFile {
 	t.Helper()
 	raw, err := os.ReadFile(path)
 	require.NoErrorf(t, err, "read spec %s", path)
-	dec := yaml.NewDecoder(bytes.NewReader(raw))
-	dec.KnownFields(true)
 	var f specFile
-	require.NoErrorf(t, dec.Decode(&f), "decode spec %s", path)
+	require.NoErrorf(t, testyml.StrictDecode(raw, &f), "decode spec %s", path)
 	require.NotEmptyf(t, f.Steps, "%s: no steps", path)
 	for i, s := range f.Steps {
 		require.NotEmptyf(t, s.Name, "%s: step %d: missing name", path, i)
-		actions := 0
-		for _, set := range []bool{s.Command != "", s.Write != nil, s.Remove != nil, s.GitRestore != nil, s.Extract != nil} {
-			if set {
-				actions++
-			}
+		require.Equalf(t, 1, s.countActions(), "%s: step %q: exactly one action", path, s.Name)
+		for _, e := range s.Expected.Files {
+			require.Truef(t, e.CountGlob != "" || e.Exists, "%s: step %q: files entries are positive (exists: true)", path, s.Name)
 		}
-		require.Equalf(t, 1, actions, "%s: step %q: exactly one action", path, s.Name)
-		require.Emptyf(t, s.NotExpected.StdOutFull, "%s: step %q: stdOutFull is expected-only", path, s.Name)
-		for _, f := range append(append([]fileAssert{}, s.Expected.Files...), s.NotExpected.Files...) {
-			if f.CountGlob != "" {
-				continue
-			}
-			require.Truef(t, f.Exists, "%s: step %q: files entries are positive-only (exists: true), assert absence under notExpected", path, s.Name)
+		for _, e := range s.NotExpected.Files {
+			require.Truef(t, e.Exists, "%s: step %q: notExpected files entries assert absence of exists: true", path, s.Name)
 		}
 	}
 	return f
@@ -140,25 +132,14 @@ func setup(t *testing.T, specEnv map[string]string) *world {
 	if dir := os.Getenv("E2E_GOCOVERDIR"); dir != "" {
 		w.env = append(w.env, "GOCOVERDIR="+dir)
 	}
-	for _, repo := range []string{w.local, w.remote} {
-		w.git(t, repo, "init", "-q", "-b", "main")
-		w.git(t, repo, "add", "-A")
-		w.git(t, repo, "-c", "user.email=e2e@invalid", "-c", "user.name=e2e", "commit", "-qm", "init")
-	}
+	testutil.GitRepo(t, w.local)
+	testutil.GitRepo(t, w.remote)
 	return w
 }
 
 func (w *world) expand(s string) string { return testyml.Expand(s, w.vars) }
 
-func (w *world) git(t *testing.T, repo string, args ...string) {
-	t.Helper()
-	cmd := exec.Command("git", append([]string{"-C", repo}, args...)...)
-	cmd.Env = w.env
-	out, err := cmd.CombinedOutput()
-	require.NoErrorf(t, err, "git %v: %s", args, out)
-}
-
-func (w *world) act(t *testing.T, s step) string {
+func (w *world) act(t *testing.T, s step) (out string, exitCode int) {
 	t.Helper()
 	switch {
 	case s.Command != "":
@@ -171,14 +152,17 @@ func (w *world) act(t *testing.T, s step) string {
 			require.NoErrorf(t, os.RemoveAll(w.expand(p)), "step %s: remove %s", s.Name, p)
 		}
 	case s.GitRestore != nil:
-		w.git(t, w.expand(s.GitRestore.Repo), "checkout", "-q", "--", s.GitRestore.Path)
+		cmd := exec.Command("git", "-C", w.expand(s.GitRestore.Repo), "checkout", "-q", "--", s.GitRestore.Path)
+		cmd.Env = w.env
+		gitOut, err := cmd.CombinedOutput()
+		require.NoErrorf(t, err, "step %s: git restore %s: %s", s.Name, s.GitRestore.Path, gitOut)
 	case s.Extract != nil:
 		w.extract(t, s)
 	}
-	return ""
+	return "", 0
 }
 
-func (w *world) runCommand(t *testing.T, s step) string {
+func (w *world) runCommand(t *testing.T, s step) (string, int) {
 	t.Helper()
 	fields := strings.Fields(w.expand(s.Command))
 	require.Equalf(t, "che", fields[0], "step %s: command must invoke che", s.Name)
@@ -191,7 +175,6 @@ func (w *world) runCommand(t *testing.T, s step) string {
 	if out != "" && !strings.HasSuffix(out, "\n") {
 		fmt.Println()
 	}
-	out = ansiRe.ReplaceAllString(out, "")
 	code := 0
 	if err != nil {
 		var exitErr *exec.ExitError
@@ -200,46 +183,39 @@ func (w *world) runCommand(t *testing.T, s step) string {
 		}
 		code = exitErr.ExitCode()
 	}
-	assert.Equalf(t, s.Expected.ExitCode, code, "step %s: exit code, output:\n%s", s.Name, out)
-	return out
+	return testutil.StripANSI(out), code
 }
 
-var (
-	ansiRe = regexp.MustCompile("\x1b\\[[0-9;]*m")
-	holeRe = regexp.MustCompile(`\{\{/(.*?)/\}\}`)
-)
-
-func (w *world) assertWant(t *testing.T, name, out string, want want, positive bool) {
+func (w *world) assertExpected(t *testing.T, name, out string, want want) {
 	t.Helper()
 	if want.StdOutFull != "" {
 		full := w.expand(want.StdOutFull)
-		var b strings.Builder
-		b.WriteString(`\A`)
-		last := 0
-		for _, loc := range holeRe.FindAllStringSubmatchIndex(full, -1) {
-			b.WriteString(regexp.QuoteMeta(full[last:loc[0]]))
-			b.WriteString(full[loc[2]:loc[3]])
-			last = loc[1]
-		}
-		b.WriteString(regexp.QuoteMeta(full[last:]))
-		b.WriteString(`\z`)
-		if !regexp.MustCompile(b.String()).MatchString(out) {
+		if !testyml.IsMatchFull(out, full) {
 			t.Errorf("step %s: full output mismatch\n--- want ---\n%s--- got ---\n%s", name, full, out)
 		}
 	}
 	for _, m := range want.StdOut {
-		if positive {
-			testyml.MustMatch(t, out, w.expand(m))
-		} else {
-			testyml.MustNotMatch(t, out, w.expand(m))
-		}
+		testyml.MustMatch(t, out, w.expand(m))
 	}
 	for _, f := range want.Files {
-		w.assertFile(t, name, f, positive)
+		w.assertFile(t, name, f)
 	}
 }
 
-func (w *world) assertFile(t *testing.T, name string, f fileAssert, positive bool) {
+func (w *world) assertNotExpected(t *testing.T, name, out string, want notWant) {
+	t.Helper()
+	for _, m := range want.StdOut {
+		testyml.MustNotMatch(t, out, w.expand(m))
+	}
+	for _, f := range want.Files {
+		path := w.expand(f.Path)
+		if _, err := os.Lstat(path); err == nil {
+			t.Errorf("step %s: present but must be absent: %s", name, path)
+		}
+	}
+}
+
+func (w *world) assertFile(t *testing.T, name string, f fileAssert) {
 	t.Helper()
 	if f.CountGlob != "" {
 		matches, err := filepath.Glob(w.expand(f.CountGlob))
@@ -249,12 +225,6 @@ func (w *world) assertFile(t *testing.T, name string, f fileAssert, positive boo
 	}
 	path := w.expand(f.Path)
 	info, err := os.Lstat(path)
-	if !positive {
-		if err == nil {
-			t.Errorf("step %s: present but must be absent: %s", name, path)
-		}
-		return
-	}
 	if err != nil {
 		t.Errorf("step %s: missing %s", name, path)
 		return
@@ -279,8 +249,8 @@ func (w *world) assertFile(t *testing.T, name string, f fileAssert, positive boo
 	if f.SymlinkTo != "" {
 		target, err := os.Readlink(path)
 		require.NoErrorf(t, err, "step %s: readlink %s", name, path)
-		if !testyml.IsMatch(target, w.expand(f.SymlinkTo)) {
-			t.Errorf("step %s: symlink %s -> %s, want %s", name, path, target, w.expand(f.SymlinkTo))
+		if want := w.expand(f.SymlinkTo); !testyml.IsMatch(target, want) {
+			t.Errorf("step %s: symlink %s -> %s, want %s", name, path, target, want)
 		}
 	}
 	if f.Content != "" {
@@ -307,29 +277,22 @@ func (w *world) extract(t *testing.T, s step) {
 			break
 		}
 		require.NoErrorf(t, err, "step %s: read %s", s.Name, matches[0])
-		target := filepath.Join(dest, strings.TrimPrefix(hdr.Name, "/"))
-		switch hdr.Typeflag {
-		case tar.TypeDir:
-			require.NoError(t, os.MkdirAll(target, 0o755))
-		case tar.TypeReg:
-			require.NoError(t, os.MkdirAll(filepath.Dir(target), 0o755))
-			out, err := os.Create(target)
-			require.NoError(t, err)
-			_, err = io.Copy(out, reader)
-			require.NoError(t, err)
-			require.NoError(t, out.Close())
-		case tar.TypeSymlink:
-			require.NoError(t, os.MkdirAll(filepath.Dir(target), 0o755))
-			require.NoError(t, os.Symlink(hdr.Linkname, target))
-		default:
-			t.Fatalf("step %s: unsupported tar entry %q (type %v)", s.Name, hdr.Name, hdr.Typeflag)
-		}
+		// [why] che backups (fsutil.ArchiveDestinations) emit regular files only.
+		require.Equalf(t, byte(tar.TypeReg), hdr.Typeflag, "step %s: tar entry %q", s.Name, hdr.Name)
+		target := filepath.Join(dest, hdr.Name)
+		require.NoError(t, os.MkdirAll(filepath.Dir(target), 0o755))
+		out, err := os.Create(target)
+		require.NoError(t, err)
+		_, err = io.Copy(out, reader)
+		require.NoError(t, err)
+		require.NoError(t, out.Close())
 	}
 }
 
+var headerRule = strings.Repeat("━", 64)
+
 func printHeader(name string) {
-	rule := strings.Repeat("━", 64)
-	fmt.Printf("\n\x1b[1;36m%s\n  %s\n%s\x1b[0m\n", rule, name, rule)
+	fmt.Printf("\n\x1b[1;36m%s\n  %s\n%s\x1b[0m\n", headerRule, name, headerRule)
 }
 
 // [<] 🤖🤖
