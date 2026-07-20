@@ -52,6 +52,7 @@ test-cover:
 	if [[ -e cover-unit ]] rm -rf cover-unit; mkdir -p cover-unit
 	CC=$(CC) $(GO) test -v -cover -coverpkg=./... ./... -args -test.gocoverdir=$(CURDIR)/cover-unit
 	@$(GO) tool covdata textfmt -i=cover-unit -o coverage.out
+	@sed -i.bak '\|/che/e2e/|d' coverage.out && rm coverage.out.bak
 	@$(GO) run $(GOCOVER_COBERTURA) < coverage.out > coverage.xml
 	@sed -i.bak 's|filename="gitlab.com/konradodwrot/go-modules/|filename="|g' coverage.xml && rm coverage.xml.bak
 	@$(GO) tool cover -func=coverage.out | tail -1
@@ -62,6 +63,7 @@ cover-report:
 		[[ -n $$dirs ]] || { print "no cover-* covdata dirs"; exit 1 }; \
 		print "merging covdata: $$dirs"; \
 		$(GO) tool covdata textfmt -i=$$dirs -o coverage.out
+	@sed -i.bak '\|/che/e2e/|d' coverage.out && rm coverage.out.bak
 	@$(GO) run $(GOCOVER_COBERTURA) < coverage.out > coverage.xml
 	@sed -i.bak 's|filename="gitlab.com/konradodwrot/go-modules/|filename="|g' coverage.xml && rm coverage.xml.bak
 	@$(GO) tool cover -func=coverage.out | tail -1
