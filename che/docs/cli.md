@@ -10,8 +10,8 @@ sourced profile refs included).
 | Option | Env | Values | Default | Description |
 | --- | --- | --- | --- | --- |
 | `-C`, `--che-working-directory` | `CHE_WORKING_DIRECTORY` | `string` |  | change into this directory before resolving the repo |
-| `--debug` | `CHE_DEBUG` | `bool` | `false` | print debug-level lines (source announce, clone/pull attempts) |
 | `--dry-run` | `CHE_DRY_RUN` | `delta (changed dests, bare-flag default)` \| `all (every dest)` \| `true (alias for delta)` | `off` | print mutating actions instead of executing them |
+| `--log-level` | `CHE_LOG_LEVEL` | `error (failures only)` \| `warn` \| `info (what happened)` \| `debug (adds intentions and won't-happen with reasons)` \| `trace (adds details)` | `info` | human-log level |
 | `--profile-working-directory` | `CHE_PROFILE_WORKING_DIRECTORY` | `string` |  | the load-ops source tree (che level; spec/profile options.profileWorkingDirectory override); default root |
 | `--profiles` | `CHE_PROFILE (comma-separated)` | `stringSlice` | `[]` | run only these profiles (comma-separated or repeated; autoDiscover skipped, runIf still enforced) |
 | `--skip-ops` | `CHE_SKIP_OPS` | `prune-broken-links` \| `make-dirs` \| `make-links` \| `make-copies` \| `render-templates` \| `run-scripts` | `[]` | skip these ops everywhere (comma-separated or repeated; dropped from the run sequence, direct op subcommands become logged no-ops) |
@@ -134,9 +134,22 @@ You will need to start a new shell for this setup to take effect.
 | --- | --- | --- | --- | --- |
 | `--no-descriptions` |  | `bool` | `false` | disable completion descriptions |
 
+### `$ che config`
+
+inspect che's resolved configuration.
+
+### `$ che config show`
+
+print the resolved options with their deciding sources (--delta default, --all for every option).
+
+| Option | Env | Values | Default | Description |
+| --- | --- | --- | --- | --- |
+| `--all` |  | `bool` | `false` | print every option with its value and source |
+| `--delta` |  | `bool` | `false` | print only the options differing from defaults (default mode) |
+
 ### `$ che discover-profiles`
 
-log the prepared profiles with per-op all/delta counts (one per line) and exit.
+log the discovered profiles with their per-op changes and exit.
 
 ### `$ che init-remote-sources`
 

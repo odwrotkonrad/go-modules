@@ -8,6 +8,9 @@ package telemetry
 
 import (
 	"context"
+	"maps"
+	"slices"
+	"strings"
 	"time"
 
 	"go.opentelemetry.io/otel/attribute"
@@ -26,6 +29,8 @@ import (
 	sdktrace "go.opentelemetry.io/otel/sdk/trace"
 	"go.opentelemetry.io/otel/trace"
 	tracenoop "go.opentelemetry.io/otel/trace/noop"
+
+	"gitlab.com/konradodwrot/go-modules/che/internal/log"
 )
 
 // [>] 🤖🤖 config
@@ -327,27 +332,48 @@ func (t *Telemetry) CountError(ctx context.Context, op string) {
 
 // [>] 🤖🤖 log bridge
 
-// LogRecord emits one che log line as an OTLP log record (title as event name,
-// msg as body, level -> severity). No-op when logs are off.
-func (t *Telemetry) LogRecord(title, msg, level string) {
+// LogRecord emits one che log event as an OTLP log record: event name
+// "<scope>.<action>", msg as body, attrs (+ joined reasons) as attributes,
+// level -> severity. No-op when logs are off.
+func (t *Telemetry) LogRecord(e log.Event) {
 	if t == nil || t.logger == nil {
 		return
 	}
 	var r otellog.Record
 	r.SetObservedTimestamp(time.Now())
-	r.SetSeverity(severity(level))
-	r.SetSeverityText(level)
-	r.SetEventName(title)
-	r.SetBody(otellog.StringValue(msg))
+	r.SetSeverity(severity(e.Level))
+	r.SetSeverityText(e.Level.String())
+	name := e.Scope
+	if e.Action != "" {
+		name += "." + e.Action
+	}
+	r.SetEventName(name)
+	r.SetBody(otellog.StringValue(e.Msg))
+	var attrs []otellog.KeyValue
+	for _, k := range slices.Sorted(maps.Keys(e.Attrs)) {
+		attrs = append(attrs, otellog.String(k, e.Attrs[k]))
+	}
+	if len(e.Reasons) > 0 {
+		attrs = append(attrs, otellog.String("reasons", strings.Join(e.Reasons, ",")))
+	}
+	r.AddAttributes(attrs...)
 	t.logger.Emit(context.Background(), r)
 }
 
-// severity maps a che log level word to an OTLP severity.
-func severity(level string) otellog.Severity {
-	if level == "debug" {
+// severity maps a che log level to its OTLP severity.
+func severity(l log.Level) otellog.Severity {
+	switch l {
+	case log.Levels.Error:
+		return otellog.SeverityError
+	case log.Levels.Warn:
+		return otellog.SeverityWarn
+	case log.Levels.Debug:
 		return otellog.SeverityDebug
+	case log.Levels.Trace:
+		return otellog.SeverityTrace
+	default:
+		return otellog.SeverityInfo
 	}
-	return otellog.SeverityInfo
 }
 
 // [<] 🤖🤖 log bridge

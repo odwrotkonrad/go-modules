@@ -10,14 +10,15 @@ cases:
   - name: ShouldRenderOnlyHostDestsForHostProfile
     expected:
       stdOut: |
-        backup: ${HOME}/.local/state/che/backups/che-render-{{/.*/}}.tar.bz2
-        render-templates(created): ${HOME}/.config/zsh/t
+        profile cli/macos:
+          created ${HOME}/.local/state/che/backups/che-render-{{/\S*/}}.tar.bz2
+          created ${HOME}/.config/zsh/t
   - name: ShouldRenderOnlyRepoDestsForOntoRepoProfile
     context:
       command: che render-templates --profile ontoRepo
     expected:
       stdOut: |
-        render-templates(created): ${REPO}/docs/r.md
+        created ${REPO}/docs/r.md
     notExpected:
       stdOut:
         - ${HOME}/.config/zsh/t

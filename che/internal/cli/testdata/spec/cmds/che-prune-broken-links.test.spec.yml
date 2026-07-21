@@ -11,5 +11,5 @@ cases:
     notExpected:
       stdOut:
         - 'rm: '
-        - 'prune-link'
+        - 'pruned '
 # [<] 🤖

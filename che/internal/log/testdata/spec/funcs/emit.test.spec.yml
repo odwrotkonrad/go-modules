@@ -1,0 +1,70 @@
+# [>] 🤖🤖
+context:
+  function: log.Emit
+cases:
+  - name: ShouldRenderActionBoldBeforeMsg
+    input:
+      args: [gate: info, level: info, scope: make-links, action: created, msg: /etc/zshrc]
+    expected:
+      output: "created /etc/zshrc\n"
+  - name: ShouldRenderHyphenatedActionAsProse
+    input:
+      args: [gate: info, level: info, scope: init-remote-sources, action: up-to-date, msg: remote x into y]
+    expected:
+      output: "up to date remote x into y\n"
+  - name: ShouldRenderBareMsgWithoutAction
+    input:
+      args: [gate: info, level: info, scope: discover-profiles, action: "", msg: "profile plain"]
+    expected:
+      output: "profile plain\n"
+  - name: ShouldRenderReasonsAsWillNotProse
+    input:
+      args: [gate: info, level: info, scope: render-templates, action: overwrite, msg: /x, reasons: [same content]]
+    expected:
+      output: "will not overwrite /x: same content\n"
+  - name: ShouldJoinMultipleReasons
+    input:
+      args: [gate: info, level: info, scope: make-links, action: create, msg: /x, reasons: [already linked, "dry run (all)"]]
+    expected:
+      output: "will not create /x: already linked, dry run (all)\n"
+  - name: ShouldIndentEveryLineOfMultilineMsg
+    input:
+      args: [gate: info, level: info, scope: discover-profiles, action: "", msg: "profile plain\n  make-links: 1 change", indent: 1]
+    expected:
+      output: "  profile plain\n    make-links: 1 change\n"
+  - name: ShouldSilenceLevelBelowGate
+    input:
+      args: [gate: info, level: debug, scope: run, action: will-run, msg: make-links]
+    expected:
+      output: ""
+  - name: ShouldPrintDebugAtDebugGate
+    input:
+      args: [gate: debug, level: debug, scope: run, action: will-run, msg: make-links]
+    expected:
+      output: "will run make-links\n"
+  - name: ShouldPrintTraceOnlyAtTraceGate
+    input:
+      args: [gate: debug, level: trace, scope: ledger, action: error, msg: boom]
+    expected:
+      output: ""
+  - name: ShouldPrintErrorAtErrorGate
+    input:
+      args: [gate: error, level: error, scope: run, action: fail, msg: "plain: boom"]
+    expected:
+      output: "fail plain: boom\n"
+  - name: ShouldSilenceInfoAtErrorGate
+    input:
+      args: [gate: error, level: info, scope: make-links, action: created, msg: /x]
+    expected:
+      output: ""
+  - name: ShouldSilenceWarnAtErrorGate
+    input:
+      args: [gate: error, level: warn, scope: init-remote-sources, action: warning, msg: fetch failed]
+    expected:
+      output: ""
+  - name: ShouldPrintWarnAtWarnGate
+    input:
+      args: [gate: warn, level: warn, scope: init-remote-sources, action: warning, msg: fetch failed]
+    expected:
+      output: "warning fetch failed\n"
+# [<] 🤖🤖

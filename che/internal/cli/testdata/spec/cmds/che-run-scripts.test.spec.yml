@@ -10,14 +10,13 @@ cases:
   - name: ShouldExecEachScriptAndReportOk
     expected:
       stdOut: |
-        run-scripts: ${REPO}/install/setup
-        run-scripts(report): ok ${REPO}/install/setup
+        ran ${REPO}/install/setup
   - name: ShouldNarrowToMatchingName
     context:
       command: che run-scripts setup
     expected:
       stdOut: |
-        run-scripts: ${REPO}/install/setup
+        ran ${REPO}/install/setup
   - name: ShouldErrorWhenNameMatchesNothing
     context:
       command: che run-scripts nonExistingScript
@@ -27,24 +26,24 @@ cases:
         - 'no script matches: [nonExistingScript]'
     notExpected:
       stdOut:
-        - 'run-scripts: '
+        - 'ran '
   - name: ShouldNoOpWhenGloballySkipped
     context:
-      env: {CHE_SKIP_OPS: run-scripts, CHE_DEBUG: "1"}
+      env: {CHE_SKIP_OPS: run-scripts, CHE_LOG_LEVEL: debug}
     expected:
       stdOut:
-        - 'run-scripts(runProfile, skippedDue[config.skipOps]): cli/macos'
+        - 'will not run profile cli/macos: options.skipOps'
     notExpected:
       stdOut:
-        - 'run-scripts: '
+        - 'ran '
   - name: ShouldNotErrorOnNameFilterWhenGloballySkipped
     context:
       command: che run-scripts nonExistingScript
-      env: {CHE_SKIP_OPS: run-scripts, CHE_DEBUG: "1"}
+      env: {CHE_SKIP_OPS: run-scripts, CHE_LOG_LEVEL: debug}
     expected:
       stdOut:
-        - 'run-scripts(runProfile, skippedDue[config.skipOps]): cli/macos'
+        - 'will not run profile cli/macos: options.skipOps'
     notExpected:
       stdOut:
-        - 'run-scripts: '
+        - 'ran '
 # [<] 🤖

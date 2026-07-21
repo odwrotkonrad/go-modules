@@ -45,15 +45,16 @@ func TestProfileSourceDecode(t *testing.T) {
 }
 
 // AllPass gates on a profile's runIf; FindRecipe errors on undefined names.
-// A pass logs at normal level, a reject only at debug level.
+// Condition evaluations log at trace level only.
 func TestRunIfGate(t *testing.T) {
 	testyml.Run(t, td, "testdata/spec/funcs/run_if_pass.test.spec.yml", func(t *testing.T, c testyml.Case[bool]) {
 		for k, v := range c.Context.Env {
 			t.Setenv(k, v)
 		}
 		if c.Input.Args.Bool(t, 1) {
-			log.SetDebug(true)
-			t.Cleanup(func() { log.SetDebug(false) })
+			prev := log.GetLevel()
+			log.SetLevel(log.Levels.Trace)
+			t.Cleanup(func() { log.SetLevel(prev) })
 		}
 		dir := testutil.Tree(t, map[string]string{"che.yml": "p:\n  options:\n    runIf: ['env:X']\n"})
 		d, err := Load(filepath.Join(dir, "che.yml"))

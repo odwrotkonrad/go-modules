@@ -3,6 +3,7 @@ package che
 // [>] 🤖🤖
 
 import (
+	"cmp"
 	"context"
 	"embed"
 	"errors"
@@ -110,7 +111,7 @@ func sourcedProfile(ps []*ProfileReady) *ProfileReady {
 type prepFlags struct {
 	SkipRemoteRefs bool     `yaml:"skipRemoteRefs"`
 	ValidateSpec   string   `yaml:"validateSpec"`
-	Debug          bool     `yaml:"debug"`
+	LogLevel       string   `yaml:"logLevel"`
 	UnsetEnv       []string `yaml:"unsetEnv"` // keys omitted from Context.Env
 }
 
@@ -165,15 +166,19 @@ func TestPrepareSpecs(t *testing.T) {
 			ctx := newContext(env, hostRepo)
 
 			vs := options.ValidateSpecMode(testyml.Expand(flags.ValidateSpec, vars))
+			logLevel := cmp.Or(flags.LogLevel, "info")
 			opts := options.Options{
 				AutoDiscover:    true,
 				SkipRemoteRefs:  flags.SkipRemoteRefs,
 				ValidateSpec:    vs,
 				ValidateSpecCLI: vs, // models the flag/env override
-				Debug:           flags.Debug,
+				LogLevel:        logLevel,
 			}
-			log.SetDebug(flags.Debug)
-			t.Cleanup(func() { log.SetDebug(false) })
+			level, err := log.ParseLevel(logLevel)
+			require.NoError(t, err)
+			prevLevel := log.GetLevel()
+			log.SetLevel(level)
+			t.Cleanup(func() { log.SetLevel(prevLevel) })
 			var root *SpecReady
 			out, err := testutil.CaptureStdout(t, func() error {
 				var e error
@@ -219,11 +224,13 @@ func TestPrepareSpecs(t *testing.T) {
 					got[r.Ref] = r.Cond
 				}
 				assert.Equal(t, want, got, "rejected profiles\n%s", out)
+				log.SetLevel(log.Levels.Debug)
 				line, err := testutil.CaptureStdout(t, func() error { root.LogRejected(); return nil })
+				log.SetLevel(prevLevel)
 				require.NoError(t, err)
 				for ref, cond := range want {
 					assert.Contains(t, testutil.StripANSI(line),
-						"discover-profiles(noMatchDue["+cond+"]): "+ref, "per-profile noMatch line")
+						"will not run profile "+ref+": runIf failed: "+cond, "per-profile rejected line")
 				}
 			}
 			sp := sourcedProfile(profiles)
@@ -279,7 +286,7 @@ func TestPrepareSpecs(t *testing.T) {
 // defaults, driving Context.Env instead of the process env.
 func TestPrepareOptionsPrecedence(t *testing.T) {
 	repo := testutil.Repo(t, map[string]string{
-		"che.yml": "options:\n  validateSpec: error\n  debug: true\np:\n  options: {autoDiscover: true}\n",
+		"che.yml": "options:\n  validateSpec: error\n  logLevel: debug\np:\n  options: {autoDiscover: true}\n",
 	})
 	_, baseEnv := prepEnv(t)
 	ctx := func(extra map[string]string) Context {
@@ -292,7 +299,7 @@ func TestPrepareOptionsPrecedence(t *testing.T) {
 	_, opts, err := PrepareApplicationOptions(ctx(nil), options.Options{})
 	require.NoError(t, err)
 	assert.Equal(t, options.ValidateSpec.Error, opts.ValidateSpec, "yaml layer over default")
-	assert.True(t, opts.Debug, "yaml debug over default")
+	assert.Equal(t, "debug", opts.LogLevel, "yaml logLevel over default")
 
 	_, opts, err = PrepareApplicationOptions(ctx(map[string]string{"CHE_VALIDATE_SPEC": "warn"}), options.Options{})
 	require.NoError(t, err)
@@ -321,7 +328,7 @@ func TestPrepareOptionsUserConfig(t *testing.T) {
 	cfgDir := filepath.Join(cfgHome, "che")
 	require.NoError(t, os.MkdirAll(cfgDir, 0o755))
 	config := "validateSpec: error\n" +
-		"debug: true\n" +
+		"logLevel: debug\n" +
 		"dryRun: delta\n" +
 		"skipRemoteRefs: true\n" +
 		"autoDiscover: true\n" +
@@ -340,7 +347,7 @@ func TestPrepareOptionsUserConfig(t *testing.T) {
 	_, opts, err := PrepareApplicationOptions(ctx(nil), options.Options{})
 	require.NoError(t, err)
 	assert.Equal(t, options.ValidateSpec.Error, opts.ValidateSpec, "user-config validateSpec over spec")
-	assert.True(t, opts.Debug, "user-config debug")
+	assert.Equal(t, "debug", opts.LogLevel, "user-config logLevel")
 	assert.Equal(t, options.DryRun.Delta, opts.DryRun, "user-config dryRun")
 	assert.True(t, opts.SkipRemoteRefs, "user-config skipRemoteRefs")
 	assert.True(t, opts.RenderSkipSecrets, "user-config renderTemplates.skipSecrets")
@@ -502,11 +509,14 @@ func TestExecOperations(t *testing.T) {
 			&stubOperation{name: "last", selected: true, delta: 1, ran: &ran},
 		},
 	}
+	prev := log.GetLevel()
+	log.SetLevel(log.Levels.Debug)
+	t.Cleanup(func() { log.SetLevel(prev) })
 	out, err := testutil.CaptureStdout(t, func() error { return p.ExecOperations(context.Background()) })
 	require.ErrorIs(t, err, boom)
 	assert.Equal(t, []string{"one", "failing", "last"}, ran, "run order, failure does not stop")
-	assert.Contains(t, testutil.StripANSI(out), "run(runOp): one")
-	assert.NotContains(t, testutil.StripANSI(out), "run(runOp): skipped")
+	assert.Contains(t, testutil.StripANSI(out), "will run one")
+	assert.NotContains(t, testutil.StripANSI(out), "will run skipped")
 }
 
 // TestExecOperationsSkipOpsNoSweep: a skipped deselected op takes the skip
@@ -517,16 +527,19 @@ func TestExecOperationsSkipOpsNoSweep(t *testing.T) {
 	var ran []string
 	p := &ProfileReady{
 		ref:  "p",
-		opts: options.Options{SkipOps: []string{"render-templates"}, Debug: true},
+		opts: options.Options{SkipOps: []string{"render-templates"}},
 		OperationsReady: []operationReady{
 			&stubOperation{name: "render-templates", selected: false, ran: &ran},
 		},
 	}
+	prev := log.GetLevel()
+	log.SetLevel(log.Levels.Debug)
+	t.Cleanup(func() { log.SetLevel(prev) })
 	out, err := testutil.CaptureStdout(t, func() error { return p.ExecOperations(context.Background()) })
 	require.NoError(t, err)
 	assert.Empty(t, ran)
 	stripped := testutil.StripANSI(out)
-	assert.Contains(t, stripped, "run(runOp, skippedDue[config.skipOps]): render-templates")
+	assert.Contains(t, stripped, "will not run op render-templates: options.skipOps")
 	assert.NotContains(t, stripped, "(nothing selected)", "skip wins over the deselected sweep branch")
 }
 
@@ -541,6 +554,9 @@ func TestExecEachSkipsZeroDeltaProfile(t *testing.T) {
 		}}
 	}
 	s := &SpecReady{Profiles: []*ProfileReady{mk("settled", 0), mk("drifted", 1)}}
+	prev := log.GetLevel()
+	log.SetLevel(log.Levels.Debug)
+	t.Cleanup(func() { log.SetLevel(prev) })
 	var executed []string
 	out, err := testutil.CaptureStdout(t, func() error {
 		return s.ExecEach(context.Background(), "run", func(_ context.Context, p *ProfileReady) error {
@@ -551,8 +567,8 @@ func TestExecEachSkipsZeroDeltaProfile(t *testing.T) {
 	require.NoError(t, err)
 	assert.Equal(t, []string{"drifted"}, executed, "zero-delta profile not executed")
 	stripped := testutil.StripANSI(out)
-	assert.Contains(t, stripped, "run(runProfile, skippedDue[NoDelta]): settled: [make-links(0)]")
-	assert.Contains(t, stripped, "run(runProfile): drifted: [make-links(1)]")
+	assert.Contains(t, stripped, "will not run profile settled: no changes")
+	assert.Contains(t, stripped, "will run profile drifted: make-links (1 change)")
 }
 
 // [<] 🤖🤖

@@ -1,0 +1,26 @@
+# [>] 🤖🤖
+context:
+  function: log.ParseLevel
+cases:
+  - name: ShouldParseError
+    input: {args: [level: error]}
+    expected: {output: error}
+  - name: ShouldParseWarn
+    input: {args: [level: warn]}
+    expected: {output: warn}
+  - name: ShouldParseInfo
+    input: {args: [level: info]}
+    expected: {output: info}
+  - name: ShouldParseDebug
+    input: {args: [level: debug]}
+    expected: {output: debug}
+  - name: ShouldParseTrace
+    input: {args: [level: trace]}
+    expected: {output: trace}
+  - name: ShouldRejectUnknownWord
+    input: {args: [level: verbose]}
+    expected: {errorOutput: ['invalid log level "verbose"']}
+  - name: ShouldRejectEmpty
+    input: {args: [level: ""]}
+    expected: {errorOutput: ["invalid log level"]}
+# [<] 🤖🤖

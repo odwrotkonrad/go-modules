@@ -22,7 +22,7 @@ cases:
         - flags: {}
     expected:
       stdOut:
-        - validate(che.yml)
+        - "warning /p:"
         - includes
       output:
         profiles: [main, "${REF_DIR}/che.yml::p"]
@@ -66,13 +66,13 @@ cases:
                     - source: "@file://${REF_DIR}/che.yml::gitlabGroup"
                   runScripts: [scripts/local.zsh]
             scripts/local.zsh: "#!/bin/zsh\n"
-        - flags: {debug: true}
+        - flags: {logLevel: trace}
     expected:
       stdOut:
-        - 'init-remote-sources(cloneRemote): file://${REF_DIR}'
-        - 'debug discover-profiles(showCandidates, all): [main[remote:${REF_NAME}:gitlabGroup]]'
-        - 'debug discover-profiles(showCandidates, autoDiscoverable): [main]'
-        - 'debug discover-profiles(evaluating[gitlabGroup], pass): env:REF_GATE'
+        - 'cloned remote file://${REF_DIR}'
+        - 'listed candidates [main[remote:${REF_NAME}:gitlabGroup]]'
+        - 'listed candidates auto-discoverable [main]'
+        - 'evaluated run if gitlabGroup: "env:REF_GATE" passed'
       output:
         profiles: [main, "remote:${REF_NAME}:gitlabGroup"]
         repoRootUnder: ${CACHE}
@@ -99,7 +99,7 @@ cases:
                     - source: "${REF_DIR}/che.yml::gitlabGroup"
         - flags:
             unsetEnv: [REF_GATE]
-            debug: true
+            logLevel: debug
     expected:
       output:
         profiles: [main]
@@ -338,9 +338,9 @@ cases:
                 options: {autoDiscover: true}
         - flags:
             unsetEnv: [SPEC_GATE]
-            debug: true
+            logLevel: debug
     expected:
-      stdOut: debug spec(skip)
+      stdOut: will not load spec
       output:
         profiles: [main]
   - name: ShouldInheritSpecAutoDiscoverDefault

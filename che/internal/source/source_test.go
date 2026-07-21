@@ -63,8 +63,13 @@ func TestEnsure(t *testing.T) {
 		execx.Swap(t, testutil.NewCmdMockExecutor())
 		ResetCache()
 		t.Cleanup(ResetCache)
-		log.SetDebug(c.Input.Args.Bool(t, 2))
-		t.Cleanup(func() { log.SetDebug(false) })
+		level := log.Levels.Info
+		if c.Input.Args.Bool(t, 2) {
+			level = log.Levels.Debug
+		}
+		prev := log.GetLevel()
+		log.SetLevel(level)
+		t.Cleanup(func() { log.SetLevel(prev) })
 		up := testutil.Repo(t, map[string]string{"che.yml": "p: {}\n"})
 		home := t.TempDir()
 		url := "file://" + up
@@ -93,7 +98,7 @@ func TestEnsure(t *testing.T) {
 		require.NoError(t, err)
 		assert.Equal(t, Dir(home, url), dir)
 		out = testutil.StripANSI(out)
-		vars := map[string]string{"URL": url, "DIR": dir}
+		vars := map[string]string{"URL": url, "DIR": dir, "ABBRDIR": abbreviateHome(dir, home)}
 		for _, m := range c.Expected.StdOut {
 			testyml.MustMatch(t, out, testyml.Expand(m, vars))
 		}

@@ -9,24 +9,24 @@ cases:
   - name: ShouldLogOnlyShowDeltaWithoutExistingDests
     expected:
       stdOut: |
-        backup(showDelta): {{/.*/}}
+        backup delta {{/.*/}}
     notExpected:
       stdOut:
-        - 'backup(created'
+        - 'created {{/\S*/}}che-backup'
   - name: ShouldLogOnlyShowDeltaForSettledDests
     input:
       args: [settleLink: true]
     expected:
       stdOut: |
-        backup(showDelta): make-links(1),make-copies(2),render-templates(1)
+        backup delta make-links (1 change), make-copies (2 changes), render-templates (1 change)
     notExpected:
       stdOut:
-        - 'backup(created'
+        - 'created {{/\S*/}}che-backup'
   - name: ShouldArchiveOnlyDestsThatWouldChange
     input:
       args: [driftLink: true]
     expected:
       stdOut: |
-        backup(showDelta): {{/.*/}}make-links({{/[0-9]+/}}),make-copies({{/[0-9]+/}}),render-templates({{/[0-9]+/}})
-        backup(created): {{/.*/}}B, ${HOME}/.local/state/che/backups/che-backup-{{/.*/}}.tar.bz2
+        backup delta make-links ({{/[0-9]+/}} change{{/s?/}}), make-copies ({{/[0-9]+/}} change{{/s?/}}), render-templates ({{/[0-9]+/}} change{{/s?/}})
+        created {{/.*/}}B, ${HOME}/.local/state/che/backups/che-backup-{{/.*/}}.tar.bz2
 # [<] 🤖🤖

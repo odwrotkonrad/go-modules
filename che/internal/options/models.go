@@ -47,10 +47,12 @@ type Options struct {
 	// subcommands become logged no-ops.
 	SkipOps []string
 	// RunSkipOps skips ops in the run sequence only.
-	RunSkipOps        []string
-	SkipRunIf         bool
-	SkipRemoteRefs    bool
-	Debug             bool
+	RunSkipOps     []string
+	SkipRunIf      bool
+	SkipRemoteRefs bool
+	// LogLevel selects the human-log verbosity: error | warn | info | debug |
+	// trace (default info).
+	LogLevel          string
 	RenderSkipSecrets bool
 	// AutoDiscover is the auto-discovery master switch (default true): whether
 	// profiles marked autoDiscover run on bare che; false leaves only

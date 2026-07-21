@@ -5,10 +5,10 @@ cases:
   - name: ShouldReportOnlyDefaultsAsEmptyDelta
     expected:
       output:
-        delta: "[]"
+        delta: ""
   - name: ShouldReportFlagEnvConfigSpecSources
     context:
-      env: {CHE_DEBUG: "1"}
+      env: {CHE_LOG_LEVEL: debug}
     input:
       args:
         - flags: {dryRun: delta}
@@ -16,7 +16,7 @@ cases:
         - spec: {profileWorkingDirectory: root}
     expected:
       output:
-        delta: "[dryRun=delta(cliFlag),profileWorkingDirectory=root(specFile),skipRemoteRefs=true(config-file),debug=true(env)]"
+        delta: "dryRun=delta (cliFlag), profileWorkingDirectory=root (specFile), skipRemoteRefs=true (config-file), logLevel=debug (env)"
   - name: ShouldReportEveryOptionWithSourceInAll
     input:
       args:
@@ -26,11 +26,12 @@ cases:
     expected:
       output:
         allContains:
-          - "dryRun=false(default)"
-          - "skipOps=[](default)"
-          - "autoDiscover=true(default)"
-          - "validateSpec=warn(default)"
-          - "otel.protocol=grpc(default)"
-          - "otel.endpoint=localhost:4317(default)"
-          - "otel.metrics=true(default)"
+          - "dryRun=false (default)"
+          - "skipOps=[] (default)"
+          - "autoDiscover=true (default)"
+          - "validateSpec=warn (default)"
+          - "logLevel=info (default)"
+          - "otel.protocol=grpc (default)"
+          - "otel.endpoint=localhost:4317 (default)"
+          - "otel.metrics=true (default)"
 # [<] 🤖🤖

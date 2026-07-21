@@ -9,6 +9,8 @@ import (
 	"slices"
 	"strconv"
 	"strings"
+
+	"gitlab.com/konradodwrot/go-modules/che/internal/log"
 )
 
 // LookupEnv is the env-lookup seam Resolve reads instead of the process env:
@@ -35,13 +37,13 @@ func (c Options) SettingsDelta() []Setting {
 	return out
 }
 
-// FormatSettings renders settings as "[key=value(source),...]".
+// FormatSettings renders settings as "key=value (source), ..." prose.
 func FormatSettings(settings []Setting) string {
 	parts := make([]string, len(settings))
 	for i, s := range settings {
-		parts[i] = fmt.Sprintf("%s=%s(%s)", s.Key, s.Value, s.Source)
+		parts[i] = fmt.Sprintf("%s=%s (%s)", s.Key, s.Value, s.Source)
 	}
-	return "[" + strings.Join(parts, ",") + "]"
+	return strings.Join(parts, ", ")
 }
 
 // cand pairs a candidate value with its source layer, in precedence order.
@@ -207,8 +209,11 @@ func (c *Options) Resolve(env LookupEnv, user, spec Layer) error {
 	c.SkipRunIf = c.resolveBool("skipRunIf", c.SkipRunIf, env("CHE_SKIP_RUN_IF"), false)
 	c.SkipRemoteRefs = c.resolveBool("skipRemoteRefs", c.SkipRemoteRefs, env("CHE_SKIP_REMOTE_REFS"), false,
 		boolLayer{user.SkipRemoteRefs, "config-file"}, boolLayer{spec.SkipRemoteRefs, "specFile"})
-	c.Debug = c.resolveBool("debug", c.Debug, env("CHE_DEBUG"), false,
-		boolLayer{user.Debug, "config-file"}, boolLayer{spec.Debug, "specFile"})
+	c.LogLevel = c.resolveStr("logLevel", "info",
+		flagStr(c.LogLevel), envStr(env("CHE_LOG_LEVEL")), layer(user.LogLevel, "config-file"), layer(spec.LogLevel, "specFile"))
+	if _, err := log.ParseLevel(c.LogLevel); err != nil {
+		return fmt.Errorf("--log-level: %w", err)
+	}
 	c.RenderSkipSecrets = c.resolveBool("renderTemplates.skipSecrets", c.RenderSkipSecrets, env("CHE_RENDER_TEMPLATES_SKIP_SECRETS"), false,
 		boolLayer{user.RenderTemplates.SkipSecrets, "config-file"}, boolLayer{spec.RenderTemplates.SkipSecrets, "specFile"})
 	c.AutoDiscover = c.resolveBool("autoDiscover", false, env("CHE_AUTO_DISCOVER"), true,

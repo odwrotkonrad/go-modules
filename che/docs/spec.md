@@ -32,7 +32,7 @@ options:
   profileWorkingDirectory: root
   runIf: ['env:CHE_ENABLED']
   autoDiscover: false
-  debug: false
+  logLevel: info
   validateSpec: warn
 env:
   SOME_VAR: value
@@ -118,7 +118,8 @@ Spec-wide defaults + che knobs:
 
 - `runIf` (string list): gates every profile of this spec (profile runIf
   grammar).
-- `autoDiscover`, `debug` (bool): defaults for profiles that don't set them.
+- `autoDiscover` (bool), `logLevel` (`error`|`warn`|`info`|`debug`|`trace`):
+  defaults for profiles that don't set them.
 - `profileWorkingDirectory` (path): load-ops source tree, default `.` (the checkout).
   Absolute, `~/`, `$VAR`, env vars expand; relative resolves under the
   checkout. makeLinks/makeCopies globs and renderTemplates host sources resolve
@@ -178,8 +179,8 @@ profile runs its full op sequence, profile by profile.
   (string compare). Sources: `builtin:isOs` (`macos`/`linux`), `builtin:isVirt`
   (`true`/`false`), `env:<NAME>`. Empty: always. `--skip-exec-if` (env
   `CHE_SKIP_EXEC_IF`): all pass.
-- `debug` (bool): debug lines around this profile. Unset: inherit spec, then
-  che level.
+- `logLevel` (`error`|`warn`|`info`|`debug`|`trace`): human-log level around
+  this profile's ops. Unset: inherit spec, then che level.
 - `profileWorkingDirectory` (path): the profile's load-ops source tree. Unset: inherit
   spec, then che level (`--working-directory` / `CHE_WORKING_DIRECTORY`), then
   `.`.
@@ -241,7 +242,7 @@ flags. Bare object mirroring the che.yml [`options:`](#options) shape (no
 
 ```yaml
 # ~/.config/che/config.yml
-debug: true
+logLevel: debug
 validateSpec: error
 dryRun: delta
 autoDiscover: true

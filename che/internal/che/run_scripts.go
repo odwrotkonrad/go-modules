@@ -14,6 +14,7 @@ import (
 
 	"gitlab.com/konradodwrot/go-modules/che/internal/execx"
 	"gitlab.com/konradodwrot/go-modules/che/internal/fsutil"
+	"gitlab.com/konradodwrot/go-modules/che/internal/log"
 )
 
 // scriptResult pairs a script with its run status ("ok" | "fail").
@@ -44,16 +45,17 @@ func (p *ProfileReady) runScripts(scripts []string) error {
 	var results []scriptResult
 	var failed []string
 	for _, script := range scripts {
-		p.logMsg("run-scripts", script)
 		if p.isDryRun() {
+			p.emitSkip(log.Levels.Info, "run-scripts", "run", script, p.dryRunReasons()...)
 			continue
 		}
+		p.emit(log.Levels.Debug, "run-scripts", "will-run", script)
 		sctx, span := p.tel.Span(p.opContext(), "run-script", attribute.String("script", script))
 		c := execx.Cmd{Ctx: sctx, Argv: []string{script}, Env: env, Stdout: os.Stdout, Stderr: os.Stderr}
 		status := "ok"
 		if err := execx.Default.Exec(c); err != nil {
 			span.RecordError(err)
-			p.logMsg("run-scripts(fail)", fmt.Sprintf("%s: %v", script, err))
+			p.emit(log.Levels.Error, "run-scripts", "fail", fmt.Sprintf("%s: %v", script, err))
 			status = "fail"
 			failed = append(failed, script)
 		}
@@ -63,7 +65,11 @@ func (p *ProfileReady) runScripts(scripts []string) error {
 	}
 
 	for _, r := range results {
-		p.logMsg("run-scripts(report)", fmt.Sprintf("%s %s", r.status, r.script))
+		action := "ran"
+		if r.status == "fail" {
+			action = "failed"
+		}
+		p.emit(log.Levels.Info, "run-scripts", action, r.script)
 	}
 
 	if len(failed) > 0 {

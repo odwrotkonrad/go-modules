@@ -46,7 +46,7 @@ func (p *ProfileReady) renderTemplates(templates []spec.FileItem, skipSecrets bo
 		dests := p.resolveTemplateDests(item)
 		if skipSecrets && p.isSecretRefInItem(item) {
 			for _, d := range dests {
-				log.Debug(skipTitle("render-templates", p.wouldAction(d.path), p.skipReasons("config.renderTemplates.skipSecrets")...), d.path)
+				p.emitSkip(log.Levels.Debug, "render-templates", p.wouldAction(d.path), d.path, p.skipReasons("options.renderTemplates.skipSecrets")...)
 			}
 			continue
 		}
@@ -70,10 +70,10 @@ func (p *ProfileReady) renderTemplates(templates []spec.FileItem, skipSecrets bo
 				settled := settledMap[d.path]
 				switch {
 				case settled && p.isDryRunAll():
-					p.logMsg(skipTitle("render-templates", p.wouldAction(d.path), p.skipReasons("SameContent")...), d.path)
+					p.emitSkip(log.Levels.Info, "render-templates", p.wouldAction(d.path), d.path, p.skipReasons("same content")...)
 				case settled: // [why] delta mode: an unchanged render logs nothing
 				default:
-					p.logMsg(skipTitle("render-templates", p.wouldAction(d.path), p.dryRunReasons()...), d.path)
+					p.emitSkip(log.Levels.Info, "render-templates", p.wouldAction(d.path), d.path, p.dryRunReasons()...)
 				}
 				if d.host {
 					if err := p.fixPerms("render-templates", d.path, t.item); err != nil {
@@ -199,10 +199,10 @@ func (p *ProfileReady) renderTemplate(item spec.FileItem, dests []tmplDest) erro
 		}
 		current, err := os.ReadFile(d.path)
 		if err == nil && bytes.Equal(current, out) {
-			log.Debug(skipTitle("render-templates", "overwrite", "SameContent"), d.path)
+			p.emitSkip(log.Levels.Debug, "render-templates", "overwrite", d.path, "same content")
 			continue
 		}
-		p.logMsg(resolveCreateTitle("render-templates(create)", err == nil), d.path)
+		p.emit(log.Levels.Info, "render-templates", resolvePastAction("create", err == nil), d.path)
 		if err := os.MkdirAll(filepath.Dir(d.path), 0o755); err != nil {
 			return err
 		}
@@ -245,12 +245,12 @@ func (p *ProfileReady) readExistingDest(d tmplDest) ([]byte, error) {
 // (overwrite, skippedDue[SameContent]) line, perms drift still corrected.
 func (p *ProfileReady) placeFile(dest string, body []byte, item spec.FileItem) error {
 	if cur, err := p.Reader.ReadFileBytes(dest); err == nil && bytes.Equal(cur, body) {
-		log.Debug(skipTitle("render-templates", "overwrite", "SameContent"), dest)
+		p.emitSkip(log.Levels.Debug, "render-templates", "overwrite", dest, "same content")
 		return p.fixPerms("render-templates", dest, item)
 	}
 	mode, _ := fsutil.ParseMode(item.Chmod)
 	info := opInfo{kind: "render", srcRel: item.Rel, mode: item.Chmod, owner: formatOwnerSpec(item)}
-	return p.mutate("render-templates(create)", dest, dest, info, func() error {
+	return p.mutate("render-templates", "create", dest, dest, info, func() error {
 		return p.FS.InstallFile(dest, body, mode, formatOwnerSpec(item))
 	})
 }

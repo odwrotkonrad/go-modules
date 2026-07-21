@@ -10,11 +10,11 @@ cases:
     notExpected:
       stdOut:
         - 'rm: '
-        - 'prune-link'
+        - 'pruned '
   - name: ShouldRemoveBrokenRepoLink
     input:
       args: [brokenLink: true]
     expected:
       stdOut: |
-        prune-link: ${HOME}/.config/zsh/dead
+        pruned ${HOME}/.config/zsh/dead
 # [<] 🤖

@@ -126,9 +126,9 @@ func undefinedProfile(recipes []ProfileRecipe, ref string) error {
 	return fmt.Errorf("%s is not defined in che.yml (defined: %v)", ref, names(recipes, func(ProfileRecipe) bool { return true }))
 }
 
-// AllPass logs each condition evaluation at debug level only, under the
-// discover scope (spec/che/LogBehavior.md). failed names the first rejecting
-// expression ("" when all pass).
+// AllPass logs each condition evaluation at trace level only, under the
+// discover scope (spec/che/LogRedesignBehavior.md). failed names the first
+// rejecting expression ("" when all pass).
 func AllPass(name string, exprs []string, forceAll bool, eval func(expr string) (bool, error)) (pass bool, failed string, err error) {
 	if forceAll {
 		return true, "", nil
@@ -138,11 +138,18 @@ func AllPass(name string, exprs []string, forceAll bool, eval func(expr string) 
 		if err != nil {
 			return false, expr, fmt.Errorf("profile %q runIf %q: %w", name, expr, err)
 		}
+		verdict := "passed"
 		if !ok {
-			log.Debug("discover-profiles(evaluating["+name+"], noPass)", expr)
+			verdict = "failed"
+		}
+		log.Emit(log.Event{
+			Level: log.Levels.Trace, Scope: "discover-profiles", Action: "evaluated-run-if",
+			Msg:   fmt.Sprintf("%s: %q %s", name, expr, verdict),
+			Attrs: map[string]string{"profile": name, "condition": expr, "verdict": verdict},
+		})
+		if !ok {
 			return false, expr, nil
 		}
-		log.Debug("discover-profiles(evaluating["+name+"], pass)", expr)
 	}
 	return true, "", nil
 }
@@ -544,8 +551,8 @@ func (o ProfileOptions) Over(spec Options) ProfileOptions {
 	if o.AutoDiscover == nil {
 		o.AutoDiscover = spec.AutoDiscover
 	}
-	if o.Debug == nil {
-		o.Debug = spec.Debug
+	if o.LogLevel == "" {
+		o.LogLevel = spec.LogLevel
 	}
 	if o.ProfileWorkingDirectory == "" {
 		o.ProfileWorkingDirectory = spec.ProfileWorkingDirectory
@@ -562,8 +569,8 @@ func (o ProfileOptions) OverRef(entry ProfileOptions) ProfileOptions {
 	if entry.AutoDiscover != nil {
 		o.AutoDiscover = entry.AutoDiscover
 	}
-	if entry.Debug != nil {
-		o.Debug = entry.Debug
+	if entry.LogLevel != "" {
+		o.LogLevel = entry.LogLevel
 	}
 	if entry.ProfileWorkingDirectory != "" {
 		o.ProfileWorkingDirectory = entry.ProfileWorkingDirectory

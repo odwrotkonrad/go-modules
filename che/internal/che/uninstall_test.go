@@ -53,7 +53,7 @@ func TestUninstallRemovesCreatedDest(t *testing.T) {
 	p := realProfile(t)
 	dest := filepath.Join(p.home, "created.txt")
 	require.NoError(t, p.archiveBefore("make-copies", []string{dest})) // dest absent: empty archive
-	require.NoError(t, p.mutate("make-copies(create)", dest, dest, opInfo{kind: "copy"}, func() error {
+	require.NoError(t, p.mutate("make-copies", "create", dest, dest, opInfo{kind: "copy"}, func() error {
 		return os.WriteFile(dest, []byte("new"), 0o644)
 	}))
 	require.FileExists(t, dest)
@@ -67,7 +67,7 @@ func TestUninstallRestoresPreExisting(t *testing.T) {
 	dest := filepath.Join(p.home, "pre.txt")
 	require.NoError(t, os.WriteFile(dest, []byte("original"), 0o644))  // pre-install content
 	require.NoError(t, p.archiveBefore("make-copies", []string{dest})) // snapshots original
-	require.NoError(t, p.mutate("make-copies(create)", dest, dest, opInfo{kind: "copy"}, func() error {
+	require.NoError(t, p.mutate("make-copies", "create", dest, dest, opInfo{kind: "copy"}, func() error {
 		return os.WriteFile(dest, []byte("overwritten"), 0o644)
 	}))
 
@@ -81,7 +81,7 @@ func TestUninstallSkipsDrift(t *testing.T) {
 	p := realProfile(t)
 	dest := filepath.Join(p.home, "drift.txt")
 	require.NoError(t, p.archiveBefore("make-copies", []string{dest}))
-	require.NoError(t, p.mutate("make-copies(create)", dest, dest, opInfo{kind: "copy"}, func() error {
+	require.NoError(t, p.mutate("make-copies", "create", dest, dest, opInfo{kind: "copy"}, func() error {
 		return os.WriteFile(dest, []byte("che"), 0o644)
 	}))
 	recorded, err := os.Stat(dest) // che records the umask-masked on-disk mode, not 0644
@@ -100,7 +100,7 @@ func TestUninstallInverseExcludesFromInstalled(t *testing.T) {
 	p := realProfile(t)
 	dest := filepath.Join(p.home, "gone.txt")
 	require.NoError(t, p.archiveBefore("make-copies", []string{dest}))
-	require.NoError(t, p.mutate("make-copies(create)", dest, dest, opInfo{kind: "copy"}, func() error {
+	require.NoError(t, p.mutate("make-copies", "create", dest, dest, opInfo{kind: "copy"}, func() error {
 		return os.WriteFile(dest, []byte("x"), 0o644)
 	}))
 	require.NoError(t, uninstallerOver(t, p).Uninstall())
@@ -114,7 +114,7 @@ func TestUninstallDryRunWritesNothing(t *testing.T) {
 	p := realProfile(t)
 	dest := filepath.Join(p.home, "dry.txt")
 	require.NoError(t, p.archiveBefore("make-copies", []string{dest}))
-	require.NoError(t, p.mutate("make-copies(create)", dest, dest, opInfo{kind: "copy"}, func() error {
+	require.NoError(t, p.mutate("make-copies", "create", dest, dest, opInfo{kind: "copy"}, func() error {
 		return os.WriteFile(dest, []byte("x"), 0o644)
 	}))
 	u := uninstallerOver(t, p)

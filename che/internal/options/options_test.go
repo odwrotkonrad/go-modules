@@ -74,7 +74,7 @@ func TestResolveSettings(t *testing.T) {
 		o := &Options{DryRun: DryRunMode(flags.DryRun)}
 		env := func(k string) string { return c.Context.Env[k] }
 		require.NoError(t, o.Resolve(env, user, spec))
-		if c.Expected.Output.Delta != "" {
+		if len(c.Expected.Output.AllContains) == 0 {
 			assert.Equal(t, c.Expected.Output.Delta, FormatSettings(o.SettingsDelta()))
 		}
 		all := FormatSettings(o.Settings)

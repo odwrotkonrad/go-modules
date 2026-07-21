@@ -5,26 +5,26 @@ package che
 import (
 	"os"
 	"path/filepath"
-	"strings"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
 	"gitlab.com/konradodwrot/go-modules/che/internal/database"
+	"gitlab.com/konradodwrot/go-modules/che/internal/log"
 	"gitlab.com/konradodwrot/go-modules/che/internal/options"
 	"gitlab.com/konradodwrot/go-modules/che/internal/spec"
 	"gitlab.com/konradodwrot/go-modules/che/internal/testutil"
 	"gitlab.com/konradodwrot/go-modules/lib/testyml"
 )
 
-// countOf extracts one "op(delta=…,all=…)" segment from a discovered line.
-func countOf(t *testing.T, summary, op string) string {
+// countOf renders one op's "delta=…,all=…" segment from the discovered
+// event's attrs.
+func countOf(t *testing.T, attrs map[string]string, op string) string {
 	t.Helper()
-	_, rest, found := strings.Cut(summary, op+"(")
-	require.Truef(t, found, "op %s missing in %q", op, summary)
-	seg, _, _ := strings.Cut(rest, ")")
-	return seg
+	delta, ok := attrs[op+".delta"]
+	require.Truef(t, ok, "op %s missing in %v", op, attrs)
+	return "delta=" + delta + ",all=" + attrs[op+".all"]
 }
 
 // recordHealthyLink records a ledger link op whose source still exists.
@@ -52,8 +52,8 @@ func seedRenderedDest(t *testing.T, p *ProfileReady, res spec.OperationRecipes) 
 
 // TestDiscoverSummary: per-op all/delta counts over a tree mixing settled and
 // unsettled dests, the ledger prune scan, and the render-delta content compare
-// — each case applies its named setup steps IN ORDER, then asserts
-// discoverSummary's op segments.
+// — each case applies its named setup steps IN ORDER, then asserts the
+// discovered event's per-op count attrs.
 func TestDiscoverSummary(t *testing.T) {
 	testyml.Run(t, td, "testdata/spec/funcs/discover_summary.test.spec.yml", func(t *testing.T, c testyml.Case[map[string]string]) {
 		p, res, dir := setupProfile(t, options.Options{})
@@ -98,9 +98,15 @@ func TestDiscoverSummary(t *testing.T) {
 				t.Fatalf("unknown step %q", name)
 			}
 		}
-		got := p.discoverSummary()
+		var events []log.Event
+		log.SetSink(func(e log.Event) { events = append(events, e) })
+		t.Cleanup(func() { log.SetSink(nil) })
+		_, err = testutil.CaptureStdout(t, func() error { p.logDiscovered(); return nil })
+		require.NoError(t, err)
+		require.Len(t, events, 1, "one discovered event")
+		attrs := events[0].Attrs
 		for op, want := range c.Expected.Output {
-			assert.Equalf(t, want, countOf(t, got, op), "op %s in %q", op, got)
+			assert.Equalf(t, want, countOf(t, attrs, op), "op %s in %v", op, attrs)
 		}
 	})
 }

@@ -12,32 +12,20 @@ cases:
     expected:
       output: delta
       stdOut: |
-        dry-run(config.dryRun=delta): no actual operations will be performed, reporting only dests that would change
-      stdOutCounts: {'dry-run(': 1}
-    notExpected:
-      stdOut:
-        - ',dry-run='
-        - '(dry-run='
+        dry run (delta) no actual operations will be performed, reporting only dests that would change
+      stdOutCounts: {'no actual operations will be performed': 1}
   - name: ShouldAliasTrueToDelta
     context: {env: {CHE_DRY_RUN: "true"}}
     expected:
       output: delta
       stdOut: |
-        dry-run(config.dryRun=delta): no actual operations will be performed, reporting only dests that would change
-      stdOutCounts: {'dry-run(': 1}
-    notExpected:
-      stdOut:
-        - ',dry-run='
-        - '(dry-run='
+        dry run (delta) no actual operations will be performed, reporting only dests that would change
+      stdOutCounts: {'no actual operations will be performed': 1}
   - name: ShouldAnnounceAllModeFirstAndOnce
     context: {env: {CHE_DRY_RUN: all}}
     expected:
       output: all
       stdOut: |
-        dry-run(config.dryRun=all): no actual operations will be performed, reporting every dest's state
-      stdOutCounts: {'dry-run(': 1}
-    notExpected:
-      stdOut:
-        - ',dry-run='
-        - '(dry-run='
+        dry run (all) no actual operations will be performed, reporting every dest's state
+      stdOutCounts: {'no actual operations will be performed': 1}
 # [<] 🤖🤖

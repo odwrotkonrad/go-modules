@@ -33,11 +33,11 @@ func NewUninstaller(ctx Context, opts options.Options) (*Uninstaller, error) {
 	seams := NewSeams(home)
 	spec, err := seams.Ledger.StartSpec(ctx.RunID, "", "uninstall")
 	if err != nil {
-		log.Debug("ledger", "uninstall start spec: "+err.Error())
+		log.EmitTrace("ledger", "error", "uninstall start spec: "+err.Error())
 	}
 	prof, err := seams.Ledger.StartProfile(spec, "uninstall", "uninstall", "", home)
 	if err != nil {
-		log.Debug("ledger", "uninstall start profile: "+err.Error())
+		log.EmitTrace("ledger", "error", "uninstall start profile: "+err.Error())
 	}
 	p := &ProfileReady{
 		ref:         "uninstall",
@@ -67,7 +67,7 @@ func (u *Uninstaller) Uninstall() error {
 		}
 	}
 	for _, err := range errs {
-		log.Msg("uninstall(report)", "fail "+err.Error())
+		log.EmitError("uninstall", "fail", err.Error())
 	}
 	return errors.Join(errs...)
 }
@@ -79,11 +79,11 @@ func (u *Uninstaller) revert(op database.OperationDone) error {
 	p := u.p
 	live := p.classifyDest(op.Dest)
 	if driftedFromNext(live, op.Next) {
-		p.logMsg("uninstall(drift)", op.Dest)
+		p.emitSkip(log.Levels.Debug, "uninstall", "uninstall", op.Dest, "dest drifted from the recorded state")
 		return nil
 	}
 	if u.dryRun {
-		p.logMsg("uninstall", op.Dest)
+		p.emitSkip(log.Levels.Info, "uninstall", "uninstall", op.Dest, p.dryRunReasons()...)
 		return nil
 	}
 	if err := p.snapshotForRemoval("uninstall", []string{op.Dest}); err != nil {
@@ -92,7 +92,7 @@ func (u *Uninstaller) revert(op database.OperationDone) error {
 	if err := u.revertKind(op); err != nil {
 		return err
 	}
-	p.logMsg("uninstall", op.Dest)
+	p.emit(log.Levels.Info, "uninstall", "uninstalled", op.Dest)
 	p.recordRemoval(op.Kind, op.Dest, live)
 	return nil
 }
@@ -129,7 +129,7 @@ func (u *Uninstaller) removeDir(dest string) error {
 	err := u.p.FS.RemoveDir(dest)
 	if err != nil && u.p.Reader != nil {
 		if entries, derr := u.p.Reader.ReadDirectory(dest); derr == nil && len(entries) > 0 {
-			u.p.logMsg("uninstall(keep-nonempty)", dest)
+			u.p.emitSkip(log.Levels.Debug, "uninstall", "remove-dir", dest, "directory not empty")
 			return nil
 		}
 	}
