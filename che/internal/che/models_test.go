@@ -515,8 +515,8 @@ func TestExecOperations(t *testing.T) {
 	out, err := testutil.CaptureStdout(t, func() error { return p.ExecOperations(context.Background()) })
 	require.ErrorIs(t, err, boom)
 	assert.Equal(t, []string{"one", "failing", "last"}, ran, "run order, failure does not stop")
-	assert.Contains(t, testutil.StripANSI(out), "will run one")
-	assert.NotContains(t, testutil.StripANSI(out), "will run skipped")
+	assert.Contains(t, testutil.StripANSI(out), "# one")
+	assert.NotContains(t, testutil.StripANSI(out), "# skipped")
 }
 
 // TestExecOperationsSkipOpsNoSweep: a skipped deselected op takes the skip

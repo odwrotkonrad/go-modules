@@ -28,5 +28,5 @@ cases:
     expected:
       stdOut: |
         backup delta make-links ({{/[0-9]+/}} change{{/s?/}}), make-copies ({{/[0-9]+/}} change{{/s?/}}), render-templates ({{/[0-9]+/}} change{{/s?/}})
-        created {{/.*/}}B, ${HOME}/.local/state/che/backups/che-backup-{{/.*/}}.tar.bz2
+          created {{/.*/}}B, ${HOME}/.local/state/che/backups/che-backup-{{/.*/}}.tar.bz2
 # [<] 🤖🤖

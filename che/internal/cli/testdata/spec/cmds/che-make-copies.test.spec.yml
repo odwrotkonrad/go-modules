@@ -10,18 +10,18 @@ cases:
   - name: ShouldCopyMarkerFilesAndChownDaemonPlist
     expected:
       stdOut: |
-        profile cli/macos:
-          running make-copies
-            created ${HOME}/.config
-            created ${HOME}/.config/bar
-            created ${HOME}/.config/zsh
-            created /Library
-            created /Library/LaunchDaemons
-            created /etc
-            created ${HOME}/.local/state/che/backups/che-make-copies-{{/\S*/}}.tar.bz2
-            created /Library/LaunchDaemons/otelcol.plist
-            chown root:wheel /Library/LaunchDaemons/otelcol.plist
-            created ${HOME}/.config/zsh/c
+        # profile cli/macos
+        ## make-copies
+          created ${HOME}/.config
+          created ${HOME}/.config/bar
+          created ${HOME}/.config/zsh
+          created /Library
+          created /Library/LaunchDaemons
+          created /etc
+          created ${HOME}/.local/state/che/backups/che-make-copies-{{/\S*/}}.tar.bz2
+          created /Library/LaunchDaemons/otelcol.plist
+          chown root:wheel /Library/LaunchDaemons/otelcol.plist
+          created ${HOME}/.config/zsh/c
   - name: ShouldNoOpWhenGloballySkipped
     context:
       env: {CHE_SKIP_OPS: make-copies, CHE_LOG_LEVEL: debug}

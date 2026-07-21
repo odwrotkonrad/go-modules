@@ -10,15 +10,15 @@ cases:
   - name: ShouldCreateConfigDirsAndReapplySetgidChmod
     expected:
       stdOut: |
-        profile cli/macos:
-          running make-dirs
-            created ${HOME}/.config
-            created ${HOME}/.config/bar
-            created ${HOME}/.config/zsh
-            created /Library
-            created /Library/LaunchDaemons
-            created /etc
-            created ${HOME}/.cache/zsh
-            created /var/log/che-test-setgid
-            chmod 2775 /var/log/che-test-setgid
+        # profile cli/macos
+        ## make-dirs
+          created ${HOME}/.config
+          created ${HOME}/.config/bar
+          created ${HOME}/.config/zsh
+          created /Library
+          created /Library/LaunchDaemons
+          created /etc
+          created ${HOME}/.cache/zsh
+          created /var/log/che-test-setgid
+          chmod 2775 /var/log/che-test-setgid
 # [<] 🤖

@@ -103,8 +103,8 @@ func TestDiscoverSummary(t *testing.T) {
 		t.Cleanup(func() { log.SetSink(nil) })
 		_, err = testutil.CaptureStdout(t, func() error { p.logDiscovered(); return nil })
 		require.NoError(t, err)
-		require.Len(t, events, 1, "one discovered event")
-		attrs := events[0].Attrs
+		require.NotEmpty(t, events, "a discovered heading event")
+		attrs := events[0].Attrs // the heading event carries the per-op count attrs
 		for op, want := range c.Expected.Output {
 			assert.Equalf(t, want, countOf(t, attrs, op), "op %s in %v", op, attrs)
 		}

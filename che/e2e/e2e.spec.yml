@@ -140,21 +140,21 @@ testCases:
           stdOutFull: |
             using spec ${LOCAL}/che.yml
             cloned remote file://${REMOTE} into ~/.cache/che/remote-sources/{{/[A-Za-z0-9.-]+/}}
-            discovered profile plain  (working directory: ${LOCAL}/root)
+            # discovered profile plain  (working directory: ${LOCAL}/root)
               make-dirs: 2 changes
               make-links: 1 change
               make-copies: 1 change
               render-templates: 1 change
               run-scripts: 1 change
-            discovered profile conditional  (working directory: ${LOCAL}/root)
+            # discovered profile conditional  (working directory: ${LOCAL}/root)
               make-dirs: 2 changes
               make-links: 1 change
               make-copies: 1 change
               render-templates: 1 change
               run-scripts: 1 change
-            discovered profile remote-carrier  (working directory: ${LOCAL}/root)
+            # discovered profile remote-carrier  (working directory: ${LOCAL}/root)
               no changes
-            discovered profile remote:remote:ops-remote  (working directory: ~/.cache/che/remote-sources/{{/[A-Za-z0-9.-]+/}}/root)
+            # discovered profile remote:remote:ops-remote  (working directory: ~/.cache/che/remote-sources/{{/[A-Za-z0-9.-]+/}}/root)
               make-dirs: 2 changes
               make-links: 1 change
               make-copies: 1 change

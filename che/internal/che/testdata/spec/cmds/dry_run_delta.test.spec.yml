@@ -23,7 +23,7 @@ cases:
     expected:
       stdOut: |
         backup delta {{/.*/}}
-        will not create {{/.*/}}che-backup-{{/.*/}}.tar.bz2: dry run (delta)
+          will not create {{/.*/}}che-backup-{{/.*/}}.tar.bz2: dry run (delta)
     notExpected:
       stdOut:
         - 'created {{/\S*/}}che-backup'
