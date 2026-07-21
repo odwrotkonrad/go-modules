@@ -29,7 +29,7 @@ Scenario: discovery logs profiles
   Status: tested
   Given a profile whose runtime spec contains os-mutating operations
   When I invoke an os-mutating che command
-  Then the log lists discovered profiles, one line each, regardless of debug mode
+  Then the log reports each discovered profile as a `### Profile <ref>` heading, its ops indented beneath
 
 Scenario: run logs the runtime spec once
   Status: tested
@@ -51,9 +51,9 @@ Scenario: commands wrapped by `run` reuse its discovery
   Then no wrapped command runs discover again
   And each uses the discovery `run` ran once at start
 
-Scenario: discovery logs regardless of debug mode
+Scenario: discovery logs at the default log level
   Status: tested
-  Given debug mode is disabled
+  Given `CHE_LOG_LEVEL` is unset
   When I invoke `discover-profiles` standalone or an os-mutating che command
   Then the log lists discovered profiles
 

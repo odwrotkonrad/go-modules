@@ -52,7 +52,7 @@ conditional:
   options: {autoDiscover: true, runIf: ['env:CHE_E2E == 1']}
   include: {profiles: [ops-conditional]}
 
-remote:
+remote-empty:
   options: {autoDiscover: true}
   include:
     profiles: [{source: "@file://__REMOTE_DIR__/che.yml::ops-remote"}]

@@ -11,6 +11,8 @@ import (
 	"github.com/stretchr/testify/require"
 	sdkmetric "go.opentelemetry.io/otel/sdk/metric"
 	"go.opentelemetry.io/otel/sdk/metric/metricdata"
+
+	"gitlab.com/konradodwrot/go-modules/che/internal/log"
 )
 
 // nilTel is the disabled/no-op handle every counter and the log bridge must
@@ -25,7 +27,7 @@ func TestNilTelemetryIsNoOp(t *testing.T) {
 		tel.CountOperation(ctx, "make-links")
 		tel.CountUnit(ctx, "link", "create", "all")
 		tel.CountError(ctx, "make-links")
-		tel.LogRecord("make-links", "linked foo", "info")
+		tel.LogRecord(log.Event{Level: log.Levels.Info, Scope: "make-links", Action: "created", Msg: "/x"})
 		sctx, span := tel.Span(ctx, "op")
 		assert.Equal(t, ctx, sctx)
 		span.End()
@@ -51,7 +53,10 @@ func TestStartUnreachableDegrades(t *testing.T) {
 	assert.NotPanics(t, func() {
 		ctx, span := tel.Span(context.Background(), "che run")
 		tel.CountUnit(ctx, "link", "create", "all")
-		tel.LogRecord("make-links", "linked foo", "info")
+		tel.LogRecord(log.Event{
+			Level: log.Levels.Error, Scope: "make-links", Action: "fail", Msg: "/x: boom",
+			Reasons: []string{"same content"}, Attrs: map[string]string{"profile": "cli"},
+		})
 		span.End()
 		_ = tel.Shutdown(context.Background())
 	})

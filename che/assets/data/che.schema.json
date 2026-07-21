@@ -114,9 +114,16 @@
           "type": "boolean",
           "description": "run on bare che (nil: inherit spec options, then false: runs only via --profiles or include.profiles)"
         },
-        "debug": {
-          "type": "boolean",
-          "description": "print debug-level lines around this profile (nil: inherit spec options, then che level)"
+        "logLevel": {
+          "type": "string",
+          "enum": [
+            "error",
+            "warn",
+            "info",
+            "debug",
+            "trace"
+          ],
+          "description": "log level around this profile's ops (empty: inherit spec options, then che level)"
         },
         "profileWorkingDirectory": {
           "type": "string",
@@ -130,7 +137,7 @@
       "properties": {
         "options": {
           "$ref": "#/$defs/ProfileOptions",
-          "description": "when the profile runs: autoDiscover opts in to bare-che runs, runIf predicates must ALL pass; debug/profileWorkingDirectory cascade (most nested wins)"
+          "description": "when the profile runs: autoDiscover opts in to bare-che runs, runIf predicates must ALL pass; logLevel/profileWorkingDirectory cascade (most nested wins)"
         },
         "include": {
           "$ref": "#/$defs/includeSet"
@@ -219,9 +226,16 @@
           "type": "boolean",
           "description": "spec block: default for profiles that don't set it; user config: auto-discovery master switch (default true, false: only --profiles and include.profiles refs run); overridden by CHE_AUTO_DISCOVER"
         },
-        "debug": {
-          "type": "boolean",
-          "description": "default for profiles that don't set it"
+        "logLevel": {
+          "type": "string",
+          "enum": [
+            "error",
+            "warn",
+            "info",
+            "debug",
+            "trace"
+          ],
+          "description": "human-log level default for profiles that don't set it; overridden by --log-level and CHE_LOG_LEVEL"
         },
         "profileWorkingDirectory": {
           "type": "string",
@@ -285,7 +299,7 @@
       },
       "additionalProperties": false,
       "type": "object",
-      "description": "reserved top-level options: block: spec-wide defaults (runIf gate, autoDiscover/debug/workingDirectory) + che knobs (validateSpec/dryRun/profiles/skipRemoteRefs/renderTemplates.skipSecrets); same shape as the user-config file"
+      "description": "reserved top-level options: block: spec-wide defaults (runIf gate, autoDiscover/logLevel/workingDirectory) + che knobs (validateSpec/dryRun/profiles/skipRemoteRefs/renderTemplates.skipSecrets); same shape as the user-config file"
     },
     "dirGroup": {
       "properties": {

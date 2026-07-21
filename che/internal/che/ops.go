@@ -22,7 +22,7 @@ const Bin = "che"
 // path/sub are stashed on the profile so the op's following mutate calls
 // reference this run's Backup row. Uses the run's shared TsLayout stamp so the
 // filename and the ledger run line up. Under `run` the backup stage already
-// archived every op dest (spec/che/BackupCmdBehavior.md): the op skips its own
+// archived every op dest (spec/che/backup.md): the op skips its own
 // archive and points its records at the stage archive.
 func (p *ProfileReady) archiveBefore(sub string, dests []string) error {
 	if p.backedUp {
@@ -33,7 +33,7 @@ func (p *ProfileReady) archiveBefore(sub string, dests []string) error {
 	path := fsutil.ResolveBackupArchivePath(p.home, Bin, sub, p.runID)
 	p.currentArchive = path
 	p.currentSub = sub
-	return p.mutate("backup", path, "", opInfo{}, func() error { return p.FS.ArchiveDestinations(path, dests) })
+	return p.mutate("backup", "create", path, "", opInfo{}, func() error { return p.FS.ArchiveDestinations(path, dests) })
 }
 
 // backupDests lists the dests the profile's file ops WOULD CHANGE (unsettled
@@ -86,14 +86,15 @@ func (p *ProfileReady) existingDests(dests []string) int {
 
 // ExecBackup archives every existing would-change dest into one per-run backup
 // archive and marks the profile backed up, so the following ops skip their own
-// archives. The showDelta line always logs (spec/che/BackupCmdBehavior.md);
+// archives. The showDelta line always logs (spec/che/backup.md);
 // the created line reports the written archive with its size, nothing to back
 // up writes and logs nothing more.
 func (p *ProfileReady) ExecBackup() error { return p.execBackup(p.backupDests()) }
 
 func (p *ProfileReady) execBackup(dests []string) error {
 	defer func() { p.backedUp = true }()
-	p.logMsg("backup(showDelta)", p.opDeltaList("backup"))
+	defer p.enterOp("backup")()
+	p.emit(log.Levels.Info, "backup", "backup-delta", p.describeOpDeltas("backup"))
 	if p.existingDests(dests) == 0 {
 		return nil
 	}
@@ -101,14 +102,14 @@ func (p *ProfileReady) execBackup(dests []string) error {
 	p.currentArchive = path
 	p.currentSub = "backup"
 	if p.isDryRun() { // [why] prediction only: no archive is written
-		p.logMsg(skipTitle("backup", "create", p.dryRunReasons()...), path)
+		p.emitDryRun("backup", "create", path)
 		return nil
 	}
 	if err := p.FS.ArchiveDestinations(path, dests); err != nil {
 		return err
 	}
 	p.backupArchive = path
-	p.logMsg("backup(created)", humanSize(archiveSize(path))+", "+path)
+	p.emit(log.Levels.Info, "backup", "created", humanSize(archiveSize(path))+", "+path)
 	return nil
 }
 
@@ -134,21 +135,15 @@ func humanSize(n int64) string {
 }
 
 // ExecBackupStage is ExecBackup as the run sequence's backup stage: announced
-// like the other wrapped ops (skippedDue[NoDelta] when nothing needs backing up).
+// and nested like the other wrapped ops (execBackup owns the op heading).
 func (p *ProfileReady) ExecBackupStage() error {
-	dests := p.backupDests()
-	title := "run(runOp)"
-	if p.existingDests(dests) == 0 {
-		title = skipTitle("run", "runOp", "NoDelta")
-	}
-	log.Msg(title, "backup")
-	return p.execBackup(dests)
+	return p.execBackup(p.backupDests())
 }
 
-// failItem logs "<op>(fail): <dest>: <err>" and returns err, the per-item
-// continue-on-error hook: ops collect these and errors.Join at the end.
+// failItem logs "fail <dest>: <err>" at error level and returns err, the
+// per-item continue-on-error hook: ops collect these and errors.Join at the end.
 func (p *ProfileReady) failItem(op, dest string, err error) error {
-	p.logMsg(op+"(fail)", dest+": "+err.Error())
+	p.emit(log.Levels.Error, op, "fail", dest+": "+err.Error())
 	return err
 }
 
@@ -173,7 +168,7 @@ func (p *ProfileReady) makeDirs(dirs []spec.FileItem) error {
 func (p *ProfileReady) upsertExtraDir(item spec.FileItem, dest string) error {
 	if fsutil.IsDirSettled(p.Reader, dest) {
 		if p.isDryRunAll() {
-			p.logMsg(skipTitle("make-dirs", p.wouldAction(dest), p.skipReasons("AlreadyExists")...), dest)
+			p.emitSkip(log.Levels.Info, "make-dirs", p.wouldAction(dest), dest, p.skipReasons("already exists")...)
 		}
 		return p.fixPerms("make-dirs", dest, item)
 	}
@@ -184,11 +179,11 @@ func (p *ProfileReady) ensureConfigDir(relativePath string) error {
 	dest := p.toDest(relativePath)
 	if fsutil.IsDirSettled(p.Reader, dest) {
 		if p.isDryRunAll() {
-			p.logMsg(skipTitle("make-dirs", p.wouldAction(dest), p.skipReasons("AlreadyExists")...), dest)
+			p.emitSkip(log.Levels.Info, "make-dirs", p.wouldAction(dest), dest, p.skipReasons("already exists")...)
 		}
 		return nil
 	}
-	err := p.mutate("make-dirs(create)", dest, dest, opInfo{kind: "dir"}, func() error { return p.FS.MakeDir(dest, 0, false) })
+	err := p.mutate("make-dirs", "create", dest, dest, opInfo{kind: "dir"}, func() error { return p.FS.MakeDir(dest, 0, false) })
 	if err != nil {
 		return p.failItem("make-dirs", dest, err)
 	}
@@ -200,30 +195,30 @@ func (p *ProfileReady) ensureConfigDir(relativePath string) error {
 // drop them.
 func (p *ProfileReady) makeExtraDir(item spec.FileItem, dest string) error {
 	mode, _ := fsutil.ParseMode(item.Chmod)
-	err := p.mutate("make-dirs(create)", dest, dest, opInfo{kind: "dir", mode: item.Chmod}, func() error { return p.FS.MakeDir(dest, mode, true) })
+	err := p.mutate("make-dirs", "create", dest, dest, opInfo{kind: "dir", mode: item.Chmod}, func() error { return p.FS.MakeDir(dest, mode, true) })
 	if err != nil {
 		return err
 	}
 	if mode > 0o777 {
-		if err := p.chmod("make-dirs(chmod)", mode, dest); err != nil {
+		if err := p.chmod("make-dirs", mode, dest); err != nil {
 			return err
 		}
 	}
-	return p.chownIfSet("make-dirs(chown)", item, dest)
+	return p.chownIfSet("make-dirs", item, dest)
 }
 
-func (p *ProfileReady) chmod(title string, mode os.FileMode, dest string) error {
+func (p *ProfileReady) chmod(scope string, mode os.FileMode, dest string) error {
 	arg := fsutil.FormatModeArg(mode)
-	return p.mutate(title, arg+" "+dest, dest, opInfo{kind: "chmod", mode: arg}, func() error { return p.FS.ChangeMode(arg, dest) })
+	return p.mutate(scope, "chmod", arg+" "+dest, dest, opInfo{kind: "chmod", mode: arg}, func() error { return p.FS.ChangeMode(arg, dest) })
 }
 
-func (p *ProfileReady) chown(title, owner, dest string) error {
-	return p.mutate(title, owner+" "+dest, dest, opInfo{kind: "chown", owner: owner}, func() error { return p.FS.ChangeOwner(owner, dest) })
+func (p *ProfileReady) chown(scope, owner, dest string) error {
+	return p.mutate(scope, "chown", owner+" "+dest, dest, opInfo{kind: "chown", owner: owner}, func() error { return p.FS.ChangeOwner(owner, dest) })
 }
 
-func (p *ProfileReady) chownIfSet(title string, item spec.FileItem, dest string) error {
+func (p *ProfileReady) chownIfSet(scope string, item spec.FileItem, dest string) error {
 	if owner := formatOwnerSpec(item); owner != "" {
-		return p.chown(title, owner, dest)
+		return p.chown(scope, owner, dest)
 	}
 	return nil
 }
@@ -232,23 +227,23 @@ func (p *ProfileReady) chownIfSet(title string, item spec.FileItem, dest string)
 // the fixes with the owning op ("<op>(chmod)" / "<op>(chown)"). In dry-run=delta
 // these lines report the drift; off they correct it. A settled dest (no drift)
 // emits nothing, except under dry-run=all, where the already-set state logs
-// (spec/che/LogBehavior.md).
+// (spec/che/log.md).
 func (p *ProfileReady) fixPerms(op, dest string, item spec.FileItem) error {
 	needChmod, needChown := fsutil.DetectPermsDrift(p.Reader, dest, item.Chmod, formatOwnerSpec(item))
 	if needChmod {
 		mode, _ := fsutil.ParseMode(item.Chmod)
-		if err := p.chmod(op+"(chmod)", mode, dest); err != nil {
+		if err := p.chmod(op, mode, dest); err != nil {
 			return err
 		}
 	} else if p.isDryRunAll() && item.Chmod != "" {
-		p.logMsg(skipTitle(op, "chmod", p.skipReasons("AlreadySet")...), dest)
+		p.emitSkip(log.Levels.Info, op, "chmod", dest, p.skipReasons("already set")...)
 	}
 	if needChown {
-		if err := p.chown(op+"(chown)", formatOwnerSpec(item), dest); err != nil {
+		if err := p.chown(op, formatOwnerSpec(item), dest); err != nil {
 			return err
 		}
 	} else if p.isDryRunAll() && formatOwnerSpec(item) != "" {
-		p.logMsg(skipTitle(op, "chown", p.skipReasons("AlreadySet")...), dest)
+		p.emitSkip(log.Levels.Info, op, "chown", dest, p.skipReasons("already set")...)
 	}
 	return nil
 }
@@ -295,11 +290,11 @@ func (p *ProfileReady) makeLink(item spec.FileItem, dest string) error {
 	src := p.resolveSrc(item.Rel)
 	if fsutil.IsLinkSettled(p.Reader, src, dest) {
 		if p.isDryRunAll() {
-			p.logMsg(skipTitle("make-links", p.wouldAction(dest), p.skipReasons("AlreadyLinked")...), dest)
+			p.emitSkip(log.Levels.Info, "make-links", p.wouldAction(dest), dest, p.skipReasons("already linked")...)
 		}
 		return nil
 	}
-	return p.mutate("make-links(create)", dest, dest, opInfo{kind: "link", target: src, srcRel: item.Rel}, func() error { return p.FS.MakeSymlink(src, dest) })
+	return p.mutate("make-links", "create", dest, dest, opInfo{kind: "link", target: src, srcRel: item.Rel}, func() error { return p.FS.MakeSymlink(src, dest) })
 }
 
 // makeCopies copies each *.ontoHost.cp to its dest(s) (marker stripped, or explicit
@@ -313,16 +308,16 @@ func (p *ProfileReady) makeCopy(item spec.FileItem, dest string) error {
 	src := p.resolveSrc(item.Rel)
 	if fsutil.IsSameContent(p.Reader, src, dest) {
 		if p.isDryRunAll() {
-			p.logMsg(skipTitle("make-copies", p.wouldAction(dest), p.skipReasons("SameContent")...), dest)
+			p.emitSkip(log.Levels.Info, "make-copies", p.wouldAction(dest), dest, p.skipReasons("same content")...)
 		}
 		return p.fixPerms("make-copies", dest, item)
 	}
 	mode, _ := fsutil.ParseMode(item.Chmod)
-	err := p.mutate("make-copies(create)", dest, dest, opInfo{kind: "copy", srcRel: item.Rel, mode: item.Chmod}, func() error { return p.FS.CopyFile(src, dest, mode) })
+	err := p.mutate("make-copies", "create", dest, dest, opInfo{kind: "copy", srcRel: item.Rel, mode: item.Chmod}, func() error { return p.FS.CopyFile(src, dest, mode) })
 	if err != nil {
 		return err
 	}
-	return p.chownIfSet("make-copies(chown)", item, dest)
+	return p.chownIfSet("make-copies", item, dest)
 }
 
 // resolveCopyDests returns the explicit dests (~/ resolved), else the marker-stripped derived dest.

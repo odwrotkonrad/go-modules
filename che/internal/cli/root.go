@@ -49,7 +49,11 @@ sourced profile refs included).`,
 		SilenceUsage:  true,
 		SilenceErrors: true,
 		PersistentPreRunE: func(cmd *cobra.Command, args []string) error {
-			return a.init(cmd.Name())
+			name := cmd.Name()
+			if p := cmd.Parent(); p != nil && p.Name() == "config" {
+				name = "config"
+			}
+			return a.init(name)
 		},
 		PersistentPostRunE: func(cmd *cobra.Command, args []string) error {
 			a.shutdownTelemetry()
@@ -74,10 +78,10 @@ sourced profile refs included).`,
 		"treat every runIf predicate as passing; env: CHE_SKIP_RUN_IF")
 	pf.BoolVar(&a.flags.SkipRemoteRefs, "skip-remote-refs", false,
 		"skip sourced include.profiles refs, load only the local repo's specs; env: CHE_SKIP_REMOTE_REFS")
-	pf.BoolVar(&a.flags.Debug, "debug", false,
-		"print debug-level lines (source announce, clone/pull attempts); env: CHE_DEBUG")
+	pf.StringVar(&a.flags.LogLevel, "log-level", "",
+		"human-log level; values: error (failures only) | warn | info (what happened) | debug (adds intentions and won't-happen with reasons) | trace (adds details); default: info; env: CHE_LOG_LEVEL")
 
-	root.AddCommand(a.runCmd(), a.initCmd(), a.backupCmd(), a.discoverCmd(), a.uninstallCmd())
+	root.AddCommand(a.runCmd(), a.initCmd(), a.backupCmd(), a.discoverCmd(), a.uninstallCmd(), a.configCmd())
 	for _, o := range ops() {
 		root.AddCommand(a.opCmd(o))
 	}
@@ -99,20 +103,21 @@ func (a *app) init(command string) error {
 	if err != nil {
 		return err
 	}
-	// [why] the dry-run announce opens the whole output, then the config log:
-	// the non-default options with their deciding source, the full set at
-	// debug (spec/che/LogBehavior.md). Completion commands print to stdout for
-	// shell eval, so they stay silent.
+	// [why] the dry-run announce opens the whole output, then the config
+	// delta at debug (spec/che/log.md). `che config show` owns
+	// its own config output, so it skips the startup delta line; completion
+	// commands print to stdout for shell eval, so they stay silent.
 	if command != "completion" && command != "__complete" {
 		if a.opts.DryRun != options.DryRun.Off {
 			desc := "no actual operations will be performed, reporting only dests that would change"
 			if a.opts.DryRun == options.DryRun.All {
 				desc = "no actual operations will be performed, reporting every dest's state"
 			}
-			log.Msg("dry-run(config.dryRun="+string(a.opts.DryRun)+")", desc)
+			log.EmitInfo("config", "dry-run", "("+string(a.opts.DryRun)+") "+desc)
 		}
-		log.Msg("config(show, noDefaults)", options.FormatSettings(a.opts.SettingsDelta()))
-		log.Debug("config(show)", options.FormatSettings(a.opts.Settings))
+		if command != "config" {
+			log.EmitDebug("config", "config-delta", options.FormatSettings(a.opts.SettingsDelta()))
+		}
 	}
 	a.startTelemetry(ctx)
 	ctx.Tel = a.tel
@@ -121,13 +126,13 @@ func (a *app) init(command string) error {
 	ctx.RunCtx = a.runCtx
 	a.ctx = ctx
 	a.tel.CountCommand(a.runCtx, command)
-	if command == "uninstall" {
+	if command == "uninstall" || command == "config" {
 		return nil
 	}
 	// [why] the init stage prefetches every remote spec source before
-	// discovery; all announces both stages like its other wrapped ops.
+	// discovery; run announces both stages as sub-headings like its ops.
 	if command == "run" {
-		log.Msg("run(runOp)", "init-remote-sources")
+		log.EmitHeading(log.Levels.Info, 1, "run", "running", "init-remote-sources")
 	}
 	if err := che.InitSources(ctx, a.opts); err != nil {
 		return err
@@ -136,7 +141,7 @@ func (a *app) init(command string) error {
 		return nil
 	}
 	if command == "run" {
-		log.Msg("run(runOp)", "discover-profiles")
+		log.EmitHeading(log.Levels.Info, 1, "run", "running", "discover-profiles")
 	}
 	a.root, err = che.PrepareSpecs(ctx, a.opts, spec.SpecSourceRecipe{})
 	if err != nil {
@@ -153,7 +158,7 @@ func (a *app) startTelemetry(ctx che.Context) {
 	cfg := telemetry.Config(a.opts.Otel)
 	tel, err := telemetry.Start(context.Background(), cfg, ctx.RunID, ctx.Command)
 	if err != nil {
-		log.Debug("otel", "start failed: "+err.Error())
+		log.EmitTrace("otel", "error", "start failed: "+err.Error())
 		return
 	}
 	a.tel = tel
@@ -170,7 +175,7 @@ func (a *app) shutdownTelemetry() {
 	}
 	log.SetSink(nil)
 	if err := a.tel.Shutdown(context.Background()); err != nil {
-		log.Debug("otel", "shutdown: "+err.Error())
+		log.EmitTrace("otel", "error", "shutdown: "+err.Error())
 	}
 }
 
@@ -239,20 +244,47 @@ func (a *app) backupCmd() *cobra.Command {
 	}
 }
 
-// discoverCmd logs each prepared profile's discovered line (per-op all/delta
+// discoverCmd logs each prepared profile's discovered entry (per-op change
 // counts) and exits.
 func (a *app) discoverCmd() *cobra.Command {
 	return &cobra.Command{
 		Use:   "discover-profiles",
-		Short: "log the prepared profiles with per-op all/delta counts (one per line) and exit",
+		Short: "log the discovered profiles with their per-op changes and exit",
 		RunE: func(cmd *cobra.Command, args []string) error {
-			a.root.LogRejected()
-			for _, p := range a.root.AllProfiles() {
-				log.Msg("discover-profiles(match)", p.DiscoverSummary())
+			a.root.LogDiscovered()
+			return nil
+		},
+	}
+}
+
+// configCmd is the config command group: `config show` prints the resolved
+// options, one "key = value  (source)" line each, the non-default delta by
+// default (--delta), the full set with --all.
+func (a *app) configCmd() *cobra.Command {
+	cmd := &cobra.Command{
+		Use:   "config",
+		Short: "inspect che's resolved configuration",
+	}
+	var delta, all bool
+	show := &cobra.Command{
+		Use:   "show",
+		Short: "print the resolved options with their deciding sources (--delta default, --all for every option)",
+		RunE: func(cmd *cobra.Command, args []string) error {
+			settings := a.opts.SettingsDelta()
+			if all {
+				settings = a.opts.SettingsSorted()
+			}
+			for _, s := range settings {
+				fmt.Printf("%s = %s  (%s)\n", s.Key, s.Value, s.DisplaySource())
 			}
 			return nil
 		},
 	}
+	show.Flags().BoolVar(&delta, "delta", false, "print only the options differing from defaults (default mode)")
+	show.Flags().BoolVar(&all, "all", false, "print every option with its value and source")
+	show.MarkFlagsMutuallyExclusive("delta", "all")
+	cmd.AddCommand(show)
+	return cmd
 }
 
 // runScriptsRunE is the run-scripts RunE: the op plus the name-substring arg

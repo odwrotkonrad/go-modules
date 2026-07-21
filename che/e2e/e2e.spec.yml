@@ -54,89 +54,129 @@ defs:
 
 testCases:
   - name: dry-run-e2e
-    context: {env: {CHE_DEBUG: "1"}}
+    context: {env: {CHE_LOG_LEVEL: trace}}
     steps:
       - name: DiscoverProfiles
         command: che discover-profiles
         expected:
           stdOut:
-            - "(match): plain:"
-            - "(match): conditional:"
+            - "## Profile plain"
+            - "## Profile conditional"
             - "ops-remote"
-            - "noMatchDue[env:CHE_E2E_DROPPED]): dropped"
-            - "debug "
+            - "will not run profile dropped: runIf failed: env:CHE_E2E_DROPPED"
+            - "evaluated run if"
         notExpected:
-          stdOut: ["(match): dropped:"]
+          stdOut: ["## Profile dropped "]
 
       - name: RunDryRun
         command: che run --dry-run=all
-        expected: {stdOut: ["debug "]}
+        expected: {stdOut: ["(dry run)"]}
         notExpected: {files: *allProfilesAllFilesExists}
 
       - name: UninstallDryRun
         command: che uninstall --dry-run=all
-        expected: {stdOut: ["debug "]}
         notExpected: {files: *allProfilesAllFilesExists}
 
       - name: MakeDirsDryRun
         command: che make-dirs --dry-run=all
-        expected: {stdOut: ["debug "]}
+        expected: {stdOut: ["create ${HOME}/plain (dry run)"]}
         notExpected: {files: *allProfilesAllFilesExists}
 
       - name: MakeLinksDryRun
         command: che make-links --dry-run=all
-        expected: {stdOut: ["debug "]}
+        expected: {stdOut: ["create ${HOME}/plain/link.txt (dry run)"]}
         notExpected: {files: *allProfilesAllFilesExists}
 
       - name: MakeCopiesDryRun
         command: che make-copies --dry-run=all
-        expected: {stdOut: ["debug "]}
+        expected: {stdOut: ["create ${HOME}/plain/copy (dry run)"]}
         notExpected: {files: *allProfilesAllFilesExists}
 
       - name: RenderTemplatesDryRun
         command: che render-templates --dry-run=all
-        expected: {stdOut: ["debug "]}
+        expected: {stdOut: ["create ${HOME}/plain/tpl (dry run)"]}
         notExpected: {files: *allProfilesAllFilesExists}
 
       - name: RunScriptsDryRun
         command: che run-scripts --dry-run=all
-        expected: {stdOut: ["debug "]}
+        expected: {stdOut: ["run ${LOCAL}/install/plain-script (dry run)"]}
         notExpected: {files: *allProfilesAllFilesExists}
 
       - name: PruneBrokenLinksDryRun
         command: che prune-broken-links --dry-run=all
-        expected: {stdOut: ["debug "]}
         notExpected: {files: *allProfilesAllFilesExists}
 
       - name: BackupDryRun
         command: che backup --dry-run=all
         expected:
-          stdOut: ["debug "]
+          stdOut: ["backup delta"]
           files:
             - {countGlob: "${XDG_STATE_HOME}/che/backups/che-backup-*.tar.bz2", count: 0}
         notExpected: {files: *allProfilesAllFilesExists}
 
+      - name: ConfigShowDelta
+        command: che config show
+        expected:
+          stdOut:
+            - "logLevel = trace  (env)"
+            - "validateSpec = error  (env)"
+        notExpected:
+          # no config-delta summary line, and no unset defaults in delta mode
+          stdOut:
+            - "config delta"
+            - "dryRun = false  (unset)"
+
+      - name: ConfigShowAll
+        command: che config show --all
+        expected:
+          stdOut:
+            # unset options labeled (unset), not (default)
+            - "dryRun = false  (unset)"
+            - "otel.protocol = grpc  (unset)"
+            # changed sort before unset: env/specFile/cliFlag lines precede the first (unset)
+            - "logLevel = trace  (env){{/[\\s\\S]*/}}dryRun = false  (unset)"
+        notExpected:
+          # no config-delta summary line, no (default) labels
+          stdOut:
+            - "config delta"
+            - "(default)"
+
   - name: e2e
-    context: {env: {CHE_DEBUG: "0"}}
+    context: {env: {CHE_LOG_LEVEL: info}}
     steps:
       - name: DiscoverProfiles
         command: che discover-profiles
         expected:
           stdOutFull: |
-            config(show, noDefaults): [validateSpec=error(env),cheWorkingDirectory=${LOCAL}(cliFlag),profileWorkingDirectory=root(specFile),debug=false(env)]
-            init-remote-sources(cloneRemote): file://${REMOTE} -> ${XDG_CACHE_HOME}/che/remote-sources/{{/[A-Za-z0-9.-]+/}}
-            discover-profiles(noMatchDue[env:CHE_E2E_DROPPED]): dropped
-            discover-profiles(match): plain: profileWorkingDirectory: ${LOCAL}/root, ops: [prune-broken-links(delta=0,all=0),make-dirs(delta=2,all=3),make-links(delta=1,all=1),make-copies(delta=1,all=1),render-templates(delta=1,all=1),run-scripts(delta=1,all=1)]
-            discover-profiles(match): conditional: profileWorkingDirectory: ${LOCAL}/root, ops: [prune-broken-links(delta=0,all=0),make-dirs(delta=2,all=3),make-links(delta=1,all=1),make-copies(delta=1,all=1),render-templates(delta=1,all=1),run-scripts(delta=1,all=1)]
-            discover-profiles(match): remote: profileWorkingDirectory: ${LOCAL}/root, ops: []
-            discover-profiles(match): remote:remote:ops-remote: profileWorkingDirectory: ${XDG_CACHE_HOME}/che/remote-sources/{{/[A-Za-z0-9.-]+/}}/root, ops: [prune-broken-links(delta=0,all=0),make-dirs(delta=2,all=3),make-links(delta=1,all=1),make-copies(delta=1,all=1),render-templates(delta=1,all=1),run-scripts(delta=1,all=1)]
+            using spec ${LOCAL}/che.yml
+            cloned remote file://${REMOTE} into ~/.cache/che/remote-sources/{{/[A-Za-z0-9.-]+/}}
+            ## Profile plain  (profile workdir: ${LOCAL}/root)
+              make-dirs: 2 changes
+              make-links: 1 change
+              make-copies: 1 change
+              render-templates: 1 change
+              run-scripts: 1 change
+            ## Profile conditional  (profile workdir: ${LOCAL}/root)
+              make-dirs: 2 changes
+              make-links: 1 change
+              make-copies: 1 change
+              render-templates: 1 change
+              run-scripts: 1 change
+            ## Profile remote-empty  (profile workdir: ${LOCAL}/root)
+              no changes
+            ## Profile remote:remote:ops-remote  (profile workdir: ~/.cache/che/remote-sources/{{/[A-Za-z0-9.-]+/}}/root)
+              make-dirs: 2 changes
+              make-links: 1 change
+              make-copies: 1 change
+              render-templates: 1 change
+              run-scripts: 1 change
 
       - name: Run
         command: che run
         expected:
           files: *allProfilesAllFilesAccurate
         notExpected:
-          stdOut: ["debug "]
+          stdOut: ["will run", "will not"]
           files: *profileDroppedHomeDirExists
 
       - name: RemoveScriptOutputs
@@ -148,8 +188,13 @@ testCases:
 
       - name: Uninstall
         command: che uninstall
+        expected:
+          stdOut:
+            - "removed ${HOME}/plain/link.txt"
+            # reverse application order: sourced ops-remote unwinds before conditional before plain
+            - "## profile {{/.*/}}ops-remote{{/[\\s\\S]*/}}## profile conditional{{/[\\s\\S]*/}}## profile plain"
         notExpected:
-          stdOut: ["debug "]
+          stdOut: ["will run ", "will not run "]
           files: *allProfilesAllFilesExists
 
       - name: MakeDirs
@@ -157,12 +202,12 @@ testCases:
         expected:
           files: *allProfilesDirsAccurate
         notExpected:
-          stdOut: ["debug "]
+          stdOut: ["will run ", "will not run "]
 
       - name: MakeDirsUninstall
         command: che uninstall
         notExpected:
-          stdOut: ["debug "]
+          stdOut: ["will run ", "will not run "]
           files: *allProfilesDirsExists
 
       - name: MakeLinks
@@ -170,12 +215,12 @@ testCases:
         expected:
           files: *allProfilesLinksAccurate
         notExpected:
-          stdOut: ["debug "]
+          stdOut: ["will run ", "will not run "]
 
       - name: MakeLinksUninstall
         command: che uninstall
         notExpected:
-          stdOut: ["debug "]
+          stdOut: ["will run ", "will not run "]
           files: *allProfilesLinksExists
 
       - name: MakeCopies
@@ -183,12 +228,12 @@ testCases:
         expected:
           files: *allProfilesCopiesAccurate
         notExpected:
-          stdOut: ["debug "]
+          stdOut: ["will run ", "will not run "]
 
       - name: MakeCopiesUninstall
         command: che uninstall
         notExpected:
-          stdOut: ["debug "]
+          stdOut: ["will run ", "will not run "]
           files: *allProfilesCopiesExists
 
       - name: RenderTemplatesMakeDirs
@@ -196,19 +241,19 @@ testCases:
         expected:
           files: *allProfilesDirsAccurate
         notExpected:
-          stdOut: ["debug "]
+          stdOut: ["will run ", "will not run "]
 
       - name: RenderTemplates
         command: che render-templates
         expected:
           files: *allProfilesTemplatesAccurate
         notExpected:
-          stdOut: ["debug "]
+          stdOut: ["will run ", "will not run "]
 
       - name: RenderTemplatesUninstall
         command: che uninstall
         notExpected:
-          stdOut: ["debug "]
+          stdOut: ["will run ", "will not run "]
           files: [*allProfilesTemplatesExists, *allProfilesDirsExists]
 
       - name: RunScripts
@@ -216,12 +261,12 @@ testCases:
         expected:
           files: *allProfilesScriptOutputsAccurate
         notExpected:
-          stdOut: ["debug "]
+          stdOut: ["will run ", "will not run "]
 
       - name: RunScriptsUninstall
         command: che uninstall
         notExpected:
-          stdOut: ["debug "]
+          stdOut: ["will run ", "will not run "]
 
       - name: RunScriptsCleanup
         remove:
@@ -240,7 +285,7 @@ testCases:
         expected:
           files: *allProfilesDirsAccurate
         notExpected:
-          stdOut: ["debug "]
+          stdOut: ["will run ", "will not run "]
           files: [*allProfilesLinksExists, *allProfilesCopiesExists, *allProfilesTemplatesExists, *allProfilesScriptOutputsExists]
 
       - name: AccumulateMakeLinks
@@ -248,7 +293,7 @@ testCases:
         expected:
           files: [*allProfilesDirsAccurate, *allProfilesLinksAccurate]
         notExpected:
-          stdOut: ["debug "]
+          stdOut: ["will run ", "will not run "]
           files: [*allProfilesCopiesExists, *allProfilesTemplatesExists, *allProfilesScriptOutputsExists]
 
       - name: AccumulateMakeCopies
@@ -256,7 +301,7 @@ testCases:
         expected:
           files: [*allProfilesDirsAccurate, *allProfilesLinksAccurate, *allProfilesCopiesAccurate]
         notExpected:
-          stdOut: ["debug "]
+          stdOut: ["will run ", "will not run "]
           files: [*allProfilesTemplatesExists, *allProfilesScriptOutputsExists]
 
       - name: AccumulateRenderTemplates
@@ -264,7 +309,7 @@ testCases:
         expected:
           files: [*allProfilesDirsAccurate, *allProfilesLinksAccurate, *allProfilesCopiesAccurate, *allProfilesTemplatesAccurate]
         notExpected:
-          stdOut: ["debug "]
+          stdOut: ["will run ", "will not run "]
           files: *allProfilesScriptOutputsExists
 
       - name: AccumulateRunScripts
@@ -272,7 +317,7 @@ testCases:
         expected:
           files: *allProfilesAllFilesAccurate
         notExpected:
-          stdOut: ["debug "]
+          stdOut: ["will run ", "will not run "]
 
       - name: AccumulateRemoveScriptOutputs
         remove:
@@ -284,7 +329,7 @@ testCases:
       - name: AccumulateUninstall
         command: che uninstall
         notExpected:
-          stdOut: ["debug "]
+          stdOut: ["will run ", "will not run "]
           files: *allProfilesAllFilesExists
 
       - name: PruneMakeLinks
@@ -292,7 +337,7 @@ testCases:
         expected:
           files: *allProfilesLinksAccurate
         notExpected:
-          stdOut: ["debug "]
+          stdOut: ["will run ", "will not run "]
 
       - name: PruneRemoveLinkSource
         remove:
@@ -303,7 +348,7 @@ testCases:
         expected:
           files: [*profileConditionalLinkAccurate, *profileRemoteLinkAccurate]
         notExpected:
-          stdOut: ["debug "]
+          stdOut: ["will run ", "will not run "]
           files: *profilePlainLinkExists
 
       - name: PruneRestoreLinkSource
@@ -312,7 +357,7 @@ testCases:
       - name: PruneUninstall
         command: che uninstall
         notExpected:
-          stdOut: ["debug "]
+          stdOut: ["will run ", "will not run "]
           files: *allProfilesLinksExists
 
       - name: BackupRemoveState
@@ -324,7 +369,7 @@ testCases:
         expected:
           files: *allProfilesCopiesAccurate
         notExpected:
-          stdOut: ["debug "]
+          stdOut: ["will run ", "will not run "]
 
       - name: BackupTamperCopy
         write: {path: "${HOME}/plain/copy", content: tampered}
@@ -332,11 +377,11 @@ testCases:
       - name: Backup
         command: che backup
         expected:
-          stdOut: ["(created)"]
+          stdOut: ["created "]
           files:
             - {countGlob: "${XDG_STATE_HOME}/che/backups/che-backup-*.tar.bz2", count: 1}
         notExpected:
-          stdOut: ["debug "]
+          stdOut: ["will run ", "will not run "]
 
       - name: BackupExtract
         extract:
@@ -354,12 +399,12 @@ testCases:
         expected:
           files: *allProfilesCopiesAccurate
         notExpected:
-          stdOut: ["debug "]
+          stdOut: ["will run ", "will not run "]
 
       - name: BackupSettled
         command: che backup
         notExpected:
-          stdOut: ["(created)", "debug "]
+          stdOut: ["created ", "will run ", "will not run "]
 
       - name: BackupTamperAgain
         write: {path: "${HOME}/plain/copy", content: tampered}
@@ -367,11 +412,11 @@ testCases:
       - name: BackupRunRestores
         command: che run
         expected:
-          stdOut: ["runOp): backup"]
+          stdOut: ["created "]
           files:
             - {path: "${HOME}/plain/copy", exists: true, type: file, content: copy-plain}
         notExpected:
-          stdOut: ["debug "]
+          stdOut: ["will run ", "will not run "]
 
       - name: BackupRemoveScriptOutputs
         remove:
@@ -386,7 +431,7 @@ testCases:
           files:
             - {path: "${HOME}/plain/copy", exists: true, type: file, content: tampered}
         notExpected:
-          stdOut: ["debug "]
+          stdOut: ["will run ", "will not run "]
 
       - name: BackupCleanup
         remove:

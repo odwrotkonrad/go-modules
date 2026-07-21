@@ -4,6 +4,7 @@ package che
 
 import (
 	"fmt"
+	"path/filepath"
 
 	"gitlab.com/konradodwrot/go-modules/che/internal/log"
 	"gitlab.com/konradodwrot/go-modules/che/internal/options"
@@ -15,13 +16,14 @@ import (
 // include.profiles refs — recursive, cycle-guarded, runIf NOT evaluated
 // (init fetches everything declared; discovery decides what runs). A source
 // that cannot be fetched AND has no cached checkout is fatal; a failing update
-// with a cache warns and continues (spec/che/InitCmdBehavior.md).
+// with a cache warns and continues (spec/che/init.md).
 // SkipRemoteRefs skips remote refs.
 func InitSources(ctx Context, opts options.Options) error {
 	repoRoot, err := findRepoRoot(ctx)
 	if err != nil {
 		return err
 	}
+	log.EmitInfo("discover-profiles", "using-spec", filepath.Join(repoRoot, "che.yml"))
 	home, err := resolveInvokingHome(ctx)
 	if err != nil {
 		return err
@@ -63,7 +65,7 @@ func (w *initWalker) walkSpec(src spec.SpecSourceRecipe, anchor, name string) er
 	}
 	for _, rec := range doc.ProfileRecipes {
 		for _, ref := range rec.SourcedRefs() {
-			log.Debug("init-remote-sources(detectedRemoteInSpec)", "profile="+ref.ProfileName+" "+ref.String())
+			log.EmitTrace("init-remote-sources", "detected-remote-ref", "profile "+ref.ProfileName+": "+ref.String())
 			err := w.walkSpec(
 				spec.SpecSourceRecipe{SourceRecipe: spec.SourceRecipe{URI: ref.URI, SpecFile: ref.SpecFile}},
 				ready.DirectoryPath, ref.ProfileName)

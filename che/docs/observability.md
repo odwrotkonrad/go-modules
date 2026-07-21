@@ -85,7 +85,7 @@ When `otel.traces` is on, che emits spans on tracer `che`. The tree nests `che r
 
 ## Logs
 
-When `otel.logs` is on, each che log line is mirrored as an OTLP log record via the log bridge (`Telemetry.LogRecord`): the log title becomes the record event name, the message becomes the body, and the level maps to severity (`debug` -> Debug, everything else -> Info).
+When `otel.logs` is on, each che log event is mirrored as an OTLP log record via the log bridge (`Telemetry.LogRecord`): the event name is `<scope>.<action>`, the message becomes the body, the event's attributes (plus any skip reasons) become record attributes, and the level maps to severity (`error` -> Error, `warn` -> Warn, `info` -> Info, `debug` -> Debug, `trace` -> Trace).
 
 ## Config
 

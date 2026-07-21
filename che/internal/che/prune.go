@@ -7,6 +7,7 @@ import (
 
 	"gitlab.com/konradodwrot/go-modules/che/internal/database"
 	"gitlab.com/konradodwrot/go-modules/che/internal/fsutil"
+	"gitlab.com/konradodwrot/go-modules/che/internal/log"
 )
 
 // sweepStale removes every dest of kind the ledger recorded for THIS profile
@@ -52,7 +53,7 @@ func (p *ProfileReady) removeStale(op database.OperationDone) error {
 			return err
 		}
 	}
-	p.logMsg("prune-"+op.Kind, dest)
+	p.emit(log.Levels.Info, "prune-"+op.Kind, "pruned", dest)
 	p.recordRemoval(op.Kind, dest, prev)
 	return nil
 }

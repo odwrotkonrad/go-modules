@@ -7,7 +7,7 @@ cases:
       args: [mkMode: "0700", chmod: "0755"]
     expected:
       output:
-        deltaLine: "make-dirs(chmod, skippedDue[config.dryRun=delta]): 0755 ${DEST}"
+        deltaLine: "chmod 0755 ${DEST} (dry run)"
         wetPerm: "0755"
   - name: ShouldStaySilentForSettledSetgid
     input:
@@ -24,7 +24,7 @@ cases:
       args: [mkMode: "0775", chmod: "2775"]
     expected:
       output:
-        deltaLine: "make-dirs(chmod, skippedDue[config.dryRun=delta]): 2775 ${DEST}"
+        deltaLine: "chmod 2775 ${DEST} (dry run)"
         wetPerm: "0775"
         wetSetgid: true
 # [<] 🤖🤖

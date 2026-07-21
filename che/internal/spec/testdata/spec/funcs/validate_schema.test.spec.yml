@@ -84,7 +84,7 @@ cases:
             options:
               runIf: ['env:X']
               autoDiscover: true
-              debug: false
+              logLevel: info
               validateSpec: warn
             env:
               GITLAB_GROUP: konradodwrot

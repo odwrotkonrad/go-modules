@@ -3,13 +3,13 @@ cases:
   - name: ShouldReportSettledLinkAsSkippedOnlyUnderAll
     context: {command: che make-links}
     expected:
-      stdOut: "make-links(overwrite, skippedDue[AlreadyLinked,config.dryRun=all]): ${DEST}"
+      stdOut: "will not overwrite ${DEST}: already linked"
     notExpected:
       stdOut: "${DEST}"
   - name: ShouldReportSettledCopyAsSkippedOnlyUnderAll
     context: {command: che make-copies}
     expected:
-      stdOut: "make-copies(overwrite, skippedDue[SameContent,config.dryRun=all]): ${DEST}"
+      stdOut: "will not overwrite ${DEST}: same content"
     notExpected:
       stdOut: "${DEST}"
 # [<] 🤖🤖

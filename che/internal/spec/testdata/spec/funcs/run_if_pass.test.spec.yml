@@ -2,43 +2,43 @@
 context:
   function: spec.AllPass
 cases:
-  - name: ShouldRejectSilentlyOnEmptyEnvAtNormalLevel
+  - name: ShouldRejectSilentlyOnEmptyEnvAtInfoLevel
     context:
       env: {X: ""}
     input:
-      args: [profile: p, debug: false]
+      args: [profile: p, trace: false]
     expected:
       output: false
     notExpected:
-      stdOut: ["noPass"]
-  - name: ShouldLogRejectAtDebugLevel
+      stdOut: ["evaluated run if"]
+  - name: ShouldLogRejectAtTraceLevel
     context:
       env: {X: ""}
     input:
-      args: [profile: p, debug: true]
+      args: [profile: p, trace: true]
     expected:
       output: false
-      stdOut: ["debug discover-profiles(evaluating[p], noPass): env:X"]
-  - name: ShouldPassSilentlyOnSetEnvAtNormalLevel
+      stdOut: ['evaluated run if p: "env:X" failed']
+  - name: ShouldPassSilentlyOnSetEnvAtInfoLevel
     context:
       env: {X: "1"}
     input:
-      args: [profile: p, debug: false]
+      args: [profile: p, trace: false]
     expected:
       output: true
     notExpected:
-      stdOut: ["evaluating["]
-  - name: ShouldPassAndLogOnSetEnvAtDebugLevel
+      stdOut: ["evaluated run if"]
+  - name: ShouldPassAndLogOnSetEnvAtTraceLevel
     context:
       env: {X: "1"}
     input:
-      args: [profile: p, debug: true]
+      args: [profile: p, trace: true]
     expected:
       output: true
-      stdOut: ["debug discover-profiles(evaluating[p], pass): env:X"]
+      stdOut: ['evaluated run if p: "env:X" passed']
   - name: ShouldErrorOnUndefinedProfile
     input:
-      args: [profile: nope, debug: false]
+      args: [profile: nope, trace: false]
     expected:
       errorOutput: ['profile "nope" is not defined in che.yml']
 # [<] 🤖🤖

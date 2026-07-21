@@ -72,12 +72,12 @@ cover-report:
 build-cover:
 	CC=$(CC) $(GO) build -cover -coverpkg=./... -o dist/$(BIN) .
 
-#[what] dry-run e2e flow (every command --dry-run=all, CHE_DEBUG=1), binary covdata into ./cover-e2e-dryrun
+#[what] dry-run e2e flow (every command --dry-run=all, CHE_LOG_LEVEL=trace), binary covdata into ./cover-e2e-dryrun
 e2e-dryrun: build-cover
 	if [[ -e cover-e2e-dryrun ]] rm -rf cover-e2e-dryrun; mkdir -p cover-e2e-dryrun
 	E2E_BIN=$(CURDIR)/dist/$(BIN) E2E_GOCOVERDIR=$(CURDIR)/cover-e2e-dryrun CC=$(CC) $(GO) test -v -run TestE2EDryRun ./e2e
 
-#[what] real full-flow e2e (CHE_DEBUG=0), binary covdata into ./cover-e2e-run
+#[what] real full-flow e2e (CHE_LOG_LEVEL=info), binary covdata into ./cover-e2e-run
 e2e-run: build-cover
 	if [[ -e cover-e2e-run ]] rm -rf cover-e2e-run; mkdir -p cover-e2e-run
 	E2E_BIN=$(CURDIR)/dist/$(BIN) E2E_GOCOVERDIR=$(CURDIR)/cover-e2e-run CC=$(CC) $(GO) test -v -run TestE2ERun ./e2e

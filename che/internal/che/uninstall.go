@@ -33,11 +33,11 @@ func NewUninstaller(ctx Context, opts options.Options) (*Uninstaller, error) {
 	seams := NewSeams(home)
 	spec, err := seams.Ledger.StartSpec(ctx.RunID, "", "uninstall")
 	if err != nil {
-		log.Debug("ledger", "uninstall start spec: "+err.Error())
+		log.EmitTrace("ledger", "error", "uninstall start spec: "+err.Error())
 	}
 	prof, err := seams.Ledger.StartProfile(spec, "uninstall", "uninstall", "", home)
 	if err != nil {
-		log.Debug("ledger", "uninstall start profile: "+err.Error())
+		log.EmitTrace("ledger", "error", "uninstall start profile: "+err.Error())
 	}
 	p := &ProfileReady{
 		ref:         "uninstall",
@@ -46,13 +46,16 @@ func NewUninstaller(ctx Context, opts options.Options) (*Uninstaller, error) {
 		runID:       ctx.RunID,
 		specDone:    spec,
 		profileDone: prof,
+		logDepth:    1, // [why] removals nest under their per-profile `## profile` heading
 		Seams:       seams,
 	}
 	return &Uninstaller{p: p, dryRun: opts.DryRun != options.DryRun.Off}, nil
 }
 
 // Uninstall reverts every ledger-installed dest, newest-first (so nested dests
-// unwind cleanly). A failing item does not stop the rest: failures collect,
+// unwind cleanly, and profiles unwind in reverse application order). It groups
+// the output by owning profile: a `## profile <ref>` heading precedes each
+// profile's removals. A failing item does not stop the rest: failures collect,
 // report, and join. dry-run logs the actions and writes no rows.
 func (u *Uninstaller) Uninstall() error {
 	p := u.p
@@ -61,13 +64,18 @@ func (u *Uninstaller) Uninstall() error {
 		return err
 	}
 	var errs []error
+	lastRef := ""
 	for _, op := range installed {
+		if op.ProfileRef != lastRef {
+			log.EmitHeading(log.Levels.Info, 2, "uninstall", "uninstalling", "profile "+op.ProfileRef)
+			lastRef = op.ProfileRef
+		}
 		if err := u.revert(op); err != nil {
 			errs = append(errs, p.failItem("uninstall", op.Dest, err))
 		}
 	}
 	for _, err := range errs {
-		log.Msg("uninstall(report)", "fail "+err.Error())
+		log.EmitError("uninstall", "fail", err.Error())
 	}
 	return errors.Join(errs...)
 }
@@ -79,11 +87,11 @@ func (u *Uninstaller) revert(op database.OperationDone) error {
 	p := u.p
 	live := p.classifyDest(op.Dest)
 	if driftedFromNext(live, op.Next) {
-		p.logMsg("uninstall(drift)", op.Dest)
+		p.emitSkip(log.Levels.Debug, "uninstall", "remove", op.Dest, "dest drifted from the recorded state")
 		return nil
 	}
 	if u.dryRun {
-		p.logMsg("uninstall", op.Dest)
+		p.emitDryRun("uninstall", "remove", op.Dest)
 		return nil
 	}
 	if err := p.snapshotForRemoval("uninstall", []string{op.Dest}); err != nil {
@@ -92,7 +100,7 @@ func (u *Uninstaller) revert(op database.OperationDone) error {
 	if err := u.revertKind(op); err != nil {
 		return err
 	}
-	p.logMsg("uninstall", op.Dest)
+	p.emit(log.Levels.Info, "uninstall", "removed", op.Dest)
 	p.recordRemoval(op.Kind, op.Dest, live)
 	return nil
 }
@@ -129,7 +137,7 @@ func (u *Uninstaller) removeDir(dest string) error {
 	err := u.p.FS.RemoveDir(dest)
 	if err != nil && u.p.Reader != nil {
 		if entries, derr := u.p.Reader.ReadDirectory(dest); derr == nil && len(entries) > 0 {
-			u.p.logMsg("uninstall(keep-nonempty)", dest)
+			u.p.emitSkip(log.Levels.Debug, "uninstall", "remove-dir", dest, "directory not empty")
 			return nil
 		}
 	}

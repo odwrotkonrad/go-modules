@@ -9,6 +9,8 @@ import (
 	"slices"
 	"strconv"
 	"strings"
+
+	"gitlab.com/konradodwrot/go-modules/che/internal/log"
 )
 
 // LookupEnv is the env-lookup seam Resolve reads instead of the process env:
@@ -17,7 +19,7 @@ type LookupEnv func(string) string
 
 // Setting is one resolved option: its key, final value, and the layer that
 // decided it (cliFlag | env | config-file | specFile | default). The config log renders
-// these (spec/che/LogBehavior.md).
+// these (spec/che/log.md).
 type Setting struct {
 	Key    string
 	Value  string
@@ -28,20 +30,51 @@ type Setting struct {
 func (c Options) SettingsDelta() []Setting {
 	var out []Setting
 	for _, s := range c.Settings {
-		if s.Source != "default" {
+		if s.IsChanged() {
 			out = append(out, s)
 		}
 	}
 	return out
 }
 
-// FormatSettings renders settings as "[key=value(source),...]".
+// SettingsSorted lists every setting with the source-decided ones first (in
+// Resolve/config order), the unset defaults after (also in config order): the
+// order `config show --all` prints (spec/che/log.md).
+func (c Options) SettingsSorted() []Setting {
+	out := make([]Setting, 0, len(c.Settings))
+	for _, s := range c.Settings {
+		if s.IsChanged() {
+			out = append(out, s)
+		}
+	}
+	for _, s := range c.Settings {
+		if !s.IsChanged() {
+			out = append(out, s)
+		}
+	}
+	return out
+}
+
+// IsChanged reports whether a source (not the code default) decided this
+// setting: a source explicitly set it, even if to the default value.
+func (s Setting) IsChanged() bool { return s.Source != "default" }
+
+// DisplaySource is the label config show prints: the deciding source, or
+// "unset" when no source set the option (the code default is in effect).
+func (s Setting) DisplaySource() string {
+	if s.Source == "default" {
+		return "unset"
+	}
+	return s.Source
+}
+
+// FormatSettings renders settings as "key=value (source), ..." prose.
 func FormatSettings(settings []Setting) string {
 	parts := make([]string, len(settings))
 	for i, s := range settings {
-		parts[i] = fmt.Sprintf("%s=%s(%s)", s.Key, s.Value, s.Source)
+		parts[i] = fmt.Sprintf("%s=%s (%s)", s.Key, s.Value, s.Source)
 	}
-	return "[" + strings.Join(parts, ",") + "]"
+	return strings.Join(parts, ", ")
 }
 
 // cand pairs a candidate value with its source layer, in precedence order.
@@ -207,8 +240,11 @@ func (c *Options) Resolve(env LookupEnv, user, spec Layer) error {
 	c.SkipRunIf = c.resolveBool("skipRunIf", c.SkipRunIf, env("CHE_SKIP_RUN_IF"), false)
 	c.SkipRemoteRefs = c.resolveBool("skipRemoteRefs", c.SkipRemoteRefs, env("CHE_SKIP_REMOTE_REFS"), false,
 		boolLayer{user.SkipRemoteRefs, "config-file"}, boolLayer{spec.SkipRemoteRefs, "specFile"})
-	c.Debug = c.resolveBool("debug", c.Debug, env("CHE_DEBUG"), false,
-		boolLayer{user.Debug, "config-file"}, boolLayer{spec.Debug, "specFile"})
+	c.LogLevel = c.resolveStr("logLevel", "info",
+		flagStr(c.LogLevel), envStr(env("CHE_LOG_LEVEL")), layer(user.LogLevel, "config-file"), layer(spec.LogLevel, "specFile"))
+	if _, err := log.ParseLevel(c.LogLevel); err != nil {
+		return fmt.Errorf("--log-level: %w", err)
+	}
 	c.RenderSkipSecrets = c.resolveBool("renderTemplates.skipSecrets", c.RenderSkipSecrets, env("CHE_RENDER_TEMPLATES_SKIP_SECRETS"), false,
 		boolLayer{user.RenderTemplates.SkipSecrets, "config-file"}, boolLayer{spec.RenderTemplates.SkipSecrets, "specFile"})
 	c.AutoDiscover = c.resolveBool("autoDiscover", false, env("CHE_AUTO_DISCOVER"), true,

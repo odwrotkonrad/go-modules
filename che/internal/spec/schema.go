@@ -33,7 +33,7 @@ func Schema() *jsonschema.Schema {
 	defs["ProfileRecipe"].Description = "one profile block: options self-describe eligibility, include.profiles compose refs in order (local scalars, sourced {source, options, env}), include adds, exclude filters last and wins"
 	defs["includeSet"].Description = "additive payload: profile refs, makeLinks globs, makeCopies/renderTemplates/makeDirs perm-groups, runScripts globs"
 	defs["excludeSet"].Description = "subtractive glob filter, applied last, wins over every include (rich entries too)"
-	defs["SpecOptions"].Description = "reserved top-level options: block: spec-wide defaults (runIf gate, autoDiscover/debug/workingDirectory) + che knobs (validateSpec/dryRun/profiles/skipRemoteRefs/renderTemplates.skipSecrets); same shape as the user-config file"
+	defs["SpecOptions"].Description = "reserved top-level options: block: spec-wide defaults (runIf gate, autoDiscover/logLevel/workingDirectory) + che knobs (validateSpec/dryRun/profiles/skipRemoteRefs/renderTemplates.skipSecrets); same shape as the user-config file"
 	prop(defs["ProfileOptions"], "runIf").Description = "predicate expressions `<source>` or `<source> == <literal>`, sources builtin:*/env:*; empty: always"
 
 	root := &jsonschema.Schema{

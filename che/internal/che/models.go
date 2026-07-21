@@ -60,7 +60,7 @@ type Seams struct {
 var NewSeams = func(home string) Seams {
 	db, err := database.Open(filepath.Join(fsutil.ResolveStateHome(home), "ops.db"))
 	if err != nil {
-		log.Debug("ledger", "open failed: "+err.Error())
+		log.EmitTrace("ledger", "error", "open failed: "+err.Error())
 		db = nil
 	}
 	return Seams{
@@ -124,7 +124,11 @@ func PrepareApplicationOptions(ctx Context, opts options.Options) (Context, opti
 	if err := resolvedOptions.Resolve(ctx.lookupEnv(), readUserLayer(fsutil.ResolveUserConfigPath(home)), readSpecLayer(filepath.Join(repoRoot, "che.yml"))); err != nil {
 		return ctx, resolvedOptions, err
 	}
-	log.SetDebug(resolvedOptions.Debug)
+	level, err := log.ParseLevel(resolvedOptions.LogLevel)
+	if err != nil {
+		return ctx, resolvedOptions, err
+	}
+	log.SetLevel(level)
 	resolvedOptions.FillDefaultSetting("cheWorkingDirectory", ctx.Cwd)
 	return ctx, resolvedOptions, nil
 }
@@ -224,7 +228,7 @@ func (p *specsPrep) startSpec(db *database.DB, uri string) *database.SpecDone {
 	}
 	s, err := db.StartSpec(p.ctx.RunID, uri, p.ctx.Command)
 	if err != nil {
-		log.Debug("ledger", "start spec: "+err.Error())
+		log.EmitTrace("ledger", "error", "start spec: "+err.Error())
 		return nil
 	}
 	p.specDone = s
@@ -245,12 +249,12 @@ func (p *specsPrep) prepare(src spec.SpecSourceRecipe, anchor string, forced *sp
 		// referenced under different relative URIs across hops.
 		key := recipe.sourceReady.DirectoryPath + "::" + forced.ProfileName
 		if p.seenRefs[key] {
-			log.Debug("init-remote-sources(skip)", forced.ProfileName+": duplicate "+forced.String())
+			log.EmitSkip(log.Levels.Trace, "init-remote-sources", "prepare", forced.ProfileName, "duplicate ref "+forced.String())
 			return nil, nil
 		}
 		p.seenRefs[key] = true
 	} else if !root && p.seenSpecs[recipe.sourceReady.DirectoryPath] {
-		log.Debug("init-remote-sources(skip)", "spec: duplicate "+recipe.sourceReady.DirectoryPath)
+		log.EmitSkip(log.Levels.Trace, "init-remote-sources", "prepare", recipe.sourceReady.DirectoryPath, "duplicate spec")
 		return nil, nil
 	}
 	p.seenSpecs[recipe.sourceReady.DirectoryPath] = true
@@ -396,7 +400,7 @@ func (r *SpecRecipe) validateSchema(cli options.ValidateSpecMode) error {
 		return fmt.Errorf("schema violations in %s:\n%s", r.sourceReady.DefinitionURI, strings.Join(finds, "\n"))
 	}
 	for _, f := range finds {
-		log.Msg("validate(che.yml)", f)
+		log.EmitWarn("validate-spec", "warning", f)
 	}
 	return nil
 }
@@ -415,7 +419,7 @@ func peekSpecValidateMode(b []byte) string {
 
 // candidateSummary lists the spec's candidate profiles (each with the profiles
 // it is assembled from) and the autoDiscoverable subset
-// (spec/che/LogBehavior.md).
+// (spec/che/log.md).
 func (r *SpecRecipe) candidateSummary() (all, autoDiscoverable string) {
 	var profs, auto []string
 	for _, rec := range r.ProfileRecipes {
@@ -439,8 +443,8 @@ func (r *SpecRecipe) PrepareProfiles(p *specsPrep, forced *spec.ProfileSourceRec
 	ready := &SpecReady{Source: r.sourceReady, Options: r.Options, Env: r.Env, recipes: r.ProfileRecipes, tel: p.tel}
 	if root { // [why] candidates log once, for the invoked spec only
 		all, auto := r.candidateSummary()
-		log.Debug("discover-profiles(showCandidates, all)", all)
-		log.Debug("discover-profiles(showCandidates, autoDiscoverable)", auto)
+		log.EmitTrace("discover-profiles", "listed-candidates", all)
+		log.EmitTrace("discover-profiles", "listed-candidates", "auto-discoverable "+auto)
 	}
 	// [why] the spec-level env: overlay gates this spec's own runIf.
 	eval := p.evalWith(r.Env)
@@ -449,7 +453,7 @@ func (r *SpecRecipe) PrepareProfiles(p *specsPrep, forced *spec.ProfileSourceRec
 		return nil, err
 	}
 	if !pass {
-		log.Debug("spec(skip)", r.sourceReady.DefinitionURI+" (runIf failed)")
+		log.EmitSkip(log.Levels.Debug, "discover-profiles", "load-spec", r.sourceReady.DefinitionURI, "runIf failed")
 		return ready, nil
 	}
 	lookup, err := r.composeIncludes(p, ready)
@@ -529,14 +533,14 @@ func (r *SpecRecipe) selectEligibleNames(p *specsPrep, forced *spec.ProfileSourc
 		if root {
 			return nil, fmt.Errorf("auto-discovery is disabled (options.autoDiscover=false): pass --profiles")
 		}
-		log.Debug("spec(skip)", r.sourceReady.DefinitionURI+" (autoDiscover disabled)")
+		log.EmitSkip(log.Levels.Debug, "discover-profiles", "load-spec", r.sourceReady.DefinitionURI, "autoDiscover disabled")
 		return nil, nil
 	}
 	names, rejected, err := spec.EligibleRecipes(r.ProfileRecipes, forcedProfiles, p.opts.SkipRunIf, p.evalWith(r.Env))
 	p.rejected = append(p.rejected, rejected...)
 	if err != nil {
 		if !root && errors.Is(err, spec.ErrNoneEligible) {
-			log.Debug("spec(skip)", r.sourceReady.DefinitionURI+" (no eligible profile)")
+			log.EmitSkip(log.Levels.Debug, "discover-profiles", "load-spec", r.sourceReady.DefinitionURI, "no eligible profile")
 			return nil, nil
 		}
 		return nil, err
@@ -598,7 +602,7 @@ func (r *SpecRecipe) makeProfileReady(p *specsPrep, rec spec.ProfileRecipe, look
 	specDone := p.startSpec(seams.Ledger, r.sourceReady.DefinitionURI)
 	profileDone, err := seams.Ledger.StartProfile(specDone, rec.Source.String(), name, r.sourceReady.DefinitionURI, rec.Source.DirectoryPath)
 	if err != nil {
-		log.Debug("ledger", "start profile: "+err.Error())
+		log.EmitTrace("ledger", "error", "start profile: "+err.Error())
 	}
 	pr := &ProfileReady{
 		Source: spec.ProfileSourceReady{
@@ -646,12 +650,25 @@ type SpecReady struct {
 	tel      *telemetry.Telemetry // OTLP counters (nil = no-op), for the per-profile ExecEach count
 }
 
-// LogRejected logs each runIf-rejected profile before the match lines, its
-// rejecting condition as the reason (spec/che/LogBehavior.md); nothing
-// rejected logs nothing.
+// LogRejected logs each runIf-rejected profile at debug, its rejecting
+// condition as the reason (spec/che/log.md); nothing rejected
+// logs nothing.
 func (s *SpecReady) LogRejected() {
 	for _, r := range s.Rejected {
-		log.Msg("discover-profiles(noMatchDue["+r.Cond+"])", r.Ref)
+		log.Emit(log.Event{
+			Level: log.Levels.Debug, Scope: "discover-profiles", Action: "run",
+			Msg: "profile " + r.Ref, Reasons: []string{"runIf failed: " + r.Cond},
+			Attrs: map[string]string{"profile": r.Ref, "condition": r.Cond},
+		})
+	}
+}
+
+// LogDiscovered logs the rejected profiles (debug), then each discovered
+// profile's entry (info).
+func (s *SpecReady) LogDiscovered() {
+	s.LogRejected()
+	for _, p := range s.AllProfiles() {
+		p.logDiscovered()
 	}
 }
 
@@ -668,24 +685,20 @@ func (s *SpecReady) AllProfiles() []*ProfileReady {
 // ExecEach runs fn over every profile in the tree, each under its own span
 // (child of ctx). It first logs the discovery summary: one
 // "discover-profiles(discovered)" info line per profile with per-op all/delta counts
-// (spec/che/LogBehavior.md). A failing profile does not stop the rest: failures
+// (spec/che/log.md). A failing profile does not stop the rest: failures
 // collect (ref-wrapped), report as "<op>(report): fail <ref>: <err>" lines
 // after all profiles, and join into the returned error.
 func (s *SpecReady) ExecEach(ctx context.Context, opName string, fn func(context.Context, *ProfileReady) error) error {
 	ctx, span := s.tel.Span(ctx, opName, attribute.String("op", opName))
 	defer span.End()
-	profiles := s.AllProfiles()
-	s.LogRejected()
-	for _, p := range profiles {
-		log.Msg("discover-profiles(match)", p.discoverSummary())
-	}
+	s.LogDiscovered()
 	var fails []error
-	for _, p := range profiles {
+	for _, p := range s.AllProfiles() {
 		// [why] a profile whose command ops carry no delta at all is skipped
-		// wholesale: nothing would change (spec/che/ExecutionBehavior.md). The
+		// wholesale: nothing would change (spec/che/che.md). The
 		// skip reason distinguishes config-skipped and undefined op sets.
 		if ops := p.commandOps(opName); len(ops) == 0 {
-			reasons := []string{"NoDef"}
+			reasons := []string{"not defined"}
 			if scoped := p.commandScopedOps(opName); len(scoped) > 0 {
 				reasons = nil
 				for _, op := range scoped {
@@ -694,17 +707,19 @@ func (s *SpecReady) ExecEach(ctx context.Context, opName string, fn func(context
 					}
 				}
 			}
-			log.Msg(skipTitle(opName, "runProfile", reasons...), p.runProfileSummary(opName))
+			log.EmitSkip(log.Levels.Debug, opName, "run", "profile "+p.Ref(), reasons...)
 			continue
 		} else if p.commandDelta(opName) == 0 && !p.isDryRunAll() {
 			// [why] dry-run=all wants every dest's true state, so it bypasses
 			// the zero-delta profile skip.
-			log.Msg(skipTitle(opName, "runProfile", "NoDelta"), p.runProfileSummary(opName))
+			log.EmitSkip(log.Levels.Debug, opName, "run", "profile "+p.Ref(), "no changes")
 			continue
 		}
 		pctx, pspan := s.tel.Span(ctx, "profile", attribute.String("profile", p.Ref()))
 		s.tel.CountProfile(pctx, p.Ref())
-		log.Msg(opName+"(runProfile)", p.runProfileSummary(opName))
+		log.EmitDebug(opName, "will-run", "profile "+p.Ref()+": "+p.describeOpDeltas(opName))
+		p.emitHeading(log.Levels.Info, opName, "run-profile", "Run profile "+p.Ref(), 1)
+		p.logDepth = 1
 		if err := fn(pctx, p); err != nil {
 			pspan.RecordError(err)
 			fails = append(fails, fmt.Errorf("%s: %w", p.Ref(), err))
@@ -712,7 +727,7 @@ func (s *SpecReady) ExecEach(ctx context.Context, opName string, fn func(context
 		pspan.End()
 	}
 	for _, err := range fails {
-		log.Msg(opName+"(report)", "fail "+err.Error())
+		log.EmitError(opName, "fail", err.Error())
 	}
 	return errors.Join(fails...)
 }
@@ -731,6 +746,7 @@ type ProfileReady struct {
 	Profiles        []spec.ProfileSourceRecipe // sourced refs, consumed by PrepareSpecs
 	OperationsReady []operationReady           // prepared, in run order
 	ref             string                     // display ref: bare name local, <source>::<name> sourced
+	logDepth        int                        // heading depth this profile's body lines sit beneath (2 under profile+op headings, 0 for standalone)
 	workingDir      string                     // resolved load-ops source tree (options.profileWorkingDirectory cascade)
 	opts            options.Options
 	home            string
@@ -773,49 +789,65 @@ func (p *ProfileReady) resolveRoot() string { return p.workingDir }
 // resolveProfileName is the resolved profile name (CONFIGS_PROFILE, plist domain).
 func (p *ProfileReady) resolveProfileName() string { return p.Source.GetProfileName() }
 
-// buildLogSubtype is the trailing log subtype word: sourced profiles carry
-// "profile=<name>" ([why] disambiguates interleaved runs), local ones none.
-func (p *ProfileReady) buildLogSubtype() string {
-	if p.ref != p.resolveProfileName() {
-		return "profile=" + p.resolveProfileName()
-	}
-	return ""
-}
-
 // isDryRun reports whether this is any dry run (delta or all).
 func (p *ProfileReady) isDryRun() bool { return p.opts.DryRun != options.DryRun.Off }
 
 // isDryRunAll reports the dry-run=all mode (every dest re-reports, never skips).
 func (p *ProfileReady) isDryRunAll() bool { return p.opts.DryRun == options.DryRun.All }
 
-// logMsg logs title/msg at the profile's dry-run mode, carrying its log subtype.
-func (p *ProfileReady) logMsg(title, msg string) {
-	log.MsgSub(title, msg, p.buildLogSubtype())
+// emit logs one profile-scoped body event, indented under the current heading
+// depth. The profile heading names the profile once, so lines beneath it carry
+// only the machine-side profile attr, not a name suffix.
+func (p *ProfileReady) emit(level log.Level, scope, action, msg string) {
+	log.Emit(log.Event{
+		Level: level, Scope: scope, Action: action, Msg: msg,
+		Attrs: map[string]string{"profile": p.Ref()}, Depth: p.logDepth,
+	})
+}
+
+// emitSkip logs one profile-scoped won't-happen body event with its reasons.
+func (p *ProfileReady) emitSkip(level log.Level, scope, action, msg string, reasons ...string) {
+	log.Emit(log.Event{
+		Level: level, Scope: scope, Action: action, Msg: msg, Reasons: reasons,
+		Attrs: map[string]string{"profile": p.Ref()}, Depth: p.logDepth,
+	})
+}
+
+// emitHeading logs one profile-scoped heading event at the given markdown level.
+func (p *ProfileReady) emitHeading(level log.Level, scope, action, msg string, heading int) {
+	log.Emit(log.Event{
+		Level: level, Scope: scope, Action: action, Msg: msg,
+		Attrs: map[string]string{"profile": p.Ref()}, Heading: heading,
+	})
+}
+
+// emitDryRun logs one profile-scoped predicted-mutation event: the action
+// renders affirmatively with a "(dry run)" suffix ("create <msg> (dry run)"),
+// not as a "will not" skip.
+func (p *ProfileReady) emitDryRun(scope, action, msg string) {
+	log.Emit(log.Event{
+		Level: log.Levels.Info, Scope: scope, Action: action, Msg: msg, DryRun: true,
+		Attrs: map[string]string{"profile": p.Ref(), "dryRun": string(p.opts.DryRun)}, Depth: p.logDepth,
+	})
 }
 
 // mutate is the one dry-run+log gate for every mutating op: dry run logs only
 // (fs untouched); real run executes fn, then logs. On a real run it also records
 // the dest mutation into the ops ledger (classify prev before fn, next after),
 // keyed by info.kind. dest "" / dry-run / no ledger -> nothing recorded.
-func (p *ProfileReady) mutate(title, msg, dest string, info opInfo, fn func() error) error {
+func (p *ProfileReady) mutate(scope, action, msg, dest string, info opInfo, fn func() error) error {
 	prev := p.classifyDest(dest)
 	if p.isDryRun() {
-		scope, sub, _ := strings.Cut(strings.TrimSuffix(title, ")"), "(")
-		action := sub
-		if action == "" || action == "create" {
-			action = "create"
-			if prev.Present {
-				action = "overwrite"
-			}
+		if action == "create" && prev.Present {
+			action = "overwrite"
 		}
-		p.logMsg(skipTitle(scope, action, p.dryRunReasons()...), msg)
+		p.emitDryRun(scope, action, msg)
 		return nil
 	}
-	title = resolveCreateTitle(title, prev.Present)
 	if err := fn(); err != nil {
 		return err
 	}
-	p.logMsg(title, msg)
+	p.emit(log.Levels.Info, scope, resolvePastAction(action, prev.Present), msg)
 	p.recordOperation(dest, info, prev)
 	if info.kind != "" && dest != "" {
 		p.tel.CountUnit(p.opContext(), info.kind, deriveOpType(prev, p.classifyDest(dest)), p.command)
@@ -878,7 +910,7 @@ func (p *ProfileReady) recordOperation(dest string, info opInfo, prev database.O
 		op.BackupID = &backup.ID
 	}
 	if err := p.Ledger.RecordOperation(p.profileDone, op); err != nil {
-		log.Debug("ledger", "record op: "+err.Error())
+		log.EmitTrace("ledger", "error", "record op: "+err.Error())
 	}
 }
 
@@ -888,18 +920,55 @@ func (p *ProfileReady) skippedOps() []string {
 	return slices.Concat(p.opts.SkipOps, p.opts.RunSkipOps)
 }
 
-// discoverSummary builds the profile's discovered line details:
-// workingDirectory first, then the selected, non-skipped ops with delta/all
-// counts, execution order (spec/che/LogBehavior.md). Discovery never writes
+// logDiscovered emits the profile's discovered entry: one info event whose
+// human block lists the working directory and the per-op changes (delta only
+// at info, every op with declared counts at debug). Discovery never writes
 // the render-delta cache: only real renders do ([why] a cache refresh without
 // applying would zero the delta and skip the profile before it converges).
-func (p *ProfileReady) discoverSummary() string {
-	var parts []string
+func (p *ProfileReady) logDiscovered() {
+	attrs := map[string]string{"profile": p.Ref(), "workingDirectory": p.workingDir}
+	var lines []string
 	for _, op := range p.commandOps("run") {
 		all, delta := op.counts(p)
-		parts = append(parts, fmt.Sprintf("%s(delta=%d,all=%d)", op.Name(), delta, all))
+		attrs[op.Name()+".delta"] = fmt.Sprint(delta)
+		attrs[op.Name()+".all"] = fmt.Sprint(all)
+		switch {
+		case log.IsEnabled(log.Levels.Debug):
+			lines = append(lines, fmt.Sprintf("%s: %s (%d declared)", op.Name(), formatChanges(delta), all))
+		case delta > 0:
+			lines = append(lines, fmt.Sprintf("%s: %s", op.Name(), formatChanges(delta)))
+		}
 	}
-	return fmt.Sprintf("%s: profileWorkingDirectory: %s, ops: [%s]", p.Ref(), p.workingDir, strings.Join(parts, ","))
+	if len(lines) == 0 {
+		lines = append(lines, "no changes")
+	}
+	heading := fmt.Sprintf("Profile %s  (profile workdir: %s)",
+		p.Ref(), abbreviateHome(p.workingDir, p.home))
+	log.Emit(log.Event{Level: log.Levels.Info, Scope: "discover-profiles", Action: "discovered", Msg: heading, Attrs: attrs, Heading: 2})
+	for _, l := range lines {
+		log.Emit(log.Event{Level: log.Levels.Info, Scope: "discover-profiles", Msg: l, Depth: 1})
+	}
+}
+
+// formatChanges renders a delta count as prose: "no changes", "1 change",
+// "<n> changes".
+func formatChanges(n int) string {
+	switch n {
+	case 0:
+		return "no changes"
+	case 1:
+		return "1 change"
+	default:
+		return fmt.Sprintf("%d changes", n)
+	}
+}
+
+// abbreviateHome renders path with the home prefix abbreviated to ~.
+func abbreviateHome(path, home string) string {
+	if home != "" && strings.HasPrefix(path, home+string(filepath.Separator)) {
+		return "~" + strings.TrimPrefix(path, home)
+	}
+	return path
 }
 
 // commandOps lists the selected, non-skipped ops the invoked command will run
@@ -943,7 +1012,7 @@ func (p *ProfileReady) commandScopedOps(opName string) []operationReady {
 }
 
 // commandDelta sums the invoked command's op deltas over this profile: the
-// profile-skip decision (spec/che/ExecutionBehavior.md).
+// profile-skip decision (spec/che/che.md).
 func (p *ProfileReady) commandDelta(opName string) int {
 	total := 0
 	for _, op := range p.commandOps(opName) {
@@ -953,58 +1022,39 @@ func (p *ProfileReady) commandDelta(opName string) int {
 	return total
 }
 
-// runProfileSummary builds the profile-announce details for the invoked
-// command: the profile ref plus the ops the command will run with their
-// discover deltas (spec/che/LogBehavior.md).
-func (p *ProfileReady) runProfileSummary(opName string) string {
-	return fmt.Sprintf("%s: [%s]", p.Ref(), p.opDeltaList(opName))
-}
-
-// opDeltaList lists the invoked command's ops with their discover deltas:
-// "op(delta),op(delta)".
-func (p *ProfileReady) opDeltaList(opName string) string {
+// describeOpDeltas lists the invoked command's ops with their discover deltas
+// as prose: "op (1 change), op (no changes)".
+func (p *ProfileReady) describeOpDeltas(opName string) string {
 	var parts []string
 	for _, op := range p.commandOps(opName) {
 		_, delta := op.counts(p)
-		parts = append(parts, fmt.Sprintf("%s(%d)", op.Name(), delta))
+		parts = append(parts, fmt.Sprintf("%s (%s)", op.Name(), formatChanges(delta)))
 	}
-	return strings.Join(parts, ",")
+	return strings.Join(parts, ", ")
 }
 
-// DiscoverSummary is the exported discoverSummary (standalone discover-profiles).
-func (p *ProfileReady) DiscoverSummary() string { return p.discoverSummary() }
+// LogDiscovered is the exported per-profile discovered entry (standalone
+// discover-profiles).
+func (p *ProfileReady) LogDiscovered() { p.logDiscovered() }
 
-// resolveCreateTitle resolves a "(create)" title against the dest's prior
-// state: absent -> "(created)", present -> "(overwritten)".
-func resolveCreateTitle(title string, existed bool) string {
-	action := "(created)"
+// resolvePastAction maps a mutation action to its past tense against the
+// dest's prior state: create -> created/overwritten, others pass through.
+func resolvePastAction(action string, existed bool) string {
+	if action != "create" {
+		return action
+	}
 	if existed {
-		action = "(overwritten)"
+		return "overwritten"
 	}
-	return strings.Replace(title, "(create)", action, 1)
+	return "created"
 }
 
-// skipTitle renders a skipped action's title:
-// "<scope>(<action>, skippedDue[<reason>,<reason>])" (spec/che/LogBehavior.md).
-func skipTitle(scope, action string, reasons ...string) string {
-	return scope + "(" + action + ", skippedDue[" + strings.Join(reasons, ",") + "])"
-}
-
-// dryRunReasons is the active dry-run mode as a skip reason list (empty when
-// off), config-key notation matching the config log line.
-func (p *ProfileReady) dryRunReasons() []string {
-	if p.opts.DryRun == options.DryRun.Off {
-		return nil
-	}
-	return []string{"config.dryRun=" + string(p.opts.DryRun)}
-}
-
-// skipOpsReason names the config key that skipped op, config-key notation.
+// skipOpsReason names the config option that skipped op.
 func (p *ProfileReady) skipOpsReason(op string) string {
 	if slices.Contains(p.opts.SkipOps, op) {
-		return "config.skipOps"
+		return "options.skipOps"
 	}
-	return "config.run.skipOps"
+	return "options.run.skipOps"
 }
 
 // wouldAction is the would-be mutation action for dest: create when absent,
@@ -1016,9 +1066,11 @@ func (p *ProfileReady) wouldAction(dest string) string {
 	return "create"
 }
 
-// skipReasons appends the dry-run reason to base reasons.
+// skipReasons is the base reason list for a genuine no-op skip (already
+// settled dest). The reason itself explains why nothing changes; the dry-run
+// mode is not appended (these lines surface only under dry-run=all anyway).
 func (p *ProfileReady) skipReasons(reasons ...string) []string {
-	return append(reasons, p.dryRunReasons()...)
+	return reasons
 }
 
 // deriveOpType maps a prev/next Object pair to the op_type discriminator.
@@ -1075,15 +1127,19 @@ func (p *ProfileReady) expandHome(path string) string {
 
 // [<] 🤖🤖
 
-// withDebugLevel runs fn under the profile's effective debug level ([why] a
-// profile's options.debug overrides the che-level level for its ops).
-func (p *ProfileReady) withDebugLevel(fn func() error) error {
-	debug := p.opts.Debug
-	if p.Options.Debug != nil {
-		debug = *p.Options.Debug
+// withLogLevel runs fn under the profile's effective log level ([why] a
+// profile's options.logLevel overrides the che-level level for its ops).
+func (p *ProfileReady) withLogLevel(fn func() error) error {
+	if p.Options.LogLevel == "" {
+		return fn()
 	}
-	log.SetDebug(debug)
-	defer log.SetDebug(p.opts.Debug)
+	level, err := log.ParseLevel(p.Options.LogLevel)
+	if err != nil {
+		return fn() // [why] schema validation reports the bad value; the che level stays
+	}
+	prev := log.GetLevel()
+	log.SetLevel(level)
+	defer log.SetLevel(prev)
 	return fn()
 }
 
@@ -1095,7 +1151,7 @@ func (p *ProfileReady) withDebugLevel(fn func() error) error {
 // ran already swept their own stale dests inline; this covers the emptied-op case
 // so a removed-entirely op still prunes its orphans.
 func (p *ProfileReady) ExecOperations(ctx context.Context) error {
-	return p.withDebugLevel(func() error {
+	return p.withLogLevel(func() error {
 		var fails []error
 		skippedKinds := map[string]string{"make-links": "link", "make-copies": "copy", "render-templates": "render"}
 		skipOps := slices.Concat(p.opts.SkipOps, p.opts.RunSkipOps)
@@ -1103,22 +1159,15 @@ func (p *ProfileReady) ExecOperations(ctx context.Context) error {
 			// [why] a config-skipped op is a plain skip, never a sweep: skipping
 			// render-templates must not prune its previously rendered dests.
 			if slices.Contains(skipOps, op.Name()) {
-				log.Msg(skipTitle("run", "runOp", p.skipOpsReason(op.Name())), op.Name())
+				p.emitSkip(log.Levels.Debug, "run", "run-op", op.Name(), p.skipOpsReason(op.Name()))
 				continue
 			}
 			if !op.Selected() {
-				log.Msg(skipTitle("run", "runOp", "NoDef"), op.Name())
+				p.emitSkip(log.Levels.Debug, "run", "run-op", op.Name(), "not defined")
 				if kind, ok := skippedKinds[op.Name()]; ok && !p.isDryRun() {
 					fails = append(fails, p.sweepStale(kind, nil)) // [why] emptied op: sweep all prior dests of its kind
 				}
 				continue
-			}
-			// [why] a zero-delta op still runs (idempotent, sweeps included), its
-			// announce marking that nothing would change (spec/che/LogBehavior.md).
-			if _, delta := op.counts(p); delta == 0 {
-				log.Msg(skipTitle("run", "runOp", "NoDelta"), op.Name())
-			} else {
-				log.Msg("run(runOp)", op.Name())
 			}
 			if err := p.execOp(ctx, op); err != nil {
 				fails = append(fails, fmt.Errorf("%s: %w", op.Name(), err))
@@ -1129,8 +1178,9 @@ func (p *ProfileReady) ExecOperations(ctx context.Context) error {
 }
 
 // execOp runs one selected operation under its own span (child of ctx), setting
-// p.opCtx so leaf mutate/fetch/exec calls parent onto it. Counts the run, and
-// the error on failure.
+// p.opCtx so leaf mutate/fetch/exec calls parent onto it. Announces the op as an
+// indented heading under the profile, then indents its mutation lines one level
+// deeper (spec/che/log.md). Counts the run, and the error on failure.
 func (p *ProfileReady) execOp(ctx context.Context, op operationReady) error {
 	ctx, span := p.tel.Span(ctx, op.Name(), attribute.String("op", op.Name()))
 	defer span.End()
@@ -1138,6 +1188,7 @@ func (p *ProfileReady) execOp(ctx context.Context, op operationReady) error {
 	p.opCtx = ctx
 	defer func() { p.opCtx = prev }()
 	p.tel.CountOperation(ctx, op.Name())
+	defer p.enterOp(op.Name())()
 	err := op.execOperation(p)
 	if err != nil {
 		span.RecordError(err)
@@ -1146,12 +1197,41 @@ func (p *ProfileReady) execOp(ctx context.Context, op operationReady) error {
 	return err
 }
 
+// enterOp announces the op as a markdown sub-heading (one level below the
+// profile heading), then sets the profile's body depth so the op's mutation
+// lines indent beneath it (spec/che/log.md). A zero-delta op
+// notes "(no changes)" on its heading so it does not read as a dangling
+// section. The returned func restores the prior depth (deferred by the caller).
+func (p *ProfileReady) enterOp(name string) func() {
+	msg := name
+	if op := p.opNamed(name); op != nil {
+		if _, delta := op.counts(p); delta == 0 {
+			msg += " (no changes)"
+		}
+	}
+	prev := p.logDepth
+	p.emitHeading(log.Levels.Info, "run", "running", msg, prev+1)
+	p.logDepth = 1 // [why] headings carry the nesting; body lines sit one step in
+	return func() { p.logDepth = prev }
+}
+
+// opNamed returns the profile's prepared op of that name, nil when absent
+// (backup is a stage, not an operationReady).
+func (p *ProfileReady) opNamed(name string) operationReady {
+	for _, op := range p.OperationsReady {
+		if op.Name() == name {
+			return op
+		}
+	}
+	return nil
+}
+
 // ExecOperation executes one prepared operation (per-op subcommands): same
-// debug level and Selected() gating.
+// log level and Selected() gating.
 func (p *ProfileReady) ExecOperation(ctx context.Context, op operationReady) error {
-	return p.withDebugLevel(func() error {
+	return p.withLogLevel(func() error {
 		if !op.Selected() {
-			log.Msg(skipTitle("run", "runOp", "NoDef"), op.Name())
+			p.emitSkip(log.Levels.Debug, "run", "run-op", op.Name(), "not defined")
 			return nil
 		}
 		return p.execOp(ctx, op)
@@ -1162,7 +1242,7 @@ func (p *ProfileReady) ExecOperation(ctx context.Context, op operationReady) err
 // the profile prepared none).
 func (p *ProfileReady) ExecOperationNamed(ctx context.Context, name string) error {
 	if slices.Contains(p.opts.SkipOps, name) {
-		log.Msg(skipTitle("run", "runOp", p.skipOpsReason(name)), name)
+		p.emitSkip(log.Levels.Debug, "run", "run-op", name, p.skipOpsReason(name))
 		return nil
 	}
 	for _, op := range p.OperationsReady {
@@ -1177,11 +1257,11 @@ func (p *ProfileReady) ExecOperationNamed(ctx context.Context, name string) erro
 // returning how many matched.
 func (p *ProfileReady) ExecRunScripts(ctx context.Context, names []string) (int, error) {
 	if slices.Contains(p.opts.SkipOps, "run-scripts") {
-		log.Msg(skipTitle("run", "runOp", p.skipOpsReason("run-scripts")), "run-scripts")
+		p.emitSkip(log.Levels.Debug, "run", "run-op", "run-scripts", p.skipOpsReason("run-scripts"))
 		return 0, nil
 	}
 	matched := 0
-	err := p.withDebugLevel(func() error {
+	err := p.withLogLevel(func() error {
 		for _, op := range p.OperationsReady {
 			rs, ok := op.(*RunScriptsOperationReady)
 			if !ok {
@@ -1192,6 +1272,7 @@ func (p *ProfileReady) ExecRunScripts(ctx context.Context, names []string) (int,
 			prev := p.opCtx
 			p.opCtx = sctx
 			defer func() { p.opCtx = prev }()
+			defer p.enterOp("run-scripts")()
 			scripts := filterScriptsByName(rs.Scripts, names)
 			matched = len(scripts)
 			return p.runScripts(scripts)

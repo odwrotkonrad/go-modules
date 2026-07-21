@@ -16,7 +16,7 @@ import (
 //	  include  sources: other specs composed in (SpecSourceRecipe list)
 //	  ProfileRecipe  raw declared profile
 //	    Source          ProfileSourceRecipe stamped at parse
-//	    ProfileOptions  eligibility + cascade: autoDiscover, runIf, debug, profileWorkingDirectory
+//	    ProfileOptions  eligibility + cascade: autoDiscover, runIf, logLevel, profileWorkingDirectory
 //	    includeSet      additive payload per op, plus profiles: profile refs
 //	      linkEntry / entry / dirGroup   perm-groups (Perms cascade to items)
 //	        fileSpec / dirSpec           scalar-or-object union items
@@ -114,7 +114,7 @@ type Doc struct {
 type Options struct {
 	RunIf                   []string        `yaml:"runIf" jsonschema_description:"spec-level predicates: gate every profile of this spec (ANDed with each profile's own); spec-only"`
 	AutoDiscover            *bool           `yaml:"autoDiscover" jsonschema_description:"spec block: default for profiles that don't set it; user config: auto-discovery master switch (default true, false: only --profiles and include.profiles refs run); overridden by CHE_AUTO_DISCOVER"`
-	Debug                   *bool           `yaml:"debug" jsonschema_description:"default for profiles that don't set it"`
+	LogLevel                string          `yaml:"logLevel" jsonschema:"enum=error,enum=warn,enum=info,enum=debug,enum=trace" jsonschema_description:"human-log level default for profiles that don't set it; overridden by --log-level and CHE_LOG_LEVEL"`
 	ProfileWorkingDirectory string          `yaml:"profileWorkingDirectory" jsonschema_description:"the load-ops source tree (absolute, relative to the checkout, ~/, $VAR, env vars expanded); default the checkout itself; makeLinks/makeCopies/renderTemplates host sources resolve against it; home targeting is explicit via a $HOME dest rewrite; spec-only"`
 	ValidateSpec            string          `yaml:"validateSpec" jsonschema:"enum=warn,enum=error" jsonschema_description:"how this spec's schema violations report (per-spec: each included spec honors its own); overridden by the flag and env var"`
 	DryRun                  string          `yaml:"dryRun" jsonschema:"enum=delta,enum=all,enum=true" jsonschema_description:"default dry-run mode: delta (changed dests) | all (every dest) | true (alias for delta); overridden by the flag and env var"`
@@ -151,7 +151,7 @@ type Otel struct {
 // ProfileRecipe is one raw declared profile.
 type ProfileRecipe struct {
 	Source  ProfileSourceRecipe `yaml:"-" jsonschema:"-"`
-	Options ProfileOptions      `yaml:"options" jsonschema_description:"when the profile runs: autoDiscover opts in to bare-che runs, runIf predicates must ALL pass; debug/profileWorkingDirectory cascade (most nested wins)"`
+	Options ProfileOptions      `yaml:"options" jsonschema_description:"when the profile runs: autoDiscover opts in to bare-che runs, runIf predicates must ALL pass; logLevel/profileWorkingDirectory cascade (most nested wins)"`
 	Include includeSet          `yaml:"include"`
 	Exclude excludeSet          `yaml:"exclude"`
 }
@@ -161,7 +161,7 @@ type ProfileRecipe struct {
 type ProfileOptions struct {
 	RunIf                   []string `yaml:"runIf" jsonschema_description:"predicates that must ALL pass for the profile to run"`
 	AutoDiscover            *bool    `yaml:"autoDiscover" jsonschema_description:"run on bare che (nil: inherit spec options, then false: runs only via --profiles or include.profiles)"`
-	Debug                   *bool    `yaml:"debug" jsonschema_description:"print debug-level lines around this profile (nil: inherit spec options, then che level)"`
+	LogLevel                string   `yaml:"logLevel" jsonschema:"enum=error,enum=warn,enum=info,enum=debug,enum=trace" jsonschema_description:"log level around this profile's ops (empty: inherit spec options, then che level)"`
 	ProfileWorkingDirectory string   `yaml:"profileWorkingDirectory" jsonschema_description:"the profile's load-ops source tree (empty: inherit spec options, then che level, then the checkout)"`
 }
 

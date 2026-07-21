@@ -56,6 +56,9 @@ type OperationDone struct {
 	Next          Object `gorm:"embedded;embeddedPrefix:next_"`
 	BackupID      *uint  `gorm:"index"`
 	Backup        *Backup
+	// ProfileRef is the owning profile's ref, populated by Installed's join
+	// (read-only projection; not a stored column).
+	ProfileRef string `gorm:"->;column:profile_ref"`
 }
 
 // Object is a dest's classified state, embedded twice (prev/next) on OperationDone.
@@ -169,10 +172,12 @@ func (d *DB) installedWhere(ref string) ([]OperationDone, error) {
 		sub = sub.Where("profile_dones.ref = ?", ref)
 	}
 	var ops []OperationDone
-	err := d.gorm.Preload("Backup").
-		Where("id IN (?)", sub).
-		Where("op_type <> ?", "remove").
-		Order("id DESC").
+	err := d.gorm.Model(&OperationDone{}).Preload("Backup").
+		Joins("JOIN profile_dones ON profile_dones.id = operation_dones.profile_done_id").
+		Select("operation_dones.*, profile_dones.ref as profile_ref").
+		Where("operation_dones.id IN (?)", sub).
+		Where("operation_dones.op_type <> ?", "remove").
+		Order("operation_dones.id DESC").
 		Find(&ops).Error
 	return ops, err
 }

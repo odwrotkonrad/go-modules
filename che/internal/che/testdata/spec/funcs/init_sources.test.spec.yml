@@ -21,8 +21,8 @@ cases:
         - flags: {prepareAfter: true}
     expected:
       stdOut:
-        - 'debug init-remote-sources(detectedRemoteInSpec): profile=gitlabGroup @file://${REF_DIR}/che.yml::gitlabGroup'
-        - 'init-remote-sources(cloneRemote): file://${REF_DIR}'
+        - 'detected remote ref profile gitlabGroup: @file://${REF_DIR}/che.yml::gitlabGroup'
+        - 'cloned remote file://${REF_DIR}'
   - name: ShouldFetchRefEvenWhenItsConditionFails
     input:
       args:
@@ -40,10 +40,10 @@ cases:
                     - source: "@file://${REF_DIR}/che.yml::gitlabGroup"
     expected:
       stdOut:
-        - 'init-remote-sources(cloneRemote): file://${REF_DIR}'
+        - 'cloned remote file://${REF_DIR}'
     notExpected:
       stdOut:
-        - 'conditionEvaluated'
+        - 'evaluated run if'
   - name: ShouldSkipRemoteRefsWithOptionSet
     input:
       args:
@@ -60,7 +60,7 @@ cases:
         - flags: {skipRemoteRefs: true}
     notExpected:
       stdOut:
-        - 'cloneRemote'
+        - 'cloned remote'
   - name: ShouldAbortOnUnreachableRemoteWithoutCache
     input:
       args:
