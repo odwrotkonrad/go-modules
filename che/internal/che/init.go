@@ -16,7 +16,7 @@ import (
 // include.profiles refs — recursive, cycle-guarded, runIf NOT evaluated
 // (init fetches everything declared; discovery decides what runs). A source
 // that cannot be fetched AND has no cached checkout is fatal; a failing update
-// with a cache warns and continues (spec/che/InitCmdBehavior.md).
+// with a cache warns and continues (spec/che/init.md).
 // SkipRemoteRefs skips remote refs.
 func InitSources(ctx Context, opts options.Options) error {
 	repoRoot, err := findRepoRoot(ctx)

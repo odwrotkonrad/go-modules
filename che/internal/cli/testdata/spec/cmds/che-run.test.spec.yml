@@ -11,11 +11,11 @@ cases:
       pwd: testdata/fixture/commands/common/sample-tree
     expected:
       stdOut: |
-        # profile cli/macos
-        ## backup
+        ## Profile cli/macos
+        ### backup
           backup delta make-links (3 changes), make-copies (2 changes), render-templates (1 change)
-        ## prune-broken-links (no changes)
-        ## make-dirs
+        ### prune-broken-links (no changes)
+        ### make-dirs
           created ${HOME}/.config
           created ${HOME}/.config/bar
           created ${HOME}/.config/zsh
@@ -25,7 +25,7 @@ cases:
           created ${HOME}/.cache/zsh
           created /var/log/che-test-setgid
           chmod 2775 /var/log/che-test-setgid
-        ## make-links
+        ### make-links
           created ${HOME}/.config
           created ${HOME}/.config/bar
           created ${HOME}/.config/zsh
@@ -35,7 +35,7 @@ cases:
           created ${HOME}/.config/bar/a
           created ${HOME}/.config/zsh/.zshrc
           created /etc/zshrc
-        ## make-copies
+        ### make-copies
           created ${HOME}/.config
           created ${HOME}/.config/bar
           created ${HOME}/.config/zsh
@@ -45,23 +45,23 @@ cases:
           created /Library/LaunchDaemons/otelcol.plist
           chown root:wheel /Library/LaunchDaemons/otelcol.plist
           created ${HOME}/.config/zsh/c
-        ## render-templates
+        ### render-templates
           created ${HOME}/.config/zsh/t
-        ## run-scripts
+        ### run-scripts
           ran ${REPO}/install/setup
   - name: ShouldSkipOpsWithoutSelection
     context:
       pwd: testdata/fixture/commands/all/sample-tree-only-links
     expected:
       stdOut: |
-        # profile cli/macos
-        ## backup
+        ## Profile cli/macos
+        ### backup
           backup delta make-links (1 change)
-        ## prune-broken-links (no changes)
-        ## make-dirs
+        ### prune-broken-links (no changes)
+        ### make-dirs
           created ${HOME}/.config
           created ${HOME}/.config/bar
-        ## make-links
+        ### make-links
           created ${HOME}/.config
           created ${HOME}/.config/bar
           created ${HOME}/.config/bar/a
@@ -79,7 +79,7 @@ cases:
         - 'will not run op run-scripts: options.run.skipOps'
     notExpected:
       stdOut:
-        - '## run-scripts'
+        - '### run-scripts'
         - 'ran '
   - name: ShouldSkipOpsListedInSkipOpsEnv
     context:
@@ -88,11 +88,11 @@ cases:
     expected:
       stdOut:
         - 'will not run op make-copies: options.skipOps'
-        - '## render-templates'
+        - '### render-templates'
     notExpected:
       stdOut:
-        - '## run-scripts'
-        - '## make-copies'
+        - '### run-scripts'
+        - '### make-copies'
         - 'ran '
         - created /Library/LaunchDaemons/otelcol.plist
   - name: ShouldLogDiscoverySummaryBeforeExecution
@@ -100,40 +100,40 @@ cases:
       pwd: testdata/fixture/commands/all/sample-tree-only-links
     expected:
       stdOutCounts:
-        '# discovered profile ': 1
+        '### Profile ': 1
       stdOut: |
-        # discovered profile cli/macos  (working directory: {{/[^)]*/}})
+        ### Profile cli/macos  (profile workdir: {{/[^)]*/}})
           make-dirs: 2 changes
           make-links: 1 change
-        # profile cli/macos
+        ## Profile cli/macos
   - name: ShouldLogDiscoveryOnceWithDebug
     context:
       pwd: testdata/fixture/commands/all/sample-tree-only-links
       env: {CHE_LOG_LEVEL: debug}
     expected:
       stdOutCounts:
-        '# discovered profile ': 1
+        '### Profile ': 1
       stdOut:
-        - '# discovered profile cli/macos  (working directory: {{/[^)]*/}})'
+        - '### Profile cli/macos  (profile workdir: {{/[^)]*/}})'
   - name: ShouldAnnounceZeroDeltaOpsAsSkipped
     context:
       pwd: testdata/fixture/commands/all/sample-tree-only-links
     expected:
       stdOut:
-        - '## prune-broken-links (no changes)'
-        - '## make-links'
+        - '### prune-broken-links (no changes)'
+        - '### make-links'
       stdOutCounts:
-        '## make-links (no changes)': 0
+        '### make-links (no changes)': 0
   - name: ShouldExecuteProfilesSequentiallyInDiscoveryOrder
     context:
       command: che run --profile cli/macos,ontoRepo
       pwd: testdata/fixture/commands/common/sample-tree
     expected:
       stdOutCounts:
-        '# profile cli/macos': 1
-        '# profile ontoRepo': 1
+        "\n## Profile cli/macos\n": 1
+        "\n## Profile ontoRepo\n": 1
       stdOut: |
-        # discovered profile cli/macos  (working directory: {{/[^)]*/}})
+        ### Profile cli/macos  (profile workdir: {{/[^)]*/}})
   - name: ShouldRunSecondProfileOpsAfterFirstProfileFinished
     context:
       command: che run --profile cli/macos,ontoRepo
@@ -141,9 +141,9 @@ cases:
     expected:
       stdOut: |
         ran ${REPO}/install/setup
-        # profile ontoRepo
-        ## backup
+        ## Profile ontoRepo
+        ### backup
           backup delta render-templates (1 change)
-        ## render-templates
+        ### render-templates
           created ${REPO}/docs/r.md
 # [<] 🤖

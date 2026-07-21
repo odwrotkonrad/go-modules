@@ -106,11 +106,13 @@ func Emit(e Event) {
 // heading ("## msg" for level 2), no action decoration. A body line renders
 // reasons as "will not <action> <msg>: <reasons>", else "<action> <msg>"
 // (action bold, hyphens displayed as spaces), a bare Msg as-is; every line is
-// indented one step per heading level it sits beneath (Depth). Multi-line Msg
-// indents each line.
+// indented one step per heading level it sits beneath (Depth). Every level but
+// info leads with its tag ("[error] " / "[warn] " / "[debug] " / "[trace] ");
+// info (the default) carries none. Multi-line Msg prefixes and indents each line.
 func renderHuman(e Event) string {
+	prefix := levelPrefix(e.Level)
 	if e.Heading > 0 {
-		return bold(strings.Repeat("#", e.Heading)+" "+e.Msg) + "\n"
+		return prefix + bold(strings.Repeat("#", e.Heading)+" "+e.Msg) + "\n"
 	}
 	line := e.Msg
 	switch {
@@ -122,11 +124,29 @@ func renderHuman(e Event) string {
 	pad := strings.Repeat("  ", e.Depth)
 	var b strings.Builder
 	for l := range strings.SplitSeq(line, "\n") {
+		b.WriteString(prefix)
 		b.WriteString(pad)
 		b.WriteString(l)
 		b.WriteString("\n")
 	}
 	return b.String()
+}
+
+// levelPrefix is the human-line level tag: every level but info carries one
+// ("[error] " / "[warn] " / "[debug] " / "[trace] "); info (the default) is bare.
+func levelPrefix(l Level) string {
+	switch l {
+	case Levels.Error:
+		return "[error] "
+	case Levels.Warn:
+		return "[warn] "
+	case Levels.Debug:
+		return "[debug] "
+	case Levels.Trace:
+		return "[trace] "
+	default:
+		return ""
+	}
 }
 
 // displayAction renders a machine action token as prose: hyphens to spaces.
@@ -164,6 +184,11 @@ func EmitTrace(scope, action, msg string) {
 // EmitSkip emits a won't-happen event with its reasons at the given level.
 func EmitSkip(level Level, scope, action, msg string, reasons ...string) {
 	Emit(Event{Level: level, Scope: scope, Action: action, Msg: msg, Reasons: reasons})
+}
+
+// EmitHeading emits a markdown-style heading event of the given level.
+func EmitHeading(level Level, heading int, scope, action, msg string) {
+	Emit(Event{Level: level, Scope: scope, Action: action, Msg: msg, Heading: heading})
 }
 
 // [<] 🤖🤖 emitters

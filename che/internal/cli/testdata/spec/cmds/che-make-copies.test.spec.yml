@@ -10,8 +10,8 @@ cases:
   - name: ShouldCopyMarkerFilesAndChownDaemonPlist
     expected:
       stdOut: |
-        # profile cli/macos
-        ## make-copies
+        ## Profile cli/macos
+        ### make-copies
           created ${HOME}/.config
           created ${HOME}/.config/bar
           created ${HOME}/.config/zsh

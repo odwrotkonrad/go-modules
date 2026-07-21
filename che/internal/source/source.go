@@ -58,7 +58,7 @@ func EnsureCheckout(home, url string) (string, error) {
 	return dir, err
 }
 
-// ensureCheckout logs one entry per remote (spec/che/LogRedesignBehavior.md):
+// ensureCheckout logs one entry per remote (spec/che/log.md):
 // cloned, updated and up-to-date at info, the cache path home-abbreviated; a
 // failing update with a cached checkout warns and continues.
 func ensureCheckout(home, url string) (string, error) {
@@ -79,7 +79,7 @@ func ensureCheckout(home, url string) (string, error) {
 	}
 	before, _ := gitOut("-C", dir, "rev-parse", "HEAD")
 	// [why] a failing update with a cached checkout is survivable: warn and use
-	// the cache; only a missing checkout is fatal (spec/che/InitCmdBehavior.md).
+	// the cache; only a missing checkout is fatal (spec/che/init.md).
 	if err := git("-C", dir, "fetch", "--quiet", "--depth", "1"); err != nil {
 		log.EmitWarn("init-remote-sources", "warning", fmt.Sprintf("fetch failed, using cached checkout %s: %v", dir, err))
 		return dir, nil

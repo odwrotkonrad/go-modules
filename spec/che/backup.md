@@ -24,10 +24,10 @@ Scenario: wrapped ops' ledger records point at the run backup archive
 Scenario: backup logs its delta summary and the created archive
   Status: tested
   When backup archives
-  Then a line `backup(showDelta): <op>(<delta>),<op>(<delta>)` always lists the covered file ops with their deltas
-  And a line `backup(created): <filesize>, <file>` reports the written archive
+  Then a `backup delta <op> (<n> changes), <op> (<n> changes)` line always lists the covered file ops with their deltas
+  And a `created <size>, <path>` line reports the written archive
   And nothing to back up writes and logs nothing more
-  And dry run writes no archive, predicting `backup(create, skippedDue[config.dryRun=<mode>]): <file>` instead
+  And dry run writes no archive, predicting `will not create <path>: <dry-run reason>` instead
 
 Scenario: standalone backup archives only dests that would change
   Status: tested
@@ -41,10 +41,10 @@ Scenario: direct op subcommands still back up their own dests
   When I invoke an os-mutating op subcommand directly, not wrapped by `run`
   Then the op archives its own dests before mutating, as before
 
-Scenario: the backup stage announces delta-gated
+Scenario: the backup stage announces as an op heading
   Status: tested
   When the backup stage starts within `run`
-  Then an info line `run(runOp): backup` announces it when any dest exists
-  And nothing to back up announces `run(runOp, skippedDue[NoDelta]): backup` at info
+  Then a `### backup` heading announces it under the profile heading
+  And the delta line always logs beneath it, even with nothing to back up
 
 <!-- [<] 🤖🤖 -->

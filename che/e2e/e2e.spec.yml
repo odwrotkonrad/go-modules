@@ -60,13 +60,13 @@ testCases:
         command: che discover-profiles
         expected:
           stdOut:
-            - "discovered profile plain"
-            - "discovered profile conditional"
+            - "### Profile plain"
+            - "### Profile conditional"
             - "ops-remote"
             - "will not run profile dropped: runIf failed: env:CHE_E2E_DROPPED"
             - "evaluated run if"
         notExpected:
-          stdOut: ["discovered profile dropped "]
+          stdOut: ["### Profile dropped "]
 
       - name: RunDryRun
         command: che run --dry-run=all
@@ -121,15 +121,25 @@ testCases:
             - "logLevel = trace  (env)"
             - "validateSpec = error  (env)"
         notExpected:
-          stdOut: ["dryRun = false  (default)"]
+          # no config-delta summary line, and no unset defaults in delta mode
+          stdOut:
+            - "config delta"
+            - "dryRun = false  (unset)"
 
       - name: ConfigShowAll
         command: che config show --all
         expected:
           stdOut:
-            - "logLevel = trace  (env)"
-            - "dryRun = false  (default)"
-            - "otel.protocol = grpc  (default)"
+            # unset options labeled (unset), not (default)
+            - "dryRun = false  (unset)"
+            - "otel.protocol = grpc  (unset)"
+            # changed sort before unset: env/specFile/cliFlag lines precede the first (unset)
+            - "logLevel = trace  (env){{/[\\s\\S]*/}}dryRun = false  (unset)"
+        notExpected:
+          # no config-delta summary line, no (default) labels
+          stdOut:
+            - "config delta"
+            - "(default)"
 
   - name: e2e
     context: {env: {CHE_LOG_LEVEL: info}}
@@ -140,21 +150,21 @@ testCases:
           stdOutFull: |
             using spec ${LOCAL}/che.yml
             cloned remote file://${REMOTE} into ~/.cache/che/remote-sources/{{/[A-Za-z0-9.-]+/}}
-            # discovered profile plain  (working directory: ${LOCAL}/root)
+            ### Profile plain  (profile workdir: ${LOCAL}/root)
               make-dirs: 2 changes
               make-links: 1 change
               make-copies: 1 change
               render-templates: 1 change
               run-scripts: 1 change
-            # discovered profile conditional  (working directory: ${LOCAL}/root)
+            ### Profile conditional  (profile workdir: ${LOCAL}/root)
               make-dirs: 2 changes
               make-links: 1 change
               make-copies: 1 change
               render-templates: 1 change
               run-scripts: 1 change
-            # discovered profile remote-carrier  (working directory: ${LOCAL}/root)
+            ### Profile remote-empty  (profile workdir: ${LOCAL}/root)
               no changes
-            # discovered profile remote:remote:ops-remote  (working directory: ~/.cache/che/remote-sources/{{/[A-Za-z0-9.-]+/}}/root)
+            ### Profile remote:remote:ops-remote  (profile workdir: ~/.cache/che/remote-sources/{{/[A-Za-z0-9.-]+/}}/root)
               make-dirs: 2 changes
               make-links: 1 change
               make-copies: 1 change
@@ -178,8 +188,13 @@ testCases:
 
       - name: Uninstall
         command: che uninstall
+        expected:
+          stdOut:
+            - "removed ${HOME}/plain/link.txt"
+            # reverse application order: sourced ops-remote unwinds before conditional before plain
+            - "## profile {{/.*/}}ops-remote{{/[\\s\\S]*/}}## profile conditional{{/[\\s\\S]*/}}## profile plain"
         notExpected:
-          stdOut: ["will "]
+          stdOut: ["will run ", "will not run "]
           files: *allProfilesAllFilesExists
 
       - name: MakeDirs
@@ -187,12 +202,12 @@ testCases:
         expected:
           files: *allProfilesDirsAccurate
         notExpected:
-          stdOut: ["will "]
+          stdOut: ["will run ", "will not run "]
 
       - name: MakeDirsUninstall
         command: che uninstall
         notExpected:
-          stdOut: ["will "]
+          stdOut: ["will run ", "will not run "]
           files: *allProfilesDirsExists
 
       - name: MakeLinks
@@ -200,12 +215,12 @@ testCases:
         expected:
           files: *allProfilesLinksAccurate
         notExpected:
-          stdOut: ["will "]
+          stdOut: ["will run ", "will not run "]
 
       - name: MakeLinksUninstall
         command: che uninstall
         notExpected:
-          stdOut: ["will "]
+          stdOut: ["will run ", "will not run "]
           files: *allProfilesLinksExists
 
       - name: MakeCopies
@@ -213,12 +228,12 @@ testCases:
         expected:
           files: *allProfilesCopiesAccurate
         notExpected:
-          stdOut: ["will "]
+          stdOut: ["will run ", "will not run "]
 
       - name: MakeCopiesUninstall
         command: che uninstall
         notExpected:
-          stdOut: ["will "]
+          stdOut: ["will run ", "will not run "]
           files: *allProfilesCopiesExists
 
       - name: RenderTemplatesMakeDirs
@@ -226,19 +241,19 @@ testCases:
         expected:
           files: *allProfilesDirsAccurate
         notExpected:
-          stdOut: ["will "]
+          stdOut: ["will run ", "will not run "]
 
       - name: RenderTemplates
         command: che render-templates
         expected:
           files: *allProfilesTemplatesAccurate
         notExpected:
-          stdOut: ["will "]
+          stdOut: ["will run ", "will not run "]
 
       - name: RenderTemplatesUninstall
         command: che uninstall
         notExpected:
-          stdOut: ["will "]
+          stdOut: ["will run ", "will not run "]
           files: [*allProfilesTemplatesExists, *allProfilesDirsExists]
 
       - name: RunScripts
@@ -246,12 +261,12 @@ testCases:
         expected:
           files: *allProfilesScriptOutputsAccurate
         notExpected:
-          stdOut: ["will "]
+          stdOut: ["will run ", "will not run "]
 
       - name: RunScriptsUninstall
         command: che uninstall
         notExpected:
-          stdOut: ["will "]
+          stdOut: ["will run ", "will not run "]
 
       - name: RunScriptsCleanup
         remove:
@@ -270,7 +285,7 @@ testCases:
         expected:
           files: *allProfilesDirsAccurate
         notExpected:
-          stdOut: ["will "]
+          stdOut: ["will run ", "will not run "]
           files: [*allProfilesLinksExists, *allProfilesCopiesExists, *allProfilesTemplatesExists, *allProfilesScriptOutputsExists]
 
       - name: AccumulateMakeLinks
@@ -278,7 +293,7 @@ testCases:
         expected:
           files: [*allProfilesDirsAccurate, *allProfilesLinksAccurate]
         notExpected:
-          stdOut: ["will "]
+          stdOut: ["will run ", "will not run "]
           files: [*allProfilesCopiesExists, *allProfilesTemplatesExists, *allProfilesScriptOutputsExists]
 
       - name: AccumulateMakeCopies
@@ -286,7 +301,7 @@ testCases:
         expected:
           files: [*allProfilesDirsAccurate, *allProfilesLinksAccurate, *allProfilesCopiesAccurate]
         notExpected:
-          stdOut: ["will "]
+          stdOut: ["will run ", "will not run "]
           files: [*allProfilesTemplatesExists, *allProfilesScriptOutputsExists]
 
       - name: AccumulateRenderTemplates
@@ -294,7 +309,7 @@ testCases:
         expected:
           files: [*allProfilesDirsAccurate, *allProfilesLinksAccurate, *allProfilesCopiesAccurate, *allProfilesTemplatesAccurate]
         notExpected:
-          stdOut: ["will "]
+          stdOut: ["will run ", "will not run "]
           files: *allProfilesScriptOutputsExists
 
       - name: AccumulateRunScripts
@@ -302,7 +317,7 @@ testCases:
         expected:
           files: *allProfilesAllFilesAccurate
         notExpected:
-          stdOut: ["will "]
+          stdOut: ["will run ", "will not run "]
 
       - name: AccumulateRemoveScriptOutputs
         remove:
@@ -314,7 +329,7 @@ testCases:
       - name: AccumulateUninstall
         command: che uninstall
         notExpected:
-          stdOut: ["will "]
+          stdOut: ["will run ", "will not run "]
           files: *allProfilesAllFilesExists
 
       - name: PruneMakeLinks
@@ -322,7 +337,7 @@ testCases:
         expected:
           files: *allProfilesLinksAccurate
         notExpected:
-          stdOut: ["will "]
+          stdOut: ["will run ", "will not run "]
 
       - name: PruneRemoveLinkSource
         remove:
@@ -333,7 +348,7 @@ testCases:
         expected:
           files: [*profileConditionalLinkAccurate, *profileRemoteLinkAccurate]
         notExpected:
-          stdOut: ["will "]
+          stdOut: ["will run ", "will not run "]
           files: *profilePlainLinkExists
 
       - name: PruneRestoreLinkSource
@@ -342,7 +357,7 @@ testCases:
       - name: PruneUninstall
         command: che uninstall
         notExpected:
-          stdOut: ["will "]
+          stdOut: ["will run ", "will not run "]
           files: *allProfilesLinksExists
 
       - name: BackupRemoveState
@@ -354,7 +369,7 @@ testCases:
         expected:
           files: *allProfilesCopiesAccurate
         notExpected:
-          stdOut: ["will "]
+          stdOut: ["will run ", "will not run "]
 
       - name: BackupTamperCopy
         write: {path: "${HOME}/plain/copy", content: tampered}
@@ -366,7 +381,7 @@ testCases:
           files:
             - {countGlob: "${XDG_STATE_HOME}/che/backups/che-backup-*.tar.bz2", count: 1}
         notExpected:
-          stdOut: ["will "]
+          stdOut: ["will run ", "will not run "]
 
       - name: BackupExtract
         extract:
@@ -384,12 +399,12 @@ testCases:
         expected:
           files: *allProfilesCopiesAccurate
         notExpected:
-          stdOut: ["will "]
+          stdOut: ["will run ", "will not run "]
 
       - name: BackupSettled
         command: che backup
         notExpected:
-          stdOut: ["created ", "will "]
+          stdOut: ["created ", "will run ", "will not run "]
 
       - name: BackupTamperAgain
         write: {path: "${HOME}/plain/copy", content: tampered}
@@ -401,7 +416,7 @@ testCases:
           files:
             - {path: "${HOME}/plain/copy", exists: true, type: file, content: copy-plain}
         notExpected:
-          stdOut: ["will "]
+          stdOut: ["will run ", "will not run "]
 
       - name: BackupRemoveScriptOutputs
         remove:
@@ -416,7 +431,7 @@ testCases:
           files:
             - {path: "${HOME}/plain/copy", exists: true, type: file, content: tampered}
         notExpected:
-          stdOut: ["will "]
+          stdOut: ["will run ", "will not run "]
 
       - name: BackupCleanup
         remove:

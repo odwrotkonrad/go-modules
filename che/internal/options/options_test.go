@@ -84,4 +84,64 @@ func TestResolveSettings(t *testing.T) {
 	})
 }
 
+// TestSettingsDisplay: config show labeling + sorting. An unset default shows
+// "unset"; a source that set an option (even to its default value) shows the
+// source and sorts with the changed options, ahead of the unset defaults, both
+// groups in config order.
+func TestSettingsDisplay(t *testing.T) {
+	o := &Options{LogLevel: "info"} // [why] --log-level info: cliFlag set to the default value
+	env := func(k string) string {
+		if k == "CHE_VALIDATE_SPEC" {
+			return "error"
+		}
+		return ""
+	}
+	require.NoError(t, o.Resolve(env, Layer{}, Layer{}))
+
+	byKey := map[string]Setting{}
+	for _, s := range o.Settings {
+		byKey[s.Key] = s
+	}
+	assert.Equal(t, "cliFlag", byKey["logLevel"].DisplaySource(), "explicit-to-default keeps its source")
+	assert.True(t, byKey["logLevel"].IsChanged(), "explicit-to-default counts as changed")
+	assert.Equal(t, "env", byKey["validateSpec"].DisplaySource())
+	assert.Equal(t, "unset", byKey["dryRun"].DisplaySource(), "no source -> unset, not default")
+	assert.False(t, byKey["dryRun"].IsChanged())
+
+	sorted := o.SettingsSorted()
+	require.Len(t, sorted, len(o.Settings), "sorted holds every setting once")
+	// changed group first, in config order; then unset, in config order.
+	firstUnset := -1
+	for i, s := range sorted {
+		if !s.IsChanged() {
+			firstUnset = i
+			break
+		}
+	}
+	require.Positive(t, firstUnset, "some changed settings sort first")
+	for _, s := range sorted[:firstUnset] {
+		assert.True(t, s.IsChanged(), "no unset setting before the boundary")
+	}
+	for _, s := range sorted[firstUnset:] {
+		assert.False(t, s.IsChanged(), "no changed setting after the boundary")
+	}
+	assert.True(t, configOrderPreserved(o.Settings, sorted[:firstUnset]), "changed group keeps config order")
+	assert.True(t, configOrderPreserved(o.Settings, sorted[firstUnset:]), "unset group keeps config order")
+}
+
+// configOrderPreserved reports whether subset appears in the same relative
+// order as in the full Resolve-order settings list.
+func configOrderPreserved(full, subset []Setting) bool {
+	idx := map[string]int{}
+	for i, s := range full {
+		idx[s.Key] = i
+	}
+	for i := 1; i < len(subset); i++ {
+		if idx[subset[i-1].Key] > idx[subset[i].Key] {
+			return false
+		}
+	}
+	return true
+}
+
 // [<] 🤖🤖

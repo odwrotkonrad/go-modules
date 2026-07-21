@@ -47,21 +47,41 @@ cases:
       args: [gate: info, level: debug, scope: run, action: will-run, msg: make-links]
     expected:
       output: ""
-  - name: ShouldPrintDebugAtDebugGate
+  - name: ShouldPrefixDebugLineAtDebugGate
     input:
       args: [gate: debug, level: debug, scope: run, action: will-run, msg: make-links]
     expected:
-      output: "will run make-links\n"
+      output: "[debug] will run make-links\n"
+  - name: ShouldPrefixTraceLineAtTraceGate
+    input:
+      args: [gate: trace, level: trace, scope: discover-profiles, action: "", msg: listed candidates]
+    expected:
+      output: "[trace] listed candidates\n"
+  - name: ShouldPrefixDebugHeadingBeforeHashes
+    input:
+      args: [gate: debug, level: debug, scope: run, action: running, msg: make-links, heading: 2]
+    expected:
+      output: "[debug] ## make-links\n"
+  - name: ShouldNotPrefixInfoLine
+    input:
+      args: [gate: info, level: info, scope: make-links, action: created, msg: /x]
+    expected:
+      output: "created /x\n"
+  - name: ShouldPrefixWarnLine
+    input:
+      args: [gate: warn, level: warn, scope: init-remote-sources, action: warning, msg: fetch failed]
+    expected:
+      output: "[warn] warning fetch failed\n"
   - name: ShouldPrintTraceOnlyAtTraceGate
     input:
       args: [gate: debug, level: trace, scope: ledger, action: error, msg: boom]
     expected:
       output: ""
-  - name: ShouldPrintErrorAtErrorGate
+  - name: ShouldPrefixErrorLineAtErrorGate
     input:
       args: [gate: error, level: error, scope: run, action: fail, msg: "plain: boom"]
     expected:
-      output: "fail plain: boom\n"
+      output: "[error] fail plain: boom\n"
   - name: ShouldSilenceInfoAtErrorGate
     input:
       args: [gate: error, level: info, scope: make-links, action: created, msg: /x]
@@ -76,5 +96,5 @@ cases:
     input:
       args: [gate: warn, level: warn, scope: init-remote-sources, action: warning, msg: fetch failed]
     expected:
-      output: "warning fetch failed\n"
+      output: "[warn] warning fetch failed\n"
 # [<] 🤖🤖

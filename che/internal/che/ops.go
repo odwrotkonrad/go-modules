@@ -22,7 +22,7 @@ const Bin = "che"
 // path/sub are stashed on the profile so the op's following mutate calls
 // reference this run's Backup row. Uses the run's shared TsLayout stamp so the
 // filename and the ledger run line up. Under `run` the backup stage already
-// archived every op dest (spec/che/BackupCmdBehavior.md): the op skips its own
+// archived every op dest (spec/che/backup.md): the op skips its own
 // archive and points its records at the stage archive.
 func (p *ProfileReady) archiveBefore(sub string, dests []string) error {
 	if p.backedUp {
@@ -86,7 +86,7 @@ func (p *ProfileReady) existingDests(dests []string) int {
 
 // ExecBackup archives every existing would-change dest into one per-run backup
 // archive and marks the profile backed up, so the following ops skip their own
-// archives. The showDelta line always logs (spec/che/BackupCmdBehavior.md);
+// archives. The showDelta line always logs (spec/che/backup.md);
 // the created line reports the written archive with its size, nothing to back
 // up writes and logs nothing more.
 func (p *ProfileReady) ExecBackup() error { return p.execBackup(p.backupDests()) }
@@ -227,7 +227,7 @@ func (p *ProfileReady) chownIfSet(scope string, item spec.FileItem, dest string)
 // the fixes with the owning op ("<op>(chmod)" / "<op>(chown)"). In dry-run=delta
 // these lines report the drift; off they correct it. A settled dest (no drift)
 // emits nothing, except under dry-run=all, where the already-set state logs
-// (spec/che/LogBehavior.md).
+// (spec/che/log.md).
 func (p *ProfileReady) fixPerms(op, dest string, item spec.FileItem) error {
 	needChmod, needChown := fsutil.DetectPermsDrift(p.Reader, dest, item.Chmod, formatOwnerSpec(item))
 	if needChmod {

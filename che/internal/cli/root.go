@@ -104,9 +104,9 @@ func (a *app) init(command string) error {
 		return err
 	}
 	// [why] the dry-run announce opens the whole output, then the config
-	// delta at debug (spec/che/LogRedesignBehavior.md; `che config show`
-	// covers the full set). Completion commands print to stdout for shell
-	// eval, so they stay silent.
+	// delta at debug (spec/che/log.md). `che config show` owns
+	// its own config output, so it skips the startup delta line; completion
+	// commands print to stdout for shell eval, so they stay silent.
 	if command != "completion" && command != "__complete" {
 		if a.opts.DryRun != options.DryRun.Off {
 			desc := "no actual operations will be performed, reporting only dests that would change"
@@ -115,7 +115,9 @@ func (a *app) init(command string) error {
 			}
 			log.EmitInfo("config", "dry-run", "("+string(a.opts.DryRun)+") "+desc)
 		}
-		log.EmitDebug("config", "config-delta", options.FormatSettings(a.opts.SettingsDelta()))
+		if command != "config" {
+			log.EmitDebug("config", "config-delta", options.FormatSettings(a.opts.SettingsDelta()))
+		}
 	}
 	a.startTelemetry(ctx)
 	ctx.Tel = a.tel
@@ -128,9 +130,9 @@ func (a *app) init(command string) error {
 		return nil
 	}
 	// [why] the init stage prefetches every remote spec source before
-	// discovery; all announces both stages like its other wrapped ops.
+	// discovery; run announces both stages as sub-headings like its ops.
 	if command == "run" {
-		log.EmitDebug("run", "will-run", "init-remote-sources")
+		log.EmitHeading(log.Levels.Info, 1, "run", "running", "init-remote-sources")
 	}
 	if err := che.InitSources(ctx, a.opts); err != nil {
 		return err
@@ -139,7 +141,7 @@ func (a *app) init(command string) error {
 		return nil
 	}
 	if command == "run" {
-		log.EmitDebug("run", "will-run", "discover-profiles")
+		log.EmitHeading(log.Levels.Info, 1, "run", "running", "discover-profiles")
 	}
 	a.root, err = che.PrepareSpecs(ctx, a.opts, spec.SpecSourceRecipe{})
 	if err != nil {
@@ -270,10 +272,10 @@ func (a *app) configCmd() *cobra.Command {
 		RunE: func(cmd *cobra.Command, args []string) error {
 			settings := a.opts.SettingsDelta()
 			if all {
-				settings = a.opts.Settings
+				settings = a.opts.SettingsSorted()
 			}
 			for _, s := range settings {
-				fmt.Printf("%s = %s  (%s)\n", s.Key, s.Value, s.Source)
+				fmt.Printf("%s = %s  (%s)\n", s.Key, s.Value, s.DisplaySource())
 			}
 			return nil
 		},

@@ -17,7 +17,7 @@ import (
 
 // TestDryRunAnnounce: dry run announces itself once, as the whole output's
 // first line, mode-specific desc, no other line carrying a dry-run marker;
-// --dry-run=true aliases delta (spec/che/ExecutionBehavior.md). Cases in
+// --dry-run=true aliases delta (spec/che/che.md). Cases in
 // dry_run_announce.test.spec.yml: expected.output pins the resolved mode,
 // stdOut the announce line, stdOutCounts its once-ness.
 func TestDryRunAnnounce(t *testing.T) {

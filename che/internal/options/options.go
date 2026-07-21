@@ -19,7 +19,7 @@ type LookupEnv func(string) string
 
 // Setting is one resolved option: its key, final value, and the layer that
 // decided it (cliFlag | env | config-file | specFile | default). The config log renders
-// these (spec/che/LogBehavior.md).
+// these (spec/che/log.md).
 type Setting struct {
 	Key    string
 	Value  string
@@ -30,11 +30,42 @@ type Setting struct {
 func (c Options) SettingsDelta() []Setting {
 	var out []Setting
 	for _, s := range c.Settings {
-		if s.Source != "default" {
+		if s.IsChanged() {
 			out = append(out, s)
 		}
 	}
 	return out
+}
+
+// SettingsSorted lists every setting with the source-decided ones first (in
+// Resolve/config order), the unset defaults after (also in config order): the
+// order `config show --all` prints (spec/che/log.md).
+func (c Options) SettingsSorted() []Setting {
+	out := make([]Setting, 0, len(c.Settings))
+	for _, s := range c.Settings {
+		if s.IsChanged() {
+			out = append(out, s)
+		}
+	}
+	for _, s := range c.Settings {
+		if !s.IsChanged() {
+			out = append(out, s)
+		}
+	}
+	return out
+}
+
+// IsChanged reports whether a source (not the code default) decided this
+// setting: a source explicitly set it, even if to the default value.
+func (s Setting) IsChanged() bool { return s.Source != "default" }
+
+// DisplaySource is the label config show prints: the deciding source, or
+// "unset" when no source set the option (the code default is in effect).
+func (s Setting) DisplaySource() string {
+	if s.Source == "default" {
+		return "unset"
+	}
+	return s.Source
 }
 
 // FormatSettings renders settings as "key=value (source), ..." prose.

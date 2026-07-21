@@ -127,7 +127,7 @@ func undefinedProfile(recipes []ProfileRecipe, ref string) error {
 }
 
 // AllPass logs each condition evaluation at trace level only, under the
-// discover scope (spec/che/LogRedesignBehavior.md). failed names the first
+// discover scope (spec/che/log.md). failed names the first
 // rejecting expression ("" when all pass).
 func AllPass(name string, exprs []string, forceAll bool, eval func(expr string) (bool, error)) (pass bool, failed string, err error) {
 	if forceAll {

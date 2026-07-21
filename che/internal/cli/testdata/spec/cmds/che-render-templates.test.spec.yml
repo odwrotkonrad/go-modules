@@ -10,8 +10,8 @@ cases:
   - name: ShouldRenderOnlyHostDestsForHostProfile
     expected:
       stdOut: |
-        # profile cli/macos
-        ## render-templates
+        ## Profile cli/macos
+        ### render-templates
           created ${HOME}/.local/state/che/backups/che-render-{{/\S*/}}.tar.bz2
           created ${HOME}/.config/zsh/t
   - name: ShouldRenderOnlyRepoDestsForOntoRepoProfile
