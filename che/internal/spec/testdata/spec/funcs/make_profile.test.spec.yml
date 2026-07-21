@@ -175,6 +175,30 @@ cases:
       links: [_home/.config/foo/a]
     notExpected:
       links: [_home/.config/foo/b]
+  - name: ShouldMapExplicitDestLinksOverGlobTwins
+    context: {pwd: testdata/fixture/resolve/tree-link-rewrite}
+    input:
+      args: [spec: link-explicit, profile: cli/macos]
+    expected:
+      links: [_home/.config/foo/a, _home/.config/foo/b, etc/zshrc]
+      dests:
+        _home/.config/foo/a: [$HOME/.config/bar/a, /etc/bar/a]
+        _home/.config/foo/b: []
+        etc/zshrc: []
+  - name: ShouldContributeExplicitLinkAncestorDirs
+    context: {pwd: testdata/fixture/resolve/tree-link-rewrite}
+    input:
+      args: [spec: link-explicit, profile: cli/macos]
+    contains:
+      dirs: [$HOME/.config/bar]
+  - name: ShouldExcludeLinkByExplicitDest
+    context: {pwd: testdata/fixture/resolve/tree-link-rewrite}
+    input:
+      args: [spec: link-explicit, profile: exclude-explicit]
+    contains:
+      links: [_home/.config/foo/b]
+    notExpected:
+      links: [_home/.config/foo/a]
   - name: ShouldErrorOnMalformedLinkDestRule
     context: {pwd: testdata/fixture/resolve/tree-link-rewrite}
     input:

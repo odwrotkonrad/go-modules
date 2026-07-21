@@ -168,7 +168,7 @@ type ProfileOptions struct {
 // includeSet is the additive payload.
 type includeSet struct {
 	Profiles        []ProfileSourceRecipe `yaml:"profiles" jsonschema_description:"profile refs composed depth-first before this profile's own payload: local profile name scalar, or {source, options, env} where source is <source>/<spec-file>.yml::<profile> locating a profile in another spec (its own checkout anchor)"`
-	MakeLinks       []linkEntry           `yaml:"makeLinks" jsonschema_description:"symlink-op entries, workingDirectory-relative: glob string (dest derived 1:1) or {source, dest} dest rewrite (sed-style s:^_home:$HOME: or prefix-swap sugar {source: _home/**, dest: $HOME/**} to target home)"`
+	MakeLinks       []linkEntry           `yaml:"makeLinks" jsonschema_description:"symlink-op entries, workingDirectory-relative: glob string (dest derived 1:1), {source, dest: [paths]} explicit per-file dests, or {source, dest} dest rewrite (sed-style s:^_home:$HOME: or prefix-swap sugar {source: _home/**, dest: $HOME/**} to target home)"`
 	MakeCopies      []entry               `yaml:"makeCopies" jsonschema_description:"*.ontoHost.cp copy-op perm-groups, workingDirectory-relative sources; a glob source may carry a {source, dest} dest rewrite (sed-style s:^_home:$HOME: or prefix-swap sugar _home/** -> $HOME/**)"`
 	RenderTemplates []templateGroup       `yaml:"renderTemplates" jsonschema_description:"*.tpl render-op perm-groups; local host sources workingDirectory-relative, repo-doc sources (repo dest) checkout-relative, or remote (@<repo>//<path>[?ref=<ref>], explicit dest required); glob and derived-dest forms are host sources; a glob source may carry a {source, dest} dest rewrite (sed-style s:^_home:$HOME: or prefix-swap sugar _home/** -> $HOME/**)"`
 	MakeDirs        []dirGroup            `yaml:"makeDirs" jsonschema_description:"extra-dir perm-groups; each item one dir path (brace-expanded)"`
@@ -184,11 +184,15 @@ type excludeSet struct {
 	Scripts         []string `yaml:"runScripts" jsonschema_description:"drop matching scripts (resolved file paths)"`
 }
 
-// linkEntry: bare glob string or {source, dest}. glob set iff the glob form.
+// linkEntry: bare glob string, {source, dest: [paths]} (explicit per-file
+// dests), or {source, dest: <rule>} (glob source + sed-style dest rewrite).
+// glob set iff the bare-glob form; DestRule set iff the dest scalar parses as
+// a rewrite rule.
 type linkEntry struct {
-	glob   string
-	Source string `yaml:"source"`
-	Dest   string `yaml:"dest"`
+	glob     string
+	DestRule string
+	Source   string     `yaml:"source"`
+	Dest     []DestSpec `yaml:"dest"`
 }
 
 // entry is a makeCopies perm-group.
@@ -368,6 +372,7 @@ type effective struct {
 	linkGlobs globSet               // link-op globs (workingDirectory-relative)
 	copyGlobs globSet               // copy-op globs (workingDirectory-relative)
 	tmplGlobs globSet               // render-templates globs (workingDirectory-relative, host dest derived)
+	richLink  []FileItem            // rich-form link entries (explicit dests)
 	richCopy  []FileItem            // rich-form copy entries
 	richTmpl  []FileItem            // rich-form render-templates entries
 	dirs      []FileItem            // makeDirs: glob forms expanded to one item per path, rich carry perms

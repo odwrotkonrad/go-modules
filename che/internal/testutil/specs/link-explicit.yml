@@ -1,0 +1,20 @@
+##[>] 🤖🤖
+base:
+  include:
+    makeLinks:
+      - etc/zshrc
+      - _home/.config/foo/**
+      - {source: _home/.config/foo/a, dest: [$HOME/.config/bar/a, /etc/bar/a]}
+
+cli/macos:
+  options: {autoDiscover: true}
+  include:
+    profiles: [base]
+
+exclude-explicit:
+  include:
+    profiles: [base]
+  exclude:
+    makeLinks:
+      - $HOME/.config/bar/a
+##[<] 🤖🤖

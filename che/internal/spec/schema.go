@@ -119,12 +119,19 @@ func destRuleSchema() *jsonschema.Schema {
 }
 
 func (linkEntry) JSONSchema() *jsonschema.Schema {
-	o := obj("source file or glob with a sed-style dest rewrite", []string{"source", "dest"})
+	o := obj("source file with explicit dests, or source glob with a sed-style dest rewrite", []string{"source", "dest"})
 	o.Properties.Set("source", &jsonschema.Schema{
 		Description: "file or glob, workingDirectory-relative",
 		Type:        "string",
 	})
-	o.Properties.Set("dest", destRuleSchema())
+	o.Properties.Set("dest", &jsonschema.Schema{OneOf: []*jsonschema.Schema{
+		{
+			Description: "dest paths: ~/ or absolute -> host",
+			Type:        "array",
+			Items:       &jsonschema.Schema{Ref: "#/$defs/DestSpec"},
+		},
+		destRuleSchema(),
+	}})
 	return scalarOr("glob over git-tracked files (brace-expanded), workingDirectory-relative, dest derived 1:1", o)
 }
 

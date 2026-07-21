@@ -26,6 +26,24 @@ cases:
                 makeLinks: [_home/**]
     expected:
       output: includes
+  - name: ShouldFlagLinkEntryWithoutDest
+    input:
+      args:
+        - doc: |
+            p:
+              include:
+                makeLinks: [{source: _home/.config/foo/a}]
+    expected:
+      output: dest
+  - name: ShouldAcceptLinkEntryWithExplicitDests
+    input:
+      args:
+        - doc: |
+            p:
+              include:
+                makeLinks: [{source: _home/.config/foo/a, dest: [$HOME/.config/bar/a, /etc/bar/a]}]
+    expected:
+      output: ""
   - name: ShouldFlagBogusWriteTypeEnum
     input:
       args:

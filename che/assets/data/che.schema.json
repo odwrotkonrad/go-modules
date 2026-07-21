@@ -493,7 +493,7 @@
             "$ref": "#/$defs/linkEntry"
           },
           "type": "array",
-          "description": "symlink-op entries, workingDirectory-relative: glob string (dest derived 1:1) or {source, dest} dest rewrite (sed-style s:^_home:$HOME: or prefix-swap sugar {source: _home/**, dest: $HOME/**} to target home)"
+          "description": "symlink-op entries, workingDirectory-relative: glob string (dest derived 1:1), {source, dest: [paths]} explicit per-file dests, or {source, dest} dest rewrite (sed-style s:^_home:$HOME: or prefix-swap sugar {source: _home/**, dest: $HOME/**} to target home)"
         },
         "makeCopies": {
           "items": {
@@ -543,14 +543,25 @@
             "dest": {
               "oneOf": [
                 {
-                  "type": "string",
-                  "pattern": "^s\\W.+\\W(g)?$",
-                  "description": "sed-style rewrite s\u003cdelim\u003e\u003cpattern\u003e\u003cdelim\u003e\u003creplacement\u003e\u003cdelim\u003e[g] (Go regexp pattern, literal replacement so $HOME survives; g: every match, absent: first only), applied to the workingDirectory-relative dest path before host mapping (:-delimited is the blessed form; e.g. s:^_home:$HOME: targets the invoking user's home)"
+                  "items": {
+                    "$ref": "#/$defs/DestSpec"
+                  },
+                  "type": "array",
+                  "description": "dest paths: ~/ or absolute -\u003e host"
                 },
                 {
-                  "type": "string",
-                  "pattern": "/\\*\\*$",
-                  "description": "prefix-swap sugar \u003cprefix\u003e/**: with source \u003csrcPrefix\u003e/** it desugars to s:^\u003csrcPrefix\u003e:\u003cprefix\u003e: (e.g. dest $HOME/** with source _home/** targets home)"
+                  "oneOf": [
+                    {
+                      "type": "string",
+                      "pattern": "^s\\W.+\\W(g)?$",
+                      "description": "sed-style rewrite s\u003cdelim\u003e\u003cpattern\u003e\u003cdelim\u003e\u003creplacement\u003e\u003cdelim\u003e[g] (Go regexp pattern, literal replacement so $HOME survives; g: every match, absent: first only), applied to the workingDirectory-relative dest path before host mapping (:-delimited is the blessed form; e.g. s:^_home:$HOME: targets the invoking user's home)"
+                    },
+                    {
+                      "type": "string",
+                      "pattern": "/\\*\\*$",
+                      "description": "prefix-swap sugar \u003cprefix\u003e/**: with source \u003csrcPrefix\u003e/** it desugars to s:^\u003csrcPrefix\u003e:\u003cprefix\u003e: (e.g. dest $HOME/** with source _home/** targets home)"
+                    }
+                  ]
                 }
               ]
             }
@@ -561,7 +572,7 @@
             "source",
             "dest"
           ],
-          "description": "source file or glob with a sed-style dest rewrite"
+          "description": "source file with explicit dests, or source glob with a sed-style dest rewrite"
         }
       ]
     },
