@@ -136,10 +136,18 @@ test-e2e-che-run:
     paths:
       - che/cover-e2e-run/
 
+test-e2e-che-backup:
+  extends: .test-e2e-che
+  script:
+    - make -C che e2e-backup
+  artifacts:
+    paths:
+      - che/cover-e2e-backup/
+
 coverage-che:
   image: $CI_IMAGE
   stage: coverage
-  needs: [test-che, test-e2e-che-dryrun, test-e2e-che-run]
+  needs: [test-che, test-e2e-che-dryrun, test-e2e-che-run, test-e2e-che-backup]
   cache:
     - key: go-mod
       paths:
@@ -455,11 +463,16 @@ rebuild-ci-image:
   needs: [publish-che]
   rules:
     - if: $CI_COMMIT_TAG =~ /^che\/v/
+  inherit:
+    variables: false
+  variables:
+    BUILD_ALL_IMAGES: "true"
   trigger:
     project: konradodwrot/infra/oci-images
     branch: main
     forward:
-      yaml_variables: false
+      yaml_variables: true
+      pipeline_variables: false
 ##[<] 🤖🤖
 
 publish-get-os-open-files-with:
