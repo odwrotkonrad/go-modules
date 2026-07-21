@@ -2,6 +2,10 @@
 defs:
   profilePlainLinkExists: &profilePlainLinkExists {path: "${HOME}/plain/link.txt", exists: true}
   profilePlainLinkAccurate: &profilePlainLinkAccurate {path: "${HOME}/plain/link.txt", exists: true, type: symlink, symlinkTo: "${LOCAL}/root/plain/link.txt"}
+  profilePlainLinkExplicitAExists: &profilePlainLinkExplicitAExists {path: "${HOME}/plain/link-explicit-a.txt", exists: true}
+  profilePlainLinkExplicitAAccurate: &profilePlainLinkExplicitAAccurate {path: "${HOME}/plain/link-explicit-a.txt", exists: true, type: symlink, symlinkTo: "${LOCAL}/root/plain/link-explicit.txt"}
+  profilePlainLinkExplicitBExists: &profilePlainLinkExplicitBExists {path: "${HOME}/plain/link-explicit-b.txt", exists: true}
+  profilePlainLinkExplicitBAccurate: &profilePlainLinkExplicitBAccurate {path: "${HOME}/plain/link-explicit-b.txt", exists: true, type: symlink, symlinkTo: "${LOCAL}/root/plain/link-explicit.txt"}
   profilePlainCopyExists: &profilePlainCopyExists {path: "${HOME}/plain/copy", exists: true}
   profilePlainCopyAccurate: &profilePlainCopyAccurate {path: "${HOME}/plain/copy", exists: true, type: file, content: copy-plain}
   profilePlainTemplateExists: &profilePlainTemplateExists {path: "${HOME}/plain/tpl", exists: true}
@@ -38,8 +42,8 @@ defs:
 
   profileDroppedHomeDirExists: &profileDroppedHomeDirExists {path: "${HOME}/dropped", exists: true}
 
-  allProfilesLinksExists: &allProfilesLinksExists [*profilePlainLinkExists, *profileConditionalLinkExists, *profileRemoteLinkExists]
-  allProfilesLinksAccurate: &allProfilesLinksAccurate [*profilePlainLinkAccurate, *profileConditionalLinkAccurate, *profileRemoteLinkAccurate]
+  allProfilesLinksExists: &allProfilesLinksExists [*profilePlainLinkExists, *profilePlainLinkExplicitAExists, *profilePlainLinkExplicitBExists, *profileConditionalLinkExists, *profileRemoteLinkExists]
+  allProfilesLinksAccurate: &allProfilesLinksAccurate [*profilePlainLinkAccurate, *profilePlainLinkExplicitAAccurate, *profilePlainLinkExplicitBAccurate, *profileConditionalLinkAccurate, *profileRemoteLinkAccurate]
   allProfilesCopiesExists: &allProfilesCopiesExists [*profilePlainCopyExists, *profileConditionalCopyExists, *profileRemoteCopyExists]
   allProfilesCopiesAccurate: &allProfilesCopiesAccurate [*profilePlainCopyAccurate, *profileConditionalCopyAccurate, *profileRemoteCopyAccurate]
   allProfilesTemplatesExists: &allProfilesTemplatesExists [*profilePlainTemplateExists, *profileConditionalTemplateExists, *profileRemoteTemplateExists]
@@ -152,7 +156,7 @@ testCases:
             cloned remote file://${REMOTE} into ~/.cache/che/remote-sources/{{/[A-Za-z0-9.-]+/}}
             ## Profile plain  (profile workdir: ${LOCAL}/root)
               make-dirs: 2 changes
-              make-links: 1 change
+              make-links: 3 changes
               make-copies: 1 change
               render-templates: 1 change
               run-scripts: 1 change

@@ -5,6 +5,7 @@ ops-plain:
   include:
     makeLinks:
       - {source: plain/link.txt, dest: 's:^plain:$HOME/plain:'}
+      - {source: plain/link-explicit.txt, dest: [$HOME/plain/link-explicit-a.txt, $HOME/plain/link-explicit-b.txt]}
     makeCopies:
       - files: [{source: plain/copy.ontoHost.cp, dest: 's:^plain:$HOME/plain:'}]
     renderTemplates:

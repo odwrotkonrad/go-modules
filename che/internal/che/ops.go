@@ -49,9 +49,10 @@ func (p *ProfileReady) backupDests() []string {
 		switch o := op.(type) {
 		case *MakeLinksOperationReady:
 			for _, item := range o.Links {
-				dest := p.toDest(spec.DestRel(item))
-				if !fsutil.IsLinkSettled(p.Reader, p.resolveSrc(item.Rel), dest) {
-					out = append(out, dest)
+				for _, dest := range p.resolveLinkDests(item) {
+					if !fsutil.IsLinkSettled(p.Reader, p.resolveSrc(item.Rel), dest) {
+						out = append(out, dest)
+					}
 				}
 			}
 		case *MakeCopiesOperationReady:
@@ -291,8 +292,20 @@ func (p *ProfileReady) runFileOp(archiveSub, failOp, kind string, dirRelativePat
 // dests upfront, skipping links already pointing into the repo.
 func (p *ProfileReady) makeLinks(links []spec.FileItem, dirRelativePaths []string) error {
 	return p.runFileOp("make-links", "make-links", "link", dirRelativePaths, links,
-		func(item spec.FileItem) []string { return []string{p.toDest(spec.DestRel(item))} },
-		p.makeLink)
+		p.resolveLinkDests, p.makeLink)
+}
+
+// resolveLinkDests returns the explicit dests (~/ resolved), else the derived
+// dest (rewritten Dests[0] when a dest rule applied, else the source rel).
+func (p *ProfileReady) resolveLinkDests(item spec.FileItem) []string {
+	if len(item.Dests) == 0 || item.Derived {
+		return []string{p.toDest(spec.DestRel(item))}
+	}
+	out := make([]string, len(item.Dests))
+	for i, d := range item.Dests {
+		out[i] = p.expandHome(d.Path)
+	}
+	return out
 }
 
 func (p *ProfileReady) makeLink(item spec.FileItem, dest string) error {

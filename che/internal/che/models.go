@@ -1407,9 +1407,11 @@ func (o *MakeLinksOperationReady) execOperation(p *ProfileReady) error {
 func (o *MakeLinksOperationReady) counts(p *ProfileReady) (int, int) {
 	all, delta := 0, 0
 	for _, item := range o.Links {
-		all++
-		if !fsutil.IsLinkSettled(p.Reader, p.resolveSrc(item.Rel), p.toDest(spec.DestRel(item))) {
-			delta++
+		for _, dest := range p.resolveLinkDests(item) {
+			all++
+			if !fsutil.IsLinkSettled(p.Reader, p.resolveSrc(item.Rel), dest) {
+				delta++
+			}
 		}
 	}
 	return all, delta

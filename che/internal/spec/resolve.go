@@ -183,6 +183,7 @@ func (r ProfileRecipe) MakeProfile(recipes []ProfileRecipe, workingDir string) (
 	res := resolved{
 		ExtraDirs: eff.dirs,
 		Scripts:   scripts,
+		Links:     eff.richLink,
 		Copies:    eff.richCopy,
 		Templates: eff.richTmpl,
 	}
@@ -299,6 +300,9 @@ func hit(gs globSet, rel string, destBase func(string) string, items *[]FileItem
 
 func richRels(eff effective) map[string]bool {
 	m := map[string]bool{}
+	for _, it := range eff.richLink {
+		m[it.Rel] = true
+	}
 	for _, it := range eff.richCopy {
 		m[it.Rel] = true
 	}
@@ -420,18 +424,22 @@ func mergeRecipe(recipes []ProfileRecipe, eff *effective, ps ProfileRecipe, seen
 	}
 	in := ps.Include
 	for _, e := range in.MakeLinks {
-		if e.glob != "" {
+		switch {
+		case e.glob != "":
 			eff.linkGlobs.add(e.glob, Perms{})
-			continue
-		}
-		if e.Source == "" {
+		case e.Source == "":
 			return fmt.Errorf("profile %q: link entry missing source", name)
+		case e.DestRule != "":
+			rule, err := ruleFromDest(e.Source, e.DestRule)
+			if err != nil {
+				return fmt.Errorf("profile %q: %w", name, err)
+			}
+			eff.linkGlobs.addRule(e.Source, Perms{}, rule)
+		case len(e.Dest) == 0:
+			return fmt.Errorf("profile %q: link entry %q missing dest", name, e.Source)
+		default:
+			eff.richLink = append(eff.richLink, FileItem{Rel: e.Source, Dests: e.Dest})
 		}
-		rule, err := ruleFromDest(e.Source, e.Dest)
-		if err != nil {
-			return fmt.Errorf("profile %q: %w", name, err)
-		}
-		eff.linkGlobs.addRule(e.Source, Perms{}, rule)
 	}
 	if err := splitEntries(in.MakeCopies, &eff.copyGlobs, &eff.richCopy); err != nil {
 		return fmt.Errorf("profile %q: %w", name, err)

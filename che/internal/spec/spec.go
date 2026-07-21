@@ -72,8 +72,15 @@ func TrimTmplExt(rel string) string {
 }
 
 func (l *linkEntry) UnmarshalYAML(value *yaml.Node) error {
+	// A scalar dest is a rewrite rule, not a path list: capture it and drop the
+	// key so the alias decode (Dest []DestSpec) does not choke on the scalar.
+	node := value
+	if rule, rest, ok := takeScalarDest(value); ok {
+		l.DestRule = rule
+		node = rest
+	}
 	type alias linkEntry
-	return decodeScalarOr(value, &l.glob, (*alias)(l))
+	return decodeScalarOr(node, &l.glob, (*alias)(l))
 }
 
 // decodeScalarOr implements the scalar-or-object union form shared by every

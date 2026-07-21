@@ -316,12 +316,13 @@ Entries over git-tracked files under `root/`, repo-relative below it. Symlinks
 to the derived host path (`root/etc/x` -> `/etc/x`; home targeting via a `$HOME`
 dest rewrite). Templates, `*.ontoHost.cp`, `.gitkeep` never link.
 
-Items: glob string (brace-expanded, dest derived 1:1), or `{source, dest}` where
-`source` is a file or glob and `dest` a sed-style rewrite
-`s<delim><pattern><delim><replacement><delim>[g]` (any `<delim>` after `s`, Go
-regexp pattern, literal replacement, `\<delim>` escapes a literal delimiter; `g`
-rewrites every match, absent: first only) applied to the repo-relative dest path
-before host mapping.
+Items: glob string (brace-expanded, dest derived 1:1),
+`{source, dest: [paths]}` (one source file, explicit dests, `~/` or absolute ->
+host), or `{source, dest: <rule>}` where `source` is a file or glob and `dest`
+a sed-style rewrite `s<delim><pattern><delim><replacement><delim>[g]` (any
+`<delim>` after `s`, Go regexp pattern, literal replacement, `\<delim>` escapes
+a literal delimiter; `g` rewrites every match, absent: first only) applied to
+the repo-relative dest path before host mapping.
 
 ```yaml
 include:
@@ -329,10 +330,12 @@ include:
     - {source: HOME/**, dest: 's#^HOME#$HOME#'}
     - etc/{grafana,prometheus}/**
     - {source: HOME/.config/foo/**, dest: 's#^HOME/.config/foo#$HOME/.config/bar#'}
+    - {source: files/config, dest: [$HOME/.config/mypy/config]}
 ```
 
 The first entry links `root/HOME/.config/x` to `~/.config/x`; the rewrite entry
-links `root/HOME/.config/foo/x` to `~/.config/bar/x`.
+links `root/HOME/.config/foo/x` to `~/.config/bar/x`; the explicit-dest entry
+links one flattened source file to each listed host path.
 
 ### makeCopies
 
