@@ -12,6 +12,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"regexp"
 	"strings"
 	"testing"
 
@@ -25,6 +26,8 @@ import (
 func TestE2EDryRun(t *testing.T) { runCase(t, "dry-run-e2e") }
 
 func TestE2ERun(t *testing.T) { runCase(t, "e2e") }
+
+func TestE2EBackup(t *testing.T) { runCase(t, "backup-e2e") }
 
 type world struct {
 	bin                       string
@@ -59,6 +62,7 @@ func runCase(t *testing.T, name string) {
 		if s.Command != "" {
 			assert.Equalf(t, s.Expected.ExitCode, code, "step %s: exit code, output:\n%s", s.Name, out)
 		}
+		w.capture(t, s, out)
 		w.assertExpected(t, s.Name, out, s.Expected)
 		w.assertNotExpected(t, s.Name, out, s.NotExpected)
 		if t.Failed() {
@@ -148,6 +152,17 @@ func setup(t *testing.T, specEnv map[string]string) *world {
 }
 
 func (w *world) expand(s string) string { return testyml.Expand(s, w.vars) }
+
+// capture stores each declared var from the step's output (first capture
+// group), so later steps expand it via ${VAR}.
+func (w *world) capture(t *testing.T, s step, out string) {
+	t.Helper()
+	for name, pattern := range s.Capture {
+		m := regexp.MustCompile(pattern).FindStringSubmatch(out)
+		require.Lenf(t, m, 2, "step %s: capture %s: %q must match with one group in output:\n%s", s.Name, name, pattern, out)
+		w.vars[name] = m[1]
+	}
+}
 
 func (w *world) act(t *testing.T, s step) (out string, exitCode int) {
 	t.Helper()

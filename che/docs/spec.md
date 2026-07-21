@@ -265,7 +265,7 @@ che-owned env:
 | --- | --- | --- | --- | --- |
 | user-config file | `config.yml` | `XDG_CONFIG_HOME` | `CHE_CONFIG_HOME` | `~/.config/che` |
 | remote source caches | `sources/<slug>` | `XDG_CACHE_HOME` | `CHE_CACHE_HOME` | `~/.cache/che` |
-| per-run backups | `backups/<che-op-ts>.tar.bz2` | `XDG_STATE_HOME` | `CHE_STATE_HOME` | `~/.local/state/che` |
+| backup archives | `backups/<profile-slug>/<op>/<ts>-<backup-id>.tar.bz2` | `XDG_STATE_HOME` | `CHE_STATE_HOME` | `~/.local/state/che` |
 | (data — reserved, no current use) | — | `XDG_DATA_HOME` | `CHE_DATA_HOME` | `~/.local/share/che` |
 
 Precedence per base, most specific wins: `CHE_<X>_HOME` > `XDG_<X>_HOME/che` >

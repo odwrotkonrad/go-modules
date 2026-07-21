@@ -6,7 +6,6 @@ import (
 	"errors"
 
 	"gitlab.com/konradodwrot/go-modules/che/internal/database"
-	"gitlab.com/konradodwrot/go-modules/che/internal/fsutil"
 	"gitlab.com/konradodwrot/go-modules/che/internal/log"
 )
 
@@ -62,7 +61,7 @@ func (p *ProfileReady) removeStale(op database.OperationDone) error {
 // stashes its path/sub as the in-flight Backup, so the recorded remove op points
 // at a snapshot that makes the removal reversible.
 func (p *ProfileReady) snapshotForRemoval(sub string, dests []string) error {
-	path := fsutil.ResolveBackupArchivePath(p.home, Bin, sub, p.runID)
+	path := p.resolveArchivePath(sub)
 	p.currentArchive = path
 	p.currentSub = sub
 	return p.FS.ArchiveDestinations(path, dests)

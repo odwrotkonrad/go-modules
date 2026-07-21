@@ -17,16 +17,16 @@ cases:
     expected:
       stdOut: "create ${HOME}/.config (dry run)"
   - name: ShouldReportBackupArchivePrediction
-    context: {command: che backup}
+    context: {command: che backup create}
     input:
       args: [driftLink: true]
     expected:
       stdOut: |
         backup delta {{/.*/}}
-          create {{/.*/}}che-backup-{{/.*/}}.tar.bz2 (dry run)
+          create {{/.*/}}/backup/{{/.*/}}.tar.bz2 (dry run)
     notExpected:
       stdOut:
-        - 'created {{/\S*/}}che-backup'
+        - 'created {{/\S*/}}/backup/'
   - name: ShouldReportNothingForPrune
     context: {command: che prune-broken-links}
     notExpected:

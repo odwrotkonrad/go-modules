@@ -9,7 +9,7 @@ cases:
   - name: ShouldCopyMarkerFilesAndChownDaemonPlist
     expected:
       stdOut: |
-        created {{/.*/}}che-make-copies-{{/.*/}}.tar.bz2
+        created {{/.*/}}/make-copies/{{/.*/}}.tar.bz2
         created /Library/LaunchDaemons/otelcol.plist
         chown root:wheel /Library/LaunchDaemons/otelcol.plist
         created ${HOME}/.config/zsh/c

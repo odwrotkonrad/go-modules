@@ -59,7 +59,7 @@ test-cover:
 
 #[what] merge every present cover-* covdata dir into coverage.out/coverage.xml, print the combined total
 cover-report:
-	@dirs=$$(print -l cover-unit(N) cover-e2e-dryrun(N) cover-e2e-run(N) | paste -sd, -); \
+	@dirs=$$(print -l cover-unit(N) cover-e2e-dryrun(N) cover-e2e-run(N) cover-e2e-backup(N) | paste -sd, -); \
 		[[ -n $$dirs ]] || { print "no cover-* covdata dirs"; exit 1 }; \
 		print "merging covdata: $$dirs"; \
 		$(GO) tool covdata textfmt -i=$$dirs -o coverage.out
@@ -82,8 +82,13 @@ e2e-run: build-cover
 	if [[ -e cover-e2e-run ]] rm -rf cover-e2e-run; mkdir -p cover-e2e-run
 	E2E_BIN=$(CURDIR)/dist/$(BIN) E2E_GOCOVERDIR=$(CURDIR)/cover-e2e-run CC=$(CC) $(GO) test -v -run TestE2ERun ./e2e
 
-#[what] run both e2e flows
-e2e: e2e-dryrun e2e-run
+#[what] backup e2e flow (create/ls/restore selectors, CHE_LOG_LEVEL=info), binary covdata into ./cover-e2e-backup
+e2e-backup: build-cover
+	if [[ -e cover-e2e-backup ]] rm -rf cover-e2e-backup; mkdir -p cover-e2e-backup
+	E2E_BIN=$(CURDIR)/dist/$(BIN) E2E_GOCOVERDIR=$(CURDIR)/cover-e2e-backup CC=$(CC) $(GO) test -v -run TestE2EBackup ./e2e
+
+#[what] run all e2e flows
+e2e: e2e-dryrun e2e-run e2e-backup
 
 #[what] build the binary into ./dist
 build:

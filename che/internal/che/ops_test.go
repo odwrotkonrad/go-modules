@@ -51,6 +51,7 @@ func newProfile(dir, home string, cfg options.Options) *ProfileReady {
 		opts:        cfg,
 		home:        home,
 		runID:       testRunID,
+		runTs:       testRunID,
 		specDone:    specRow,
 		profileDone: profRow,
 		Seams:       seams,
@@ -84,7 +85,7 @@ var ops = map[string]func(*ProfileReady, spec.OperationRecipes) error{
 	},
 	"make-dirs":          func(p *ProfileReady, r spec.OperationRecipes) error { return p.makeDirs(r.MakeDirs.Dirs) },
 	"prune-broken-links": func(p *ProfileReady, _ spec.OperationRecipes) error { return p.pruneBrokenLinks() },
-	"backup": func(p *ProfileReady, r spec.OperationRecipes) error {
+	"backup-create": func(p *ProfileReady, r spec.OperationRecipes) error {
 		ops, err := p.prepareOperations(r)
 		if err != nil {
 			return err

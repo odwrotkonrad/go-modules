@@ -18,7 +18,7 @@ cases:
           created /Library
           created /Library/LaunchDaemons
           created /etc
-          created ${HOME}/.local/state/che/backups/che-make-copies-{{/\S*/}}.tar.bz2
+          created ${HOME}/.local/state/che/backups/cli-macos/make-copies/{{/\S*/}}.tar.bz2
           created /Library/LaunchDaemons/otelcol.plist
           chown root:wheel /Library/LaunchDaemons/otelcol.plist
           created ${HOME}/.config/zsh/c

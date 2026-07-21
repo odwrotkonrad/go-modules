@@ -130,4 +130,39 @@ func TestBackupPreloadedOnInstalled(t *testing.T) {
 	require.Equal(t, "/state/backups/a.tar.bz2", got[0].Backup.Path)
 }
 
+func TestBackupsProjectsRunIDNewestFirst(t *testing.T) {
+	db := openTemp(t)
+	specA, err := db.StartSpec("runaaaaaaaaa", "che.yml", "run")
+	require.NoError(t, err)
+	specB, err := db.StartSpec("runbbbbbbbbb", "che.yml", "run")
+	require.NoError(t, err)
+	_, err = db.EnsureBackup(specA, "/b/cli/backup/t1-ida.tar.bz2", "backup")
+	require.NoError(t, err)
+	_, err = db.EnsureBackup(specB, "/b/cli/backup/t2-idb.tar.bz2", "backup")
+	require.NoError(t, err)
+
+	got, err := db.Backups()
+	require.NoError(t, err)
+	require.Len(t, got, 2)
+	require.Equal(t, "/b/cli/backup/t2-idb.tar.bz2", got[0].Path) // newest first
+	require.Equal(t, "runbbbbbbbbb", got[0].RunID)
+	require.Equal(t, "runaaaaaaaaa", got[1].RunID)
+}
+
+func TestLatestOpsIncludesRemovesAndProjectsProfileRef(t *testing.T) {
+	db := openTemp(t)
+	prof := seedRun(t, db)
+	require.NoError(t, db.RecordOperation(prof, OperationDone{OpType: "create", Kind: "copy", Dest: "/a"}))
+	require.NoError(t, db.RecordOperation(prof, OperationDone{OpType: "remove", Kind: "copy", Dest: "/a", Next: Object{Kind: "absent"}}))
+	require.NoError(t, db.RecordOperation(prof, OperationDone{OpType: "create", Kind: "copy", Dest: "/b"}))
+
+	got, err := db.LatestOps()
+	require.NoError(t, err)
+	require.Len(t, got, 2) // one per dest, remove kept as /a's latest
+	require.Equal(t, "/b", got[0].Dest)
+	require.Equal(t, "cli", got[0].ProfileRef)
+	require.Equal(t, "/a", got[1].Dest)
+	require.Equal(t, "remove", got[1].OpType)
+}
+
 // [<] 🤖🤖

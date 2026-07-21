@@ -618,6 +618,7 @@ func (r *SpecRecipe) makeProfileReady(p *specsPrep, rec spec.ProfileRecipe, look
 		opts:        p.opts,
 		home:        p.home,
 		runID:       p.ctx.RunID,
+		runTs:       p.ctx.RunTs,
 		tel:         p.tel,
 		command:     p.ctx.Command,
 		specDone:    specDone,
@@ -751,7 +752,8 @@ type ProfileReady struct {
 	opts            options.Options
 	home            string
 	env             map[string]string     // captured launch env overlaid with Env, read by expandEnv/buildScriptsEnv
-	runID           string                // the run's TsLayout stamp (backup filenames + ledger run)
+	runID           string                // the run's 12-char base36 id (ledger run key + restore --run-id)
+	runTs           string                // the run's TsLayout stamp (backup archive filenames)
 	tel             *telemetry.Telemetry  // OTLP counters (nil = no-op), emitted at mutate + scripts/services
 	opCtx           context.Context       // active operation span ctx, set at execOperation entry, read by leaf mutate/fetch/exec
 	command         string                // the invoked subcommand, the CountUnit command label

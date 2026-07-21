@@ -107,11 +107,11 @@ testCases:
         notExpected: {files: *allProfilesAllFilesExists}
 
       - name: BackupDryRun
-        command: che backup --dry-run=all
+        command: che backup create --dry-run=all
         expected:
           stdOut: ["backup delta"]
           files:
-            - {countGlob: "${XDG_STATE_HOME}/che/backups/che-backup-*.tar.bz2", count: 0}
+            - {countGlob: "${XDG_STATE_HOME}/che/backups/*/backup/*.tar.bz2", count: 0}
         notExpected: {files: *allProfilesAllFilesExists}
 
       - name: ConfigShowDelta
@@ -360,32 +360,31 @@ testCases:
           stdOut: ["will run ", "will not run "]
           files: *allProfilesLinksExists
 
-      - name: BackupRemoveState
-        remove:
-          paths: ["${XDG_STATE_HOME}/che/backups"]
-
-      - name: BackupMakeCopies
+  - name: backup-e2e
+    context: {env: {CHE_LOG_LEVEL: info}}
+    steps:
+      - name: MakeCopies
         command: che make-copies
         expected:
           files: *allProfilesCopiesAccurate
         notExpected:
           stdOut: ["will run ", "will not run "]
 
-      - name: BackupTamperCopy
+      - name: TamperCopy
         write: {path: "${HOME}/plain/copy", content: tampered}
 
-      - name: Backup
-        command: che backup
+      - name: BackupCreate
+        command: che backup create
         expected:
           stdOut: ["created "]
           files:
-            - {countGlob: "${XDG_STATE_HOME}/che/backups/che-backup-*.tar.bz2", count: 1}
+            - {countGlob: "${XDG_STATE_HOME}/che/backups/plain/backup/*.tar.bz2", count: 1}
         notExpected:
           stdOut: ["will run ", "will not run "]
 
       - name: BackupExtract
         extract:
-          archiveGlob: "${XDG_STATE_HOME}/che/backups/che-backup-*.tar.bz2"
+          archiveGlob: "${XDG_STATE_HOME}/che/backups/plain/backup/*.tar.bz2"
           dest: "${WORK}/restore"
         expected:
           files:
@@ -394,7 +393,7 @@ testCases:
           files:
             - {path: "${WORK}/restore${HOME}/conditional/copy", exists: true}
 
-      - name: BackupSettleCopies
+      - name: SettleCopies
         command: che make-copies
         expected:
           files: *allProfilesCopiesAccurate
@@ -402,30 +401,71 @@ testCases:
           stdOut: ["will run ", "will not run "]
 
       - name: BackupSettled
-        command: che backup
+        command: che backup create
         notExpected:
           stdOut: ["created ", "will run ", "will not run "]
 
-      - name: BackupTamperAgain
-        write: {path: "${HOME}/plain/copy", content: tampered}
-
-      - name: BackupRunRestores
-        command: che run
+      - name: BackupLs
+        command: che backup ls
+        capture:
+          RUN_ID: 'run ([a-z0-9]{12}), backup [a-z0-9]{12}, [^,]+, [^,]+, \S*/plain/backup/'
+          BACKUP_ID: 'run [a-z0-9]{12}, backup ([a-z0-9]{12}), [^,]+, [^,]+, \S*/plain/backup/'
         expected:
-          stdOut: ["created "]
+          stdOut:
+            - "# backups"
+            - "run {{/[a-z0-9]{12}/}}, backup {{/[a-z0-9]{12}/}}, {{/[0-9]{8}T[0-9]{6}/}}, {{/\\S+/}}, ~/.local/state/che/backups/plain/backup/{{/\\S+/}}.tar.bz2"
+
+      - name: RestoreDryRun
+        command: che backup restore --backup-id ${BACKUP_ID} --dry-run=all
+        expected:
+          stdOut: ["restore ${HOME}/plain/copy (dry run)"]
           files:
             - {path: "${HOME}/plain/copy", exists: true, type: file, content: copy-plain}
-        notExpected:
-          stdOut: ["will run ", "will not run "]
 
-      - name: BackupRemoveScriptOutputs
-        remove:
-          paths:
-            - "${HOME}/plain/script-output"
-            - "${HOME}/conditional/script-output"
-            - "${HOME}/remote/script-output"
+      - name: RestoreByBackupID
+        command: che backup restore --backup-id ${BACKUP_ID}
+        expected:
+          stdOut: ["restored ${HOME}/plain/copy"]
+          files:
+            - {path: "${HOME}/plain/copy", exists: true, type: file, content: tampered}
 
-      - name: BackupUninstall
+      - name: ResettleCopies
+        command: che make-copies
+        expected:
+          files: *allProfilesCopiesAccurate
+
+      - name: RestoreByRunID
+        command: che backup restore --run-id ${RUN_ID}
+        expected:
+          stdOut: ["restored ${HOME}/plain/copy"]
+          files:
+            - {path: "${HOME}/plain/copy", exists: true, type: file, content: tampered}
+
+      - name: RestoreByTimestamp
+        command: che backup restore --timestamp 99991231T235959
+        expected:
+          stdOut: ["restored ${HOME}/plain/copy"]
+          files:
+            - {path: "${HOME}/plain/copy", exists: true, type: file, content: tampered}
+
+      - name: BareBackupPrintsUsage
+        command: che backup
+        expected:
+          stdOut: ["Usage:", "create", "ls", "restore"]
+
+      - name: RestoreWithoutSelectorFails
+        command: che backup restore
+        expected:
+          exitCode: 1
+          stdOut: ["pass one of --run-id, --backup-id, --timestamp"]
+
+      - name: RestoreUnknownRunIDFails
+        command: che backup restore --run-id zzzzzzzzzzzz
+        expected:
+          exitCode: 1
+          stdOut: ['no backup matches run id "zzzzzzzzzzzz"']
+
+      - name: Uninstall
         command: che uninstall
         expected:
           files:
@@ -433,7 +473,7 @@ testCases:
         notExpected:
           stdOut: ["will run ", "will not run "]
 
-      - name: BackupCleanup
+      - name: Cleanup
         remove:
           paths:
             - "${HOME}/plain/copy"

@@ -9,6 +9,6 @@ cases:
   - name: ShouldRenderAndInstallHostDest
     expected:
       stdOut: |
-        created {{/.*/}}che-render-{{/.*/}}.tar.bz2
+        created {{/.*/}}/render/{{/.*/}}.tar.bz2
         created ${HOME}/.config/zsh/t
 # [<] 🤖

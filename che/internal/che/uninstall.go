@@ -6,7 +6,6 @@ import (
 	"errors"
 
 	"gitlab.com/konradodwrot/go-modules/che/internal/database"
-	"gitlab.com/konradodwrot/go-modules/che/internal/fsutil"
 	"gitlab.com/konradodwrot/go-modules/che/internal/log"
 	"gitlab.com/konradodwrot/go-modules/che/internal/options"
 )
@@ -44,6 +43,7 @@ func NewUninstaller(ctx Context, opts options.Options) (*Uninstaller, error) {
 		home:        home,
 		opts:        opts,
 		runID:       ctx.RunID,
+		runTs:       ctx.RunTs,
 		specDone:    spec,
 		profileDone: prof,
 		logDepth:    1, // [why] removals nest under their per-profile `## profile` heading
@@ -124,7 +124,7 @@ func (u *Uninstaller) revertKind(op database.OperationDone) error {
 	case "chown":
 		return nil // [why] prev owner is not captured in Object; nothing to reapply
 	case "rm":
-		_, err := u.restoreFromBackup(op)
+		_, err := u.p.restoreFromBackup(op)
 		return err
 	default:
 		return nil
@@ -147,7 +147,7 @@ func (u *Uninstaller) removeDir(dest string) error {
 // restoreOrRemove restores the op's pre-install backup entry onto the dest when
 // one exists, else removes the dest (che had created it fresh).
 func (u *Uninstaller) restoreOrRemove(op database.OperationDone) error {
-	restored, err := u.restoreFromBackup(op)
+	restored, err := u.p.restoreFromBackup(op)
 	if err != nil {
 		return err
 	}
@@ -155,30 +155,6 @@ func (u *Uninstaller) restoreOrRemove(op database.OperationDone) error {
 		return nil
 	}
 	return u.p.FS.RemoveFile(op.Dest)
-}
-
-// restoreFromBackup writes the op's pre-install backup entry back onto the dest
-// through FS (sudo/dry-run honored). Returns false when the op has no backup or
-// the archive holds no entry for the dest (it pre-existed absent).
-func (u *Uninstaller) restoreFromBackup(op database.OperationDone) (bool, error) {
-	if op.Backup == nil {
-		return false, nil
-	}
-	body, mode, found, err := fsutil.ReadFromArchive(op.Backup.Path, op.Dest)
-	if err != nil || !found {
-		return false, err
-	}
-	if err := u.p.FS.InstallFile(op.Dest, body, mode, ""); err != nil {
-		return false, err
-	}
-	return true, nil
-}
-
-// driftedFromNext reports whether the live dest no longer matches the op's
-// recorded Next state (kind/target/mode), the "look before you overwrite"
-// guardrail. An absent dest that the op left present is drift too.
-func driftedFromNext(live, next database.Object) bool {
-	return live.Kind != next.Kind || live.Target != next.Target || live.Mode != next.Mode
 }
 
 // Close releases the uninstaller's ledger handle.

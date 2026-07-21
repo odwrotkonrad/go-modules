@@ -1,7 +1,10 @@
 che [command]
 
 Available Commands:
-  backup               archive every op dest (links, copies, host renders) into the per-run backup archive and exit
+  backup               manage backup archives: create, ls, restore
+    create             archive every op dest (links, copies, host renders) into the per-run backup archive and exit
+    ls                 list the backup points (run id, backup id, timestamp, size, path), newest first
+    restore            restore state from backup archives: --run-id (that run's archives), --backup-id (one archive), --timestamp (point-in-time)
   completion           Generate the autocompletion script for the specified shell
     bash               Generate the autocompletion script for bash
     fish               Generate the autocompletion script for fish

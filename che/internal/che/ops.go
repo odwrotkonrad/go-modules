@@ -14,14 +14,18 @@ import (
 	"gitlab.com/konradodwrot/go-modules/che/internal/spec"
 )
 
-// Bin is che's binary name, carried in per-run backup archive filenames.
-const Bin = "che"
+// resolveArchivePath resolves a fresh backup archive path for this profile:
+// backups/<profile-slug>/<op>/<runTs>-<backupID>.tar.bz2, each archive minted
+// its own 12-char base36 backup id (the restore --backup-id selector).
+func (p *ProfileReady) resolveArchivePath(op string) string {
+	return fsutil.ResolveBackupArchivePath(p.home, fsutil.SlugRef(p.ref), op, p.runTs, newID())
+}
 
 // archiveBefore snapshots every existing dest into one per-run .tar.bz2 under
 // the XDG backups dir before a mutating op runs (sub = op identity). The archive
 // path/sub are stashed on the profile so the op's following mutate calls
-// reference this run's Backup row. Uses the run's shared TsLayout stamp so the
-// filename and the ledger run line up. Under `run` the backup stage already
+// reference this run's Backup row. The filename carries the run's shared
+// TsLayout stamp plus a per-archive backup id. Under `run` the backup stage already
 // archived every op dest (spec/che/backup.md): the op skips its own
 // archive and points its records at the stage archive.
 func (p *ProfileReady) archiveBefore(sub string, dests []string) error {
@@ -30,7 +34,7 @@ func (p *ProfileReady) archiveBefore(sub string, dests []string) error {
 		p.currentSub = "backup"
 		return nil
 	}
-	path := fsutil.ResolveBackupArchivePath(p.home, Bin, sub, p.runID)
+	path := p.resolveArchivePath(sub)
 	p.currentArchive = path
 	p.currentSub = sub
 	return p.mutate("backup", "create", path, "", opInfo{}, func() error { return p.FS.ArchiveDestinations(path, dests) })
@@ -98,7 +102,7 @@ func (p *ProfileReady) execBackup(dests []string) error {
 	if p.existingDests(dests) == 0 {
 		return nil
 	}
-	path := fsutil.ResolveBackupArchivePath(p.home, Bin, "backup", p.runID)
+	path := p.resolveArchivePath("backup")
 	p.currentArchive = path
 	p.currentSub = "backup"
 	if p.isDryRun() { // [why] prediction only: no archive is written
@@ -107,6 +111,11 @@ func (p *ProfileReady) execBackup(dests []string) error {
 	}
 	if err := p.FS.ArchiveDestinations(path, dests); err != nil {
 		return err
+	}
+	// [why] the standalone archive carries no op records, so its ledger Backup
+	// row is written here (backup ls / restore select it).
+	if _, err := p.Ledger.EnsureBackup(p.specDone, path, "backup"); err != nil {
+		log.EmitTrace("ledger", "error", "ensure backup: "+err.Error())
 	}
 	p.backupArchive = path
 	p.emit(log.Levels.Info, "backup", "created", humanSize(archiveSize(path))+", "+path)
