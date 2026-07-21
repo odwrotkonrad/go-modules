@@ -17,7 +17,7 @@ import (
 //	specFile
 //	  defs          anchor scratch space shared by all cases, ignored by the runner
 //	  testCases     named flows; each carries context.env (extra env for every
-//	                che invocation, e.g. CHE_DEBUG) and its ordered steps,
+//	                che invocation, e.g. CHE_LOG_LEVEL) and its ordered steps,
 //	                fail-fast, sharing one fresh workdir + HOME per case
 //	step: exactly one action (command | write | remove | gitRestore | extract).
 //	expected: stdOut substring matchers (literal with {{/regex/}} holes),
