@@ -12,48 +12,59 @@ cases:
     expected:
       stdOut: |
         profile cli/macos:
-          backup delta make-links (3 changes), make-copies (2 changes), render-templates (1 change)
-          created ${HOME}/.config
-          created ${HOME}/.config/bar
-          created ${HOME}/.config/zsh
-          created /Library
-          created /Library/LaunchDaemons
-          created /etc
-          created ${HOME}/.cache/zsh
-          created /var/log/che-test-setgid
-          chmod 2775 /var/log/che-test-setgid
-          created ${HOME}/.config
-          created ${HOME}/.config/bar
-          created ${HOME}/.config/zsh
-          created /Library
-          created /Library/LaunchDaemons
-          created /etc
-          created ${HOME}/.config/bar/a
-          created ${HOME}/.config/zsh/.zshrc
-          created /etc/zshrc
-          created ${HOME}/.config
-          created ${HOME}/.config/bar
-          created ${HOME}/.config/zsh
-          created /Library
-          created /Library/LaunchDaemons
-          created /etc
-          created /Library/LaunchDaemons/otelcol.plist
-          chown root:wheel /Library/LaunchDaemons/otelcol.plist
-          created ${HOME}/.config/zsh/c
-          created ${HOME}/.config/zsh/t
-          ran ${REPO}/install/setup
+          running backup
+            backup delta make-links (3 changes), make-copies (2 changes), render-templates (1 change)
+          running prune-broken-links (no changes)
+          running make-dirs
+            created ${HOME}/.config
+            created ${HOME}/.config/bar
+            created ${HOME}/.config/zsh
+            created /Library
+            created /Library/LaunchDaemons
+            created /etc
+            created ${HOME}/.cache/zsh
+            created /var/log/che-test-setgid
+            chmod 2775 /var/log/che-test-setgid
+          running make-links
+            created ${HOME}/.config
+            created ${HOME}/.config/bar
+            created ${HOME}/.config/zsh
+            created /Library
+            created /Library/LaunchDaemons
+            created /etc
+            created ${HOME}/.config/bar/a
+            created ${HOME}/.config/zsh/.zshrc
+            created /etc/zshrc
+          running make-copies
+            created ${HOME}/.config
+            created ${HOME}/.config/bar
+            created ${HOME}/.config/zsh
+            created /Library
+            created /Library/LaunchDaemons
+            created /etc
+            created /Library/LaunchDaemons/otelcol.plist
+            chown root:wheel /Library/LaunchDaemons/otelcol.plist
+            created ${HOME}/.config/zsh/c
+          running render-templates
+            created ${HOME}/.config/zsh/t
+          running run-scripts
+            ran ${REPO}/install/setup
   - name: ShouldSkipOpsWithoutSelection
     context:
       pwd: testdata/fixture/commands/all/sample-tree-only-links
     expected:
       stdOut: |
         profile cli/macos:
-          backup delta make-links (1 change)
-          created ${HOME}/.config
-          created ${HOME}/.config/bar
-          created ${HOME}/.config
-          created ${HOME}/.config/bar
-          created ${HOME}/.config/bar/a
+          running backup
+            backup delta make-links (1 change)
+          running prune-broken-links (no changes)
+          running make-dirs
+            created ${HOME}/.config
+            created ${HOME}/.config/bar
+          running make-links
+            created ${HOME}/.config
+            created ${HOME}/.config/bar
+            created ${HOME}/.config/bar/a
     notExpected:
       stdOut:
         - otelcol.plist
@@ -68,7 +79,7 @@ cases:
         - 'will not run op run-scripts: options.run.skipOps'
     notExpected:
       stdOut:
-        - 'will run run-scripts'
+        - 'running run-scripts'
         - 'ran '
   - name: ShouldSkipOpsListedInSkipOpsEnv
     context:
@@ -77,11 +88,11 @@ cases:
     expected:
       stdOut:
         - 'will not run op make-copies: options.skipOps'
-        - 'will run render-templates'
+        - 'running render-templates'
     notExpected:
       stdOut:
-        - 'will run run-scripts'
-        - 'will run make-copies'
+        - 'running run-scripts'
+        - 'running make-copies'
         - 'ran '
         - created /Library/LaunchDaemons/otelcol.plist
   - name: ShouldLogDiscoverySummaryBeforeExecution
@@ -107,14 +118,12 @@ cases:
   - name: ShouldAnnounceZeroDeltaOpsAsSkipped
     context:
       pwd: testdata/fixture/commands/all/sample-tree-only-links
-      env: {CHE_LOG_LEVEL: debug}
     expected:
       stdOut:
-        - |
-          will run backup: no changes
-            backup delta {{/.*/}}
-        - 'will run prune-broken-links: no changes'
-        - 'will run make-links'
+        - 'running prune-broken-links (no changes)'
+        - 'running make-links'
+      stdOutCounts:
+        'running make-links (no changes)': 0
   - name: ShouldExecuteProfilesSequentiallyInDiscoveryOrder
     context:
       command: che run --profile cli/macos,ontoRepo
@@ -133,6 +142,8 @@ cases:
       stdOut: |
         ran ${REPO}/install/setup
         profile ontoRepo:
-          backup delta render-templates (1 change)
-          created ${REPO}/docs/r.md
+          running backup
+            backup delta render-templates (1 change)
+          running render-templates
+            created ${REPO}/docs/r.md
 # [<] 🤖

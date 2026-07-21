@@ -11,16 +11,17 @@ cases:
     expected:
       stdOut: |
         profile cli/macos:
-          created ${HOME}/.config
-          created ${HOME}/.config/bar
-          created ${HOME}/.config/zsh
-          created /Library
-          created /Library/LaunchDaemons
-          created /etc
-          created ${HOME}/.local/state/che/backups/che-make-links-{{/\S*/}}.tar.bz2
-          created ${HOME}/.config/bar/a
-          created ${HOME}/.config/zsh/.zshrc
-          created /etc/zshrc
+          running make-links
+            created ${HOME}/.config
+            created ${HOME}/.config/bar
+            created ${HOME}/.config/zsh
+            created /Library
+            created /Library/LaunchDaemons
+            created /etc
+            created ${HOME}/.local/state/che/backups/che-make-links-{{/\S*/}}.tar.bz2
+            created ${HOME}/.config/bar/a
+            created ${HOME}/.config/zsh/.zshrc
+            created /etc/zshrc
   - name: ShouldRewriteDestPathWithSedRule
     expected:
       stdOut: |
@@ -35,5 +36,6 @@ cases:
           render-templates: 1 change
           run-scripts: 1 change
         profile cli/macos:
-          created ${HOME}/.config
+          running make-links
+            created ${HOME}/.config
 # [<] 🤖

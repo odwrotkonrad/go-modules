@@ -110,6 +110,13 @@ Scenario: debug logs profiles that failed discovery
   Then the human log reports the rejected profile with the reason
   And no ops list is needed for a rejected profile
 
+Scenario: each executed op announces itself, its mutations nested under it
+  Status: tested
+  When a che command executes a profile's ops at log level info
+  Then the human log announces each op it runs, indented under the profile
+  And every mutation the op makes indents one level deeper, under that op
+  And an op that changes nothing announces itself with a no-changes note, no lines beneath it
+
 Scenario: config show outputs the config delta by default
   Status: tested
   When I invoke `che config show` or `che config show --delta`

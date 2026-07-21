@@ -14,5 +14,7 @@ pre-commit:
       glob: "*.go"
       run: make lint
     - name: docsgen
+      env:
+        MK_DRY_RUN: ""
       run: make render-docs render-templates && { git diff --exit-code || { echo "regeneration changed tracked files (diff above), restage and re-commit"; exit 1; } }
 ##[<] 🤖

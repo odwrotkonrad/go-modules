@@ -93,6 +93,7 @@ func (p *ProfileReady) ExecBackup() error { return p.execBackup(p.backupDests())
 
 func (p *ProfileReady) execBackup(dests []string) error {
 	defer func() { p.backedUp = true }()
+	defer p.enterOp("backup")()
 	p.emit(log.Levels.Info, "backup", "backup-delta", p.describeOpDeltas("backup"))
 	if p.existingDests(dests) == 0 {
 		return nil
@@ -134,15 +135,9 @@ func humanSize(n int64) string {
 }
 
 // ExecBackupStage is ExecBackup as the run sequence's backup stage: announced
-// like the other wrapped ops (no changes marked when nothing needs backing up).
+// and nested like the other wrapped ops (execBackup owns the op heading).
 func (p *ProfileReady) ExecBackupStage() error {
-	dests := p.backupDests()
-	if p.existingDests(dests) == 0 {
-		p.emit(log.Levels.Debug, "run", "will-run", "backup: no changes")
-	} else {
-		p.emit(log.Levels.Debug, "run", "will-run", "backup")
-	}
-	return p.execBackup(dests)
+	return p.execBackup(p.backupDests())
 }
 
 // failItem logs "fail <dest>: <err>" at error level and returns err, the

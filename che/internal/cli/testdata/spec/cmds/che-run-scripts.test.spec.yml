@@ -10,7 +10,9 @@ cases:
   - name: ShouldExecEachScriptAndReportOk
     expected:
       stdOut: |
-        ran ${REPO}/install/setup
+        profile cli/macos:
+          running run-scripts
+            ran ${REPO}/install/setup
   - name: ShouldNarrowToMatchingName
     context:
       command: che run-scripts setup

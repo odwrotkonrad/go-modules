@@ -11,13 +11,14 @@ cases:
     expected:
       stdOut: |
         profile cli/macos:
-          created ${HOME}/.config
-          created ${HOME}/.config/bar
-          created ${HOME}/.config/zsh
-          created /Library
-          created /Library/LaunchDaemons
-          created /etc
-          created ${HOME}/.cache/zsh
-          created /var/log/che-test-setgid
-          chmod 2775 /var/log/che-test-setgid
+          running make-dirs
+            created ${HOME}/.config
+            created ${HOME}/.config/bar
+            created ${HOME}/.config/zsh
+            created /Library
+            created /Library/LaunchDaemons
+            created /etc
+            created ${HOME}/.cache/zsh
+            created /var/log/che-test-setgid
+            chmod 2775 /var/log/che-test-setgid
 # [<] 🤖

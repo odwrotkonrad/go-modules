@@ -614,7 +614,6 @@ func (r *SpecRecipe) makeProfileReady(p *specsPrep, rec spec.ProfileRecipe, look
 		env:         effectiveEnv,
 		Profiles:    sourced,
 		ref:         rec.Source.DisplayRef(),
-		logIndent:   1,
 		workingDir:  wd,
 		opts:        p.opts,
 		home:        p.home,
@@ -719,7 +718,8 @@ func (s *SpecReady) ExecEach(ctx context.Context, opName string, fn func(context
 		pctx, pspan := s.tel.Span(ctx, "profile", attribute.String("profile", p.Ref()))
 		s.tel.CountProfile(pctx, p.Ref())
 		log.EmitDebug(opName, "will-run", "profile "+p.Ref()+": "+p.describeOpDeltas(opName))
-		log.PrintHeading(log.Levels.Info, "profile "+p.Ref()+":")
+		p.emitHeading(log.Levels.Info, opName, "run-profile", "profile "+p.Ref(), 1)
+		p.logDepth = 1
 		if err := fn(pctx, p); err != nil {
 			pspan.RecordError(err)
 			fails = append(fails, fmt.Errorf("%s: %w", p.Ref(), err))
@@ -746,7 +746,7 @@ type ProfileReady struct {
 	Profiles        []spec.ProfileSourceRecipe // sourced refs, consumed by PrepareSpecs
 	OperationsReady []operationReady           // prepared, in run order
 	ref             string                     // display ref: bare name local, <source>::<name> sourced
-	logIndent       int                        // human log indentation for this profile's events (1 under a profile heading)
+	logDepth        int                        // heading depth this profile's body lines sit beneath (2 under profile+op headings, 0 for standalone)
 	workingDir      string                     // resolved load-ops source tree (options.profileWorkingDirectory cascade)
 	opts            options.Options
 	home            string
@@ -804,20 +804,28 @@ func (p *ProfileReady) isDryRun() bool { return p.opts.DryRun != options.DryRun.
 // isDryRunAll reports the dry-run=all mode (every dest re-reports, never skips).
 func (p *ProfileReady) isDryRunAll() bool { return p.opts.DryRun == options.DryRun.All }
 
-// emit logs one profile-scoped event: profile attr attached, sourced-profile
-// suffix on the msg, the profile's indentation.
+// emit logs one profile-scoped body event: profile attr attached,
+// sourced-profile suffix on the msg, indented under the current heading depth.
 func (p *ProfileReady) emit(level log.Level, scope, action, msg string) {
 	log.Emit(log.Event{
 		Level: level, Scope: scope, Action: action, Msg: p.decorateMsg(msg),
-		Attrs: map[string]string{"profile": p.Ref()}, Indent: p.logIndent,
+		Attrs: map[string]string{"profile": p.Ref()}, Depth: p.logDepth,
 	})
 }
 
-// emitSkip logs one profile-scoped won't-happen event with its reasons.
+// emitSkip logs one profile-scoped won't-happen body event with its reasons.
 func (p *ProfileReady) emitSkip(level log.Level, scope, action, msg string, reasons ...string) {
 	log.Emit(log.Event{
 		Level: level, Scope: scope, Action: action, Msg: p.decorateMsg(msg), Reasons: reasons,
-		Attrs: map[string]string{"profile": p.Ref()}, Indent: p.logIndent,
+		Attrs: map[string]string{"profile": p.Ref()}, Depth: p.logDepth,
+	})
+}
+
+// emitHeading logs one profile-scoped heading event at the given markdown level.
+func (p *ProfileReady) emitHeading(level log.Level, scope, action, msg string, heading int) {
+	log.Emit(log.Event{
+		Level: level, Scope: scope, Action: action, Msg: p.decorateMsg(msg),
+		Attrs: map[string]string{"profile": p.Ref()}, Heading: heading,
 	})
 }
 
@@ -924,17 +932,20 @@ func (p *ProfileReady) logDiscovered() {
 		attrs[op.Name()+".all"] = fmt.Sprint(all)
 		switch {
 		case log.IsEnabled(log.Levels.Debug):
-			lines = append(lines, fmt.Sprintf("  %s: %s (%d declared)", op.Name(), formatChanges(delta), all))
+			lines = append(lines, fmt.Sprintf("%s: %s (%d declared)", op.Name(), formatChanges(delta), all))
 		case delta > 0:
-			lines = append(lines, fmt.Sprintf("  %s: %s", op.Name(), formatChanges(delta)))
+			lines = append(lines, fmt.Sprintf("%s: %s", op.Name(), formatChanges(delta)))
 		}
 	}
 	if len(lines) == 0 {
-		lines = append(lines, "  no changes")
+		lines = append(lines, "no changes")
 	}
-	msg := fmt.Sprintf("profile %s  (working directory: %s)\n%s",
-		p.Ref(), abbreviateHome(p.workingDir, p.home), strings.Join(lines, "\n"))
-	log.Emit(log.Event{Level: log.Levels.Info, Scope: "discover-profiles", Action: "discovered", Msg: msg, Attrs: attrs})
+	heading := fmt.Sprintf("discovered profile %s  (working directory: %s)",
+		p.Ref(), abbreviateHome(p.workingDir, p.home))
+	log.Emit(log.Event{Level: log.Levels.Info, Scope: "discover-profiles", Action: "discovered", Msg: heading, Attrs: attrs, Heading: 1})
+	for _, l := range lines {
+		log.Emit(log.Event{Level: log.Levels.Info, Scope: "discover-profiles", Msg: l, Depth: 1})
+	}
 }
 
 // formatChanges renders a delta count as prose: "no changes", "1 change",
@@ -1163,13 +1174,6 @@ func (p *ProfileReady) ExecOperations(ctx context.Context) error {
 				}
 				continue
 			}
-			// [why] a zero-delta op still runs (idempotent, sweeps included), its
-			// announce marking that nothing would change.
-			if _, delta := op.counts(p); delta == 0 {
-				p.emit(log.Levels.Debug, "run", "will-run", op.Name()+": no changes")
-			} else {
-				p.emit(log.Levels.Debug, "run", "will-run", op.Name())
-			}
 			if err := p.execOp(ctx, op); err != nil {
 				fails = append(fails, fmt.Errorf("%s: %w", op.Name(), err))
 			}
@@ -1179,8 +1183,9 @@ func (p *ProfileReady) ExecOperations(ctx context.Context) error {
 }
 
 // execOp runs one selected operation under its own span (child of ctx), setting
-// p.opCtx so leaf mutate/fetch/exec calls parent onto it. Counts the run, and
-// the error on failure.
+// p.opCtx so leaf mutate/fetch/exec calls parent onto it. Announces the op as an
+// indented heading under the profile, then indents its mutation lines one level
+// deeper (spec/che/LogRedesignBehavior.md). Counts the run, and the error on failure.
 func (p *ProfileReady) execOp(ctx context.Context, op operationReady) error {
 	ctx, span := p.tel.Span(ctx, op.Name(), attribute.String("op", op.Name()))
 	defer span.End()
@@ -1188,12 +1193,42 @@ func (p *ProfileReady) execOp(ctx context.Context, op operationReady) error {
 	p.opCtx = ctx
 	defer func() { p.opCtx = prev }()
 	p.tel.CountOperation(ctx, op.Name())
+	defer p.enterOp(op.Name())()
 	err := op.execOperation(p)
 	if err != nil {
 		span.RecordError(err)
 		p.tel.CountError(ctx, op.Name())
 	}
 	return err
+}
+
+// enterOp announces the op as a markdown sub-heading (one level below the
+// profile heading), then sets the profile's body depth so the op's mutation
+// lines indent beneath it (spec/che/LogRedesignBehavior.md). A zero-delta op
+// notes "(no changes)" on its heading so it does not read as a dangling
+// section. The returned func restores the prior depth (deferred by the caller).
+func (p *ProfileReady) enterOp(name string) func() {
+	msg := name
+	if op := p.opNamed(name); op != nil {
+		if _, delta := op.counts(p); delta == 0 {
+			msg += " (no changes)"
+		}
+	}
+	prev := p.logDepth
+	p.emitHeading(log.Levels.Info, "run", "running", msg, prev+1)
+	p.logDepth = 1 // [why] headings carry the nesting; body lines sit one step in
+	return func() { p.logDepth = prev }
+}
+
+// opNamed returns the profile's prepared op of that name, nil when absent
+// (backup is a stage, not an operationReady).
+func (p *ProfileReady) opNamed(name string) operationReady {
+	for _, op := range p.OperationsReady {
+		if op.Name() == name {
+			return op
+		}
+	}
+	return nil
 }
 
 // ExecOperation executes one prepared operation (per-op subcommands): same
@@ -1242,6 +1277,7 @@ func (p *ProfileReady) ExecRunScripts(ctx context.Context, names []string) (int,
 			prev := p.opCtx
 			p.opCtx = sctx
 			defer func() { p.opCtx = prev }()
+			defer p.enterOp("run-scripts")()
 			scripts := filterScriptsByName(rs.Scripts, names)
 			matched = len(scripts)
 			return p.runScripts(scripts)

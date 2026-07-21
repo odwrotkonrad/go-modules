@@ -27,11 +27,21 @@ cases:
       args: [gate: info, level: info, scope: make-links, action: create, msg: /x, reasons: [already linked, "dry run (all)"]]
     expected:
       output: "will not create /x: already linked, dry run (all)\n"
-  - name: ShouldIndentEveryLineOfMultilineMsg
+  - name: ShouldIndentBodyLineByDepth
     input:
-      args: [gate: info, level: info, scope: discover-profiles, action: "", msg: "profile plain\n  make-links: 1 change", indent: 1]
+      args: [gate: info, level: info, scope: make-links, action: created, msg: /x, depth: 2]
     expected:
-      output: "  profile plain\n    make-links: 1 change\n"
+      output: "    created /x\n"
+  - name: ShouldRenderHeadingWithMarkdownHashes
+    input:
+      args: [gate: info, level: info, scope: run, action: running, msg: make-links, heading: 2]
+    expected:
+      output: "## make-links\n"
+  - name: ShouldRenderTopHeadingWithSingleHash
+    input:
+      args: [gate: info, level: info, scope: run, action: run-profile, msg: profile plain, heading: 1]
+    expected:
+      output: "# profile plain\n"
   - name: ShouldSilenceLevelBelowGate
     input:
       args: [gate: info, level: debug, scope: run, action: will-run, msg: make-links]

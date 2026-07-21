@@ -11,8 +11,9 @@ cases:
     expected:
       stdOut: |
         profile cli/macos:
-          created ${HOME}/.local/state/che/backups/che-render-{{/\S*/}}.tar.bz2
-          created ${HOME}/.config/zsh/t
+          running render-templates
+            created ${HOME}/.local/state/che/backups/che-render-{{/\S*/}}.tar.bz2
+            created ${HOME}/.config/zsh/t
   - name: ShouldRenderOnlyRepoDestsForOntoRepoProfile
     context:
       command: che render-templates --profile ontoRepo

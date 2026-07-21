@@ -73,7 +73,14 @@ type Event struct {
 	// line as "will not <action> <msg>: <reasons>".
 	Reasons []string
 	Attrs   map[string]string // machine-side attributes (profile, dest...)
-	Indent  int               // human indentation depth (two spaces per step)
+	// Heading, when > 0, renders the event as a markdown-style heading of that
+	// level ("## " for 2, "### " for 3...), bold, no action decoration. 0 (the
+	// default) is a body line, indented under the current heading depth.
+	Heading int
+	// Depth is the body-line indent (heading levels the lines nest under);
+	// ignored for headings. Callers set it to the heading level the line sits
+	// beneath so body indents track heading depth.
+	Depth int
 }
 
 // sink is the telemetry hook: every emitted event mirrors to it regardless of
@@ -95,10 +102,16 @@ func Emit(e Event) {
 	fmt.Print(renderHuman(e))
 }
 
-// renderHuman renders one event as indented prose: reasons render as
-// "will not <action> <msg>: <reasons>", else "<action> <msg>" (action bold,
-// hyphens displayed as spaces), a bare Msg as-is. Multi-line Msg indents each line.
+// renderHuman renders one event. A Heading > 0 prints a markdown-style bold
+// heading ("## msg" for level 2), no action decoration. A body line renders
+// reasons as "will not <action> <msg>: <reasons>", else "<action> <msg>"
+// (action bold, hyphens displayed as spaces), a bare Msg as-is; every line is
+// indented one step per heading level it sits beneath (Depth). Multi-line Msg
+// indents each line.
 func renderHuman(e Event) string {
+	if e.Heading > 0 {
+		return bold(strings.Repeat("#", e.Heading)+" "+e.Msg) + "\n"
+	}
 	line := e.Msg
 	switch {
 	case len(e.Reasons) > 0:
@@ -106,7 +119,7 @@ func renderHuman(e Event) string {
 	case e.Action != "":
 		line = bold(displayAction(e.Action)) + " " + e.Msg
 	}
-	pad := strings.Repeat("  ", e.Indent)
+	pad := strings.Repeat("  ", e.Depth)
 	var b strings.Builder
 	for l := range strings.SplitSeq(line, "\n") {
 		b.WriteString(pad)
