@@ -69,7 +69,8 @@ Scenario: every level but info carries a level prefix
 Scenario: the human log nests profiles and ops as markdown headings
   Status: tested
   When a che command executes a profile's ops at log level info
-  Then each profile is a heading and each op it runs a sub-heading beneath it
+  Then each profile announces as a `# Run profile <ref>` heading
+  And each op it runs announces as a `## <op>` sub-heading beneath it
   And every mutation the op makes is a plain line indented under its op heading
   And an op that changes nothing renders as a heading with a no-changes note, no lines beneath it
   And a line beneath a profile heading carries no repeated profile-name suffix
@@ -96,11 +97,12 @@ Scenario: discover logs each remote once
 Scenario: a discovered profile reports its working directory and ops
   Status: tested
   When discovery reports a profile
-  Then it lists the profile's working directory
+  Then it announces as a `## Profile <ref>  (profile workdir: <dir>)` heading, one level under the `# discover-profiles` heading
+  And it lists the profile's working directory
   And it lists the os-mutating che commands the profile would perform, execution order
   And config-skipped ops (--skip-ops) are excluded
-  And each op carries its delta count (operations that would change os state now)
-  And at debug each op additionally carries its declared count (`<op>: <changes> (<n> declared)`)
+  And every declared op lists, zero-delta included, as `<op>: <changes> (<n> declared)`, at every level that shows discovery
+  And at debug each op additionally lists its declared items beneath it, each marked changed or unchanged
 
 Scenario: debug logs profiles that failed discovery
   Status: tested
@@ -112,10 +114,11 @@ Scenario: debug logs profiles that failed discovery
 Scenario: dry run reports the true predicted operations
   Status: tested
   When dry-run=delta runs
-  Then only operations that would change os state report, as their real action
-  And dry-run=all additionally reports every settled dest, with its skip reason
-  And skip reasons distinguish already-exists (dirs), already-linked (links), same-content (copies and renders), already-set (perms)
-  And the active dry-run mode joins every skip reason
+  Then only operations that would change os state report
+  And each predicted mutation renders affirmatively with a `(dry run)` suffix, e.g. `create <dest> (dry run)`, never as a `will not` line
+  And dry-run=all additionally reports every settled dest as a no-op: `will not <action> <dest>: <reason>`
+  And no-op reasons distinguish already-exists (dirs), already-linked (links), same-content (copies and renders), already-set (perms)
+  And a no-op line carries only its reason, not the dry-run mode
   And dry-run=all bypasses the zero-delta profile skip
 
 Scenario: mutation reports created or overwritten
@@ -143,6 +146,14 @@ Scenario: uninstall groups removals by profile in reverse application order
   Then each profile's removals sit under a `profile <ref>` heading
   And the profiles unwind in reverse of the order they were applied
   And each removed dest logs one indented line under its profile heading
+
+Scenario: uninstall skips a non-empty che-created dir
+  Status: todo
+  When uninstall reverts a dir op whose dest still holds other content
+  Then the dir stays and a debug skip line reports `will not remove <dest>: directory not empty`
+  And no `removed <dest>` line logs
+  And no inverse removal records in the ledger
+  And no raw rmdir stderr leaks into the output
 
 Scenario: debug logs the config delta from defaults
   Status: tested

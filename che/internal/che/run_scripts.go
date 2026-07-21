@@ -46,7 +46,7 @@ func (p *ProfileReady) runScripts(scripts []string) error {
 	var failed []string
 	for _, script := range scripts {
 		if p.isDryRun() {
-			p.emitSkip(log.Levels.Info, "run-scripts", "run", script, p.dryRunReasons()...)
+			p.emitDryRun("run-scripts", "run", script)
 			continue
 		}
 		p.emit(log.Levels.Debug, "run-scripts", "will-run", script)

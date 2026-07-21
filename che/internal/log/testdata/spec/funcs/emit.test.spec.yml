@@ -27,6 +27,16 @@ cases:
       args: [gate: info, level: info, scope: make-links, action: create, msg: /x, reasons: [already linked, "dry run (all)"]]
     expected:
       output: "will not create /x: already linked, dry run (all)\n"
+  - name: ShouldRenderDryRunAffirmativelyWithSuffix
+    input:
+      args: [gate: info, level: info, scope: make-links, action: create, msg: /x, dryRun: true]
+    expected:
+      output: "create /x (dry run)\n"
+  - name: ShouldPreferReasonsOverDryRunSuffix
+    input:
+      args: [gate: info, level: info, scope: make-links, action: overwrite, msg: /x, dryRun: true, reasons: [already linked]]
+    expected:
+      output: "will not overwrite /x: already linked\n"
   - name: ShouldIndentBodyLineByDepth
     input:
       args: [gate: info, level: info, scope: make-links, action: created, msg: /x, depth: 2]

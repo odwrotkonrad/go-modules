@@ -60,17 +60,17 @@ testCases:
         command: che discover-profiles
         expected:
           stdOut:
-            - "### Profile plain"
-            - "### Profile conditional"
+            - "## Profile plain"
+            - "## Profile conditional"
             - "ops-remote"
             - "will not run profile dropped: runIf failed: env:CHE_E2E_DROPPED"
             - "evaluated run if"
         notExpected:
-          stdOut: ["### Profile dropped "]
+          stdOut: ["## Profile dropped "]
 
       - name: RunDryRun
         command: che run --dry-run=all
-        expected: {stdOut: ["will run"]}
+        expected: {stdOut: ["(dry run)"]}
         notExpected: {files: *allProfilesAllFilesExists}
 
       - name: UninstallDryRun
@@ -79,27 +79,27 @@ testCases:
 
       - name: MakeDirsDryRun
         command: che make-dirs --dry-run=all
-        expected: {stdOut: ["will not"]}
+        expected: {stdOut: ["create ${HOME}/plain (dry run)"]}
         notExpected: {files: *allProfilesAllFilesExists}
 
       - name: MakeLinksDryRun
         command: che make-links --dry-run=all
-        expected: {stdOut: ["will not"]}
+        expected: {stdOut: ["create ${HOME}/plain/link.txt (dry run)"]}
         notExpected: {files: *allProfilesAllFilesExists}
 
       - name: MakeCopiesDryRun
         command: che make-copies --dry-run=all
-        expected: {stdOut: ["will not"]}
+        expected: {stdOut: ["create ${HOME}/plain/copy (dry run)"]}
         notExpected: {files: *allProfilesAllFilesExists}
 
       - name: RenderTemplatesDryRun
         command: che render-templates --dry-run=all
-        expected: {stdOut: ["will not"]}
+        expected: {stdOut: ["create ${HOME}/plain/tpl (dry run)"]}
         notExpected: {files: *allProfilesAllFilesExists}
 
       - name: RunScriptsDryRun
         command: che run-scripts --dry-run=all
-        expected: {stdOut: ["will not run"]}
+        expected: {stdOut: ["run ${LOCAL}/install/plain-script (dry run)"]}
         notExpected: {files: *allProfilesAllFilesExists}
 
       - name: PruneBrokenLinksDryRun
@@ -150,21 +150,21 @@ testCases:
           stdOutFull: |
             using spec ${LOCAL}/che.yml
             cloned remote file://${REMOTE} into ~/.cache/che/remote-sources/{{/[A-Za-z0-9.-]+/}}
-            ### Profile plain  (profile workdir: ${LOCAL}/root)
+            ## Profile plain  (profile workdir: ${LOCAL}/root)
               make-dirs: 2 changes
               make-links: 1 change
               make-copies: 1 change
               render-templates: 1 change
               run-scripts: 1 change
-            ### Profile conditional  (profile workdir: ${LOCAL}/root)
+            ## Profile conditional  (profile workdir: ${LOCAL}/root)
               make-dirs: 2 changes
               make-links: 1 change
               make-copies: 1 change
               render-templates: 1 change
               run-scripts: 1 change
-            ### Profile remote-empty  (profile workdir: ${LOCAL}/root)
+            ## Profile remote-empty  (profile workdir: ${LOCAL}/root)
               no changes
-            ### Profile remote:remote:ops-remote  (profile workdir: ~/.cache/che/remote-sources/{{/[A-Za-z0-9.-]+/}}/root)
+            ## Profile remote:remote:ops-remote  (profile workdir: ~/.cache/che/remote-sources/{{/[A-Za-z0-9.-]+/}}/root)
               make-dirs: 2 changes
               make-links: 1 change
               make-copies: 1 change

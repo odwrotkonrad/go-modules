@@ -73,7 +73,7 @@ func (p *ProfileReady) renderTemplates(templates []spec.FileItem, skipSecrets bo
 					p.emitSkip(log.Levels.Info, "render-templates", p.wouldAction(d.path), d.path, p.skipReasons("same content")...)
 				case settled: // [why] delta mode: an unchanged render logs nothing
 				default:
-					p.emitSkip(log.Levels.Info, "render-templates", p.wouldAction(d.path), d.path, p.dryRunReasons()...)
+					p.emitDryRun("render-templates", p.wouldAction(d.path), d.path)
 				}
 				if d.host {
 					if err := p.fixPerms("render-templates", d.path, t.item); err != nil {

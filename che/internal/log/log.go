@@ -72,7 +72,11 @@ type Event struct {
 	// Reasons name why the action will not happen; presence renders the human
 	// line as "will not <action> <msg>: <reasons>".
 	Reasons []string
-	Attrs   map[string]string // machine-side attributes (profile, dest...)
+	// DryRun marks a predicted mutation (dry run): the action renders
+	// affirmatively with a " (dry run)" suffix ("create <msg> (dry run)"),
+	// never as a "will not" line. Ignored when Reasons is set.
+	DryRun bool
+	Attrs  map[string]string // machine-side attributes (profile, dest...)
 	// Heading, when > 0, renders the event as a markdown-style heading of that
 	// level ("## " for 2, "### " for 3...), bold, no action decoration. 0 (the
 	// default) is a body line, indented under the current heading depth.
@@ -118,6 +122,8 @@ func renderHuman(e Event) string {
 	switch {
 	case len(e.Reasons) > 0:
 		line = bold("will not "+displayAction(e.Action)) + " " + e.Msg + ": " + strings.Join(e.Reasons, ", ")
+	case e.DryRun && e.Action != "":
+		line = bold(displayAction(e.Action)) + " " + e.Msg + " (dry run)"
 	case e.Action != "":
 		line = bold(displayAction(e.Action)) + " " + e.Msg
 	}

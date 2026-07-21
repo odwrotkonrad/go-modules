@@ -37,7 +37,7 @@ func eventFromArgs(t *testing.T, a testyml.Args) Event {
 	level, err := ParseLevel(a.String(t, 1))
 	require.NoError(t, err)
 	e := Event{Level: level, Scope: a.String(t, 2), Action: a.String(t, 3), Msg: a.String(t, 4)}
-	for i := 5; i < 8; i++ {
+	for i := 5; i < 9; i++ {
 		switch a.Name(i) {
 		case "reasons":
 			e.Reasons = a.Strings(t, i)
@@ -45,6 +45,8 @@ func eventFromArgs(t *testing.T, a testyml.Args) Event {
 			e.Depth = a.Int(t, i)
 		case "heading":
 			e.Heading = a.Int(t, i)
+		case "dryRun":
+			e.DryRun = a.Bool(t, i)
 		}
 	}
 	return e

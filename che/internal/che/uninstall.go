@@ -91,7 +91,7 @@ func (u *Uninstaller) revert(op database.OperationDone) error {
 		return nil
 	}
 	if u.dryRun {
-		p.emitSkip(log.Levels.Info, "uninstall", "remove", op.Dest, p.dryRunReasons()...)
+		p.emitDryRun("uninstall", "remove", op.Dest)
 		return nil
 	}
 	if err := p.snapshotForRemoval("uninstall", []string{op.Dest}); err != nil {

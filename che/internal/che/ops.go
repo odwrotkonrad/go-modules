@@ -102,7 +102,7 @@ func (p *ProfileReady) execBackup(dests []string) error {
 	p.currentArchive = path
 	p.currentSub = "backup"
 	if p.isDryRun() { // [why] prediction only: no archive is written
-		p.emitSkip(log.Levels.Info, "backup", "create", path, p.dryRunReasons()...)
+		p.emitDryRun("backup", "create", path)
 		return nil
 	}
 	if err := p.FS.ArchiveDestinations(path, dests); err != nil {

@@ -3,19 +3,19 @@ cases:
   - name: ShouldOnlyReportLinkCreates
     context: {command: che make-links}
     expected:
-      stdOut: "will not create ${HOME}/.config/zsh/{{/\\S+/}}: dry run (delta)"
+      stdOut: "create ${HOME}/.config/zsh/{{/\\S+/}} (dry run)"
   - name: ShouldOnlyReportCopyCreates
     context: {command: che make-copies}
     expected:
-      stdOut: "will not create ${HOME}/.config/zsh/{{/\\S+/}}: dry run (delta)"
+      stdOut: "create ${HOME}/.config/zsh/{{/\\S+/}} (dry run)"
   - name: ShouldOnlyReportRenderCreates
     context: {command: che render-templates}
     expected:
-      stdOut: "will not create ${HOME}/.config/zsh/{{/\\S+/}}: dry run (delta)"
+      stdOut: "create ${HOME}/.config/zsh/{{/\\S+/}} (dry run)"
   - name: ShouldOnlyReportMkdirCreates
     context: {command: che make-dirs}
     expected:
-      stdOut: "will not create ${HOME}/.config: dry run (delta)"
+      stdOut: "create ${HOME}/.config (dry run)"
   - name: ShouldReportBackupArchivePrediction
     context: {command: che backup}
     input:
@@ -23,7 +23,7 @@ cases:
     expected:
       stdOut: |
         backup delta {{/.*/}}
-          will not create {{/.*/}}che-backup-{{/.*/}}.tar.bz2: dry run (delta)
+          create {{/.*/}}che-backup-{{/.*/}}.tar.bz2 (dry run)
     notExpected:
       stdOut:
         - 'created {{/\S*/}}che-backup'
@@ -35,5 +35,5 @@ cases:
   - name: ShouldOnlyReportScriptRuns
     context: {command: che run-scripts}
     expected:
-      stdOut: "will not run ${REPO}/install/setup: dry run (delta)"
+      stdOut: "run ${REPO}/install/setup (dry run)"
 # [<] 🤖🤖

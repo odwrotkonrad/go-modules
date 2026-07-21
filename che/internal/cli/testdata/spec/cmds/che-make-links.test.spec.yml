@@ -10,8 +10,8 @@ cases:
   - name: ShouldSymlinkRepoFilesOntoHomeAndSystem
     expected:
       stdOut: |
-        ## Profile cli/macos
-        ### make-links
+        # Run profile cli/macos
+        ## make-links
           created ${HOME}/.config
           created ${HOME}/.config/bar
           created ${HOME}/.config/zsh
@@ -29,13 +29,13 @@ cases:
   - name: ShouldLogDiscoveryBeforeDirectOp
     expected:
       stdOut: |
-        ### Profile cli/macos  (profile workdir: {{/[^)]*/}})
+        ## Profile cli/macos  (profile workdir: {{/[^)]*/}})
           make-dirs: 8 changes
           make-links: 3 changes
           make-copies: 2 changes
           render-templates: 1 change
           run-scripts: 1 change
-        ## Profile cli/macos
-        ### make-links
+        # Run profile cli/macos
+        ## make-links
           created ${HOME}/.config
 # [<] 🤖

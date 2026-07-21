@@ -10,7 +10,7 @@ cases:
   - name: ShouldLogDiscoveredProfileWithOpCounts
     expected:
       stdOut: |
-        ### Profile cli/macos  (profile workdir: {{/[^)]*/}})
+        ## Profile cli/macos  (profile workdir: {{/[^)]*/}})
           make-dirs: 8 changes
           make-links: 3 changes
           make-copies: 2 changes
@@ -21,12 +21,12 @@ cases:
       command: che discover-profiles --profile cli/macos,ontoRepo
     expected:
       stdOut: |
-        ### Profile cli/macos  (profile workdir: {{/[^)]*/}})
+        ## Profile cli/macos  (profile workdir: {{/[^)]*/}})
           make-dirs: 8 changes
           make-links: 3 changes
           make-copies: 2 changes
           render-templates: 1 change
           run-scripts: 1 change
-        ### Profile ontoRepo  (profile workdir: {{/[^)]*/}})
+        ## Profile ontoRepo  (profile workdir: {{/[^)]*/}})
           render-templates: 1 change
 # [<] 🤖

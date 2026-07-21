@@ -718,8 +718,8 @@ func (s *SpecReady) ExecEach(ctx context.Context, opName string, fn func(context
 		pctx, pspan := s.tel.Span(ctx, "profile", attribute.String("profile", p.Ref()))
 		s.tel.CountProfile(pctx, p.Ref())
 		log.EmitDebug(opName, "will-run", "profile "+p.Ref()+": "+p.describeOpDeltas(opName))
-		p.emitHeading(log.Levels.Info, opName, "run-profile", "Profile "+p.Ref(), 2)
-		p.logDepth = 2
+		p.emitHeading(log.Levels.Info, opName, "run-profile", "Run profile "+p.Ref(), 1)
+		p.logDepth = 1
 		if err := fn(pctx, p); err != nil {
 			pspan.RecordError(err)
 			fails = append(fails, fmt.Errorf("%s: %w", p.Ref(), err))
@@ -821,6 +821,16 @@ func (p *ProfileReady) emitHeading(level log.Level, scope, action, msg string, h
 	})
 }
 
+// emitDryRun logs one profile-scoped predicted-mutation event: the action
+// renders affirmatively with a "(dry run)" suffix ("create <msg> (dry run)"),
+// not as a "will not" skip.
+func (p *ProfileReady) emitDryRun(scope, action, msg string) {
+	log.Emit(log.Event{
+		Level: log.Levels.Info, Scope: scope, Action: action, Msg: msg, DryRun: true,
+		Attrs: map[string]string{"profile": p.Ref(), "dryRun": string(p.opts.DryRun)}, Depth: p.logDepth,
+	})
+}
+
 // mutate is the one dry-run+log gate for every mutating op: dry run logs only
 // (fs untouched); real run executes fn, then logs. On a real run it also records
 // the dest mutation into the ops ledger (classify prev before fn, next after),
@@ -831,7 +841,7 @@ func (p *ProfileReady) mutate(scope, action, msg, dest string, info opInfo, fn f
 		if action == "create" && prev.Present {
 			action = "overwrite"
 		}
-		p.emitSkip(log.Levels.Info, scope, action, msg, p.dryRunReasons()...)
+		p.emitDryRun(scope, action, msg)
 		return nil
 	}
 	if err := fn(); err != nil {
@@ -934,7 +944,7 @@ func (p *ProfileReady) logDiscovered() {
 	}
 	heading := fmt.Sprintf("Profile %s  (profile workdir: %s)",
 		p.Ref(), abbreviateHome(p.workingDir, p.home))
-	log.Emit(log.Event{Level: log.Levels.Info, Scope: "discover-profiles", Action: "discovered", Msg: heading, Attrs: attrs, Heading: 3})
+	log.Emit(log.Event{Level: log.Levels.Info, Scope: "discover-profiles", Action: "discovered", Msg: heading, Attrs: attrs, Heading: 2})
 	for _, l := range lines {
 		log.Emit(log.Event{Level: log.Levels.Info, Scope: "discover-profiles", Msg: l, Depth: 1})
 	}
@@ -1039,15 +1049,6 @@ func resolvePastAction(action string, existed bool) string {
 	return "created"
 }
 
-// dryRunReasons is the active dry-run mode as a skip reason list (empty when
-// off).
-func (p *ProfileReady) dryRunReasons() []string {
-	if p.opts.DryRun == options.DryRun.Off {
-		return nil
-	}
-	return []string{"dry run (" + string(p.opts.DryRun) + ")"}
-}
-
 // skipOpsReason names the config option that skipped op.
 func (p *ProfileReady) skipOpsReason(op string) string {
 	if slices.Contains(p.opts.SkipOps, op) {
@@ -1065,9 +1066,11 @@ func (p *ProfileReady) wouldAction(dest string) string {
 	return "create"
 }
 
-// skipReasons appends the dry-run reason to base reasons.
+// skipReasons is the base reason list for a genuine no-op skip (already
+// settled dest). The reason itself explains why nothing changes; the dry-run
+// mode is not appended (these lines surface only under dry-run=all anyway).
 func (p *ProfileReady) skipReasons(reasons ...string) []string {
-	return append(reasons, p.dryRunReasons()...)
+	return reasons
 }
 
 // deriveOpType maps a prev/next Object pair to the op_type discriminator.

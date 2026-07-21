@@ -10,8 +10,8 @@ cases:
   - name: ShouldCreateConfigDirsAndReapplySetgidChmod
     expected:
       stdOut: |
-        ## Profile cli/macos
-        ### make-dirs
+        # Run profile cli/macos
+        ## make-dirs
           created ${HOME}/.config
           created ${HOME}/.config/bar
           created ${HOME}/.config/zsh
