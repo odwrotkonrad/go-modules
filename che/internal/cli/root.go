@@ -50,8 +50,19 @@ sourced profile refs included).`,
 		SilenceErrors: true,
 		PersistentPreRunE: func(cmd *cobra.Command, args []string) error {
 			name := cmd.Name()
-			if p := cmd.Parent(); p != nil && p.Name() == "config" {
-				name = "config"
+			if p := cmd.Parent(); p != nil {
+				switch p.Name() {
+				case "config":
+					name = "config"
+				case "backup":
+					// [why] backup create stays on the spec path under the
+					// command name "backup"; ls/restore are ledger-only.
+					if name == "create" {
+						name = "backup"
+					} else {
+						name = "backup-" + name
+					}
+				}
 			}
 			return a.init(name)
 		},
@@ -126,7 +137,7 @@ func (a *app) init(command string) error {
 	ctx.RunCtx = a.runCtx
 	a.ctx = ctx
 	a.tel.CountCommand(a.runCtx, command)
-	if command == "uninstall" || command == "config" {
+	if command == "uninstall" || command == "config" || command == "backup-ls" || command == "backup-restore" {
 		return nil
 	}
 	// [why] the init stage prefetches every remote spec source before
@@ -230,11 +241,17 @@ func (a *app) initCmd() *cobra.Command {
 	}
 }
 
-// backupCmd archives every op dest of every profile into the per-run backup
-// archive and exits.
+// backupCmd is the backup command group: `backup create` archives every
+// would-change op dest, `backup ls` lists the recorded backup points, `backup
+// restore` restores state by --run-id, --backup-id, or --timestamp. Bare
+// `backup` prints usage.
 func (a *app) backupCmd() *cobra.Command {
-	return &cobra.Command{
+	cmd := &cobra.Command{
 		Use:   "backup",
+		Short: "manage backup archives: create, ls, restore",
+	}
+	create := &cobra.Command{
+		Use:   "create",
 		Short: "archive every op dest (links, copies, host renders) into the per-run backup archive and exit",
 		RunE: func(cmd *cobra.Command, args []string) error {
 			return a.root.ExecEach(a.runCtx, "backup", func(ctx context.Context, p *che.ProfileReady) error {
@@ -242,6 +259,32 @@ func (a *app) backupCmd() *cobra.Command {
 			})
 		},
 	}
+	ls := &cobra.Command{
+		Use:   "ls",
+		Short: "list the backup points (run id, backup id, timestamp, size, path), newest first",
+		RunE: func(cmd *cobra.Command, args []string) error {
+			return che.ListBackups(a.ctx)
+		},
+	}
+	var sel che.RestoreSelector
+	restore := &cobra.Command{
+		Use:   "restore",
+		Short: "restore state from backup archives: --run-id (that run's archives), --backup-id (one archive), --timestamp (point-in-time)",
+		RunE: func(cmd *cobra.Command, args []string) error {
+			r, err := che.NewRestorer(a.ctx, a.opts)
+			if err != nil {
+				return err
+			}
+			defer func() { _ = r.Close() }()
+			return r.Restore(sel)
+		},
+	}
+	restore.Flags().StringVar(&sel.RunID, "run-id", "", "restore every archive of this run id")
+	restore.Flags().StringVar(&sel.BackupID, "backup-id", "", "restore the single archive carrying this backup id")
+	restore.Flags().StringVar(&sel.Timestamp, "timestamp", "", "point-in-time restore: per dest, the newest backup at or before this timestamp (20060102T150405)")
+	restore.MarkFlagsMutuallyExclusive("run-id", "backup-id", "timestamp")
+	cmd.AddCommand(create, ls, restore)
+	return cmd
 }
 
 // discoverCmd logs each prepared profile's discovered entry (per-op change

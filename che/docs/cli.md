@@ -23,7 +23,25 @@ sourced profile refs included).
 
 ### `$ che backup`
 
+manage backup archives: create, ls, restore.
+
+### `$ che backup create`
+
 archive every op dest (links, copies, host renders) into the per-run backup archive and exit.
+
+### `$ che backup ls`
+
+list the backup points (run id, backup id, timestamp, size, path), newest first.
+
+### `$ che backup restore`
+
+restore state from backup archives: --run-id (that run's archives), --backup-id (one archive), --timestamp (point-in-time).
+
+| Option | Env | Values | Default | Description |
+| --- | --- | --- | --- | --- |
+| `--backup-id` |  | `string` |  | restore the single archive carrying this backup id |
+| `--run-id` |  | `string` |  | restore every archive of this run id |
+| `--timestamp` |  | `string` |  | point-in-time restore: per dest, the newest backup at or before this timestamp (20060102T150405) |
 
 ### `$ che completion`
 

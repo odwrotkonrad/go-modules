@@ -14,7 +14,7 @@ cases:
         created /Library
         created /Library/LaunchDaemons
         created /etc
-        created {{/.*/}}che-make-links-{{/.*/}}.tar.bz2
+        created {{/.*/}}/make-links/{{/.*/}}.tar.bz2
         created ${HOME}/.config/zsh/.zshrc
         created /etc/zshrc
 # [<] 🤖

@@ -80,7 +80,7 @@ e2e-dryrun: build-cover
 #[what] real full-flow e2e (CHE_LOG_LEVEL=info), binary covdata into ./cover-e2e-run
 e2e-run: build-cover
 	if [[ -e cover-e2e-run ]] rm -rf cover-e2e-run; mkdir -p cover-e2e-run
-	E2E_BIN=$(CURDIR)/dist/$(BIN) E2E_GOCOVERDIR=$(CURDIR)/cover-e2e-run CC=$(CC) $(GO) test -v -run TestE2ERun ./e2e
+	E2E_BIN=$(CURDIR)/dist/$(BIN) E2E_GOCOVERDIR=$(CURDIR)/cover-e2e-run CC=$(CC) $(GO) test -v -run 'TestE2ERun|TestE2EBackup' ./e2e
 
 #[what] run both e2e flows
 e2e: e2e-dryrun e2e-run

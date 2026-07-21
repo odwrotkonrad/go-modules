@@ -12,7 +12,7 @@ cases:
       stdOut: |
         # Run profile cli/macos
         ## render-templates
-          created ${HOME}/.local/state/che/backups/che-render-{{/\S*/}}.tar.bz2
+          created ${HOME}/.local/state/che/backups/cli-macos/render/{{/\S*/}}.tar.bz2
           created ${HOME}/.config/zsh/t
   - name: ShouldRenderOnlyRepoDestsForOntoRepoProfile
     context:

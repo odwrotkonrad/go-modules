@@ -18,7 +18,7 @@ cases:
           created /Library
           created /Library/LaunchDaemons
           created /etc
-          created ${HOME}/.local/state/che/backups/che-make-links-{{/\S*/}}.tar.bz2
+          created ${HOME}/.local/state/che/backups/cli-macos/make-links/{{/\S*/}}.tar.bz2
           created ${HOME}/.config/bar/a
           created ${HOME}/.config/zsh/.zshrc
           created /etc/zshrc

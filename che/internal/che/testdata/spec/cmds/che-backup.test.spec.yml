@@ -1,6 +1,6 @@
 # [>] 🤖🤖
 context:
-  command: che backup
+  command: che backup create
   mockedInterfaces:
     execx.CmdExecutor: testutil.CmdMockExecutor
     fsutil.FileSystemWriter: testutil.FileSystemMockWriter
@@ -12,7 +12,7 @@ cases:
         backup delta {{/.*/}}
     notExpected:
       stdOut:
-        - 'created {{/\S*/}}che-backup'
+        - 'created {{/\S*/}}/backup/'
   - name: ShouldLogOnlyShowDeltaForSettledDests
     input:
       args: [settleLink: true]
@@ -21,12 +21,12 @@ cases:
         backup delta make-links (1 change), make-copies (2 changes), render-templates (1 change)
     notExpected:
       stdOut:
-        - 'created {{/\S*/}}che-backup'
+        - 'created {{/\S*/}}/backup/'
   - name: ShouldArchiveOnlyDestsThatWouldChange
     input:
       args: [driftLink: true]
     expected:
       stdOut: |
         backup delta make-links ({{/[0-9]+/}} change{{/s?/}}), make-copies ({{/[0-9]+/}} change{{/s?/}}), render-templates ({{/[0-9]+/}} change{{/s?/}})
-          created {{/.*/}}B, ${HOME}/.local/state/che/backups/che-backup-{{/.*/}}.tar.bz2
+          created {{/.*/}}B, ${HOME}/.local/state/che/backups/cli-macos/backup/{{/.*/}}.tar.bz2
 # [<] 🤖🤖

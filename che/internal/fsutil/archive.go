@@ -17,12 +17,28 @@ import (
 // TsLayout stamps backup filenames + log lines (one stamp per run).
 const TsLayout = "20060102T150405"
 
-// ResolveBackupArchivePath resolves the XDG state backups dir + per-run archive
-// filename: <ResolveStateHome>/backups/<bin>-<sub>-<ts>.tar.bz2 (default
-// ~/.local/state/che/backups).
-func ResolveBackupArchivePath(home, bin, sub, ts string) string {
-	name := fmt.Sprintf("%s-%s-%s.tar.bz2", bin, sub, ts)
-	return filepath.Join(ResolveStateHome(home), "backups", name)
+// ResolveBackupArchivePath resolves one backup archive's path under the XDG
+// state backups dir: <ResolveStateHome>/backups/<profileSlug>/<op>/<ts>-<backupID>.tar.bz2
+// (default ~/.local/state/che/backups). Each archive carries its own backupID.
+func ResolveBackupArchivePath(home, profileSlug, op, ts, backupID string) string {
+	name := fmt.Sprintf("%s-%s.tar.bz2", ts, backupID)
+	return filepath.Join(ResolveStateHome(home), "backups", profileSlug, op, name)
+}
+
+// SlugRef sanitizes a profile ref into a path segment: path separators and
+// colons flattened to hyphens (cli/macos -> cli-macos).
+func SlugRef(ref string) string {
+	s := strings.NewReplacer("/", "-", ":", "-").Replace(ref)
+	return strings.Trim(s, "-")
+}
+
+// ParseBackupArchiveName splits an archive path's basename into its ts and
+// backup id (<ts>-<backupID>.tar.bz2); an unparseable name returns it whole as
+// ts with an empty id.
+func ParseBackupArchiveName(path string) (ts, backupID string) {
+	base := strings.TrimSuffix(filepath.Base(path), ".tar.bz2")
+	ts, backupID, _ = strings.Cut(base, "-")
+	return ts, backupID
 }
 
 // ArchiveDestinations snapshots each existing dest's contents into a single .tar.bz2
@@ -75,6 +91,33 @@ func archiveDest(tw *tar.Writer, dest string) error {
 	}
 	_, err = tw.Write(body)
 	return err
+}
+
+// ListArchiveEntries lists the dest paths archived at archivePath (entry names
+// restored to absolute form). Mirror of ArchiveDestinations.
+func ListArchiveEntries(archivePath string) ([]string, error) {
+	in, err := os.Open(archivePath)
+	if err != nil {
+		return nil, err
+	}
+	defer in.Close()
+	bz, err := bzip2.NewReader(in, nil)
+	if err != nil {
+		return nil, err
+	}
+	defer func() { _ = bz.Close() }()
+	tr := tar.NewReader(bz)
+	var out []string
+	for {
+		hdr, err := tr.Next()
+		if errors.Is(err, io.EOF) {
+			return out, nil
+		}
+		if err != nil {
+			return nil, err
+		}
+		out = append(out, "/"+filepath.FromSlash(hdr.Name))
+	}
 }
 
 // ReadFromArchive finds dest's entry (stripped-absolute name) in the .tar.bz2 at

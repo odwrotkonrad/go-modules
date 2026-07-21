@@ -21,7 +21,7 @@ import (
 // SpecDone is one recorded che invocation (the root resolved spec of a run).
 type SpecDone struct {
 	ID            uint   `gorm:"primaryKey"`
-	RunID         string `gorm:"index"` // TsLayout stamp; second-precision, not unique (same-second runs share it)
+	RunID         string `gorm:"index"` // 12-char base36 per-run id, unique per invocation
 	CreatedAt     time.Time
 	DefinitionURI string
 	Command       string
@@ -77,6 +77,9 @@ type Backup struct {
 	CreatedAt  time.Time
 	Path       string `gorm:"uniqueIndex"`
 	Sub        string
+	// RunID is the owning run's id, populated by Backups' join (read-only
+	// projection; not a stored column).
+	RunID string `gorm:"->;column:run_id"`
 }
 
 // [<] 🤖🤖 models
@@ -177,6 +180,41 @@ func (d *DB) installedWhere(ref string) ([]OperationDone, error) {
 		Select("operation_dones.*, profile_dones.ref as profile_ref").
 		Where("operation_dones.id IN (?)", sub).
 		Where("operation_dones.op_type <> ?", "remove").
+		Order("operation_dones.id DESC").
+		Find(&ops).Error
+	return ops, err
+}
+
+// Backups lists every backup archive row with its run's id projected, newest
+// first (backup ls). nil DB -> nil.
+func (d *DB) Backups() ([]Backup, error) {
+	if d == nil {
+		return nil, nil
+	}
+	var out []Backup
+	err := d.gorm.Model(&Backup{}).
+		Joins("JOIN spec_dones ON spec_dones.id = backups.spec_done_id").
+		Select("backups.*, spec_dones.run_id as run_id").
+		Order("backups.id DESC").
+		Find(&out).Error
+	return out, err
+}
+
+// LatestOps returns the newest OperationDone per dest, removes included, with
+// the owning profile's ref projected: the last recorded state of every dest che
+// ever touched (the restore drift guard + grouping). nil DB -> nil.
+func (d *DB) LatestOps() ([]OperationDone, error) {
+	if d == nil {
+		return nil, nil
+	}
+	sub := d.gorm.Model(&OperationDone{}).
+		Select("MAX(operation_dones.id) as id").
+		Group("operation_dones.dest")
+	var ops []OperationDone
+	err := d.gorm.Model(&OperationDone{}).
+		Joins("JOIN profile_dones ON profile_dones.id = operation_dones.profile_done_id").
+		Select("operation_dones.*, profile_dones.ref as profile_ref").
+		Where("operation_dones.id IN (?)", sub).
 		Order("operation_dones.id DESC").
 		Find(&ops).Error
 	return ops, err

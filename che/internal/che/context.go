@@ -4,6 +4,7 @@ package che
 
 import (
 	"context"
+	"crypto/rand"
 	"os"
 	"strings"
 	"time"
@@ -19,7 +20,8 @@ type Context struct {
 	Env     map[string]string // CHE_*/HOME/SUDO_USER/runIf env, snapshot at entry
 	Cwd     string            // replaces os.Getwd
 	Euid    int               // replaces os.Geteuid
-	RunID   string            // one TsLayout stamp per invocation: ledger run + backup filenames
+	RunID   string            // one 12-char base36 id per invocation: ledger run key + restore --run-id selector
+	RunTs   string            // one TsLayout stamp per invocation: backup archive filenames
 	Command string            // the invoked subcommand (ledger SpecDone.Command), set at the CLI boundary
 	// Tel is the OTLP telemetry handle started at the CLI boundary after options
 	// resolve; nil (tests, disabled) makes every counter/log call a no-op.
@@ -38,13 +40,30 @@ func (c Context) runContext() context.Context {
 }
 
 // NewContext snapshots the process launch world (os.Environ -> map, os.Getwd,
-// os.Geteuid) and stamps the per-run id (backup filenames + ledger run key).
+// os.Geteuid) and stamps the per-run id (ledger run key) plus the run's
+// TsLayout stamp (backup archive filenames).
 func NewContext() (Context, error) {
 	cwd, err := os.Getwd()
 	if err != nil {
 		return Context{}, err
 	}
-	return Context{Env: environMap(), Cwd: cwd, Euid: os.Geteuid(), RunID: time.Now().Format(fsutil.TsLayout)}, nil
+	return Context{Env: environMap(), Cwd: cwd, Euid: os.Geteuid(), RunID: newID(), RunTs: time.Now().Format(fsutil.TsLayout)}, nil
+}
+
+// idAlphabet is the base36 token alphabet (run ids + backup ids).
+const idAlphabet = "0123456789abcdefghijklmnopqrstuvwxyz"
+
+// newID returns a 12-char base36 random token: one per run (Context.RunID) and
+// one per backup archive filename.
+func newID() string {
+	b := make([]byte, 12)
+	if _, err := rand.Read(b); err != nil {
+		panic(err)
+	}
+	for i := range b {
+		b[i] = idAlphabet[int(b[i])%len(idAlphabet)]
+	}
+	return string(b)
 }
 
 // environMap materializes os.Environ into a KEY -> value map.

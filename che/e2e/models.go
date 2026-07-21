@@ -45,14 +45,17 @@ type specContext struct {
 }
 
 type step struct {
-	Name        string       `yaml:"name"`
-	Command     string       `yaml:"command"`
-	Write       *writeSpec   `yaml:"write"`
-	Remove      *removeSpec  `yaml:"remove"`
-	GitRestore  *gitSpec     `yaml:"gitRestore"`
-	Extract     *extractSpec `yaml:"extract"`
-	Expected    want         `yaml:"expected"`
-	NotExpected notWant      `yaml:"notExpected"`
+	Name       string       `yaml:"name"`
+	Command    string       `yaml:"command"`
+	Write      *writeSpec   `yaml:"write"`
+	Remove     *removeSpec  `yaml:"remove"`
+	GitRestore *gitSpec     `yaml:"gitRestore"`
+	Extract    *extractSpec `yaml:"extract"`
+	// Capture extracts vars from a command step's output: var name -> regex
+	// with one capture group, stored for later steps' ${VAR} expansion.
+	Capture     map[string]string `yaml:"capture"`
+	Expected    want              `yaml:"expected"`
+	NotExpected notWant           `yaml:"notExpected"`
 }
 
 // countActions counts the step's declared actions (exactly one is valid).
