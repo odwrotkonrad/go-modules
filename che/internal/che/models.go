@@ -265,16 +265,39 @@ func (p *specsPrep) prepare(src spec.SpecSourceRecipe, anchor string, forced *sp
 }
 
 // findRepoRoot: git toplevel of ctx.Cwd, che.yml must live there (che's
-// defining marker).
+// defining marker). Outside any git repo, the nearest ancestor dir (ctx.Cwd
+// included) carrying a che.yml anchors instead ([why] specs must run from
+// non-repo dirs too, e.g. a container home carrying only a che.yml).
 func findRepoRoot(ctx Context) (string, error) {
 	root, err := fsutil.ResolveRepoRoot(ctx.Cwd)
 	if err != nil {
+		if fsutil.IsNoRepo(err) {
+			return findSpecRoot(ctx.Cwd)
+		}
 		return "", err
 	}
 	if _, err := os.Stat(filepath.Join(root, "che.yml")); err != nil {
 		return "", fmt.Errorf("che.yml not found at repo root %s", root)
 	}
 	return root, nil
+}
+
+// findSpecRoot walks up from dir to the nearest ancestor carrying a che.yml.
+func findSpecRoot(dir string) (string, error) {
+	d, err := filepath.Abs(dir)
+	if err != nil {
+		return "", err
+	}
+	for {
+		if _, err := os.Stat(filepath.Join(d, "che.yml")); err == nil {
+			return d, nil
+		}
+		parent := filepath.Dir(d)
+		if parent == d {
+			return "", fmt.Errorf("che.yml not found walking up from %s (no git repo)", dir)
+		}
+		d = parent
+	}
 }
 
 // resolveInvokingHome resolves the invoking user's home. Under sudo (EUID 0,

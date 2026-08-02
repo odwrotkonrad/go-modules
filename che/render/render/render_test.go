@@ -6,6 +6,7 @@ import (
 	"embed"
 	"errors"
 	"os"
+	"path/filepath"
 	"testing"
 	"time"
 
@@ -189,7 +190,12 @@ func TestDirsTree(t *testing.T) {
 		var files map[string]string
 		c.Input.Args.To(t, 0, &files)
 		dir := t.TempDir()
-		if len(files) > 0 {
+		if len(files) > 0 && c.Input.Args.Bool(t, 1) {
+			for p, body := range files {
+				require.NoError(t, os.MkdirAll(filepath.Join(dir, filepath.Dir(p)), 0o755))
+				require.NoError(t, os.WriteFile(filepath.Join(dir, p), []byte(body), 0o644))
+			}
+		} else if len(files) > 0 {
 			dir = testutil.Repo(t, files)
 		}
 		got, err := DirsTree(dir)

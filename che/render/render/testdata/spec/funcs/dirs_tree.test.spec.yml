@@ -12,7 +12,15 @@ cases:
             src/lib/y: x
     expected:
       files: testdata/fixture/dirs-tree/expected.tree
-  - name: ShouldErrorOutsideGitRepo
+  - name: ShouldWalkTreeOutsideGitRepo
+    input:
+      args:
+        - files:
+            top: x
+            .hidden/file: x
+            docs/data/x: x
+            src/lib/y: x
+        - norepo: true
     expected:
-      errorOutput: ['open git repo from']
+      files: testdata/fixture/dirs-tree/expected.tree
 # [<] 🤖🤖

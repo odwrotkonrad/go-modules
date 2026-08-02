@@ -158,3 +158,16 @@ func TestFSOps(t *testing.T) {
 }
 
 // [<] 🤖🤖
+
+// TestTrackedFilesNoRepo: outside any git repo the listing falls back to a
+// filesystem walk: nested files in, dirs and .git contents out.
+func TestTrackedFilesNoRepo(t *testing.T) {
+	dir := t.TempDir()
+	require.NoError(t, os.MkdirAll(filepath.Join(dir, "sub"), 0o755))
+	require.NoError(t, os.WriteFile(filepath.Join(dir, "che.yml"), []byte("x"), 0o644))
+	require.NoError(t, os.WriteFile(filepath.Join(dir, "sub", "f"), []byte("x"), 0o644))
+	got, err := ListTrackedFiles(dir)
+	require.NoError(t, err)
+	slices.Sort(got)
+	require.Equal(t, []string{"che.yml", filepath.Join("sub", "f")}, got)
+}

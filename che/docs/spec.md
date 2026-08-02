@@ -312,7 +312,9 @@ too), deduped by source + profile, cycle-guarded. `--skip-remote-refs` (env
 
 ### makeLinks
 
-Entries over git-tracked files under `root/`, repo-relative below it. Symlinks
+Entries over git-tracked files under `root/`, repo-relative below it (outside
+any git repo the spec anchors at the nearest ancestor dir carrying a `che.yml`
+and file selection falls back to a filesystem walk). Symlinks
 to the derived host path (`root/etc/x` -> `/etc/x`; home targeting via a `$HOME`
 dest rewrite). Templates, `*.ontoHost.cp`, `.gitkeep` never link.
 
