@@ -572,3 +572,22 @@ func TestExecEachSkipsZeroDeltaProfile(t *testing.T) {
 }
 
 // [<] 🤖🤖
+
+// TestFindSpecRoot: outside any git repo the spec anchors at the nearest
+// ancestor carrying a che.yml; none up to / errors.
+func TestFindSpecRoot(t *testing.T) {
+	dir := t.TempDir()
+	require.NoError(t, os.MkdirAll(filepath.Join(dir, "a", "b"), 0o755))
+	require.NoError(t, os.WriteFile(filepath.Join(dir, "che.yml"), []byte("x"), 0o644))
+
+	got, err := findSpecRoot(filepath.Join(dir, "a", "b"))
+	require.NoError(t, err)
+	want, err := filepath.EvalSymlinks(dir)
+	require.NoError(t, err)
+	gotEval, err := filepath.EvalSymlinks(got)
+	require.NoError(t, err)
+	require.Equal(t, want, gotEval)
+
+	_, err = findSpecRoot(filepath.Join(os.TempDir(), "definitely-no-spec-here"))
+	require.Error(t, err)
+}

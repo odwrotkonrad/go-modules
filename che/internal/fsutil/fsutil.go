@@ -4,7 +4,9 @@ package fsutil
 // [>] 🤖🤖
 
 import (
+	"errors"
 	"fmt"
+	"io/fs"
 	"maps"
 	"os"
 	"path/filepath"
@@ -185,6 +187,9 @@ func MergeMap[K comparable, V any](base, overlay map[K]V) map[K]V {
 	return out
 }
 
+// IsNoRepo reports whether err means no enclosing git repo was found.
+func IsNoRepo(err error) bool { return errors.Is(err, git.ErrRepositoryNotExists) }
+
 // openRepo opens the git repo containing dir (walking up for .git).
 func openRepo(dir string) (*git.Repository, string, error) {
 	repo, err := git.PlainOpenWithOptions(dir, &git.PlainOpenOptions{DetectDotGit: true})
@@ -209,10 +214,15 @@ func ResolveRepoRoot(dir string) (string, error) {
 }
 
 // ListTrackedFiles lists git-tracked files under root, relative to root. root may be
-// a repo subtree: only entries within it returned, prefix-stripped.
+// a repo subtree: only entries within it returned, prefix-stripped. Outside any
+// git repo it falls back to a filesystem walk ([why] specs must run from
+// non-repo dirs too, e.g. a container home carrying only a che.yml).
 func ListTrackedFiles(root string) ([]string, error) {
 	repo, repoRoot, err := openRepo(root)
 	if err != nil {
+		if IsNoRepo(err) {
+			return listFilesWalk(root)
+		}
 		return nil, err
 	}
 	idx, err := repo.Storer.Index()
@@ -233,6 +243,43 @@ func ListTrackedFiles(root string) ([]string, error) {
 			continue // outside the requested subtree
 		}
 		files = append(files, rel)
+	}
+	return files, nil
+}
+
+// listFilesWalk lists regular files (and symlinks) under root recursively,
+// relative to root, .git dirs skipped: the no-repo stand-in for the git index.
+func listFilesWalk(root string) ([]string, error) {
+	abs, err := filepath.Abs(root)
+	if err != nil {
+		return nil, err
+	}
+	if abs, err = filepath.EvalSymlinks(abs); err != nil {
+		return nil, err
+	}
+	var files []string
+	err = filepath.WalkDir(abs, func(p string, d fs.DirEntry, walkErr error) error {
+		if walkErr != nil {
+			return walkErr
+		}
+		if d.IsDir() {
+			if d.Name() == git.GitDirName {
+				return filepath.SkipDir
+			}
+			return nil
+		}
+		if !d.Type().IsRegular() && d.Type()&fs.ModeSymlink == 0 {
+			return nil
+		}
+		rel, err := filepath.Rel(abs, p)
+		if err != nil {
+			return err
+		}
+		files = append(files, rel)
+		return nil
+	})
+	if err != nil {
+		return nil, fmt.Errorf("list files under %s: %w", root, err)
 	}
 	return files, nil
 }
