@@ -66,8 +66,13 @@ func execWithCtx(name string, body []byte, repoRoot string, itemCtx map[string]s
 		secret = secretFunc(ctx)
 	}
 	funcs := template.FuncMap{
-		"secret":               secret,
-		"renderDirsTree":       func() (string, error) { return DirsTree(repoRoot) },
+		"secret": secret,
+		"renderDirsTree": func(rel ...string) (string, error) {
+			if len(rel) > 0 {
+				return DirsTree(filepath.Join(repoRoot, rel[0]))
+			}
+			return DirsTree(repoRoot)
+		},
 		"renderRepoGroupIndex": RepoGroupIndexDir,
 		"renderMakefileDoc":    MakefileDoc,
 		"frontmatter":          func(path string) (string, error) { return ReadFrontmatter(repoRoot, path) },
