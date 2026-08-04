@@ -182,6 +182,7 @@ func (ProfileSourceRecipe) JSONSchema() *jsonschema.Schema {
 	})
 	o.Properties.Set("options", &jsonschema.Schema{Ref: "#/$defs/ProfileOptions"})
 	o.Properties.Set("env", envSchema("envs exported around everything done for the referenced profile (sourced entries only)"))
+	o.Properties.Set("ctx", envSchema("ctx overlay merged over the referenced profile's renderTemplates ctx (entry wins), parameterizing a shared profile per consumer (sourced entries only)"))
 	return scalarOr("local profile name, composed depth-first", o)
 }
 

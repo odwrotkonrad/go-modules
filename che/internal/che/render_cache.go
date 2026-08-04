@@ -59,7 +59,7 @@ func (p *ProfileReady) renderSettled(item spec.FileItem) map[string]bool {
 	if err != nil {
 		return settled
 	}
-	body, err := render.ExecWithCtxMockSecrets(tmplPath, src, p.resolveRepoRoot(), item.Ctx)
+	body, err := render.ExecWithCtxMockSecrets(tmplPath, src, p.templateAnchor(item), p.mergedCtx(item.Ctx))
 	if err != nil {
 		return settled
 	}
@@ -98,7 +98,7 @@ func (p *ProfileReady) renderCounts(templates []spec.FileItem) (int, int) {
 func (p *ProfileReady) storeRenderHashes(item spec.FileItem, dests []tmplDest, tmplPath string, src, body []byte) {
 	hash := hashHex(body)
 	if render.IsSecretRefPresent(src) {
-		mocked, err := render.ExecWithCtxMockSecrets(tmplPath, src, p.resolveRepoRoot(), item.Ctx)
+		mocked, err := render.ExecWithCtxMockSecrets(tmplPath, src, p.templateAnchor(item), p.mergedCtx(item.Ctx))
 		if err != nil {
 			return
 		}

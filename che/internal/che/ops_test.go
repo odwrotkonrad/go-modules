@@ -47,6 +47,7 @@ func newProfile(dir, home string, cfg options.Options) *ProfileReady {
 	return &ProfileReady{
 		Source:      spec.ProfileSourceReady{ProfileName: testutil.CheProfile},
 		ref:         testutil.CheProfile,
+		env:         map[string]string{"invokingSpecGitRoot": dir},
 		workingDir:  filepath.Join(dir, "root"),
 		opts:        cfg,
 		home:        home,

@@ -171,6 +171,13 @@
               },
               "type": "object",
               "description": "envs exported around everything done for the referenced profile (sourced entries only)"
+            },
+            "ctx": {
+              "additionalProperties": {
+                "type": "string"
+              },
+              "type": "object",
+              "description": "ctx overlay merged over the referenced profile's renderTemplates ctx (entry wins), parameterizing a shared profile per consumer (sourced entries only)"
             }
           },
           "additionalProperties": false,
@@ -507,7 +514,7 @@
             "$ref": "#/$defs/templateGroup"
           },
           "type": "array",
-          "description": "*.tpl render-op perm-groups; local host sources workingDirectory-relative, repo-doc sources (repo dest) checkout-relative, or remote (@\u003crepo\u003e//\u003cpath\u003e[?ref=\u003cref\u003e], explicit dest required); glob and derived-dest forms are host sources; a glob source may carry a {source, dest} dest rewrite (sed-style s:^_home:$HOME: or prefix-swap sugar _home/** -\u003e $HOME/**)"
+          "description": "*.tpl render-op perm-groups; local host sources workingDirectory-relative, repo-doc sources (repo dest) workingDirectory-relative, or remote (@\u003crepo\u003e//\u003cpath\u003e[?ref=\u003cref\u003e], explicit dest required); glob and derived-dest forms are host sources; a glob source may carry a {source, dest} dest rewrite (sed-style s:^_home:$HOME: or prefix-swap sugar _home/** -\u003e $HOME/**); dests expand env vars incl ${invokingSpecGitRoot}, the top-level spec's checkout"
         },
         "makeDirs": {
           "items": {

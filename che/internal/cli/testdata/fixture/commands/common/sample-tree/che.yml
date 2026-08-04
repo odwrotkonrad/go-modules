@@ -33,6 +33,7 @@ desktop/macos:
     profiles: [base]
 
 ontoRepo:
+  options: {profileWorkingDirectory: .}
   include:
     renderTemplates:
       - templates:
