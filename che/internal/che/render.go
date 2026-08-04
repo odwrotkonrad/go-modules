@@ -93,30 +93,52 @@ func (p *ProfileReady) renderTemplates(templates []spec.FileItem, skipSecrets bo
 	return errors.Join(errs...)
 }
 
-// templateSrcPath resolves a local template source to its absolute path. Host
-// templates (derived-dest glob form, or any host dest) anchor at
-// workingDirectory (like makeCopies + services); repo-doc templates (repo dests
-// only) anchor at the checkout.
+// templateSrcPath resolves a local template source to its absolute path: both
+// host and repo-doc templates anchor at workingDirectory (default the checkout).
 func (p *ProfileReady) templateSrcPath(item spec.FileItem) string {
+	return filepath.Join(p.resolveRoot(), item.Rel)
+}
+
+// mergedCtx merges the sourced-ref ctx overlay over an item's own ctx (ref
+// wins), parameterizing a shared profile's renders per consumer.
+func (p *ProfileReady) mergedCtx(ctx map[string]string) map[string]string {
+	return fsutil.MergeMap(ctx, p.refCtx)
+}
+
+// templateAnchor is the base dir an item's repo dests and template context
+// (frontmatter/readBody/renderDirsTree/@refs) resolve against: workingDirectory
+// for repo-doc templates, the checkout for host templates ([why] a host
+// workingDirectory is a load-ops source tree like root/, not the repo the
+// template reads belong to).
+func (p *ProfileReady) templateAnchor(item spec.FileItem) string {
 	if p.isHostTemplate(item) {
-		return filepath.Join(p.resolveRoot(), item.Rel)
+		return p.resolveRepoRoot()
 	}
-	return filepath.Join(p.resolveRepoRoot(), item.Rel)
+	return p.resolveRoot()
 }
 
 // isHostTemplate reports whether the item renders to a host dest: derived-dest
 // (no explicit dest) is always host, else any explicit host dest (~/ or
-// absolute) marks it host.
+// absolute) marks it host. ${invokingSpecGitRoot} dests are repo dests despite expanding
+// absolute: they target the top-level spec's checkout, not the host.
 func (p *ProfileReady) isHostTemplate(item spec.FileItem) bool {
 	if len(item.Dests) == 0 {
 		return true
 	}
 	for _, d := range item.Dests {
+		if isGitRootDest(d.Path) {
+			continue
+		}
 		if strings.HasPrefix(p.expandHome(d.Path), "/") {
 			return true
 		}
 	}
 	return false
+}
+
+// isGitRootDest: the dest path is anchored by the ${invokingSpecGitRoot} variable.
+func isGitRootDest(path string) bool {
+	return strings.HasPrefix(path, "${invokingSpecGitRoot}/")
 }
 
 // isSecretRefInItem: the item's template source carries an op:// or gcp:// ref. Remote
@@ -149,13 +171,17 @@ func (p *ProfileReady) resolveTemplateDests(item spec.FileItem) []tmplDest {
 	}
 	out := make([]tmplDest, len(item.Dests))
 	for i, d := range item.Dests {
+		if rest, ok := strings.CutPrefix(d.Path, "${invokingSpecGitRoot}/"); ok {
+			out[i] = tmplDest{path: filepath.Join(p.expandEnv("${invokingSpecGitRoot}"), rest), opts: d.Options, header: rest}
+			continue
+		}
 		// [why] expand env / ~ before the host-vs-repo decision so $HOME/... and
 		// $VAR/... dests resolve to their absolute host path, not a repo-relative one.
 		path := p.expandHome(d.Path)
 		if strings.HasPrefix(path, "/") {
 			out[i] = tmplDest{path: path, host: true, opts: d.Options, header: path}
 		} else {
-			out[i] = tmplDest{path: filepath.Join(p.resolveRepoRoot(), path), opts: d.Options, header: d.Path}
+			out[i] = tmplDest{path: filepath.Join(p.templateAnchor(item), path), opts: d.Options, header: d.Path}
 		}
 	}
 	return out
@@ -181,7 +207,7 @@ func (p *ProfileReady) renderTemplate(item spec.FileItem, dests []tmplDest) erro
 	if err != nil {
 		return err
 	}
-	body, err := render.ExecWithCtx(tmplPath, src, p.resolveRepoRoot(), item.Ctx)
+	body, err := render.ExecWithCtx(tmplPath, src, p.templateAnchor(item), p.mergedCtx(item.Ctx))
 	if err != nil {
 		return err
 	}
@@ -227,7 +253,7 @@ func (p *ProfileReady) composeDest(item spec.FileItem, d tmplDest, body []byte) 
 		HeaderDest: d.header,
 		TmplName:   item.Rel,
 		Existing:   existing,
-		RepoRoot:   p.resolveRepoRoot(),
+		RepoRoot:   p.templateAnchor(item),
 	})
 }
 

@@ -232,3 +232,17 @@ func TestExecWithCtx(t *testing.T) {
 }
 
 // [<] 🤖🤖
+
+// [>] 🤖🤖
+// TestLocalFileRelativeInclude: localFile resolves a relative path against the
+// render's anchor and inlines the file.
+func TestLocalFileRelativeInclude(t *testing.T) {
+	dir := t.TempDir()
+	require.NoError(t, os.WriteFile(filepath.Join(dir, "pwd.md"), []byte("LOCAL"), 0o644))
+	body := []byte(`{{ localFile "pwd.md" }}`)
+	got, err := ExecWithCtx("t.tpl", body, dir, nil)
+	require.NoError(t, err)
+	assert.Equal(t, "LOCAL", string(got))
+}
+
+// [<] 🤖🤖

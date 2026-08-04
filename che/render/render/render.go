@@ -79,6 +79,7 @@ func execWithCtx(name string, body []byte, repoRoot string, itemCtx map[string]s
 		"readBody":             func(path string) (string, error) { return ReadBody(repoRoot, path) },
 		"renderMarkdown":       func(path string, opts ...string) (string, error) { return RenderMarkdown(repoRoot, path, opts...) },
 		"remoteFile":           NewRemoteFetcher(),
+		"localFile":            func(path string) (string, error) { return readLocalFile(repoRoot, path) },
 	}
 	opts := gomplate.RenderOptions{Funcs: funcs, MissingKey: "error"}
 	if len(itemCtx) > 0 {
@@ -95,6 +96,21 @@ func execWithCtx(name string, body []byte, repoRoot string, itemCtx map[string]s
 		return nil, fmt.Errorf("render template %s: %w", name, err)
 	}
 	return buf.Bytes(), nil
+}
+
+// readLocalFile reads a file for the localFile func: relative paths resolve
+// against the render's anchor (the profile's working directory for repo-doc
+// renders, local checkout and remote cache alike), so a template can include a
+// sibling file wherever its profile runs.
+func readLocalFile(repoRoot, path string) (string, error) {
+	if !filepath.IsAbs(path) {
+		path = filepath.Join(repoRoot, path)
+	}
+	b, err := os.ReadFile(path)
+	if err != nil {
+		return "", fmt.Errorf("localFile %q: %w", path, err)
+	}
+	return string(b), nil
 }
 
 // writeCtxFile: gomplate context datasources are URL-addressed, .json drives MIME.

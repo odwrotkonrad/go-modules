@@ -86,6 +86,9 @@ type ProfileSourceRecipe struct {
 	Options ProfileOptions `yaml:"options"`
 	// Env is the overlay exported around the referenced profile (sourced refs only).
 	Env map[string]string `yaml:"env"`
+	// Ctx is merged over the referenced profile's renderTemplates ctx (entry
+	// wins), parameterizing a shared profile per consumer (sourced refs only).
+	Ctx map[string]string `yaml:"ctx"`
 }
 
 // ProfileSourceReady is a resolved ProfileSourceRecipe.
@@ -170,7 +173,7 @@ type includeSet struct {
 	Profiles        []ProfileSourceRecipe `yaml:"profiles" jsonschema_description:"profile refs composed depth-first before this profile's own payload: local profile name scalar, or {source, options, env} where source is <source>/<spec-file>.yml::<profile> locating a profile in another spec (its own checkout anchor)"`
 	MakeLinks       []linkEntry           `yaml:"makeLinks" jsonschema_description:"symlink-op entries, workingDirectory-relative: glob string (dest derived 1:1), {source, dest: [paths]} explicit per-file dests, or {source, dest} dest rewrite (sed-style s:^_home:$HOME: or prefix-swap sugar {source: _home/**, dest: $HOME/**} to target home)"`
 	MakeCopies      []entry               `yaml:"makeCopies" jsonschema_description:"*.ontoHost.cp copy-op perm-groups, workingDirectory-relative sources; a glob source may carry a {source, dest} dest rewrite (sed-style s:^_home:$HOME: or prefix-swap sugar _home/** -> $HOME/**)"`
-	RenderTemplates []templateGroup       `yaml:"renderTemplates" jsonschema_description:"*.tpl render-op perm-groups; local host sources workingDirectory-relative, repo-doc sources (repo dest) checkout-relative, or remote (@<repo>//<path>[?ref=<ref>], explicit dest required); glob and derived-dest forms are host sources; a glob source may carry a {source, dest} dest rewrite (sed-style s:^_home:$HOME: or prefix-swap sugar _home/** -> $HOME/**)"`
+	RenderTemplates []templateGroup       `yaml:"renderTemplates" jsonschema_description:"*.tpl render-op perm-groups; local host sources workingDirectory-relative, repo-doc sources (repo dest) workingDirectory-relative, or remote (@<repo>//<path>[?ref=<ref>], explicit dest required); glob and derived-dest forms are host sources; a glob source may carry a {source, dest} dest rewrite (sed-style s:^_home:$HOME: or prefix-swap sugar _home/** -> $HOME/**); dests expand env vars incl ${invokingSpecGitRoot}, the top-level spec's checkout"`
 	MakeDirs        []dirGroup            `yaml:"makeDirs" jsonschema_description:"extra-dir perm-groups; each item one dir path (brace-expanded)"`
 	Scripts         []string              `yaml:"runScripts" jsonschema_description:"script paths or globs, repo-relative, run in spec order"`
 }

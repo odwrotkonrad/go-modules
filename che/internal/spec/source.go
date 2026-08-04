@@ -54,7 +54,14 @@ func (r SourceRecipe) prepare(repoRoot, home string) (SourceReady, error) {
 
 func (r SourceRecipe) resolveDir(repoRoot, home string) (string, error) {
 	if r.GetSourceType() == SourceTypes.Remote {
-		return source.EnsureCheckout(home, RemoteSrcRef(r.URI))
+		// [why] @<repo>//<subdir> targets a spec nested in the remote checkout,
+		// anchoring the profile at that subdir like a local nested spec.
+		repo, sub := splitRepoSubdir(RemoteSrcRef(r.URI))
+		dir, err := source.EnsureCheckout(home, repo)
+		if err != nil || sub == "" {
+			return dir, err
+		}
+		return filepath.Join(dir, sub), nil
 	}
 	if r.URI == "" {
 		if r.DirectoryPath != "" {
@@ -70,6 +77,19 @@ func (r SourceRecipe) resolveDir(repoRoot, home string) (string, error) {
 		return "", fmt.Errorf("source dir not found: %s (from %q)", dir, r.URI)
 	}
 	return dir, nil
+}
+
+// splitRepoSubdir splits a remote ref at the // subdir marker, skipping a
+// scheme's :// separator (file://, https://).
+func splitRepoSubdir(ref string) (string, string) {
+	start := 0
+	if i := strings.Index(ref, "://"); i >= 0 {
+		start = i + 3
+	}
+	if j := strings.Index(ref[start:], "//"); j >= 0 {
+		return ref[:start+j], ref[start+j+2:]
+	}
+	return ref, ""
 }
 
 // expandDir expands ~/, $VAR and anchors relative paths at repoRoot.

@@ -197,6 +197,7 @@ func PrepareSpecs(ctx Context, opts options.Options, src spec.SpecSourceRecipe) 
 		ctx:       ctx,
 		opts:      opts,
 		home:      home,
+		gitRoot:   repoRoot,
 		tel:       ctx.Tel,
 		seenSpecs: map[string]bool{},
 		seenRefs:  map[string]bool{},
@@ -213,6 +214,7 @@ type specsPrep struct {
 	ctx       Context
 	opts      options.Options
 	home      string
+	gitRoot   string               // the top-level spec's checkout anchor (findRepoRoot), injected as ${invokingSpecGitRoot}
 	tel       *telemetry.Telemetry // OTLP counters/logs (nil = no-op), threaded onto each ProfileReady
 	seenSpecs map[string]bool      // resolved spec dirs (include.sources cycle/dup guard)
 	seenRefs  map[string]bool      // <uri>::<profile> (sourced-ref dedup)
@@ -580,11 +582,16 @@ func (r *SpecRecipe) assembleProfiles(p *specsPrep, ready *SpecReady, lookup []s
 			return err
 		}
 		env := r.Env
+		var refCtx map[string]string
 		if forced != nil {
 			rec.Options = rec.Options.OverRef(forced.Options)
 			env = fsutil.MergeMap(r.Env, forced.Env)
+			refCtx = forced.Ctx
 		}
 		pr, refs, err := r.makeProfileReady(p, rec, lookup, env)
+		if err == nil {
+			pr.refCtx = refCtx
+		}
 		if err != nil {
 			return err
 		}
@@ -613,6 +620,9 @@ func (r *SpecRecipe) assembleProfiles(p *specsPrep, ready *SpecReady, lookup []s
 func (r *SpecRecipe) makeProfileReady(p *specsPrep, rec spec.ProfileRecipe, lookup []spec.ProfileRecipe, env map[string]string) (*ProfileReady, []spec.ProfileSourceRecipe, error) {
 	name := rec.Source.GetProfileName()
 	effectiveEnv := overlayEnv(p.ctx.Env, env)
+	// [why] ${invokingSpecGitRoot} anchors dests at the top-level spec's checkout, letting a
+	// nested/sourced profile target the invoking repo without ../ workdir walks.
+	effectiveEnv = overlayEnv(effectiveEnv, map[string]string{"invokingSpecGitRoot": p.gitRoot})
 	wd, err := resolveWorkingDir(effectiveEnv, rec.Source.DirectoryPath, rec.Options.ProfileWorkingDirectory)
 	if err != nil {
 		return nil, nil, fmt.Errorf("profile %q: %w", name, err)
@@ -772,6 +782,7 @@ type ProfileReady struct {
 	ref             string                     // display ref: bare name local, <source>::<name> sourced
 	logDepth        int                        // heading depth this profile's body lines sit beneath (2 under profile+op headings, 0 for standalone)
 	workingDir      string                     // resolved load-ops source tree (options.profileWorkingDirectory cascade)
+	refCtx          map[string]string          // sourced-ref ctx overlay, merged over each render item's ctx (ref wins)
 	opts            options.Options
 	home            string
 	env             map[string]string     // captured launch env overlaid with Env, read by expandEnv/buildScriptsEnv
