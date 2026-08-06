@@ -323,10 +323,10 @@ goreleaser-darwin-che:
         - .cache/go-build
       policy: pull-push
   before_script:
-    - curl --connect-timeout 30 --retry 5 --retry-delay 2 --retry-all-errors -fsSL -o /tmp/go.tar.gz "https://go.dev/dl/go${GO_VERSION}.darwin-arm64.tar.gz"
+    - curl --connect-timeout 30 --retry 10 --retry-delay 30 --retry-all-errors -fsSL -o /tmp/go.tar.gz "https://go.dev/dl/go${GO_VERSION}.darwin-arm64.tar.gz"
     - echo "$GO_SHA256_DARWIN_ARM64  /tmp/go.tar.gz" | shasum -a 256 -c -
     - tar -C "$HOME" -xzf /tmp/go.tar.gz
-    - curl --connect-timeout 30 --retry 5 --retry-delay 2 --retry-all-errors -fsSL -o /tmp/goreleaser.tar.gz "https://github.com/goreleaser/goreleaser/releases/download/v${GORELEASER_VERSION}/goreleaser_Darwin_arm64.tar.gz"
+    - curl --connect-timeout 30 --retry 10 --retry-delay 30 --retry-all-errors -fsSL -o /tmp/goreleaser.tar.gz "https://github.com/goreleaser/goreleaser/releases/download/v${GORELEASER_VERSION}/goreleaser_Darwin_arm64.tar.gz"
     - echo "$GORELEASER_SHA256_DARWIN_ARM64  /tmp/goreleaser.tar.gz" | shasum -a 256 -c -
     - mkdir -p "$HOME/bin"
     - tar -C "$HOME/bin" -xzf /tmp/goreleaser.tar.gz goreleaser
@@ -395,10 +395,10 @@ prerelease-darwin-che:
         - .cache/go-build
       policy: pull-push
   before_script:
-    - curl --connect-timeout 30 --retry 5 --retry-delay 2 --retry-all-errors -fsSL -o /tmp/go.tar.gz "https://go.dev/dl/go${GO_VERSION}.darwin-arm64.tar.gz"
+    - curl --connect-timeout 30 --retry 10 --retry-delay 30 --retry-all-errors -fsSL -o /tmp/go.tar.gz "https://go.dev/dl/go${GO_VERSION}.darwin-arm64.tar.gz"
     - echo "$GO_SHA256_DARWIN_ARM64  /tmp/go.tar.gz" | shasum -a 256 -c -
     - tar -C "$HOME" -xzf /tmp/go.tar.gz
-    - curl --connect-timeout 30 --retry 5 --retry-delay 2 --retry-all-errors -fsSL -o /tmp/goreleaser.tar.gz "https://github.com/goreleaser/goreleaser/releases/download/v${GORELEASER_VERSION}/goreleaser_Darwin_arm64.tar.gz"
+    - curl --connect-timeout 30 --retry 10 --retry-delay 30 --retry-all-errors -fsSL -o /tmp/goreleaser.tar.gz "https://github.com/goreleaser/goreleaser/releases/download/v${GORELEASER_VERSION}/goreleaser_Darwin_arm64.tar.gz"
     - echo "$GORELEASER_SHA256_DARWIN_ARM64  /tmp/goreleaser.tar.gz" | shasum -a 256 -c -
     - mkdir -p "$HOME/bin"
     - tar -C "$HOME/bin" -xzf /tmp/goreleaser.tar.gz goreleaser

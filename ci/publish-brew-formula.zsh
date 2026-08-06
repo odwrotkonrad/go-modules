@@ -56,7 +56,7 @@ EOF
 if [[ "${RENDER_ONLY:-0}" == 1 ]] { echo "rendered ${FORMULA_FILE}"; exit 0 }
 
 commit_formula() {
-  curl -fsSL --connect-timeout 30 --retry 5 --retry-delay 2 --request POST --header "PRIVATE-TOKEN: ${HOMEBREW_TAP_TOKEN:?}" \
+  curl -fsSL --connect-timeout 30 --retry 10 --retry-delay 30 --request POST --header "PRIVATE-TOKEN: ${HOMEBREW_TAP_TOKEN:?}" \
     --data-urlencode "branch=main" \
     --data-urlencode "commit_message=chore: che ${MODULE_VERSION}" \
     --data-urlencode "actions[][action]=$1" \

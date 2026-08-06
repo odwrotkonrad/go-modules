@@ -45,9 +45,9 @@ for f in $FILES; do
   TYPE=other
   if [[ "$NAME" == *.tar.gz && "$NAME" != che-docs_* ]] TYPE=package
   echo "uploading ${NAME} (${TYPE})"
-  curl -fsSL --connect-timeout 30 --retry 5 --retry-delay 2 --header "JOB-TOKEN: ${CI_JOB_TOKEN}" --upload-file "$f" "${PKG}/${NAME}"
+  curl -fsSL --connect-timeout 30 --retry 10 --retry-delay 30 --header "JOB-TOKEN: ${CI_JOB_TOKEN}" --upload-file "$f" "${PKG}/${NAME}"
   echo
-  curl -fsSL --connect-timeout 30 --retry 5 --retry-delay 2 --request POST --header "JOB-TOKEN: ${CI_JOB_TOKEN}" \
+  curl -fsSL --connect-timeout 30 --retry 10 --retry-delay 30 --request POST --header "JOB-TOKEN: ${CI_JOB_TOKEN}" \
     --data-urlencode "name=${NAME}" \
     --data-urlencode "url=${PKG}/${NAME}" \
     --data-urlencode "link_type=${TYPE}" \
@@ -60,7 +60,7 @@ ALIAS="${CI_API_V4_URL}/projects/${CI_PROJECT_ID}/packages/generic/${MODULE}/lat
 for f in dist/${MODULE}_${MODULE_VERSION}_linux_*.tar.gz(N) darwin-dist/${MODULE}_${MODULE_VERSION}_darwin_*.tar.gz(N); do
   plat="${${f:t:r:r}#${MODULE}_${MODULE_VERSION}_}"
   echo "aliasing ${MODULE}_${plat} -> latest"
-  curl -fsSL --connect-timeout 30 --retry 5 --retry-delay 2 --header "JOB-TOKEN: ${CI_JOB_TOKEN}" --upload-file "$f" "${ALIAS}/${MODULE}_latest_${plat}.tar.gz"
+  curl -fsSL --connect-timeout 30 --retry 10 --retry-delay 30 --header "JOB-TOKEN: ${CI_JOB_TOKEN}" --upload-file "$f" "${ALIAS}/${MODULE}_latest_${plat}.tar.gz"
   echo
 done
 ##[<] 🤖🤖
