@@ -1,4 +1,4 @@
-module gitlab.com/konradodwrot/unrestricted/go-modules/lib
+module gitlab.com/konradodwrot/go-modules/lib
 
 go 1.26
 

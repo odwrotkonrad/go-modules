@@ -11,8 +11,8 @@ import (
 
 	"gopkg.in/yaml.v3"
 
-	"gitlab.com/konradodwrot/unrestricted/go-modules/che/internal/fsutil"
-	"gitlab.com/konradodwrot/unrestricted/go-modules/che/internal/source"
+	"gitlab.com/konradodwrot/go-modules/che/internal/fsutil"
+	"gitlab.com/konradodwrot/go-modules/che/internal/source"
 )
 
 // GetSourceType classifies the URI: @-prefixed -> remote, else filesystem

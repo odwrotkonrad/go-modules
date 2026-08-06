@@ -33,7 +33,7 @@ Each convention dir carries a runnable `example/`. This repo itself follows all 
 
 # Modules
 
-Each module has its own `go.mod` (`gitlab.com/konradodwrot/unrestricted/go-modules/<module>`) and release stream: dir-prefixed tags `<module>/vX.Y.Z`, bumped by CI on default-branch pushes touching the module dir. Root `go.work` ties the modules together for local dev.
+Each module has its own `go.mod` (`gitlab.com/konradodwrot/go-modules/<module>`) and release stream: dir-prefixed tags `<module>/vX.Y.Z`, bumped by CI on default-branch pushes touching the module dir. Root `go.work` ties the modules together for local dev.
 
 ## che
 
@@ -134,6 +134,7 @@ config loaders and main-shape boilerplate.
 
 `create-tag`
 `publish` tag pipeline: goreleaser snapshot build for $CI_COMMIT_TAG's module, upload to the generic package registry, link release assets
+`publish-brew` tag pipeline: render Formula/che.rb for $CI_COMMIT_TAG's version, commit it to the homebrew tap repo via the GitLab commits API
 `release-check` validate every module's goreleaser configs
 `release-snapshot` local snapshot build of every module, no publish
 

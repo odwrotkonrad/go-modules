@@ -18,7 +18,7 @@ import (
 	"github.com/go-git/go-git/v5/plumbing/object"
 	"github.com/stretchr/testify/require"
 
-	"gitlab.com/konradodwrot/unrestricted/go-modules/lib/testyml"
+	"gitlab.com/konradodwrot/go-modules/lib/testyml"
 )
 
 var ansiRe = regexp.MustCompile(`\x1b\[[0-9;]*m`)

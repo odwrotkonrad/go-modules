@@ -6,9 +6,9 @@ package main
 import (
 	"os"
 
-	"gitlab.com/konradodwrot/unrestricted/go-modules/che/render/checkcmd"
-	"gitlab.com/konradodwrot/unrestricted/go-modules/che/render/render"
-	"gitlab.com/konradodwrot/unrestricted/go-modules/lib/yamlcfg"
+	"gitlab.com/konradodwrot/go-modules/che/render/checkcmd"
+	"gitlab.com/konradodwrot/go-modules/che/render/render"
+	"gitlab.com/konradodwrot/go-modules/lib/yamlcfg"
 )
 
 const usage = `usage: render-tpl -f <template>

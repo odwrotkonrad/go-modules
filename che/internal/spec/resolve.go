@@ -11,9 +11,9 @@ import (
 	"slices"
 	"strings"
 
-	"gitlab.com/konradodwrot/unrestricted/go-modules/che/internal/fsutil"
-	"gitlab.com/konradodwrot/unrestricted/go-modules/che/internal/log"
-	"gitlab.com/konradodwrot/unrestricted/go-modules/che/render/render"
+	"gitlab.com/konradodwrot/go-modules/che/internal/fsutil"
+	"gitlab.com/konradodwrot/go-modules/che/internal/log"
+	"gitlab.com/konradodwrot/go-modules/che/render/render"
 )
 
 func (gs *globSet) add(glob string, perms Perms) { gs.addRule(glob, perms, nil) }

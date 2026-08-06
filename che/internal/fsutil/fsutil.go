@@ -15,7 +15,7 @@ import (
 
 	"github.com/go-git/go-git/v5"
 
-	"gitlab.com/konradodwrot/unrestricted/go-modules/che/internal/execx"
+	"gitlab.com/konradodwrot/go-modules/che/internal/execx"
 )
 
 // FileSystemWriter is the mutating fs surface host ops drive; FS is the real

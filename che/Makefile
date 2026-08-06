@@ -54,7 +54,7 @@ test-cover:
 	@$(GO) tool covdata textfmt -i=cover-unit -o coverage.out
 	@sed -i.bak '\|/che/e2e/|d' coverage.out && rm coverage.out.bak
 	@$(GO) run $(GOCOVER_COBERTURA) < coverage.out > coverage.xml
-	@sed -i.bak 's|filename="gitlab.com/konradodwrot/unrestricted/go-modules/|filename="|g' coverage.xml && rm coverage.xml.bak
+	@sed -i.bak 's|filename="gitlab.com/konradodwrot/go-modules/|filename="|g' coverage.xml && rm coverage.xml.bak
 	@$(GO) tool cover -func=coverage.out | tail -1
 
 #[what] merge every present cover-* covdata dir into coverage.out/coverage.xml, print the combined total
@@ -65,7 +65,7 @@ cover-report:
 		$(GO) tool covdata textfmt -i=$$dirs -o coverage.out
 	@sed -i.bak '\|/che/e2e/|d' coverage.out && rm coverage.out.bak
 	@$(GO) run $(GOCOVER_COBERTURA) < coverage.out > coverage.xml
-	@sed -i.bak 's|filename="gitlab.com/konradodwrot/unrestricted/go-modules/|filename="|g' coverage.xml && rm coverage.xml.bak
+	@sed -i.bak 's|filename="gitlab.com/konradodwrot/go-modules/|filename="|g' coverage.xml && rm coverage.xml.bak
 	@$(GO) tool cover -func=coverage.out | tail -1
 
 #[what] build the coverage-instrumented binary into ./dist (e2e prerequisite)

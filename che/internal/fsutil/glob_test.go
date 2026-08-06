@@ -5,7 +5,7 @@ package fsutil
 import (
 	"testing"
 
-	"gitlab.com/konradodwrot/unrestricted/go-modules/lib/testyml"
+	"gitlab.com/konradodwrot/go-modules/lib/testyml"
 )
 
 func TestMatchGlob(t *testing.T) {

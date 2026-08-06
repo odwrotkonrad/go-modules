@@ -7,7 +7,7 @@ import (
 
 	"github.com/spf13/cobra"
 
-	"gitlab.com/konradodwrot/unrestricted/go-modules/che/internal/che"
+	"gitlab.com/konradodwrot/go-modules/che/internal/che"
 )
 
 // opCmd is one per-op subcommand shape: its cobra wiring plus the prepared

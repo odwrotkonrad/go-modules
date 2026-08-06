@@ -19,7 +19,7 @@ Each convention dir carries a runnable `example/`. This repo itself follows all 
 
 # Modules
 
-Each module has its own `go.mod` (`gitlab.com/konradodwrot/unrestricted/go-modules/<module>`) and release stream: dir-prefixed tags `<module>/vX.Y.Z`, bumped by CI on default-branch pushes touching the module dir. Root `go.work` ties the modules together for local dev.
+Each module has its own `go.mod` (`gitlab.com/konradodwrot/go-modules/<module>`) and release stream: dir-prefixed tags `<module>/vX.Y.Z`, bumped by CI on default-branch pushes touching the module dir. Root `go.work` ties the modules together for local dev.
 
 ## che
 
