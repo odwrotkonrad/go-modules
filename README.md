@@ -28,11 +28,23 @@ Four sibling repos duplicated toolchain, CI, conventions, release flow. One repo
 
 ## Install
 
+### che via brew (Homebrew on macOS, Linuxbrew)
+
+```sh
+brew tap konradodwrot/tap https://gitlab.com/konradodwrot/homebrew-tap.git
+brew install konradodwrot/tap/che
+```
+
+Binary formula for `{darwin,linux}_{amd64,arm64}`: installs `che` and the render
+CLIs from the prebuilt release archives, updated by each che tag pipeline.
+
+### Prebuilt archives
+
 Prebuilt: each [release](https://gitlab.com/konradodwrot/go-modules/-/releases)
 `<module>/vX.Y.Z` attaches `<binary>_<version>_{darwin,linux}_{amd64,arm64}.tar.gz`
 plus `checksums.txt` (che: also the render CLI archives and `che.schema.json`).
 
-From source:
+### From source
 
 ```sh
 go install gitlab.com/konradodwrot/go-modules/che@latest
