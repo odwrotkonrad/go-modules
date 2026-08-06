@@ -1,4 +1,4 @@
-module gitlab.com/konradodwrot/unrestricted/go-modules/che
+module gitlab.com/konradodwrot/go-modules/che
 
 go 1.26.3
 
@@ -19,7 +19,7 @@ require (
 	github.com/stretchr/testify v1.11.1
 	github.com/tree-sitter-grammars/tree-sitter-make v1.1.1
 	github.com/tree-sitter/go-tree-sitter v0.24.0
-	gitlab.com/konradodwrot/unrestricted/go-modules/lib v0.0.1
+	gitlab.com/konradodwrot/go-modules/lib v0.0.1
 	go.opentelemetry.io/otel v1.42.0
 	go.opentelemetry.io/otel/exporters/otlp/otlplog/otlploggrpc v0.13.0
 	go.opentelemetry.io/otel/exporters/otlp/otlplog/otlploghttp v0.13.0
@@ -214,5 +214,3 @@ require (
 	modernc.org/memory v1.5.0 // indirect
 	modernc.org/sqlite v1.23.1 // indirect
 )
-
-replace gitlab.com/konradodwrot/unrestricted/go-modules/lib => ../lib

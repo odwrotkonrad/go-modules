@@ -6,9 +6,9 @@ import (
 	"fmt"
 	"path/filepath"
 
-	"gitlab.com/konradodwrot/unrestricted/go-modules/che/internal/log"
-	"gitlab.com/konradodwrot/unrestricted/go-modules/che/internal/options"
-	"gitlab.com/konradodwrot/unrestricted/go-modules/che/internal/spec"
+	"gitlab.com/konradodwrot/go-modules/che/internal/log"
+	"gitlab.com/konradodwrot/go-modules/che/internal/options"
+	"gitlab.com/konradodwrot/go-modules/che/internal/spec"
 )
 
 // InitSources is the init stage: prefetch every spec source reachable from the

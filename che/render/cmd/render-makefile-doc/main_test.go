@@ -8,10 +8,10 @@ import (
 
 	"github.com/stretchr/testify/require"
 
-	"gitlab.com/konradodwrot/unrestricted/go-modules/che/internal/execx"
-	"gitlab.com/konradodwrot/unrestricted/go-modules/che/internal/testutil"
-	"gitlab.com/konradodwrot/unrestricted/go-modules/che/render/lib"
-	"gitlab.com/konradodwrot/unrestricted/go-modules/lib/testyml"
+	"gitlab.com/konradodwrot/go-modules/che/internal/execx"
+	"gitlab.com/konradodwrot/go-modules/che/internal/testutil"
+	"gitlab.com/konradodwrot/go-modules/che/render/lib"
+	"gitlab.com/konradodwrot/go-modules/lib/testyml"
 )
 
 //go:embed all:testdata

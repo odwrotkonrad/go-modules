@@ -6,8 +6,8 @@ import (
 	"os/user"
 	"testing"
 
-	"gitlab.com/konradodwrot/unrestricted/go-modules/che/internal/testutil"
-	"gitlab.com/konradodwrot/unrestricted/go-modules/lib/testyml"
+	"gitlab.com/konradodwrot/go-modules/che/internal/testutil"
+	"gitlab.com/konradodwrot/go-modules/lib/testyml"
 )
 
 func TestNormalizeOS(t *testing.T) {

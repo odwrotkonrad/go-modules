@@ -9,10 +9,10 @@ import (
 	"path/filepath"
 	"strings"
 
-	"gitlab.com/konradodwrot/unrestricted/go-modules/che/internal/fsutil"
-	"gitlab.com/konradodwrot/unrestricted/go-modules/che/internal/log"
-	"gitlab.com/konradodwrot/unrestricted/go-modules/che/internal/spec"
-	"gitlab.com/konradodwrot/unrestricted/go-modules/che/render/render"
+	"gitlab.com/konradodwrot/go-modules/che/internal/fsutil"
+	"gitlab.com/konradodwrot/go-modules/che/internal/log"
+	"gitlab.com/konradodwrot/go-modules/che/internal/spec"
+	"gitlab.com/konradodwrot/go-modules/che/render/render"
 )
 
 // repoFileMode: repo-rendered dests are plain repo files (git-tracked, group-writable).

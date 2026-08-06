@@ -13,9 +13,9 @@ import (
 
 	"go.opentelemetry.io/otel/attribute"
 
-	"gitlab.com/konradodwrot/unrestricted/go-modules/che/internal/execx"
-	"gitlab.com/konradodwrot/unrestricted/go-modules/che/internal/fsutil"
-	"gitlab.com/konradodwrot/unrestricted/go-modules/che/internal/log"
+	"gitlab.com/konradodwrot/go-modules/che/internal/execx"
+	"gitlab.com/konradodwrot/go-modules/che/internal/fsutil"
+	"gitlab.com/konradodwrot/go-modules/che/internal/log"
 )
 
 // scriptResult pairs a script with its run status ("ok" | "fail").

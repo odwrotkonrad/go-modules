@@ -9,8 +9,8 @@ import (
 	"strings"
 	"time"
 
-	"gitlab.com/konradodwrot/unrestricted/go-modules/che/internal/fsutil"
-	"gitlab.com/konradodwrot/unrestricted/go-modules/che/internal/telemetry"
+	"gitlab.com/konradodwrot/go-modules/che/internal/fsutil"
+	"gitlab.com/konradodwrot/go-modules/che/internal/telemetry"
 )
 
 // Context is the launch context: the process world captured once at the CLI

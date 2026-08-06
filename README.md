@@ -28,17 +28,17 @@ Four sibling repos duplicated toolchain, CI, conventions, release flow. One repo
 
 ## Install
 
-Prebuilt: each [release](https://gitlab.com/konradodwrot/unrestricted/go-modules/-/releases)
+Prebuilt: each [release](https://gitlab.com/konradodwrot/go-modules/-/releases)
 `<module>/vX.Y.Z` attaches `<binary>_<version>_{darwin,linux}_{amd64,arm64}.tar.gz`
 plus `checksums.txt` (che: also the render CLI archives and `che.schema.json`).
 
 From source:
 
 ```sh
-go install gitlab.com/konradodwrot/unrestricted/go-modules/che@latest
-go install gitlab.com/konradodwrot/unrestricted/go-modules/che/render/cmd/render-tpl@latest
-go install gitlab.com/konradodwrot/unrestricted/go-modules/get-os-open-files-with@latest
-go install gitlab.com/konradodwrot/unrestricted/go-modules/get-term-open-files-with@latest
+go install gitlab.com/konradodwrot/go-modules/che@latest
+go install gitlab.com/konradodwrot/go-modules/che/render/cmd/render-tpl@latest
+go install gitlab.com/konradodwrot/go-modules/get-os-open-files-with@latest
+go install gitlab.com/konradodwrot/go-modules/get-term-open-files-with@latest
 ```
 
 che and the render CLIs need CGO (1Password SDK): a C compiler at build time.

@@ -4,8 +4,8 @@ package main
 // [>] 🤖🤖
 
 import (
-	"gitlab.com/konradodwrot/unrestricted/go-modules/che/render/checkcmd"
-	"gitlab.com/konradodwrot/unrestricted/go-modules/che/render/lib"
+	"gitlab.com/konradodwrot/go-modules/che/render/checkcmd"
+	"gitlab.com/konradodwrot/go-modules/che/render/lib"
 )
 
 var version = "dev"

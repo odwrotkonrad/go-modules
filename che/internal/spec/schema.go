@@ -5,10 +5,10 @@ package spec
 import (
 	"github.com/invopop/jsonschema"
 
-	"gitlab.com/konradodwrot/unrestricted/go-modules/che/render/render"
+	"gitlab.com/konradodwrot/go-modules/che/render/render"
 )
 
-const schemaID = "https://gitlab.com/konradodwrot/unrestricted/go-modules/-/raw/main/che/assets/data/che.schema.json"
+const schemaID = "https://gitlab.com/konradodwrot/go-modules/-/raw/main/che/assets/data/che.schema.json"
 
 // Schema is the JSON Schema (draft 2020-12) for che.yml, reflected from this
 // package's types (union scalar-or-object forms via JSONSchema() methods,

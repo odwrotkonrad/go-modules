@@ -9,7 +9,7 @@ import (
 
 	"gopkg.in/yaml.v3"
 
-	"gitlab.com/konradodwrot/unrestricted/go-modules/lib/testyml"
+	"gitlab.com/konradodwrot/go-modules/lib/testyml"
 )
 
 // Domain model (the e2e spec schema):

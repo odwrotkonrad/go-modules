@@ -9,7 +9,7 @@ import (
 	"strings"
 	"sync"
 
-	"gitlab.com/konradodwrot/unrestricted/go-modules/che/internal/fsutil"
+	"gitlab.com/konradodwrot/go-modules/che/internal/fsutil"
 )
 
 // NewEvaluator wires the builtin sources (isOs (macos|linux|...), isVirt) and

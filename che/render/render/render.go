@@ -24,8 +24,8 @@ import (
 	"github.com/hairyhenderson/gomplate/v4"
 	"github.com/invopop/jsonschema"
 
-	"gitlab.com/konradodwrot/unrestricted/go-modules/che/internal/fsutil"
-	"gitlab.com/konradodwrot/unrestricted/go-modules/che/render/lib"
+	"gitlab.com/konradodwrot/go-modules/che/internal/fsutil"
+	"gitlab.com/konradodwrot/go-modules/che/render/lib"
 )
 
 // secretRetryDelays: backoff between secret-resolve attempts that hit a

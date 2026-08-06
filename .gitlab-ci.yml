@@ -15,7 +15,7 @@ stages:
   - publish
 
 variables:
-  CI_IMAGE: registry.gitlab.com/konradodwrot/unrestricted/infra/oci-images/ci-linux:latest
+  CI_IMAGE: registry.gitlab.com/konradodwrot/infra/oci-images/ci-linux:latest
   GOMODCACHE: $CI_PROJECT_DIR/.cache/go-mod
   GOCACHE: $CI_PROJECT_DIR/.cache/go-build
   CC: clang
@@ -458,6 +458,18 @@ publish-che:
     - make publish
 
 ##[>] 🤖🤖
+publish-brew-che:
+  stage: publish
+  image: $CI_IMAGE
+  needs:
+    - publish-che
+    - goreleaser-darwin-che
+    - goreleaser-linux-che
+  rules:
+    - if: $CI_COMMIT_TAG =~ /^che\/v/
+  script:
+    - make publish-brew
+
 rebuild-ci-image:
   stage: publish
   needs: [publish-che]
@@ -468,7 +480,7 @@ rebuild-ci-image:
   variables:
     BUILD_ALL_IMAGES: "true"
   trigger:
-    project: konradodwrot/unrestricted/infra/oci-images
+    project: konradodwrot/infra/oci-images
     branch: main
     forward:
       yaml_variables: true

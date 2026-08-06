@@ -8,7 +8,7 @@ import (
 	"os"
 	"runtime/debug"
 
-	"gitlab.com/konradodwrot/unrestricted/go-modules/lib/yamlcfg"
+	"gitlab.com/konradodwrot/go-modules/lib/yamlcfg"
 )
 
 func Run(name, version, usage string, run func(args []string) (string, error)) {

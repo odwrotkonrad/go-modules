@@ -10,8 +10,8 @@ import (
 
 	"github.com/stretchr/testify/assert"
 
-	"gitlab.com/konradodwrot/unrestricted/go-modules/che/internal/testutil"
-	"gitlab.com/konradodwrot/unrestricted/go-modules/lib/testyml"
+	"gitlab.com/konradodwrot/go-modules/che/internal/testutil"
+	"gitlab.com/konradodwrot/go-modules/lib/testyml"
 )
 
 // SecretMockResolver is the secretResolver test double: counts Resolve calls,

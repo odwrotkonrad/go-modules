@@ -8,7 +8,7 @@ import (
 
 	"gopkg.in/yaml.v3"
 
-	"gitlab.com/konradodwrot/unrestricted/go-modules/lib/yamlcfg"
+	"gitlab.com/konradodwrot/go-modules/lib/yamlcfg"
 )
 
 func cfgErr(msg string) *yamlcfg.CodedError {

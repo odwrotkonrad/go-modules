@@ -9,9 +9,9 @@ import (
 	"os"
 	"strings"
 
-	"gitlab.com/konradodwrot/unrestricted/go-modules/che/internal/execx"
-	"gitlab.com/konradodwrot/unrestricted/go-modules/lib/climain"
-	"gitlab.com/konradodwrot/unrestricted/go-modules/lib/yamlcfg"
+	"gitlab.com/konradodwrot/go-modules/che/internal/execx"
+	"gitlab.com/konradodwrot/go-modules/lib/climain"
+	"gitlab.com/konradodwrot/go-modules/lib/yamlcfg"
 )
 
 const (

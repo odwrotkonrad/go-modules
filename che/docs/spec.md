@@ -10,7 +10,7 @@ every other key defines a profile block. Schema:
 First line of `che.yml`:
 
 ```yaml
-# yaml-language-server: $schema=https://gitlab.com/konradodwrot/unrestricted/go-modules/-/raw/main/che/assets/data/che.schema.json
+# yaml-language-server: $schema=https://gitlab.com/konradodwrot/go-modules/-/raw/main/che/assets/data/che.schema.json
 ```
 
 Pin `main` to the release tag matching the installed che: each tag snapshots
@@ -27,7 +27,7 @@ error` (env `CHE_VALIDATE_SPEC=error`) aborts instead.
 Every construct in one spec (schema-validated by the test suite):
 
 ```yaml
-# yaml-language-server: $schema=https://gitlab.com/konradodwrot/unrestricted/go-modules/-/raw/main/che/assets/data/che.schema.json
+# yaml-language-server: $schema=https://gitlab.com/konradodwrot/go-modules/-/raw/main/che/assets/data/che.schema.json
 options:
   profileWorkingDirectory: root
   runIf: ['env:CHE_ENABLED']

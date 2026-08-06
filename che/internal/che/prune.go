@@ -5,8 +5,8 @@ package che
 import (
 	"errors"
 
-	"gitlab.com/konradodwrot/unrestricted/go-modules/che/internal/database"
-	"gitlab.com/konradodwrot/unrestricted/go-modules/che/internal/log"
+	"gitlab.com/konradodwrot/go-modules/che/internal/database"
+	"gitlab.com/konradodwrot/go-modules/che/internal/log"
 )
 
 // sweepStale removes every dest of kind the ledger recorded for THIS profile

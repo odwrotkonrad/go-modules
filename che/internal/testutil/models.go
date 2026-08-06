@@ -5,7 +5,7 @@ package testutil
 import (
 	"os/user"
 
-	"gitlab.com/konradodwrot/unrestricted/go-modules/che/internal/execx"
+	"gitlab.com/konradodwrot/go-modules/che/internal/execx"
 )
 
 // MockSet is the full safe-double set for a command harness: the executor is

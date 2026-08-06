@@ -10,7 +10,7 @@ import (
 	"strconv"
 	"strings"
 
-	"gitlab.com/konradodwrot/unrestricted/go-modules/che/internal/log"
+	"gitlab.com/konradodwrot/go-modules/che/internal/log"
 )
 
 // LookupEnv is the env-lookup seam Resolve reads instead of the process env:

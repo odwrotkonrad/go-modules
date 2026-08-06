@@ -14,9 +14,9 @@ import (
 	"github.com/spf13/cobra"
 	"github.com/spf13/pflag"
 
-	"gitlab.com/konradodwrot/unrestricted/go-modules/che/internal/cli"
-	"gitlab.com/konradodwrot/unrestricted/go-modules/che/internal/spec"
-	"gitlab.com/konradodwrot/unrestricted/go-modules/che/internal/telemetry"
+	"gitlab.com/konradodwrot/go-modules/che/internal/cli"
+	"gitlab.com/konradodwrot/go-modules/che/internal/spec"
+	"gitlab.com/konradodwrot/go-modules/che/internal/telemetry"
 )
 
 const (
