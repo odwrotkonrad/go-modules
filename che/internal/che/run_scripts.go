@@ -3,6 +3,7 @@ package che
 // [>] 🤖🤖
 
 import (
+	"errors"
 	"fmt"
 	"maps"
 	"os"
@@ -23,6 +24,10 @@ type scriptResult struct {
 	status string
 }
 
+// ErrErrexit marks a script failure that must stop the whole run (--errexit):
+// ExecOperations and ExecEach stop on errors carrying it instead of continuing.
+var ErrErrexit = errors.New("errexit")
+
 // resolveScripts maps spec-resolved script rels (globs already expanded by
 // spec.Resolve) to absolute paths, IN SPEC ORDER, verifying each exists.
 func (p *ProfileReady) resolveScripts(relativePaths []string) ([]string, error) {
@@ -39,11 +44,14 @@ func (p *ProfileReady) resolveScripts(relativePaths []string) ([]string, error) 
 
 // runScripts runs profile scripts in spec order. A failing script is logged
 // and the rest still run; a per-script status report prints at the end, and
-// the run returns an error if any script failed.
+// the run returns an error if any script failed. Under --errexit the first
+// failure stops immediately: remaining scripts never run and the returned
+// error carries ErrErrexit so the run stops too.
 func (p *ProfileReady) runScripts(scripts []string) error {
 	env := p.buildScriptsEnv()
 	var results []scriptResult
 	var failed []string
+	errexitHit := false
 	for _, script := range scripts {
 		if p.isDryRun() {
 			p.emitDryRun("run-scripts", "run", script)
@@ -62,6 +70,10 @@ func (p *ProfileReady) runScripts(scripts []string) error {
 		span.End()
 		p.tel.CountUnit(sctx, "script", status, p.command)
 		results = append(results, scriptResult{script, status})
+		if status == "fail" && p.opts.Errexit {
+			errexitHit = true
+			break
+		}
 	}
 
 	for _, r := range results {
@@ -72,6 +84,9 @@ func (p *ProfileReady) runScripts(scripts []string) error {
 		p.emit(log.Levels.Info, "run-scripts", action, r.script)
 	}
 
+	if errexitHit {
+		return fmt.Errorf("scripts failed: %s: %w", strings.Join(failed, ", "), ErrErrexit)
+	}
 	if len(failed) > 0 {
 		return fmt.Errorf("scripts failed: %s", strings.Join(failed, ", "))
 	}

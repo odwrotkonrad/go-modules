@@ -50,6 +50,9 @@ type Options struct {
 	RunSkipOps     []string
 	SkipRunIf      bool
 	SkipRemoteRefs bool
+	// Errexit stops the run at the first script failure (default false:
+	// continue, report, join errors at the end).
+	Errexit bool
 	// LogLevel selects the human-log verbosity: error | warn | info | debug |
 	// trace (default info).
 	LogLevel          string

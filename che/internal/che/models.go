@@ -721,7 +721,8 @@ func (s *SpecReady) AllProfiles() []*ProfileReady {
 // "discover-profiles(discovered)" info line per profile with per-op all/delta counts
 // (spec/che/log.md). A failing profile does not stop the rest: failures
 // collect (ref-wrapped), report as "<op>(report): fail <ref>: <err>" lines
-// after all profiles, and join into the returned error.
+// after all profiles, and join into the returned error. An ErrErrexit-carrying
+// failure (--errexit script failure) stops the remaining profiles.
 func (s *SpecReady) ExecEach(ctx context.Context, opName string, fn func(context.Context, *ProfileReady) error) error {
 	ctx, span := s.tel.Span(ctx, opName, attribute.String("op", opName))
 	defer span.End()
@@ -754,11 +755,15 @@ func (s *SpecReady) ExecEach(ctx context.Context, opName string, fn func(context
 		log.EmitDebug(opName, "will-run", "profile "+p.Ref()+": "+p.describeOpDeltas(opName))
 		p.emitHeading(log.Levels.Info, opName, "run-profile", "Run profile "+p.Ref(), 1)
 		p.logDepth = 1
-		if err := fn(pctx, p); err != nil {
+		err := fn(pctx, p)
+		if err != nil {
 			pspan.RecordError(err)
 			fails = append(fails, fmt.Errorf("%s: %w", p.Ref(), err))
 		}
 		pspan.End()
+		if errors.Is(err, ErrErrexit) {
+			break
+		}
 	}
 	for _, err := range fails {
 		log.EmitError(opName, "fail", err.Error())
@@ -1181,7 +1186,8 @@ func (p *ProfileReady) withLogLevel(fn func() error) error {
 
 // ExecOperations executes ALL of the profile's operations, in run order:
 // Selected() gated (all(skip) debug line), errors join, a failing op does not
-// stop the rest. After the ops, it reconciles the ledger: any recorded dest of
+// stop the rest (except an ErrErrexit-carrying failure, which stops the
+// remaining ops). After the ops, it reconciles the ledger: any recorded dest of
 // an install kind (link/copy/render) whose op produced nothing this run — the op
 // was fully emptied and thus deselected — is swept (removed + archived). Ops that
 // ran already swept their own stale dests inline; this covers the emptied-op case
@@ -1207,6 +1213,9 @@ func (p *ProfileReady) ExecOperations(ctx context.Context) error {
 			}
 			if err := p.execOp(ctx, op); err != nil {
 				fails = append(fails, fmt.Errorf("%s: %w", op.Name(), err))
+				if errors.Is(err, ErrErrexit) {
+					break
+				}
 			}
 		}
 		return errors.Join(fails...)
