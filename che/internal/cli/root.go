@@ -87,6 +87,8 @@ sourced profile refs included).`,
 		"skip these ops everywhere (comma-separated or repeated; dropped from the run sequence, direct op subcommands become logged no-ops); values: prune-broken-links | make-dirs | make-links | make-copies | render-templates | run-scripts; env: CHE_SKIP_OPS")
 	pf.BoolVar(&a.flags.SkipRunIf, "skip-run-if", false,
 		"treat every runIf predicate as passing; env: CHE_SKIP_RUN_IF")
+	pf.BoolVar(&a.flags.Errexit, "errexit", false,
+		"stop the run at the first script failure (remaining scripts, ops, profiles skipped); default: continue and report all failures; env: CHE_ERREXIT")
 	pf.BoolVar(&a.flags.SkipRemoteRefs, "skip-remote-refs", false,
 		"skip sourced include.profiles refs, load only the local repo's specs; env: CHE_SKIP_REMOTE_REFS")
 	pf.StringVar(&a.flags.LogLevel, "log-level", "",

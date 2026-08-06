@@ -37,4 +37,18 @@ Scenario: a user sees what will run before watching it run, at every log level s
   Status: tested
   When a che command executes
   Then the discovery log precedes execution, at every log level that shows both
+
+Scenario: a user collects every script failure in one run, the default keeps going
+  Status: tested
+  When a profile script fails and `--errexit` is not set
+  Then the remaining scripts still run
+  And the per-script status report lists every script as `ran` or `failed`
+  And the run continues through the remaining ops and profiles, failures joining into the final error
+
+Scenario: an operator aborts a doomed run at the first script failure with errexit
+  Status: tested
+  When a profile script fails and `--errexit` (or `CHE_ERREXIT`) is set
+  Then the remaining scripts never run
+  And the remaining ops of the profile and the remaining profiles are skipped
+  And the run exits nonzero, the error naming the failed script
 <!-- [<] 🤖🤖 -->

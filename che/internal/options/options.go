@@ -238,6 +238,7 @@ func (c *Options) Resolve(env LookupEnv, user, spec Layer) error {
 		}
 	}
 	c.SkipRunIf = c.resolveBool("skipRunIf", c.SkipRunIf, env("CHE_SKIP_RUN_IF"), false)
+	c.Errexit = c.resolveBool("errexit", c.Errexit, env("CHE_ERREXIT"), false)
 	c.SkipRemoteRefs = c.resolveBool("skipRemoteRefs", c.SkipRemoteRefs, env("CHE_SKIP_REMOTE_REFS"), false,
 		boolLayer{user.SkipRemoteRefs, "config-file"}, boolLayer{spec.SkipRemoteRefs, "specFile"})
 	c.LogLevel = c.resolveStr("logLevel", "info",

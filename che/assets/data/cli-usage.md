@@ -26,6 +26,7 @@ Available Commands:
 Flags:
   -C, --che-working-directory string       change into this directory before resolving the repo; env: CHE_WORKING_DIRECTORY
       --dry-run string[="delta"]           print mutating actions instead of executing them; values: delta (changed dests, bare-flag default) | all (every dest) | true (alias for delta); default: off; env: CHE_DRY_RUN
+      --errexit                            stop the run at the first script failure (remaining scripts, ops, profiles skipped); default: continue and report all failures; env: CHE_ERREXIT
       --log-level string                   human-log level; values: error (failures only) | warn | info (what happened) | debug (adds intentions and won't-happen with reasons) | trace (adds details); default: info; env: CHE_LOG_LEVEL
       --profile-working-directory string   the load-ops source tree (che level; spec/profile options.profileWorkingDirectory override); default root; env: CHE_PROFILE_WORKING_DIRECTORY
       --profiles strings                   run only these profiles (comma-separated or repeated; autoDiscover skipped, runIf still enforced); env: CHE_PROFILE (comma-separated)
