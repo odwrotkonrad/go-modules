@@ -17,7 +17,7 @@ API="${CI_API_V4_URL}/projects/${CI_PROJECT_ID}/repository/tags?per_page=100&ord
 
 fetch() {
   if (( $+commands[curl] )) {
-    curl -fsSL --header "JOB-TOKEN: ${CI_JOB_TOKEN}" "$1"
+    curl -fsSL --connect-timeout 30 --retry 5 --retry-delay 2 --retry-all-errors --header "JOB-TOKEN: ${CI_JOB_TOKEN}" "$1"
   } else {
     wget -qO- --header="JOB-TOKEN: ${CI_JOB_TOKEN}" "$1"
   }
