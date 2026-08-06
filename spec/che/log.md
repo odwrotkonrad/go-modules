@@ -10,7 +10,7 @@ going to happen, why), trace (adds details). Discovery reports each profile,
 its working directory, and its ops with delta counts; ops report the mutations
 they make or would make.
 
-Scenario: human and machine logs are separate kinds
+Scenario: a user reads clean prose in the CLI while dashboards get structured events, neither leaks into the other
   Status: tested
   When any che command runs
   Then the CLI prints the human log only
@@ -18,13 +18,13 @@ Scenario: human and machine logs are separate kinds
   And no machine-oriented line format leaks into the human log
   And structure comes from headings and indentation, readability decides the layout
 
-Scenario: CHE_LOG_LEVEL selects the log level
+Scenario: a user dials verbosity with one env var, a sensible info default when unset
   Status: tested
   When I set `CHE_LOG_LEVEL=<level>` with level error | warn | info | debug | trace
   Then the human log includes that level and every higher-severity level
   And info is the default when unset
 
-Scenario: each level shows itself and every higher-severity level
+Scenario: an operator raising verbosity only gains lines, never loses the more severe ones
   Status: tested
   Given severity order error > warn > info > debug > trace
   When I set the log level
@@ -35,7 +35,7 @@ Scenario: each level shows itself and every higher-severity level
   And trace shows every line
   And a line below the selected level never prints
 
-Scenario: info logs only what happened
+Scenario: an operator reading info-level output sees completed facts only, no speculation noise
   Status: tested
   Given log level info
   When a che command runs
@@ -43,21 +43,21 @@ Scenario: info logs only what happened
   And no line announces what is going to happen
   And no line explains what is not going to happen
 
-Scenario: debug adds intentions and negatives with reasons
+Scenario: an operator debugging sees what will and will not happen, each with its reason
   Status: tested
   Given log level debug
   When a che command runs
   Then the human log additionally reports what is going to happen
   And what is not going to happen, each with its reason
 
-Scenario: trace adds details
+Scenario: an operator opts into full detail without it ever polluting everyday levels
   Status: tested
   Given log level trace
   When a che command runs
   Then the human log additionally reports detail-level events
   And details never log at info or debug
 
-Scenario: every level but info carries a level prefix
+Scenario: an operator grep-filters lines by severity, everyday info lines stay unprefixed and clean
   Status: tested
   When the human log prints a line
   Then an error line starts with `[error] `
@@ -66,7 +66,7 @@ Scenario: every level but info carries a level prefix
   And a trace line starts with `[trace] `
   And an info line carries no level prefix
 
-Scenario: the human log nests profiles and ops as markdown headings
+Scenario: a user navigates the run log like a document: profile, op, mutation, each at its own depth
   Status: tested
   When a che command executes a profile's ops at log level info
   Then each profile announces as a `# Run profile <ref>` heading
@@ -75,18 +75,18 @@ Scenario: the human log nests profiles and ops as markdown headings
   And an op that changes nothing renders as a heading with a no-changes note, no lines beneath it
   And a line beneath a profile heading carries no repeated profile-name suffix
 
-Scenario: run announces its init and discover stages as headings
+Scenario: a user sees where setup ends and execution begins, each stage announced by a heading
   Status: tested
   When `che run` starts at log level info
   Then it announces the init-remote-sources stage as a heading before the remote lines
   And it announces the discover-profiles stage as a heading before the discovered profiles
 
-Scenario: discover logs the spec path
+Scenario: a user confirms which spec file drives the run
   Status: tested
   When discovery runs at log level info
   Then the human log reports the che spec path in use
 
-Scenario: discover logs each remote once
+Scenario: an operator audits each remote's state and cache location in a single entry, no duplicates
   Status: tested
   Given the spec references remote sources
   When discovery initializes or updates remotes at log level info
@@ -94,7 +94,7 @@ Scenario: discover logs each remote once
   And each entry states whether the remote was initialized or updated
   And each entry states it landed in cache, with the cache path abbreviated
 
-Scenario: a discovered profile reports its working directory and ops
+Scenario: a config author verifies each profile's workdir and full op plan, deltas included, before anything runs
   Status: tested
   When discovery reports a profile
   Then it announces as a `## Profile <ref>  (profile workdir: <dir>)` heading, one level under the `# discover-profiles` heading
@@ -104,14 +104,14 @@ Scenario: a discovered profile reports its working directory and ops
   And every declared op lists, zero-delta included, as `<op>: <changes> (<n> declared)`, at every level that shows discovery
   And at debug each op additionally lists its declared items beneath it, each marked changed or unchanged
 
-Scenario: debug logs profiles that failed discovery
+Scenario: a config author learns why a profile was rejected instead of wondering where it went
   Status: tested
   Given log level debug
   When discovery rejects a profile
   Then the human log reports the rejected profile with the reason
   And no ops list is needed for a rejected profile
 
-Scenario: dry run reports the true predicted operations
+Scenario: a user trusts dry-run output as the exact mutations a real run would make
   Status: tested
   When dry-run=delta runs
   Then only operations that would change os state report
@@ -121,33 +121,33 @@ Scenario: dry run reports the true predicted operations
   And a no-op line carries only its reason, not the dry-run mode
   And dry-run=all bypasses the zero-delta profile skip
 
-Scenario: mutation reports created or overwritten
+Scenario: an operator tells fresh dests from replaced ones at a glance
   Status: tested
   When an op mutates a dest
   Then the action is created for a previously absent dest and overwritten for an existing one
   And template renders report under the render-templates op heading
 
-Scenario: render-templates delta comes from a mock-render content compare
+Scenario: a user sees render deltas reflecting real content differences, secret templates covered without leaking secrets
   Status: tested
   When discovery counts render-templates deltas
   Then each secret-free template's mock render composes per dest and byte-compares against the dest's current content, differing or absent counts as delta
   And each secret-bearing template's mock-render hash compares against the stored hash of the previous run instead
   And the cache stores the most recent hash only, keyed by dest, written on real renders only
 
-Scenario: a zero-delta op still runs
+Scenario: a user keeps idempotent sweeps running even when an op appears to have nothing to change
   Status: tested
   When run reaches an op whose delta is zero
   Then the op still executes (idempotent, sweeps included)
   And its heading notes `(no changes)` at info
 
-Scenario: uninstall groups removals by profile in reverse application order
+Scenario: an operator watches uninstall unwind profiles newest-first, every removal accounted for under its profile
   Status: tested
   When `che uninstall` runs at log level info
   Then each profile's removals sit under a `profile <ref>` heading
   And the profiles unwind in reverse of the order they were applied
   And each removed dest logs one indented line under its profile heading
 
-Scenario: uninstall skips a non-empty che-created dir
+Scenario: a user's own files survive uninstall, a non-empty dir stays with a reasoned skip line
   Status: todo
   When uninstall reverts a dir op whose dest still holds other content
   Then the dir stays and a debug skip line reports `will not remove <dest>: directory not empty`
@@ -155,43 +155,43 @@ Scenario: uninstall skips a non-empty che-created dir
   And no inverse removal records in the ledger
   And no raw rmdir stderr leaks into the output
 
-Scenario: debug logs the config delta from defaults
+Scenario: an operator sees only the config that differs from defaults, never a wall of settings
   Status: tested
   Given log level debug
   When a che command starts
   Then the human log reports the config options differing from defaults only
   And never the full config
 
-Scenario: config show outputs the config delta by default
+Scenario: a user asking for config sees what they changed, with sources, by default
   Status: tested
   When I invoke `che config show` or `che config show --delta`
   Then the output lists the config options differing from defaults, with sources
   And --delta is the default mode
 
-Scenario: config show --all outputs the full config
+Scenario: a user audits every config option, value and source, on demand
   Status: tested
   When I invoke `che config show --all`
   Then the output lists every config option with its value and source
 
-Scenario: config show prints no delta summary line
+Scenario: a user pipes config show output straight into tools, no summary line to strip
   Status: tested
   When I invoke `che config show` in any mode
   Then the output holds only the per-option lines
   And no `config delta ...` summary line precedes them
 
-Scenario: config show --all sorts changed options before defaults
+Scenario: a user spots their changed options first in the full config listing
   Status: tested
   When I invoke `che config show --all`
   Then the changed options list first, in config order
   And the remaining options follow, in config order
 
-Scenario: config show labels unset options as unset
+Scenario: a config author distinguishes untouched options from ones explicitly left at default
   Status: tested
   Given a config option no source sets
   When I invoke `che config show --all`
   Then that option shows its default value labeled `(unset)`, not `(default)`
 
-Scenario: config show labels options explicitly set to their default with the source
+Scenario: a config author sees which source set an option even when its value matches the default
   Status: tested
   Given a config option a source sets to its default value
   When I invoke `che config show --all`
