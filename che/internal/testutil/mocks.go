@@ -15,7 +15,7 @@ import (
 	"testing"
 	"time"
 
-	"gitlab.com/konradodwrot/go-modules/che/internal/execx"
+	"gitlab.com/konradodwrot/unrestricted/go-modules/che/internal/execx"
 )
 
 // mockRegistry: the pairs specs may declare in context.mockedInterfaces.

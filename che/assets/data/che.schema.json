@@ -1,6 +1,6 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "https://gitlab.com/konradodwrot/go-modules/-/raw/main/che/assets/data/che.schema.json",
+  "$id": "https://gitlab.com/konradodwrot/unrestricted/go-modules/-/raw/main/che/assets/data/che.schema.json",
   "$defs": {
     "DestSpec": {
       "oneOf": [

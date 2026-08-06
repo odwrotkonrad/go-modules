@@ -1,7 +1,7 @@
 ##[>] 🤖🤖
 site_name: che
 site_url: https://konradodwrot.gitlab.io/go-modules/
-repo_url: https://gitlab.com/konradodwrot/go-modules
+repo_url: https://gitlab.com/konradodwrot/unrestricted/go-modules
 repo_name: konradodwrot/go-modules
 use_directory_urls: !ENV [DOCS_DIR_URLS, true]
 

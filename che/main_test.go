@@ -8,8 +8,8 @@ import (
 
 	"github.com/stretchr/testify/assert"
 
-	"gitlab.com/konradodwrot/go-modules/che/internal/cli"
-	"gitlab.com/konradodwrot/go-modules/lib/testyml"
+	"gitlab.com/konradodwrot/unrestricted/go-modules/che/internal/cli"
+	"gitlab.com/konradodwrot/unrestricted/go-modules/lib/testyml"
 )
 
 //go:embed all:testdata

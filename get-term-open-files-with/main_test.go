@@ -13,10 +13,10 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	"gitlab.com/konradodwrot/go-modules/get-term-open-files-with/lib"
-	"gitlab.com/konradodwrot/go-modules/lib/climain"
-	"gitlab.com/konradodwrot/go-modules/lib/testyml"
-	"gitlab.com/konradodwrot/go-modules/lib/yamlcfg"
+	"gitlab.com/konradodwrot/unrestricted/go-modules/get-term-open-files-with/lib"
+	"gitlab.com/konradodwrot/unrestricted/go-modules/lib/climain"
+	"gitlab.com/konradodwrot/unrestricted/go-modules/lib/testyml"
+	"gitlab.com/konradodwrot/unrestricted/go-modules/lib/yamlcfg"
 )
 
 //go:embed all:testdata

@@ -15,7 +15,7 @@ builds:
     flags:
       - -trimpath
     ldflags:
-      - -s -w -X gitlab.com/konradodwrot/go-modules/che/internal/cli.version={{.Version}}
+      - -s -w -X gitlab.com/konradodwrot/unrestricted/go-modules/che/internal/cli.version={{.Version}}
     env:
       - CGO_ENABLED=1
       - 'CC=zig cc -target {{ if eq .Arch "amd64" }}x86_64{{ else }}aarch64{{ end }}-linux-gnu'

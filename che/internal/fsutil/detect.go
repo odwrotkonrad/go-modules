@@ -7,7 +7,7 @@ import (
 	"runtime"
 	"strings"
 
-	"gitlab.com/konradodwrot/go-modules/che/internal/execx"
+	"gitlab.com/konradodwrot/unrestricted/go-modules/che/internal/execx"
 )
 
 func NormalizeOS(goos string) string {

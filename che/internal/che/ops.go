@@ -8,10 +8,10 @@ import (
 	"os"
 	"strings"
 
-	"gitlab.com/konradodwrot/go-modules/che/internal/database"
-	"gitlab.com/konradodwrot/go-modules/che/internal/fsutil"
-	"gitlab.com/konradodwrot/go-modules/che/internal/log"
-	"gitlab.com/konradodwrot/go-modules/che/internal/spec"
+	"gitlab.com/konradodwrot/unrestricted/go-modules/che/internal/database"
+	"gitlab.com/konradodwrot/unrestricted/go-modules/che/internal/fsutil"
+	"gitlab.com/konradodwrot/unrestricted/go-modules/che/internal/log"
+	"gitlab.com/konradodwrot/unrestricted/go-modules/che/internal/spec"
 )
 
 // resolveArchivePath resolves a fresh backup archive path for this profile:

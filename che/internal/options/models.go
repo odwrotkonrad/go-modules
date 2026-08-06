@@ -2,7 +2,7 @@ package options
 
 // [>] 🤖🤖
 
-import "gitlab.com/konradodwrot/go-modules/che/internal/spec"
+import "gitlab.com/konradodwrot/unrestricted/go-modules/che/internal/spec"
 
 // Domain model:
 //

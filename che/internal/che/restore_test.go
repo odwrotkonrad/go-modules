@@ -9,9 +9,9 @@ import (
 
 	"github.com/stretchr/testify/require"
 
-	"gitlab.com/konradodwrot/go-modules/che/internal/fsutil"
-	"gitlab.com/konradodwrot/go-modules/che/internal/options"
-	"gitlab.com/konradodwrot/go-modules/che/internal/testutil"
+	"gitlab.com/konradodwrot/unrestricted/go-modules/che/internal/fsutil"
+	"gitlab.com/konradodwrot/unrestricted/go-modules/che/internal/options"
+	"gitlab.com/konradodwrot/unrestricted/go-modules/che/internal/testutil"
 )
 
 // restorerOver runs the restore algorithm over p's ledger, reusing p's real

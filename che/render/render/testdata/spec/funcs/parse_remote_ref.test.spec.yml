@@ -4,11 +4,11 @@ context:
 cases:
   - name: ShouldParseBareHostPath
     input:
-      args: [ref: "gitlab.com/konradodwrot/conventions//conventions/comments/convention.md"]
+      args: [ref: "gitlab.com/konradodwrot/unrestricted/conventions//conventions/comments/convention.md"]
     expected:
       output:
-        repoURL: "https://gitlab.com/konradodwrot/conventions.git"
-        sshURL: "ssh://git@gitlab.com/konradodwrot/conventions.git"
+        repoURL: "https://gitlab.com/konradodwrot/unrestricted/conventions.git"
+        sshURL: "ssh://git@gitlab.com/konradodwrot/unrestricted/conventions.git"
         path: conventions/comments/convention.md
         gitRef: ""
   - name: ShouldParseRefQuery
