@@ -17,12 +17,12 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	"gitlab.com/konradodwrot/go-modules/che/internal/execx"
-	"gitlab.com/konradodwrot/go-modules/che/internal/log"
-	"gitlab.com/konradodwrot/go-modules/che/internal/options"
-	"gitlab.com/konradodwrot/go-modules/che/internal/spec"
-	"gitlab.com/konradodwrot/go-modules/che/internal/testutil"
-	"gitlab.com/konradodwrot/go-modules/lib/testyml"
+	"gitlab.com/konradodwrot/unrestricted/go-modules/che/internal/execx"
+	"gitlab.com/konradodwrot/unrestricted/go-modules/che/internal/log"
+	"gitlab.com/konradodwrot/unrestricted/go-modules/che/internal/options"
+	"gitlab.com/konradodwrot/unrestricted/go-modules/che/internal/spec"
+	"gitlab.com/konradodwrot/unrestricted/go-modules/che/internal/testutil"
+	"gitlab.com/konradodwrot/unrestricted/go-modules/lib/testyml"
 )
 
 //go:embed all:testdata

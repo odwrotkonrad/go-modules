@@ -1,4 +1,4 @@
-# yaml-language-server: $schema=https://gitlab.com/konradodwrot/go-modules/-/raw/main/che/assets/data/che.schema.json
+# yaml-language-server: $schema=https://gitlab.com/konradodwrot/unrestricted/go-modules/-/raw/main/che/assets/data/che.schema.json
 ##[>] 🤖🤖
 ontoRepo:
   options: {autoDiscover: true}
@@ -23,6 +23,6 @@ claude-agents:
   options: {autoDiscover: true, runIf: ['builtin:isVirt']}
   include:
     profiles:
-      - source: "@https://gitlab.com/konradodwrot/configs//profiles/llm/claude/che.yml::llm/claude/virt"
+      - source: "@https://gitlab.com/konradodwrot/unrestricted/configs//profiles/llm/claude/che.yml::llm/claude/virt"
         ctx: {repo: GoModules}
 ##[<] 🤖🤖

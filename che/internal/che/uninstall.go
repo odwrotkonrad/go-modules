@@ -5,9 +5,9 @@ package che
 import (
 	"errors"
 
-	"gitlab.com/konradodwrot/go-modules/che/internal/database"
-	"gitlab.com/konradodwrot/go-modules/che/internal/log"
-	"gitlab.com/konradodwrot/go-modules/che/internal/options"
+	"gitlab.com/konradodwrot/unrestricted/go-modules/che/internal/database"
+	"gitlab.com/konradodwrot/unrestricted/go-modules/che/internal/log"
+	"gitlab.com/konradodwrot/unrestricted/go-modules/che/internal/options"
 )
 
 // Uninstaller backs out everything the ledger marks installed onto this host,

@@ -5,7 +5,7 @@ package spec
 import (
 	"testing"
 
-	"gitlab.com/konradodwrot/go-modules/lib/testyml"
+	"gitlab.com/konradodwrot/unrestricted/go-modules/lib/testyml"
 )
 
 func TestDestRule(t *testing.T) {

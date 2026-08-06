@@ -10,9 +10,9 @@ import (
 	"path/filepath"
 	"strings"
 
-	"gitlab.com/konradodwrot/go-modules/che/internal/fsutil"
-	"gitlab.com/konradodwrot/go-modules/che/internal/spec"
-	"gitlab.com/konradodwrot/go-modules/che/render/render"
+	"gitlab.com/konradodwrot/unrestricted/go-modules/che/internal/fsutil"
+	"gitlab.com/konradodwrot/unrestricted/go-modules/che/internal/spec"
+	"gitlab.com/konradodwrot/unrestricted/go-modules/che/render/render"
 )
 
 // renderCachePath is a dest's stored mock-render hash file:

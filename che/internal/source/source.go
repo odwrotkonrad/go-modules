@@ -10,9 +10,9 @@ import (
 	"path/filepath"
 	"strings"
 
-	"gitlab.com/konradodwrot/go-modules/che/internal/execx"
-	"gitlab.com/konradodwrot/go-modules/che/internal/fsutil"
-	"gitlab.com/konradodwrot/go-modules/che/internal/log"
+	"gitlab.com/konradodwrot/unrestricted/go-modules/che/internal/execx"
+	"gitlab.com/konradodwrot/unrestricted/go-modules/che/internal/fsutil"
+	"gitlab.com/konradodwrot/unrestricted/go-modules/che/internal/log"
 )
 
 // Dir is the managed cache checkout path for url:

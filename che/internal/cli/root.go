@@ -12,11 +12,11 @@ import (
 	"go.opentelemetry.io/otel/attribute"
 	"go.opentelemetry.io/otel/trace"
 
-	"gitlab.com/konradodwrot/go-modules/che/internal/che"
-	"gitlab.com/konradodwrot/go-modules/che/internal/log"
-	"gitlab.com/konradodwrot/go-modules/che/internal/options"
-	"gitlab.com/konradodwrot/go-modules/che/internal/spec"
-	"gitlab.com/konradodwrot/go-modules/che/internal/telemetry"
+	"gitlab.com/konradodwrot/unrestricted/go-modules/che/internal/che"
+	"gitlab.com/konradodwrot/unrestricted/go-modules/che/internal/log"
+	"gitlab.com/konradodwrot/unrestricted/go-modules/che/internal/options"
+	"gitlab.com/konradodwrot/unrestricted/go-modules/che/internal/spec"
+	"gitlab.com/konradodwrot/unrestricted/go-modules/che/internal/telemetry"
 )
 
 // version is injected at build time via -ldflags -X.

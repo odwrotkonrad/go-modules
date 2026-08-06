@@ -4,9 +4,9 @@ package main
 // [>] 🤖🤖
 
 import (
-	"gitlab.com/konradodwrot/go-modules/get-term-open-files-with/lib"
-	"gitlab.com/konradodwrot/go-modules/lib/climain"
-	"gitlab.com/konradodwrot/go-modules/lib/yamlcfg"
+	"gitlab.com/konradodwrot/unrestricted/go-modules/get-term-open-files-with/lib"
+	"gitlab.com/konradodwrot/unrestricted/go-modules/lib/climain"
+	"gitlab.com/konradodwrot/unrestricted/go-modules/lib/yamlcfg"
 )
 
 const usage = `usage: get-term-open-files-with <any|vscode|kitty>

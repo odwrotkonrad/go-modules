@@ -13,8 +13,8 @@ import (
 	"github.com/stretchr/testify/require"
 	"gopkg.in/yaml.v3"
 
-	"gitlab.com/konradodwrot/go-modules/lib/testyml"
-	"gitlab.com/konradodwrot/go-modules/lib/yamlcfg"
+	"gitlab.com/konradodwrot/unrestricted/go-modules/lib/testyml"
+	"gitlab.com/konradodwrot/unrestricted/go-modules/lib/yamlcfg"
 )
 
 //go:embed all:testdata

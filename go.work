@@ -7,4 +7,4 @@ use (
 	./lib
 )
 
-replace gitlab.com/konradodwrot/go-modules/lib v0.0.1 => ./lib
+replace gitlab.com/konradodwrot/unrestricted/go-modules/lib v0.0.1 => ./lib

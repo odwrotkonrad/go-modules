@@ -19,13 +19,13 @@ import (
 	"go.opentelemetry.io/otel/attribute"
 	"gopkg.in/yaml.v3"
 
-	"gitlab.com/konradodwrot/go-modules/che/internal/database"
-	"gitlab.com/konradodwrot/go-modules/che/internal/fsutil"
-	"gitlab.com/konradodwrot/go-modules/che/internal/log"
-	"gitlab.com/konradodwrot/go-modules/che/internal/options"
-	"gitlab.com/konradodwrot/go-modules/che/internal/spec"
-	"gitlab.com/konradodwrot/go-modules/che/internal/telemetry"
-	"gitlab.com/konradodwrot/go-modules/che/render/render"
+	"gitlab.com/konradodwrot/unrestricted/go-modules/che/internal/database"
+	"gitlab.com/konradodwrot/unrestricted/go-modules/che/internal/fsutil"
+	"gitlab.com/konradodwrot/unrestricted/go-modules/che/internal/log"
+	"gitlab.com/konradodwrot/unrestricted/go-modules/che/internal/options"
+	"gitlab.com/konradodwrot/unrestricted/go-modules/che/internal/spec"
+	"gitlab.com/konradodwrot/unrestricted/go-modules/che/internal/telemetry"
+	"gitlab.com/konradodwrot/unrestricted/go-modules/che/render/render"
 )
 
 // Domain model:

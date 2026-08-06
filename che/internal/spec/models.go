@@ -5,7 +5,7 @@ package spec
 import (
 	"regexp"
 
-	"gitlab.com/konradodwrot/go-modules/che/render/render"
+	"gitlab.com/konradodwrot/unrestricted/go-modules/che/render/render"
 )
 
 // Domain model:

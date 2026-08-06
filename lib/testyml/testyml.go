@@ -16,7 +16,7 @@ import (
 	"github.com/stretchr/testify/require"
 	"gopkg.in/yaml.v3"
 
-	"gitlab.com/konradodwrot/go-modules/lib/yamlcfg"
+	"gitlab.com/konradodwrot/unrestricted/go-modules/lib/yamlcfg"
 )
 
 // CommandArgs returns the context command's argv past the binary name.

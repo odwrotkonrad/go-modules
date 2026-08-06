@@ -7,7 +7,7 @@ import (
 	"fmt"
 	"os"
 
-	"gitlab.com/konradodwrot/go-modules/che/internal/cli"
+	"gitlab.com/konradodwrot/unrestricted/go-modules/che/internal/cli"
 )
 
 func main() {

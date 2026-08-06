@@ -11,8 +11,8 @@ import (
 	"github.com/spf13/cobra"
 	"github.com/stretchr/testify/require"
 
-	"gitlab.com/konradodwrot/go-modules/che/internal/testutil"
-	"gitlab.com/konradodwrot/go-modules/lib/testyml"
+	"gitlab.com/konradodwrot/unrestricted/go-modules/che/internal/testutil"
+	"gitlab.com/konradodwrot/unrestricted/go-modules/lib/testyml"
 )
 
 //go:embed all:testdata

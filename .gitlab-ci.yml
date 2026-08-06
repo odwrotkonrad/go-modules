@@ -15,7 +15,7 @@ stages:
   - publish
 
 variables:
-  CI_IMAGE: registry.gitlab.com/konradodwrot/infra/oci-images/ci-linux:latest
+  CI_IMAGE: registry.gitlab.com/konradodwrot/unrestricted/infra/oci-images/ci-linux:latest
   GOMODCACHE: $CI_PROJECT_DIR/.cache/go-mod
   GOCACHE: $CI_PROJECT_DIR/.cache/go-build
   CC: clang
@@ -468,7 +468,7 @@ rebuild-ci-image:
   variables:
     BUILD_ALL_IMAGES: "true"
   trigger:
-    project: konradodwrot/infra/oci-images
+    project: konradodwrot/unrestricted/infra/oci-images
     branch: main
     forward:
       yaml_variables: true

@@ -19,8 +19,8 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	"gitlab.com/konradodwrot/go-modules/che/internal/testutil"
-	"gitlab.com/konradodwrot/go-modules/lib/testyml"
+	"gitlab.com/konradodwrot/unrestricted/go-modules/che/internal/testutil"
+	"gitlab.com/konradodwrot/unrestricted/go-modules/lib/testyml"
 )
 
 func TestE2EDryRun(t *testing.T) { runCase(t, "dry-run-e2e") }

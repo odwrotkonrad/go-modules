@@ -12,10 +12,10 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	"gitlab.com/konradodwrot/go-modules/che/internal/options"
-	"gitlab.com/konradodwrot/go-modules/che/internal/spec"
-	"gitlab.com/konradodwrot/go-modules/che/internal/testutil"
-	"gitlab.com/konradodwrot/go-modules/lib/testyml"
+	"gitlab.com/konradodwrot/unrestricted/go-modules/che/internal/options"
+	"gitlab.com/konradodwrot/unrestricted/go-modules/che/internal/spec"
+	"gitlab.com/konradodwrot/unrestricted/go-modules/che/internal/testutil"
+	"gitlab.com/konradodwrot/unrestricted/go-modules/lib/testyml"
 )
 
 func octal(t *testing.T, s string) os.FileMode {
