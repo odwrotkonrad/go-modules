@@ -76,15 +76,15 @@ func NewPackagesInstaller(env map[string]string, home string, opts options.Optio
 	return &packages.Installer{
 		File: f, FilePath: path, Host: NewPackagesHost(),
 		Opts: packages.Options{
-			Update:                               opts.PackagesUpdate,
-			IfMissing:                            opts.PackagesIfMissing,
-			DryRun:                               opts.DryRun != options.DryRun.Off,
-			PreferredMethods:                     opts.PackagesPreferredMethods,
-			PrebuiltArchiveDestinationCandidates: opts.PackagesPrebuiltArchiveDestinationCandidates,
-			PrebuiltArchiveCheckPresentOnPath:    opts.PackagesPrebuiltArchiveCheckPresentOnPath,
-			CompletionsEnabled:                   opts.PackagesCompletionsEnabled,
-			CompletionsDestinationCandidates:     opts.PackagesCompletionsDestinationCandidates,
-			CompletionsCheckPresentOnFpath:       opts.PackagesCompletionsCheckPresentOnFpath,
+			Update:           opts.PackagesUpdate,
+			IfMissing:        opts.PackagesIfMissing,
+			DryRun:           opts.DryRun != options.DryRun.Off,
+			PreferredMethods: opts.PackagesPreferredMethods,
+			PrebuiltBinariesArchiveDestinationCandidates: opts.PackagesPrebuiltBinariesArchiveDestinationCandidates,
+			PrebuiltBinariesArchiveCheckPresentOnPath:    opts.PackagesPrebuiltBinariesArchiveCheckPresentOnPath,
+			CompletionsEnabled:                           opts.PackagesCompletionsEnabled,
+			CompletionsDestinationCandidates:             opts.PackagesCompletionsDestinationCandidates,
+			CompletionsCheckPresentOnFpath:               opts.PackagesCompletionsCheckPresentOnFpath,
 		},
 	}, nil
 }
@@ -108,11 +108,11 @@ func (p *ProfileReady) newInstaller() (*packages.Installer, error) {
 		}
 		opts.PackagesPreferredMethods = m
 	}
-	if d := p.Options.Packages.PrebuiltArchive.InstallDestinationCandidates; len(d) > 0 {
-		opts.PackagesPrebuiltArchiveDestinationCandidates = d
+	if d := p.Options.Packages.PrebuiltBinariesArchive.InstallDestinationCandidates; len(d) > 0 {
+		opts.PackagesPrebuiltBinariesArchiveDestinationCandidates = d
 	}
-	if c := p.Options.Packages.PrebuiltArchive.CheckPresentOnPath; c != nil {
-		opts.PackagesPrebuiltArchiveCheckPresentOnPath = *c
+	if c := p.Options.Packages.PrebuiltBinariesArchive.CheckPresentOnPath; c != nil {
+		opts.PackagesPrebuiltBinariesArchiveCheckPresentOnPath = *c
 	}
 	if e := p.Options.Packages.Completions.Zsh.Enabled; e != nil {
 		opts.PackagesCompletionsEnabled = *e

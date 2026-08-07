@@ -27,7 +27,7 @@ func (a *app) packagesCmd() *cobra.Command {
 	pf.StringVar(&a.flags.PackagesOverride, "packages-override", "",
 		"override packages file merged over the effective base (the packages file, or the builtin when none exists): same-name entries replace, new names append; default: $XDG_CONFIG_HOME/che/packages-override.yml if present; env: CHE_PACKAGES_OVERRIDE")
 	pf.StringSliceVar(&a.flags.PackagesPreferredMethods, "preferred-methods", nil,
-		"installation-method preference order (comma-separated or repeated): listed managers try first within each package entry, unlisted follow in entry order; values: brew | cask | apt | npm | go | gem | prebuiltArchive | script | vscode | versionManager; env: CHE_PACKAGES_PREFERRED_METHODS")
+		"installation-method preference order (comma-separated or repeated): listed managers try first within each package entry, unlisted follow in entry order; values: brew | cask | apt | npm | go | gem | prebuiltBinariesArchive | script | vscode | versionManager; env: CHE_PACKAGES_PREFERRED_METHODS")
 
 	install := &cobra.Command{
 		Use:   "install [pkg...]",

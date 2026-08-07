@@ -166,7 +166,7 @@ test-install-methods-linux:
   image: debian:bookworm-slim
   parallel:
     matrix:
-      - METHOD: [apt, prebuiltArchive, script, versionManager, npm, go]
+      - METHOD: [apt, prebuiltBinariesArchive, script, versionManager, npm, go]
   before_script:
     #[why] bootstrap minimum only: zsh + clang run the Makefile itself, the rest installs through basePackages and each package's requires
     - apt-get update && apt-get install -y --no-install-recommends ca-certificates curl make sudo zsh clang
@@ -181,7 +181,7 @@ test-install-methods-darwin:
   image: macos-26-xcode-26
   parallel:
     matrix:
-      - METHOD: [brew/formulae, brew/cask, prebuiltArchive, script, versionManager]
+      - METHOD: [brew/formulae, brew/cask, prebuiltBinariesArchive, script, versionManager]
   before_script:
     - curl -fsSL --connect-timeout 30 --retry 10 --retry-delay 30 --retry-all-errors -o /tmp/go.tar.gz "https://go.dev/dl/go1.26.4.darwin-arm64.tar.gz"
     - sudo tar -xzf /tmp/go.tar.gz -C /usr/local

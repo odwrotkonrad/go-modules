@@ -13,10 +13,10 @@ import (
 	"gitlab.com/konradodwrot/go-modules/che/internal/log"
 )
 
-func (in *Installer) installPrebuiltArchive(pkg string, b *PrebuiltArchiveSpec) error {
+func (in *Installer) installPrebuiltBinariesArchive(pkg string, b *PrebuiltBinariesArchiveSpec) error {
 	if in.hasCmd(pkg) {
 		if pin := in.pinFor(pkg, b.Version); pin == "" || in.versionOutputHasPin(pkg, pin) {
-			in.emitSkip(log.Levels.Debug, pkg, "already installed via prebuiltArchive")
+			in.emitSkip(log.Levels.Debug, pkg, "already installed via prebuiltBinariesArchive")
 			return nil
 		}
 		in.emit(log.Levels.Info, "reinstall", pkg+": -> "+in.pinFor(pkg, b.Version))
@@ -25,7 +25,7 @@ func (in *Installer) installPrebuiltArchive(pkg string, b *PrebuiltArchiveSpec) 
 		return err
 	}
 	if in.Opts.DryRun {
-		in.emitDryRun("install", pkg+" via prebuiltArchive")
+		in.emitDryRun("install", pkg+" via prebuiltBinariesArchive")
 		return nil
 	}
 	version, err := in.resolveArchiveVersion(pkg, b)
@@ -46,7 +46,7 @@ func (in *Installer) installPrebuiltArchive(pkg string, b *PrebuiltArchiveSpec) 
 	if err := in.exec(curlArgv(url, asset)); err != nil {
 		return err
 	}
-	if want, ok := b.Sha256[in.Host.ShaKey()]; ok {
+	if want, ok := b.Platforms.Sha[in.Host.ShaKey()]; ok {
 		if err := in.verifySha256(pkg, asset, want); err != nil {
 			return err
 		}
@@ -56,7 +56,7 @@ func (in *Installer) installPrebuiltArchive(pkg string, b *PrebuiltArchiveSpec) 
 	if err := in.installMembers(pkg, asset, version, arch, b); err != nil {
 		return err
 	}
-	in.emit(log.Levels.Info, "installed", pkg+" via prebuiltArchive")
+	in.emit(log.Levels.Info, "installed", pkg+" via prebuiltBinariesArchive")
 	return nil
 }
 
@@ -99,7 +99,7 @@ func (in *Installer) archFor(convention string) (string, error) {
 	return "", fmt.Errorf("unknown archConvention %q for arch %s (declare it under archNameConventions)", convention, in.Host.Arch)
 }
 
-func (in *Installer) members(pkg, version, arch string, b *PrebuiltArchiveSpec) []string {
+func (in *Installer) members(pkg, version, arch string, b *PrebuiltBinariesArchiveSpec) []string {
 	names := b.ExtractBinaries
 	if len(names) == 0 {
 		names = Strings{pkg}
@@ -111,7 +111,7 @@ func (in *Installer) members(pkg, version, arch string, b *PrebuiltArchiveSpec) 
 	return out
 }
 
-func (in *Installer) installMembers(pkg, asset, version, arch string, b *PrebuiltArchiveSpec) error {
+func (in *Installer) installMembers(pkg, asset, version, arch string, b *PrebuiltBinariesArchiveSpec) error {
 	binDir := in.userBinDir()
 	if err := in.exec([]string{"mkdir", "-p", binDir}); err != nil {
 		return err
@@ -154,9 +154,9 @@ func (in *Installer) extract(asset, dest string) error {
 }
 
 func (in *Installer) userBinDir() string {
-	return in.resolveDestDir(&in.binDir, in.Opts.PrebuiltArchiveDestinationCandidates, DefaultPrebuiltArchiveDestinationCandidates,
-		in.Opts.PrebuiltArchiveCheckPresentOnPath, in.Host.PathDirs,
-		"packages.prebuiltArchive.installDestinationCandidates", "PATH")
+	return in.resolveDestDir(&in.binDir, in.Opts.PrebuiltBinariesArchiveDestinationCandidates, DefaultPrebuiltBinariesArchiveDestinationCandidates,
+		in.Opts.PrebuiltBinariesArchiveCheckPresentOnPath, in.Host.PathDirs,
+		"packages.prebuiltBinariesArchive.installDestinationCandidates", "PATH")
 }
 
 func (in *Installer) resolveDestDir(cached *string, candidates, defaults []string, check bool, dirs func() []string, optName, pathLabel string) string {

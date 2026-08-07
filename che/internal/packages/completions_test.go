@@ -15,12 +15,12 @@ import (
 const goCompYaml = `packages:
   go:
     installMethods:
-      - prebuiltArchive:
+      - prebuiltBinariesArchive:
           version: 1.26.4
           url: https://example.com/go{version}.{os}-{arch}.tar.gz
-          bin: go/bin/go go/bin/gofmt
-          sha256:
-            linux-amd64: goodsha
+          extractBinaries: [go/bin/go, go/bin/gofmt]
+          platforms:
+            - linux-amd64: goodsha
     completions:
       zsh:
         name: _golang
@@ -38,7 +38,7 @@ func TestEntryObjectFormParsesManagersAndCompletions(t *testing.T) {
 	entry, err := in.File.Find("go", "packages.yml")
 	require.NoError(t, err)
 	require.Len(t, entry.Items, 1)
-	require.Equal(t, "prebuiltArchive", entry.Items[0].Mgr)
+	require.Equal(t, "prebuiltBinariesArchive", entry.Items[0].Mgr)
 	require.Equal(t, "_golang", entry.Completions.Zsh.Name)
 	require.Equal(t, "https://example.com/_golang", entry.Completions.Zsh.URL)
 }

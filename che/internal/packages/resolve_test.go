@@ -49,6 +49,7 @@ type itemGot struct {
 	Name       string            `yaml:"name"`
 	Version    string            `yaml:"version,omitempty"`
 	URL        string            `yaml:"url,omitempty"`
+	Platforms  []string          `yaml:"platformNames,omitempty"`
 	Sha256     map[string]string `yaml:"sha256,omitempty"`
 	Run        string            `yaml:"run,omitempty"`
 	ScriptOs   string            `yaml:"scriptOs,omitempty"`
@@ -63,8 +64,8 @@ func TestItemUnmarshal(t *testing.T) {
 			return itemGot{}, err
 		}
 		got := itemGot{Mgr: it.Mgr, Name: it.Name}
-		if it.PrebuiltArchive != nil {
-			got.Version, got.URL, got.Sha256 = it.PrebuiltArchive.Version, it.PrebuiltArchive.URL, it.PrebuiltArchive.Sha256
+		if it.PrebuiltBinariesArchive != nil {
+			got.Version, got.URL, got.Platforms, got.Sha256 = it.PrebuiltBinariesArchive.Version, it.PrebuiltBinariesArchive.URL, it.PrebuiltBinariesArchive.Platforms.Names, it.PrebuiltBinariesArchive.Platforms.Sha
 		}
 		if it.Script != nil {
 			got.Run, got.ScriptOs = strings.TrimSpace(it.Script.Run), it.Script.OS

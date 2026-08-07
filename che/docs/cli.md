@@ -196,7 +196,7 @@ install packages from packages.yml and check their state.
 | --- | --- | --- | --- | --- |
 | `--packages-file` | `CHE_PACKAGES_FILE` | `string` | `$XDG_CONFIG_HOME/packages/packages.yml` | packages.yml path, fully superseding the builtin packages.yml shipped in che (a set file must exist; the builtin serves only when no file exists at the default path) |
 | `--packages-override` | `CHE_PACKAGES_OVERRIDE` | `string` | `$XDG_CONFIG_HOME/che/packages-override.yml if present` | override packages file merged over the effective base (the packages file, or the builtin when none exists): same-name entries replace, new names append |
-| `--preferred-methods` | `CHE_PACKAGES_PREFERRED_METHODS` | `brew` \| `cask` \| `apt` \| `npm` \| `go` \| `gem` \| `prebuiltArchive` \| `script` \| `vscode` \| `versionManager` | `[]` | installation-method preference order (comma-separated or repeated): listed managers try first within each package entry, unlisted follow in entry order |
+| `--preferred-methods` | `CHE_PACKAGES_PREFERRED_METHODS` | `brew` \| `cask` \| `apt` \| `npm` \| `go` \| `gem` \| `prebuiltBinariesArchive` \| `script` \| `vscode` \| `versionManager` | `[]` | installation-method preference order (comma-separated or repeated): listed managers try first within each package entry, unlisted follow in entry order |
 
 ### `$ che packages check-not-shadowed`
 

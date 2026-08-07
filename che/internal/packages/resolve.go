@@ -81,8 +81,8 @@ func (h Host) applicable(pkg string, it Item) (bool, error) {
 	case "brew", "cask":
 		return h.OS == "darwin" && h.HasCmd("brew"), nil
 	case "apt":
-		if it.Apt != nil && it.Apt.Repo != nil && (it.Apt.Repo.URL == "" || it.Apt.Repo.GpgURL == "") {
-			return false, fmt.Errorf("package %s: apt repo requires url and gpgUrl", pkg)
+		if it.Apt != nil && it.Apt.FromSource != nil && (it.Apt.FromSource.URL == "" || it.Apt.FromSource.VerificationKey == "") {
+			return false, fmt.Errorf("package %s: apt fromSource requires url and verificationKey", pkg)
 		}
 		return h.OS == "linux" && h.HasCmd("apt-get"), nil
 	case "npm":
@@ -97,15 +97,12 @@ func (h Host) applicable(pkg string, it Item) (bool, error) {
 		}
 		fi, err := os.Stat("/usr/local/go/bin/go")
 		return err == nil && fi.Mode()&0o111 != 0, nil
-	case "prebuiltArchive":
-		if it.PrebuiltArchive == nil {
-			return false, fmt.Errorf("package %s: prebuiltArchive item missing props", pkg)
+	case "prebuiltBinariesArchive":
+		if it.PrebuiltBinariesArchive == nil {
+			return false, fmt.Errorf("package %s: prebuiltBinariesArchive item missing props", pkg)
 		}
-		if _, ok := it.PrebuiltArchive.Sha256[h.ShaKey()]; ok {
-			return true, nil
-		}
-		for _, p := range it.PrebuiltArchive.Platforms {
-			if p == h.ShaKey() || p == h.OS {
+		for _, p := range it.PrebuiltBinariesArchive.Platforms.Names {
+			if p == h.ShaKey() {
 				return true, nil
 			}
 		}
@@ -128,10 +125,8 @@ func (h Host) applicable(pkg string, it Item) (bool, error) {
 		if it.Script == nil || (it.Script.Run == "" && it.Script.Path == "" && it.Script.URL == "") {
 			return false, fmt.Errorf("package %s: script item missing run, path, or remoteUrl", pkg)
 		}
-		if len(it.Script.Sha256) > 0 {
-			if _, ok := it.Script.Sha256[h.ShaKey()]; !ok {
-				return false, nil
-			}
+		if len(it.Script.Platforms.Names) > 0 && !slices.Contains(it.Script.Platforms.Names, h.ShaKey()) {
+			return false, nil
 		}
 		return it.Script.OS == "" || it.Script.OS == h.OS, nil
 	default:
@@ -165,13 +160,13 @@ func methodFamily(mgr string) string {
 	return mgr
 }
 
-var KnownManagers = []string{"brew", "cask", "apt", "npm", "go", "gem", "prebuiltArchive", "script", "vscode", "versionManager"}
+var KnownManagers = []string{"brew", "cask", "apt", "npm", "go", "gem", "prebuiltBinariesArchive", "script", "vscode", "versionManager"}
 
-var PlatformMethods = []string{"brew", "brew/cask", "brew/vscode", "apt", "npm", "go", "gem", "prebuiltArchive", "script", "versionManager"}
+var PlatformMethods = []string{"brew", "brew/cask", "brew/vscode", "apt", "npm", "go", "gem", "prebuiltBinariesArchive", "script", "versionManager"}
 
-var DefaultPreferredMethods = []string{"brew", "cask", "apt", "prebuiltArchive", "script", "npm", "go", "gem", "vscode"}
+var DefaultPreferredMethods = []string{"brew", "cask", "apt", "prebuiltBinariesArchive", "script", "npm", "go", "gem", "vscode"}
 
-var DefaultPrebuiltArchiveDestinationCandidates = []string{"~/.local/bin", "~/bin"}
+var DefaultPrebuiltBinariesArchiveDestinationCandidates = []string{"~/.local/bin", "~/bin"}
 
 var DefaultCompletionsDestinationCandidates = []string{"~/.local/share/zsh/site-functions", "~/.zfunc"}
 

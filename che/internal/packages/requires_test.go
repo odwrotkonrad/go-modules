@@ -134,10 +134,10 @@ func TestRequestedMultipleVersionsNeedVersionManager(t *testing.T) {
 	const yml = `packages:
   kind:
     installMethods:
-      - prebuiltArchive:
+      - prebuiltBinariesArchive:
           version: 0.32.0
           url: https://example.com/kind-{version}
-          sha256: {linux-amd64: goodsha}
+          platforms: [{linux-amd64: goodsha}]
 `
 	in, _ := newInstaller(t, yml, "linux", cmdMap([]string{"sha256sum"}), Options{})
 	err := in.InstallRequests([]Request{{Name: "kind", Versions: []string{"0.32.0", "0.31.0"}}})
@@ -149,10 +149,10 @@ func TestRequestedVersionRejectedWhenPinnedAssetDiffers(t *testing.T) {
   kind:
     version: "0.32.*"
     installMethods:
-      - prebuiltArchive:
+      - prebuiltBinariesArchive:
           version: 0.32.0
           url: https://example.com/kind-{version}
-          sha256: {linux-amd64: goodsha}
+          platforms: [{linux-amd64: goodsha}]
 `
 	in, _ := newInstaller(t, yml, "linux", cmdMap([]string{"sha256sum"}), Options{})
 	err := in.InstallRequests([]Request{{Name: "kind", Versions: []string{"0.32.1"}}})

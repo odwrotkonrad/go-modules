@@ -73,9 +73,9 @@ func TestEntryVersionPinsArchiveVersion(t *testing.T) {
   kind:
     version: "0.32.0"
     installMethods:
-      - prebuiltArchive:
+      - prebuiltBinariesArchive:
           url: https://example.com/kind-{version}
-          sha256: {linux-amd64: goodsha}
+          platforms: [{linux-amd64: goodsha}]
 `
 	in, m := newInstaller(t, y, "linux", cmdMap([]string{"sha256sum"}), Options{})
 	m.Stub = shaStub("goodsha")
@@ -86,7 +86,7 @@ func TestEntryVersionPinsArchiveVersion(t *testing.T) {
 func TestArchiveWithoutVersionNeedsNoPin(t *testing.T) {
 	const y = `packages:
   aws:
-    - prebuiltArchive:
+    - prebuiltBinariesArchive:
         url: https://example.com/aws-latest.zip
         platforms: [linux-amd64]
         extractBinaries: [aws/dist/aws]
@@ -166,9 +166,9 @@ func TestUnversionedLatestSentinelNotUsedAsArchiveVersion(t *testing.T) {
   kind:
     version: __the_one_published__
     installMethods:
-      - prebuiltArchive:
+      - prebuiltBinariesArchive:
           url: https://example.com/kind-{version}
-          sha256: {linux-amd64: goodsha}
+          platforms: [{linux-amd64: goodsha}]
 `
 	in, _ := newInstaller(t, y, "linux", cmdMap([]string{"sha256sum"}), Options{})
 	require.ErrorContains(t, in.Install([]string{"kind"}), "no version pinned")
@@ -181,7 +181,7 @@ func TestAliasBinaryLinksRenamedBinary(t *testing.T) {
     installMethods:
       - brew
       - apt:
-          packages:
+          installPackages:
             bat:
               aliasBinary:
                 batcat: bat
@@ -210,7 +210,7 @@ func TestAliasBinarySkippedWhenSourceAbsent(t *testing.T) {
     version: __the_one_published__
     installMethods:
       - apt:
-          packages:
+          installPackages:
             bat:
               aliasBinary:
                 batcat: bat
@@ -346,22 +346,22 @@ func TestGoModulePinsFromEntryVersion(t *testing.T) {
 func TestAptPackagesAcceptListAndMapForms(t *testing.T) {
 	const y = `packages:
   listform:
-    installMethods: [{apt: {packages: [a, b]}}]
+    installMethods: [{apt: {installPackages: [a, b]}}]
   mapform:
     installMethods:
       - apt:
-          packages:
+          installPackages:
             a: {}
             b:
               aliasBinary: {bcat: b}
 `
 	var f File
 	require.NoError(t, yaml.Unmarshal([]byte(y), &f))
-	require.Equal(t, []string{"a", "b"}, f.Packages["listform"].Items[0].Apt.Packages.Names)
+	require.Equal(t, []string{"a", "b"}, f.Packages["listform"].Items[0].Apt.InstallPackages.Names)
 	require.Empty(t, f.Packages["listform"].Items[0].AliasBinary)
 
 	m := f.Packages["mapform"].Items[0]
-	require.Equal(t, []string{"a", "b"}, m.Apt.Packages.Names)
+	require.Equal(t, []string{"a", "b"}, m.Apt.InstallPackages.Names)
 	require.Equal(t, map[string]string{"bcat": "b"}, m.AliasBinary)
 }
 

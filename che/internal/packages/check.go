@@ -62,7 +62,7 @@ func (in *Installer) CheckUpgradable(pkgs []string) error {
 			}
 			continue
 		}
-		if it.Mgr == "prebuiltArchive" || it.Mgr == "script" {
+		if it.Mgr == "prebuiltBinariesArchive" || it.Mgr == "script" {
 			continue
 		}
 		name := it.Name
@@ -78,8 +78,8 @@ func (in *Installer) CheckUpgradable(pkgs []string) error {
 
 func pinnedVersion(it Item) string {
 	switch {
-	case it.PrebuiltArchive != nil:
-		return it.PrebuiltArchive.Version
+	case it.PrebuiltBinariesArchive != nil:
+		return it.PrebuiltBinariesArchive.Version
 	case it.Script != nil:
 		return it.Script.Version
 	}
@@ -183,7 +183,7 @@ func (in *Installer) managerBinDir(mgr string) string {
 			return filepath.Join(d, "bin")
 		}
 		return filepath.Join(in.Host.Getenv("HOME"), "go", "bin")
-	case "prebuiltArchive":
+	case "prebuiltBinariesArchive":
 		return in.userBinDir()
 	}
 	return ""

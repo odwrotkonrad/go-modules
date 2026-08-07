@@ -70,7 +70,7 @@ func (in *Installer) requestedOverridesPin(pkg, itemVersion string) error {
 	return fmt.Errorf("%s: requested version %s but %s pins %s (no checksum for the requested version)", pkg, r.Versions[0], in.FilePath, itemVersion)
 }
 
-func (in *Installer) resolveArchiveVersion(pkg string, b *PrebuiltArchiveSpec) (string, error) {
+func (in *Installer) resolveArchiveVersion(pkg string, b *PrebuiltBinariesArchiveSpec) (string, error) {
 	if r, ok := in.requested[pkg]; ok {
 		if v := r.globalVersion(); v != "" {
 			return v, nil
@@ -79,14 +79,14 @@ func (in *Installer) resolveArchiveVersion(pkg string, b *PrebuiltArchiveSpec) (
 	if b.Version != "" {
 		return b.Version, nil
 	}
-	if e, ok := in.File.Packages[pkg]; ok && e.Version != "" && e.Version != VersionTheOnePublished && e.Version != VersionLatest {
+	if e, ok := in.File.Packages[pkg]; ok && e.Version != "" && e.Version != VersionTheOnePublished {
 		return e.Version, nil
 	}
 	// [why] a version-less url (vendor "latest" endpoint) needs no pin
 	if !strings.Contains(b.URL, "{version}") && !strings.Contains(strings.Join(b.ExtractBinaries, " "), "{version}") {
 		return "", nil
 	}
-	return "", fmt.Errorf("%s: no version pinned: set version on the entry or the prebuiltArchive item", pkg)
+	return "", fmt.Errorf("%s: no version pinned: set version on the entry or the prebuiltBinariesArchive item", pkg)
 }
 
 // [<] 🤖🤖🤖

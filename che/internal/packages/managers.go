@@ -18,15 +18,15 @@ import (
 const Scope = "install-packages"
 
 type Options struct {
-	Update                               bool
-	IfMissing                            bool
-	DryRun                               bool
-	PreferredMethods                     []string
-	PrebuiltArchiveDestinationCandidates []string
-	PrebuiltArchiveCheckPresentOnPath    bool
-	CompletionsEnabled                   bool
-	CompletionsDestinationCandidates     []string
-	CompletionsCheckPresentOnFpath       bool
+	Update                                       bool
+	IfMissing                                    bool
+	DryRun                                       bool
+	PreferredMethods                             []string
+	PrebuiltBinariesArchiveDestinationCandidates []string
+	PrebuiltBinariesArchiveCheckPresentOnPath    bool
+	CompletionsEnabled                           bool
+	CompletionsDestinationCandidates             []string
+	CompletionsCheckPresentOnFpath               bool
 }
 
 type Installer struct {
@@ -267,8 +267,8 @@ func (in *Installer) installVia(pkg string, it Item) error {
 		return in.installAptSpec(pkg, it.Apt)
 	case it.Mgr == "versionManager":
 		return in.installVersionManager(pkg, it.VersionManager)
-	case it.Mgr == "prebuiltArchive":
-		return in.installPrebuiltArchive(pkg, it.PrebuiltArchive)
+	case it.Mgr == "prebuiltBinariesArchive":
+		return in.installPrebuiltBinariesArchive(pkg, it.PrebuiltBinariesArchive)
 	case it.Mgr == "script":
 		return in.installScript(pkg, it.Script)
 	}
@@ -543,7 +543,7 @@ func (in *Installer) scriptEnv(pkg string, s *ScriptSpec) []string {
 	env := append(os.Environ(),
 		"CHE_PKG_NAME="+pkg,
 		"CHE_PKG_VERSION="+s.Version,
-		"CHE_PKG_SHA256="+s.Sha256[in.Host.ShaKey()],
+		"CHE_PKG_SHA256="+s.Platforms.Sha[in.Host.ShaKey()],
 		"CHE_PKG_OS="+in.Host.OS,
 		"CHE_PKG_ARCH="+in.Host.Arch,
 	)

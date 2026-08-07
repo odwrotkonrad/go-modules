@@ -540,7 +540,7 @@ testCases:
         expected:
           exitCode: 0
           stdOut:
-            - "installed e2e-bin-new via prebuiltArchive"
+            - "installed e2e-bin-new via prebuiltBinariesArchive"
 
       - name: InstallFailsOnManagerMissingPackage
         command: che packages install --packages-file ${LOCAL}/packages.yml e2e-missing-pkg
@@ -581,9 +581,9 @@ testCases:
           exitCode: 0
           stdOut:
             - "upgradable e2e-outdated via npm"
-            - "upgradable e2e-bin-old via prebuiltArchive: yaml pins 9.9.9"
+            - "upgradable e2e-bin-old via prebuiltBinariesArchive: yaml pins 9.9.9"
         notExpected:
-          stdOut: ["upgradable e2e-bin via prebuiltArchive"]
+          stdOut: ["upgradable e2e-bin via prebuiltBinariesArchive"]
 
       - name: CheckNotShadowedWarnsShadowedOnly
         command: che packages check-not-shadowed --packages-file ${LOCAL}/packages.yml e2e-dup e2e-present

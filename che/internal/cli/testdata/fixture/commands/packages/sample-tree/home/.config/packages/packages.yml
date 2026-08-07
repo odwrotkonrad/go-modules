@@ -6,11 +6,11 @@ packages:
     version: 1.2.3
     installMethods: [npm]
   kubectx:
-    - prebuiltArchive:
+    - prebuiltBinariesArchive:
         version: 0.11.0
         url: https://example.com/v{version}/kubectx_v{version}_{os}_{arch}.tar.gz
         archConvention: odd
         extractBinaries: [kubectx]
-        sha256:
-          linux-amd64: mocksha
+        platforms:
+          - linux-amd64: mocksha
 ##[<] 🤖🤖

@@ -30,13 +30,13 @@ cases:
     input:
       args:
         - yaml: |
-            prebuiltArchive:
+            prebuiltBinariesArchive:
               version: 0.32.0
               url: https://example.com/kind-{os}-{arch}
-              sha256:
-                linux-amd64: abc
+              platforms:
+                - linux-amd64: abc
     expected:
-      output: {mgr: prebuiltArchive, name: "", version: 0.32.0, url: "https://example.com/kind-{os}-{arch}", sha256: {linux-amd64: abc}}
+      output: {mgr: prebuiltBinariesArchive, name: "", version: 0.32.0, url: "https://example.com/kind-{os}-{arch}", platformNames: [linux-amd64], sha256: {linux-amd64: abc}}
   - name: ShouldDecodeScriptScalarForm
     input:
       args:
@@ -109,9 +109,9 @@ cases:
   - name: ShouldRejectLegacyArchTokens
     input:
       args:
-        - yaml: "{prebuiltArchive: {url: 'https://x/y-{arch_x}.zip'}}"
+        - yaml: "{prebuiltBinariesArchive: {url: 'https://x/y-{arch_x}.zip'}}"
     expected:
-      errorOutput: "prebuiltArchive tokens {arch_x}/{arch_g} are gone: use {arch} with archConvention"
+      errorOutput: "prebuiltBinariesArchive tokens {arch_x}/{arch_g} are gone: use {arch} with archConvention"
   - name: ShouldRejectAptEmbeddedPin
     input:
       args:

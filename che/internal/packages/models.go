@@ -89,8 +89,8 @@ type CompletionFile struct {
 
 func (it Item) MarshalYAML() (any, error) {
 	switch {
-	case it.PrebuiltArchive != nil:
-		return map[string]*PrebuiltArchiveSpec{"prebuiltArchive": it.PrebuiltArchive}, nil
+	case it.PrebuiltBinariesArchive != nil:
+		return map[string]*PrebuiltBinariesArchiveSpec{"prebuiltBinariesArchive": it.PrebuiltBinariesArchive}, nil
 	case it.Script != nil:
 		return map[string]*ScriptSpec{"script": it.Script}, nil
 	case it.Apt != nil:
@@ -238,13 +238,13 @@ func (s *Strings) UnmarshalYAML(node *yaml.Node) error {
 }
 
 type Item struct {
-	Mgr             string
-	Name            string
-	AliasBinary     map[string]string
-	PrebuiltArchive *PrebuiltArchiveSpec
-	Script          *ScriptSpec
-	Apt             *AptSpec
-	VersionManager  *VersionManagerSpec
+	Mgr                     string
+	Name                    string
+	AliasBinary             map[string]string
+	PrebuiltBinariesArchive *PrebuiltBinariesArchiveSpec
+	Script                  *ScriptSpec
+	Apt                     *AptSpec
+	VersionManager          *VersionManagerSpec
 }
 
 type VersionManagerSpec struct {
@@ -254,8 +254,8 @@ type VersionManagerSpec struct {
 }
 
 type AptSpec struct {
-	Packages AptPackages  `yaml:"packages,omitempty"`
-	Repo     *AptRepoSpec `yaml:"repo,omitempty"`
+	InstallPackages AptPackages  `yaml:"installPackages,omitempty"`
+	FromSource      *AptRepoSpec `yaml:"fromSource,omitempty"`
 }
 
 // AptPackages maps each debian package name to its attributes, preserving file order.
@@ -313,10 +313,10 @@ func (a AptPackages) Aliases() map[string]string {
 }
 
 type AptRepoSpec struct {
-	URL        string `yaml:"url,omitempty"`
-	GpgURL     string `yaml:"gpgUrl,omitempty"`
-	Suites     string `yaml:"suites,omitempty"`
-	Components string `yaml:"components,omitempty"`
+	URL             string `yaml:"url,omitempty"`
+	VerificationKey string `yaml:"verificationKey,omitempty"`
+	Suites          string `yaml:"suites,omitempty"`
+	Components      string `yaml:"components,omitempty"`
 }
 
 func (s *ScriptSpec) UnmarshalYAML(node *yaml.Node) error {
@@ -335,18 +335,63 @@ type ScriptSpec struct {
 	URL              string            `yaml:"remoteUrl,omitempty"`
 	OS               string            `yaml:"os,omitempty"`
 	Version          string            `yaml:"version,omitempty"`
-	Sha256           map[string]string `yaml:"sha256,omitempty"`
+	Platforms        ItemPlatforms     `yaml:"platforms,omitempty"`
 	Env              map[string]string `yaml:"env,omitempty"`
 	ValidateArtifact string            `yaml:"validateArtifact,omitempty"`
 }
 
-type PrebuiltArchiveSpec struct {
-	Version         string            `yaml:"version,omitempty"`
-	URL             string            `yaml:"url,omitempty"`
-	ArchConvention  string            `yaml:"archConvention,omitempty"`
-	ExtractBinaries Strings           `yaml:"extractBinaries,omitempty"`
-	Platforms       []string          `yaml:"platforms,omitempty"`
-	Sha256          map[string]string `yaml:"sha256,omitempty"`
+// ItemPlatforms lists an item's supported platforms, each optionally carrying its asset's sha256.
+// [why] a sha references exactly one platform, so one key holds both facts:
+//
+//   - darwin-arm64            (supported, unverified)
+//   - linux-amd64: <sha256>   (supported, verified)
+type ItemPlatforms struct {
+	Names []string
+	Sha   map[string]string
+}
+
+func (ip *ItemPlatforms) UnmarshalYAML(node *yaml.Node) error {
+	if node.Kind != yaml.SequenceNode {
+		return fmt.Errorf("platforms must be a list of platform names or platform: sha256 pairs")
+	}
+	for _, el := range node.Content {
+		if el.Kind == yaml.ScalarNode {
+			ip.Names = append(ip.Names, el.Value)
+			continue
+		}
+		if el.Kind != yaml.MappingNode || len(el.Content) != 2 {
+			return fmt.Errorf("platforms entry must be a platform name or a single platform: sha256 pair")
+		}
+		name := el.Content[0].Value
+		ip.Names = append(ip.Names, name)
+		if ip.Sha == nil {
+			ip.Sha = map[string]string{}
+		}
+		ip.Sha[name] = el.Content[1].Value
+	}
+	return nil
+}
+
+func (ip ItemPlatforms) MarshalYAML() (any, error) {
+	out := make([]any, 0, len(ip.Names))
+	for _, n := range ip.Names {
+		if sha, ok := ip.Sha[n]; ok {
+			out = append(out, map[string]string{n: sha})
+			continue
+		}
+		out = append(out, n)
+	}
+	return out, nil
+}
+
+func (ip ItemPlatforms) IsZero() bool { return len(ip.Names) == 0 }
+
+type PrebuiltBinariesArchiveSpec struct {
+	Version         string        `yaml:"version,omitempty"`
+	URL             string        `yaml:"url,omitempty"`
+	ArchConvention  string        `yaml:"archConvention,omitempty"`
+	ExtractBinaries Strings       `yaml:"extractBinaries,omitempty"`
+	Platforms       ItemPlatforms `yaml:"platforms,omitempty"`
 }
 
 func (it *Item) UnmarshalYAML(node *yaml.Node) error {
@@ -361,14 +406,14 @@ func (it *Item) UnmarshalYAML(node *yaml.Node) error {
 		return fmt.Errorf("manager item must be a scalar or a single-key map")
 	}
 	key, val := node.Content[0], node.Content[1]
-	if key.Value == "prebuiltArchive" {
-		it.Mgr = "prebuiltArchive"
-		it.PrebuiltArchive = &PrebuiltArchiveSpec{}
-		if err := val.Decode(it.PrebuiltArchive); err != nil {
+	if key.Value == "prebuiltBinariesArchive" {
+		it.Mgr = "prebuiltBinariesArchive"
+		it.PrebuiltBinariesArchive = &PrebuiltBinariesArchiveSpec{}
+		if err := val.Decode(it.PrebuiltBinariesArchive); err != nil {
 			return err
 		}
-		if strings.Contains(it.PrebuiltArchive.URL+" "+strings.Join(it.PrebuiltArchive.ExtractBinaries, " "), "{arch_") {
-			return fmt.Errorf("prebuiltArchive tokens {arch_x}/{arch_g} are gone: use {arch} with archConvention")
+		if strings.Contains(it.PrebuiltBinariesArchive.URL+" "+strings.Join(it.PrebuiltBinariesArchive.ExtractBinaries, " "), "{arch_") {
+			return fmt.Errorf("prebuiltBinariesArchive tokens {arch_x}/{arch_g} are gone: use {arch} with archConvention")
 		}
 		return nil
 	}
@@ -378,7 +423,7 @@ func (it *Item) UnmarshalYAML(node *yaml.Node) error {
 		if err := val.Decode(it.Apt); err != nil {
 			return err
 		}
-		it.AliasBinary = it.Apt.Packages.Aliases()
+		it.AliasBinary = it.Apt.InstallPackages.Aliases()
 		return nil
 	}
 	if key.Value == "versionManager" {
@@ -460,11 +505,6 @@ func (f *File) ValidatePlatforms() error {
 		return nil
 	}
 	supported := slices.Sorted(maps.Keys(platforms))
-	oses := map[string]bool{}
-	for _, id := range supported {
-		osName, _, _ := strings.Cut(id, "-")
-		oses[osName] = true
-	}
 	for id, methods := range platforms {
 		for _, m := range methods {
 			if !slices.Contains(PlatformMethods, m) {
@@ -474,16 +514,16 @@ func (f *File) ValidatePlatforms() error {
 	}
 	for _, name := range slices.Sorted(maps.Keys(f.Packages)) {
 		for _, it := range f.Packages[name].Items {
-			if it.PrebuiltArchive == nil {
+			if it.PrebuiltBinariesArchive == nil {
 				continue
 			}
-			for _, p := range it.PrebuiltArchive.Platforms {
-				if !slices.Contains(supported, p) && !oses[p] {
+			for _, p := range it.PrebuiltBinariesArchive.Platforms.Names {
+				if !slices.Contains(supported, p) {
 					return fmt.Errorf("package %s: unknown platform %q (platforms keys: %s)", name, p, strings.Join(supported, ", "))
 				}
 			}
-			c := it.PrebuiltArchive.ArchConvention
-			if c == "" && strings.Contains(it.PrebuiltArchive.URL+" "+strings.Join(it.PrebuiltArchive.ExtractBinaries, " "), "{arch}") {
+			c := it.PrebuiltBinariesArchive.ArchConvention
+			if c == "" && strings.Contains(it.PrebuiltBinariesArchive.URL+" "+strings.Join(it.PrebuiltBinariesArchive.ExtractBinaries, " "), "{arch}") {
 				return fmt.Errorf("package %s: {arch} requires archConvention (archNameConventions sets: %s)", name, strings.Join(slices.Sorted(maps.Keys(archNameConventions)), ", "))
 			}
 			if c != "" {

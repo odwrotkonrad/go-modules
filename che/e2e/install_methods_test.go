@@ -94,7 +94,7 @@ func runInstallGroup(t *testing.T, g installGroup) {
 		"XDG_CACHE_HOME=" + filepath.Join(home, ".cache"),
 		"CHE_E2E=1",
 		"CHE_LOG_LEVEL=debug",
-		"CHE_PACKAGES_PREBUILT_ARCHIVE_CHECK_PRESENT_ON_PATH=0",
+		"CHE_PACKAGES_PREBUILT_BINARIES_ARCHIVE_CHECK_PRESENT_ON_PATH=0",
 		"NVM_DIR=" + filepath.Join(home, ".config", "nvm"),
 		"GOBIN=" + goBin,
 	}

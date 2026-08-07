@@ -209,7 +209,7 @@ func TestManagerBinDirs(t *testing.T) {
 	require.Equal(t, "", in.managerBinDir("script"))
 	require.Equal(t, "", in.managerBinDir("code"))
 	env["HOME"] = "/home/u"
-	require.Equal(t, "/home/u/.local/bin", in.managerBinDir("prebuiltArchive"))
+	require.Equal(t, "/home/u/.local/bin", in.managerBinDir("prebuiltBinariesArchive"))
 	require.Equal(t, "/home/u/go/bin", in.managerBinDir("go"))
 	env["GOPATH"] = "/gopath"
 	require.Equal(t, "/gopath/bin", in.managerBinDir("go"))
@@ -220,11 +220,11 @@ func TestManagerBinDirs(t *testing.T) {
 func TestInstallBinaryZipAsset(t *testing.T) {
 	const zipYaml = `packages:
   terraform:
-    - prebuiltArchive:
+    - prebuiltBinariesArchive:
         version: 1.15.0
         url: https://example.com/terraform_{version}_{os}_{arch}.zip
-        sha256:
-          linux-amd64: goodsha
+        platforms:
+          - linux-amd64: goodsha
 `
 	in, m := newInstaller(t, zipYaml, "linux", cmdMap([]string{"sha256sum"}), Options{})
 	m.Stub = shaStub("goodsha")

@@ -38,12 +38,12 @@ groups:
     verify:
       gcloud: gcloud --version
 
-  - method: prebuiltArchive/bare
+  - method: prebuiltBinariesArchive/bare
     packages: [kubectl]
     verify:
       kubectl: kubectl version --client
 
-  - method: prebuiltArchive/tree
+  - method: prebuiltBinariesArchive/tree
     packages: [kubectx, glab]
     verify:
       kubectx: kubectx --help

@@ -13,10 +13,10 @@ const dockerAptYaml = `packages:
   docker:
     installMethods:
       - apt:
-          packages: [docker-ce, docker-ce-cli, containerd.io]
-          repo:
+          installPackages: [docker-ce, docker-ce-cli, containerd.io]
+          fromSource:
             url: https://download.docker.com/linux/debian
-            gpgUrl: https://download.docker.com/linux/debian/gpg
+            verificationKey: https://download.docker.com/linux/debian/gpg
     completions:
       zsh: {cmd: docker completion zsh}
   docker-desktop:
@@ -82,7 +82,7 @@ func TestAptPrerequisitesSkippedWhenInstalled(t *testing.T) {
   x:
     installMethods:
       - apt:
-          packages: [x-cli]
+          installPackages: [x-cli]
           prerequisitePackages: [gnupg]
 `
 	in, m := newInstaller(t, yml, "linux", cmdMap([]string{"apt-get"}), Options{})
@@ -103,10 +103,10 @@ func TestAptRepoRequiresUrlAndGpg(t *testing.T) {
   x:
     installMethods:
       - apt:
-          repo: {url: https://example.com}
+          fromSource: {url: https://example.com}
 `
 	in, _ := newInstaller(t, yml, "linux", cmdMap([]string{"apt-get"}), Options{})
-	require.ErrorContains(t, in.Install([]string{"x"}), "apt repo requires url and gpgUrl")
+	require.ErrorContains(t, in.Install([]string{"x"}), "apt fromSource requires url and verificationKey")
 }
 
 func TestCommandOverrideSkipsScriptWhenPresent(t *testing.T) {

@@ -13,7 +13,7 @@ import (
 )
 
 func (in *Installer) installAptSpec(pkg string, a *AptSpec) error {
-	pkgs := a.Packages.Names
+	pkgs := a.InstallPackages.Names
 	if len(pkgs) == 0 {
 		pkgs = []string{pkg}
 	}
@@ -25,8 +25,8 @@ func (in *Installer) installAptSpec(pkg string, a *AptSpec) error {
 		in.emitDryRun("install", pkg+" via apt")
 		return nil
 	}
-	if a.Repo != nil {
-		if err := in.ensureAptRepo(pkg, a.Repo); err != nil {
+	if a.FromSource != nil {
+		if err := in.ensureAptRepo(pkg, a.FromSource); err != nil {
 			return err
 		}
 	}
@@ -70,7 +70,7 @@ func (in *Installer) ensureAptRepo(name string, r *AptRepoSpec) error {
 	}
 	defer func() { _ = os.RemoveAll(tmp) }()
 	asc := filepath.Join(tmp, name+".asc")
-	if err := in.exec(curlArgv(r.GpgURL, asc)); err != nil {
+	if err := in.exec(curlArgv(r.VerificationKey, asc)); err != nil {
 		return err
 	}
 	sources := filepath.Join(tmp, name+".sources")

@@ -282,18 +282,18 @@ func TestInstallScriptUrlFetchFailureAborts(t *testing.T) {
 const gcloudYaml = `packages:
   gcloud:
     - apt:
-        packages: [google-cloud-cli]
-        repo:
+        installPackages: [google-cloud-cli]
+        fromSource:
           url: https://packages.cloud.google.com/apt
-          gpgUrl: https://packages.cloud.google.com/apt/doc/apt-key.gpg
+          verificationKey: https://packages.cloud.google.com/apt/doc/apt-key.gpg
           suites: cloud-sdk
           components: main
     - script:
         os: darwin
         version: 572.0.0
         run: echo install-gcloud
-        sha256:
-          darwin-arm64: gsha
+        platforms:
+          - darwin-arm64: gsha
 `
 
 func TestInstallScriptPinReinstallsOnDrift(t *testing.T) {
@@ -346,7 +346,7 @@ func TestInstallGcloudPicksLinuxAptRepo(t *testing.T) {
 func TestScriptEnvCarriesPinShaAndHost(t *testing.T) {
 	in, _ := newInstaller(t, gcloudYaml, "darwin", cmdMap(nil), Options{})
 	in.Host.Arch = "arm64"
-	env := in.scriptEnv("gcloud", &ScriptSpec{Version: "572.0.0", Sha256: map[string]string{"darwin-arm64": "gsha"}})
+	env := in.scriptEnv("gcloud", &ScriptSpec{Version: "572.0.0", Platforms: ItemPlatforms{Names: []string{"darwin-arm64"}, Sha: map[string]string{"darwin-arm64": "gsha"}}})
 	joined := strings.Join(env, "\n")
 	for _, want := range []string{
 		"CHE_PKG_NAME=gcloud", "CHE_PKG_VERSION=572.0.0", "CHE_PKG_SHA256=gsha",
@@ -361,14 +361,14 @@ func TestValidatePlatforms(t *testing.T) {
 	base := `archNameConventions:
   uname: {amd64: x86_64}
 platforms:
-  linux-amd64: [prebuiltArchive]
+  linux-amd64: [prebuiltBinariesArchive]
 packages:
   x:
-    - prebuiltArchive:
+    - prebuiltBinariesArchive:
         url: https://example.com/x-{arch}.tar.gz
 `
 	var f File
-	require.NoError(t, yaml.Unmarshal([]byte(base+"        archConvention: uname\n        platforms: [linux-amd64, linux]\n"), &f))
+	require.NoError(t, yaml.Unmarshal([]byte(base+"        archConvention: uname\n        platforms: [linux-amd64]\n"), &f))
 	require.NoError(t, f.ValidatePlatforms())
 
 	var missing File
@@ -385,7 +385,7 @@ packages:
 }
 
 func TestArchForUnknownConventionErrors(t *testing.T) {
-	in, _ := newInstaller(t, "packages:\n  x:\n    - prebuiltArchive:\n        version: \"1\"\n        url: https://example.com/x-{arch}\n        archConvention: gnu\n        sha256: {linux-amd64: s}", "linux", cmdMap(nil), Options{})
+	in, _ := newInstaller(t, "packages:\n  x:\n    - prebuiltBinariesArchive:\n        version: \"1\"\n        url: https://example.com/x-{arch}\n        archConvention: gnu\n        platforms: [{linux-amd64: s}]", "linux", cmdMap(nil), Options{})
 	require.ErrorContains(t, in.Install([]string{"x"}), `unknown archConvention "gnu"`)
 }
 
@@ -438,11 +438,11 @@ func TestInstallPythonPyenvPinFromBuiltin(t *testing.T) {
 const kubectlYaml = `packages:
   kubectl:
     installMethods:
-      - prebuiltArchive:
+      - prebuiltBinariesArchive:
           version: 1.36.3
           url: https://example.com/v{version}/kubectl
-          sha256:
-            linux-amd64: goodsha
+          platforms:
+            - linux-amd64: goodsha
     versionCommand: kubectl version --client
 `
 
