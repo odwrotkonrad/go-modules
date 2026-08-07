@@ -10,6 +10,7 @@ stages:
   - verify
   - test-unit
   - test-e2e
+  - test-e2e-installs
   - coverage
   - release
   - publish
@@ -143,6 +144,49 @@ test-e2e-che-backup:
   artifacts:
     paths:
       - che/cover-e2e-backup/
+
+##[>] 🤖🤖
+#[what] real-install e2e: each installation method installs live packages into a throwaway HOME, then runs each one
+#[why] every other test stubs exec: only these prove the methods against real registries, archives and repos
+.test-install-methods:
+  stage: test-e2e-installs
+  needs: []
+  rules:
+    - if: $CI_PIPELINE_SOURCE == "merge_request_event"
+      changes: [che/internal/packages/**/*, che/e2e/install_methods*, .gitlab-ci.yml]
+      when: manual
+      allow_failure: true
+    - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
+      changes: [che/internal/packages/**/*, che/e2e/install_methods*]
+      when: manual
+      allow_failure: true
+  script:
+    - make -C che e2e-install-methods METHOD="$METHOD"
+
+test-install-methods-linux:
+  extends: .test-install-methods
+  image: debian:bookworm-slim
+  parallel:
+    matrix:
+      - METHOD: [apt, prebuiltArchive, script, versionManager, npm, go]
+  before_script:
+    - apt-get update && apt-get install -y --no-install-recommends ca-certificates curl git make sudo build-essential zlib1g-dev libssl-dev libreadline-dev libbz2-dev libffi-dev liblzma-dev libsqlite3-dev
+    - curl -fsSL https://go.dev/dl/go1.26.4.linux-amd64.tar.gz | tar -xz -C /usr/local
+    - export PATH=/usr/local/go/bin:$PATH
+
+test-install-methods-darwin:
+  extends: .test-install-methods
+  tags:
+    - saas-macos-medium-m1
+  image: macos-26-xcode-26
+  parallel:
+    matrix:
+      - METHOD: [brew/formulae, brew/cask, prebuiltArchive, script, versionManager]
+  before_script:
+    - curl -fsSL -o /tmp/go.tar.gz "https://go.dev/dl/go1.26.4.darwin-arm64.tar.gz"
+    - sudo tar -xzf /tmp/go.tar.gz -C /usr/local
+    - export PATH=/usr/local/go/bin:$PATH
+##[<] 🤖🤖
 
 coverage-che:
   image: $CI_IMAGE

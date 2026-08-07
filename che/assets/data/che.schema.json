@@ -111,6 +111,43 @@
       "additionalProperties": false,
       "type": "object"
     },
+    "PackageRef": {
+      "oneOf": [
+        {
+          "type": "string"
+        },
+        {
+          "properties": {
+            "name": {
+              "type": "string",
+              "description": "canonical package name in the packages file"
+            },
+            "versions": {
+              "oneOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "items": {
+                    "type": "string"
+                  },
+                  "type": "array"
+                }
+              ]
+            },
+            "globalVersion": {
+              "type": "string",
+              "description": "which installed version becomes the default (version-manager methods only); defaults to the first listed"
+            }
+          },
+          "additionalProperties": false,
+          "type": "object",
+          "required": [
+            "name"
+          ]
+        }
+      ]
+    },
     "Packages": {
       "properties": {
         "file": {
@@ -129,8 +166,8 @@
               "gem",
               "prebuiltArchive",
               "script",
-              "pkg",
-              "code"
+              "vscode",
+              "versionManager"
             ]
           },
           "type": "array",
@@ -345,9 +382,10 @@
           "enum": [
             "delta",
             "all",
-            "true"
+            "true",
+            "false"
           ],
-          "description": "default dry-run mode: delta (changed dests) | all (every dest) | true (alias for delta); overridden by the flag and env var"
+          "description": "default dry-run mode: delta (changed dests) | all (every dest) | true (alias for delta) | false (off, the default); overridden by the flag and env var"
         },
         "profiles": {
           "items": {
@@ -634,10 +672,10 @@
         },
         "installPackages": {
           "items": {
-            "type": "string"
+            "$ref": "#/$defs/PackageRef"
           },
           "type": "array",
-          "description": "canonical package names installed from the packages file (default $XDG_CONFIG_HOME/packages/packages.yml), each entry listing managers in preference order; runs before runScripts"
+          "description": "packages installed from the packages file (default $XDG_CONFIG_HOME/packages/packages.yml): canonical name scalar, or {name, version} to install a specific version (exact or wildcard), overriding the entry's default version; runs before runScripts"
         },
         "runScripts": {
           "items": {

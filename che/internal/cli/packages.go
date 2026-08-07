@@ -27,7 +27,7 @@ func (a *app) packagesCmd() *cobra.Command {
 	pf.StringVar(&a.flags.PackagesOverride, "packages-override", "",
 		"override packages file merged over the effective base (the packages file, or the builtin when none exists): same-name entries replace, new names append; default: $XDG_CONFIG_HOME/che/packages-override.yml if present; env: CHE_PACKAGES_OVERRIDE")
 	pf.StringSliceVar(&a.flags.PackagesPreferredMethods, "preferred-methods", nil,
-		"installation-method preference order (comma-separated or repeated): listed managers try first within each package entry, unlisted follow in entry order; values: brew | cask | apt | npm | go | gem | binary | script | pkg | code; env: CHE_PACKAGES_PREFERRED_METHODS")
+		"installation-method preference order (comma-separated or repeated): listed managers try first within each package entry, unlisted follow in entry order; values: brew | cask | apt | npm | go | gem | prebuiltArchive | script | vscode | versionManager; env: CHE_PACKAGES_PREFERRED_METHODS")
 
 	install := &cobra.Command{
 		Use:   "install [pkg...]",
@@ -52,7 +52,66 @@ func (a *app) packagesCmd() *cobra.Command {
 		a.packagesCheckCmd("check-not-shadowed", "warn when a package's manager-expected binary is not the first PATH hit",
 			func(in *packages.Installer, pkgs []string) error { return in.CheckNotShadowed(pkgs) }),
 		a.packagesCheckCmd("check-single-present", "warn when a canonical command resolves in more than one PATH dir, listing every location",
-			func(in *packages.Installer, pkgs []string) error { return in.CheckSinglePresent(pkgs) }))
+			func(in *packages.Installer, pkgs []string) error { return in.CheckSinglePresent(pkgs) }),
+		a.packagesConfigCmd())
+	return cmd
+}
+
+func (a *app) packagesConfigCmd() *cobra.Command {
+	cmd := &cobra.Command{
+		Use:   "config",
+		Short: "inspect the resolved packages database",
+	}
+	var delta, all, defaults bool
+	var output string
+	show := &cobra.Command{
+		Use:   "show",
+		Short: "print the packages database (--delta default: entries differing from the builtin; --all: the effective merged set; --defaults: the builtin only)",
+		RunE: func(cmd *cobra.Command, args []string) error {
+			builtin, err := packages.LoadBuiltin()
+			if err != nil {
+				return err
+			}
+			file := builtin
+			if !defaults {
+				in, err := che.NewPackagesInstallerFromContext(a.ctx, a.opts)
+				if err != nil {
+					return err
+				}
+				file = in.File
+				if !all {
+					file = file.Delta(builtin)
+				}
+			}
+			switch output {
+			case "", "text":
+				for _, name := range slices.Sorted(maps.Keys(file.Packages)) {
+					var mgrs []string
+					for _, it := range file.Packages[name].Items {
+						mgrs = append(mgrs, it.Mgr)
+					}
+					fmt.Printf("%s = %s\n", name, strings.Join(mgrs, ", "))
+				}
+				return nil
+			case "yaml":
+				out, err := file.YAML()
+				if err != nil {
+					return err
+				}
+				fmt.Print(out)
+				return nil
+			default:
+				return fmt.Errorf("invalid --output %q: want text or yaml", output)
+			}
+		},
+	}
+	show.Flags().BoolVar(&delta, "delta", false, "print only the entries differing from the builtin packages.yml (default mode)")
+	show.Flags().BoolVar(&all, "all", false, "print the effective merged set (packages file or builtin, plus override)")
+	show.Flags().BoolVar(&defaults, "defaults", false, "print the builtin packages.yml only")
+	show.Flags().StringVar(&output, "output", "text",
+		"output format; values: text (name = methods lines) | yaml (packages.yml shape)")
+	show.MarkFlagsMutuallyExclusive("delta", "all", "defaults")
+	cmd.AddCommand(show)
 	return cmd
 }
 
@@ -65,8 +124,8 @@ func (a *app) profilePackages() []string {
 				continue
 			}
 			for _, pkg := range ip.Packages {
-				if !slices.Contains(out, pkg) {
-					out = append(out, pkg)
+				if !slices.Contains(out, pkg.Name) {
+					out = append(out, pkg.Name)
 				}
 			}
 		}

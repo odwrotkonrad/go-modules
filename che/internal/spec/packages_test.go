@@ -29,7 +29,7 @@ base:
 main:
   include:
     profiles: [base]
-    installPackages: [jq, tmux, kind]
+    installPackages: [{name: jq, versions: "1.7.*"}, tmux, kind]
   exclude:
     installPackages: [kind]
 `)
@@ -37,7 +37,29 @@ main:
 	require.NoError(t, err)
 	ops, _, err := rec.MakeProfile(recipes, t.TempDir())
 	require.NoError(t, err)
-	require.Equal(t, []string{"git", "jq", "tmux"}, ops.InstallPackages.Packages)
+	require.Equal(t, []PackageRef{{Name: "git"}, {Name: "jq", Versions: StringOrList{"1.7.*"}}, {Name: "tmux"}}, ops.InstallPackages.Packages)
+}
+
+func TestPackageRefRequiresName(t *testing.T) {
+	var ref PackageRef
+	require.ErrorContains(t, yaml.Unmarshal([]byte("{versions: 1.2.3}"), &ref), "requires name")
+}
+
+func TestPackageRefVersionListAndGlobal(t *testing.T) {
+	var ref PackageRef
+	require.NoError(t, yaml.Unmarshal([]byte(`{name: node, versions: [24.16.0, 22.14.0], globalVersion: 22.14.0}`), &ref))
+	require.Equal(t, StringOrList{"24.16.0", "22.14.0"}, ref.Versions)
+	require.Equal(t, "22.14.0", ref.GlobalVersion)
+
+	var scalar PackageRef
+	require.NoError(t, yaml.Unmarshal([]byte(`{name: go, versions: 1.26.4}`), &scalar))
+	require.Equal(t, StringOrList{"1.26.4"}, scalar.Versions)
+}
+
+func TestPackageRefGlobalVersionMustBeListed(t *testing.T) {
+	var ref PackageRef
+	err := yaml.Unmarshal([]byte(`{name: node, versions: [24.16.0], globalVersion: 22.14.0}`), &ref)
+	require.ErrorContains(t, err, "globalVersion 22.14.0 is not among versions")
 }
 
 // [<] 🤖🤖

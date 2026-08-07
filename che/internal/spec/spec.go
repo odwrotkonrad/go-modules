@@ -103,6 +103,14 @@ func (o optionsSpec) over(base render.Options) render.Options {
 	return base
 }
 
+func (s *Scalar) UnmarshalYAML(value *yaml.Node) error {
+	if value.Kind != yaml.ScalarNode {
+		return fmt.Errorf("want a scalar, got kind %v", value.Kind)
+	}
+	*s = Scalar(value.Value)
+	return nil
+}
+
 func (s *StringOrList) UnmarshalYAML(value *yaml.Node) error {
 	if value.Kind == yaml.ScalarNode {
 		*s = StringOrList{value.Value}

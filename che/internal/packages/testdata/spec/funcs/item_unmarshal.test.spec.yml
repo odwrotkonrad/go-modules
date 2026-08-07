@@ -64,16 +64,24 @@ cases:
         - yaml: "{script: {remoteUrl: https://example.com/install.sh}}"
     expected:
       output: {mgr: script, name: "", scriptUrl: https://example.com/install.sh}
-  - name: ShouldDecodePkgForm
+  - name: ShouldDecodeBrewCodeExtensionForm
     input:
       args:
-        - yaml: |
-            pkg:
-              url: https://awscli.amazonaws.com/AWSCLIV2.pkg
-              sha256:
-                darwin-arm64: abc
+        - yaml: "{brew: {vscode: golang.go}}"
     expected:
-      output: {mgr: pkg, name: "", url: "https://awscli.amazonaws.com/AWSCLIV2.pkg", sha256: {darwin-arm64: abc}}
+      output: {mgr: vscode, name: golang.go}
+  - name: ShouldRejectBareCodeItem
+    input:
+      args:
+        - yaml: "code"
+    expected:
+      errorOutput: "vscode extension items must be written {brew: {vscode: <extension-id>}}"
+  - name: ShouldRejectDirectCodeMap
+    input:
+      args:
+        - yaml: "{code: golang.go}"
+    expected:
+      errorOutput: "vscode extension items must be written {brew: {vscode: <extension-id>}}"
   - name: ShouldErrorOnMultiKeyMap
     input:
       args:
@@ -86,4 +94,28 @@ cases:
         - yaml: "{brew: {formula: x}}"
     expected:
       errorOutput: "brew object form must be {cask: <name>}"
+  - name: ShouldRejectNpmEmbeddedPin
+    input:
+      args:
+        - yaml: "{npm: lefthook@2.1.9}"
+    expected:
+      errorOutput: "npm item lefthook@2.1.9: version pins go in the entry version field"
+  - name: ShouldAllowNpmScopedName
+    input:
+      args:
+        - yaml: "{npm: '@github/copilot'}"
+    expected:
+      output: {mgr: npm, name: '@github/copilot'}
+  - name: ShouldRejectLegacyArchTokens
+    input:
+      args:
+        - yaml: "{prebuiltArchive: {url: 'https://x/y-{arch_x}.zip'}}"
+    expected:
+      errorOutput: "prebuiltArchive tokens {arch_x}/{arch_g} are gone: use {arch} with archConvention"
+  - name: ShouldRejectAptEmbeddedPin
+    input:
+      args:
+        - yaml: "{apt: jq=1.7-1}"
+    expected:
+      errorOutput: "apt item jq=1.7-1: version pins go in the entry version field"
 # [<] 🤖🤖

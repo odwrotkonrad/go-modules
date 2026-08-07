@@ -156,7 +156,7 @@ func (r ProfileRecipe) MakeProfile(recipes []ProfileRecipe, workingDir string) (
 	}
 	res := resolved{
 		ExtraDirs: eff.dirs,
-		Packages:  dedupe(eff.packages),
+		Packages:  dedupePackages(eff.packages),
 		Scripts:   scripts,
 		Links:     eff.richLink,
 		Copies:    eff.richCopy,
@@ -302,16 +302,31 @@ func collectDirs(res *resolved) {
 
 func byRel(a, b FileItem) int { return cmp.Compare(a.Rel, b.Rel) }
 
-func dedupe(xs []string) []string {
-	seen := map[string]bool{}
-	var out []string
+// [why] later entries win, so a profile ref can re-pin a package version
+func dedupePackages(xs []PackageRef) []PackageRef {
+	at := map[string]int{}
+	var out []PackageRef
 	for _, x := range xs {
-		if !seen[x] {
-			seen[x] = true
-			out = append(out, x)
+		if i, ok := at[x.Name]; ok {
+			if len(x.Versions) > 0 {
+				out[i].Versions = x.Versions
+			}
+			if x.GlobalVersion != "" {
+				out[i].GlobalVersion = x.GlobalVersion
+			}
+			continue
 		}
+		at[x.Name] = len(out)
+		out = append(out, x)
 	}
 	return out
+}
+
+func dropPackages(xs []PackageRef, globs []string) []PackageRef {
+	if len(globs) == 0 {
+		return xs
+	}
+	return slices.DeleteFunc(xs, func(x PackageRef) bool { return isAnyGlobMatch(globs, x.Name) })
 }
 
 func isAnyGlobMatch(globs []string, rel string) bool {
@@ -330,7 +345,7 @@ func applyExcludes(ex excludeSet, res *resolved) {
 	res.Copies = dropFiles(res.Copies, copyG)
 	res.Templates = dropFiles(res.Templates, tmplG)
 	res.ExtraDirs = dropFiles(res.ExtraDirs, dirG)
-	res.Packages = dropStrings(res.Packages, pkgG)
+	res.Packages = dropPackages(res.Packages, pkgG)
 	res.Scripts = dropStrings(res.Scripts, instG)
 
 	res.Dirs = nil

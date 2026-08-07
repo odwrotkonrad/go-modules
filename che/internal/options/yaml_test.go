@@ -19,6 +19,8 @@ func TestDefaultSettingsYAMLIsSeedableConfig(t *testing.T) {
 
 	for _, want := range []string{
 		"logLevel: info",
+		"dryRun: false",
+		"file: __builtin__.packages.yml",
 		"checkInPath: true",
 		"autoDiscover: true",
 		"installDestinationCandidates: [~/.local/bin, ~/bin]",

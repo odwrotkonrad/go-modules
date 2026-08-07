@@ -15,17 +15,28 @@ import (
 
 func (in *Installer) installPrebuiltArchive(pkg string, b *PrebuiltArchiveSpec) error {
 	if in.hasCmd(pkg) {
-		if b.Version == "" || in.versionOutputHasPin(pkg, b.Version) {
+		if pin := in.pinFor(pkg, b.Version); pin == "" || in.versionOutputHasPin(pkg, pin) {
 			in.emitSkip(log.Levels.Debug, pkg, "already installed via prebuiltArchive")
 			return nil
 		}
-		in.emit(log.Levels.Info, "reinstall", pkg+": -> "+b.Version)
+		in.emit(log.Levels.Info, "reinstall", pkg+": -> "+in.pinFor(pkg, b.Version))
+	}
+	if err := in.requestedOverridesPin(pkg, b.Version); err != nil {
+		return err
 	}
 	if in.Opts.DryRun {
 		in.emitDryRun("install", pkg+" via prebuiltArchive")
 		return nil
 	}
-	url := in.Host.expand(b.URL, b.Version)
+	version, err := in.resolveArchiveVersion(pkg, b)
+	if err != nil {
+		return err
+	}
+	arch, err := in.archFor(b.ArchConvention)
+	if err != nil {
+		return fmt.Errorf("%s: %w", pkg, err)
+	}
+	url := in.Host.expandAs(b.URL, version, arch)
 	tmp, err := os.MkdirTemp("", "che-packages-")
 	if err != nil {
 		return err
@@ -35,61 +46,31 @@ func (in *Installer) installPrebuiltArchive(pkg string, b *PrebuiltArchiveSpec) 
 	if err := in.exec([]string{"curl", "-fsSL", "--connect-timeout", "30", "--retry", "10", "--retry-delay", "30", "--retry-all-errors", "-o", asset, url}); err != nil {
 		return err
 	}
-	if err := in.verifySha256(pkg, asset, b.Sha256[in.Host.ShaKey()]); err != nil {
-		return err
+	if want, ok := b.Sha256[in.Host.ShaKey()]; ok {
+		if err := in.verifySha256(pkg, asset, want); err != nil {
+			return err
+		}
+	} else {
+		in.emit(log.Levels.Warn, "unverified", pkg+": no sha256 declared for "+in.Host.ShaKey()+", skipping verification")
 	}
-	if err := in.installMembers(pkg, asset, b); err != nil {
+	if err := in.installMembers(pkg, asset, version, arch, b); err != nil {
 		return err
 	}
 	in.emit(log.Levels.Info, "installed", pkg+" via prebuiltArchive")
 	return nil
 }
 
-func (in *Installer) installPkg(pkg string, p *PkgSpec) error {
-	if in.hasCmd(pkg) {
-		if p.Version == "" || in.versionOutputHasPin(pkg, p.Version) {
-			in.emitSkip(log.Levels.Debug, pkg, "already installed via pkg")
-			return nil
-		}
-		in.emit(log.Levels.Info, "reinstall", pkg+": -> "+p.Version)
-	}
-	if in.Opts.DryRun {
-		in.emitDryRun("install", pkg+" via pkg")
-		return nil
-	}
-	url := in.Host.expand(p.URL, p.Version)
-	tmp, err := os.MkdirTemp("", "che-packages-")
-	if err != nil {
-		return err
-	}
-	defer func() { _ = os.RemoveAll(tmp) }()
-	asset := filepath.Join(tmp, path.Base(url))
-	if err := in.exec([]string{"curl", "-fsSL", "--connect-timeout", "30", "--retry", "10", "--retry-delay", "30", "--retry-all-errors", "-o", asset, url}); err != nil {
-		return err
-	}
-	if want, ok := p.Sha256[in.Host.ShaKey()]; ok {
-		if err := in.verifySha256(pkg, asset, want); err != nil {
-			return err
-		}
-	}
-	argv := []string{"installer", "-pkg", asset, "-target", "/"}
-	if in.Host.Euid != 0 {
-		argv = append([]string{"sudo"}, argv...)
-	}
-	if err := in.exec(argv); err != nil {
-		return err
-	}
-	in.emit(log.Levels.Info, "installed", pkg+" via pkg")
-	return nil
-}
-
 func (in *Installer) versionOutputHasPin(pkg, pin string) bool {
+	if e, ok := in.File.Packages[pkg]; ok && e.VersionCommand != "" {
+		out, ok := in.output(strings.Fields(e.VersionCommand))
+		return ok && PinMatches(out, pin)
+	}
 	cmd := in.cmdFor(pkg)
-	if out, ok := in.output([]string{cmd, "--version"}); ok && strings.Contains(out, pin) {
+	if out, ok := in.output([]string{cmd, "--version"}); ok && PinMatches(out, pin) {
 		return true
 	}
 	out, ok := in.output([]string{cmd, "version"})
-	return ok && strings.Contains(out, pin)
+	return ok && PinMatches(out, pin)
 }
 
 func (in *Installer) verifySha256(pkg, asset, want string) error {
@@ -108,7 +89,17 @@ func (in *Installer) verifySha256(pkg, asset, want string) error {
 	return nil
 }
 
-func (in *Installer) members(pkg string, b *PrebuiltArchiveSpec) []string {
+func (in *Installer) archFor(convention string) (string, error) {
+	if convention == "" {
+		return in.Host.Arch, nil
+	}
+	if v, ok := in.File.archNameConventionsOrBuiltin()[convention][in.Host.Arch]; ok {
+		return v, nil
+	}
+	return "", fmt.Errorf("unknown archConvention %q for arch %s (declare it under archNameConventions)", convention, in.Host.Arch)
+}
+
+func (in *Installer) members(pkg, version, arch string, b *PrebuiltArchiveSpec) []string {
 	spec := b.Bin
 	if spec == "" {
 		spec = pkg
@@ -116,12 +107,12 @@ func (in *Installer) members(pkg string, b *PrebuiltArchiveSpec) []string {
 	fields := strings.Fields(spec)
 	out := make([]string, len(fields))
 	for i, m := range fields {
-		out[i] = in.Host.expand(m, b.Version)
+		out[i] = in.Host.expandAs(m, version, arch)
 	}
 	return out
 }
 
-func (in *Installer) installMembers(pkg, asset string, b *PrebuiltArchiveSpec) error {
+func (in *Installer) installMembers(pkg, asset, version, arch string, b *PrebuiltArchiveSpec) error {
 	binDir := in.userBinDir()
 	if err := in.exec([]string{"mkdir", "-p", binDir}); err != nil {
 		return err
@@ -139,7 +130,7 @@ func (in *Installer) installMembers(pkg, asset string, b *PrebuiltArchiveSpec) e
 	if err := in.extract(asset, opt); err != nil {
 		return err
 	}
-	for _, m := range in.members(pkg, b) {
+	for _, m := range in.members(pkg, version, arch, b) {
 		if err := in.exec([]string{"ln", "-sf", filepath.Join(opt, m), filepath.Join(binDir, path.Base(m))}); err != nil {
 			return err
 		}

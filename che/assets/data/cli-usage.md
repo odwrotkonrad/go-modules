@@ -22,6 +22,8 @@ Available Commands:
     check-present         check the canonical commands resolve on PATH (errors on any missing)
     check-single-present  warn when a canonical command resolves in more than one PATH dir, listing every location
     check-upgradable      warn on manager-reported outdated packages and binary pins drifted from --version output
+    config                inspect the resolved packages database
+      show                print the packages database (--delta default: entries differing from the builtin; --all: the effective merged set; --defaults: the builtin only)
     install               install packages by canonical name (no args: every resolved profile's include.installPackages)
   prune-broken-links      delete broken symlinks
   render-templates        render *.tpl sources; each dest path decides target (relative -> repo, ~/ or absolute -> host)

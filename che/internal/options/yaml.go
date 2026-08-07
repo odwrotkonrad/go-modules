@@ -47,12 +47,13 @@ func settingNode(s Setting) *yaml.Node {
 			}
 		}
 		return seq
-	default:
-		v := s.Value
-		if s.Key == "dryRun" && v == "false" {
-			v = ""
+	case "dryRun":
+		if s.Value == "false" {
+			return &yaml.Node{Kind: yaml.ScalarNode, Tag: "!!bool", Value: "false"}
 		}
-		return &yaml.Node{Kind: yaml.ScalarNode, Value: v}
+		return &yaml.Node{Kind: yaml.ScalarNode, Value: s.Value}
+	default:
+		return &yaml.Node{Kind: yaml.ScalarNode, Value: s.Value}
 	}
 }
 

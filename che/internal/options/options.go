@@ -165,11 +165,16 @@ func (c *Options) resolveBool(key string, flagVal bool, envVal string, def bool,
 func (c *Options) Resolve(env LookupEnv, user, spec Layer) error {
 	c.Settings = nil
 	c.DryRun = DryRunMode(c.resolveStr("dryRun", "",
-		flagStr(string(c.DryRun)), envStr(env("CHE_DRY_RUN")), layer(user.DryRun, "config-file"), layer(spec.DryRun, "specFile")))
+		flagStr(string(c.DryRun)), envStr(env("CHE_DRY_RUN")), layer(string(user.DryRun), "config-file"), layer(string(spec.DryRun), "specFile")))
 	c.fillDefault("dryRun", "false")
+	c.setKind("dryRun", "dryRun")
 	if c.DryRun == "true" {
 		c.DryRun = DryRun.Delta
 		c.setValue("dryRun", string(c.DryRun))
+	}
+	if c.DryRun == "false" || c.DryRun == "off" {
+		c.DryRun = DryRun.Off
+		c.setValue("dryRun", "false")
 	}
 	switch c.DryRun {
 	case DryRun.Off, DryRun.Delta, DryRun.All:
@@ -227,6 +232,7 @@ func (c *Options) Resolve(env LookupEnv, user, spec Layer) error {
 		boolLayer{user.RenderTemplates.SkipSecrets, "config-file"}, boolLayer{spec.RenderTemplates.SkipSecrets, "specFile"})
 	c.PackagesFile = c.resolveStr("packages.file", "",
 		flagStr(c.PackagesFile), envStr(env("CHE_PACKAGES_FILE")), layer(user.Packages.File, "config-file"), layer(spec.Packages.File, "specFile"))
+	c.fillDefault("packages.file", packages.BuiltinSentinel)
 	c.PackagesOverride = c.resolveStr("packages.override", "",
 		flagStr(c.PackagesOverride), envStr(env("CHE_PACKAGES_OVERRIDE")))
 	c.PackagesPreferredMethods = c.resolveList("packages.preferredInstallationMethods",

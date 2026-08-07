@@ -4,7 +4,7 @@
 
 `che packages` declaratively installs packages from a packages file
 (`$XDG_CONFIG_HOME/packages/packages.yml`): each canonical name lists managers
-in preference order (brew/cask/apt/npm/go/gem/prebuiltArchive/script/pkg/code), the first applicable on
+in preference order (brew, brew/cask, brew/vscode, apt, npm, go, gem, prebuiltArchive, script, versionManager), the first applicable on
 this host wins. Profiles declare `include.installPackages` and the run
 sequence installs them before `runScripts`. Four check subcommands report
 presence, upgradability, shadowing, and duplicates.
@@ -63,8 +63,16 @@ Scenario: an installed package is left alone by default, no surprise updates
 
 Scenario: a version pin converges the host on exactly that version, downgrades included
   Status: tested
-  When a version is specified (prebuiltArchive `version:`, npm `name@ver`, apt `name=ver`) and the installed version differs
-  Then install reinstalls to match the pin exactly
+  When a version is specified (entry-level or spec-level `version:`) and the installed version differs
+  Then install reinstalls to match the pin: npm installs `name@<pin>`, apt installs `name=<pin>`, other managers run their update path
+  And embedded pins in item names (npm `name@ver`, apt `name=ver`) are parse errors naming the version field
+
+Scenario: an entry-level version with wildcards guards any package's installed version
+  Status: tested
+  When an entry sets `version:` (exact or wildcarded: `1.*`, `1.1.*`, `0.12.*`)
+  Then it overrides the item-level pin for the drift check, matched against whole version tokens of the probe output (`1.*` never matches `11.2`)
+  And a manager-installed package drifting from the pin runs the manager's update path; check-upgradable warns while drifted
+  And entries whose manager ships one recent version stay unpinned by convention; the builtin pins only its version-distributing entries (archives, scripts, versionManager)
 
 Scenario: a user refreshes everything with one flag
   Status: tested
@@ -89,17 +97,27 @@ Scenario: a user overrides single entries without forking the packages file
   Then its same-name entries replace the base entries and new names append
   And `--packages-file` / `packages.file` user config relocate the base file
 
+Scenario: top-level archNameConventions and platforms blocks standardize os, arch, and platform references
+  Status: tested
+  When the packages file opens with `archNameConventions:` (named arch spelling sets, e.g. `uname: {amd64: x86_64, arm64: aarch64}`, `odd: {amd64: x86_64, arm64: arm64}`) and `platforms:` (each supported `<os>-<arch>` id keyed to its supported installation methods)
+  Then the platform keys are the supported set: item `platforms:` gates and method lists validate against them, an unknown value is a hard error naming the block
+  And on a host whose platform id is a key, only its listed methods are applicable, named explicitly: `brew`, `brew/cask`, `brew/vscode`, apt, npm, go, gem, prebuiltArchive, script, versionManager; an unlisted host platform falls back to the built-in applicability rules
+  And a file without the blocks inherits the builtin's
+  And an item's `archConvention: <set>` picks the spelling `{arch}` expands to; every item using `{arch}` must declare it (the builtin ships `go`, `uname`, `odd`)
+  And the old `{arch_x}`/`{arch_g}` tokens and per-item `archNames:` maps are parse errors
+
 Scenario: a prebuiltArchive entry downloads, verifies, and lands on the destination candidate
   Status: tested
   When a prebuiltArchive item applies (sha256 for this os-arch)
-  Then url and bin members expand {version} {os} {arch} {arch_x} {arch_g}
+  Then url and bin members expand {version} {os} {arch} ({arch} spelled per archConvention)
   And the download sha256-verifies or the install aborts
   And .tar.* extract the listed members, .zip unzips, bare assets install as-is
-  And a pinned version absent from `<pkg> --version` output triggers reinstall
+  And a pinned version absent from the version probe output triggers reinstall
+  And the probe runs `<canonical> --version`, falling back to `<canonical> version`, unless the entry sets `versionCommand:` (odd tools, e.g. kubectl -> `kubectl version --client`)
 
 Scenario: a vscode extension is a package like any other
   Status: tested
-  When a package named by its extension id lists the `code` manager (`golang.go: [code]`)
+  When a package named by its extension id lists the `vscode` method via the brew object form (`golang.go: [{brew: {vscode: golang.go}}]`; bare `code`/`vscode` and `{code: id}`/`{vscode: id}` are illegal)
   Then it applies where the `code` command is present and installs via `code --install-extension <id>`
   And presence (install skip and check-present) reads `code --list-extensions`, queried once per run, case-insensitive
   And `--update` reruns the install with `--force`
@@ -109,18 +127,11 @@ Scenario: a vendor installer becomes a declarative script entry
   Status: tested
   When a package lists a `- script:` item (optional `os: darwin|linux` gate) with `run:` inline shell, `path:` a script file, or `remoteUrl:` a fetched script
   Then it applies on matching hosts and runs via POSIX `/bin/sh -e` when the canonical command is missing
-  And a `path:` resolves relative to the packages file, falling back to the POSIX sh scripts shipped inside che (install-brew.sh, install-aws.sh)
+  And a `path:` resolves relative to the packages file
   And a `remoteUrl:` fetches with curl (retrying) and aborts the install when the fetch fails or returns empty
   And a present canonical command skips the script (install-if-missing semantics)
-  And an optional `version:` + per os-arch `sha256:` pin declaratively: the pin exports to the script as CHE_PKG_VERSION/CHE_PKG_SHA256 (plus CHE_PKG_NAME/OS/ARCH/ARCH_X/ARCH_G), a `--version` output lacking the pin reinstalls and check-upgradable warns, and a sha256 map gates applicability to hosts with a key (gcloud: apt-repo script on linux, pinned tarball script on macos)
+  And an optional `version:` + per os-arch `sha256:` pin declaratively: the pin exports to the script as CHE_PKG_VERSION/CHE_PKG_SHA256 (plus CHE_PKG_NAME/OS/ARCH and CHE_PKG_ARCH_<SET> per platforms.archNameConventions set), a `--version` output lacking the pin reinstalls and check-upgradable warns, and a sha256 map gates applicability to hosts with a key (gcloud: apt-repo script on linux, pinned tarball script on macos)
   And dry run announces `install <pkg> via script` without executing
-
-Scenario: a macos .pkg vendor installer is a declarative pkg entry
-  Status: tested
-  When a package lists a `- pkg:` item (url, optional version + per os-arch sha256)
-  Then it applies on macos only: the .pkg downloads, sha256-verifies when pinned, and installs via `sudo installer -pkg <asset> -target /`
-  And a present canonical command skips it; a version pin absent from `--version` output reinstalls
-  And the linux half of such a package is a sibling `script` item (e.g. aws: pkg on macos, shipped install-aws.sh on linux)
 
 Scenario: an install run ends by proving the commands exist
   Status: tested

@@ -18,12 +18,8 @@ import (
 var td embed.FS
 
 func testHost(osname, arch string, cmds map[string]string) Host {
-	archX, archG := "x86_64", "x86_64"
-	if arch == "arm64" {
-		archX, archG = "aarch64", "arm64"
-	}
 	return Host{
-		OS: osname, Arch: arch, ArchX: archX, ArchG: archG, Euid: 501,
+		OS: osname, Arch: arch, Euid: 501,
 		LookPath: func(name string) (string, error) {
 			if p, ok := cmds[name]; ok {
 				return p, nil
@@ -70,9 +66,6 @@ func TestItemUnmarshal(t *testing.T) {
 		if it.PrebuiltArchive != nil {
 			got.Version, got.URL, got.Sha256 = it.PrebuiltArchive.Version, it.PrebuiltArchive.URL, it.PrebuiltArchive.Sha256
 		}
-		if it.Pkg != nil {
-			got.Version, got.URL, got.Sha256 = it.Pkg.Version, it.Pkg.URL, it.Pkg.Sha256
-		}
 		if it.Script != nil {
 			got.Run, got.ScriptOs = strings.TrimSpace(it.Script.Run), it.Script.OS
 			got.ScriptPath, got.ScriptURL = it.Script.Path, it.Script.URL
@@ -107,7 +100,7 @@ func TestPick(t *testing.T) {
 		h := testHost(c.Input.Args.String(t, 0), "amd64", cmdMap(c.Input.Args.Strings(t, 1)))
 		var entry Entry
 		require.NoError(t, yaml.Unmarshal([]byte(c.Input.Args.String(t, 2)), &entry))
-		it, ok, err := h.pickPreferred("pkg", entry, c.Input.Args.Strings(t, 3))
+		it, ok, err := h.pickPreferred("pkg", entry, c.Input.Args.Strings(t, 3), nil)
 		if err != nil {
 			return pickGot{}, err
 		}
@@ -117,8 +110,8 @@ func TestPick(t *testing.T) {
 
 func TestExpand(t *testing.T) {
 	testyml.Eq(t, td, "testdata/spec/funcs/expand.test.spec.yml", func(t *testing.T, c testyml.Case[string]) (string, error) {
-		h := testHost(c.Input.Args.String(t, 0), c.Input.Args.String(t, 1), nil)
-		return h.expand(c.Input.Args.String(t, 2), c.Input.Args.String(t, 3)), nil
+		h := testHost(c.Input.Args.String(t, 0), "amd64", nil)
+		return h.expandAs(c.Input.Args.String(t, 2), c.Input.Args.String(t, 3), c.Input.Args.String(t, 1)), nil
 	})
 }
 

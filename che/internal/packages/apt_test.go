@@ -77,6 +77,27 @@ func TestInstallAptRepoDryRunAnnounces(t *testing.T) {
 	require.NotContains(t, strings.Join(m.Calls(), "\n"), "curl")
 }
 
+func TestAptPrerequisitesSkippedWhenInstalled(t *testing.T) {
+	const yml = `packages:
+  x:
+    installMethods:
+      - apt:
+          packages: [x-cli]
+          prerequisitePackages: [gnupg]
+`
+	in, m := newInstaller(t, yml, "linux", cmdMap([]string{"apt-get"}), Options{})
+	m.Stub = func(argv []string) ([]byte, error) {
+		if strings.HasPrefix(strings.Join(argv, " "), "dpkg -s x-cli") {
+			return nil, errNotInstalled
+		}
+		return nil, nil
+	}
+	require.NoError(t, in.Install([]string{"x"}))
+	calls := strings.Join(m.Calls(), "\n")
+	require.NotContains(t, calls, "--no-install-recommends gnupg")
+	require.Contains(t, calls, "--no-install-recommends x-cli")
+}
+
 func TestAptRepoRequiresUrlAndGpg(t *testing.T) {
 	const yml = `packages:
   x:

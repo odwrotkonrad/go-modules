@@ -10,6 +10,7 @@ import (
 	"gitlab.com/konradodwrot/go-modules/che/internal/log"
 	"gitlab.com/konradodwrot/go-modules/che/internal/options"
 	"gitlab.com/konradodwrot/go-modules/che/internal/packages"
+	"gitlab.com/konradodwrot/go-modules/che/internal/spec"
 )
 
 func resolvePackagesFile(env map[string]string, home string, opts options.Options) string {
@@ -35,6 +36,10 @@ func resolvePackagesOverride(env map[string]string, home string, opts options.Op
 var NewPackagesHost = packages.NewHost
 
 func loadPackagesFile(env map[string]string, home string, opts options.Options) (*packages.File, string, error) {
+	if opts.PackagesFile == packages.BuiltinSentinel {
+		f, err := packages.LoadBuiltin()
+		return f, packages.BuiltinPath, err
+	}
 	path := resolvePackagesFile(env, home, opts)
 	if opts.PackagesFile == "" {
 		if _, err := os.Stat(path); err != nil {
@@ -57,6 +62,9 @@ func NewPackagesInstaller(env map[string]string, home string, opts options.Optio
 			return nil, err
 		}
 		f.Merge(o)
+	}
+	if err := f.ValidatePlatforms(); err != nil {
+		return nil, err
 	}
 	return &packages.Installer{
 		File: f, FilePath: path, Host: NewPackagesHost(),
@@ -120,16 +128,20 @@ func (p *ProfileReady) newInstaller() (*packages.Installer, error) {
 	return in, nil
 }
 
-func (p *ProfileReady) installPackages(pkgs []string) error {
+func (p *ProfileReady) installPackages(refs []spec.PackageRef) error {
 	in, err := p.newInstaller()
 	if err != nil {
 		return err
 	}
-	if err := in.Install(pkgs); err != nil {
+	reqs := make([]packages.Request, len(refs))
+	for i, r := range refs {
+		reqs[i] = packages.Request{Name: r.Name, Versions: r.Versions, Global: r.GlobalVersion}
+	}
+	if err := in.InstallRequests(reqs); err != nil {
 		return err
 	}
 	if !p.isDryRun() {
-		in.CheckPresent(pkgs)
+		in.CheckPresent(packages.RequestNames(reqs))
 	}
 	return nil
 }

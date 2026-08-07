@@ -17,8 +17,6 @@ import (
 type Host struct {
 	OS        string
 	Arch      string
-	ArchX     string
-	ArchG     string
 	Euid      int
 	LookPath  func(string) (string, error)
 	PathDirs  func() []string
@@ -27,12 +25,8 @@ type Host struct {
 }
 
 func NewHost() Host {
-	archX, archG := "x86_64", "x86_64"
-	if runtime.GOARCH == "arm64" {
-		archX, archG = "aarch64", "arm64"
-	}
 	return Host{
-		OS: runtime.GOOS, Arch: runtime.GOARCH, ArchX: archX, ArchG: archG,
+		OS: runtime.GOOS, Arch: runtime.GOARCH,
 		Euid:      os.Geteuid(),
 		LookPath:  exec.LookPath,
 		PathDirs:  func() []string { return filepath.SplitList(os.Getenv("PATH")) },
@@ -61,6 +55,16 @@ func fpathDirs() []string {
 	return nil
 }
 
+func (h Host) nvmDir() string {
+	if d := h.Getenv("NVM_DIR"); d != "" {
+		return d
+	}
+	if x := h.Getenv("XDG_CONFIG_HOME"); x != "" {
+		return filepath.Join(x, "nvm")
+	}
+	return filepath.Join(h.Getenv("HOME"), ".nvm")
+}
+
 func (h Host) ShaKey() string { return h.OS + "-" + h.Arch }
 
 func (h Host) HasCmd(name string) bool {
@@ -68,11 +72,8 @@ func (h Host) HasCmd(name string) bool {
 	return err == nil
 }
 
-func (h Host) expand(s, version string) string {
-	r := strings.NewReplacer(
-		"{version}", version, "{os}", h.OS, "{arch}", h.Arch,
-		"{arch_x}", h.ArchX, "{arch_g}", h.ArchG)
-	return r.Replace(s)
+func (h Host) expandAs(s, version, arch string) string {
+	return strings.NewReplacer("{version}", version, "{os}", h.OS, "{arch}", arch).Replace(s)
 }
 
 func (h Host) applicable(pkg string, it Item) (bool, error) {
@@ -86,7 +87,7 @@ func (h Host) applicable(pkg string, it Item) (bool, error) {
 		return h.OS == "linux" && h.HasCmd("apt-get"), nil
 	case "npm":
 		return h.HasCmd("npm"), nil
-	case "code":
+	case "vscode":
 		return h.HasCmd("code"), nil
 	case "gem":
 		return h.HasCmd("gem"), nil
@@ -100,13 +101,29 @@ func (h Host) applicable(pkg string, it Item) (bool, error) {
 		if it.PrebuiltArchive == nil {
 			return false, fmt.Errorf("package %s: prebuiltArchive item missing props", pkg)
 		}
-		_, ok := it.PrebuiltArchive.Sha256[h.ShaKey()]
-		return ok, nil
-	case "pkg":
-		if it.Pkg == nil || it.Pkg.URL == "" {
-			return false, fmt.Errorf("package %s: pkg item missing url", pkg)
+		if _, ok := it.PrebuiltArchive.Sha256[h.ShaKey()]; ok {
+			return true, nil
 		}
-		return h.OS == "darwin", nil
+		for _, p := range it.PrebuiltArchive.Platforms {
+			if p == h.ShaKey() || p == h.OS {
+				return true, nil
+			}
+		}
+		return false, nil
+	case "versionManager":
+		vm := it.VersionManager
+		if vm == nil || len(vm.Versions) == 0 {
+			return false, fmt.Errorf("package %s: versionManager item requires versions", pkg)
+		}
+		switch vm.Tool {
+		case "pyenv":
+			return h.HasCmd("pyenv"), nil
+		case "nvm":
+			_, err := os.Stat(filepath.Join(h.nvmDir(), "nvm.sh"))
+			return err == nil, nil
+		default:
+			return false, fmt.Errorf("package %s: unknown versionManager tool %q (want pyenv or nvm)", pkg, vm.Tool)
+		}
 	case "script":
 		if it.Script == nil || (it.Script.Run == "" && it.Script.Path == "" && it.Script.URL == "") {
 			return false, fmt.Errorf("package %s: script item missing run, path, or remoteUrl", pkg)
@@ -123,14 +140,17 @@ func (h Host) applicable(pkg string, it Item) (bool, error) {
 }
 
 func (h Host) pick(pkg string, entry Entry) (Item, bool, error) {
-	return h.pickPreferred(pkg, entry, nil)
+	return h.pickPreferred(pkg, entry, nil, nil)
 }
 
-func (h Host) pickPreferred(pkg string, entry Entry, preferred []string) (Item, bool, error) {
+func (h Host) pickPreferred(pkg string, entry Entry, preferred, allowed []string) (Item, bool, error) {
 	for _, it := range orderByPreference(entry.Items, preferred) {
 		ok, err := h.applicable(pkg, it)
 		if err != nil {
 			return Item{}, false, err
+		}
+		if ok && len(allowed) > 0 && !slices.Contains(allowed, methodFamily(it.Mgr)) {
+			ok = false
 		}
 		if ok {
 			return it, true, nil
@@ -139,9 +159,21 @@ func (h Host) pickPreferred(pkg string, entry Entry, preferred []string) (Item, 
 	return Item{}, false, nil
 }
 
-var KnownManagers = []string{"brew", "cask", "apt", "npm", "go", "gem", "prebuiltArchive", "script", "pkg", "code"}
+func methodFamily(mgr string) string {
+	switch mgr {
+	case "cask":
+		return "brew/cask"
+	case "vscode":
+		return "brew/vscode"
+	}
+	return mgr
+}
 
-var DefaultPreferredMethods = []string{"brew", "cask", "apt", "pkg", "prebuiltArchive", "script", "npm", "go", "gem", "code"}
+var KnownManagers = []string{"brew", "cask", "apt", "npm", "go", "gem", "prebuiltArchive", "script", "vscode", "versionManager"}
+
+var PlatformMethods = []string{"brew", "brew/cask", "brew/vscode", "apt", "npm", "go", "gem", "prebuiltArchive", "script", "versionManager"}
+
+var DefaultPreferredMethods = []string{"brew", "cask", "apt", "prebuiltArchive", "script", "npm", "go", "gem", "vscode"}
 
 var DefaultPrebuiltArchiveDestinationCandidates = []string{"~/.local/bin", "~/bin"}
 

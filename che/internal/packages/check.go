@@ -41,8 +41,8 @@ func (in *Installer) isCodeManaged(pkg string) bool {
 	if !ok {
 		return false
 	}
-	it, picked, err := in.Host.pickPreferred(pkg, entry, in.Opts.PreferredMethods)
-	return err == nil && picked && it.Mgr == "code"
+	it, picked, err := in.pickItem(pkg, entry)
+	return err == nil && picked && it.Mgr == "vscode"
 }
 
 func (in *Installer) CheckUpgradable(pkgs []string) error {
@@ -52,25 +52,24 @@ func (in *Installer) CheckUpgradable(pkgs []string) error {
 		if err != nil {
 			return err
 		}
-		it, ok, err := in.Host.pickPreferred(pkg, entry, in.Opts.PreferredMethods)
+		it, ok, err := in.pickItem(pkg, entry)
 		if err != nil || !ok {
 			continue
 		}
-		if pin := pinnedVersion(it); pin != "" && (it.Mgr == "prebuiltArchive" || it.Mgr == "script" || it.Mgr == "pkg") {
+		if pin := in.pinFor(pkg, pinnedVersion(it)); pin != "" {
 			if in.hasCmd(pkg) && !in.versionOutputHasPin(pkg, pin) {
 				in.emit(log.Levels.Warn, "upgradable", pkg+" via "+it.Mgr+": yaml pins "+pin)
 			}
 			continue
 		}
-		if it.Mgr == "prebuiltArchive" || it.Mgr == "script" || it.Mgr == "pkg" {
+		if it.Mgr == "prebuiltArchive" || it.Mgr == "script" {
 			continue
 		}
 		name := it.Name
 		if name == "" {
 			name = pkg
 		}
-		base, _ := splitPin(it.Mgr, name)
-		if outdated[it.Mgr][tail(base)] {
+		if outdated[it.Mgr][tail(name)] {
 			in.emit(log.Levels.Warn, "upgradable", pkg+" via "+it.Mgr)
 		}
 	}
@@ -83,8 +82,6 @@ func pinnedVersion(it Item) string {
 		return it.PrebuiltArchive.Version
 	case it.Script != nil:
 		return it.Script.Version
-	case it.Pkg != nil:
-		return it.Pkg.Version
 	}
 	return ""
 }
@@ -117,7 +114,7 @@ func (in *Installer) managerOutdated() map[string]map[string]bool {
 			for line := range strings.Lines(o) {
 				parts := strings.Split(strings.TrimSpace(line), ":")
 				if len(parts) >= 2 {
-					base, _ := splitPin("npm", parts[1])
+					base, _ := splitPin(parts[1])
 					names[tail(base)] = true
 				}
 			}
@@ -133,7 +130,7 @@ func (in *Installer) CheckNotShadowed(pkgs []string) error {
 		if err != nil {
 			return err
 		}
-		it, ok, err := in.Host.pickPreferred(pkg, entry, in.Opts.PreferredMethods)
+		it, ok, err := in.pickItem(pkg, entry)
 		if err != nil || !ok {
 			continue
 		}

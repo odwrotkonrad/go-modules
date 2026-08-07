@@ -196,7 +196,7 @@ install packages from packages.yml and check their state.
 | --- | --- | --- | --- | --- |
 | `--packages-file` | `CHE_PACKAGES_FILE` | `string` | `$XDG_CONFIG_HOME/packages/packages.yml` | packages.yml path, fully superseding the builtin packages.yml shipped in che (a set file must exist; the builtin serves only when no file exists at the default path) |
 | `--packages-override` | `CHE_PACKAGES_OVERRIDE` | `string` | `$XDG_CONFIG_HOME/che/packages-override.yml if present` | override packages file merged over the effective base (the packages file, or the builtin when none exists): same-name entries replace, new names append |
-| `--preferred-methods` | `CHE_PACKAGES_PREFERRED_METHODS` | `brew` \| `cask` \| `apt` \| `npm` \| `go` \| `gem` \| `binary` \| `script` \| `pkg` \| `code` | `[]` | installation-method preference order (comma-separated or repeated): listed managers try first within each package entry, unlisted follow in entry order |
+| `--preferred-methods` | `CHE_PACKAGES_PREFERRED_METHODS` | `brew` \| `cask` \| `apt` \| `npm` \| `go` \| `gem` \| `prebuiltArchive` \| `script` \| `vscode` \| `versionManager` | `[]` | installation-method preference order (comma-separated or repeated): listed managers try first within each package entry, unlisted follow in entry order |
 
 ### `$ che packages check-not-shadowed`
 
@@ -221,6 +221,21 @@ Usage: `che packages check-single-present [pkg...]`
 warn on manager-reported outdated packages and binary pins drifted from --version output.
 
 Usage: `che packages check-upgradable [pkg...]`
+
+### `$ che packages config`
+
+inspect the resolved packages database.
+
+### `$ che packages config show`
+
+print the packages database (--delta default: entries differing from the builtin; --all: the effective merged set; --defaults: the builtin only).
+
+| Option | Env | Values | Default | Description |
+| --- | --- | --- | --- | --- |
+| `--all` |  | `bool` | `false` | print the effective merged set (packages file or builtin, plus override) |
+| `--defaults` |  | `bool` | `false` | print the builtin packages.yml only |
+| `--delta` |  | `bool` | `false` | print only the entries differing from the builtin packages.yml (default mode) |
+| `--output` |  | `text (name = methods lines)` \| `yaml (packages.yml shape)` | `text` | output format |
 
 ### `$ che packages install`
 

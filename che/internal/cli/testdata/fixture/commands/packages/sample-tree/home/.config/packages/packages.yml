@@ -2,11 +2,14 @@
 packages:
   jq: [brew, apt]
   fd: [brew, {apt: fd-find}]
-  npmtool: [{npm: "npmtool@1.2.3"}]
+  npmtool:
+    version: 1.2.3
+    installMethods: [npm]
   kubectx:
     - prebuiltArchive:
         version: 0.11.0
-        url: https://example.com/v{version}/kubectx_v{version}_{os}_{arch_g}.tar.gz
+        url: https://example.com/v{version}/kubectx_v{version}_{os}_{arch}.tar.gz
+        archConvention: odd
         bin: kubectx
         sha256:
           linux-amd64: mocksha

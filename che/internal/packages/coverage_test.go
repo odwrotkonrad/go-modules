@@ -20,7 +20,7 @@ func TestLoadBuiltinParsesShippedFile(t *testing.T) {
 	brew, err := f.Find("brew", BuiltinPath)
 	require.NoError(t, err)
 	require.Equal(t, "script", brew.Items[0].Mgr)
-	require.Equal(t, "scripts/install-brew.sh", brew.Items[0].Script.Path)
+	require.Equal(t, "https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh", brew.Items[0].Script.URL)
 }
 
 func TestLoadReadsFileAndErrors(t *testing.T) {
@@ -52,8 +52,6 @@ func TestNewHostCapturesRuntime(t *testing.T) {
 	h := NewHost()
 	require.NotEmpty(t, h.OS)
 	require.NotEmpty(t, h.Arch)
-	require.NotEmpty(t, h.ArchX)
-	require.NotEmpty(t, h.ArchG)
 	require.NotNil(t, h.LookPath)
 	require.NotEmpty(t, h.PathDirs())
 	require.Equal(t, os.Getenv("PATH"), h.Getenv("PATH"))
@@ -160,7 +158,7 @@ func TestInstalledVersionAptAndNpmMisses(t *testing.T) {
 }
 
 func TestInstallAptPinReinstallsOnDrift(t *testing.T) {
-	in, m := newInstaller(t, "packages:\n  jq: [{apt: jq=1.7-1}]", "linux", cmdMap([]string{"apt-get"}), Options{})
+	in, m := newInstaller(t, "packages:\n  jq:\n    version: 1.7-1\n    installMethods: [apt]", "linux", cmdMap([]string{"apt-get"}), Options{})
 	m.Stub = func(argv []string) ([]byte, error) {
 		if argv[0] == "dpkg-query" {
 			return []byte("1.6-2"), nil

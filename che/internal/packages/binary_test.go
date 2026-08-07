@@ -13,7 +13,8 @@ const kubectxYaml = `packages:
   kubectx:
     - prebuiltArchive:
         version: 0.11.0
-        url: https://example.com/v{version}/kubectx_v{version}_{os}_{arch_g}.tar.gz
+        url: https://example.com/v{version}/kubectx_v{version}_{os}_{arch}.tar.gz
+        archConvention: odd
         bin: kubectx
         sha256:
           linux-amd64: goodsha
@@ -74,8 +75,9 @@ const zigYaml = `packages:
   zig:
     - prebuiltArchive:
         version: 0.16.0
-        url: https://example.com/{version}/zig-{arch_x}-linux-{version}.tar.xz
-        bin: zig-{arch_x}-linux-{version}/zig
+        url: https://example.com/{version}/zig-{arch}-linux-{version}.tar.xz
+        archConvention: uname
+        bin: zig-{arch}-linux-{version}/zig
         sha256:
           linux-amd64: goodsha
 `
@@ -90,6 +92,30 @@ func TestInstallBinaryTreeFlow(t *testing.T) {
 	require.Contains(t, calls, "tar -x -C /home/u/.local/opt/zig")
 	require.Contains(t, calls, "ln -sf /home/u/.local/opt/zig/zig-x86_64-linux-0.16.0/zig /home/u/.local/bin/zig")
 	require.NotContains(t, calls, "install -m 0755")
+}
+
+const gcloudArchiveYaml = `archNameConventions:
+  vendor: {arm64: arm, amd64: x86_64}
+packages:
+  gcloud:
+    - prebuiltArchive:
+        version: 572.0.0
+        url: https://example.com/cli-{version}-{os}-{arch}.tar.gz
+        archConvention: vendor
+        bin: sdk/bin/gcloud sdk/bin/gsutil
+        sha256:
+          darwin-arm64: goodsha
+`
+
+func TestInstallPrebuiltArchiveArchConvention(t *testing.T) {
+	in, m := newInstaller(t, gcloudArchiveYaml, "darwin", cmdMap([]string{"sha256sum"}), Options{})
+	in.Host.Arch = "arm64"
+	m.Stub = shaStub("goodsha")
+	require.NoError(t, in.Install([]string{"gcloud"}))
+	calls := strings.Join(m.Calls(), "\n")
+	require.Contains(t, calls, "cli-572.0.0-darwin-arm.tar.gz https://example.com/cli-572.0.0-darwin-arm.tar.gz")
+	require.Contains(t, calls, "ln -sf /home/u/.local/opt/gcloud/sdk/bin/gcloud /home/u/.local/bin/gcloud")
+	require.Contains(t, calls, "ln -sf /home/u/.local/opt/gcloud/sdk/bin/gsutil /home/u/.local/bin/gsutil")
 }
 
 func TestInstallBinarySkipsWhenPinPresent(t *testing.T) {
@@ -116,61 +142,47 @@ func TestInstallBinaryReinstallsOnPinDrift(t *testing.T) {
 	require.Contains(t, strings.Join(m.Calls(), "\n"), "curl -fsSL")
 }
 
-const awsPkgYaml = `packages:
+const awsYaml = `packages:
   aws:
-    - pkg:
-        url: https://awscli.amazonaws.com/AWSCLIV2.pkg
     - script:
-        os: linux
-        path: scripts/install-aws.sh
+        os: darwin
+        remoteUrl: https://awscli.amazonaws.com/v2/install.sh
+    - prebuiltArchive:
+        url: https://awscli.amazonaws.com/awscli-exe-linux-{arch}.zip
+        archConvention: uname
+        platforms: [linux-amd64, linux-arm64]
+        bin: aws/dist/aws aws/dist/aws_completer
 `
 
-func TestInstallPkgDownloadsAndRunsInstaller(t *testing.T) {
-	in, m := newInstaller(t, awsPkgYaml, "darwin", cmdMap(nil), Options{})
+func TestInstallAwsScriptOnDarwin(t *testing.T) {
+	in, m := newInstaller(t, awsYaml, "darwin", cmdMap(nil), Options{})
+	m.Stub = func(argv []string) ([]byte, error) {
+		if argv[0] == "curl" {
+			return []byte("echo install-aws"), nil
+		}
+		return nil, nil
+	}
 	require.NoError(t, in.Install([]string{"aws"}))
 	calls := strings.Join(m.Calls(), "\n")
-	require.Contains(t, calls, "curl -fsSL")
-	require.Contains(t, calls, "AWSCLIV2.pkg https://awscli.amazonaws.com/AWSCLIV2.pkg")
-	require.Contains(t, calls, "sudo installer -pkg")
-	require.Contains(t, calls, "-target /")
+	require.Contains(t, calls, "https://awscli.amazonaws.com/v2/install.sh")
+	require.Contains(t, calls, "/bin/sh -ec echo install-aws")
 }
 
-func TestInstallPkgSkipsWhenPresent(t *testing.T) {
-	in, m := newInstaller(t, awsPkgYaml, "darwin", cmdMap([]string{"aws"}), Options{})
+func TestInstallAwsSkipsWhenPresent(t *testing.T) {
+	in, m := newInstaller(t, awsYaml, "darwin", cmdMap([]string{"aws"}), Options{})
 	require.NoError(t, in.Install([]string{"aws"}))
 	require.Empty(t, m.Calls())
 }
 
-func TestInstallPkgVerifiesShaWhenPinned(t *testing.T) {
-	const yaml = `packages:
-  aws:
-    - pkg:
-        url: https://awscli.amazonaws.com/AWSCLIV2.pkg
-        sha256: {darwin-amd64: badsha}
-`
-	in, m := newInstaller(t, yaml, "darwin", cmdMap([]string{"sha256sum"}), Options{})
-	m.Stub = shaStub("othersha")
-	err := in.Install([]string{"aws"})
-	require.ErrorContains(t, err, "sha256 mismatch")
-	require.NotContains(t, strings.Join(m.Calls(), "\n"), "installer -pkg")
-}
-
-func TestInstallPkgFallsBackToLinuxScript(t *testing.T) {
-	in, m := newInstaller(t, awsPkgYaml, "linux", cmdMap(nil), Options{})
-	in.FilePath = BuiltinPath
+func TestInstallAwsLinuxArchive(t *testing.T) {
+	in, m := newInstaller(t, awsYaml, "linux", cmdMap(nil), Options{})
 	require.NoError(t, in.Install([]string{"aws"}))
-	calls := m.Calls()
-	require.Len(t, calls, 1)
-	require.Contains(t, calls[0], "/bin/sh -ec")
-	require.Contains(t, calls[0], "awscli-exe-linux")
-}
-
-func TestInstallPkgDryRunAnnounces(t *testing.T) {
-	in, m := newInstaller(t, awsPkgYaml, "darwin", cmdMap(nil), Options{DryRun: true})
-	out, err := captureStdout(t, func() error { return in.Install([]string{"aws"}) })
-	require.NoError(t, err)
-	wantLines(t, out, "install aws via pkg (dry run)")
-	require.Empty(t, m.Calls())
+	calls := strings.Join(m.Calls(), "\n")
+	require.Contains(t, calls, "awscli-exe-linux-x86_64.zip")
+	require.Contains(t, calls, "unzip -oq")
+	require.Contains(t, calls, "ln -sf /home/u/.local/opt/aws/aws/dist/aws /home/u/.local/bin/aws")
+	require.Contains(t, calls, "ln -sf /home/u/.local/opt/aws/aws/dist/aws_completer /home/u/.local/bin/aws_completer")
+	require.NotContains(t, calls, "install --update")
 }
 
 func TestInstallBinaryCustomDestination(t *testing.T) {

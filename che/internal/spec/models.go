@@ -3,9 +3,12 @@ package spec
 // [>] 🤖🤖
 
 import (
+	"fmt"
 	"regexp"
+	"slices"
 
 	"github.com/invopop/jsonschema"
+	"gopkg.in/yaml.v3"
 
 	"gitlab.com/konradodwrot/go-modules/che/render/render"
 )
@@ -68,7 +71,7 @@ type Options struct {
 	LogLevel                string          `yaml:"logLevel" jsonschema:"enum=error,enum=warn,enum=info,enum=debug,enum=trace" jsonschema_description:"human-log level default for profiles that don't set it; overridden by --log-level and CHE_LOG_LEVEL"`
 	ProfileWorkingDirectory string          `yaml:"profileWorkingDirectory" jsonschema_description:"the load-ops source tree (absolute, relative to the checkout, ~/, $VAR, env vars expanded); default the checkout itself; makeLinks/makeCopies/renderTemplates host sources resolve against it; home targeting is explicit via a $HOME dest rewrite; spec-only"`
 	ValidateSpec            string          `yaml:"validateSpec" jsonschema:"enum=warn,enum=error" jsonschema_description:"how this spec's schema violations report (per-spec: each included spec honors its own); overridden by the flag and env var"`
-	DryRun                  string          `yaml:"dryRun" jsonschema:"enum=delta,enum=all,enum=true" jsonschema_description:"default dry-run mode: delta (changed dests) | all (every dest) | true (alias for delta); overridden by the flag and env var"`
+	DryRun                  Scalar          `yaml:"dryRun" jsonschema:"enum=delta,enum=all,enum=true,enum=false" jsonschema_description:"default dry-run mode: delta (changed dests) | all (every dest) | true (alias for delta) | false (off, the default); overridden by the flag and env var"`
 	Profiles                []string        `yaml:"profiles" jsonschema_description:"profiles to run (autoDiscover skipped, runIf still enforced); overridden by --profiles and CHE_PROFILE"`
 	SkipRemoteRefs          *bool           `yaml:"skipRemoteRefs" jsonschema_description:"skip sourced include.profiles refs; overridden by the flag and env var"`
 	SkipOps                 []string        `yaml:"skipOps" jsonschema:"enum=prune-broken-links,enum=make-dirs,enum=make-links,enum=make-copies,enum=render-templates,enum=install-packages,enum=run-scripts" jsonschema_description:"ops skipped everywhere: dropped from the run sequence, direct op subcommands become logged no-ops; overridden by --skip-ops and CHE_SKIP_OPS"`
@@ -84,7 +87,7 @@ type Run struct {
 
 type Packages struct {
 	File                         string                 `yaml:"file" jsonschema_description:"packages.yml path; default $XDG_CONFIG_HOME/packages/packages.yml; overridden by --packages-file and CHE_PACKAGES_FILE"`
-	PreferredInstallationMethods []string               `yaml:"preferredInstallationMethods" jsonschema:"enum=brew,enum=cask,enum=apt,enum=npm,enum=go,enum=gem,enum=prebuiltArchive,enum=script,enum=pkg,enum=code" jsonschema_description:"manager preference order: listed managers are tried first (in this order) within each package entry, unlisted ones follow in entry order; cascades profile > spec > user config; overridden by CHE_PACKAGES_PREFERRED_METHODS"`
+	PreferredInstallationMethods []string               `yaml:"preferredInstallationMethods" jsonschema:"enum=brew,enum=cask,enum=apt,enum=npm,enum=go,enum=gem,enum=prebuiltArchive,enum=script,enum=vscode,enum=versionManager" jsonschema_description:"manager preference order: listed managers are tried first (in this order) within each package entry, unlisted ones follow in entry order; cascades profile > spec > user config; overridden by CHE_PACKAGES_PREFERRED_METHODS"`
 	PrebuiltArchive              PrebuiltArchiveInstall `yaml:"prebuiltArchive" jsonschema_description:"prebuiltArchive installation method options"`
 	Completions                  CompletionsInstall     `yaml:"completions" jsonschema_description:"zsh completions installation options"`
 }
@@ -104,7 +107,55 @@ type PrebuiltArchiveInstall struct {
 	CheckInPath                  *bool        `yaml:"checkInPath" jsonschema_description:"pick the first candidate destination found on PATH and warn when none is; default true; overridden by CHE_PACKAGES_PREBUILT_ARCHIVE_CHECK_IN_PATH"`
 }
 
+type PackageRef struct {
+	Name          string       `yaml:"name" jsonschema_description:"canonical package name in the packages file"`
+	Versions      StringOrList `yaml:"versions,omitempty" jsonschema_description:"version(s) to install: one version or a list (exact 24.16.0 or wildcard 24.*), overriding the packages-file entry's default; multiple versions require a version-manager installation method"`
+	GlobalVersion string       `yaml:"globalVersion,omitempty" jsonschema_description:"which installed version becomes the default (version-manager methods only); defaults to the first version listed"`
+}
+
+func (p *PackageRef) UnmarshalYAML(node *yaml.Node) error {
+	if node.Kind == yaml.ScalarNode {
+		p.Name = node.Value
+		return nil
+	}
+	var obj struct {
+		Name          string       `yaml:"name"`
+		Versions      StringOrList `yaml:"versions"`
+		GlobalVersion string       `yaml:"globalVersion"`
+	}
+	if err := node.Decode(&obj); err != nil {
+		return err
+	}
+	if obj.Name == "" {
+		return fmt.Errorf("installPackages object form requires name")
+	}
+	if obj.GlobalVersion != "" && !slices.Contains(obj.Versions, obj.GlobalVersion) {
+		return fmt.Errorf("installPackages %s: globalVersion %s is not among versions %v", obj.Name, obj.GlobalVersion, []string(obj.Versions))
+	}
+	p.Name, p.Versions, p.GlobalVersion = obj.Name, obj.Versions, obj.GlobalVersion
+	return nil
+}
+
+func (p PackageRef) JSONSchema() *jsonschema.Schema {
+	obj := &jsonschema.Schema{
+		Type:                 "object",
+		Properties:           jsonschema.NewProperties(),
+		Required:             []string{"name"},
+		AdditionalProperties: jsonschema.FalseSchema,
+	}
+	strOrList := &jsonschema.Schema{OneOf: []*jsonschema.Schema{
+		{Type: "string"},
+		{Type: "array", Items: &jsonschema.Schema{Type: "string"}},
+	}}
+	obj.Properties.Set("name", &jsonschema.Schema{Type: "string", Description: "canonical package name in the packages file"})
+	obj.Properties.Set("versions", strOrList)
+	obj.Properties.Set("globalVersion", &jsonschema.Schema{Type: "string", Description: "which installed version becomes the default (version-manager methods only); defaults to the first listed"})
+	return &jsonschema.Schema{OneOf: []*jsonschema.Schema{{Type: "string"}, obj}}
+}
+
 type StringOrList []string
+
+type Scalar string
 
 func (StringOrList) JSONSchema() *jsonschema.Schema {
 	return &jsonschema.Schema{
@@ -149,7 +200,7 @@ type includeSet struct {
 	MakeCopies      []entry               `yaml:"makeCopies" jsonschema_description:"*.ontoHost.cp copy-op perm-groups, workingDirectory-relative sources; a glob source may carry a {source, dest} dest rewrite (sed-style s:^_home:$HOME: or prefix-swap sugar _home/** -> $HOME/**)"`
 	RenderTemplates []templateGroup       `yaml:"renderTemplates" jsonschema_description:"*.tpl render-op perm-groups; local host sources workingDirectory-relative, repo-doc sources (repo dest) workingDirectory-relative, or remote (@<repo>//<path>[?ref=<ref>], explicit dest required); glob and derived-dest forms are host sources; a glob source may carry a {source, dest} dest rewrite (sed-style s:^_home:$HOME: or prefix-swap sugar _home/** -> $HOME/**); dests expand env vars incl ${invokingSpecGitRoot}, the top-level spec's checkout"`
 	MakeDirs        []dirGroup            `yaml:"makeDirs" jsonschema_description:"extra-dir perm-groups; each item one dir path (brace-expanded)"`
-	InstallPackages []string              `yaml:"installPackages" jsonschema_description:"canonical package names installed from the packages file (default $XDG_CONFIG_HOME/packages/packages.yml), each entry listing managers in preference order; runs before runScripts"`
+	InstallPackages []PackageRef          `yaml:"installPackages" jsonschema_description:"packages installed from the packages file (default $XDG_CONFIG_HOME/packages/packages.yml): canonical name scalar, or {name, version} to install a specific version (exact or wildcard), overriding the entry's default version; runs before runScripts"`
 	Scripts         []string              `yaml:"runScripts" jsonschema_description:"script paths or globs, repo-relative, run in spec order"`
 }
 
@@ -262,7 +313,7 @@ type (
 	}
 	InstallPackagesOperationRecipe struct {
 		OperationRecipe
-		Packages []string
+		Packages []PackageRef
 	}
 	RunScriptsOperationRecipe struct {
 		OperationRecipe
@@ -290,7 +341,7 @@ type resolved struct {
 	Templates []FileItem
 	Dirs      []string
 	ExtraDirs []FileItem
-	Packages  []string
+	Packages  []PackageRef
 	Scripts   []string
 }
 
@@ -321,7 +372,7 @@ type effective struct {
 	richCopy  []FileItem
 	richTmpl  []FileItem
 	dirs      []FileItem
-	packages  []string
+	packages  []PackageRef
 	scripts   []string
 	refs      []ProfileSourceRecipe
 	exclude   excludeSet

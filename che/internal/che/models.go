@@ -1260,7 +1260,7 @@ func (o *RenderTemplatesOperationReady) counts(p *ProfileReady) (int, int) {
 
 type InstallPackagesOperationReady struct {
 	OperationReady
-	Packages []string
+	Packages []spec.PackageRef
 }
 
 func (o *InstallPackagesOperationReady) Name() string   { return "install-packages" }
