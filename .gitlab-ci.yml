@@ -104,7 +104,7 @@ test-che:
   image: $CI_IMAGE
   stage: test-e2e
   needs:
-    - job: test-che
+    - job: warm-go
       optional: true
   cache:
     - key: go-mod
