@@ -97,6 +97,9 @@ func runInstallGroup(t *testing.T, g installGroup) {
 		"CHE_PACKAGES_PREBUILT_BINARIES_ARCHIVE_CHECK_PRESENT_ON_PATH=0",
 		"NVM_DIR=" + filepath.Join(home, ".config", "nvm"),
 		"GOBIN=" + goBin,
+		//[why] GOPATH defaults into the throwaway HOME: without this the module cache's
+		//  read-only dirs make t.TempDir cleanup fail the passing test
+		"GOFLAGS=-modcacherw",
 	}
 	if v := os.Getenv("SSL_CERT_FILE"); v != "" {
 		env = append(env, "SSL_CERT_FILE="+v)
