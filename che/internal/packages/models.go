@@ -70,42 +70,10 @@ type Entry struct {
 	Items          []Item
 	Version        string
 	Requires       []string
-	Command        Command
-	AliasBinary    map[string]string
+	Command        string
 	PostInstall    *ScriptSpec
 	VersionCommand string
 	Completions    Completions
-}
-
-// Command is the canonical command a package provides: one name, or a per-os map
-// [why] distros rename binaries (debian ships bat as batcat), so presence checks need the host's name
-type Command struct {
-	Name  string
-	PerOS map[string]string
-}
-
-func (c Command) IsZero() bool { return c.Name == "" && len(c.PerOS) == 0 }
-
-func (c Command) For(os string) string {
-	if v, ok := c.PerOS[os]; ok {
-		return v
-	}
-	return c.Name
-}
-
-func (c *Command) UnmarshalYAML(node *yaml.Node) error {
-	if node.Kind == yaml.ScalarNode {
-		c.Name = node.Value
-		return nil
-	}
-	return node.Decode(&c.PerOS)
-}
-
-func (c Command) MarshalYAML() (any, error) {
-	if len(c.PerOS) > 0 {
-		return c.PerOS, nil
-	}
-	return c.Name, nil
 }
 
 type Completions struct {
@@ -143,7 +111,7 @@ func (it Item) MarshalYAML() (any, error) {
 }
 
 func (e Entry) MarshalYAML() (any, error) {
-	if e.Version == "" && len(e.Requires) == 0 && len(e.AliasBinary) == 0 && e.PostInstall == nil && e.Command.IsZero() && e.VersionCommand == "" && e.Completions.Zsh == nil {
+	if e.Version == "" && len(e.Requires) == 0 && e.PostInstall == nil && e.Command == "" && e.VersionCommand == "" && e.Completions.Zsh == nil {
 		return e.Items, nil
 	}
 	obj := map[string]any{"installMethods": e.Items}
@@ -153,13 +121,10 @@ func (e Entry) MarshalYAML() (any, error) {
 	if len(e.Requires) > 0 {
 		obj["requires"] = e.Requires
 	}
-	if len(e.AliasBinary) > 0 {
-		obj["aliasBinary"] = e.AliasBinary
-	}
 	if e.PostInstall != nil {
 		obj["postInstall"] = e.PostInstall
 	}
-	if !e.Command.IsZero() {
+	if e.Command != "" {
 		obj["command"] = e.Command
 	}
 	if e.VersionCommand != "" {
@@ -229,14 +194,13 @@ func (e *Entry) UnmarshalYAML(node *yaml.Node) error {
 		return node.Decode(&e.Items)
 	}
 	var obj struct {
-		Managers       []Item            `yaml:"installMethods"`
-		Version        string            `yaml:"version"`
-		Requires       []string          `yaml:"requires"`
-		AliasBinary    map[string]string `yaml:"aliasBinary"`
-		PostInstall    *ScriptSpec       `yaml:"postInstall"`
-		Command        Command           `yaml:"command"`
-		VersionCommand string            `yaml:"versionCommand"`
-		Completions    Completions       `yaml:"completions"`
+		Managers       []Item      `yaml:"installMethods"`
+		Version        string      `yaml:"version"`
+		Requires       []string    `yaml:"requires"`
+		PostInstall    *ScriptSpec `yaml:"postInstall"`
+		Command        string      `yaml:"command"`
+		VersionCommand string      `yaml:"versionCommand"`
+		Completions    Completions `yaml:"completions"`
 	}
 	if err := node.Decode(&obj); err != nil {
 		return err
@@ -250,7 +214,6 @@ func (e *Entry) UnmarshalYAML(node *yaml.Node) error {
 	e.Items = obj.Managers
 	e.Version = obj.Version
 	e.Requires = obj.Requires
-	e.AliasBinary = obj.AliasBinary
 	e.Command = obj.Command
 	e.PostInstall = obj.PostInstall
 	e.VersionCommand = obj.VersionCommand
@@ -258,9 +221,26 @@ func (e *Entry) UnmarshalYAML(node *yaml.Node) error {
 	return nil
 }
 
+// Strings is a yaml list that also accepts a single scalar
+type Strings []string
+
+func (s *Strings) UnmarshalYAML(node *yaml.Node) error {
+	if node.Kind == yaml.ScalarNode {
+		*s = Strings{node.Value}
+		return nil
+	}
+	var list []string
+	if err := node.Decode(&list); err != nil {
+		return err
+	}
+	*s = list
+	return nil
+}
+
 type Item struct {
 	Mgr             string
 	Name            string
+	AliasBinary     map[string]string
 	PrebuiltArchive *PrebuiltArchiveSpec
 	Script          *ScriptSpec
 	Apt             *AptSpec
@@ -274,8 +254,62 @@ type VersionManagerSpec struct {
 }
 
 type AptSpec struct {
-	Packages []string     `yaml:"packages,omitempty"`
+	Packages AptPackages  `yaml:"packages,omitempty"`
 	Repo     *AptRepoSpec `yaml:"repo,omitempty"`
+}
+
+// AptPackages maps each debian package name to its attributes, preserving file order.
+// [why] attributes belong to the package that needs them (a rename is one package's quirk),
+//
+//	and a bare list stays valid for the common attribute-less case
+type AptPackages struct {
+	Names []string
+	Attrs map[string]AptPackage
+}
+
+type AptPackage struct {
+	AliasBinary map[string]string `yaml:"aliasBinary,omitempty"`
+}
+
+func (a *AptPackages) UnmarshalYAML(node *yaml.Node) error {
+	if node.Kind == yaml.SequenceNode {
+		return node.Decode(&a.Names)
+	}
+	if node.Kind != yaml.MappingNode {
+		return fmt.Errorf("apt packages must be a list or a map of name to attributes")
+	}
+	a.Attrs = map[string]AptPackage{}
+	for i := 0; i < len(node.Content); i += 2 {
+		name := node.Content[i].Value
+		a.Names = append(a.Names, name)
+		var p AptPackage
+		if node.Content[i+1].Kind == yaml.MappingNode {
+			if err := node.Content[i+1].Decode(&p); err != nil {
+				return err
+			}
+		}
+		a.Attrs[name] = p
+	}
+	return nil
+}
+
+func (a AptPackages) MarshalYAML() (any, error) {
+	if len(a.Attrs) == 0 {
+		return a.Names, nil
+	}
+	out := map[string]AptPackage{}
+	for _, n := range a.Names {
+		out[n] = a.Attrs[n]
+	}
+	return out, nil
+}
+
+func (a AptPackages) Aliases() map[string]string {
+	out := map[string]string{}
+	for _, p := range a.Attrs {
+		maps.Copy(out, p.AliasBinary)
+	}
+	return out
 }
 
 type AptRepoSpec struct {
@@ -295,25 +329,24 @@ func (s *ScriptSpec) UnmarshalYAML(node *yaml.Node) error {
 }
 
 type ScriptSpec struct {
-	Run     string            `yaml:"run,omitempty"`
-	Shell   string            `yaml:"shell,omitempty"`
-	Args    []string          `yaml:"args,omitempty"`
-	Path    string            `yaml:"path,omitempty"`
-	URL     string            `yaml:"remoteUrl,omitempty"`
-	OS      string            `yaml:"os,omitempty"`
-	Version string            `yaml:"version,omitempty"`
-	Sha256  map[string]string `yaml:"sha256,omitempty"`
-	Env     map[string]string `yaml:"env,omitempty"`
-	Creates string            `yaml:"creates,omitempty"`
+	Run              string            `yaml:"run,omitempty"`
+	Args             []string          `yaml:"args,omitempty"`
+	Path             string            `yaml:"path,omitempty"`
+	URL              string            `yaml:"remoteUrl,omitempty"`
+	OS               string            `yaml:"os,omitempty"`
+	Version          string            `yaml:"version,omitempty"`
+	Sha256           map[string]string `yaml:"sha256,omitempty"`
+	Env              map[string]string `yaml:"env,omitempty"`
+	ValidateArtifact string            `yaml:"validateArtifact,omitempty"`
 }
 
 type PrebuiltArchiveSpec struct {
-	Version        string            `yaml:"version,omitempty"`
-	URL            string            `yaml:"url,omitempty"`
-	ArchConvention string            `yaml:"archConvention,omitempty"`
-	Bin            string            `yaml:"bin,omitempty"`
-	Platforms      []string          `yaml:"platforms,omitempty"`
-	Sha256         map[string]string `yaml:"sha256,omitempty"`
+	Version         string            `yaml:"version,omitempty"`
+	URL             string            `yaml:"url,omitempty"`
+	ArchConvention  string            `yaml:"archConvention,omitempty"`
+	ExtractBinaries Strings           `yaml:"extractBinaries,omitempty"`
+	Platforms       []string          `yaml:"platforms,omitempty"`
+	Sha256          map[string]string `yaml:"sha256,omitempty"`
 }
 
 func (it *Item) UnmarshalYAML(node *yaml.Node) error {
@@ -334,7 +367,7 @@ func (it *Item) UnmarshalYAML(node *yaml.Node) error {
 		if err := val.Decode(it.PrebuiltArchive); err != nil {
 			return err
 		}
-		if strings.Contains(it.PrebuiltArchive.URL+" "+it.PrebuiltArchive.Bin, "{arch_") {
+		if strings.Contains(it.PrebuiltArchive.URL+" "+strings.Join(it.PrebuiltArchive.ExtractBinaries, " "), "{arch_") {
 			return fmt.Errorf("prebuiltArchive tokens {arch_x}/{arch_g} are gone: use {arch} with archConvention")
 		}
 		return nil
@@ -342,7 +375,11 @@ func (it *Item) UnmarshalYAML(node *yaml.Node) error {
 	if key.Value == "apt" && val.Kind == yaml.MappingNode {
 		it.Mgr = "apt"
 		it.Apt = &AptSpec{}
-		return val.Decode(it.Apt)
+		if err := val.Decode(it.Apt); err != nil {
+			return err
+		}
+		it.AliasBinary = it.Apt.Packages.Aliases()
+		return nil
 	}
 	if key.Value == "versionManager" {
 		it.Mgr = "versionManager"
@@ -446,7 +483,7 @@ func (f *File) ValidatePlatforms() error {
 				}
 			}
 			c := it.PrebuiltArchive.ArchConvention
-			if c == "" && strings.Contains(it.PrebuiltArchive.URL+" "+it.PrebuiltArchive.Bin, "{arch}") {
+			if c == "" && strings.Contains(it.PrebuiltArchive.URL+" "+strings.Join(it.PrebuiltArchive.ExtractBinaries, " "), "{arch}") {
 				return fmt.Errorf("package %s: {arch} requires archConvention (archNameConventions sets: %s)", name, strings.Join(slices.Sorted(maps.Keys(archNameConventions)), ", "))
 			}
 			if c != "" {
@@ -469,20 +506,26 @@ func (f *File) Find(pkg, path string) (Entry, error) {
 
 // [<] 🤖🤖🤖
 
+// [>] 🤖🤖
+
 // ResolveScriptPaths anchors relative script paths to the file that declared them.
 // [why] override entries merge into a base file: without anchoring, their relative
 //
 //	paths would resolve against the base (or the builtin embed, by basename)
 func (f *File) ResolveScriptPaths(dir string) {
-	for name, e := range f.Packages {
-		for i, it := range e.Items {
-			if it.Script != nil && it.Script.Path != "" && !filepath.IsAbs(it.Script.Path) {
-				e.Items[i].Script.Path = filepath.Join(dir, it.Script.Path)
-			}
+	for _, e := range f.Packages {
+		for _, it := range e.Items {
+			anchorScriptPath(dir, it.Script)
 		}
-		if e.PostInstall != nil && e.PostInstall.Path != "" && !filepath.IsAbs(e.PostInstall.Path) {
-			e.PostInstall.Path = filepath.Join(dir, e.PostInstall.Path)
-		}
-		f.Packages[name] = e
+		anchorScriptPath(dir, e.PostInstall)
 	}
 }
+
+func anchorScriptPath(dir string, s *ScriptSpec) {
+	if s == nil || s.Path == "" || filepath.IsAbs(s.Path) {
+		return
+	}
+	s.Path = filepath.Join(dir, s.Path)
+}
+
+// [<] 🤖🤖

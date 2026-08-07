@@ -15,7 +15,7 @@ const kubectxYaml = `packages:
         version: 0.11.0
         url: https://example.com/v{version}/kubectx_v{version}_{os}_{arch}.tar.gz
         archConvention: odd
-        bin: kubectx
+        extractBinaries: [kubectx]
         sha256:
           linux-amd64: goodsha
 `
@@ -77,7 +77,7 @@ const zigYaml = `packages:
         version: 0.16.0
         url: https://example.com/{version}/zig-{arch}-linux-{version}.tar.xz
         archConvention: uname
-        bin: zig-{arch}-linux-{version}/zig
+        extractBinaries: ["zig-{arch}-linux-{version}/zig"]
         sha256:
           linux-amd64: goodsha
 `
@@ -102,7 +102,7 @@ packages:
         version: 572.0.0
         url: https://example.com/cli-{version}-{os}-{arch}.tar.gz
         archConvention: vendor
-        bin: sdk/bin/gcloud sdk/bin/gsutil
+        extractBinaries: [sdk/bin/gcloud, sdk/bin/gsutil]
         sha256:
           darwin-arm64: goodsha
 `
@@ -151,7 +151,7 @@ const awsYaml = `packages:
         url: https://awscli.amazonaws.com/awscli-exe-linux-{arch}.zip
         archConvention: uname
         platforms: [linux-amd64, linux-arm64]
-        bin: aws/dist/aws aws/dist/aws_completer
+        extractBinaries: [aws/dist/aws, aws/dist/aws_completer]
 `
 
 func TestInstallAwsScriptOnDarwin(t *testing.T) {
@@ -165,7 +165,7 @@ func TestInstallAwsScriptOnDarwin(t *testing.T) {
 	require.NoError(t, in.Install([]string{"aws"}))
 	calls := strings.Join(m.Calls(), "\n")
 	require.Contains(t, calls, "https://awscli.amazonaws.com/v2/install.sh")
-	require.Contains(t, calls, "/bin/sh -ec echo install-aws")
+	require.Contains(t, calls, "che-script-")
 }
 
 func TestInstallAwsSkipsWhenPresent(t *testing.T) {

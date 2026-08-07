@@ -119,17 +119,17 @@ func TestVersionManagerUnknownToolErrors(t *testing.T) {
 	require.ErrorContains(t, in.Install([]string{"x"}), `unknown versionManager tool "rbenv"`)
 }
 
-func TestInstallScriptCreatesSkipsWhenPresent(t *testing.T) {
+func TestInstallScriptValidateArtifactSkipsWhenPresent(t *testing.T) {
 	dir := t.TempDir()
 	require.NoError(t, os.WriteFile(filepath.Join(dir, "nvm.sh"), []byte(""), 0o644))
-	yml := "packages:\n  nvm: [{script: {remoteUrl: https://example.com/i.sh, creates: " + dir + "/nvm.sh}}]\n"
+	yml := "packages:\n  nvm: [{script: {remoteUrl: https://example.com/i.sh, validateArtifact: " + dir + "/nvm.sh}}]\n"
 	in, m := newInstaller(t, yml, "linux", cmdMap(nil), Options{})
 	require.NoError(t, in.Install([]string{"nvm"}))
 	require.Empty(t, m.Calls())
 }
 
-func TestInstallScriptCreatesRunsWhenAbsent(t *testing.T) {
-	yml := "packages:\n  nvm: [{script: {remoteUrl: https://example.com/i.sh, creates: " + t.TempDir() + "/nvm.sh}}]\n"
+func TestInstallScriptValidateArtifactRunsWhenAbsent(t *testing.T) {
+	yml := "packages:\n  nvm: [{script: {remoteUrl: https://example.com/i.sh, validateArtifact: " + t.TempDir() + "/nvm.sh}}]\n"
 	in, m := newInstaller(t, yml, "linux", cmdMap(nil), Options{})
 	m.Stub = func(argv []string) ([]byte, error) {
 		if argv[0] == "curl" {
@@ -138,7 +138,7 @@ func TestInstallScriptCreatesRunsWhenAbsent(t *testing.T) {
 		return nil, nil
 	}
 	require.NoError(t, in.Install([]string{"nvm"}))
-	require.Contains(t, strings.Join(m.Calls(), "\n"), "/bin/sh -ec echo hi")
+	require.Contains(t, strings.Join(m.Calls(), "\n"), "che-script-")
 }
 
 // [<] 🤖🤖

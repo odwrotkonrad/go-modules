@@ -60,6 +60,9 @@ func NewPackagesInstaller(env map[string]string, home string, opts options.Optio
 		return nil, err
 	}
 	if override := resolvePackagesOverride(env, home, opts); override != "" {
+		if abs, err := filepath.Abs(override); err == nil {
+			override = abs
+		}
 		o, err := packages.Load(override)
 		if err != nil {
 			return nil, err

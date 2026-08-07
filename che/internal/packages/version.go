@@ -28,12 +28,16 @@ func PinMatches(out, pin string) bool {
 // stating it explicitly keeps an absent version meaning "not yet decided" rather than "nothing to pin".
 const VersionUnversionedLatest = "__unversioned_latest__"
 
+// VersionLatest tracks a manager's newest release rather than a pin.
+// [why] for sources whose head we own or deliberately follow: no drift check, no version in the name
+const VersionLatest = "latest"
+
 func (in *Installer) pinFor(pkg, specVersion string) string {
 	if r, ok := in.requested[pkg]; ok && len(r.Versions) > 0 {
 		return r.globalVersion()
 	}
 	if e, ok := in.File.Packages[pkg]; ok && e.Version != "" {
-		if e.Version == VersionUnversionedLatest {
+		if e.Version == VersionUnversionedLatest || e.Version == VersionLatest {
 			return ""
 		}
 		return e.Version
@@ -75,11 +79,11 @@ func (in *Installer) resolveArchiveVersion(pkg string, b *PrebuiltArchiveSpec) (
 	if b.Version != "" {
 		return b.Version, nil
 	}
-	if e, ok := in.File.Packages[pkg]; ok && e.Version != "" && e.Version != VersionUnversionedLatest {
+	if e, ok := in.File.Packages[pkg]; ok && e.Version != "" && e.Version != VersionUnversionedLatest && e.Version != VersionLatest {
 		return e.Version, nil
 	}
 	// [why] a version-less url (vendor "latest" endpoint) needs no pin
-	if !strings.Contains(b.URL, "{version}") && !strings.Contains(b.Bin, "{version}") {
+	if !strings.Contains(b.URL, "{version}") && !strings.Contains(strings.Join(b.ExtractBinaries, " "), "{version}") {
 		return "", nil
 	}
 	return "", fmt.Errorf("%s: no version pinned: set version on the entry or the prebuiltArchive item", pkg)

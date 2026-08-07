@@ -100,13 +100,12 @@ func (in *Installer) archFor(convention string) (string, error) {
 }
 
 func (in *Installer) members(pkg, version, arch string, b *PrebuiltArchiveSpec) []string {
-	spec := b.Bin
-	if spec == "" {
-		spec = pkg
+	names := b.ExtractBinaries
+	if len(names) == 0 {
+		names = Strings{pkg}
 	}
-	fields := strings.Fields(spec)
-	out := make([]string, len(fields))
-	for i, m := range fields {
+	out := make([]string, len(names))
+	for i, m := range names {
 		out[i] = in.Host.expandAs(m, version, arch)
 	}
 	return out

@@ -152,16 +152,10 @@ test-e2e-che-backup:
   stage: test-e2e-installs
   needs: []
   rules:
-    - if: $CI_PIPELINE_SOURCE == "merge_request_event"
+    - if: $CI_PIPELINE_SOURCE == "merge_request_event" || $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
       changes: [che/internal/packages/**/*, che/e2e/install_methods*]
       allow_failure: true
-    - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
-      changes: [che/internal/packages/**/*, che/e2e/install_methods*]
-      allow_failure: true
-    - if: $CI_PIPELINE_SOURCE == "merge_request_event"
-      when: manual
-      allow_failure: true
-    - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
+    - if: $CI_PIPELINE_SOURCE == "merge_request_event" || $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
       when: manual
       allow_failure: true
   script:
@@ -437,8 +431,6 @@ prerelease-darwin-che:
   rules:
     - if: $CI_PIPELINE_SOURCE == "merge_request_event"
       changes: [che/**/*, lib/**/*]
-      when: manual
-      allow_failure: true
   variables:
     MODULE_VERSION: 0.0.0-mr${CI_MERGE_REQUEST_IID}
     GOPATH: $CI_PROJECT_DIR/.cache/go-path
@@ -480,8 +472,6 @@ prerelease-linux-che:
   rules:
     - if: $CI_PIPELINE_SOURCE == "merge_request_event"
       changes: [che/**/*, lib/**/*]
-      when: manual
-      allow_failure: true
   variables:
     MODULE_VERSION: 0.0.0-mr${CI_MERGE_REQUEST_IID}
     ARCH: amd64

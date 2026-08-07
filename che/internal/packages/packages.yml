@@ -3,7 +3,6 @@ archNameConventions:
     go: {amd64: amd64, arm64: arm64}
     uname: {amd64: x86_64, arm64: aarch64}
     odd: {amd64: x86_64, arm64: arm64}
-    #[why] rust release triples, libc per BurntSushi's ripgrep assets: musl on amd64, gnu on arm64
     rust: {amd64: "x86_64-unknown-{os}-musl", arm64: "aarch64-unknown-{os}-gnu"}
 platforms:
     darwin-arm64: [brew, brew/cask, brew/vscode, prebuiltArchive, script, npm, go, gem, versionManager]
@@ -13,14 +12,11 @@ basePackages:
     common:
         - curl
         - git
+        - unzip
     apt:
         - apt-transport-https
         - ca-certificates
         - gnupg
-    prebuiltArchive:
-        - unzip
-    script:
-        - unzip
 packages:
     anthropic.claude-code:
         version: 2.1.224
@@ -39,7 +35,7 @@ packages:
                 url: https://awscli.amazonaws.com/awscli-exe-linux-{arch}-{version}.zip
                 archConvention: uname
                 platforms: [linux-amd64, linux-arm64]
-                bin: aws/dist/aws aws/dist/aws_completer
+                extractBinaries: [aws/dist/aws, aws/dist/aws_completer]
     az:
         version: __unversioned_latest__
         installMethods:
@@ -49,12 +45,12 @@ packages:
         version: __unversioned_latest__
         installMethods:
             - brew
-            - apt
-        #[why] debian renames the binary (bat is taken by bacula-console-qt): alias it back
-        command:
-            linux: batcat
-        aliasBinary:
-            batcat: bat
+            - apt:
+                packages:
+                    bat:
+                        #[why] debian renames the binary (bat is taken by bacula-console-qt): alias it back
+                        aliasBinary:
+                            batcat: bat
     bats:
         version: __unversioned_latest__
         installMethods:
@@ -94,7 +90,7 @@ packages:
                 url: https://gitlab.com/api/v4/projects/konradodwrot%2Fgo-modules/packages/generic/che/latest/che_latest_{os}_{arch}.tar.gz
                 archConvention: go
                 platforms: [darwin, linux]
-                bin: che render-tpl render-dirs-tree render-makefile-doc render-repo-group-index
+                extractBinaries: [che, render-tpl, render-dirs-tree, render-makefile-doc, render-repo-group-index]
             - script:
                 remoteUrl: https://konradodwrot.gitlab.io/go-modules/install.sh
     cilium:
@@ -104,7 +100,7 @@ packages:
             - prebuiltArchive:
                 url: https://github.com/cilium/cilium-cli/releases/download/v{version}/cilium-{os}-{arch}.tar.gz
                 archConvention: go
-                bin: cilium
+                extractBinaries: [cilium]
                 sha256:
                     linux-amd64: cd15e0983bf0acc7946cd05d453d1e58376ea92dec2642e745212df2b07d8852
                     linux-arm64: 9482937f14061fb239f2dbb2f97f4103de1b101f5d5defbff319f294f9bd540f
@@ -211,7 +207,10 @@ packages:
             - brew:
                 cask: gcloud-cli
     get-os-open-files-with:
-        - go: gitlab.com/konradodwrot/go-modules/get-os-open-files-with@latest
+        #[why] our own module: track its head rather than chase tags in this file
+        version: latest
+        installMethods:
+            - go: gitlab.com/konradodwrot/go-modules/get-os-open-files-with
     gh:
         version: __unversioned_latest__
         installMethods:
@@ -237,7 +236,7 @@ packages:
             - prebuiltArchive:
                 url: https://gitlab.com/gitlab-org/cli/-/releases/v{version}/downloads/glab_{version}_linux_{arch}.tar.gz
                 archConvention: go
-                bin: bin/glab
+                extractBinaries: [bin/glab]
                 sha256:
                     linux-amd64: f1c52907558b665f2032b615787d353cd06e54240b501a81f9489bfc8f6a8ebf
                     linux-arm64: 54a5fe7de0db23e34151c55e561c28e59e6ef6a7731f7d0ce8a00fa58cd8d8f8
@@ -258,7 +257,7 @@ packages:
             - prebuiltArchive:
                 url: https://go.dev/dl/go{version}.{os}-{arch}.tar.gz
                 archConvention: go
-                bin: go/bin/go go/bin/gofmt
+                extractBinaries: [go/bin/go, go/bin/gofmt]
                 platforms: [darwin-arm64, linux-amd64, linux-arm64]
     golang.go:
         version: 0.56.0
@@ -268,7 +267,7 @@ packages:
     gopls:
         version: 0.23.0
         installMethods:
-            - go: golang.org/x/tools/gopls@latest
+            - go: golang.org/x/tools/gopls
     goreleaser:
         version: 2.17.1
         installMethods:
@@ -276,7 +275,7 @@ packages:
             - prebuiltArchive:
                 url: https://github.com/goreleaser/goreleaser/releases/download/v{version}/goreleaser_Linux_{arch}.tar.gz
                 archConvention: odd
-                bin: goreleaser
+                extractBinaries: [goreleaser]
                 sha256:
                     linux-amd64: a99bbc7ae0d8d897b07c4c497a9b62f222558804715ef219d1af05a7e417bc80
                     linux-arm64: 702f03769ac8bcb0e47839c82243cc614ae995633599a98c63062e13ea85f829
@@ -299,7 +298,7 @@ packages:
         installMethods:
             - prebuiltArchive:
                 url: https://github.com/jaegertracing/jaeger/releases/download/v{version}/jaeger-{version}-darwin-arm64.tar.gz
-                bin: jaeger-{version}-darwin-arm64/jaeger
+                extractBinaries: ["jaeger-{version}-darwin-arm64/jaeger"]
                 sha256:
                     darwin-arm64: b2d21051b27f06535c288dd63e15a42d5aae653d0113695014d7e6b502736e5d
     jq:
@@ -354,7 +353,7 @@ packages:
             - prebuiltArchive:
                 url: https://github.com/ahmetb/kubectx/releases/download/v{version}/kubectx_v{version}_{os}_{arch}.tar.gz
                 archConvention: odd
-                bin: kubectx
+                extractBinaries: [kubectx]
                 platforms: [darwin-arm64, linux-amd64, linux-arm64]
     kubens:
         version: 0.11.0
@@ -366,7 +365,7 @@ packages:
             - prebuiltArchive:
                 url: https://github.com/ahmetb/kubectx/releases/download/v{version}/kubens_v{version}_{os}_{arch}.tar.gz
                 archConvention: odd
-                bin: kubens
+                extractBinaries: [kubens]
                 platforms: [darwin-arm64, linux-amd64, linux-arm64]
     lefthook:
         version: 2.1.10
@@ -473,12 +472,13 @@ packages:
     nvm:
         - script:
             remoteUrl: https://raw.githubusercontent.com/nvm-sh/nvm/v0.40.6/install.sh
-            #[why] the installer aborts unless it runs under bash
-            shell: /bin/bash
             env:
                 NVM_DIR: $XDG_CONFIG_HOME/nvm
+                #[why] the installer otherwise appends its bootstrap lines to ~/.zshrc, a che-managed
+                #   symlink into the configs repo; the zsh config sources nvm itself
                 PROFILE: /dev/null
-            creates: $XDG_CONFIG_HOME/nvm/nvm.sh
+            #[why] nvm is a sourced function, never a binary on PATH: this file marks it installed
+            validateArtifact: $XDG_CONFIG_HOME/nvm/nvm.sh
     ollama:
         version: __unversioned_latest__
         installMethods:
@@ -513,7 +513,7 @@ packages:
             - prebuiltArchive:
                 url: https://github.com/open-telemetry/opentelemetry-collector-releases/releases/download/v{version}/otelcol_{version}_{os}_{arch}.tar.gz
                 archConvention: go
-                bin: otelcol
+                extractBinaries: [otelcol]
                 sha256:
                     darwin-arm64: a4fc106889faa4ffcd43c062cc8fd14c1eff6d2f53bef64930b3199bd8303095
                     linux-amd64: 589da4823bca1e14f074c91e4d7f842548ee6d2662f0621cca57246bbe49e321
@@ -561,7 +561,7 @@ packages:
             - prebuiltArchive:
                 url: https://github.com/prometheus/prometheus/releases/download/v{version}/prometheus-{version}.{os}-{arch}.tar.gz
                 archConvention: go
-                bin: prometheus-{version}.{os}-{arch}/prometheus prometheus-{version}.{os}-{arch}/promtool
+                extractBinaries: ["prometheus-{version}.{os}-{arch}/prometheus", "prometheus-{version}.{os}-{arch}/promtool"]
                 sha256:
                     darwin-arm64: f68ca4f1dbedd6366bbfdd8ac5d2c0b7ba1f273474acc8d38eb33202fbeec7a4
     pstree:
@@ -620,7 +620,7 @@ packages:
             - prebuiltArchive:
                 url: https://github.com/BurntSushi/ripgrep/releases/download/{version}/ripgrep-{version}-{arch}.tar.gz
                 archConvention: rust
-                bin: ripgrep-{version}-{arch}/rg
+                extractBinaries: ["ripgrep-{version}-{arch}/rg"]
                 sha256:
                     linux-arm64: c827481c4ff4ea10c9dc7a4022c8de5db34a5737cb74484d62eb94a95841ab2f
                     linux-amd64: 4cf9f2741e6c465ffdb7c26f38056a59e2a2544b51f7cc128ef28337eeae4d8e
@@ -742,7 +742,7 @@ packages:
             - prebuiltArchive:
                 url: https://ziglang.org/download/{version}/zig-{arch}-linux-{version}.tar.xz
                 archConvention: uname
-                bin: zig-{arch}-linux-{version}/zig
+                extractBinaries: ["zig-{arch}-linux-{version}/zig"]
                 sha256:
                     darwin-amd64: 0387557ed1877bc6a2e1802c8391953baddba76081876301c522f52977b52ba7
                     darwin-arm64: b23d70deaa879b5c2d486ed3316f7eaa53e84acf6fc9cc747de152450d401489

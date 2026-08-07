@@ -116,10 +116,8 @@ func (in *Installer) output(argv []string) (string, bool) {
 }
 
 func (in *Installer) cmdFor(pkg string) string {
-	if e, ok := in.File.Packages[pkg]; ok && !e.Command.IsZero() {
-		if c := e.Command.For(in.Host.OS); c != "" {
-			return c
-		}
+	if e, ok := in.File.Packages[pkg]; ok && e.Command != "" {
+		return e.Command
 	}
 	return pkg
 }
@@ -186,7 +184,7 @@ func (in *Installer) InstallRequests(reqs []Request) error {
 					return err
 				}
 			}
-			if err := in.aliasBinaries(pkg, entry); err != nil {
+			if err := in.aliasBinaries(pkg, it); err != nil {
 				return err
 			}
 			if err := in.installCompletions(pkg, entry); err != nil {
@@ -510,9 +508,9 @@ func (in *Installer) aptUpdate() error {
 }
 
 func (in *Installer) installScript(pkg string, s *ScriptSpec) error {
-	if s.Creates != "" {
-		if fileExists(in.expandPath(s.Creates)) {
-			in.emitSkip(log.Levels.Debug, pkg, "already installed via script ("+s.Creates+" present)")
+	if s.ValidateArtifact != "" {
+		if fileExists(in.expandPath(s.ValidateArtifact)) {
+			in.emitSkip(log.Levels.Debug, pkg, "already installed via script ("+s.ValidateArtifact+" present)")
 			return nil
 		}
 	} else if in.hasCmd(pkg) {
@@ -526,9 +524,12 @@ func (in *Installer) installScript(pkg string, s *ScriptSpec) error {
 		in.emitDryRun("install", pkg+" via script")
 		return nil
 	}
-	argv, err := in.scriptArgv(pkg, s)
+	argv, cleanup, err := in.scriptArgv(pkg, s)
 	if err != nil {
 		return err
+	}
+	if cleanup != nil {
+		defer cleanup()
 	}
 	c := execx.Cmd{Argv: argv, Env: in.scriptEnv(pkg, s), Stdout: os.Stdout, Stderr: os.Stderr}
 	if err := execx.Default.Exec(c); err != nil {
@@ -558,14 +559,6 @@ func (in *Installer) scriptEnv(pkg string, s *ScriptSpec) []string {
 	return env
 }
 
-// [why] some vendor installers refuse a POSIX sh (nvm checks $BASH_VERSION), so the item may name its shell
-func scriptShell(s *ScriptSpec) string {
-	if s.Shell != "" {
-		return s.Shell
-	}
-	return "/bin/sh"
-}
-
 // [why] with -c the first trailing word becomes $0, so a placeholder keeps s.Args aligned to $1..
 func withScriptArgs(argv []string, s *ScriptSpec) []string {
 	if len(s.Args) == 0 {
@@ -574,16 +567,31 @@ func withScriptArgs(argv []string, s *ScriptSpec) []string {
 	return append(append(argv, "che-script"), s.Args...)
 }
 
-func (in *Installer) scriptArgv(pkg string, s *ScriptSpec) ([]string, error) {
+func (in *Installer) scriptArgv(pkg string, s *ScriptSpec) ([]string, func(), error) {
 	if s.Run != "" {
-		return withScriptArgs([]string{scriptShell(s), "-ec", s.Run}, s), nil
+		return withScriptArgs([]string{"/bin/sh", "-ec", s.Run}, s), nil, nil
 	}
+	// [why] the fetched script runs as a file so its shebang picks the interpreter (nvm insists on bash)
 	if s.URL != "" {
 		content, ok := in.output(curlArgv(s.URL))
 		if !ok || content == "" {
-			return nil, fmt.Errorf("%s: install script fetch failed: %s", pkg, s.URL)
+			return nil, nil, fmt.Errorf("%s: install script fetch failed: %s", pkg, s.URL)
 		}
-		return withScriptArgs([]string{scriptShell(s), "-ec", content}, s), nil
+		f, err := os.CreateTemp("", "che-script-*")
+		if err != nil {
+			return nil, nil, err
+		}
+		if _, err := f.WriteString(content); err != nil {
+			return nil, nil, err
+		}
+		if err := f.Chmod(0o755); err != nil {
+			return nil, nil, err
+		}
+		if err := f.Close(); err != nil {
+			return nil, nil, err
+		}
+		cleanup := func() { _ = os.Remove(f.Name()) }
+		return append([]string{f.Name()}, s.Args...), cleanup, nil
 	}
 	p := s.Path
 	if !filepath.IsAbs(p) && in.FilePath != BuiltinPath {
@@ -591,20 +599,24 @@ func (in *Installer) scriptArgv(pkg string, s *ScriptSpec) ([]string, error) {
 	}
 	if in.FilePath != BuiltinPath || filepath.IsAbs(p) {
 		if _, err := os.Stat(p); err == nil {
-			return append([]string{scriptShell(s), "-e", p}, s.Args...), nil
+			return append([]string{"/bin/sh", "-e", p}, s.Args...), nil, nil
 		}
 	}
 	// [why] only builtin entries reach the embedded scripts: a user file's missing script must
 	//   error, never silently run a same-named shipped one
 	if in.FilePath == BuiltinPath && !filepath.IsAbs(s.Path) {
 		if b, err := builtinScripts.ReadFile("scripts/" + path.Base(s.Path)); err == nil {
-			return withScriptArgs([]string{scriptShell(s), "-ec", string(b)}, s), nil
+			return withScriptArgs([]string{"/bin/sh", "-ec", string(b)}, s), nil, nil
 		}
 	}
-	return nil, fmt.Errorf("%s: install script not found: %s", pkg, s.Path)
+	return nil, nil, fmt.Errorf("%s: install script not found: %s", pkg, p)
 }
 
+// [why] go install demands a version suffix: an unpinned entry tracks the module's latest
 func (in *Installer) goInstall(pkg, module string) error {
+	if !strings.Contains(module, "@") {
+		module += "@latest"
+	}
 	c := execx.Cmd{
 		Argv:   []string{"go", "install", module},
 		Env:    append(os.Environ(), "PATH="+in.userBinDir()+":"+in.Host.Getenv("PATH")),

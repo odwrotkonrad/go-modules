@@ -237,7 +237,7 @@ func TestInstallScriptRemoteUrlFetchesAndRuns(t *testing.T) {
 	calls := m.Calls()
 	require.Contains(t, calls[0], "curl -fsSL")
 	require.Contains(t, calls[0], "https://example.com/install.sh")
-	require.Contains(t, calls[1], "/bin/sh -ec echo installing")
+	require.Contains(t, calls[1], "che-script-")
 	require.Contains(t, m.Envs()[1], "NONINTERACTIVE=1")
 }
 
@@ -269,7 +269,7 @@ func TestInstallScriptUrlFetchesAndRuns(t *testing.T) {
 	calls := m.Calls()
 	require.Len(t, calls, 2)
 	require.Contains(t, calls[0], "curl -fsSL")
-	require.Equal(t, "/bin/sh -ec echo fetched", calls[1])
+	require.Contains(t, calls[1], "che-script-")
 }
 
 func TestInstallScriptUrlFetchFailureAborts(t *testing.T) {

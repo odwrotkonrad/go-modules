@@ -13,7 +13,7 @@ import (
 )
 
 func (in *Installer) installAptSpec(pkg string, a *AptSpec) error {
-	pkgs := a.Packages
+	pkgs := a.Packages.Names
 	if len(pkgs) == 0 {
 		pkgs = []string{pkg}
 	}

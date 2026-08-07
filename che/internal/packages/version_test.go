@@ -11,7 +11,6 @@ import (
 	"github.com/stretchr/testify/require"
 	"gopkg.in/yaml.v3"
 
-	"gitlab.com/konradodwrot/go-modules/che/internal/execx"
 	"gitlab.com/konradodwrot/go-modules/lib/testyml"
 )
 
@@ -90,7 +89,7 @@ func TestArchiveWithoutVersionNeedsNoPin(t *testing.T) {
     - prebuiltArchive:
         url: https://example.com/aws-latest.zip
         platforms: [linux-amd64]
-        bin: aws/dist/aws
+        extractBinaries: [aws/dist/aws]
 `
 	in, m := newInstaller(t, y, "linux", cmdMap(nil), Options{})
 	require.NoError(t, in.Install([]string{"aws"}))
@@ -175,33 +174,17 @@ func TestUnversionedLatestSentinelNotUsedAsArchiveVersion(t *testing.T) {
 	require.ErrorContains(t, in.Install([]string{"kind"}), "no version pinned")
 }
 
-func TestPerOsCommandResolvesHostBinary(t *testing.T) {
-	const y = `packages:
-  bat:
-    version: __unversioned_latest__
-    installMethods: [brew, apt]
-    command:
-      linux: batcat
-`
-	in, m := newInstaller(t, y, "linux", cmdMap([]string{"apt-get", "batcat"}), Options{})
-	require.NoError(t, in.Install([]string{"bat"}))
-	require.NotContains(t, strings.Join(m.Calls(), "\n"), "apt-get install")
-
-	mac, mm := newInstaller(t, y, "darwin", cmdMap([]string{"brew"}), Options{})
-	mm.Stub = failOn("brew list")
-	require.NoError(t, mac.Install([]string{"bat"}))
-	require.Contains(t, strings.Join(mm.Calls(), "\n"), "brew install bat")
-}
-
 func TestAliasBinaryLinksRenamedBinary(t *testing.T) {
 	const y = `packages:
   bat:
     version: __unversioned_latest__
-    installMethods: [brew, apt]
-    command:
-      linux: batcat
-    aliasBinary:
-      batcat: bat
+    installMethods:
+      - brew
+      - apt:
+          packages:
+            bat:
+              aliasBinary:
+                batcat: bat
 `
 	cmds := cmdMap([]string{"apt-get"})
 	in, m := newInstaller(t, y, "linux", cmds, Options{})
@@ -225,9 +208,12 @@ func TestAliasBinarySkippedWhenSourceAbsent(t *testing.T) {
 	const y = `packages:
   bat:
     version: __unversioned_latest__
-    installMethods: [brew]
-    aliasBinary:
-      batcat: bat
+    installMethods:
+      - apt:
+          packages:
+            bat:
+              aliasBinary:
+                batcat: bat
 `
 	in, m := newInstaller(t, y, "darwin", cmdMap([]string{"brew", "bat"}), Options{})
 	require.NoError(t, in.Install([]string{"bat"}))
@@ -252,7 +238,8 @@ func TestPostInstallRunsOnFreshInstallOnly(t *testing.T) {
 	}
 	require.NoError(t, in.Install([]string{"kitty"}))
 	calls := strings.Join(m.Calls(), "\n")
-	require.Contains(t, calls, "-ec echo installing\n che-script launch=n")
+	require.Contains(t, calls, "che-script-")
+	require.Contains(t, calls, " launch=n")
 	require.Contains(t, calls, `ln -fs /Applications/kitty.app/Contents/MacOS/kitty "$HOME/.local/bin/kitty"`)
 
 	present, mp := newInstaller(t, y, "darwin", cmdMap([]string{"kitty"}), Options{})
@@ -282,6 +269,8 @@ func TestPostInstallShippedScriptResolves(t *testing.T) {
 	require.Contains(t, calls, `ln -fs "$app/MacOS/kitten" "$bin/kitten"`)
 	require.Contains(t, calls, `ln -fs "$app/MacOS/kitty" "$bin/kitty"`)
 }
+
+// [>] 🤖🤖
 
 type scriptPathsGot struct {
 	Items       []string `yaml:"items"`
@@ -313,15 +302,10 @@ func TestResolveScriptPaths(t *testing.T) {
 }
 
 func TestUserFileScriptNeverFallsBackToBuiltin(t *testing.T) {
-	dir := t.TempDir()
 	yml := "packages:\n  kitty:\n    installMethods: [{script: {path: scripts/post-install-kitty.sh}}]\n"
-	require.NoError(t, os.WriteFile(filepath.Join(dir, "packages.yml"), []byte(yml), 0o644))
-	f, err := Load(filepath.Join(dir, "packages.yml"))
-	require.NoError(t, err)
-	in := &Installer{File: f, FilePath: filepath.Join(dir, "packages.yml"), Host: testHost("darwin", "amd64", cmdMap(nil))}
-	m := &execx.Mock{}
-	execx.Swap(t, m)
-	err = in.Install([]string{"kitty"})
+	in, m := newInstaller(t, yml, "darwin", cmdMap(nil), Options{})
+	in.FilePath = filepath.Join(t.TempDir(), "packages.yml")
+	err := in.Install([]string{"kitty"})
 	require.ErrorContains(t, err, "install script not found")
 	require.NotContains(t, strings.Join(m.Calls(), "\n"), "kitty.app")
 }
@@ -336,12 +320,74 @@ func TestOverrideAnchoredScriptRuns(t *testing.T) {
 	require.NoError(t, err)
 	o.ResolveScriptPaths(dir)
 
+	in, m := newInstaller(t, "packages: {}", "darwin", cmdMap(nil), Options{})
 	base, err := LoadBuiltin()
 	require.NoError(t, err)
 	base.Merge(o)
-	in := &Installer{File: base, FilePath: BuiltinPath, Host: testHost("darwin", "amd64", cmdMap(nil))}
-	m := &execx.Mock{}
-	execx.Swap(t, m)
+	in.File, in.FilePath = base, BuiltinPath
 	require.NoError(t, in.Install([]string{"mytool"}))
 	require.Contains(t, strings.Join(m.Calls(), "\n"), filepath.Join(dir, "scripts", "my-post.sh"))
+}
+
+// [<] 🤖🤖
+
+func TestGoModulePinsFromEntryVersion(t *testing.T) {
+	const y = `packages:
+  gopls:
+    version: 0.23.0
+    installMethods:
+      - go: golang.org/x/tools/gopls
+`
+	in, m := newInstaller(t, y, "darwin", cmdMap([]string{"go"}), Options{})
+	require.NoError(t, in.Install([]string{"gopls"}))
+	require.Contains(t, strings.Join(m.Calls(), "\n"), "go install golang.org/x/tools/gopls@v0.23.0")
+}
+
+func TestAptPackagesAcceptListAndMapForms(t *testing.T) {
+	const y = `packages:
+  listform:
+    installMethods: [{apt: {packages: [a, b]}}]
+  mapform:
+    installMethods:
+      - apt:
+          packages:
+            a: {}
+            b:
+              aliasBinary: {bcat: b}
+`
+	var f File
+	require.NoError(t, yaml.Unmarshal([]byte(y), &f))
+	require.Equal(t, []string{"a", "b"}, f.Packages["listform"].Items[0].Apt.Packages.Names)
+	require.Empty(t, f.Packages["listform"].Items[0].AliasBinary)
+
+	m := f.Packages["mapform"].Items[0]
+	require.Equal(t, []string{"a", "b"}, m.Apt.Packages.Names)
+	require.Equal(t, map[string]string{"bcat": "b"}, m.AliasBinary)
+}
+
+func TestVersionLatestTracksModuleHead(t *testing.T) {
+	const y = `packages:
+  mytool:
+    version: latest
+    installMethods:
+      - go: example.com/mytool
+`
+	in, m := newInstaller(t, y, "darwin", cmdMap([]string{"go"}), Options{})
+	require.NoError(t, in.Install([]string{"mytool"}))
+	calls := strings.Join(m.Calls(), "\n")
+	require.Contains(t, calls, "go install example.com/mytool@latest")
+	require.NotContains(t, calls, "@vlatest")
+}
+
+func TestVersionLatestSkipsDriftChecks(t *testing.T) {
+	const y = `packages:
+  mytool:
+    version: latest
+    installMethods: [brew]
+`
+	in, m := newInstaller(t, y, "darwin", cmdMap([]string{"brew", "mytool"}), Options{})
+	require.NoError(t, in.Install([]string{"mytool"}))
+	calls := strings.Join(m.Calls(), "\n")
+	require.NotContains(t, calls, "brew install")
+	require.NotContains(t, calls, "brew upgrade")
 }
