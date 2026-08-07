@@ -227,3 +227,52 @@ func TestAliasBinarySkippedWhenSourceAbsent(t *testing.T) {
 	require.NoError(t, in.Install([]string{"bat"}))
 	require.NotContains(t, strings.Join(m.Calls(), "\n"), "ln -sf")
 }
+
+func TestPostInstallRunsOnFreshInstallOnly(t *testing.T) {
+	const y = `packages:
+  kitty:
+    installMethods:
+      - script:
+          remoteUrl: https://example.com/installer.sh
+          args: [launch=n]
+    postInstall: ln -fs /Applications/kitty.app/Contents/MacOS/kitty "$HOME/.local/bin/kitty"
+`
+	in, m := newInstaller(t, y, "darwin", cmdMap(nil), Options{})
+	m.Stub = func(argv []string) ([]byte, error) {
+		if argv[0] == "curl" {
+			return []byte("echo installing\n"), nil
+		}
+		return nil, nil
+	}
+	require.NoError(t, in.Install([]string{"kitty"}))
+	calls := strings.Join(m.Calls(), "\n")
+	require.Contains(t, calls, "-ec echo installing\n che-script launch=n")
+	require.Contains(t, calls, `ln -fs /Applications/kitty.app/Contents/MacOS/kitty "$HOME/.local/bin/kitty"`)
+
+	present, mp := newInstaller(t, y, "darwin", cmdMap([]string{"kitty"}), Options{})
+	require.NoError(t, present.Install([]string{"kitty"}))
+	require.NotContains(t, strings.Join(mp.Calls(), "\n"), "ln -fs")
+}
+
+func TestPostInstallShippedScriptResolves(t *testing.T) {
+	const y = `packages:
+  kitty:
+    installMethods:
+      - script:
+          remoteUrl: https://example.com/installer.sh
+    postInstall:
+      path: scripts/post-install-kitty.sh
+`
+	in, m := newInstaller(t, y, "darwin", cmdMap(nil), Options{})
+	in.FilePath = BuiltinPath
+	m.Stub = func(argv []string) ([]byte, error) {
+		if argv[0] == "curl" {
+			return []byte("echo installing\n"), nil
+		}
+		return nil, nil
+	}
+	require.NoError(t, in.Install([]string{"kitty"}))
+	calls := strings.Join(m.Calls(), "\n")
+	require.Contains(t, calls, `ln -fs "$app/MacOS/kitten" "$bin/kitten"`)
+	require.Contains(t, calls, `ln -fs "$app/MacOS/kitty" "$bin/kitty"`)
+}

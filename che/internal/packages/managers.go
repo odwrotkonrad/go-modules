@@ -177,8 +177,14 @@ func (in *Installer) InstallRequests(reqs []Request) error {
 				continue
 			}
 			progress = true
+			had := in.hasCmd(pkg)
 			if err := in.installVia(pkg, it); err != nil {
 				return err
+			}
+			if !had {
+				if err := in.runEntryPostInstall(pkg, entry); err != nil {
+					return err
+				}
 			}
 			if err := in.aliasBinaries(pkg, entry); err != nil {
 				return err
@@ -560,16 +566,24 @@ func scriptShell(s *ScriptSpec) string {
 	return "/bin/sh"
 }
 
+// [why] with -c the first trailing word becomes $0, so a placeholder keeps s.Args aligned to $1..
+func withScriptArgs(argv []string, s *ScriptSpec) []string {
+	if len(s.Args) == 0 {
+		return argv
+	}
+	return append(append(argv, "che-script"), s.Args...)
+}
+
 func (in *Installer) scriptArgv(pkg string, s *ScriptSpec) ([]string, error) {
 	if s.Run != "" {
-		return []string{scriptShell(s), "-ec", s.Run}, nil
+		return withScriptArgs([]string{scriptShell(s), "-ec", s.Run}, s), nil
 	}
 	if s.URL != "" {
 		content, ok := in.output(curlArgv(s.URL))
 		if !ok || content == "" {
 			return nil, fmt.Errorf("%s: install script fetch failed: %s", pkg, s.URL)
 		}
-		return []string{scriptShell(s), "-ec", content}, nil
+		return withScriptArgs([]string{scriptShell(s), "-ec", content}, s), nil
 	}
 	p := s.Path
 	if !filepath.IsAbs(p) && in.FilePath != BuiltinPath {
@@ -577,8 +591,11 @@ func (in *Installer) scriptArgv(pkg string, s *ScriptSpec) ([]string, error) {
 	}
 	if in.FilePath != BuiltinPath || filepath.IsAbs(p) {
 		if _, err := os.Stat(p); err == nil {
-			return []string{scriptShell(s), "-e", p}, nil
+			return append([]string{scriptShell(s), "-e", p}, s.Args...), nil
 		}
+	}
+	if b, err := builtinScripts.ReadFile("scripts/" + path.Base(s.Path)); err == nil {
+		return withScriptArgs([]string{scriptShell(s), "-ec", string(b)}, s), nil
 	}
 	return nil, fmt.Errorf("%s: install script not found: %s", pkg, s.Path)
 }

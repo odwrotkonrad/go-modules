@@ -81,6 +81,7 @@ che
         spec
           funcs
     packages
+      scripts
       testdata
         spec
           funcs

@@ -3,6 +3,8 @@ archNameConventions:
     go: {amd64: amd64, arm64: arm64}
     uname: {amd64: x86_64, arm64: aarch64}
     odd: {amd64: x86_64, arm64: arm64}
+    #[why] rust release triples, libc per BurntSushi's ripgrep assets: musl on amd64, gnu on arm64
+    rust: {amd64: "x86_64-unknown-{os}-musl", arm64: "aarch64-unknown-{os}-gnu"}
 platforms:
     darwin-arm64: [brew, brew/cask, brew/vscode, prebuiltArchive, script, npm, go, gem, versionManager]
     linux-amd64: [apt, prebuiltArchive, script, npm, go, gem, versionManager]
@@ -123,6 +125,8 @@ packages:
                 cask: visual-studio-code
     codex:
         version: 0.147.0
+        requires:
+            - ruby
         completions:
             zsh:
                 cmd: codex completion zsh
@@ -316,6 +320,16 @@ packages:
                 sha256:
                     linux-amd64: 50030de23cf40a18505f20426f6a8506bedf13c6e509244bd1fa9463721b0f54
                     linux-arm64: b92cd615e97585de8ddade28ed5cd7feb4248d717c233eea5b03c37298900f5d
+    kitty:
+        version: __unversioned_latest__
+        installMethods:
+            - script:
+                os: darwin
+                remoteUrl: https://sw.kovidgoyal.net/kitty/installer.sh
+                args: [launch=n]
+        #[why] the installer only drops kitty.app: without the links the binary never reaches PATH
+        postInstall:
+            path: scripts/post-install-kitty.sh
     kubectl:
         version: 1.36.3
         completions:
@@ -465,6 +479,14 @@ packages:
                 NVM_DIR: $XDG_CONFIG_HOME/nvm
                 PROFILE: /dev/null
             creates: $XDG_CONFIG_HOME/nvm/nvm.sh
+    ollama:
+        version: __unversioned_latest__
+        installMethods:
+            - brew:
+                cask: ollama
+            - script:
+                os: linux
+                remoteUrl: https://ollama.com/install.sh
     op:
         version: __unversioned_latest__
         installMethods:
@@ -588,13 +610,20 @@ packages:
             - brew:
                 vscode: redhat.vscode-yaml
     rg:
-        version: __unversioned_latest__
+        version: 14.1.1
         completions:
             zsh:
                 cmd: rg --generate=complete-zsh
         installMethods:
             - brew: ripgrep
-            - apt: ripgrep
+            #[why] not apt: bookworm ships ripgrep 13.x; the arch token carries the whole rust target triple
+            - prebuiltArchive:
+                url: https://github.com/BurntSushi/ripgrep/releases/download/{version}/ripgrep-{version}-{arch}.tar.gz
+                archConvention: rust
+                bin: ripgrep-{version}-{arch}/rg
+                sha256:
+                    linux-arm64: c827481c4ff4ea10c9dc7a4022c8de5db34a5737cb74484d62eb94a95841ab2f
+                    linux-amd64: 4cf9f2741e6c465ffdb7c26f38056a59e2a2544b51f7cc128ef28337eeae4d8e
     ruby:
         version: __unversioned_latest__
         installMethods:

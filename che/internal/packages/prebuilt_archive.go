@@ -94,7 +94,7 @@ func (in *Installer) archFor(convention string) (string, error) {
 		return in.Host.Arch, nil
 	}
 	if v, ok := in.File.archNameConventionsOrBuiltin()[convention][in.Host.Arch]; ok {
-		return v, nil
+		return strings.ReplaceAll(v, "{os}", in.Host.OS), nil
 	}
 	return "", fmt.Errorf("unknown archConvention %q for arch %s (declare it under archNameConventions)", convention, in.Host.Arch)
 }

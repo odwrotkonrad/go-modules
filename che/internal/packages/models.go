@@ -3,7 +3,7 @@ package packages
 // [>] 🤖🤖🤖
 
 import (
-	_ "embed"
+	"embed"
 	"fmt"
 	"maps"
 	"os"
@@ -18,6 +18,9 @@ import (
 
 //go:embed packages.yml
 var builtinPackages []byte
+
+//go:embed all:scripts
+var builtinScripts embed.FS
 
 const BuiltinPath = "builtin packages.yml"
 
@@ -68,6 +71,7 @@ type Entry struct {
 	Requires       []string
 	Command        Command
 	AliasBinary    map[string]string
+	PostInstall    *ScriptSpec
 	VersionCommand string
 	Completions    Completions
 }
@@ -138,7 +142,7 @@ func (it Item) MarshalYAML() (any, error) {
 }
 
 func (e Entry) MarshalYAML() (any, error) {
-	if e.Version == "" && len(e.Requires) == 0 && len(e.AliasBinary) == 0 && e.Command.IsZero() && e.VersionCommand == "" && e.Completions.Zsh == nil {
+	if e.Version == "" && len(e.Requires) == 0 && len(e.AliasBinary) == 0 && e.PostInstall == nil && e.Command.IsZero() && e.VersionCommand == "" && e.Completions.Zsh == nil {
 		return e.Items, nil
 	}
 	obj := map[string]any{"installMethods": e.Items}
@@ -150,6 +154,9 @@ func (e Entry) MarshalYAML() (any, error) {
 	}
 	if len(e.AliasBinary) > 0 {
 		obj["aliasBinary"] = e.AliasBinary
+	}
+	if e.PostInstall != nil {
+		obj["postInstall"] = e.PostInstall
 	}
 	if !e.Command.IsZero() {
 		obj["command"] = e.Command
@@ -225,6 +232,7 @@ func (e *Entry) UnmarshalYAML(node *yaml.Node) error {
 		Version        string            `yaml:"version"`
 		Requires       []string          `yaml:"requires"`
 		AliasBinary    map[string]string `yaml:"aliasBinary"`
+		PostInstall    *ScriptSpec       `yaml:"postInstall"`
 		Command        Command           `yaml:"command"`
 		VersionCommand string            `yaml:"versionCommand"`
 		Completions    Completions       `yaml:"completions"`
@@ -243,6 +251,7 @@ func (e *Entry) UnmarshalYAML(node *yaml.Node) error {
 	e.Requires = obj.Requires
 	e.AliasBinary = obj.AliasBinary
 	e.Command = obj.Command
+	e.PostInstall = obj.PostInstall
 	e.VersionCommand = obj.VersionCommand
 	e.Completions = obj.Completions
 	return nil
@@ -275,9 +284,19 @@ type AptRepoSpec struct {
 	Components string `yaml:"components,omitempty"`
 }
 
+func (s *ScriptSpec) UnmarshalYAML(node *yaml.Node) error {
+	if node.Kind == yaml.ScalarNode {
+		s.Run = node.Value
+		return nil
+	}
+	type plain ScriptSpec
+	return node.Decode((*plain)(s))
+}
+
 type ScriptSpec struct {
 	Run     string            `yaml:"run,omitempty"`
 	Shell   string            `yaml:"shell,omitempty"`
+	Args    []string          `yaml:"args,omitempty"`
 	Path    string            `yaml:"path,omitempty"`
 	URL     string            `yaml:"remoteUrl,omitempty"`
 	OS      string            `yaml:"os,omitempty"`
