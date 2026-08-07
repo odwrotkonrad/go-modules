@@ -170,7 +170,8 @@ test-install-methods-linux:
     matrix:
       - METHOD: [apt, prebuiltArchive, script, versionManager, npm, go]
   before_script:
-    - apt-get update && apt-get install -y --no-install-recommends ca-certificates curl git make sudo build-essential zlib1g-dev libssl-dev libreadline-dev libbz2-dev libffi-dev liblzma-dev libsqlite3-dev
+    #[why] bootstrap minimum only: zsh + clang run the Makefile itself, the rest installs through basePackages and each package's requires
+    - apt-get update && apt-get install -y --no-install-recommends ca-certificates curl make sudo zsh clang
     - curl -fsSL https://go.dev/dl/go1.26.4.linux-amd64.tar.gz | tar -xz -C /usr/local
     - export PATH=/usr/local/go/bin:$PATH
 

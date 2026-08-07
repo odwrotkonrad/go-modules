@@ -552,11 +552,11 @@ func (o ProfileOptions) Over(spec Options) ProfileOptions {
 	if len(o.Packages.Completions.Zsh.InstallDestinationCandidates) == 0 {
 		o.Packages.Completions.Zsh.InstallDestinationCandidates = spec.Packages.Completions.Zsh.InstallDestinationCandidates
 	}
-	if o.Packages.Completions.Zsh.CheckInFpath == nil {
-		o.Packages.Completions.Zsh.CheckInFpath = spec.Packages.Completions.Zsh.CheckInFpath
+	if o.Packages.Completions.Zsh.CheckPresentOnFpath == nil {
+		o.Packages.Completions.Zsh.CheckPresentOnFpath = spec.Packages.Completions.Zsh.CheckPresentOnFpath
 	}
-	if o.Packages.PrebuiltArchive.CheckInPath == nil {
-		o.Packages.PrebuiltArchive.CheckInPath = spec.Packages.PrebuiltArchive.CheckInPath
+	if o.Packages.PrebuiltArchive.CheckPresentOnPath == nil {
+		o.Packages.PrebuiltArchive.CheckPresentOnPath = spec.Packages.PrebuiltArchive.CheckPresentOnPath
 	}
 	return o
 }
@@ -589,11 +589,11 @@ func (o ProfileOptions) OverRef(entry ProfileOptions) ProfileOptions {
 	if len(entry.Packages.Completions.Zsh.InstallDestinationCandidates) > 0 {
 		o.Packages.Completions.Zsh.InstallDestinationCandidates = entry.Packages.Completions.Zsh.InstallDestinationCandidates
 	}
-	if entry.Packages.Completions.Zsh.CheckInFpath != nil {
-		o.Packages.Completions.Zsh.CheckInFpath = entry.Packages.Completions.Zsh.CheckInFpath
+	if entry.Packages.Completions.Zsh.CheckPresentOnFpath != nil {
+		o.Packages.Completions.Zsh.CheckPresentOnFpath = entry.Packages.Completions.Zsh.CheckPresentOnFpath
 	}
-	if entry.Packages.PrebuiltArchive.CheckInPath != nil {
-		o.Packages.PrebuiltArchive.CheckInPath = entry.Packages.PrebuiltArchive.CheckInPath
+	if entry.Packages.PrebuiltArchive.CheckPresentOnPath != nil {
+		o.Packages.PrebuiltArchive.CheckPresentOnPath = entry.Packages.PrebuiltArchive.CheckPresentOnPath
 	}
 	return o
 }

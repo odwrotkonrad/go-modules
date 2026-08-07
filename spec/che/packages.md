@@ -28,9 +28,9 @@ Scenario: a user steers method selection with preferred installation methods
 Scenario: a user relocates prebuiltArchive installs and knows when the target is off PATH
   Status: tested
   When `packages.prebuiltArchive.installDestinationCandidates` is set (user config, spec options, profile options, or CHE_PACKAGES_PREBUILT_ARCHIVE_INSTALL_DESTINATION_CANDIDATES; scalar or list, ~/ and $VARs expand; default ~/.local/bin)
-  Then with `checkInPath` (default true) the first candidate found on PATH becomes the install destination
+  Then with `checkPresentOnPath` (default true) the first candidate found on PATH becomes the install destination
   And when no candidate is on PATH a warning lists them once per run and the first entry is used
-  And `checkInPath: false` skips the PATH probe and always uses the first entry
+  And `checkPresentOnPath: false` skips the PATH probe and always uses the first entry
 
 Scenario: a user lists managers in preference order and the first applicable one wins
   Status: tested
@@ -64,15 +64,16 @@ Scenario: an installed package is left alone by default, no surprise updates
 Scenario: a version pin converges the host on exactly that version, downgrades included
   Status: tested
   When a version is specified (entry-level or spec-level `version:`) and the installed version differs
-  Then install reinstalls to match the pin: npm installs `name@<pin>`, apt installs `name=<pin>`, other managers run their update path
+  Then install reinstalls to match the pin: npm installs `name@<pin>`, apt installs `name=<pin>`, go installs `module@v<pin>`, gem installs `-v <pin>`; unpinnable managers run their update path
   And embedded pins in item names (npm `name@ver`, apt `name=ver`) are parse errors naming the version field
 
-Scenario: an entry-level version with wildcards guards any package's installed version
+Scenario: an entry-level version guards any package's installed version
   Status: tested
-  When an entry sets `version:` (exact or wildcarded: `1.*`, `1.1.*`, `0.12.*`)
-  Then it overrides the item-level pin for the drift check, matched against whole version tokens of the probe output (`1.*` never matches `11.2`)
+  When an entry sets an exact `version:`
+  Then it overrides the item-level pin for the drift check, matched against whole version tokens of the probe output
+  And a prebuiltArchive item whose url or bin uses `{version}` requires a pinned version: entry or item `version:`, or a requested one; none is a hard error
   And a manager-installed package drifting from the pin runs the manager's update path; check-upgradable warns while drifted
-  And entries whose manager ships one recent version stay unpinned by convention; the builtin pins only its version-distributing entries (archives, scripts, versionManager)
+  And entries whose manager ships one recent version stay unpinned by convention; the builtin pins every version-distributing entry (archives, scripts, versionManager, npm/gem/go tools)
 
 Scenario: a user refreshes everything with one flag
   Status: tested

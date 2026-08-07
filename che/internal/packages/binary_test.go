@@ -196,7 +196,7 @@ func TestInstallBinaryCustomDestination(t *testing.T) {
 
 func TestInstallBinaryPicksFirstCandidateOnPath(t *testing.T) {
 	in, m := newInstaller(t, kindYaml, "linux", cmdMap([]string{"sha256sum"}),
-		Options{PrebuiltArchiveDestinationCandidates: []string{"/custom/bin", "~/bin"}, PrebuiltArchiveCheckInPath: true})
+		Options{PrebuiltArchiveDestinationCandidates: []string{"/custom/bin", "~/bin"}, PrebuiltArchiveCheckPresentOnPath: true})
 	in.Host.PathDirs = func() []string { return []string{"/usr/bin", "/home/u/bin"} }
 	m.Stub = shaStub("goodsha")
 	out, err := captureStdout(t, func() error { return in.Install([]string{"kind"}) })
@@ -207,7 +207,7 @@ func TestInstallBinaryPicksFirstCandidateOnPath(t *testing.T) {
 
 func TestInstallBinaryWarnsWhenNoCandidateOnPath(t *testing.T) {
 	in, m := newInstaller(t, kindYaml, "linux", cmdMap([]string{"sha256sum"}),
-		Options{PrebuiltArchiveDestinationCandidates: []string{"/custom/bin", "/other/bin"}, PrebuiltArchiveCheckInPath: true})
+		Options{PrebuiltArchiveDestinationCandidates: []string{"/custom/bin", "/other/bin"}, PrebuiltArchiveCheckPresentOnPath: true})
 	in.Host.PathDirs = func() []string { return []string{"/usr/bin"} }
 	m.Stub = shaStub("goodsha")
 	out, err := captureStdout(t, func() error { return in.Install([]string{"kind"}) })
@@ -216,7 +216,7 @@ func TestInstallBinaryWarnsWhenNoCandidateOnPath(t *testing.T) {
 	require.Contains(t, strings.Join(m.Calls(), "\n"), "/custom/bin/kind")
 }
 
-func TestInstallPrebuiltArchiveCheckInPathOffUsesFirstCandidate(t *testing.T) {
+func TestInstallPrebuiltArchiveCheckPresentOnPathOffUsesFirstCandidate(t *testing.T) {
 	in, m := newInstaller(t, kindYaml, "linux", cmdMap([]string{"sha256sum"}),
 		Options{PrebuiltArchiveDestinationCandidates: []string{"/custom/bin", "~/bin"}})
 	in.Host.PathDirs = func() []string { return []string{"/home/u/bin"} }

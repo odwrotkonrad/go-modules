@@ -167,7 +167,7 @@ func (in *Installer) userBinDir() string {
 		expanded[i] = in.expandPath(c)
 	}
 	in.binDir = expanded[0]
-	if in.Opts.PrebuiltArchiveCheckInPath {
+	if in.Opts.PrebuiltArchiveCheckPresentOnPath {
 		onPath := slices.IndexFunc(expanded, func(d string) bool { return slices.Contains(in.Host.PathDirs(), d) })
 		if onPath >= 0 {
 			in.binDir = expanded[onPath]

@@ -126,7 +126,7 @@ func TestCompletionsDirPicksFpathCandidate(t *testing.T) {
 	in, m := newInstaller(t, goCompYaml, "linux", cmdMap([]string{"sha256sum"}),
 		completionsOpts(Options{
 			CompletionsDestinationCandidates: []string{"/off/fpath", "/on/fpath"},
-			CompletionsCheckInFpath:          true,
+			CompletionsCheckPresentOnFpath:   true,
 		}))
 	in.Host.FpathDirs = func() []string { return []string{"/on/fpath"} }
 	m.Stub = shaStub("goodsha")
@@ -138,7 +138,7 @@ func TestCompletionsDirWarnsWhenNoneOnFpath(t *testing.T) {
 	in, m := newInstaller(t, goCompYaml, "linux", cmdMap([]string{"sha256sum"}),
 		completionsOpts(Options{
 			CompletionsDestinationCandidates: []string{"/off/fpath"},
-			CompletionsCheckInFpath:          true,
+			CompletionsCheckPresentOnFpath:   true,
 		}))
 	in.Host.FpathDirs = func() []string { return []string{"/elsewhere"} }
 	m.Stub = shaStub("goodsha")

@@ -74,10 +74,10 @@ func NewPackagesInstaller(env map[string]string, home string, opts options.Optio
 			DryRun:                               opts.DryRun != options.DryRun.Off,
 			PreferredMethods:                     opts.PackagesPreferredMethods,
 			PrebuiltArchiveDestinationCandidates: opts.PackagesPrebuiltArchiveDestinationCandidates,
-			PrebuiltArchiveCheckInPath:           opts.PackagesPrebuiltArchiveCheckInPath,
+			PrebuiltArchiveCheckPresentOnPath:    opts.PackagesPrebuiltArchiveCheckPresentOnPath,
 			CompletionsEnabled:                   opts.PackagesCompletionsEnabled,
 			CompletionsDestinationCandidates:     opts.PackagesCompletionsDestinationCandidates,
-			CompletionsCheckInFpath:              opts.PackagesCompletionsCheckInFpath,
+			CompletionsCheckPresentOnFpath:       opts.PackagesCompletionsCheckPresentOnFpath,
 		},
 	}, nil
 }
@@ -104,8 +104,8 @@ func (p *ProfileReady) newInstaller() (*packages.Installer, error) {
 	if d := p.Options.Packages.PrebuiltArchive.InstallDestinationCandidates; len(d) > 0 {
 		opts.PackagesPrebuiltArchiveDestinationCandidates = d
 	}
-	if c := p.Options.Packages.PrebuiltArchive.CheckInPath; c != nil {
-		opts.PackagesPrebuiltArchiveCheckInPath = *c
+	if c := p.Options.Packages.PrebuiltArchive.CheckPresentOnPath; c != nil {
+		opts.PackagesPrebuiltArchiveCheckPresentOnPath = *c
 	}
 	if e := p.Options.Packages.Completions.Zsh.Enabled; e != nil {
 		opts.PackagesCompletionsEnabled = *e
@@ -113,8 +113,8 @@ func (p *ProfileReady) newInstaller() (*packages.Installer, error) {
 	if d := p.Options.Packages.Completions.Zsh.InstallDestinationCandidates; len(d) > 0 {
 		opts.PackagesCompletionsDestinationCandidates = d
 	}
-	if c := p.Options.Packages.Completions.Zsh.CheckInFpath; c != nil {
-		opts.PackagesCompletionsCheckInFpath = *c
+	if c := p.Options.Packages.Completions.Zsh.CheckPresentOnFpath; c != nil {
+		opts.PackagesCompletionsCheckPresentOnFpath = *c
 	}
 	in, err := NewPackagesInstaller(p.env, p.home, opts)
 	if err != nil {

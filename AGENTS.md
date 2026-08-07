@@ -236,6 +236,9 @@ che
   e2e
     fakebin
     fakebin2
+    home
+      .config
+        packages
     local
       root
         conditional

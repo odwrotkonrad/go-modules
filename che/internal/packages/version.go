@@ -5,43 +5,37 @@ package packages
 import (
 	"fmt"
 	"regexp"
-	"strconv"
 	"strings"
-
-	"gitlab.com/konradodwrot/go-modules/che/internal/log"
 )
 
 var versionTokenRe = regexp.MustCompile(`\d+(?:\.\d+)*(?:[.+~-][0-9A-Za-z.~+-]*)?`)
 
+// PinMatches reports whether prose version output carries the pinned version.
+// [why] output is prose ("go version go1.26.4 darwin/arm64"): compare against its version tokens
 func PinMatches(out, pin string) bool {
 	if pin == "" {
 		return true
 	}
-	re, err := pinRegexp(pin)
-	if err != nil {
-		return strings.Contains(out, pin)
-	}
 	for _, token := range versionTokenRe.FindAllString(out, -1) {
-		if re.MatchString(token) {
+		if token == pin {
 			return true
 		}
 	}
-	return false
+	return strings.Contains(out, pin)
 }
 
-func pinRegexp(pin string) (*regexp.Regexp, error) {
-	parts := strings.Split(pin, "*")
-	for i := range parts {
-		parts[i] = regexp.QuoteMeta(parts[i])
-	}
-	return regexp.Compile("^" + strings.Join(parts, `[0-9A-Za-z.~+-]+`) + "$")
-}
+// VersionUnversionedLatest marks a package the manager ships in exactly one, unversioned stream:
+// stating it explicitly keeps an absent version meaning "not yet decided" rather than "nothing to pin".
+const VersionUnversionedLatest = "__unversioned_latest__"
 
 func (in *Installer) pinFor(pkg, specVersion string) string {
 	if r, ok := in.requested[pkg]; ok && len(r.Versions) > 0 {
 		return r.globalVersion()
 	}
 	if e, ok := in.File.Packages[pkg]; ok && e.Version != "" {
+		if e.Version == VersionUnversionedLatest {
+			return ""
+		}
 		return e.Version
 	}
 	return specVersion
@@ -74,92 +68,21 @@ func (in *Installer) requestedOverridesPin(pkg, itemVersion string) error {
 
 func (in *Installer) resolveArchiveVersion(pkg string, b *PrebuiltArchiveSpec) (string, error) {
 	if r, ok := in.requested[pkg]; ok {
-		if v := r.globalVersion(); v != "" && !strings.Contains(v, "*") {
+		if v := r.globalVersion(); v != "" {
 			return v, nil
 		}
 	}
 	if b.Version != "" {
 		return b.Version, nil
 	}
-	if !strings.Contains(b.URL+" "+b.Bin, "{version}") {
+	if e, ok := in.File.Packages[pkg]; ok && e.Version != "" && e.Version != VersionUnversionedLatest {
+		return e.Version, nil
+	}
+	// [why] a version-less url (vendor "latest" endpoint) needs no pin
+	if !strings.Contains(b.URL, "{version}") && !strings.Contains(b.Bin, "{version}") {
 		return "", nil
 	}
-	constraint := ""
-	if e, ok := in.File.Packages[pkg]; ok {
-		constraint = e.Version
-	}
-	if constraint != "" && !strings.Contains(constraint, "*") {
-		return constraint, nil
-	}
-	repo := b.VersionsFrom
-	if repo == "" {
-		repo = deriveTagsRepo(b.URL)
-	}
-	if repo == "" {
-		return "", fmt.Errorf("%s: cannot resolve a concrete version: set version, versionsFrom, or request one", pkg)
-	}
-	return in.latestTagMatching(pkg, repo, constraint)
-}
-
-func deriveTagsRepo(url string) string {
-	for _, host := range []string{"https://github.com/", "https://gitlab.com/"} {
-		rest, ok := strings.CutPrefix(url, host)
-		if !ok {
-			continue
-		}
-		parts := strings.SplitN(rest, "/", 3)
-		if len(parts) < 2 {
-			return ""
-		}
-		return host + parts[0] + "/" + parts[1]
-	}
-	return ""
-}
-
-func (in *Installer) latestTagMatching(pkg, repo, constraint string) (string, error) {
-	out, ok := in.output([]string{"git", "ls-remote", "--tags", repo})
-	if !ok {
-		return "", fmt.Errorf("%s: listing versions of %s failed", pkg, repo)
-	}
-	best := ""
-	for line := range strings.Lines(out) {
-		_, ref, found := strings.Cut(strings.TrimSpace(line), "refs/tags/")
-		if !found || strings.HasSuffix(ref, "^{}") {
-			continue
-		}
-		token := versionTokenRe.FindString(ref)
-		if token == "" || strings.ContainsAny(token, "-~+") {
-			continue
-		}
-		if !PinMatches(token, constraint) {
-			continue
-		}
-		if best == "" || versionLess(best, token) {
-			best = token
-		}
-	}
-	if best == "" {
-		return "", fmt.Errorf("%s: no version matching %q among tags of %s", pkg, constraint, repo)
-	}
-	in.emit(log.Levels.Debug, "resolved", pkg+" version "+best+" (constraint "+constraint+", tags of "+repo+")")
-	return best, nil
-}
-
-func versionLess(a, b string) bool {
-	as, bs := strings.Split(a, "."), strings.Split(b, ".")
-	for i := 0; i < len(as) || i < len(bs); i++ {
-		av, bv := 0, 0
-		if i < len(as) {
-			av, _ = strconv.Atoi(as[i])
-		}
-		if i < len(bs) {
-			bv, _ = strconv.Atoi(bs[i])
-		}
-		if av != bv {
-			return av < bv
-		}
-	}
-	return false
+	return "", fmt.Errorf("%s: no version pinned: set version on the entry or the prebuiltArchive item", pkg)
 }
 
 // [<] 🤖🤖🤖

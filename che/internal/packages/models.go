@@ -247,7 +247,6 @@ type PrebuiltArchiveSpec struct {
 	ArchConvention string            `yaml:"archConvention,omitempty"`
 	Bin            string            `yaml:"bin,omitempty"`
 	Platforms      []string          `yaml:"platforms,omitempty"`
-	VersionsFrom   string            `yaml:"versionsFrom,omitempty"`
 	Sha256         map[string]string `yaml:"sha256,omitempty"`
 }
 

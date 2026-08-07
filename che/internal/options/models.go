@@ -34,10 +34,10 @@ type Options struct {
 	PackagesIfMissing                            bool
 	PackagesPreferredMethods                     []string
 	PackagesPrebuiltArchiveDestinationCandidates []string
-	PackagesPrebuiltArchiveCheckInPath           bool
+	PackagesPrebuiltArchiveCheckPresentOnPath    bool
 	PackagesCompletionsEnabled                   bool
 	PackagesCompletionsDestinationCandidates     []string
-	PackagesCompletionsCheckInFpath              bool
+	PackagesCompletionsCheckPresentOnFpath       bool
 	AutoDiscover                                 bool
 	Otel                                         Otel
 	Settings                                     []Setting

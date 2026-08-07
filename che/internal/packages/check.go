@@ -15,7 +15,7 @@ func (in *Installer) CheckPresent(pkgs []string) []string {
 	var missing []string
 	for _, pkg := range pkgs {
 		if in.isCodeManaged(pkg) {
-			if in.codeExtensions()[strings.ToLower(pkg)] {
+			if _, ok := in.codeExtensions()[strings.ToLower(pkg)]; ok {
 				in.emit(log.Levels.Debug, "present", pkg+" (code extension)")
 				continue
 			}

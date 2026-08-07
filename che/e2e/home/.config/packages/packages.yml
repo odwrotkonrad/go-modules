@@ -1,0 +1,7 @@
+##[>] 🤖🤖
+packages:
+  e2e-plain: [{npm: e2e-plain}]
+  e2e-conditional: [{npm: e2e-conditional}]
+  e2e-dropped: [{npm: e2e-dropped}]
+  e2e-remote: [{npm: e2e-remote}]
+##[<] 🤖🤖

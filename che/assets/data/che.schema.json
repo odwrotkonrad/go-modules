@@ -189,11 +189,11 @@
       "properties": {
         "installDestinationCandidates": {
           "$ref": "#/$defs/StringOrList",
-          "description": "where binary-method binaries install: one path or a candidate list (~/ and $VARs expand); with checkInPath the first candidate on PATH wins, else the first entry; default ~/.local/bin; cascades profile \u003e spec \u003e user config; overridden by CHE_PACKAGES_PREBUILT_ARCHIVE_INSTALL_DESTINATION_CANDIDATES (comma-separated)"
+          "description": "where binary-method binaries install: one path or a candidate list (~/ and $VARs expand); with checkPresentOnPath the first candidate on PATH wins, else the first entry; default ~/.local/bin; cascades profile \u003e spec \u003e user config; overridden by CHE_PACKAGES_PREBUILT_ARCHIVE_INSTALL_DESTINATION_CANDIDATES (comma-separated)"
         },
-        "checkInPath": {
+        "checkPresentOnPath": {
           "type": "boolean",
-          "description": "pick the first candidate destination found on PATH and warn when none is; default true; overridden by CHE_PACKAGES_PREBUILT_ARCHIVE_CHECK_IN_PATH"
+          "description": "pick the first candidate destination found on PATH and warn when none is; default true; overridden by CHE_PACKAGES_PREBUILT_ARCHIVE_CHECK_PRESENT_ON_PATH"
         }
       },
       "additionalProperties": false,
@@ -331,11 +331,11 @@
         },
         "installDestinationCandidates": {
           "$ref": "#/$defs/StringOrList",
-          "description": "where zsh completion files install: one path or a candidate list (~/ and $VARs expand); with checkInFpath the first candidate on fpath wins, else the first entry; default [~/.local/share/zsh/site-functions, ~/.zfunc]; cascades profile \u003e spec \u003e user config; overridden by CHE_PACKAGES_COMPLETIONS_ZSH_INSTALL_DESTINATION_CANDIDATES (comma-separated)"
+          "description": "where zsh completion files install: one path or a candidate list (~/ and $VARs expand); with checkPresentOnFpath the first candidate on fpath wins, else the first entry; default [~/.local/share/zsh/site-functions, ~/.zfunc]; cascades profile \u003e spec \u003e user config; overridden by CHE_PACKAGES_COMPLETIONS_ZSH_INSTALL_DESTINATION_CANDIDATES (comma-separated)"
         },
-        "checkInFpath": {
+        "checkPresentOnFpath": {
           "type": "boolean",
-          "description": "pick the first candidate destination found on fpath ($FPATH, else zsh -c fpath) and warn when none is; default true; overridden by CHE_PACKAGES_COMPLETIONS_ZSH_CHECK_IN_FPATH"
+          "description": "pick the first candidate destination found on fpath ($FPATH, else zsh -c fpath) and warn when none is; default true; overridden by CHE_PACKAGES_COMPLETIONS_ZSH_CHECK_PRESENT_ON_FPATH"
         }
       },
       "additionalProperties": false,

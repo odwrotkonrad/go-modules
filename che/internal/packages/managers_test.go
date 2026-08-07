@@ -98,6 +98,25 @@ func TestInstallNpmPinSkipsWhenMatching(t *testing.T) {
 	require.NotContains(t, m.Calls(), "npm install --global ccstatusline@2.2.22")
 }
 
+func TestInstallGemPinPassesVersionRequirement(t *testing.T) {
+	in, m := newInstaller(t, "packages:\n  ruby-lsp:\n    version: 0.26.10\n    installMethods: [{gem: ruby-lsp}]", "linux",
+		cmdMap([]string{"gem"}), Options{})
+	require.NoError(t, in.Install([]string{"ruby-lsp"}))
+	require.Contains(t, m.Calls(), "sudo gem install ruby-lsp -v 0.26.10")
+}
+
+func TestInstallGoPinResolvesModuleVersion(t *testing.T) {
+	in, m := newInstaller(t, "packages:\n  gopls:\n    version: 0.23.0\n    installMethods: [{go: golang.org/x/tools/gopls@latest}]", "darwin",
+		cmdMap([]string{"go"}), Options{})
+	require.NoError(t, in.Install([]string{"gopls"}))
+	require.Contains(t, m.Calls(), "go install golang.org/x/tools/gopls@v0.23.0")
+}
+
+func TestPinnedNameGoStripsModuleQuery(t *testing.T) {
+	require.Equal(t, "golang.org/x/tools/gopls@v0.23.0", pinnedName("go", "golang.org/x/tools/gopls@latest", "0.23.0"))
+	require.Equal(t, "example.com/mod@v1.2.3", pinnedName("go", "example.com/mod", "1.2.3"))
+}
+
 func TestInstallUpdateUpgradesInstalledBrew(t *testing.T) {
 	in, m := newInstaller(t, "packages:\n  bat: [brew]", "darwin", cmdMap([]string{"brew"}), Options{Update: true})
 	require.NoError(t, in.Install([]string{"bat"}))
@@ -398,16 +417,16 @@ func TestInstallPythonPyenvPinFromBuiltin(t *testing.T) {
 	}
 	require.NoError(t, in.Install([]string{"python3"}))
 	calls := strings.Join(m.Calls(), "\n")
-	require.Contains(t, calls, "pyenv install --skip-existing 3.14.5")
-	require.Contains(t, calls, "pyenv global 3.14.5")
+	require.Contains(t, calls, "pyenv install --skip-existing 3.14.6")
+	require.Contains(t, calls, "pyenv global 3.14.6")
 
 	m.Stub = func(argv []string) ([]byte, error) {
 		joined := strings.Join(argv, " ")
 		if joined == "pyenv versions --bare" {
-			return []byte("3.14.5\n"), nil
+			return []byte("3.14.6\n3.13.14\n"), nil
 		}
 		if joined == "pyenv global" {
-			return []byte("3.14.5\n"), nil
+			return []byte("3.14.6\n"), nil
 		}
 		return nil, nil
 	}
@@ -473,7 +492,7 @@ func TestInstallCodeExtensionSkipsInstalledAndListsOnce(t *testing.T) {
 	in, m := newInstaller(t, codeExtYaml, "darwin", cmdMap([]string{"code"}), Options{})
 	m.Stub = codeListStub("Golang.Go\nredhat.vscode-yaml\n")
 	require.NoError(t, in.Install([]string{"golang.go", "redhat.vscode-yaml"}))
-	require.Equal(t, []string{"code --list-extensions"}, m.Calls())
+	require.Equal(t, []string{"code --list-extensions --show-versions"}, m.Calls())
 }
 
 func TestInstallCodeExtensionSkipsWithoutCodeCommand(t *testing.T) {

@@ -21,7 +21,7 @@ func TestDefaultSettingsYAMLIsSeedableConfig(t *testing.T) {
 		"logLevel: info",
 		"dryRun: false",
 		"file: __builtin__.packages.yml",
-		"checkInPath: true",
+		"checkPresentOnPath: true",
 		"autoDiscover: true",
 		"installDestinationCandidates: [~/.local/bin, ~/bin]",
 		"installDestinationCandidates: [~/.local/share/zsh/site-functions, ~/.zfunc]",
@@ -44,7 +44,7 @@ func TestDefaultSettingsYAMLIsSeedableConfig(t *testing.T) {
 func TestSettingsYAMLNestsAndTypes(t *testing.T) {
 	out, err := SettingsYAML([]Setting{
 		{Key: "logLevel", Value: "info"},
-		{Key: "packages.binary.checkInPath", Value: "true", Kind: "bool"},
+		{Key: "packages.binary.checkPresentOnPath", Value: "true", Kind: "bool"},
 		{Key: "packages.preferredInstallationMethods", Value: "binary,brew", Kind: "list"},
 		{Key: "otel.enabled", Value: "false", Kind: "bool"},
 	})
@@ -53,7 +53,7 @@ func TestSettingsYAMLNestsAndTypes(t *testing.T) {
 		LogLevel string `yaml:"logLevel"`
 		Packages struct {
 			Binary struct {
-				CheckInPath bool `yaml:"checkInPath"`
+				CheckPresentOnPath bool `yaml:"checkPresentOnPath"`
 			} `yaml:"binary"`
 			Preferred []string `yaml:"preferredInstallationMethods"`
 		} `yaml:"packages"`
@@ -63,7 +63,7 @@ func TestSettingsYAMLNestsAndTypes(t *testing.T) {
 	}
 	require.NoError(t, yaml.Unmarshal([]byte(out), &got))
 	require.Equal(t, "info", got.LogLevel)
-	require.True(t, got.Packages.Binary.CheckInPath)
+	require.True(t, got.Packages.Binary.CheckPresentOnPath)
 	require.Equal(t, []string{"binary", "brew"}, got.Packages.Preferred)
 	require.False(t, got.Otel.Enabled)
 }

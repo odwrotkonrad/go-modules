@@ -252,8 +252,8 @@ func (c *Options) Resolve(env LookupEnv, user, spec Layer) error {
 		c.PackagesPrebuiltArchiveDestinationCandidates = packages.DefaultPrebuiltArchiveDestinationCandidates
 		c.setValue("packages.prebuiltArchive.installDestinationCandidates", "["+strings.Join(packages.DefaultPrebuiltArchiveDestinationCandidates, ", ")+"]")
 	}
-	c.PackagesPrebuiltArchiveCheckInPath = c.resolveBool("packages.prebuiltArchive.checkInPath", false, env("CHE_PACKAGES_PREBUILT_ARCHIVE_CHECK_IN_PATH"), true,
-		boolLayer{user.Packages.PrebuiltArchive.CheckInPath, "config-file"}, boolLayer{spec.Packages.PrebuiltArchive.CheckInPath, "specFile"})
+	c.PackagesPrebuiltArchiveCheckPresentOnPath = c.resolveBool("packages.prebuiltArchive.checkPresentOnPath", false, env("CHE_PACKAGES_PREBUILT_ARCHIVE_CHECK_PRESENT_ON_PATH"), true,
+		boolLayer{user.Packages.PrebuiltArchive.CheckPresentOnPath, "config-file"}, boolLayer{spec.Packages.PrebuiltArchive.CheckPresentOnPath, "specFile"})
 	c.PackagesCompletionsEnabled = c.resolveBool("packages.completions.zsh.enabled", false, env("CHE_PACKAGES_COMPLETIONS_ZSH_ENABLED"), false,
 		boolLayer{user.Packages.Completions.Zsh.Enabled, "config-file"}, boolLayer{spec.Packages.Completions.Zsh.Enabled, "specFile"})
 	c.PackagesCompletionsDestinationCandidates = c.resolveList("packages.completions.zsh.installDestinationCandidates",
@@ -264,8 +264,8 @@ func (c *Options) Resolve(env LookupEnv, user, spec Layer) error {
 		c.PackagesCompletionsDestinationCandidates = packages.DefaultCompletionsDestinationCandidates
 		c.setValue("packages.completions.zsh.installDestinationCandidates", "["+strings.Join(packages.DefaultCompletionsDestinationCandidates, ", ")+"]")
 	}
-	c.PackagesCompletionsCheckInFpath = c.resolveBool("packages.completions.zsh.checkInFpath", false, env("CHE_PACKAGES_COMPLETIONS_ZSH_CHECK_IN_FPATH"), true,
-		boolLayer{user.Packages.Completions.Zsh.CheckInFpath, "config-file"}, boolLayer{spec.Packages.Completions.Zsh.CheckInFpath, "specFile"})
+	c.PackagesCompletionsCheckPresentOnFpath = c.resolveBool("packages.completions.zsh.checkPresentOnFpath", false, env("CHE_PACKAGES_COMPLETIONS_ZSH_CHECK_PRESENT_ON_FPATH"), true,
+		boolLayer{user.Packages.Completions.Zsh.CheckPresentOnFpath, "config-file"}, boolLayer{spec.Packages.Completions.Zsh.CheckPresentOnFpath, "specFile"})
 	c.AutoDiscover = c.resolveBool("autoDiscover", false, env("CHE_AUTO_DISCOVER"), true,
 		boolLayer{user.AutoDiscover, "config-file"})
 	return c.resolveOtel(env, user, spec)

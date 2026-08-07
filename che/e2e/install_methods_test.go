@@ -79,7 +79,7 @@ func runInstallGroup(t *testing.T, g installGroup) {
 		"XDG_CACHE_HOME=" + filepath.Join(home, ".cache"),
 		"CHE_E2E=1",
 		"CHE_LOG_LEVEL=debug",
-		"CHE_PACKAGES_PREBUILT_ARCHIVE_CHECK_IN_PATH=0",
+		"CHE_PACKAGES_PREBUILT_ARCHIVE_CHECK_PRESENT_ON_PATH=0",
 		"NVM_DIR=" + filepath.Join(home, ".config", "nvm"),
 	}
 	if v := os.Getenv("SSL_CERT_FILE"); v != "" {
@@ -96,6 +96,12 @@ func runInstallGroup(t *testing.T, g installGroup) {
 	out, err := install.CombinedOutput()
 	t.Logf("install %s:\n%s", g.Method, out)
 	require.NoError(t, err, "install %s", g.Method)
+	// [why] a host copy already on PATH makes che skip: the group would then verify the system
+	//   binary and prove nothing about the method under test
+	for _, pkg := range g.Packages {
+		require.NotContains(t, string(out), "will not install "+pkg+":",
+			"%s: %s was already present on the runner, so the method never ran", g.Method, pkg)
+	}
 
 	for pkg, cmdline := range g.Verify {
 		verify := exec.Command("/bin/bash", "-ec", cmdline)

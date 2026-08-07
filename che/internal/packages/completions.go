@@ -78,7 +78,7 @@ func (in *Installer) completionsDir() string {
 		expanded[i] = in.expandPath(c)
 	}
 	in.compDir = expanded[0]
-	if in.Opts.CompletionsCheckInFpath {
+	if in.Opts.CompletionsCheckPresentOnFpath {
 		fpath := in.fpath()
 		onFpath := slices.IndexFunc(expanded, func(d string) bool { return slices.Contains(fpath, d) })
 		if onFpath >= 0 {

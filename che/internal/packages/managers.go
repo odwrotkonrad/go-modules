@@ -22,10 +22,10 @@ type Options struct {
 	DryRun                               bool
 	PreferredMethods                     []string
 	PrebuiltArchiveDestinationCandidates []string
-	PrebuiltArchiveCheckInPath           bool
+	PrebuiltArchiveCheckPresentOnPath    bool
 	CompletionsEnabled                   bool
 	CompletionsDestinationCandidates     []string
-	CompletionsCheckInFpath              bool
+	CompletionsCheckPresentOnFpath       bool
 }
 
 type Installer struct {
@@ -38,7 +38,7 @@ type Installer struct {
 	EmitDryRun func(action, msg string)
 
 	aptUpdated     bool
-	codeExts       map[string]bool
+	codeExts       map[string]string
 	binDir         string
 	compDir        string
 	requested      map[string]Request
@@ -262,7 +262,7 @@ func (in *Installer) installVia(pkg string, it Item) error {
 	switch {
 	case installed && pin != "" && !in.pinSatisfied(pkg, it.Mgr, base, pin):
 		in.emit(log.Levels.Info, "reinstall", pkg+": -> "+pin)
-		if pinnedName(it.Mgr, base, pin) == base {
+		if !pinnable(it.Mgr) {
 			return in.update(pkg, it.Mgr, base)
 		}
 	case installed && in.Opts.Update && pin == "":
@@ -275,11 +275,18 @@ func (in *Installer) installVia(pkg string, it Item) error {
 		in.emitDryRun("install", pkg+" via "+it.Mgr)
 		return nil
 	}
-	if err := in.managerInstall(it.Mgr, pinnedName(it.Mgr, base, pin)); err != nil {
+	if err := in.managerInstall(it.Mgr, pinnedName(it.Mgr, base, pin), pin); err != nil {
 		return err
 	}
 	in.emit(log.Levels.Info, "installed", pkg+" via "+it.Mgr)
 	return nil
+}
+
+// [why] managers whose install command takes the pinned version; brew is excluded on purpose:
+//
+//	it ships versions as separate formulae (node@24), so the packages file names the formula directly
+func pinnable(mgr string) bool {
+	return slices.Contains([]string{"npm", "apt", "gem", "go", "vscode"}, mgr)
 }
 
 func pinnedName(mgr, base, pin string) string {
@@ -287,10 +294,13 @@ func pinnedName(mgr, base, pin string) string {
 		return base
 	}
 	switch mgr {
-	case "npm":
+	case "npm", "vscode":
 		return base + "@" + pin
 	case "apt":
 		return base + "=" + pin
+	case "go":
+		module, _, _ := strings.Cut(base, "@")
+		return module + "@v" + pin
 	}
 	return base
 }
@@ -311,6 +321,7 @@ func splitPin(name string) (base, pin string) {
 
 func (in *Installer) isInstalled(pkg, mgr, base string) bool {
 	switch mgr {
+	// [why] a pinned brew formula is its own package (node@24): ask about the pinned name
 	case "brew":
 		_, ok := in.output([]string{"brew", "list", tail(base)})
 		return ok
@@ -327,22 +338,27 @@ func (in *Installer) isInstalled(pkg, mgr, base string) bool {
 		_, ok := in.output([]string{"npm", "ls", "--global", "--depth=0", base})
 		return ok
 	case "vscode":
-		return in.codeExtensions()[strings.ToLower(base)]
+		_, ok := in.codeExtensions()[strings.ToLower(base)]
+		return ok
 	default:
 		return in.hasCmd(pkg)
 	}
 }
 
-func (in *Installer) codeExtensions() map[string]bool {
+// [why] --show-versions prints "publisher.ext@1.2.3", the only way to check an extension pin
+func (in *Installer) codeExtensions() map[string]string {
 	if in.codeExts != nil {
 		return in.codeExts
 	}
-	in.codeExts = map[string]bool{}
-	if out, ok := in.output([]string{"code", "--list-extensions"}); ok {
+	in.codeExts = map[string]string{}
+	if out, ok := in.output([]string{"code", "--list-extensions", "--show-versions"}); ok {
 		for line := range strings.Lines(out) {
-			if ext := strings.ToLower(strings.TrimSpace(line)); ext != "" {
-				in.codeExts[ext] = true
+			ext := strings.ToLower(strings.TrimSpace(line))
+			if ext == "" {
+				continue
 			}
+			name, version, _ := strings.Cut(ext, "@")
+			in.codeExts[name] = version
 		}
 	}
 	return in.codeExts
@@ -350,6 +366,17 @@ func (in *Installer) codeExtensions() map[string]bool {
 
 func (in *Installer) installedVersion(mgr, base string) string {
 	switch mgr {
+	case "brew":
+		out, ok := in.output([]string{"brew", "list", "--versions", tail(base)})
+		if !ok {
+			return ""
+		}
+		if fields := strings.Fields(out); len(fields) > 1 {
+			return fields[len(fields)-1]
+		}
+		return ""
+	case "vscode":
+		return in.codeExtensions()[strings.ToLower(base)]
 	case "apt":
 		out, ok := in.output([]string{"dpkg-query", "-W", "-f=${Version}", base})
 		if !ok {
@@ -403,7 +430,7 @@ func (in *Installer) update(pkg, mgr, base string) error {
 	return nil
 }
 
-func (in *Installer) managerInstall(mgr, name string) error {
+func (in *Installer) managerInstall(mgr, name, pin string) error {
 	switch mgr {
 	case "brew", "cask":
 		return in.brewInstall(mgr, name)
@@ -418,9 +445,13 @@ func (in *Installer) managerInstall(mgr, name string) error {
 		if err := in.exec([]string{"code", "--install-extension", name}); err != nil {
 			return err
 		}
-		in.codeExtensions()[strings.ToLower(name)] = true
+		base, version, _ := strings.Cut(strings.ToLower(name), "@")
+		in.codeExtensions()[base] = version
 		return nil
 	case "gem":
+		if pin != "" {
+			return in.exec(in.sudo("gem", "install", name, "-v", pin))
+		}
 		return in.exec(in.sudo("gem", "install", name))
 	default:
 		return in.goInstall(name, name)

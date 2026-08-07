@@ -16,7 +16,7 @@ groups:
     verify:
       font-jetbrains-mono: brew list --cask font-jetbrains-mono
 
-  - method: brew/code
+  - method: brew/vscode
     os: darwin
     requiresCommand: code
     packages: [golang.go]
@@ -46,12 +46,6 @@ groups:
     verify:
       kubectx: kubectx --help
       glab: glab --version
-
-  - method: prebuiltArchive/postInstall
-    os: darwin
-    packages: [gcloud]
-    verify:
-      gcloud: gcloud --version
 
   - method: script/remoteUrl
     packages: [pyenv]

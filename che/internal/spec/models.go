@@ -98,13 +98,13 @@ type CompletionsInstall struct {
 
 type ShellCompletionsInstall struct {
 	Enabled                      *bool        `yaml:"enabled" jsonschema_description:"install zsh completions for packages carrying a completions def; default false; cascades profile > spec > user config; overridden by CHE_PACKAGES_COMPLETIONS_ZSH_ENABLED"`
-	InstallDestinationCandidates StringOrList `yaml:"installDestinationCandidates" jsonschema_description:"where zsh completion files install: one path or a candidate list (~/ and $VARs expand); with checkInFpath the first candidate on fpath wins, else the first entry; default [~/.local/share/zsh/site-functions, ~/.zfunc]; cascades profile > spec > user config; overridden by CHE_PACKAGES_COMPLETIONS_ZSH_INSTALL_DESTINATION_CANDIDATES (comma-separated)"`
-	CheckInFpath                 *bool        `yaml:"checkInFpath" jsonschema_description:"pick the first candidate destination found on fpath ($FPATH, else zsh -c fpath) and warn when none is; default true; overridden by CHE_PACKAGES_COMPLETIONS_ZSH_CHECK_IN_FPATH"`
+	InstallDestinationCandidates StringOrList `yaml:"installDestinationCandidates" jsonschema_description:"where zsh completion files install: one path or a candidate list (~/ and $VARs expand); with checkPresentOnFpath the first candidate on fpath wins, else the first entry; default [~/.local/share/zsh/site-functions, ~/.zfunc]; cascades profile > spec > user config; overridden by CHE_PACKAGES_COMPLETIONS_ZSH_INSTALL_DESTINATION_CANDIDATES (comma-separated)"`
+	CheckPresentOnFpath          *bool        `yaml:"checkPresentOnFpath" jsonschema_description:"pick the first candidate destination found on fpath ($FPATH, else zsh -c fpath) and warn when none is; default true; overridden by CHE_PACKAGES_COMPLETIONS_ZSH_CHECK_PRESENT_ON_FPATH"`
 }
 
 type PrebuiltArchiveInstall struct {
-	InstallDestinationCandidates StringOrList `yaml:"installDestinationCandidates" jsonschema_description:"where binary-method binaries install: one path or a candidate list (~/ and $VARs expand); with checkInPath the first candidate on PATH wins, else the first entry; default ~/.local/bin; cascades profile > spec > user config; overridden by CHE_PACKAGES_PREBUILT_ARCHIVE_INSTALL_DESTINATION_CANDIDATES (comma-separated)"`
-	CheckInPath                  *bool        `yaml:"checkInPath" jsonschema_description:"pick the first candidate destination found on PATH and warn when none is; default true; overridden by CHE_PACKAGES_PREBUILT_ARCHIVE_CHECK_IN_PATH"`
+	InstallDestinationCandidates StringOrList `yaml:"installDestinationCandidates" jsonschema_description:"where binary-method binaries install: one path or a candidate list (~/ and $VARs expand); with checkPresentOnPath the first candidate on PATH wins, else the first entry; default ~/.local/bin; cascades profile > spec > user config; overridden by CHE_PACKAGES_PREBUILT_ARCHIVE_INSTALL_DESTINATION_CANDIDATES (comma-separated)"`
+	CheckPresentOnPath           *bool        `yaml:"checkPresentOnPath" jsonschema_description:"pick the first candidate destination found on PATH and warn when none is; default true; overridden by CHE_PACKAGES_PREBUILT_ARCHIVE_CHECK_PRESENT_ON_PATH"`
 }
 
 type PackageRef struct {
