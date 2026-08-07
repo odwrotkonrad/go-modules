@@ -257,6 +257,7 @@ lib
         funcs
 spec
   che
+  release
 templates
   2-data
   3-audience
