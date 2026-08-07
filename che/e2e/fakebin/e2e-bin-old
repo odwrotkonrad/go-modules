@@ -1,0 +1,4 @@
+#!/bin/sh
+##[>] 🤖🤖
+echo "e2e-bin-old version 1.0.0"
+##[<] 🤖🤖

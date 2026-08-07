@@ -1,0 +1,4 @@
+#!/bin/sh
+##[>] 🤖🤖
+echo "e2e-outdated 1.0.0"
+##[<] 🤖🤖

@@ -1,0 +1,35 @@
+# [>] 🤖🤖
+context:
+  command: che packages check-present
+  pwd: testdata/fixture/commands/packages/sample-tree
+  mockedInterfaces:
+    execx.CmdExecutor: testutil.CmdMockExecutor
+    fsutil.FileSystemWriter: testutil.FileSystemMockWriter
+    fsutil.FileSystemReader: testutil.FileSystemMockReader
+    packages.Host: cli.PackagesMockHost
+cases:
+  - name: ShouldPassWhenNamedCommandsResolve
+    context:
+      command: che packages check-present jq
+    expected:
+      exitCode: 0
+    notExpected:
+      stdOut:
+        - "[warn]{{/ +/}}missing"
+  - name: ShouldFailListingMissingCommands
+    context:
+      command: che packages check-present jq ghost
+    expected:
+      exitCode: 1
+      stdOut:
+        - "[warn]{{/ +/}}missing ghost"
+      stdErr:
+        - "missing commands: ghost"
+  - name: ShouldDefaultToProfilePackages
+    expected:
+      exitCode: 1
+      stdOut:
+        - "[warn]{{/ +/}}missing kubectx"
+      stdErr:
+        - "missing commands: kubectx"
+# [<] 🤖🤖

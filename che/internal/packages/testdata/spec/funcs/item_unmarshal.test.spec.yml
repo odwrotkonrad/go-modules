@@ -1,0 +1,121 @@
+# [>] 🤖🤖
+context:
+  function: packages.Item.UnmarshalYAML
+cases:
+  - name: ShouldDecodeBareManagerAsCanonicalName
+    input:
+      args:
+        - yaml: "brew"
+    expected:
+      output: {mgr: brew, name: ""}
+  - name: ShouldDecodePerManagerName
+    input:
+      args:
+        - yaml: "{apt: fd-find}"
+    expected:
+      output: {mgr: apt, name: fd-find}
+  - name: ShouldDecodeBrewCaskForm
+    input:
+      args:
+        - yaml: "{brew: {cask: beekeeper-studio}}"
+    expected:
+      output: {mgr: cask, name: beekeeper-studio}
+  - name: ShouldDecodeNpmScopedPin
+    input:
+      args:
+        - yaml: '{npm: "@anthropic-ai/claude-code"}'
+    expected:
+      output: {mgr: npm, name: "@anthropic-ai/claude-code"}
+  - name: ShouldDecodeBinaryProps
+    input:
+      args:
+        - yaml: |
+            prebuiltBinariesArchive:
+              version: 0.32.0
+              url: https://example.com/kind-{os}-{arch}
+              platforms:
+                - linux-amd64: abc
+    expected:
+      output: {mgr: prebuiltBinariesArchive, name: "", version: 0.32.0, url: "https://example.com/kind-{os}-{arch}", platformNames: [linux-amd64], sha256: {linux-amd64: abc}}
+  - name: ShouldDecodeScriptScalarForm
+    input:
+      args:
+        - yaml: '{script: "echo hi"}'
+    expected:
+      output: {mgr: script, name: "", run: "echo hi"}
+  - name: ShouldDecodeScriptMapFormWithOs
+    input:
+      args:
+        - yaml: |
+            script:
+              os: darwin
+              run: echo hi
+    expected:
+      output: {mgr: script, name: "", run: "echo hi", scriptOs: darwin}
+  - name: ShouldDecodeScriptPathForm
+    input:
+      args:
+        - yaml: "{script: {path: scripts/install-brew.sh, os: darwin}}"
+    expected:
+      output: {mgr: script, name: "", scriptPath: scripts/install-brew.sh, scriptOs: darwin}
+  - name: ShouldDecodeScriptUrlForm
+    input:
+      args:
+        - yaml: "{script: {remoteUrl: https://example.com/install.sh}}"
+    expected:
+      output: {mgr: script, name: "", scriptUrl: https://example.com/install.sh}
+  - name: ShouldDecodeBrewCodeExtensionForm
+    input:
+      args:
+        - yaml: "{brew: {vscode: golang.go}}"
+    expected:
+      output: {mgr: vscode, name: golang.go}
+  - name: ShouldRejectBareCodeItem
+    input:
+      args:
+        - yaml: "code"
+    expected:
+      errorOutput: "vscode extension items must be written {brew: {vscode: <extension-id>}}"
+  - name: ShouldRejectDirectCodeMap
+    input:
+      args:
+        - yaml: "{code: golang.go}"
+    expected:
+      errorOutput: "vscode extension items must be written {brew: {vscode: <extension-id>}}"
+  - name: ShouldErrorOnMultiKeyMap
+    input:
+      args:
+        - yaml: "{apt: a, brew: b}"
+    expected:
+      errorOutput: "manager item must be a scalar or a single-key map"
+  - name: ShouldErrorOnMalformedBrewObject
+    input:
+      args:
+        - yaml: "{brew: {formula: x}}"
+    expected:
+      errorOutput: "brew object form must be {cask: <name>}"
+  - name: ShouldRejectNpmEmbeddedPin
+    input:
+      args:
+        - yaml: "{npm: lefthook@2.1.9}"
+    expected:
+      errorOutput: "npm item lefthook@2.1.9: version pins go in the entry version field"
+  - name: ShouldAllowNpmScopedName
+    input:
+      args:
+        - yaml: "{npm: '@github/copilot'}"
+    expected:
+      output: {mgr: npm, name: '@github/copilot'}
+  - name: ShouldRejectLegacyArchTokens
+    input:
+      args:
+        - yaml: "{prebuiltBinariesArchive: {url: 'https://x/y-{arch_x}.zip'}}"
+    expected:
+      errorOutput: "prebuiltBinariesArchive tokens {arch_x}/{arch_g} are gone: use {arch} with archConvention"
+  - name: ShouldRejectAptEmbeddedPin
+    input:
+      args:
+        - yaml: "{apt: jq=1.7-1}"
+    expected:
+      errorOutput: "apt item jq=1.7-1: version pins go in the entry version field"
+# [<] 🤖🤖

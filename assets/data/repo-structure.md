@@ -8,16 +8,21 @@ che
     docs-agents
   docs
   e2e
+    fakebin
+    fakebin2
+    home
+      .config
+        packages
     local
-      install
       root
         conditional
         dropped
         plain
+      scripts
     remote
-      install
       root
         remote
+      scripts
   internal
     che
       testdata
@@ -46,6 +51,14 @@ che
                       zsh
                   etc
                 templates
+            packages
+              sample-tree
+                home
+                  .config
+                    packages
+                root
+              sample-tree-builtin
+                root
         spec
           cmds
           funcs
@@ -64,6 +77,11 @@ che
         spec
           funcs
     options
+      testdata
+        spec
+          funcs
+    packages
+      scripts
       testdata
         spec
           funcs

@@ -7,13 +7,11 @@ import (
 	"strings"
 )
 
-// IsDirSettled reports whether dest already exists as a dir and may be skipped.
 func IsDirSettled(reader FileSystemReader, dest string) bool {
 	fi, err := reader.StatPath(dest)
 	return err == nil && fi.IsDir()
 }
 
-// IsLinkSettled reports whether dest already resolves to src (skippable).
 func IsLinkSettled(reader FileSystemReader, src, dest string) bool {
 	destResolved, err := reader.EvaluateSymlinks(dest)
 	if err != nil {
@@ -23,8 +21,6 @@ func IsLinkSettled(reader FileSystemReader, src, dest string) bool {
 	return err == nil && destResolved == srcResolved
 }
 
-// IsSameContent reports whether a and b have byte-identical content (either
-// unreadable -> false).
 func IsSameContent(reader FileSystemReader, a, b string) bool {
 	x, err := reader.ReadFileBytes(a)
 	if err != nil {
@@ -37,7 +33,6 @@ func IsSameContent(reader FileSystemReader, a, b string) bool {
 	return bytes.Equal(x, y)
 }
 
-// PrependEnvVar sets key=value:<existing> in env copy.
 func PrependEnvVar(env []string, key, value string) []string {
 	prefix := key + "="
 	out := make([]string, 0, len(env)+1)

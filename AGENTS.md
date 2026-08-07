@@ -135,6 +135,7 @@ config loaders and main-shape boilerplate.
 `create-tag`
 `publish` tag pipeline: goreleaser snapshot build for $CI_COMMIT_TAG's module, upload to the generic package registry, link release assets
 `publish-brew` tag pipeline: render Formula/che.rb + Formula/che@<version>.rb for $CI_COMMIT_TAG's version, commit them to the homebrew tap repo via the GitLab commits API
+`publish-apt` rebuild the signed apt repo tree into ./public-apt from every che .deb in the generic package registry
 `release-check` validate every module's goreleaser configs
 `release-snapshot` local snapshot build of every module, no publish
 
@@ -159,7 +160,9 @@ config loaders and main-shape boilerplate.
 `e2e-dryrun`: `build-cover` dry-run e2e flow (every command --dry-run=all, CHE_LOG_LEVEL=trace), binary covdata into ./cover-e2e-dryrun
 `e2e-run`: `build-cover` real full-flow e2e (CHE_LOG_LEVEL=info), binary covdata into ./cover-e2e-run
 `e2e-backup`: `build-cover` backup e2e flow (create/ls/restore selectors, CHE_LOG_LEVEL=info), binary covdata into ./cover-e2e-backup
-`e2e`: `e2e-dryrun -> e2e-run -> e2e-backup` run all e2e flows
+`e2e-packages`: `build-cover` packages e2e flow (install + checks against fake PATH managers, CHE_LOG_LEVEL=info), binary covdata into ./cover-e2e-packages
+`e2e-install-methods`: `build` real-install e2e per installation method family (METHOD=<method>, default all, prefix matches sub-groups, see e2e/install_methods.yml): installs live packages into a throwaway HOME, then runs each one
+`e2e`: `e2e-dryrun -> e2e-run -> e2e-backup -> e2e-packages` run all e2e flows
 `build` build the binary into ./dist
 `lint` golangci-lint all packages
 `vet` go vet all packages
@@ -231,16 +234,21 @@ che
     docs-agents
   docs
   e2e
+    fakebin
+    fakebin2
+    home
+      .config
+        packages
     local
-      install
       root
         conditional
         dropped
         plain
+      scripts
     remote
-      install
       root
         remote
+      scripts
   internal
     che
       testdata
@@ -269,6 +277,14 @@ che
                       zsh
                   etc
                 templates
+            packages
+              sample-tree
+                home
+                  .config
+                    packages
+                root
+              sample-tree-builtin
+                root
         spec
           cmds
           funcs
@@ -287,6 +303,11 @@ che
         spec
           funcs
     options
+      testdata
+        spec
+          funcs
+    packages
+      scripts
       testdata
         spec
           funcs

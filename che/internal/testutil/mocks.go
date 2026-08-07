@@ -18,7 +18,6 @@ import (
 	"gitlab.com/konradodwrot/go-modules/che/internal/execx"
 )
 
-// mockRegistry: the pairs specs may declare in context.mockedInterfaces.
 var mockRegistry = map[string]string{
 	"execx.CmdExecutor":       "testutil.CmdMockExecutor",
 	"fsutil.FileSystemWriter": "testutil.FileSystemMockWriter",
@@ -26,9 +25,9 @@ var mockRegistry = map[string]string{
 	"fsutil.UserLookup":       "testutil.UserMockLookup",
 	"fsutil.GroupLookup":      "testutil.GroupMockLookup",
 	"che.RemoteFetcher":       "testutil.RemoteMockFetcher",
+	"packages.Host":           "cli.PackagesMockHost",
 }
 
-// RequireRegistered fails on any declared pair the registry does not carry.
 func RequireRegistered(t *testing.T, decl map[string]string) {
 	t.Helper()
 	for iface, mock := range decl {
@@ -42,9 +41,6 @@ func RequireRegistered(t *testing.T, decl map[string]string) {
 	}
 }
 
-// ApplyMocks validates decl against the registry and returns the safe-double
-// set with execx.Default swapped to the mock executor. Undeclared seams still
-// get the default double, never a real implementation.
 func ApplyMocks(t *testing.T, decl map[string]string) *MockSet {
 	t.Helper()
 	RequireRegistered(t, decl)
@@ -57,10 +53,8 @@ func ApplyMocks(t *testing.T, decl map[string]string) *MockSet {
 	return set
 }
 
-// SleepMock is the render opSleep test double: no pacing.
 func SleepMock(time.Duration) {}
 
-// NewCmdMockExecutor: the double with its command model wired.
 func NewCmdMockExecutor() *CmdMockExecutor {
 	m := &CmdMockExecutor{clones: map[string]string{}}
 	m.Stub = m.model
@@ -81,11 +75,24 @@ func (m *CmdMockExecutor) model(argv []string) ([]byte, error) {
 	if argv[0] == "git" {
 		return m.git(argv[1:])
 	}
+	if out, ok, err := m.packagesModel(cmd, argv); ok {
+		return out, err
+	}
 	return []byte(m.Out), nil
 }
 
-// captureInstallBody snapshots the install source file: the executor caller
-// deletes the temp file right after the call.
+func (m *CmdMockExecutor) packagesModel(cmd string, argv []string) ([]byte, bool, error) {
+	switch {
+	case strings.HasPrefix(cmd, "dpkg -s"), strings.HasPrefix(cmd, "brew list"), strings.HasPrefix(cmd, "npm ls"):
+		return nil, true, errors.New("stub: not installed")
+	case argv[0] == "sha256sum", argv[0] == "shasum":
+		return []byte("mocksha  " + argv[len(argv)-1] + "\n"), true, nil
+	case strings.HasPrefix(cmd, "apt list"):
+		return []byte("jq/stable,now 1.6 amd64 [upgradable from: 1.5]\n"), true, nil
+	}
+	return nil, false, nil
+}
+
 func (m *CmdMockExecutor) captureInstallBody(argv []string) {
 	cmd := argv
 	if len(cmd) > 0 && cmd[0] == "sudo" {
@@ -99,9 +106,6 @@ func (m *CmdMockExecutor) captureInstallBody(argv []string) {
 	}
 }
 
-// git models the source-checkout CLI calls (clone / rev-parse / fetch / reset) without
-// spawning git: a clone copies the file:// source worktree plus .git, a reset
-// re-copies it (the cache dir contract: hard reset to the remote tip).
 func (m *CmdMockExecutor) git(args []string) ([]byte, error) {
 	switch {
 	case args[0] == "clone":

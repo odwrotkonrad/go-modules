@@ -2,6 +2,16 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://gitlab.com/konradodwrot/go-modules/-/raw/main/che/assets/data/che.schema.json",
   "$defs": {
+    "CompletionsInstall": {
+      "properties": {
+        "zsh": {
+          "$ref": "#/$defs/ShellCompletionsInstall",
+          "description": "zsh completions installation options"
+        }
+      },
+      "additionalProperties": false,
+      "type": "object"
+    },
     "DestSpec": {
       "oneOf": [
         {
@@ -101,6 +111,94 @@
       "additionalProperties": false,
       "type": "object"
     },
+    "PackageRef": {
+      "oneOf": [
+        {
+          "type": "string"
+        },
+        {
+          "properties": {
+            "name": {
+              "type": "string",
+              "description": "canonical package name in the packages file"
+            },
+            "versions": {
+              "oneOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "items": {
+                    "type": "string"
+                  },
+                  "type": "array"
+                }
+              ]
+            },
+            "globalVersion": {
+              "type": "string",
+              "description": "which installed version becomes the default (version-manager methods only); defaults to the first listed"
+            }
+          },
+          "additionalProperties": false,
+          "type": "object",
+          "required": [
+            "name"
+          ]
+        }
+      ]
+    },
+    "Packages": {
+      "properties": {
+        "file": {
+          "type": "string",
+          "description": "packages.yml path; default $XDG_CONFIG_HOME/packages/packages.yml; overridden by --packages-file and CHE_PACKAGES_FILE"
+        },
+        "preferredInstallationMethods": {
+          "items": {
+            "type": "string",
+            "enum": [
+              "brew",
+              "cask",
+              "apt",
+              "npm",
+              "go",
+              "gem",
+              "prebuiltBinariesArchive",
+              "script",
+              "vscode",
+              "versionManager"
+            ]
+          },
+          "type": "array",
+          "description": "manager preference order: listed managers are tried first (in this order) within each package entry, unlisted ones follow in entry order; cascades profile \u003e spec \u003e user config; overridden by CHE_PACKAGES_PREFERRED_METHODS"
+        },
+        "prebuiltBinariesArchive": {
+          "$ref": "#/$defs/PrebuiltBinariesArchiveInstall",
+          "description": "prebuiltBinariesArchive installation method options"
+        },
+        "completions": {
+          "$ref": "#/$defs/CompletionsInstall",
+          "description": "zsh completions installation options"
+        }
+      },
+      "additionalProperties": false,
+      "type": "object"
+    },
+    "PrebuiltBinariesArchiveInstall": {
+      "properties": {
+        "installDestinationCandidates": {
+          "$ref": "#/$defs/StringOrList",
+          "description": "where binary-method binaries install: one path or a candidate list (~/ and $VARs expand); with checkPresentOnPath the first candidate on PATH wins, else the first entry; default ~/.local/bin; cascades profile \u003e spec \u003e user config; overridden by CHE_PACKAGES_PREBUILT_BINARIES_ARCHIVE_INSTALL_DESTINATION_CANDIDATES (comma-separated)"
+        },
+        "checkPresentOnPath": {
+          "type": "boolean",
+          "description": "pick the first candidate destination found on PATH and warn when none is; default true; overridden by CHE_PACKAGES_PREBUILT_BINARIES_ARCHIVE_CHECK_PRESENT_ON_PATH"
+        }
+      },
+      "additionalProperties": false,
+      "type": "object"
+    },
     "ProfileOptions": {
       "properties": {
         "runIf": {
@@ -128,6 +226,10 @@
         "profileWorkingDirectory": {
           "type": "string",
           "description": "the profile's load-ops source tree (empty: inherit spec options, then che level, then the checkout)"
+        },
+        "packages": {
+          "$ref": "#/$defs/Packages",
+          "description": "installPackages options for this profile (empty fields: inherit spec options, then user config)"
         }
       },
       "additionalProperties": false,
@@ -210,11 +312,30 @@
               "make-links",
               "make-copies",
               "render-templates",
+              "install-packages",
               "run-scripts"
             ]
           },
           "type": "array",
           "description": "ops skipped in the run sequence only (direct op subcommands unaffected); overridden by che run --skip-ops and CHE_RUN_SKIP_OPS"
+        }
+      },
+      "additionalProperties": false,
+      "type": "object"
+    },
+    "ShellCompletionsInstall": {
+      "properties": {
+        "enabled": {
+          "type": "boolean",
+          "description": "install zsh completions for packages carrying a completions def; default false; cascades profile \u003e spec \u003e user config; overridden by CHE_PACKAGES_COMPLETIONS_ZSH_ENABLED"
+        },
+        "installDestinationCandidates": {
+          "$ref": "#/$defs/StringOrList",
+          "description": "where zsh completion files install: one path or a candidate list (~/ and $VARs expand); with checkPresentOnFpath the first candidate on fpath wins, else the first entry; default [~/.local/share/zsh/site-functions, ~/.zfunc]; cascades profile \u003e spec \u003e user config; overridden by CHE_PACKAGES_COMPLETIONS_ZSH_INSTALL_DESTINATION_CANDIDATES (comma-separated)"
+        },
+        "checkPresentOnFpath": {
+          "type": "boolean",
+          "description": "pick the first candidate destination found on fpath ($FPATH, else zsh -c fpath) and warn when none is; default true; overridden by CHE_PACKAGES_COMPLETIONS_ZSH_CHECK_PRESENT_ON_FPATH"
         }
       },
       "additionalProperties": false,
@@ -261,9 +382,10 @@
           "enum": [
             "delta",
             "all",
-            "true"
+            "true",
+            "false"
           ],
-          "description": "default dry-run mode: delta (changed dests) | all (every dest) | true (alias for delta); overridden by the flag and env var"
+          "description": "default dry-run mode: delta (changed dests) | all (every dest) | true (alias for delta) | false (off, the default); overridden by the flag and env var"
         },
         "profiles": {
           "items": {
@@ -285,6 +407,7 @@
               "make-links",
               "make-copies",
               "render-templates",
+              "install-packages",
               "run-scripts"
             ]
           },
@@ -299,6 +422,10 @@
           "$ref": "#/$defs/RenderTemplates",
           "description": "renderTemplates op defaults"
         },
+        "packages": {
+          "$ref": "#/$defs/Packages",
+          "description": "installPackages op defaults"
+        },
         "otel": {
           "$ref": "#/$defs/Otel",
           "description": "OTLP telemetry (metrics + logs) to a local collector; overridden by CHE_OTEL_* env"
@@ -307,6 +434,19 @@
       "additionalProperties": false,
       "type": "object",
       "description": "reserved top-level options: block: spec-wide defaults (runIf gate, autoDiscover/logLevel/workingDirectory) + che knobs (validateSpec/dryRun/profiles/skipRemoteRefs/renderTemplates.skipSecrets); same shape as the user-config file"
+    },
+    "StringOrList": {
+      "oneOf": [
+        {
+          "type": "string"
+        },
+        {
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        }
+      ]
     },
     "dirGroup": {
       "properties": {
@@ -420,6 +560,13 @@
           "type": "array",
           "description": "drop matching dirs"
         },
+        "installPackages": {
+          "items": {
+            "type": "string"
+          },
+          "type": "array",
+          "description": "drop matching canonical package names"
+        },
         "runScripts": {
           "items": {
             "type": "string"
@@ -522,6 +669,13 @@
           },
           "type": "array",
           "description": "extra-dir perm-groups; each item one dir path (brace-expanded)"
+        },
+        "installPackages": {
+          "items": {
+            "$ref": "#/$defs/PackageRef"
+          },
+          "type": "array",
+          "description": "packages installed from the packages file (default $XDG_CONFIG_HOME/packages/packages.yml): canonical name scalar, or {name, version} to install a specific version (exact or wildcard), overriding the entry's default version; runs before runScripts"
         },
         "runScripts": {
           "items": {

@@ -16,7 +16,6 @@ import (
 	"gitlab.com/konradodwrot/go-modules/lib/testyml"
 )
 
-// sourceWant is profile_source_decode's expected.output.
 type sourceWant struct {
 	Source     string            `yaml:"source"`
 	Profile    string            `yaml:"profile"`
@@ -44,8 +43,6 @@ func TestProfileSourceDecode(t *testing.T) {
 	})
 }
 
-// AllPass gates on a profile's runIf; FindRecipe errors on undefined names.
-// Condition evaluations log at trace level only.
 func TestRunIfGate(t *testing.T) {
 	testyml.Run(t, td, "testdata/spec/funcs/run_if_pass.test.spec.yml", func(t *testing.T, c testyml.Case[bool]) {
 		for k, v := range c.Context.Env {

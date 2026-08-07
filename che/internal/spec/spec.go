@@ -1,4 +1,3 @@
-// Package spec parses, schema-validates, and resolves che.yml: profile recipes, include/exclude sets, spec and profile sources.
 package spec
 
 // [>] 🤖🤖
@@ -15,29 +14,19 @@ import (
 )
 
 const (
-	TmplExt = ".tpl"
-	CpExt   = ".ontoHost.cp"
-	// DefaultWorkingDir is the load-ops source tree when options.profileWorkingDirectory
-	// is unset: the checkout itself.
+	TmplExt           = ".tpl"
+	CpExt             = ".ontoHost.cp"
 	DefaultWorkingDir = "."
 )
 
-// tmplExts are the accepted template suffixes, longest first (informational
-// only: the dest path decides host vs repo).
 var tmplExts = []string{".ontoHost.tpl", ".ontoRepo.tpl", ".tpl"}
 
-// IsTmplSrc reports whether rel is a template source (any accepted suffix).
 func IsTmplSrc(rel string) bool { return strings.HasSuffix(rel, TmplExt) }
 
-// RemoteSrcPrefix marks a renderTemplates source as remote:
-// @<repo>//<path>[?ref=<ref>], fetched at render time.
 const RemoteSrcPrefix = "@"
 
-// IsRemoteSrc reports whether source is a remote template source.
 func IsRemoteSrc(source string) bool { return strings.HasPrefix(source, RemoteSrcPrefix) }
 
-// IncludedProfileRefs lists every include.profiles entry the recipe composes,
-// by display name (local bare names, sourced refs remote:<repo>:<name>).
 func (r ProfileRecipe) IncludedProfileRefs() []string {
 	var out []string
 	for _, ref := range r.Include.Profiles {
@@ -46,8 +35,6 @@ func (r ProfileRecipe) IncludedProfileRefs() []string {
 	return out
 }
 
-// SourcedRefs lists the recipe's include.profiles entries referencing another
-// spec (URI set): the remote/filesystem refs the init stage prefetches.
 func (r ProfileRecipe) SourcedRefs() []ProfileSourceRecipe {
 	var out []ProfileSourceRecipe
 	for _, ref := range r.Include.Profiles {
@@ -58,10 +45,8 @@ func (r ProfileRecipe) SourcedRefs() []ProfileSourceRecipe {
 	return out
 }
 
-// RemoteSrcRef strips the remote marker, yielding the fetchable ref.
 func RemoteSrcRef(source string) string { return strings.TrimPrefix(source, RemoteSrcPrefix) }
 
-// TrimTmplExt strips the template suffix (longest first), yielding the derived dest.
 func TrimTmplExt(rel string) string {
 	for _, ext := range tmplExts {
 		if trimmed, ok := strings.CutSuffix(rel, ext); ok {
@@ -72,8 +57,6 @@ func TrimTmplExt(rel string) string {
 }
 
 func (l *linkEntry) UnmarshalYAML(value *yaml.Node) error {
-	// A scalar dest is a rewrite rule, not a path list: capture it and drop the
-	// key so the alias decode (Dest []DestSpec) does not choke on the scalar.
 	node := value
 	if rule, rest, ok := takeScalarDest(value); ok {
 		l.DestRule = rule
@@ -83,9 +66,6 @@ func (l *linkEntry) UnmarshalYAML(value *yaml.Node) error {
 	return decodeScalarOr(node, &l.glob, (*alias)(l))
 }
 
-// decodeScalarOr implements the scalar-or-object union form shared by every
-// spec entry type: a scalar node's value lands in scalar, anything else
-// decodes into obj (an alias type, sidestepping UnmarshalYAML recursion).
 func decodeScalarOr[T any](value *yaml.Node, scalar *string, obj *T) error {
 	if value.Kind == yaml.ScalarNode {
 		*scalar = value.Value
@@ -123,14 +103,33 @@ func (o optionsSpec) over(base render.Options) render.Options {
 	return base
 }
 
+func (s *Scalar) UnmarshalYAML(value *yaml.Node) error {
+	if value.Kind != yaml.ScalarNode {
+		return fmt.Errorf("want a scalar, got kind %v", value.Kind)
+	}
+	*s = Scalar(value.Value)
+	return nil
+}
+
+func (s *StringOrList) UnmarshalYAML(value *yaml.Node) error {
+	if value.Kind == yaml.ScalarNode {
+		*s = StringOrList{value.Value}
+		return nil
+	}
+	var list []string
+	if err := value.Decode(&list); err != nil {
+		return err
+	}
+	*s = list
+	return nil
+}
+
 func (d *dirSpec) UnmarshalYAML(value *yaml.Node) error {
 	type alias dirSpec
 	return decodeScalarOr(value, &d.glob, (*alias)(d))
 }
 
 func (f *fileSpec) UnmarshalYAML(value *yaml.Node) error {
-	// A scalar dest is a rewrite rule, not a path list: capture it and drop the
-	// key so the alias decode (Dest []DestSpec) does not choke on the scalar.
 	node := value
 	if rule, rest, ok := takeScalarDest(value); ok {
 		f.DestRule = rule
@@ -140,8 +139,6 @@ func (f *fileSpec) UnmarshalYAML(value *yaml.Node) error {
 	return decodeScalarOr(node, &f.glob, (*alias)(f))
 }
 
-// takeScalarDest returns a mapping node's scalar `dest` value and a copy of the
-// node with that key removed. ok is false when there is no scalar dest.
 func takeScalarDest(value *yaml.Node) (string, *yaml.Node, bool) {
 	if value.Kind != yaml.MappingNode {
 		return "", nil, false
@@ -158,8 +155,6 @@ func takeScalarDest(value *yaml.Node) (string, *yaml.Node, bool) {
 	return "", nil, false
 }
 
-// DestRel is a file item's pre-host-mapping dest rel: the rewritten Dests[0]
-// when a dest rule applied, else the source Rel (1:1).
 func DestRel(it FileItem) string {
 	if len(it.Dests) > 0 {
 		return it.Dests[0].Path
@@ -167,8 +162,6 @@ func DestRel(it FileItem) string {
 	return it.Rel
 }
 
-// Load parses che.yml: reserved top-level keys options/env/include, every
-// other key one ProfileRecipe (stamped with its name).
 func Load(path string) (*Doc, error) {
 	b, err := os.ReadFile(path)
 	if err != nil {
@@ -192,7 +185,6 @@ func Load(path string) (*Doc, error) {
 	return d, nil
 }
 
-// decodeKey decodes one top-level entry: a reserved key or a profile block.
 func (d *Doc) decodeKey(key string, node *yaml.Node) error {
 	switch key {
 	case "options":

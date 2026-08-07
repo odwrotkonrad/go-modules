@@ -12,8 +12,6 @@ import (
 	"gitlab.com/konradodwrot/go-modules/che/internal/fsutil"
 )
 
-// NewEvaluator wires the builtin sources (isOs (macos|linux|...), isVirt) and
-// the env: lookup, which reads the injected launch env.
 func NewEvaluator(lookupEnv func(string) string) *Evaluator {
 	return &Evaluator{
 		builtins: map[string]func() string{
@@ -24,9 +22,6 @@ func NewEvaluator(lookupEnv func(string) string) *Evaluator {
 	}
 }
 
-// EvalRunIf evaluates one expression: `<source>` (truthy: builtin iff "true",
-// env iff set non-empty) or `<source> == <literal>` (string compare, builtins
-// render as true/false).
 func (e *Evaluator) EvalRunIf(expr string) (bool, error) {
 	parts := strings.Split(expr, "==")
 	switch len(parts) {
@@ -44,7 +39,6 @@ func (e *Evaluator) EvalRunIf(expr string) (bool, error) {
 	}
 }
 
-// resolve maps a source to its value plus its bare-form truthiness.
 func (e *Evaluator) resolve(src string) (string, bool, error) {
 	switch {
 	case strings.HasPrefix(src, "builtin:"):

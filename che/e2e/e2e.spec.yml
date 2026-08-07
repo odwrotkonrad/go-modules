@@ -50,15 +50,15 @@ defs:
   allProfilesTemplatesAccurate: &allProfilesTemplatesAccurate [*profilePlainTemplateAccurate, *profileConditionalTemplateAccurate, *profileRemoteTemplateAccurate]
   allProfilesDirsExists: &allProfilesDirsExists [*profilePlainDirExists, *profileConditionalDirExists, *profileRemoteDirExists]
   allProfilesDirsAccurate: &allProfilesDirsAccurate [*profilePlainDirAccurate, *profileConditionalDirAccurate, *profileRemoteDirAccurate]
+  allProfilesHomeDirsExists: &allProfilesHomeDirsExists [*profilePlainHomeDirExists, *profileConditionalHomeDirExists, *profileRemoteHomeDirExists]
   allProfilesScriptOutputsExists: &allProfilesScriptOutputsExists [*profilePlainScriptOutputExists, *profileConditionalScriptOutputExists, *profileRemoteScriptOutputExists]
   allProfilesScriptOutputsAccurate: &allProfilesScriptOutputsAccurate [*profilePlainScriptOutputAccurate, *profileConditionalScriptOutputAccurate, *profileRemoteScriptOutputAccurate]
-  allProfilesHomeDirsExists: &allProfilesHomeDirsExists [*profilePlainHomeDirExists, *profileConditionalHomeDirExists, *profileRemoteHomeDirExists]
   allProfilesAllFilesExists: &allProfilesAllFilesExists [*allProfilesLinksExists, *allProfilesCopiesExists, *allProfilesTemplatesExists, *allProfilesDirsExists, *allProfilesScriptOutputsExists, *allProfilesHomeDirsExists, *profileDroppedHomeDirExists]
   allProfilesAllFilesAccurate: &allProfilesAllFilesAccurate [*allProfilesLinksAccurate, *allProfilesCopiesAccurate, *allProfilesTemplatesAccurate, *allProfilesDirsAccurate, *allProfilesScriptOutputsAccurate]
 
 testCases:
   - name: dry-run-e2e
-    context: {env: {CHE_LOG_LEVEL: trace}}
+    context: {env: {CHE_LOG_LEVEL: trace, PATH: "${FAKEBIN}:${PATH}"}}
     steps:
       - name: DiscoverProfiles
         command: che discover-profiles
@@ -101,9 +101,14 @@ testCases:
         expected: {stdOut: ["create ${HOME}/plain/tpl (dry run)"]}
         notExpected: {files: *allProfilesAllFilesExists}
 
+      - name: InstallPackagesDryRun
+        command: che packages install --dry-run=all
+        expected: {stdOut: ["install e2e-plain via npm (dry run)"]}
+        notExpected: {files: *allProfilesAllFilesExists}
+
       - name: RunScriptsDryRun
         command: che run-scripts --dry-run=all
-        expected: {stdOut: ["run ${LOCAL}/install/plain-script (dry run)"]}
+        expected: {stdOut: ["run ${LOCAL}/scripts/plain-script (dry run)"]}
         notExpected: {files: *allProfilesAllFilesExists}
 
       - name: PruneBrokenLinksDryRun
@@ -146,7 +151,7 @@ testCases:
             - "(default)"
 
   - name: e2e
-    context: {env: {CHE_LOG_LEVEL: info}}
+    context: {env: {CHE_LOG_LEVEL: info, PATH: "${FAKEBIN}:${PATH}"}}
     steps:
       - name: DiscoverProfiles
         command: che discover-profiles
@@ -159,12 +164,14 @@ testCases:
               make-links: 3 changes
               make-copies: 1 change
               render-templates: 1 change
+              install-packages: 1 change
               run-scripts: 1 change
             ## Profile conditional  (profile workdir: ${LOCAL}/root)
               make-dirs: 2 changes
               make-links: 1 change
               make-copies: 1 change
               render-templates: 1 change
+              install-packages: 1 change
               run-scripts: 1 change
             ## Profile remote-empty  (profile workdir: ${LOCAL}/root)
               no changes
@@ -173,6 +180,7 @@ testCases:
               make-links: 1 change
               make-copies: 1 change
               render-templates: 1 change
+              install-packages: 1 change
               run-scripts: 1 change
 
       - name: Run
@@ -260,15 +268,19 @@ testCases:
           stdOut: ["will run ", "will not run "]
           files: [*allProfilesTemplatesExists, *allProfilesDirsExists]
 
+      - name: InstallPackages
+        command: che packages install
+        expected:
+          stdOut:
+            - "installed e2e-plain via npm"
+            - "installed e2e-remote via npm"
+        notExpected:
+          stdOut: ["will run ", "will not run "]
+
       - name: RunScripts
         command: che run-scripts
         expected:
           files: *allProfilesScriptOutputsAccurate
-        notExpected:
-          stdOut: ["will run ", "will not run "]
-
-      - name: RunScriptsUninstall
-        command: che uninstall
         notExpected:
           stdOut: ["will run ", "will not run "]
 
@@ -278,6 +290,15 @@ testCases:
             - "${HOME}/plain/script-output"
             - "${HOME}/conditional/script-output"
             - "${HOME}/remote/script-output"
+
+      - name: CleanupBeforeAccumulate
+        command: che uninstall
+        notExpected:
+          stdOut: ["will run ", "will not run "]
+
+      - name: CleanupBeforeAccumulateDirs
+        remove:
+          paths:
             - "${HOME}/plain"
             - "${HOME}/conditional"
             - "${HOME}/remote"
@@ -290,7 +311,6 @@ testCases:
           files: *allProfilesDirsAccurate
         notExpected:
           stdOut: ["will run ", "will not run "]
-          files: [*allProfilesLinksExists, *allProfilesCopiesExists, *allProfilesTemplatesExists, *allProfilesScriptOutputsExists]
 
       - name: AccumulateMakeLinks
         command: che make-links
@@ -298,7 +318,6 @@ testCases:
           files: [*allProfilesDirsAccurate, *allProfilesLinksAccurate]
         notExpected:
           stdOut: ["will run ", "will not run "]
-          files: [*allProfilesCopiesExists, *allProfilesTemplatesExists, *allProfilesScriptOutputsExists]
 
       - name: AccumulateMakeCopies
         command: che make-copies
@@ -306,7 +325,6 @@ testCases:
           files: [*allProfilesDirsAccurate, *allProfilesLinksAccurate, *allProfilesCopiesAccurate]
         notExpected:
           stdOut: ["will run ", "will not run "]
-          files: [*allProfilesTemplatesExists, *allProfilesScriptOutputsExists]
 
       - name: AccumulateRenderTemplates
         command: che render-templates
@@ -314,7 +332,13 @@ testCases:
           files: [*allProfilesDirsAccurate, *allProfilesLinksAccurate, *allProfilesCopiesAccurate, *allProfilesTemplatesAccurate]
         notExpected:
           stdOut: ["will run ", "will not run "]
-          files: *allProfilesScriptOutputsExists
+
+      - name: AccumulateInstallPackages
+        command: che packages install
+        expected:
+          stdOut: ["installed e2e-plain via npm"]
+        notExpected:
+          stdOut: ["will run ", "will not run "]
 
       - name: AccumulateRunScripts
         command: che run-scripts
@@ -365,7 +389,7 @@ testCases:
           files: *allProfilesLinksExists
 
   - name: backup-e2e
-    context: {env: {CHE_LOG_LEVEL: info}}
+    context: {env: {CHE_LOG_LEVEL: info, PATH: "${FAKEBIN}:${PATH}"}}
     steps:
       - name: MakeCopies
         command: che make-copies
@@ -484,4 +508,98 @@ testCases:
             - "${HOME}/plain"
         notExpected:
           files: *allProfilesAllFilesExists
+
+  - name: packages-e2e
+    context:
+      env:
+        PATH: "${FAKEBIN}:${FAKEBIN2}:${PATH}"
+        E2E_NPM_PREFIX: "${WORK}/npmprefix"
+    steps:
+      - name: SeedShadowedManagerBinary
+        write:
+          path: "${WORK}/npmprefix/bin/e2e-dup"
+          content: shadowed-manager-binary
+
+      - name: CheckPresentPassesForPresentCommand
+        command: che packages install --packages-file ${LOCAL}/packages.yml e2e-present
+        expected:
+          exitCode: 0
+        notExpected:
+          stdOut: ["missing e2e-present"]
+
+      - name: InstallWarnsMissingCommandAfterRun
+        command: che packages install --packages-file ${LOCAL}/packages.yml e2e-absent
+        expected:
+          exitCode: 0
+          stdOut:
+            - "installed e2e-absent via npm"
+            - "missing e2e-absent"
+
+      - name: InstallBinaryDownloadsVerifiesInstalls
+        command: che packages install --packages-file ${LOCAL}/packages.yml e2e-bin-new
+        expected:
+          exitCode: 0
+          stdOut:
+            - "installed e2e-bin-new via prebuiltBinariesArchive"
+
+      - name: InstallFailsOnManagerMissingPackage
+        command: che packages install --packages-file ${LOCAL}/packages.yml e2e-missing-pkg
+        expected:
+          exitCode: 1
+          stdOut:
+            - "npm install --global e2e-missing-pkg"
+
+      - name: InstallFailsOnPackageMissingFromConfig
+        command: che packages install --packages-file ${LOCAL}/packages.yml nosuchpkg
+        expected:
+          exitCode: 1
+          stdOut:
+            - "unknown package: nosuchpkg (add it to ${LOCAL}/packages.yml)"
+
+      - name: InstallFailsOnWrongBinaryUrl
+        command: che packages install --packages-file ${LOCAL}/packages.yml e2e-bin-bad
+        expected:
+          exitCode: 1
+          stdOut:
+            - "curl"
+            - "e2e-bin-bad"
+        notExpected:
+          stdOut: ["installed e2e-bin-bad"]
+
+      - name: CheckPresentFailsOnAbsentCommand
+        command: che packages check-present --packages-file ${LOCAL}/packages.yml e2e-present e2e-absent
+        expected:
+          exitCode: 1
+          stdOut:
+            - "missing e2e-absent"
+        notExpected:
+          stdOut: ["missing e2e-present"]
+
+      - name: CheckUpgradableWarnsManagerAndBinaryDrift
+        command: che packages check-upgradable --packages-file ${LOCAL}/packages.yml e2e-outdated e2e-bin e2e-bin-old
+        expected:
+          exitCode: 0
+          stdOut:
+            - "upgradable e2e-outdated via npm"
+            - "upgradable e2e-bin-old via prebuiltBinariesArchive: yaml pins 9.9.9"
+        notExpected:
+          stdOut: ["upgradable e2e-bin via prebuiltBinariesArchive"]
+
+      - name: CheckNotShadowedWarnsShadowedOnly
+        command: che packages check-not-shadowed --packages-file ${LOCAL}/packages.yml e2e-dup e2e-present
+        expected:
+          exitCode: 0
+          stdOut:
+            - "e2e-dup shadowed by ${FAKEBIN}/e2e-dup (expected ${WORK}/npmprefix/bin/e2e-dup)"
+        notExpected:
+          stdOut: ["e2e-present shadowed"]
+
+      - name: CheckSinglePresentWarnsDuplicatesOnly
+        command: che packages check-single-present --packages-file ${LOCAL}/packages.yml e2e-dup e2e-present
+        expected:
+          exitCode: 0
+          stdOut:
+            - "multiple present e2e-dup: ${FAKEBIN}/e2e-dup, ${FAKEBIN2}/e2e-dup"
+        notExpected:
+          stdOut: ["multiple present e2e-present"]
 ##[<] 🤖🤖

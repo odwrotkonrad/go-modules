@@ -173,6 +173,20 @@ Scenario: a user audits every config option, value and source, on demand
   When I invoke `che config show --all`
   Then the output lists every config option with its value and source
 
+Scenario: a config author maintains a default config file straight from che
+  Status: tested
+  When I invoke `che config show --defaults`
+  Then every option prints with its code default, configured values ignored
+  And `--defaults` is mutually exclusive with `--delta` and `--all`
+
+Scenario: a config author seeds a config.yml from any config show mode
+  Status: tested
+  When I invoke `che config show [--all|--defaults] --output=yaml`
+  Then the options print as nested YAML in the config-file shape (`packages.binary.checkInPath` -> `packages: {binary: {checkInPath: ...}}`), in config order
+  And bools and lists keep their types, flag-only options (cheWorkingDirectory, skipRunIf, errexit, packages.override) are omitted
+  And the output round-trips: saved as `$XDG_CONFIG_HOME/che/config.yml` it resolves without error
+  And `--output=text` (the default) keeps the `key = value  (source)` lines
+
 Scenario: a user pipes config show output straight into tools, no summary line to strip
   Status: tested
   When I invoke `che config show` in any mode

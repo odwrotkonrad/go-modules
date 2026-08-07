@@ -16,9 +16,6 @@ import (
 	"gitlab.com/konradodwrot/go-modules/lib/testyml"
 )
 
-// mkRepo creates a fake repo under root/rel with a .git marker and, if purpose
-// is non-empty, an assets/docs-agents/purpose.md carrying it. [why] .git
-// markers are stamped at runtime: nested .git dirs cannot be version-controlled.
 func mkRepo(t *testing.T, root, rel, purpose string) {
 	t.Helper()
 	testutil.WriteFile(t, filepath.Join(root, rel, ".git", "HEAD"), "ref: refs/heads/main\n")
@@ -27,16 +24,6 @@ func mkRepo(t *testing.T, root, rel, purpose string) {
 	}
 }
 
-// workspace tree:
-//
-//	root/
-//	  leaf/            (leaf subgroup: two repos)
-//	    alpha (repo, purpose)
-//	    beta  (repo, no purpose)
-//	  parent/          (parent subgroup: one direct repo + one child subgroup)
-//	    direct (repo, purpose)
-//	    child/         (child subgroup: one repo)
-//	      gamma (repo, purpose)
 func buildWorkspace(t *testing.T) string {
 	t.Helper()
 	root := t.TempDir()
@@ -61,8 +48,6 @@ func TestRepoGroupIndexDir(t *testing.T) {
 	})
 }
 
-// groupIndexWant is repo_group_index's expected.output: subgroup keys the walk
-// must (not) yield, per-key content matchers, per-key expected-file indexes.
 type groupIndexWant struct {
 	Keys        []string          `yaml:"keys"`
 	MissingKeys []string          `yaml:"missingKeys"`

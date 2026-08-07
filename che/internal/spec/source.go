@@ -15,8 +15,6 @@ import (
 	"gitlab.com/konradodwrot/go-modules/che/internal/source"
 )
 
-// GetSourceType classifies the URI: @-prefixed -> remote, else filesystem
-// (local "" included).
 func (r SourceRecipe) GetSourceType() SourceType {
 	if IsRemoteSrc(r.URI) {
 		return SourceTypes.Remote
@@ -24,8 +22,6 @@ func (r SourceRecipe) GetSourceType() SourceType {
 	return SourceTypes.Filesystem
 }
 
-// IsValid rejects malformed URIs: remote needs a non-empty git URL after the
-// marker; "" (local) and path shapes pass.
 func (r SourceRecipe) IsValid() error {
 	if r.GetSourceType() == SourceTypes.Remote && RemoteSrcRef(r.URI) == "" {
 		return fmt.Errorf("source %q: empty git url after %q", r.URI, RemoteSrcPrefix)
@@ -33,9 +29,6 @@ func (r SourceRecipe) IsValid() error {
 	return nil
 }
 
-// prepare resolves the source into its local directory (remote: clone/pull
-// the cache checkout; filesystem: expand ~/, $VAR, relative -> repoRoot;
-// "" local -> DirectoryPath or repoRoot) and locates its che.yml.
 func (r SourceRecipe) prepare(repoRoot, home string) (SourceReady, error) {
 	if err := r.IsValid(); err != nil {
 		return SourceReady{}, err
@@ -55,7 +48,6 @@ func (r SourceRecipe) prepare(repoRoot, home string) (SourceReady, error) {
 func (r SourceRecipe) resolveDir(repoRoot, home string) (string, error) {
 	if r.GetSourceType() == SourceTypes.Remote {
 		// [why] @<repo>//<subdir> targets a spec nested in the remote checkout,
-		// anchoring the profile at that subdir like a local nested spec.
 		repo, sub := splitRepoSubdir(RemoteSrcRef(r.URI))
 		dir, err := source.EnsureCheckout(home, repo)
 		if err != nil || sub == "" {
@@ -79,8 +71,6 @@ func (r SourceRecipe) resolveDir(repoRoot, home string) (string, error) {
 	return dir, nil
 }
 
-// splitRepoSubdir splits a remote ref at the // subdir marker, skipping a
-// scheme's :// separator (file://, https://).
 func splitRepoSubdir(ref string) (string, string) {
 	start := 0
 	if i := strings.Index(ref, "://"); i >= 0 {
@@ -92,7 +82,6 @@ func splitRepoSubdir(ref string) (string, string) {
 	return ref, ""
 }
 
-// expandDir expands ~/, $VAR and anchors relative paths at repoRoot.
 func expandDir(ref, repoRoot, home string) (string, error) {
 	dir := fsutil.ExpandHome(os.ExpandEnv(ref), home)
 	if dir == "~" {
@@ -104,27 +93,20 @@ func expandDir(ref, repoRoot, home string) (string, error) {
 	return dir, nil
 }
 
-// PrepareSource resolves the spec source: isValid, then resolve into
-// DirectoryPath; the target must hold a valid che.yml.
 func (r SpecSourceRecipe) PrepareSource(repoRoot, home string) (SpecSourceReady, error) {
 	ready, err := r.prepare(repoRoot, home)
 	return SpecSourceReady{ready}, err
 }
 
-// PrepareSource resolves the containing spec of the referenced profile.
 func (r ProfileSourceRecipe) PrepareSource(repoRoot, home string) (ProfileSourceReady, error) {
 	ready, err := r.prepare(repoRoot, home)
 	return ProfileSourceReady{SourceReady: ready, ProfileName: r.ProfileName}, err
 }
 
-// GetProfileName is the one accessor for a profile's name.
 func (r ProfileSourceRecipe) GetProfileName() string { return r.ProfileName }
 
-// GetProfileName is the one accessor for a profile's name.
 func (r ProfileSourceReady) GetProfileName() string { return r.ProfileName }
 
-// String renders the canonical ref form: bare name local, else
-// <source>/<spec-file>::<name> (spec file defaults to che.yml).
 func (r ProfileSourceRecipe) String() string {
 	if r.URI == "" {
 		return r.ProfileName
@@ -132,9 +114,6 @@ func (r ProfileSourceRecipe) String() string {
 	return r.URI + "/" + cmp.Or(r.SpecFile, "che.yml") + "::" + r.ProfileName
 }
 
-// DisplayRef is the profile's log display name: the bare name local, a remote
-// source rendered "remote:<reponame>:<name>" (repo = the git url's last path
-// segment, .git stripped), a filesystem source the canonical ref.
 func (r ProfileSourceRecipe) DisplayRef() string {
 	if r.URI == "" {
 		return r.ProfileName
@@ -145,7 +124,6 @@ func (r ProfileSourceRecipe) DisplayRef() string {
 	return r.String()
 }
 
-// repoName derives a git url's repo name: the last path segment, .git stripped.
 func repoName(url string) string {
 	s := strings.TrimSuffix(strings.TrimSuffix(url, "/"), ".git")
 	if i := strings.LastIndexAny(s, "/:"); i >= 0 {
@@ -154,10 +132,6 @@ func repoName(url string) string {
 	return s
 }
 
-// UnmarshalYAML decodes an include.profiles entry: a scalar is a local profile
-// name; an object's `source` is `<source>/<spec-file>::<profile>` (bare
-// `<profile>` -> local) with `options`/`env` alongside. Splits source into URI
-// + SpecFile + ProfileName; env is allowed on sourced entries only.
 func (r *ProfileSourceRecipe) UnmarshalYAML(value *yaml.Node) error {
 	var scalar string
 	type alias ProfileSourceRecipe
@@ -180,10 +154,6 @@ func (r *ProfileSourceRecipe) UnmarshalYAML(value *yaml.Node) error {
 	return nil
 }
 
-// splitSourceRef splits `<source>/<spec-file>::<profile>` into its parts. No
-// `::` -> a bare local profile name (empty URI + spec file). Otherwise the last
-// `/`-segment before `::` is the spec file (must end in .yml, distinguishing it
-// from a `.git` source suffix), and the rest is the source.
 func splitSourceRef(src string) (uri, specFile, profile string, err error) {
 	i := strings.LastIndex(src, "::")
 	if i < 0 {
@@ -194,7 +164,6 @@ func splitSourceRef(src string) (uri, specFile, profile string, err error) {
 		return "", "", "", fmt.Errorf("include.profiles source %q: missing profile name", src)
 	}
 	// [why] split on the last '/' by hand: path.Dir collapses the // in
-	// file:// / https:// URLs.
 	slash := strings.LastIndex(ref, "/")
 	if slash <= 0 {
 		return "", "", "", fmt.Errorf("include.profiles source %q: needs a <source>/<spec-file>.yml::<profile> path", src)

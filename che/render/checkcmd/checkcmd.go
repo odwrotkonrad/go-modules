@@ -1,4 +1,3 @@
-// Package checkcmd implements the render CLIs' --check mode: render aside, diff against the dest, non-zero on drift.
 package checkcmd
 
 // [>] 🤖🤖
@@ -64,7 +63,6 @@ func (t Tool) check(path string) error {
 	return &yamlcfg.CodedError{Code: codeDrift, Msg: strings.TrimSuffix(drift, "\n")}
 }
 
-// coded passes coded errors through, wraps the rest as runtime failures.
 func coded(err error) error {
 	if _, ok := errors.AsType[*yamlcfg.CodedError](err); ok {
 		return err

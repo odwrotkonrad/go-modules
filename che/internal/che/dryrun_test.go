@@ -17,7 +17,6 @@ import (
 	"gitlab.com/konradodwrot/go-modules/lib/testyml"
 )
 
-// snapshotTree: sorted path + content under dir. [why] prove dry-run mutates nothing.
 func snapshotTree(t *testing.T, dir string) string {
 	t.Helper()
 	var lines []string
@@ -43,9 +42,6 @@ func snapshotTree(t *testing.T, dir string) string {
 	return strings.Join(lines, "\n")
 }
 
-// TestDryRunDelta: each op under dry-run=delta prints only dry-run lines
-// (expected.stdOut pins per-op line format) and mutates nothing; the spec must
-// cover every op in ops.
 func TestDryRunDelta(t *testing.T) {
 	covered := map[string]bool{}
 	testyml.Run(t, td, "testdata/spec/cmds/dry_run_delta.test.spec.yml", func(t *testing.T, c testyml.Case[struct{}]) {
@@ -74,8 +70,6 @@ func TestDryRunDelta(t *testing.T) {
 	}
 }
 
-// settlers put one dest into desired state (link points into repo / copy
-// matches), returning it.
 var settlers = map[string]func(*testing.T, *ProfileReady, spec.OperationRecipes) string{
 	"make-links": func(t *testing.T, p *ProfileReady, r spec.OperationRecipes) string {
 		t.Helper()
@@ -103,9 +97,6 @@ var settlers = map[string]func(*testing.T, *ProfileReady, spec.OperationRecipes)
 	},
 }
 
-// TestDryRunAll: a settled dest reports only under dry-run=all, delta skips it.
-// expected.stdOut matches the all run, notExpected.stdOut the delta run, ${DEST}
-// expands to the settled dest.
 func TestDryRunAll(t *testing.T) {
 	testyml.Run(t, td, "testdata/spec/cmds/dry_run_all.test.spec.yml", func(t *testing.T, c testyml.Case[struct{}]) {
 		op := strings.Join(c.Context.CommandArgs(), "-")

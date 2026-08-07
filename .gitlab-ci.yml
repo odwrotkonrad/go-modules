@@ -10,6 +10,7 @@ stages:
   - verify
   - test-unit
   - test-e2e
+  - test-e2e-installs
   - coverage
   - release
   - publish
@@ -103,7 +104,7 @@ test-che:
   image: $CI_IMAGE
   stage: test-e2e
   needs:
-    - job: test-che
+    - job: warm-go
       optional: true
   cache:
     - key: go-mod
@@ -143,6 +144,49 @@ test-e2e-che-backup:
   artifacts:
     paths:
       - che/cover-e2e-backup/
+
+##[>] 🤖🤖
+#[what] real-install e2e: each installation method installs live packages into a throwaway HOME, then runs each one
+#[why] every other test stubs exec: only these prove the methods against real registries, archives and repos
+.test-install-methods:
+  stage: test-e2e-installs
+  needs: []
+  rules:
+    - if: $CI_PIPELINE_SOURCE == "merge_request_event" || $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
+      changes: [che/internal/packages/**/*, che/e2e/install_methods*]
+      allow_failure: true
+    - if: $CI_PIPELINE_SOURCE == "merge_request_event" || $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
+      when: manual
+      allow_failure: true
+  script:
+    - make -C che e2e-install-methods METHOD="$METHOD"
+
+test-install-methods-linux:
+  extends: .test-install-methods
+  image: debian:bookworm-slim
+  parallel:
+    matrix:
+      - METHOD: [apt, prebuiltBinariesArchive, script, versionManager, npm, go]
+  before_script:
+    #[why] bootstrap minimum only: zsh + clang run the Makefile itself, the rest installs through basePackages and each package's requires
+    - apt-get update && apt-get install -y --no-install-recommends ca-certificates curl make sudo zsh clang
+    - curl -fsSL --connect-timeout 30 --retry 10 --retry-delay 30 --retry-all-errors -o /tmp/go.tar.gz https://go.dev/dl/go1.26.4.linux-amd64.tar.gz
+    - tar -xzf /tmp/go.tar.gz -C /usr/local
+    - export PATH=/usr/local/go/bin:$PATH
+
+test-install-methods-darwin:
+  extends: .test-install-methods
+  tags:
+    - saas-macos-medium-m1
+  image: macos-26-xcode-26
+  parallel:
+    matrix:
+      - METHOD: [brew/formulae, brew/cask, prebuiltBinariesArchive, script, versionManager]
+  before_script:
+    - curl -fsSL --connect-timeout 30 --retry 10 --retry-delay 30 --retry-all-errors -o /tmp/go.tar.gz "https://go.dev/dl/go1.26.4.darwin-arm64.tar.gz"
+    - sudo tar -xzf /tmp/go.tar.gz -C /usr/local
+    - export PATH=/usr/local/go/bin:$PATH
+##[<] 🤖🤖
 
 coverage-che:
   image: $CI_IMAGE
@@ -253,10 +297,18 @@ release-lib:
     - sed -i 's|(\.\./assets/data/che.schema.json)|(assets/data/che.schema.json)|g' che/docs/spec.md
     - printf '# che\n' > che/docs/index.md
     - tail -n +2 che/assets/docs-agents/purpose.md >> che/docs/index.md
+    ##[>] 🤖🤖
+    - printf '\n## Install\n\n' >> che/docs/index.md
+    - printf '```sh\ncurl -fsSL https://konradodwrot.gitlab.io/go-modules/install.sh | sh\n```\n' >> che/docs/index.md
+    ##[<] 🤖🤖
     - printf '# License\n\n```\n' > che/docs/license.md
     - cat LICENSE >> che/docs/license.md
     - printf '```\n' >> che/docs/license.md
     - cd che && mkdocs build --site-dir ../public
+    ##[>] 🤖🤖
+    - cp install.sh ../public/install.sh
+    - if [ -d ../public-apt ]; then cp -R ../public-apt ../public/apt; fi
+    ##[<] 🤖🤖
     - echo "docs preview -> https://konradodwrot.gitlab.io/-/go-modules/-/jobs/$CI_JOB_ID/artifacts/public/index.html"
   artifacts:
     paths:
@@ -266,7 +318,9 @@ pages-publish:
   extends: .pages-build
   stage: publish
   pages: true
-  needs: [release-che]
+  needs:
+    - release-che
+    - apt-build-che
   rules:
     - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
       changes: [che/**/*]
@@ -366,6 +420,7 @@ goreleaser-linux-che:
   artifacts:
     paths:
       - che/dist/*.tar.gz
+      - che/dist/*.deb
     expire_in: 1 day
 
 prerelease-darwin-che:
@@ -376,8 +431,6 @@ prerelease-darwin-che:
   rules:
     - if: $CI_PIPELINE_SOURCE == "merge_request_event"
       changes: [che/**/*, lib/**/*]
-      when: manual
-      allow_failure: true
   variables:
     MODULE_VERSION: 0.0.0-mr${CI_MERGE_REQUEST_IID}
     GOPATH: $CI_PROJECT_DIR/.cache/go-path
@@ -419,8 +472,6 @@ prerelease-linux-che:
   rules:
     - if: $CI_PIPELINE_SOURCE == "merge_request_event"
       changes: [che/**/*, lib/**/*]
-      when: manual
-      allow_failure: true
   variables:
     MODULE_VERSION: 0.0.0-mr${CI_MERGE_REQUEST_IID}
     ARCH: amd64
@@ -458,6 +509,33 @@ publish-che:
     - make publish
 
 ##[>] 🤖🤖
+apt-build-che:
+  stage: publish
+  image: $CI_IMAGE
+  needs:
+    - job: publish-che
+      optional: true
+  rules:
+    - if: $CI_COMMIT_TAG =~ /^che\/v/
+    - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
+      changes: [che/**/*]
+  script:
+    - apt-get update && apt-get install -y --no-install-recommends aptly gnupg
+    - make publish-apt
+  artifacts:
+    paths:
+      - public-apt
+    expire_in: 1 day
+
+pages-publish-tag:
+  extends: .pages-build
+  stage: publish
+  pages: true
+  needs:
+    - apt-build-che
+  rules:
+    - if: $CI_COMMIT_TAG =~ /^che\/v/
+
 publish-brew-che:
   stage: publish
   image: $CI_IMAGE

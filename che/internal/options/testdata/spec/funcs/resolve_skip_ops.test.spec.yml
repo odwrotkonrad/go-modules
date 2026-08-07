@@ -36,7 +36,7 @@ cases:
       args: [flag: [foo]]
     expected:
       errorOutput:
-        - 'invalid skip-ops op "foo": want one of prune-broken-links, make-dirs, make-links, make-copies, render-templates, run-scripts'
+        - 'invalid skip-ops op "foo": want one of prune-broken-links, make-dirs, make-links, make-copies, render-templates, install-packages, run-scripts'
   - name: ShouldErrorOnUnknownAllOnlyOp
     context: {env: {CHE_RUN_SKIP_OPS: "bar"}}
     expected:

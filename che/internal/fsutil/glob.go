@@ -8,7 +8,6 @@ import (
 	"github.com/bmatcuk/doublestar/v4"
 )
 
-// IsGlobMatch matches path against pattern. ** spans separators, * one segment, prefix may end in * (suffix glob).
 func IsGlobMatch(pattern, path string) bool {
 	if base, ok := strings.CutSuffix(pattern, "/**"); ok {
 		return IsUnder(path, base)
@@ -17,8 +16,6 @@ func IsGlobMatch(pattern, path string) bool {
 	return err == nil && ok
 }
 
-// ExpandBraces expands {a,b,c} groups into the cartesian product (zsh-style), e.g. "x/{a,b}/y" -> ["x/a/y","x/b/y"].
-// No braces returns the pattern unchanged.
 func ExpandBraces(pattern string) []string {
 	open := strings.IndexByte(pattern, '{')
 	if open < 0 {
@@ -37,7 +34,7 @@ func ExpandBraces(pattern string) []string {
 		}
 	}
 	if closeAt < 0 {
-		return []string{pattern} // unbalanced, leave as-is
+		return []string{pattern}
 	}
 	pre, body, post := pattern[:open], pattern[open+1:closeAt], pattern[closeAt+1:]
 	var out []string
@@ -47,7 +44,6 @@ func ExpandBraces(pattern string) []string {
 	return out
 }
 
-// splitTopLevel splits a brace body on top-level commas.
 func splitTopLevel(body string) []string {
 	var parts []string
 	depth, start := 0, 0
@@ -67,7 +63,6 @@ func splitTopLevel(body string) []string {
 	return append(parts, body[start:])
 }
 
-// ExpandAll brace-expands every pattern in xs, flattened.
 func ExpandAll(xs []string) []string {
 	var out []string
 	for _, x := range xs {

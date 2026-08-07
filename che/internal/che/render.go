@@ -15,12 +15,8 @@ import (
 	"gitlab.com/konradodwrot/go-modules/che/render/render"
 )
 
-// repoFileMode: repo-rendered dests are plain repo files (git-tracked, group-writable).
 const repoFileMode = 0o660
 
-// tmplDest is one resolved template dest: live absolute path, host vs repo
-// kind (dest path decides: ~/ or absolute -> host, relative -> repo), the
-// per-dest options, and the header path Compose stamps.
 type tmplDest struct {
 	path   string
 	host   bool
@@ -28,17 +24,11 @@ type tmplDest struct {
 	header string
 }
 
-// tmplItem pairs a resolved template item with its rendered dests.
 type tmplItem struct {
 	item  spec.FileItem
 	dests []tmplDest
 }
 
-// renderTemplates renders each *.tpl in the resolved set. Glob-form items (no
-// explicit dest) render raw to the derived host path, rich items fan out
-// across their dests through render.Compose, host dests placed with spec
-// perms, repo dests written as plain repo files. skipSecrets drops sources
-// carrying op:// or gcp:// refs (logged, dests untouched).
 func (p *ProfileReady) renderTemplates(templates []spec.FileItem, skipSecrets bool) error {
 	var keep []tmplItem
 	var hostDests []string
@@ -93,23 +83,14 @@ func (p *ProfileReady) renderTemplates(templates []spec.FileItem, skipSecrets bo
 	return errors.Join(errs...)
 }
 
-// templateSrcPath resolves a local template source to its absolute path: both
-// host and repo-doc templates anchor at workingDirectory (default the checkout).
 func (p *ProfileReady) templateSrcPath(item spec.FileItem) string {
 	return filepath.Join(p.resolveRoot(), item.Rel)
 }
 
-// mergedCtx merges the sourced-ref ctx overlay over an item's own ctx (ref
-// wins), parameterizing a shared profile's renders per consumer.
 func (p *ProfileReady) mergedCtx(ctx map[string]string) map[string]string {
 	return fsutil.MergeMap(ctx, p.refCtx)
 }
 
-// templateAnchor is the base dir an item's repo dests and template context
-// (frontmatter/readBody/renderDirsTree/@refs) resolve against: workingDirectory
-// for repo-doc templates, the checkout for host templates ([why] a host
-// workingDirectory is a load-ops source tree like root/, not the repo the
-// template reads belong to).
 func (p *ProfileReady) templateAnchor(item spec.FileItem) string {
 	if p.isHostTemplate(item) {
 		return p.resolveRepoRoot()
@@ -117,10 +98,6 @@ func (p *ProfileReady) templateAnchor(item spec.FileItem) string {
 	return p.resolveRoot()
 }
 
-// isHostTemplate reports whether the item renders to a host dest: derived-dest
-// (no explicit dest) is always host, else any explicit host dest (~/ or
-// absolute) marks it host. ${invokingSpecGitRoot} dests are repo dests despite expanding
-// absolute: they target the top-level spec's checkout, not the host.
 func (p *ProfileReady) isHostTemplate(item spec.FileItem) bool {
 	if len(item.Dests) == 0 {
 		return true
@@ -136,14 +113,10 @@ func (p *ProfileReady) isHostTemplate(item spec.FileItem) bool {
 	return false
 }
 
-// isGitRootDest: the dest path is anchored by the ${invokingSpecGitRoot} variable.
 func isGitRootDest(path string) bool {
 	return strings.HasPrefix(path, "${invokingSpecGitRoot}/")
 }
 
-// isSecretRefInItem: the item's template source carries an op:// or gcp:// ref. Remote
-// sources scan fetched content, except under dry-run ([why] dry-run stays
-// offline). Unreadable source -> false (render proceeds, errors there).
 func (p *ProfileReady) isSecretRefInItem(item spec.FileItem) bool {
 	if spec.IsRemoteSrc(item.Rel) {
 		if p.isDryRun() {
@@ -166,7 +139,7 @@ func (p *ProfileReady) resolveTemplateDests(item spec.FileItem) []tmplDest {
 	if len(item.Dests) == 0 {
 		return []tmplDest{{path: p.toDest(spec.TrimTmplExt(item.Rel)), host: true}}
 	}
-	if item.Derived { // glob dest rewrite: derived host dest, raw body like the bare-glob form
+	if item.Derived {
 		return []tmplDest{{path: p.toDest(item.Dests[0].Path), host: true}}
 	}
 	out := make([]tmplDest, len(item.Dests))
@@ -176,7 +149,6 @@ func (p *ProfileReady) resolveTemplateDests(item spec.FileItem) []tmplDest {
 			continue
 		}
 		// [why] expand env / ~ before the host-vs-repo decision so $HOME/... and
-		// $VAR/... dests resolve to their absolute host path, not a repo-relative one.
 		path := p.expandHome(d.Path)
 		if strings.HasPrefix(path, "/") {
 			out[i] = tmplDest{path: path, host: true, opts: d.Options, header: path}
@@ -187,8 +159,6 @@ func (p *ProfileReady) resolveTemplateDests(item spec.FileItem) []tmplDest {
 	return out
 }
 
-// readTemplateSrc reads the item's template source (remote fetched, local from
-// disk), returning the bytes and the template path (error messages, engine name).
 func (p *ProfileReady) readTemplateSrc(item spec.FileItem) ([]byte, string, error) {
 	if spec.IsRemoteSrc(item.Rel) {
 		content, err := p.fetchRemote(spec.RemoteSrcRef(item.Rel))
@@ -212,7 +182,7 @@ func (p *ProfileReady) renderTemplate(item spec.FileItem, dests []tmplDest) erro
 		return err
 	}
 	p.storeRenderHashes(item, dests, tmplPath, src, body)
-	if len(item.Dests) == 0 || item.Derived { // derived host dest: raw body, no Compose header
+	if len(item.Dests) == 0 || item.Derived {
 		return p.placeFile(dests[0].path, body, item)
 	}
 	for _, d := range dests {
@@ -239,14 +209,11 @@ func (p *ProfileReady) renderTemplate(item spec.FileItem, dests []tmplDest) erro
 	return nil
 }
 
-// composeDest is the final byte content a render places at d: the raw body for
-// derived/glob-form items, else Compose over the dest's current content
-// (mergeUpsert, header stamping).
 func (p *ProfileReady) composeDest(item spec.FileItem, d tmplDest, body []byte) []byte {
 	if len(item.Dests) == 0 || item.Derived {
 		return body
 	}
-	existing, _ := p.readExistingDest(d) // absent -> nil (mergeUpsert: defaults only)
+	existing, _ := p.readExistingDest(d)
 	return render.Compose(render.Composition{
 		Body:       body,
 		Opts:       d.opts,
@@ -257,8 +224,6 @@ func (p *ProfileReady) composeDest(item spec.FileItem, d tmplDest, body []byte) 
 	})
 }
 
-// readExistingDest reads a dest's current content for Compose: host dests
-// through the reader (mockable), repo dests straight from disk.
 func (p *ProfileReady) readExistingDest(d tmplDest) ([]byte, error) {
 	if d.host {
 		return p.Reader.ReadFileBytes(d.path)
@@ -266,9 +231,6 @@ func (p *ProfileReady) readExistingDest(d tmplDest) ([]byte, error) {
 	return os.ReadFile(d.path)
 }
 
-// placeFile installs body with spec perms (mode 0 -> install default, no chown).
-// An unchanged dest (byte-identical content) skips the write: a debug
-// (overwrite, skippedDue[SameContent]) line, perms drift still corrected.
 func (p *ProfileReady) placeFile(dest string, body []byte, item spec.FileItem) error {
 	if cur, err := p.Reader.ReadFileBytes(dest); err == nil && bytes.Equal(cur, body) {
 		p.emitSkip(log.Levels.Debug, "render-templates", "overwrite", dest, "same content")

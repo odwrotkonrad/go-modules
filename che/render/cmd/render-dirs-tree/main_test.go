@@ -18,8 +18,6 @@ import (
 //go:embed all:testdata
 var td embed.FS
 
-// TestRunCheck drives --check; the drift diff runs through the mock
-// executor, nothing spawns.
 func TestRunCheck(t *testing.T) {
 	testyml.Run(t, td, "testdata/spec/cmds/render-dirs-tree.test.spec.yml", func(t *testing.T, c testyml.Case[struct{}]) {
 		execx.Swap(t, testutil.NewCmdMockExecutor())

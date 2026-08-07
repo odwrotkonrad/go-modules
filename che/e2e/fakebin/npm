@@ -1,0 +1,13 @@
+#!/bin/sh
+##[>] 🤖🤖
+case "$1" in
+  ls) exit 1 ;;
+  outdated) printf '%s\n' "/g:e2e-outdated@2.0.0:e2e-outdated@1.0.0:" ;;
+  prefix) printf '%s\n' "$E2E_NPM_PREFIX" ;;
+  install)
+    for a in "$@"; do
+      if [ "$a" = "e2e-missing-pkg" ]; then echo "npm ERR! 404 e2e-missing-pkg" >&2; exit 1; fi
+    done ;;
+esac
+exit 0
+##[<] 🤖🤖

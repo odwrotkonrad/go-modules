@@ -99,6 +99,21 @@ archives:
     formats: [tar.gz]
     name_template: 'render-repo-group-index_{{ .Version }}_{{ .Os }}_{{ .Arch }}'
 
+nfpms:
+  - id: che-deb
+    ids: [che-linux, render-tpl-linux, render-dirs-tree-linux, render-makefile-doc-linux, render-repo-group-index-linux]
+    package_name: che
+    file_name_template: 'che_{{ .Version }}_linux_{{ .Arch }}'
+    formats: [deb]
+    bindir: /usr/bin
+    vendor: konradodwrot
+    homepage: https://gitlab.com/konradodwrot/go-modules
+    maintainer: Konrad Odwrot <odwrotkonrad@gmail.com>
+    description: Spec-driven dotfile configuration loader, with the render CLIs
+    license: MIT
+    section: utils
+    priority: optional
+
 checksum:
   name_template: checksums.txt
   algorithm: sha256

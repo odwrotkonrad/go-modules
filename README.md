@@ -46,6 +46,24 @@ CLIs from the prebuilt release archives, updated by each che tag pipeline. The
 tap is mirrored to [GitHub](https://github.com/konradodwrot/homebrew-tap), which
 `brew tap` resolves by default.
 
+### che via apt (Debian, Ubuntu)
+
+```sh
+sudo curl -fsSL -o /usr/share/keyrings/che-archive-keyring.asc https://konradodwrot.gitlab.io/go-modules/apt/gpg.key
+echo 'deb [signed-by=/usr/share/keyrings/che-archive-keyring.asc] https://konradodwrot.gitlab.io/go-modules/apt stable main' | sudo tee /etc/apt/sources.list.d/che.list
+sudo apt update && sudo apt install che
+```
+
+Pin a version (the pool keeps every release):
+
+```sh
+sudo apt install che=0.0.67
+```
+
+Binary package for `linux_{amd64,arm64}`: installs `che` and the render CLIs
+into `/usr/bin`. The repo is GPG-signed and rebuilt from the package registry
+by each che tag pipeline.
+
 ### Prebuilt archives
 
 Prebuilt: each [release](https://gitlab.com/konradodwrot/go-modules/-/releases)

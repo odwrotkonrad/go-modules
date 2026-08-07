@@ -18,8 +18,6 @@ import (
 	"gitlab.com/konradodwrot/go-modules/lib/testyml"
 )
 
-// countOf renders one op's "delta=…,all=…" segment from the discovered
-// event's attrs.
 func countOf(t *testing.T, attrs map[string]string, op string) string {
 	t.Helper()
 	delta, ok := attrs[op+".delta"]
@@ -27,7 +25,6 @@ func countOf(t *testing.T, attrs map[string]string, op string) string {
 	return "delta=" + delta + ",all=" + attrs[op+".all"]
 }
 
-// recordHealthyLink records a ledger link op whose source still exists.
 func recordHealthyLink(t *testing.T, p *ProfileReady) {
 	t.Helper()
 	require.NoError(t, p.Ledger.RecordOperation(p.profileDone, database.OperationDone{
@@ -38,8 +35,6 @@ func recordHealthyLink(t *testing.T, p *ProfileReady) {
 	}))
 }
 
-// seedRenderedDest writes the first template's rendered content at its dest
-// (plain template: renders to its source bytes), a settled render.
 func seedRenderedDest(t *testing.T, p *ProfileReady, res spec.OperationRecipes) {
 	t.Helper()
 	item := res.RenderTemplates.Templates[0]
@@ -50,10 +45,6 @@ func seedRenderedDest(t *testing.T, p *ProfileReady, res spec.OperationRecipes) 
 	require.NoError(t, os.WriteFile(dest, body, 0o644))
 }
 
-// TestDiscoverSummary: per-op all/delta counts over a tree mixing settled and
-// unsettled dests, the ledger prune scan, and the render-delta content compare
-// — each case applies its named setup steps IN ORDER, then asserts the
-// discovered event's per-op count attrs.
 func TestDiscoverSummary(t *testing.T) {
 	testyml.Run(t, td, "testdata/spec/funcs/discover_summary.test.spec.yml", func(t *testing.T, c testyml.Case[map[string]string]) {
 		p, res, dir := setupProfile(t, options.Options{})
@@ -77,8 +68,6 @@ func TestDiscoverSummary(t *testing.T) {
 				require.NoError(t, os.WriteFile(tpl, []byte("changed\n"), 0o644))
 			case "realRender":
 				// [why] record-only writer keeps OS perms commands out; the landed
-				// dest content is seeded by hand (delta compares mock render
-				// against the dest's current content).
 				m := testutil.ApplyMocks(t, map[string]string{
 					"execx.CmdExecutor":       "testutil.CmdMockExecutor",
 					"fsutil.FileSystemWriter": "testutil.FileSystemMockWriter",
@@ -104,7 +93,7 @@ func TestDiscoverSummary(t *testing.T) {
 		_, err = testutil.CaptureStdout(t, func() error { p.logDiscovered(); return nil })
 		require.NoError(t, err)
 		require.NotEmpty(t, events, "a discovered heading event")
-		attrs := events[0].Attrs // the heading event carries the per-op count attrs
+		attrs := events[0].Attrs
 		for op, want := range c.Expected.Output {
 			assert.Equalf(t, want, countOf(t, attrs, op), "op %s in %v", op, attrs)
 		}

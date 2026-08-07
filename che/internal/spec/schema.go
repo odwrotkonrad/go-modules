@@ -10,9 +10,6 @@ import (
 
 const schemaID = "https://gitlab.com/konradodwrot/go-modules/-/raw/main/che/assets/data/che.schema.json"
 
-// Schema is the JSON Schema (draft 2020-12) for che.yml, reflected from this
-// package's types (union scalar-or-object forms via JSONSchema() methods,
-// mirroring each UnmarshalYAML).
 func Schema() *jsonschema.Schema {
 	r := &jsonschema.Reflector{
 		Anonymous:                  true,
@@ -21,12 +18,11 @@ func Schema() *jsonschema.Schema {
 	}
 	defs := r.Reflect(ProfileRecipe{}).Definitions
 	// [why] both spec.Options and render.Options reflect to an "Options" def:
-	// the top-level block lands under its own name. Options nests RenderTemplates
-	// ($ref), carried over from the same reflection.
 	optDefs := r.Reflect(Options{}).Definitions
 	defs["SpecOptions"] = optDefs["Options"]
 	defs["Run"] = optDefs["Run"]
 	defs["RenderTemplates"] = optDefs["RenderTemplates"]
+	defs["Packages"] = optDefs["Packages"]
 	defs["Otel"] = optDefs["Otel"]
 	defs["DestSpec"] = DestSpec{}.JSONSchema()
 
@@ -52,8 +48,6 @@ func Schema() *jsonschema.Schema {
 	return root
 }
 
-// topIncludeSchema is the reserved top-level include: block: sources compose
-// other specs into this one, as if running multiple specs together.
 func topIncludeSchema() *jsonschema.Schema {
 	o := obj("other specs composed into this one", nil)
 	o.Properties.Set("sources", &jsonschema.Schema{
@@ -90,7 +84,6 @@ func obj(desc string, required []string) *jsonschema.Schema {
 	}
 }
 
-// scalarOr wraps o into the union with its scalar-string shorthand form.
 func scalarOr(scalarDesc string, o *jsonschema.Schema) *jsonschema.Schema {
 	return &jsonschema.Schema{OneOf: []*jsonschema.Schema{
 		{Description: scalarDesc, Type: "string"},
@@ -100,9 +93,6 @@ func scalarOr(scalarDesc string, o *jsonschema.Schema) *jsonschema.Schema {
 
 const destPathDesc = "dest path: relative -> repo, ~/ or absolute -> host"
 
-// destRuleSchema is the dest-rewrite string form shared by makeLinks and
-// makeCopies/renderTemplates glob sources: the sed-style rule or the
-// prefix-swap sugar (both desugar to the same anchored rewrite).
 func destRuleSchema() *jsonschema.Schema {
 	return &jsonschema.Schema{OneOf: []*jsonschema.Schema{
 		{

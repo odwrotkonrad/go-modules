@@ -1,4 +1,3 @@
-// Package testutil holds shared che test fixtures: file tree, committed git repo, stdout capture, mock registry.
 package testutil
 
 // [>] 🤖🤖
@@ -23,7 +22,6 @@ import (
 
 var ansiRe = regexp.MustCompile(`\x1b\[[0-9;]*m`)
 
-// StripANSI removes SGR escape sequences so assertions stay style-agnostic.
 func StripANSI(s string) string { return ansiRe.ReplaceAllString(s, "") }
 
 //go:embed specs/*.yml
@@ -32,7 +30,6 @@ var specsFS embed.FS
 //go:embed all:trees
 var treesFS embed.FS
 
-// Spec returns the named che.yml fixture (testutil/specs/<name>.yml).
 func Spec(t *testing.T, name string) string {
 	t.Helper()
 	b, err := specsFS.ReadFile("specs/" + name + ".yml")
@@ -40,14 +37,12 @@ func Spec(t *testing.T, name string) string {
 	return string(b)
 }
 
-// WriteFile writes content at path, creating parent dirs.
 func WriteFile(t *testing.T, path, content string) {
 	t.Helper()
 	require.NoError(t, os.MkdirAll(filepath.Dir(path), 0o755))
 	require.NoError(t, os.WriteFile(path, []byte(content), 0o644))
 }
 
-// WriteTree writes each rel->content file under dir, creating parent dirs.
 func WriteTree(t *testing.T, dir string, files map[string]string) {
 	t.Helper()
 	for rel, body := range files {
@@ -55,7 +50,6 @@ func WriteTree(t *testing.T, dir string, files map[string]string) {
 	}
 }
 
-// Tree returns a temp dir holding the rel->content files.
 func Tree(t *testing.T, files map[string]string) string {
 	t.Helper()
 	dir := t.TempDir()
@@ -63,7 +57,6 @@ func Tree(t *testing.T, files map[string]string) string {
 	return dir
 }
 
-// GitRepo inits dir as a git repo (go-git, idempotent) and commits everything in it.
 func GitRepo(t *testing.T, dir string) {
 	t.Helper()
 	repo, err := git.PlainInit(dir, false)
@@ -81,7 +74,6 @@ func GitRepo(t *testing.T, dir string) {
 	require.NoError(t, err)
 }
 
-// Repo returns a temp dir of files, committed as a git repo.
 func Repo(t *testing.T, files map[string]string) string {
 	t.Helper()
 	dir := Tree(t, files)
@@ -89,11 +81,8 @@ func Repo(t *testing.T, files map[string]string) string {
 	return dir
 }
 
-// CheProfile is the profile specs/che.yml resolves under.
 const CheProfile = "cli/macos"
 
-// CheRepo materializes the mock che repo (specs/che.yml + trees/tree-che-repo
-// covering every op) plus an on-disk HOME. Returns (repoDir, homeDir).
 func CheRepo(t *testing.T) (string, string) {
 	t.Helper()
 	dir := t.TempDir()
@@ -105,7 +94,6 @@ func CheRepo(t *testing.T) (string, string) {
 	return dir, home
 }
 
-// WantLines asserts every fragment appears in out (order-independent, style-agnostic).
 func WantLines(t *testing.T, out string, fragments ...string) {
 	t.Helper()
 	out = StripANSI(out)
@@ -116,7 +104,6 @@ func WantLines(t *testing.T, out string, fragments ...string) {
 	}
 }
 
-// NotLine asserts the fragment does not appear in out (style-agnostic).
 func NotLine(t *testing.T, out, fragment string) {
 	t.Helper()
 	out = StripANSI(out)
@@ -125,7 +112,6 @@ func NotLine(t *testing.T, out, fragment string) {
 	}
 }
 
-// CaptureStdout runs fn with os.Stdout piped. Returns printed output plus fn's error.
 func CaptureStdout(t *testing.T, fn func() error) (string, error) {
 	t.Helper()
 	orig := os.Stdout

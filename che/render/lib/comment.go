@@ -41,7 +41,6 @@ func sectionClose(text string) (depth int, ok bool) {
 	return leaders - 2, true
 }
 
-// tagComment parses a #[<tag>] line, returning its trimmed payload.
 func tagComment(text, tag string) (string, bool) {
 	p := "#[" + tag + "]"
 	if !strings.HasPrefix(text, p) {

@@ -29,6 +29,8 @@ func TestE2ERun(t *testing.T) { runCase(t, "e2e") }
 
 func TestE2EBackup(t *testing.T) { runCase(t, "backup-e2e") }
 
+func TestE2EPackages(t *testing.T) { runCase(t, "packages-e2e") }
+
 type world struct {
 	bin                       string
 	work, home, local, remote string
@@ -36,8 +38,6 @@ type world struct {
 	env                       []string
 }
 
-// binPath resolves the shell-built binary from E2E_BIN (set by the e2e-*
-// make targets, which build it with -cover); unset skips the test.
 func binPath(t *testing.T) string {
 	t.Helper()
 	bin := os.Getenv("E2E_BIN")
@@ -121,13 +121,30 @@ func setup(t *testing.T, specEnv map[string]string) *world {
 	require.NoError(t, err)
 	require.NoError(t, os.WriteFile(cheYml, bytes.ReplaceAll(raw, []byte("__REMOTE_DIR__"), []byte(w.remote)), 0o644))
 	require.NoError(t, os.MkdirAll(w.home, 0o755))
+	if _, err := os.Stat("home"); err == nil {
+		require.NoError(t, os.CopyFS(w.home, os.DirFS("home")))
+	}
 	w.vars = map[string]string{
 		"WORK":           w.work,
 		"HOME":           w.home,
 		"LOCAL":          w.local,
 		"REMOTE":         w.remote,
+		"PATH":           os.Getenv("PATH"),
 		"XDG_STATE_HOME": filepath.Join(w.home, ".local/state"),
 		"XDG_CACHE_HOME": filepath.Join(w.home, ".cache"),
+	}
+	for _, d := range []string{"fakebin", "fakebin2"} {
+		if _, err := os.Stat(d); err != nil {
+			continue
+		}
+		dest := filepath.Join(work, d)
+		require.NoError(t, os.CopyFS(dest, os.DirFS(d)))
+		entries, err := os.ReadDir(dest)
+		require.NoError(t, err)
+		for _, e := range entries {
+			require.NoError(t, os.Chmod(filepath.Join(dest, e.Name()), 0o755))
+		}
+		w.vars[strings.ToUpper(d)] = dest
 	}
 	w.env = []string{
 		"PATH=" + os.Getenv("PATH"),
@@ -141,7 +158,7 @@ func setup(t *testing.T, specEnv map[string]string) *world {
 		"CHE_VALIDATE_SPEC=error",
 	}
 	for k, v := range specEnv {
-		w.env = append(w.env, k+"="+v)
+		w.env = append(w.env, k+"="+w.expand(v))
 	}
 	if dir := os.Getenv("E2E_GOCOVERDIR"); dir != "" {
 		w.env = append(w.env, "GOCOVERDIR="+dir)
@@ -153,8 +170,6 @@ func setup(t *testing.T, specEnv map[string]string) *world {
 
 func (w *world) expand(s string) string { return testyml.Expand(s, w.vars) }
 
-// capture stores each declared var from the step's output (first capture
-// group), so later steps expand it via ${VAR}.
 func (w *world) capture(t *testing.T, s step, out string) {
 	t.Helper()
 	for name, pattern := range s.Capture {
@@ -171,6 +186,7 @@ func (w *world) act(t *testing.T, s step) (out string, exitCode int) {
 		return w.runCommand(t, s)
 	case s.Write != nil:
 		path := w.expand(s.Write.Path)
+		require.NoErrorf(t, os.MkdirAll(filepath.Dir(path), 0o755), "step %s: mkdir for %s", s.Name, path)
 		require.NoErrorf(t, os.WriteFile(path, []byte(s.Write.Content+"\n"), 0o644), "step %s: write %s", s.Name, path)
 	case s.Remove != nil:
 		for _, p := range s.Remove.Paths {

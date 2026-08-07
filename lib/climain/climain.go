@@ -1,4 +1,3 @@
-// Package climain owns the shared CLI main shape: help/version dispatch, coded-exit epilogue.
 package climain
 
 // [>] 🤖🤖
@@ -19,8 +18,6 @@ func Run(name, version, usage string, run func(args []string) (string, error)) {
 	Exit(run(os.Args[1:]))
 }
 
-// RunRaw runs a raw-output CLI: out prints via fmt.Print (no appended
-// newline), help/version dispatch left to run.
 func RunRaw(run func(args []string) (string, error)) {
 	out, err := run(os.Args[1:])
 	if err == nil {
@@ -30,9 +27,6 @@ func RunRaw(run func(args []string) (string, error)) {
 	Exit("", err)
 }
 
-// resolveVersion prefers the goreleaser-baked ldflag version; on a plain
-// `go install` (version still "dev"/empty) it falls back to the module tag Go
-// stamps into the binary's build info.
 func resolveVersion(version string) string {
 	if version != "" && version != "dev" {
 		return version

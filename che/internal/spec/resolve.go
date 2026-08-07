@@ -24,7 +24,6 @@ func (gs *globSet) addRule(glob string, perms Perms, rule *destRule) {
 	}
 }
 
-// match: last match wins.
 func (gs globSet) match(rel string) (globPerm, bool) {
 	for _, g := range slices.Backward(gs) {
 		if isGlobMatch(g.glob, rel) {
@@ -34,29 +33,17 @@ func (gs globSet) match(rel string) (globPerm, bool) {
 	return globPerm{}, false
 }
 
-// isGlobMatch matches rel against an op glob, ignoring a trailing slash.
 func isGlobMatch(glob, rel string) bool {
 	return fsutil.IsGlobMatch(strings.TrimSuffix(glob, "/"), rel)
 }
 
-// ErrNoneEligible: no autoDiscover recipe passed its runIf. The root spec
-// treats it fatal, composed specs skip.
 var ErrNoneEligible = errors.New("no eligible profile")
 
-// Rejection is one runIf-rejected candidate: its ref and the condition that
-// rejected it.
 type Rejection struct {
 	Ref  string
 	Cond string
 }
 
-// EligibleRecipes lists the recipes to MakeProfile, in declaration order,
-// plus the rejected candidates (runIf failed):
-//  1. forced (--profiles by name): only those recipes, autoDiscover skipped,
-//     runIf still enforced (forceAll = --skip-run-if lifts it).
-//  2. else every autoDiscover recipe whose runIf expressions ALL pass
-//     (forceAll makes every runIf pass, it does not lift autoDiscover).
-//  3. zero eligible: ErrNoneEligible.
 func EligibleRecipes(recipes []ProfileRecipe, forced []string, forceAll bool, eval func(expr string) (bool, error)) (eligible []string, rejected []Rejection, err error) {
 	if len(forced) > 0 {
 		out := make([]string, 0, len(forced))
@@ -100,8 +87,6 @@ func EligibleRecipes(recipes []ProfileRecipe, forced []string, forceAll bool, ev
 	return out, rejected, nil
 }
 
-// FindRecipe returns the named ProfileRecipe, erroring with the defined set
-// when absent.
 func FindRecipe(recipes []ProfileRecipe, name string) (ProfileRecipe, error) {
 	ps, ok := findRecipe(recipes, name)
 	if !ok {
@@ -110,7 +95,6 @@ func FindRecipe(recipes []ProfileRecipe, name string) (ProfileRecipe, error) {
 	return ps, nil
 }
 
-// findRecipe returns the named ProfileRecipe.
 func findRecipe(recipes []ProfileRecipe, name string) (ProfileRecipe, bool) {
 	for _, ps := range recipes {
 		if ps.Source.GetProfileName() == name {
@@ -120,15 +104,10 @@ func findRecipe(recipes []ProfileRecipe, name string) (ProfileRecipe, bool) {
 	return ProfileRecipe{}, false
 }
 
-// undefinedProfile is the shared undefined-profile error: ref names the failed
-// lookup ("--profiles %q", "profile %q").
 func undefinedProfile(recipes []ProfileRecipe, ref string) error {
 	return fmt.Errorf("%s is not defined in che.yml (defined: %v)", ref, names(recipes, func(ProfileRecipe) bool { return true }))
 }
 
-// AllPass logs each condition evaluation at trace level only, under the
-// discover scope (spec/che/log.md). failed names the first
-// rejecting expression ("" when all pass).
 func AllPass(name string, exprs []string, forceAll bool, eval func(expr string) (bool, error)) (pass bool, failed string, err error) {
 	if forceAll {
 		return true, "", nil
@@ -164,11 +143,6 @@ func names(recipes []ProfileRecipe, keep func(ProfileRecipe) bool) []string {
 	return slices.Sorted(slices.Values(out))
 }
 
-// MakeProfile resolves this one recipe: composes its local include.profiles
-// refs depth-first (looked up in recipes, cycle-guarded), classifies
-// git-tracked files under <DirectoryPath>/root, applies excludes last, then
-// emits the per-kind OperationRecipes (run order) plus the sourced
-// include.profiles refs (source set), deduped in composition order.
 func (r ProfileRecipe) MakeProfile(recipes []ProfileRecipe, workingDir string) (OperationRecipes, []ProfileSourceRecipe, error) {
 	var eff effective
 	if err := mergeRecipe(recipes, &eff, r, nil); err != nil {
@@ -182,6 +156,7 @@ func (r ProfileRecipe) MakeProfile(recipes []ProfileRecipe, workingDir string) (
 	}
 	res := resolved{
 		ExtraDirs: eff.dirs,
+		Packages:  dedupePackages(eff.packages),
 		Scripts:   scripts,
 		Links:     eff.richLink,
 		Copies:    eff.richCopy,
@@ -194,9 +169,6 @@ func (r ProfileRecipe) MakeProfile(recipes []ProfileRecipe, workingDir string) (
 	return res.operationRecipes(), eff.refs, nil
 }
 
-// operationRecipes maps the resolved selection onto the per-kind operation
-// recipes, in run order. MakeDirs carries one list: ancestor dirs (Rel, zero
-// perms) first, then the makeDirs entries.
 func (res resolved) operationRecipes() OperationRecipes {
 	dirs := make([]FileItem, 0, len(res.Dirs)+len(res.ExtraDirs))
 	for _, d := range res.Dirs {
@@ -209,14 +181,11 @@ func (res resolved) operationRecipes() OperationRecipes {
 		MakeLinks:       MakeLinksOperationRecipe{Links: res.Links, Dirs: res.Dirs},
 		MakeCopies:      MakeCopiesOperationRecipe{Copies: res.Copies, Dirs: res.Dirs},
 		RenderTemplates: RenderTemplatesOperationRecipe{Templates: res.Templates},
+		InstallPackages: InstallPackagesOperationRecipe{Packages: res.Packages},
 		RunScripts:      RunScriptsOperationRecipe{Scripts: res.Scripts},
 	}
 }
 
-// expandScripts resolves each repo-relative script entry to repo-relative file
-// paths, IN SPEC ORDER (globs expand sorted in place). Resolving here, before
-// applyExcludes, lets run-scripts excludes match real files (not glob strings).
-// Each entry must resolve to >=1 file ([why] catches typos/renames).
 func expandScripts(repoRoot string, entries []string) ([]string, error) {
 	var out []string
 	for _, entry := range entries {
@@ -246,19 +215,15 @@ func expandScripts(repoRoot string, entries []string) ([]string, error) {
 	return out, nil
 }
 
-// classify applies the glob-form ops to git-tracked files under root, bucketing
-// them into Links/Copies/Templates plus ancestor Dirs. Glob copy/template files
-// inherit the matching glob's perms. All globs are workingDirectory-relative,
-// matched against the workingDir-relative tracked rels directly.
 func classify(root string, eff effective, res *resolved) error {
 	if _, err := os.Stat(root); os.IsNotExist(err) {
-		return nil // no workingDir subtree: repo-only project (rich template selection only)
+		return nil
 	}
 	tracked, err := fsutil.ListTrackedFiles(root)
 	if err != nil {
 		return err
 	}
-	rich := richRels(eff) // rich entries win: skip their glob twins
+	rich := richRels(eff)
 	for _, rel := range tracked {
 		if rich[rel] {
 			continue
@@ -267,7 +232,6 @@ func classify(root string, eff effective, res *resolved) error {
 		case IsTmplSrc(rel) && hit(eff.tmplGlobs, rel, TrimTmplExt, &res.Templates):
 		case strings.HasSuffix(rel, CpExt) && hit(eff.copyGlobs, rel, trimCpExt, &res.Copies):
 		case filepath.Base(rel) == ".gitkeep":
-			// excluded from every op
 		case hit(eff.linkGlobs, rel, identity, &res.Links):
 		}
 	}
@@ -278,9 +242,6 @@ func classify(root string, eff effective, res *resolved) error {
 func identity(rel string) string  { return rel }
 func trimCpExt(rel string) string { return strings.TrimSuffix(rel, CpExt) }
 
-// hit matches rel against gs (the raw source rel). A dest rule rewrites the
-// derived dest (destBase strips the op's marker suffix first, so copies/
-// templates land marker-free) and, when it changes, marks the item Derived.
 func hit(gs globSet, rel string, destBase func(string) string, items *[]FileItem) bool {
 	gp, ok := gs.match(rel)
 	if !ok {
@@ -312,10 +273,6 @@ func richRels(eff effective) map[string]bool {
 	return m
 }
 
-// collectDirs derives every ancestor dir of the file items into res.Dirs.
-// Links contribute their dest rel ([why] rewritten host dirs must exist).
-// Templates contribute only derived-dest (glob-form) items ([why] rich dests
-// need no pre-created host dirs).
 func collectDirs(res *resolved) {
 	dirSeen := map[string]bool{}
 	addRel := func(rel string) {
@@ -340,28 +297,55 @@ func collectDirs(res *resolved) {
 	slices.SortFunc(res.Links, byRel)
 	slices.SortFunc(res.Copies, byRel)
 	slices.SortFunc(res.Templates, byRel)
-	slices.Sort(res.Dirs) // lexical, parents before children
+	slices.Sort(res.Dirs)
 }
 
 func byRel(a, b FileItem) int { return cmp.Compare(a.Rel, b.Rel) }
+
+// [why] later entries win, so a profile ref can re-pin a package version
+func dedupePackages(xs []PackageRef) []PackageRef {
+	at := map[string]int{}
+	var out []PackageRef
+	for _, x := range xs {
+		if i, ok := at[x.Name]; ok {
+			if len(x.Versions) > 0 {
+				out[i].Versions = x.Versions
+			}
+			if x.GlobalVersion != "" {
+				out[i].GlobalVersion = x.GlobalVersion
+			}
+			continue
+		}
+		at[x.Name] = len(out)
+		out = append(out, x)
+	}
+	return out
+}
+
+func dropPackages(xs []PackageRef, globs []string) []PackageRef {
+	if len(globs) == 0 {
+		return xs
+	}
+	return slices.DeleteFunc(xs, func(x PackageRef) bool { return isAnyGlobMatch(globs, x.Name) })
+}
 
 func isAnyGlobMatch(globs []string, rel string) bool {
 	return slices.ContainsFunc(globs, func(g string) bool { return isGlobMatch(g, rel) })
 }
 
-// applyExcludes drops items matching any exclude glob across all keys. Excludes
-// win over everything, including rich include entries.
 func applyExcludes(ex excludeSet, res *resolved) {
 	link := fsutil.ExpandAll(ex.MakeLinks)
 	copyG := fsutil.ExpandAll(ex.MakeCopies)
 	tmplG := fsutil.ExpandAll(ex.RenderTemplates)
 	dirG := fsutil.ExpandAll(ex.MakeDirs)
+	pkgG := fsutil.ExpandAll(ex.InstallPackages)
 	instG := fsutil.ExpandAll(ex.Scripts)
 
 	res.Links = dropFiles(res.Links, link)
 	res.Copies = dropFiles(res.Copies, copyG)
 	res.Templates = dropFiles(res.Templates, tmplG)
 	res.ExtraDirs = dropFiles(res.ExtraDirs, dirG)
+	res.Packages = dropPackages(res.Packages, pkgG)
 	res.Scripts = dropStrings(res.Scripts, instG)
 
 	res.Dirs = nil
@@ -393,11 +377,6 @@ func dropStrings(xs, globs []string) []string {
 	return slices.DeleteFunc(xs, func(x string) bool { return isAnyGlobMatch(globs, x) })
 }
 
-// mergeRecipe composes ps into eff: local include.profiles refs depth-first,
-// then this profile's include sections (additive). Sourced refs
-// (source set) collect into eff.refs (deduped) for the caller to
-// resolve at their own checkout. Excludes are handled separately
-// (applyExcludes). seen catches cycles.
 func mergeRecipe(recipes []ProfileRecipe, eff *effective, ps ProfileRecipe, seen []string) error {
 	name := ps.Source.GetProfileName()
 	if slices.Contains(seen, name) {
@@ -450,6 +429,7 @@ func mergeRecipe(recipes []ProfileRecipe, eff *effective, ps ProfileRecipe, seen
 	for _, e := range in.MakeDirs {
 		eff.dirs = append(eff.dirs, dirItems(e)...)
 	}
+	eff.packages = append(eff.packages, in.InstallPackages...)
 	eff.scripts = append(eff.scripts, in.Scripts...)
 	eff.exclude.append(ps.Exclude)
 	return nil
@@ -460,6 +440,7 @@ func (ex *excludeSet) append(o excludeSet) {
 	ex.MakeCopies = append(ex.MakeCopies, o.MakeCopies...)
 	ex.RenderTemplates = append(ex.RenderTemplates, o.RenderTemplates...)
 	ex.MakeDirs = append(ex.MakeDirs, o.MakeDirs...)
+	ex.InstallPackages = append(ex.InstallPackages, o.InstallPackages...)
 	ex.Scripts = append(ex.Scripts, o.Scripts...)
 }
 
@@ -484,10 +465,6 @@ func splitEntries(entries []entry, globs *globSet, rich *[]FileItem) error {
 	return nil
 }
 
-// splitTemplates: glob items go to globs, {source, dest} items become rich
-// FileItems. Glob and derived-dest sources are workingDirectory-relative (host
-// dest derived from the source path); remote refs (@<repo>//<path>) require an
-// explicit dest.
 func splitTemplates(entries []templateGroup, globs *globSet, rich *[]FileItem) error {
 	for _, e := range entries {
 		for _, f := range e.Files {
@@ -523,8 +500,6 @@ func splitTemplates(entries []templateGroup, globs *globSet, rich *[]FileItem) e
 	return nil
 }
 
-// mergeDestOptions merges group-level render options under each dest's own:
-// fields the dest sets win, unset fields inherit the group's.
 func mergeDestOptions(group render.Options, dests []DestSpec) []DestSpec {
 	if group == (render.Options{}) {
 		return dests
@@ -536,8 +511,6 @@ func mergeDestOptions(group render.Options, dests []DestSpec) []DestSpec {
 	return out
 }
 
-// dirItems expands each makeDirs perm-group item into one FileItem per
-// brace-expanded dest path, carrying the group's perms (path in Dests[0]).
 func dirItems(e dirGroup) []FileItem {
 	var out []FileItem
 	for _, f := range e.Files {
@@ -554,7 +527,6 @@ func dirItems(e dirGroup) []FileItem {
 	return out
 }
 
-// Over fills unset cascade fields from the spec-level options (profile wins).
 func (o ProfileOptions) Over(spec Options) ProfileOptions {
 	if o.AutoDiscover == nil {
 		o.AutoDiscover = spec.AutoDiscover
@@ -565,11 +537,30 @@ func (o ProfileOptions) Over(spec Options) ProfileOptions {
 	if o.ProfileWorkingDirectory == "" {
 		o.ProfileWorkingDirectory = spec.ProfileWorkingDirectory
 	}
+	if o.Packages.File == "" {
+		o.Packages.File = spec.Packages.File
+	}
+	if len(o.Packages.PreferredInstallationMethods) == 0 {
+		o.Packages.PreferredInstallationMethods = spec.Packages.PreferredInstallationMethods
+	}
+	if len(o.Packages.PrebuiltBinariesArchive.InstallDestinationCandidates) == 0 {
+		o.Packages.PrebuiltBinariesArchive.InstallDestinationCandidates = spec.Packages.PrebuiltBinariesArchive.InstallDestinationCandidates
+	}
+	if o.Packages.Completions.Zsh.Enabled == nil {
+		o.Packages.Completions.Zsh.Enabled = spec.Packages.Completions.Zsh.Enabled
+	}
+	if len(o.Packages.Completions.Zsh.InstallDestinationCandidates) == 0 {
+		o.Packages.Completions.Zsh.InstallDestinationCandidates = spec.Packages.Completions.Zsh.InstallDestinationCandidates
+	}
+	if o.Packages.Completions.Zsh.CheckPresentOnFpath == nil {
+		o.Packages.Completions.Zsh.CheckPresentOnFpath = spec.Packages.Completions.Zsh.CheckPresentOnFpath
+	}
+	if o.Packages.PrebuiltBinariesArchive.CheckPresentOnPath == nil {
+		o.Packages.PrebuiltBinariesArchive.CheckPresentOnPath = spec.Packages.PrebuiltBinariesArchive.CheckPresentOnPath
+	}
 	return o
 }
 
-// OverRef applies an include.profiles entry's option overrides onto the
-// referenced profile's own options (entry-set fields win, most nested wins).
 func (o ProfileOptions) OverRef(entry ProfileOptions) ProfileOptions {
 	if entry.RunIf != nil {
 		o.RunIf = entry.RunIf
@@ -582,6 +573,27 @@ func (o ProfileOptions) OverRef(entry ProfileOptions) ProfileOptions {
 	}
 	if entry.ProfileWorkingDirectory != "" {
 		o.ProfileWorkingDirectory = entry.ProfileWorkingDirectory
+	}
+	if entry.Packages.File != "" {
+		o.Packages.File = entry.Packages.File
+	}
+	if len(entry.Packages.PreferredInstallationMethods) > 0 {
+		o.Packages.PreferredInstallationMethods = entry.Packages.PreferredInstallationMethods
+	}
+	if len(entry.Packages.PrebuiltBinariesArchive.InstallDestinationCandidates) > 0 {
+		o.Packages.PrebuiltBinariesArchive.InstallDestinationCandidates = entry.Packages.PrebuiltBinariesArchive.InstallDestinationCandidates
+	}
+	if entry.Packages.Completions.Zsh.Enabled != nil {
+		o.Packages.Completions.Zsh.Enabled = entry.Packages.Completions.Zsh.Enabled
+	}
+	if len(entry.Packages.Completions.Zsh.InstallDestinationCandidates) > 0 {
+		o.Packages.Completions.Zsh.InstallDestinationCandidates = entry.Packages.Completions.Zsh.InstallDestinationCandidates
+	}
+	if entry.Packages.Completions.Zsh.CheckPresentOnFpath != nil {
+		o.Packages.Completions.Zsh.CheckPresentOnFpath = entry.Packages.Completions.Zsh.CheckPresentOnFpath
+	}
+	if entry.Packages.PrebuiltBinariesArchive.CheckPresentOnPath != nil {
+		o.Packages.PrebuiltBinariesArchive.CheckPresentOnPath = entry.Packages.PrebuiltBinariesArchive.CheckPresentOnPath
 	}
 	return o
 }

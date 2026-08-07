@@ -1,0 +1,17 @@
+# [>] 🤖🤖
+context:
+  command: che packages check-single-present
+  pwd: testdata/fixture/commands/packages/sample-tree
+  mockedInterfaces:
+    execx.CmdExecutor: testutil.CmdMockExecutor
+    fsutil.FileSystemWriter: testutil.FileSystemMockWriter
+    fsutil.FileSystemReader: testutil.FileSystemMockReader
+    packages.Host: cli.PackagesMockHost
+cases:
+  - name: ShouldReportNothingWhenEachCommandResolvesOnce
+    expected:
+      exitCode: 0
+    notExpected:
+      stdOut:
+        - "multiple present"
+# [<] 🤖🤖

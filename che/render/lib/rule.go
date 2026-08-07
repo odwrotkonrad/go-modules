@@ -26,8 +26,6 @@ func ruleTarget(node *sitter.Node, src []byte, what string) (target, bool) {
 	return target{name: name, what: what, chain: chain}, true
 }
 
-// paramTarget builds a parameter entry from a variable_assignment node: name is
-// the assigned word, what/vals from the preceding #[what]/#[vals] comments.
 func paramTarget(node *sitter.Node, src []byte, what, vals string) (target, bool) {
 	word := firstWord(node)
 	if word == nil {
@@ -40,8 +38,6 @@ func paramTarget(node *sitter.Node, src []byte, what, vals string) (target, bool
 	return target{name: name, what: what, vals: vals}, true
 }
 
-// firstWord returns the first descendant "word" node, depth-first. The name sits
-// directly under variable_assignment but nests under a "list" in export_directive.
 func firstWord(node *sitter.Node) *sitter.Node {
 	for i := range node.NamedChildCount() {
 		child := node.NamedChild(i)

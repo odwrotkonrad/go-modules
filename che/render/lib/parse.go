@@ -1,4 +1,3 @@
-// Package lib parses Makefiles via tree-sitter into the sectioned doc model rendered by render-makefile-doc.
 package lib
 
 import (
@@ -13,7 +12,6 @@ import (
 // [>] 🤖🤖🤖
 const includeTag = "[genai-include]"
 
-// Generate emits makefile.agents.md from a Makefile's [genai-include] sections.
 func Generate(path string) (string, error) {
 	src, err := os.ReadFile(path)
 	if err != nil {

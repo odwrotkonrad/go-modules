@@ -18,7 +18,6 @@ import (
 //go:embed all:testdata
 var td embed.FS
 
-// configDir writes raw as the user config (system dir absent), returns the dir.
 func configDir(t *testing.T, raw string) string {
 	t.Helper()
 	testyml.Swap(t, &yamlcfg.SystemDir, filepath.Join(t.TempDir(), "no-system"))

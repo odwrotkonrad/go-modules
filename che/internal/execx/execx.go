@@ -1,4 +1,3 @@
-// Package execx runs external commands behind a swappable executor, mockable in tests.
 package execx
 
 // [>] 🤖🤖🤖
@@ -15,9 +14,6 @@ type CmdExecutor interface {
 
 var Default CmdExecutor = Real{}
 
-// command maps a Cmd onto an exec.Cmd, Stdout left unset (Output owns it).
-// Cmd.Ctx (nil -> Background) binds the child process's lifetime, so a cancelled
-// ctx kills it.
 func (c Cmd) command() *exec.Cmd {
 	ctx := c.Ctx
 	if ctx == nil {

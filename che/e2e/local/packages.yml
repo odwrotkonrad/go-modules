@@ -1,0 +1,28 @@
+##[>] 🤖🤖
+packages:
+  e2e-present: [{npm: e2e-present}]
+  e2e-absent: [{npm: e2e-absent}]
+  e2e-dup: [{npm: e2e-dup}]
+  e2e-outdated: [{npm: e2e-outdated}]
+  e2e-missing-pkg: [{npm: e2e-missing-pkg}]
+  e2e-bin:
+    - prebuiltBinariesArchive:
+        version: 9.9.9
+        url: https://e2e.invalid/good/e2e-bin
+        platforms: [{darwin-arm64: e2esha}, {linux-amd64: e2esha}, {linux-arm64: e2esha}]
+  e2e-bin-new:
+    - prebuiltBinariesArchive:
+        version: 9.9.9
+        url: https://e2e.invalid/good/e2e-bin-new
+        platforms: [{darwin-arm64: e2esha}, {linux-amd64: e2esha}, {linux-arm64: e2esha}]
+  e2e-bin-old:
+    - prebuiltBinariesArchive:
+        version: 9.9.9
+        url: https://e2e.invalid/good/e2e-bin-old
+        platforms: [{darwin-arm64: e2esha}, {linux-amd64: e2esha}, {linux-arm64: e2esha}]
+  e2e-bin-bad:
+    - prebuiltBinariesArchive:
+        version: 1.0.0
+        url: https://e2e.invalid/bad/e2e-bin-bad
+        platforms: [{darwin-arm64: e2esha}, {linux-amd64: e2esha}, {linux-arm64: e2esha}]
+##[<] 🤖🤖

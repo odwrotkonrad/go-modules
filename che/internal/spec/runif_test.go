@@ -32,15 +32,11 @@ func TestEvalRunIf(t *testing.T) {
 	})
 }
 
-// builtinsWant is run_if_builtins' expected.output: the eval result plus the
-// executor call count (isVirt must cache: one exec across two evals).
 type builtinsWant struct {
 	Value     bool `yaml:"value"`
 	ExecCalls int  `yaml:"execCalls"`
 }
 
-// TestNewEvaluatorBuiltins drives the real NewEvaluator wiring against the
-// mock executor and a deny-all reader, so live container markers never leak in.
 func TestNewEvaluatorBuiltins(t *testing.T) {
 	testyml.Run(t, td, "testdata/spec/funcs/new_evaluator.test.spec.yml", func(t *testing.T, c testyml.Case[builtinsWant]) {
 		m := testutil.ApplyMocks(t, c.Context.MockedInterfaces)

@@ -1,0 +1,79 @@
+##[>] 🤖🤖
+#[what] real-install e2e matrix: per installation method, packages installed for real then verified by running them
+#[why] unit tests stub every exec: this is the only place the methods are proven against real registries and archives
+
+groups:
+  - method: brew/formulae
+    os: darwin
+    packages: [jq, bat, aws]
+    verify:
+      jq: jq --version
+      bat: bat --version
+      aws: aws --version
+
+  - method: brew/cask
+    os: darwin
+    packages: [font-jetbrains-mono]
+    verify:
+      font-jetbrains-mono: brew list --cask font-jetbrains-mono
+
+  - method: brew/vscode
+    os: darwin
+    requiresCommand: code
+    packages: [golang.go]
+    verify:
+      golang.go: code --list-extensions
+
+  - method: apt
+    os: linux
+    packages: [jq, bat]
+    verify:
+      jq: jq --version
+      #[why] debian renames the binary (see the bat entry's per-os command)
+      bat: batcat --version
+
+  - method: apt/repo
+    os: linux
+    packages: [gcloud]
+    verify:
+      gcloud: gcloud --version
+
+  - method: prebuiltBinariesArchive/bare
+    packages: [kubectl]
+    verify:
+      kubectl: kubectl version --client
+
+  - method: prebuiltBinariesArchive/tree
+    packages: [kubectx, glab]
+    verify:
+      kubectx: kubectx --help
+      glab: glab --version
+
+  - method: script/remoteUrl
+    packages: [pyenv]
+    verify:
+      pyenv: pyenv --version
+
+  - method: versionManager/pyenv
+    packages: [python3]
+    verify:
+      python3: python3 --version
+
+  - method: versionManager/nvm
+    packages: [node]
+    verify:
+      node: . "$NVM_DIR/nvm.sh" && node --version
+
+  - method: npm
+    requiresCommand: npm
+    packages: [tsc]
+    verify:
+      tsc: tsc --version
+
+  - method: go
+    requiresCommand: go
+    packages: [gopls]
+    verify:
+      gopls: gopls version
+
+##[<] 🤖🤖

@@ -24,9 +24,6 @@ func readDest(t *testing.T, root, rel string) string {
 	return string(b)
 }
 
-// renderWant: dest paths relative to the fixture root (home lives at home/).
-// files asserts exact content, rerun re-renders and re-asserts files
-// ([why] merge-upsert must be stable), absent dests must not exist.
 type renderWant struct {
 	Files       map[string]string   `yaml:"files"`
 	Contains    map[string][]string `yaml:"contains"`
@@ -36,8 +33,6 @@ type renderWant struct {
 	RerunStdOut []string            `yaml:"rerunStdOut"`
 }
 
-// TestRenderTemplates: tree/dirs seed the fixture root, items decode straight
-// into spec.FileItem, fetch (when named) swaps in the RemoteMockFetcher.
 func TestRenderTemplates(t *testing.T) {
 	testyml.Run(t, td, "testdata/spec/funcs/render_templates.test.spec.yml", func(t *testing.T, c testyml.Case[renderWant]) {
 		testutil.RequireRegistered(t, c.Context.MockedInterfaces)

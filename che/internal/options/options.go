@@ -1,4 +1,3 @@
-// Package options models che's runtime options: flag values finalized by Resolve.
 package options
 
 // [>] 🤖🤖
@@ -11,22 +10,18 @@ import (
 	"strings"
 
 	"gitlab.com/konradodwrot/go-modules/che/internal/log"
+	"gitlab.com/konradodwrot/go-modules/che/internal/packages"
 )
 
-// LookupEnv is the env-lookup seam Resolve reads instead of the process env:
-// key -> value ("" if unset), fed from the captured launch env by the caller.
 type LookupEnv func(string) string
 
-// Setting is one resolved option: its key, final value, and the layer that
-// decided it (cliFlag | env | config-file | specFile | default). The config log renders
-// these (spec/che/log.md).
 type Setting struct {
 	Key    string
 	Value  string
 	Source string
+	Kind   string
 }
 
-// SettingsDelta lists the settings a non-default layer decided.
 func (c Options) SettingsDelta() []Setting {
 	var out []Setting
 	for _, s := range c.Settings {
@@ -37,9 +32,6 @@ func (c Options) SettingsDelta() []Setting {
 	return out
 }
 
-// SettingsSorted lists every setting with the source-decided ones first (in
-// Resolve/config order), the unset defaults after (also in config order): the
-// order `config show --all` prints (spec/che/log.md).
 func (c Options) SettingsSorted() []Setting {
 	out := make([]Setting, 0, len(c.Settings))
 	for _, s := range c.Settings {
@@ -55,12 +47,8 @@ func (c Options) SettingsSorted() []Setting {
 	return out
 }
 
-// IsChanged reports whether a source (not the code default) decided this
-// setting: a source explicitly set it, even if to the default value.
 func (s Setting) IsChanged() bool { return s.Source != "default" }
 
-// DisplaySource is the label config show prints: the deciding source, or
-// "unset" when no source set the option (the code default is in effect).
 func (s Setting) DisplaySource() string {
 	if s.Source == "default" {
 		return "unset"
@@ -68,7 +56,6 @@ func (s Setting) DisplaySource() string {
 	return s.Source
 }
 
-// FormatSettings renders settings as "key=value (source), ..." prose.
 func FormatSettings(settings []Setting) string {
 	parts := make([]string, len(settings))
 	for i, s := range settings {
@@ -77,7 +64,6 @@ func FormatSettings(settings []Setting) string {
 	return strings.Join(parts, ", ")
 }
 
-// cand pairs a candidate value with its source layer, in precedence order.
 type cand struct {
 	val string
 	set bool
@@ -92,7 +78,6 @@ func layerList(v []string, src string) cand {
 	return cand{strings.Join(v, ","), len(v) > 0, src}
 }
 
-// boolLayer is one *bool layer candidate.
 type boolLayer struct {
 	val *bool
 	src string
@@ -110,7 +95,6 @@ func (c *Options) record(key, value, source string) {
 	c.Settings = append(c.Settings, Setting{Key: key, Value: value, Source: source})
 }
 
-// resolveStr picks the first set candidate (else def) and records it.
 func (c *Options) resolveStr(key, def string, candidates ...cand) string {
 	for _, cd := range candidates {
 		if cd.set {
@@ -122,10 +106,9 @@ func (c *Options) resolveStr(key, def string, candidates ...cand) string {
 	return def
 }
 
-// resolveList picks the first set candidate (env comma-split) and records it
-// (an empty list displays as []).
 func (c *Options) resolveList(key string, candidates ...cand) []string {
 	v := c.resolveStr(key, "", candidates...)
+	c.setKind(key, "list")
 	if v == "" {
 		c.fillDefault(key, "[]")
 		return nil
@@ -133,7 +116,14 @@ func (c *Options) resolveList(key string, candidates ...cand) []string {
 	return strings.Split(v, ",")
 }
 
-// setValue rewrites the recorded display value for key (alias normalization).
+func (c *Options) setKind(key, kind string) {
+	for i := range c.Settings {
+		if c.Settings[i].Key == key {
+			c.Settings[i].Kind = kind
+		}
+	}
+}
+
 func (c *Options) setValue(key, value string) {
 	for i := range c.Settings {
 		if c.Settings[i].Key == key {
@@ -142,8 +132,6 @@ func (c *Options) setValue(key, value string) {
 	}
 }
 
-// fillDefault sets the recorded default display value for key (display only,
-// the resolved option itself is untouched).
 func (c *Options) fillDefault(key, value string) {
 	for i := range c.Settings {
 		if c.Settings[i].Key == key && c.Settings[i].Source == "default" && c.Settings[i].Value == "" {
@@ -152,12 +140,8 @@ func (c *Options) fillDefault(key, value string) {
 	}
 }
 
-// FillDefaultSetting is fillDefault for callers outside Resolve (the actual
-// run directory, known only at the CLI boundary).
 func (c *Options) FillDefaultSetting(key, value string) { c.fillDefault(key, value) }
 
-// resolveBool: a set flag wins, else the env var parses (0/false/off/no ->
-// false), else the first set layer pointer, else def; recorded either way.
 func (c *Options) resolveBool(key string, flagVal bool, envVal string, def bool, layers ...boolLayer) bool {
 	v, src := def, "default"
 	switch {
@@ -174,22 +158,23 @@ func (c *Options) resolveBool(key string, flagVal bool, envVal string, def bool,
 		}
 	}
 	c.record(key, strconv.FormatBool(v), src)
+	c.setKind(key, "bool")
 	return v
 }
 
-// Resolve finalizes the options in place, per field most-specific wins: flags
-// > env vars > the user-config file (config-file) > the local spec's options: block
-// (spec) > defaults; mode values validated. env supplies the env-var layer.
-// Every resolution records a Setting (key, final value, deciding source) for
-// the config log.
 func (c *Options) Resolve(env LookupEnv, user, spec Layer) error {
 	c.Settings = nil
 	c.DryRun = DryRunMode(c.resolveStr("dryRun", "",
-		flagStr(string(c.DryRun)), envStr(env("CHE_DRY_RUN")), layer(user.DryRun, "config-file"), layer(spec.DryRun, "specFile")))
+		flagStr(string(c.DryRun)), envStr(env("CHE_DRY_RUN")), layer(string(user.DryRun), "config-file"), layer(string(spec.DryRun), "specFile")))
 	c.fillDefault("dryRun", "false")
+	c.setKind("dryRun", "dryRun")
 	if c.DryRun == "true" {
 		c.DryRun = DryRun.Delta
 		c.setValue("dryRun", string(c.DryRun))
+	}
+	if c.DryRun == "false" || c.DryRun == "off" {
+		c.DryRun = DryRun.Off
+		c.setValue("dryRun", "false")
 	}
 	switch c.DryRun {
 	case DryRun.Off, DryRun.Delta, DryRun.All:
@@ -197,9 +182,6 @@ func (c *Options) Resolve(env LookupEnv, user, spec Layer) error {
 		return fmt.Errorf("invalid --dry-run mode %q: want delta, all, or true (alias for delta)", c.DryRun)
 	}
 	// [why] ValidateSpecCLI is the flag/env/config-file override (empty if none),
-	// overriding each spec's own options.validateSpec per-spec; ValidateSpec
-	// adds the local spec's own layer, then the warn default. Recorded once,
-	// as the effective value.
 	cliVal, cliSrc := "", ""
 	for _, cd := range []cand{flagStr(string(c.ValidateSpec)), envStr(env("CHE_VALIDATE_SPEC")), layer(user.ValidateSpec, "config-file")} {
 		if cd.set {
@@ -248,15 +230,47 @@ func (c *Options) Resolve(env LookupEnv, user, spec Layer) error {
 	}
 	c.RenderSkipSecrets = c.resolveBool("renderTemplates.skipSecrets", c.RenderSkipSecrets, env("CHE_RENDER_TEMPLATES_SKIP_SECRETS"), false,
 		boolLayer{user.RenderTemplates.SkipSecrets, "config-file"}, boolLayer{spec.RenderTemplates.SkipSecrets, "specFile"})
+	c.PackagesFile = c.resolveStr("packages.file", "",
+		flagStr(c.PackagesFile), envStr(env("CHE_PACKAGES_FILE")), layer(user.Packages.File, "config-file"), layer(spec.Packages.File, "specFile"))
+	c.fillDefault("packages.file", packages.BuiltinSentinel)
+	c.PackagesOverride = c.resolveStr("packages.override", "",
+		flagStr(c.PackagesOverride), envStr(env("CHE_PACKAGES_OVERRIDE")))
+	c.PackagesPreferredMethods = c.resolveList("packages.preferredInstallationMethods",
+		layerList(c.PackagesPreferredMethods, "cliFlag"), envStr(env("CHE_PACKAGES_PREFERRED_METHODS")),
+		layerList(user.Packages.PreferredInstallationMethods, "config-file"), layerList(spec.Packages.PreferredInstallationMethods, "specFile"))
+	if err := packages.ValidateManagers(c.PackagesPreferredMethods); err != nil {
+		return err
+	}
+	if len(c.PackagesPreferredMethods) == 0 {
+		c.PackagesPreferredMethods = packages.DefaultPreferredMethods
+		c.setValue("packages.preferredInstallationMethods", "["+strings.Join(packages.DefaultPreferredMethods, ", ")+"]")
+	}
+	c.PackagesPrebuiltBinariesArchiveDestinationCandidates = c.resolveList("packages.prebuiltBinariesArchive.installDestinationCandidates",
+		layerList(c.PackagesPrebuiltBinariesArchiveDestinationCandidates, "cliFlag"), envStr(env("CHE_PACKAGES_PREBUILT_BINARIES_ARCHIVE_INSTALL_DESTINATION_CANDIDATES")),
+		layerList(user.Packages.PrebuiltBinariesArchive.InstallDestinationCandidates, "config-file"), layerList(spec.Packages.PrebuiltBinariesArchive.InstallDestinationCandidates, "specFile"))
+	if len(c.PackagesPrebuiltBinariesArchiveDestinationCandidates) == 0 {
+		c.PackagesPrebuiltBinariesArchiveDestinationCandidates = packages.DefaultPrebuiltBinariesArchiveDestinationCandidates
+		c.setValue("packages.prebuiltBinariesArchive.installDestinationCandidates", "["+strings.Join(packages.DefaultPrebuiltBinariesArchiveDestinationCandidates, ", ")+"]")
+	}
+	c.PackagesPrebuiltBinariesArchiveCheckPresentOnPath = c.resolveBool("packages.prebuiltBinariesArchive.checkPresentOnPath", false, env("CHE_PACKAGES_PREBUILT_BINARIES_ARCHIVE_CHECK_PRESENT_ON_PATH"), true,
+		boolLayer{user.Packages.PrebuiltBinariesArchive.CheckPresentOnPath, "config-file"}, boolLayer{spec.Packages.PrebuiltBinariesArchive.CheckPresentOnPath, "specFile"})
+	c.PackagesCompletionsEnabled = c.resolveBool("packages.completions.zsh.enabled", false, env("CHE_PACKAGES_COMPLETIONS_ZSH_ENABLED"), false,
+		boolLayer{user.Packages.Completions.Zsh.Enabled, "config-file"}, boolLayer{spec.Packages.Completions.Zsh.Enabled, "specFile"})
+	c.PackagesCompletionsDestinationCandidates = c.resolveList("packages.completions.zsh.installDestinationCandidates",
+		envStr(env("CHE_PACKAGES_COMPLETIONS_ZSH_INSTALL_DESTINATION_CANDIDATES")),
+		layerList(user.Packages.Completions.Zsh.InstallDestinationCandidates, "config-file"),
+		layerList(spec.Packages.Completions.Zsh.InstallDestinationCandidates, "specFile"))
+	if len(c.PackagesCompletionsDestinationCandidates) == 0 {
+		c.PackagesCompletionsDestinationCandidates = packages.DefaultCompletionsDestinationCandidates
+		c.setValue("packages.completions.zsh.installDestinationCandidates", "["+strings.Join(packages.DefaultCompletionsDestinationCandidates, ", ")+"]")
+	}
+	c.PackagesCompletionsCheckPresentOnFpath = c.resolveBool("packages.completions.zsh.checkPresentOnFpath", false, env("CHE_PACKAGES_COMPLETIONS_ZSH_CHECK_PRESENT_ON_FPATH"), true,
+		boolLayer{user.Packages.Completions.Zsh.CheckPresentOnFpath, "config-file"}, boolLayer{spec.Packages.Completions.Zsh.CheckPresentOnFpath, "specFile"})
 	c.AutoDiscover = c.resolveBool("autoDiscover", false, env("CHE_AUTO_DISCOVER"), true,
 		boolLayer{user.AutoDiscover, "config-file"})
 	return c.resolveOtel(env, user, spec)
 }
 
-// resolveOtel finalizes the OTLP telemetry group: env > config-file > specFile >
-// defaults. enabled off (default) -> the provider is a no-op regardless of the
-// rest; metrics/logs/traces default on when enabled. protocol validated (grpc
-// default).
 func (c *Options) resolveOtel(env LookupEnv, user, spec Layer) error {
 	c.Otel.Enabled = c.resolveBool("otel.enabled", false, env("CHE_OTEL_ENABLED"), false,
 		boolLayer{user.Otel.Enabled, "config-file"}, boolLayer{spec.Otel.Enabled, "specFile"})
@@ -278,7 +292,6 @@ func (c *Options) resolveOtel(env LookupEnv, user, spec Layer) error {
 	return nil
 }
 
-// defaultOtelEndpoint is the local collector's default OTLP endpoint per transport.
 func defaultOtelEndpoint(protocol string) string {
 	if protocol == "http" {
 		return "localhost:4318"

@@ -1,4 +1,3 @@
-// Render-tpl renders one gomplate template to stdout or dests: op:// (1Password) and gcp:// (GCP Secret Manager) secrets, remoteFile inclusion, frontmatter, markdown transforms.
 package main
 
 // [>] 🤖🤖

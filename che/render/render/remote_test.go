@@ -16,7 +16,6 @@ import (
 	"gitlab.com/konradodwrot/go-modules/lib/testyml"
 )
 
-// remoteRefWant is parse_remote_ref's expected.output: the parsed remoteRef fields.
 type remoteRefWant struct {
 	RepoURL string `yaml:"repoURL"`
 	SSHURL  string `yaml:"sshURL"`

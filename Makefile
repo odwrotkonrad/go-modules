@@ -5,7 +5,7 @@ SHELL := zsh
 MODULES := che get-os-open-files-with get-term-open-files-with lib
 
 WRAPPERS :=
-COMMANDS := render-templates render-docs repo-ci-prepare-hooks repo-ci-precommit-all test test-cover build vet lint install create-tag publish publish-brew release-check release-snapshot
+COMMANDS := render-templates render-docs repo-ci-prepare-hooks repo-ci-precommit-all test test-cover build vet lint install create-tag publish publish-brew publish-apt release-check release-snapshot
 
 .PHONY: $(WRAPPERS) $(COMMANDS)
 
@@ -69,6 +69,10 @@ publish:
 #[what] tag pipeline: render Formula/che.rb + Formula/che@<version>.rb for $CI_COMMIT_TAG's version, commit them to the homebrew tap repo via the GitLab commits API
 publish-brew:
 	@ci/publish-brew-formula.zsh
+
+#[what] rebuild the signed apt repo tree into ./public-apt from every che .deb in the generic package registry
+publish-apt:
+	@ci/publish-apt.zsh
 
 #[what] validate every module's goreleaser configs
 release-check:

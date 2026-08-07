@@ -14,8 +14,6 @@ import (
 	"gitlab.com/konradodwrot/go-modules/che/internal/options"
 )
 
-// realProfile builds a ProfileReady over the real FS writer/reader + a fresh
-// on-disk ledger, home rooted at a temp dir (so escalate() stays sudo-free).
 func realProfile(t *testing.T) *ProfileReady {
 	t.Helper()
 	if os.Geteuid() == 0 {
@@ -36,8 +34,6 @@ func realProfile(t *testing.T) *ProfileReady {
 	}
 }
 
-// uninstallerOver runs the uninstall algorithm over p's ledger, reusing p's real
-// seams (its own run row keeps inverse ops distinct).
 func uninstallerOver(t *testing.T, p *ProfileReady) *Uninstaller {
 	t.Helper()
 	spec, err := p.Ledger.StartSpec(testRunID+"-un", "", "uninstall")
@@ -52,21 +48,21 @@ func uninstallerOver(t *testing.T, p *ProfileReady) *Uninstaller {
 func TestUninstallRemovesCreatedDest(t *testing.T) {
 	p := realProfile(t)
 	dest := filepath.Join(p.home, "created.txt")
-	require.NoError(t, p.archiveBefore("make-copies", []string{dest})) // dest absent: empty archive
+	require.NoError(t, p.archiveBefore("make-copies", []string{dest}))
 	require.NoError(t, p.mutate("make-copies", "create", dest, dest, opInfo{kind: "copy"}, func() error {
 		return os.WriteFile(dest, []byte("new"), 0o644)
 	}))
 	require.FileExists(t, dest)
 
 	require.NoError(t, uninstallerOver(t, p).Uninstall())
-	require.NoFileExists(t, dest) // che created it fresh -> removed
+	require.NoFileExists(t, dest)
 }
 
 func TestUninstallRestoresPreExisting(t *testing.T) {
 	p := realProfile(t)
 	dest := filepath.Join(p.home, "pre.txt")
-	require.NoError(t, os.WriteFile(dest, []byte("original"), 0o644))  // pre-install content
-	require.NoError(t, p.archiveBefore("make-copies", []string{dest})) // snapshots original
+	require.NoError(t, os.WriteFile(dest, []byte("original"), 0o644))
+	require.NoError(t, p.archiveBefore("make-copies", []string{dest}))
 	require.NoError(t, p.mutate("make-copies", "create", dest, dest, opInfo{kind: "copy"}, func() error {
 		return os.WriteFile(dest, []byte("overwritten"), 0o644)
 	}))
@@ -74,7 +70,7 @@ func TestUninstallRestoresPreExisting(t *testing.T) {
 	require.NoError(t, uninstallerOver(t, p).Uninstall())
 	body, err := os.ReadFile(dest)
 	require.NoError(t, err)
-	require.Equal(t, "original", string(body)) // restored from the pre-install backup
+	require.Equal(t, "original", string(body))
 }
 
 func TestUninstallSkipsDrift(t *testing.T) {
@@ -84,13 +80,13 @@ func TestUninstallSkipsDrift(t *testing.T) {
 	require.NoError(t, p.mutate("make-copies", "create", dest, dest, opInfo{kind: "copy"}, func() error {
 		return os.WriteFile(dest, []byte("che"), 0o644)
 	}))
-	recorded, err := os.Stat(dest) // che records the umask-masked on-disk mode, not 0644
+	recorded, err := os.Stat(dest)
 	require.NoError(t, err)
-	drifted := recorded.Mode().Perm() ^ 0o100 // flip owner-execute: real drift under any umask
+	drifted := recorded.Mode().Perm() ^ 0o100
 	require.NoError(t, os.Chmod(dest, drifted))
 
 	require.NoError(t, uninstallerOver(t, p).Uninstall())
-	require.FileExists(t, dest) // drifted dest left untouched, not removed
+	require.FileExists(t, dest)
 	fi, err := os.Stat(dest)
 	require.NoError(t, err)
 	require.Equal(t, drifted, fi.Mode().Perm())
@@ -107,7 +103,7 @@ func TestUninstallInverseExcludesFromInstalled(t *testing.T) {
 
 	got, err := p.Ledger.Installed()
 	require.NoError(t, err)
-	require.Empty(t, got) // inverse remove op drops it from the installed set
+	require.Empty(t, got)
 }
 
 func TestUninstallDryRunWritesNothing(t *testing.T) {
@@ -122,7 +118,7 @@ func TestUninstallDryRunWritesNothing(t *testing.T) {
 	u.p.opts = options.Options{DryRun: options.DryRun.Delta}
 
 	require.NoError(t, u.Uninstall())
-	require.FileExists(t, dest) // dry-run touches no files
+	require.FileExists(t, dest)
 }
 
 // [<] 🤖🤖

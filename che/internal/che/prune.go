@@ -9,11 +9,6 @@ import (
 	"gitlab.com/konradodwrot/go-modules/che/internal/log"
 )
 
-// sweepStale removes every dest of kind the ledger recorded for THIS profile
-// that the current run no longer produced (produced holds this run's dests).
-// Each stale dest is archived into a fresh prune backup, removed through FS, and
-// an inverse remove op recorded — the ledger is the source of truth, git no
-// longer classifies staleness. Records-off (nil ledger) / dry-run -> no-op sweep.
 func (p *ProfileReady) sweepStale(kind string, produced []string) error {
 	if p.Ledger == nil || p.profileDone == nil {
 		return nil
@@ -38,9 +33,6 @@ func (p *ProfileReady) sweepStale(kind string, produced []string) error {
 	return errors.Join(errs...)
 }
 
-// removeStale archives the stale dest into a fresh prune backup, removes it, and
-// records the inverse remove op (so Installed() drops it and the prune is itself
-// reversible). Absent dest -> only the inverse row, nothing to remove.
 func (p *ProfileReady) removeStale(op database.OperationDone) error {
 	dest := op.Dest
 	if err := p.snapshotForRemoval("prune", []string{dest}); err != nil {
@@ -57,9 +49,6 @@ func (p *ProfileReady) removeStale(op database.OperationDone) error {
 	return nil
 }
 
-// snapshotForRemoval writes a fresh backup archive (sub) of dests through FS and
-// stashes its path/sub as the in-flight Backup, so the recorded remove op points
-// at a snapshot that makes the removal reversible.
 func (p *ProfileReady) snapshotForRemoval(sub string, dests []string) error {
 	path := p.resolveArchivePath(sub)
 	p.currentArchive = path
@@ -67,8 +56,6 @@ func (p *ProfileReady) snapshotForRemoval(sub string, dests []string) error {
 	return p.FS.ArchiveDestinations(path, dests)
 }
 
-// recordRemoval writes an inverse remove OperationDone for a swept/uninstalled
-// dest, its Backup the just-written snapshot.
 func (p *ProfileReady) recordRemoval(kind, dest string, prev database.Object) {
 	if p.Ledger == nil || p.profileDone == nil {
 		return
