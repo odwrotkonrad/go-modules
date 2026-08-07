@@ -134,7 +134,7 @@ config loaders and main-shape boilerplate.
 
 `create-tag`
 `publish` tag pipeline: goreleaser snapshot build for $CI_COMMIT_TAG's module, upload to the generic package registry, link release assets
-`publish-brew` tag pipeline: render Formula/che.rb for $CI_COMMIT_TAG's version, commit it to the homebrew tap repo via the GitLab commits API
+`publish-brew` tag pipeline: render Formula/che.rb + Formula/che@<version>.rb for $CI_COMMIT_TAG's version, commit them to the homebrew tap repo via the GitLab commits API
 `release-check` validate every module's goreleaser configs
 `release-snapshot` local snapshot build of every module, no publish
 
@@ -480,6 +480,7 @@ lib
         funcs
 spec
   che
+  release
 templates
   2-data
   3-audience

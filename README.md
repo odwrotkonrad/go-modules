@@ -31,12 +31,20 @@ Four sibling repos duplicated toolchain, CI, conventions, release flow. One repo
 ### che via brew (Homebrew on macOS, Linuxbrew)
 
 ```sh
-brew tap konradodwrot/tap https://gitlab.com/konradodwrot/homebrew-tap.git
-brew install konradodwrot/tap/che
+brew tap konradodwrot/tap
+brew install che
+```
+
+Pin a version via its versioned formula:
+
+```sh
+brew install che@0.0.67
 ```
 
 Binary formula for `{darwin,linux}_{amd64,arm64}`: installs `che` and the render
-CLIs from the prebuilt release archives, updated by each che tag pipeline.
+CLIs from the prebuilt release archives, updated by each che tag pipeline. The
+tap is mirrored to [GitHub](https://github.com/konradodwrot/homebrew-tap), which
+`brew tap` resolves by default.
 
 ### Prebuilt archives
 

@@ -66,7 +66,7 @@ create-tag:
 publish:
 	@ci/publish.zsh
 
-#[what] tag pipeline: render Formula/che.rb for $CI_COMMIT_TAG's version, commit it to the homebrew tap repo via the GitLab commits API
+#[what] tag pipeline: render Formula/che.rb + Formula/che@<version>.rb for $CI_COMMIT_TAG's version, commit them to the homebrew tap repo via the GitLab commits API
 publish-brew:
 	@ci/publish-brew-formula.zsh
 
