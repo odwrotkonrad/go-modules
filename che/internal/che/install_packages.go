@@ -64,6 +64,7 @@ func NewPackagesInstaller(env map[string]string, home string, opts options.Optio
 		if err != nil {
 			return nil, err
 		}
+		o.ResolveScriptPaths(filepath.Dir(override))
 		f.Merge(o)
 	}
 	if err := f.ValidatePlatforms(); err != nil {

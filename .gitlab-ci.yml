@@ -153,11 +153,15 @@ test-e2e-che-backup:
   needs: []
   rules:
     - if: $CI_PIPELINE_SOURCE == "merge_request_event"
-      changes: [che/internal/packages/**/*, che/e2e/install_methods*, .gitlab-ci.yml]
-      when: manual
+      changes: [che/internal/packages/**/*, che/e2e/install_methods*]
       allow_failure: true
     - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
       changes: [che/internal/packages/**/*, che/e2e/install_methods*]
+      allow_failure: true
+    - if: $CI_PIPELINE_SOURCE == "merge_request_event"
+      when: manual
+      allow_failure: true
+    - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
       when: manual
       allow_failure: true
   script:

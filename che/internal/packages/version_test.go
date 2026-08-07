@@ -3,10 +3,16 @@ package packages
 // [>] 🤖🤖
 
 import (
+	"os"
+	"path/filepath"
 	"strings"
 	"testing"
 
 	"github.com/stretchr/testify/require"
+	"gopkg.in/yaml.v3"
+
+	"gitlab.com/konradodwrot/go-modules/che/internal/execx"
+	"gitlab.com/konradodwrot/go-modules/lib/testyml"
 )
 
 func TestPinMatches(t *testing.T) {
@@ -275,4 +281,67 @@ func TestPostInstallShippedScriptResolves(t *testing.T) {
 	calls := strings.Join(m.Calls(), "\n")
 	require.Contains(t, calls, `ln -fs "$app/MacOS/kitten" "$bin/kitten"`)
 	require.Contains(t, calls, `ln -fs "$app/MacOS/kitty" "$bin/kitty"`)
+}
+
+type scriptPathsGot struct {
+	Items       []string `yaml:"items"`
+	PostInstall string   `yaml:"postInstall"`
+}
+
+func TestResolveScriptPaths(t *testing.T) {
+	testyml.Eq(t, td, "testdata/spec/funcs/resolve_script_paths.test.spec.yml", func(t *testing.T, c testyml.Case[map[string]scriptPathsGot]) (map[string]scriptPathsGot, error) {
+		var f File
+		require.NoError(t, yaml.Unmarshal([]byte(c.Input.Args.String(t, 1)), &f))
+		f.ResolveScriptPaths(c.Input.Args.String(t, 0))
+		got := map[string]scriptPathsGot{}
+		for name, e := range f.Packages {
+			g := scriptPathsGot{}
+			for _, it := range e.Items {
+				path := ""
+				if it.Script != nil {
+					path = it.Script.Path
+				}
+				g.Items = append(g.Items, path)
+			}
+			if e.PostInstall != nil {
+				g.PostInstall = e.PostInstall.Path
+			}
+			got[name] = g
+		}
+		return got, nil
+	})
+}
+
+func TestUserFileScriptNeverFallsBackToBuiltin(t *testing.T) {
+	dir := t.TempDir()
+	yml := "packages:\n  kitty:\n    installMethods: [{script: {path: scripts/post-install-kitty.sh}}]\n"
+	require.NoError(t, os.WriteFile(filepath.Join(dir, "packages.yml"), []byte(yml), 0o644))
+	f, err := Load(filepath.Join(dir, "packages.yml"))
+	require.NoError(t, err)
+	in := &Installer{File: f, FilePath: filepath.Join(dir, "packages.yml"), Host: testHost("darwin", "amd64", cmdMap(nil))}
+	m := &execx.Mock{}
+	execx.Swap(t, m)
+	err = in.Install([]string{"kitty"})
+	require.ErrorContains(t, err, "install script not found")
+	require.NotContains(t, strings.Join(m.Calls(), "\n"), "kitty.app")
+}
+
+func TestOverrideAnchoredScriptRuns(t *testing.T) {
+	dir := t.TempDir()
+	require.NoError(t, os.MkdirAll(filepath.Join(dir, "scripts"), 0o755))
+	require.NoError(t, os.WriteFile(filepath.Join(dir, "scripts", "my-post.sh"), []byte("echo user-post\n"), 0o755))
+	yml := "packages:\n  mytool:\n    installMethods: [{script: {run: echo install}}]\n    postInstall: {path: scripts/my-post.sh}\n"
+	require.NoError(t, os.WriteFile(filepath.Join(dir, "override.yml"), []byte(yml), 0o644))
+	o, err := Load(filepath.Join(dir, "override.yml"))
+	require.NoError(t, err)
+	o.ResolveScriptPaths(dir)
+
+	base, err := LoadBuiltin()
+	require.NoError(t, err)
+	base.Merge(o)
+	in := &Installer{File: base, FilePath: BuiltinPath, Host: testHost("darwin", "amd64", cmdMap(nil))}
+	m := &execx.Mock{}
+	execx.Swap(t, m)
+	require.NoError(t, in.Install([]string{"mytool"}))
+	require.Contains(t, strings.Join(m.Calls(), "\n"), filepath.Join(dir, "scripts", "my-post.sh"))
 }

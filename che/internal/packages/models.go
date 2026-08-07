@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"maps"
 	"os"
+	"path/filepath"
 	"slices"
 	"strings"
 	"sync"
@@ -467,3 +468,21 @@ func (f *File) Find(pkg, path string) (Entry, error) {
 }
 
 // [<] 🤖🤖🤖
+
+// ResolveScriptPaths anchors relative script paths to the file that declared them.
+// [why] override entries merge into a base file: without anchoring, their relative
+//
+//	paths would resolve against the base (or the builtin embed, by basename)
+func (f *File) ResolveScriptPaths(dir string) {
+	for name, e := range f.Packages {
+		for i, it := range e.Items {
+			if it.Script != nil && it.Script.Path != "" && !filepath.IsAbs(it.Script.Path) {
+				e.Items[i].Script.Path = filepath.Join(dir, it.Script.Path)
+			}
+		}
+		if e.PostInstall != nil && e.PostInstall.Path != "" && !filepath.IsAbs(e.PostInstall.Path) {
+			e.PostInstall.Path = filepath.Join(dir, e.PostInstall.Path)
+		}
+		f.Packages[name] = e
+	}
+}

@@ -98,6 +98,12 @@ Scenario: a user overrides single entries without forking the packages file
   Then its same-name entries replace the base entries and new names append
   And `--packages-file` / `packages.file` user config relocate the base file
 
+Scenario: a user's own file ships its own scripts next to it
+  Status: tested
+  When an entry in a superseding packages file or an override file uses a relative script `path:` (an install method's or `postInstall`'s)
+  Then the path resolves against that file's directory, not the base file's or the working directory
+  And it never silently falls back to a same-named builtin script
+
 Scenario: top-level archNameConventions and platforms blocks standardize os, arch, and platform references
   Status: tested
   When the packages file opens with `archNameConventions:` (named arch spelling sets, e.g. `uname: {amd64: x86_64, arm64: aarch64}`, `odd: {amd64: x86_64, arm64: arm64}`) and `platforms:` (each supported `<os>-<arch>` id keyed to its supported installation methods)

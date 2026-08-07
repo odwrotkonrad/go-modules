@@ -1,0 +1,38 @@
+# [>] 🤖🤖
+context:
+  function: packages.File.ResolveScriptPaths
+cases:
+  - name: ShouldAnchorRelativeInstallMethodAndPostInstallPaths
+    input:
+      args:
+        - dir: /overrides
+        - file: |
+            packages:
+              mytool:
+                installMethods:
+                  - script: {path: scripts/install-mytool.sh}
+                postInstall:
+                  path: scripts/post-mytool.sh
+    expected:
+      output:
+        mytool:
+          items: [/overrides/scripts/install-mytool.sh]
+          postInstall: /overrides/scripts/post-mytool.sh
+  - name: ShouldLeaveAbsolutePathsInlineRunAndRemoteUrlUntouched
+    input:
+      args:
+        - dir: /overrides
+        - file: |
+            packages:
+              mytool:
+                installMethods:
+                  - script: {path: /abs/install.sh}
+                  - script: {run: echo inline}
+                  - script: {remoteUrl: https://example.com/i.sh}
+                postInstall: echo inline-post
+    expected:
+      output:
+        mytool:
+          items: [/abs/install.sh, "", ""]
+          postInstall: ""
+# [<] 🤖🤖

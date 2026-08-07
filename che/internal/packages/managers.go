@@ -594,8 +594,12 @@ func (in *Installer) scriptArgv(pkg string, s *ScriptSpec) ([]string, error) {
 			return append([]string{scriptShell(s), "-e", p}, s.Args...), nil
 		}
 	}
-	if b, err := builtinScripts.ReadFile("scripts/" + path.Base(s.Path)); err == nil {
-		return withScriptArgs([]string{scriptShell(s), "-ec", string(b)}, s), nil
+	// [why] only builtin entries reach the embedded scripts: a user file's missing script must
+	//   error, never silently run a same-named shipped one
+	if in.FilePath == BuiltinPath && !filepath.IsAbs(s.Path) {
+		if b, err := builtinScripts.ReadFile("scripts/" + path.Base(s.Path)); err == nil {
+			return withScriptArgs([]string{scriptShell(s), "-ec", string(b)}, s), nil
+		}
 	}
 	return nil, fmt.Errorf("%s: install script not found: %s", pkg, s.Path)
 }
