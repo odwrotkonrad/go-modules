@@ -88,6 +88,8 @@ func runInstallGroup(t *testing.T, g installGroup) {
 		"PATH=" + path,
 		"PYENV_ROOT=" + pyenvRoot,
 		"XDG_CONFIG_HOME=" + filepath.Join(home, ".config"),
+		"XDG_DATA_HOME=" + filepath.Join(home, ".local", "share"),
+		"XDG_BIN_HOME=" + bin,
 		"XDG_STATE_HOME=" + filepath.Join(home, ".local", "state"),
 		"XDG_CACHE_HOME=" + filepath.Join(home, ".cache"),
 		"CHE_E2E=1",

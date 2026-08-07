@@ -5,10 +5,11 @@
 groups:
   - method: brew/formulae
     os: darwin
-    packages: [jq, bat]
+    packages: [jq, bat, aws]
     verify:
       jq: jq --version
       bat: bat --version
+      aws: aws --version
 
   - method: brew/cask
     os: darwin
@@ -75,9 +76,4 @@ groups:
     verify:
       gopls: gopls version
 
-  - method: script/aws
-    os: darwin
-    packages: [aws]
-    verify:
-      aws: aws --version
 ##[<] 🤖🤖

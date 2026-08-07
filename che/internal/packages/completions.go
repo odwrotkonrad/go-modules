@@ -6,8 +6,6 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
-	"slices"
-	"strings"
 
 	"gitlab.com/konradodwrot/go-modules/che/internal/log"
 )
@@ -46,7 +44,7 @@ func (in *Installer) installCompletions(pkg string, e Entry) error {
 			return err
 		}
 	} else {
-		if err := in.exec([]string{"curl", "-fsSL", "--connect-timeout", "30", "--retry", "10", "--retry-delay", "30", "--retry-all-errors", "-o", asset, def.URL}); err != nil {
+		if err := in.exec(curlArgv(def.URL, asset)); err != nil {
 			return err
 		}
 	}
@@ -66,29 +64,9 @@ func (in *Installer) installCompletions(pkg string, e Entry) error {
 }
 
 func (in *Installer) completionsDir() string {
-	if in.compDir != "" {
-		return in.compDir
-	}
-	candidates := in.Opts.CompletionsDestinationCandidates
-	if len(candidates) == 0 {
-		candidates = DefaultCompletionsDestinationCandidates
-	}
-	expanded := make([]string, len(candidates))
-	for i, c := range candidates {
-		expanded[i] = in.expandPath(c)
-	}
-	in.compDir = expanded[0]
-	if in.Opts.CompletionsCheckPresentOnFpath {
-		fpath := in.fpath()
-		onFpath := slices.IndexFunc(expanded, func(d string) bool { return slices.Contains(fpath, d) })
-		if onFpath >= 0 {
-			in.compDir = expanded[onFpath]
-		} else {
-			in.emit(log.Levels.Warn, "not-on-fpath",
-				"no packages.completions.zsh.installDestinationCandidates entry is on fpath ("+strings.Join(expanded, ", ")+"), using "+in.compDir)
-		}
-	}
-	return in.compDir
+	return in.resolveDestDir(&in.compDir, in.Opts.CompletionsDestinationCandidates, DefaultCompletionsDestinationCandidates,
+		in.Opts.CompletionsCheckPresentOnFpath, in.fpath,
+		"packages.completions.zsh.installDestinationCandidates", "fpath")
 }
 
 func (in *Installer) fpath() []string {

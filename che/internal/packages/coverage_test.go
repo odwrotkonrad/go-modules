@@ -59,11 +59,11 @@ func TestNewHostCapturesRuntime(t *testing.T) {
 
 func TestApplicableGemAndCask(t *testing.T) {
 	h := testHost("darwin", "amd64", cmdMap([]string{"gem", "brew"}))
-	it, ok, err := h.pick("x", Entry{Items: []Item{{Mgr: "gem"}}})
+	it, ok, err := h.pickPreferred("x", Entry{Items: []Item{{Mgr: "gem"}}}, nil, nil)
 	require.NoError(t, err)
 	require.True(t, ok)
 	require.Equal(t, "gem", it.Mgr)
-	it, ok, err = h.pick("x", Entry{Items: []Item{{Mgr: "cask", Name: "x"}}})
+	it, ok, err = h.pickPreferred("x", Entry{Items: []Item{{Mgr: "cask", Name: "x"}}}, nil, nil)
 	require.NoError(t, err)
 	require.True(t, ok)
 	require.Equal(t, "cask", it.Mgr)

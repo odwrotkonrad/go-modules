@@ -115,24 +115,6 @@ func (a *app) packagesConfigCmd() *cobra.Command {
 	return cmd
 }
 
-func (a *app) profilePackages() []string {
-	var out []string
-	for _, p := range a.root.AllProfiles() {
-		for _, op := range p.OperationsReady {
-			ip, ok := op.(*che.InstallPackagesOperationReady)
-			if !ok {
-				continue
-			}
-			for _, pkg := range ip.Packages {
-				if !slices.Contains(out, pkg.Name) {
-					out = append(out, pkg.Name)
-				}
-			}
-		}
-	}
-	return out
-}
-
 func (a *app) packagesInstallRunE(cmd *cobra.Command, args []string) error {
 	if len(args) > 0 {
 		in, err := che.NewPackagesInstallerFromContext(a.ctx, a.opts)
@@ -164,7 +146,7 @@ func (a *app) packagesCheckCmd(name, short string, run func(*packages.Installer,
 			}
 			pkgs := args
 			if len(pkgs) == 0 {
-				pkgs = a.profilePackages()
+				pkgs = che.InstallPackageNames(a.root.AllProfiles())
 			}
 			if len(pkgs) == 0 {
 				pkgs = slices.Sorted(maps.Keys(in.File.Packages))

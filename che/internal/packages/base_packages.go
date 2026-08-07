@@ -39,7 +39,10 @@ func (in *Installer) ensureBasePackages(mgr string) error {
 func (in *Installer) installBasePackages(names []string) error {
 	sub := *in
 	sub.baseInstalling = true
-	return sub.InstallRequests(Requests(names))
+	err := sub.InstallRequests(Requests(names))
+	sub.baseInstalling = false
+	*in = sub
+	return err
 }
 
 // [<] 🤖🤖

@@ -6,6 +6,7 @@ import (
 	"cmp"
 	"os"
 	"path/filepath"
+	"slices"
 
 	"gitlab.com/konradodwrot/go-modules/che/internal/log"
 	"gitlab.com/konradodwrot/go-modules/che/internal/options"
@@ -13,20 +14,22 @@ import (
 	"gitlab.com/konradodwrot/go-modules/che/internal/spec"
 )
 
+func resolveConfigBase(env map[string]string, home string) string {
+	return cmp.Or(env["XDG_CONFIG_HOME"], filepath.Join(home, ".config"))
+}
+
 func resolvePackagesFile(env map[string]string, home string, opts options.Options) string {
 	if opts.PackagesFile != "" {
 		return opts.PackagesFile
 	}
-	base := cmp.Or(env["XDG_CONFIG_HOME"], filepath.Join(home, ".config"))
-	return filepath.Join(base, "packages", "packages.yml")
+	return filepath.Join(resolveConfigBase(env, home), "packages", "packages.yml")
 }
 
 func resolvePackagesOverride(env map[string]string, home string, opts options.Options) string {
 	if opts.PackagesOverride != "" {
 		return opts.PackagesOverride
 	}
-	base := cmp.Or(env["XDG_CONFIG_HOME"], filepath.Join(home, ".config"))
-	path := filepath.Join(base, "che", "packages-override.yml")
+	path := filepath.Join(resolveConfigBase(env, home), "che", "packages-override.yml")
 	if _, err := os.Stat(path); err == nil {
 		return path
 	}
@@ -126,6 +129,24 @@ func (p *ProfileReady) newInstaller() (*packages.Installer, error) {
 	}
 	in.EmitDryRun = func(action, msg string) { p.emitDryRun(packages.Scope, action, msg) }
 	return in, nil
+}
+
+func InstallPackageNames(profiles []*ProfileReady) []string {
+	var out []string
+	for _, p := range profiles {
+		for _, op := range p.OperationsReady {
+			ip, ok := op.(*InstallPackagesOperationReady)
+			if !ok {
+				continue
+			}
+			for _, pkg := range ip.Packages {
+				if !slices.Contains(out, pkg.Name) {
+					out = append(out, pkg.Name)
+				}
+			}
+		}
+	}
+	return out
 }
 
 func (p *ProfileReady) installPackages(refs []spec.PackageRef) error {

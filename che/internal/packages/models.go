@@ -7,11 +7,13 @@ import (
 	"fmt"
 	"maps"
 	"os"
-	"reflect"
 	"slices"
 	"strings"
+	"sync"
 
 	"gopkg.in/yaml.v3"
+
+	"gitlab.com/konradodwrot/go-modules/che/internal/fsutil"
 )
 
 //go:embed packages.yml
@@ -36,11 +38,13 @@ type File struct {
 	Packages            map[string]Entry             `yaml:"packages,omitempty"`
 }
 
+var builtinFile = sync.OnceValues(LoadBuiltin)
+
 func (f *File) archNameConventionsOrBuiltin() map[string]map[string]string {
 	if f.ArchNameConventions != nil {
 		return f.ArchNameConventions
 	}
-	if builtin, err := LoadBuiltin(); err == nil {
+	if builtin, err := builtinFile(); err == nil {
 		return builtin.ArchNameConventions
 	}
 	return nil
@@ -50,7 +54,7 @@ func (f *File) platformsOrBuiltin() map[string][]string {
 	if f.Platforms != nil {
 		return f.Platforms
 	}
-	if builtin, err := LoadBuiltin(); err == nil {
+	if builtin, err := builtinFile(); err == nil {
 		return builtin.Platforms
 	}
 	return nil
@@ -171,9 +175,13 @@ func (f *File) YAML() (string, error) {
 	doc := &yaml.Node{Kind: yaml.MappingNode}
 	for _, top := range []struct {
 		key   string
+		empty bool
 		value any
-	}{{"archNameConventions", f.ArchNameConventions}, {"platforms", f.Platforms}} {
-		if reflect.ValueOf(top.value).Len() == 0 {
+	}{
+		{"archNameConventions", len(f.ArchNameConventions) == 0, f.ArchNameConventions},
+		{"platforms", len(f.Platforms) == 0, f.Platforms},
+	} {
+		if top.empty {
 			continue
 		}
 		node := &yaml.Node{}
@@ -384,16 +392,8 @@ func (f *File) Merge(override *File) {
 	if override.Platforms != nil {
 		f.Platforms = override.Platforms
 	}
-	if len(override.BasePackages) > 0 {
-		if f.BasePackages == nil {
-			f.BasePackages = map[string][]string{}
-		}
-		maps.Copy(f.BasePackages, override.BasePackages)
-	}
-	if f.Packages == nil {
-		f.Packages = map[string]Entry{}
-	}
-	maps.Copy(f.Packages, override.Packages)
+	f.BasePackages = fsutil.MergeMap(f.BasePackages, override.BasePackages)
+	f.Packages = fsutil.MergeMap(f.Packages, override.Packages)
 }
 
 func (f *File) ValidatePlatforms() error {

@@ -30,11 +30,9 @@ packages:
         installMethods:
             - apt
     aws:
-        version: 2.36.19
+        version: 2.36.18
         installMethods:
-            - script:
-                os: darwin
-                remoteUrl: https://awscli.amazonaws.com/v2/install.sh
+            - brew: awscli
             - prebuiltArchive:
                 url: https://awscli.amazonaws.com/awscli-exe-linux-{arch}-{version}.zip
                 archConvention: uname

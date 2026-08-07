@@ -42,12 +42,8 @@ func (in *Installer) installAptSpec(pkg string, a *AptSpec) error {
 }
 
 func (in *Installer) aptAllInstalled(pkgs []string) bool {
-	for _, p := range pkgs {
-		if _, ok := in.output([]string{"dpkg", "-s", p}); !ok {
-			return false
-		}
-	}
-	return true
+	_, ok := in.output(append([]string{"dpkg", "-s"}, pkgs...))
+	return ok
 }
 
 func (in *Installer) ensureAptRepo(name string, r *AptRepoSpec) error {
@@ -74,7 +70,7 @@ func (in *Installer) ensureAptRepo(name string, r *AptRepoSpec) error {
 	}
 	defer func() { _ = os.RemoveAll(tmp) }()
 	asc := filepath.Join(tmp, name+".asc")
-	if err := in.exec([]string{"curl", "-fsSL", "--connect-timeout", "30", "--retry", "10", "--retry-delay", "30", "--retry-all-errors", "-o", asc, r.GpgURL}); err != nil {
+	if err := in.exec(curlArgv(r.GpgURL, asc)); err != nil {
 		return err
 	}
 	sources := filepath.Join(tmp, name+".sources")

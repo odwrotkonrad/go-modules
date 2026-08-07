@@ -139,10 +139,6 @@ func (h Host) applicable(pkg string, it Item) (bool, error) {
 	}
 }
 
-func (h Host) pick(pkg string, entry Entry) (Item, bool, error) {
-	return h.pickPreferred(pkg, entry, nil, nil)
-}
-
 func (h Host) pickPreferred(pkg string, entry Entry, preferred, allowed []string) (Item, bool, error) {
 	for _, it := range orderByPreference(entry.Items, preferred) {
 		ok, err := h.applicable(pkg, it)

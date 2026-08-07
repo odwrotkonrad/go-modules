@@ -43,7 +43,7 @@ func (in *Installer) installPrebuiltArchive(pkg string, b *PrebuiltArchiveSpec) 
 	}
 	defer func() { _ = os.RemoveAll(tmp) }()
 	asset := filepath.Join(tmp, path.Base(url))
-	if err := in.exec([]string{"curl", "-fsSL", "--connect-timeout", "30", "--retry", "10", "--retry-delay", "30", "--retry-all-errors", "-o", asset, url}); err != nil {
+	if err := in.exec(curlArgv(url, asset)); err != nil {
 		return err
 	}
 	if want, ok := b.Sha256[in.Host.ShaKey()]; ok {
@@ -155,28 +155,33 @@ func (in *Installer) extract(asset, dest string) error {
 }
 
 func (in *Installer) userBinDir() string {
-	if in.binDir != "" {
-		return in.binDir
+	return in.resolveDestDir(&in.binDir, in.Opts.PrebuiltArchiveDestinationCandidates, DefaultPrebuiltArchiveDestinationCandidates,
+		in.Opts.PrebuiltArchiveCheckPresentOnPath, in.Host.PathDirs,
+		"packages.prebuiltArchive.installDestinationCandidates", "PATH")
+}
+
+func (in *Installer) resolveDestDir(cached *string, candidates, defaults []string, check bool, dirs func() []string, optName, pathLabel string) string {
+	if *cached != "" {
+		return *cached
 	}
-	candidates := in.Opts.PrebuiltArchiveDestinationCandidates
 	if len(candidates) == 0 {
-		candidates = DefaultPrebuiltArchiveDestinationCandidates
+		candidates = defaults
 	}
 	expanded := make([]string, len(candidates))
 	for i, c := range candidates {
 		expanded[i] = in.expandPath(c)
 	}
-	in.binDir = expanded[0]
-	if in.Opts.PrebuiltArchiveCheckPresentOnPath {
-		onPath := slices.IndexFunc(expanded, func(d string) bool { return slices.Contains(in.Host.PathDirs(), d) })
-		if onPath >= 0 {
-			in.binDir = expanded[onPath]
+	*cached = expanded[0]
+	if check {
+		on := dirs()
+		if i := slices.IndexFunc(expanded, func(d string) bool { return slices.Contains(on, d) }); i >= 0 {
+			*cached = expanded[i]
 		} else {
-			in.emit(log.Levels.Warn, "not-on-path",
-				"no packages.prebuiltArchive.installDestinationCandidates entry is on PATH ("+strings.Join(expanded, ", ")+"), using "+in.binDir)
+			in.emit(log.Levels.Warn, "not-on-"+strings.ToLower(pathLabel),
+				"no "+optName+" entry is on "+pathLabel+" ("+strings.Join(expanded, ", ")+"), using "+*cached)
 		}
 	}
-	return in.binDir
+	return *cached
 }
 
 func (in *Installer) expandPath(p string) string {

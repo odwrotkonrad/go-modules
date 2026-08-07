@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"maps"
 	"os"
+	"path"
 	"path/filepath"
 	"slices"
 	"strings"
@@ -39,11 +40,20 @@ type Installer struct {
 
 	aptUpdated     bool
 	codeExts       map[string]string
+	outdated       map[string]map[string]bool
 	binDir         string
 	compDir        string
 	requested      map[string]Request
 	baseDone       map[string]bool
 	baseInstalling bool
+}
+
+func curlArgv(url string, dest ...string) []string {
+	argv := []string{"curl", "-fsSL", "--connect-timeout", "30", "--retry", "10", "--retry-delay", "30", "--retry-all-errors"}
+	for _, d := range dest {
+		argv = append(argv, "-o", d)
+	}
+	return append(argv, url)
 }
 
 type Request struct {
@@ -116,6 +126,8 @@ func (in *Installer) cmdFor(pkg string) string {
 
 func (in *Installer) hasCmd(pkg string) bool { return in.Host.HasCmd(in.cmdFor(pkg)) }
 
+func (in *Installer) findEntry(pkg string) (Entry, error) { return in.File.Find(pkg, in.FilePath) }
+
 func (in *Installer) pickItem(pkg string, entry Entry) (Item, bool, error) {
 	return in.Host.pickPreferred(pkg, entry, in.Opts.PreferredMethods, in.File.platformsOrBuiltin()[in.Host.ShaKey()])
 }
@@ -141,7 +153,7 @@ func (in *Installer) InstallRequests(reqs []Request) error {
 		var still []string
 		progress := false
 		for _, pkg := range pending {
-			entry, err := in.File.Find(pkg, in.FilePath)
+			entry, err := in.findEntry(pkg)
 			if err != nil {
 				return err
 			}
@@ -183,7 +195,7 @@ func (in *Installer) InstallRequests(reqs []Request) error {
 	for _, pkg := range pending {
 		if in.hasCmd(pkg) {
 			in.emitSkip(log.Levels.Debug, pkg, "no applicable manager, command present")
-			entry, err := in.File.Find(pkg, in.FilePath)
+			entry, err := in.findEntry(pkg)
 			if err != nil {
 				return err
 			}
@@ -213,7 +225,7 @@ func (in *Installer) plan(reqs []Request) ([]string, error) {
 			return nil
 		}
 		seen[name] = true
-		entry, err := in.File.Find(name, in.FilePath)
+		entry, err := in.findEntry(name)
 		if err != nil {
 			return err
 		}
@@ -246,16 +258,14 @@ func (in *Installer) installVia(pkg string, it Item) error {
 			return err
 		}
 	}
-	if it.Mgr == "apt" && it.Apt != nil {
+	switch {
+	case it.Mgr == "apt" && it.Apt != nil:
 		return in.installAptSpec(pkg, it.Apt)
-	}
-	if it.Mgr == "versionManager" {
+	case it.Mgr == "versionManager":
 		return in.installVersionManager(pkg, it.VersionManager)
-	}
-	if it.Mgr == "prebuiltArchive" {
+	case it.Mgr == "prebuiltArchive":
 		return in.installPrebuiltArchive(pkg, it.PrebuiltArchive)
-	}
-	if it.Mgr == "script" {
+	case it.Mgr == "script":
 		return in.installScript(pkg, it.Script)
 	}
 	base := it.Name
@@ -328,10 +338,10 @@ func (in *Installer) isInstalled(pkg, mgr, base string) bool {
 	switch mgr {
 	// [why] a pinned brew formula is its own package (node@24): ask about the pinned name
 	case "brew":
-		_, ok := in.output([]string{"brew", "list", tail(base)})
+		_, ok := in.output([]string{"brew", "list", path.Base(base)})
 		return ok
 	case "cask":
-		_, ok := in.output([]string{"brew", "list", "--cask", tail(base)})
+		_, ok := in.output([]string{"brew", "list", "--cask", path.Base(base)})
 		return ok
 	case "apt":
 		_, ok := in.output([]string{"dpkg", "-s", base})
@@ -372,7 +382,7 @@ func (in *Installer) codeExtensions() map[string]string {
 func (in *Installer) installedVersion(mgr, base string) string {
 	switch mgr {
 	case "brew":
-		out, ok := in.output([]string{"brew", "list", "--versions", tail(base)})
+		out, ok := in.output([]string{"brew", "list", "--versions", path.Base(base)})
 		if !ok {
 			return ""
 		}
@@ -458,8 +468,10 @@ func (in *Installer) managerInstall(mgr, name, pin string) error {
 			return in.exec(in.sudo("gem", "install", name, "-v", pin))
 		}
 		return in.exec(in.sudo("gem", "install", name))
-	default:
+	case "go":
 		return in.goInstall(name, name)
+	default:
+		return fmt.Errorf("no install routine for manager %s", mgr)
 	}
 }
 
@@ -553,7 +565,7 @@ func (in *Installer) scriptArgv(pkg string, s *ScriptSpec) ([]string, error) {
 		return []string{scriptShell(s), "-ec", s.Run}, nil
 	}
 	if s.URL != "" {
-		content, ok := in.output([]string{"curl", "-fsSL", "--connect-timeout", "30", "--retry", "10", "--retry-delay", "30", "--retry-all-errors", s.URL})
+		content, ok := in.output(curlArgv(s.URL))
 		if !ok || content == "" {
 			return nil, fmt.Errorf("%s: install script fetch failed: %s", pkg, s.URL)
 		}
@@ -582,13 +594,6 @@ func (in *Installer) goInstall(pkg, module string) error {
 	}
 	in.emit(log.Levels.Info, "installed", pkg+" via go")
 	return nil
-}
-
-func tail(name string) string {
-	if i := strings.LastIndex(name, "/"); i >= 0 {
-		return name[i+1:]
-	}
-	return name
 }
 
 // [<] 🤖🤖🤖
