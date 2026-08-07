@@ -50,9 +50,11 @@ packages:
         installMethods:
             - brew
             - apt
-        #[why] debian renames the binary: the bat name is taken by bacula-console-qt
+        #[why] debian renames the binary (bat is taken by bacula-console-qt): alias it back
         command:
             linux: batcat
+        aliasBinary:
+            batcat: bat
     bats:
         version: __unversioned_latest__
         installMethods:

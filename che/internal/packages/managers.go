@@ -168,6 +168,9 @@ func (in *Installer) InstallRequests(reqs []Request) error {
 			if err := in.installVia(pkg, it); err != nil {
 				return err
 			}
+			if err := in.aliasBinaries(pkg, entry); err != nil {
+				return err
+			}
 			if err := in.installCompletions(pkg, entry); err != nil {
 				return err
 			}

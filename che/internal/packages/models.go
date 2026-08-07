@@ -63,6 +63,7 @@ type Entry struct {
 	Version        string
 	Requires       []string
 	Command        Command
+	AliasBinary    map[string]string
 	VersionCommand string
 	Completions    Completions
 }
@@ -133,7 +134,7 @@ func (it Item) MarshalYAML() (any, error) {
 }
 
 func (e Entry) MarshalYAML() (any, error) {
-	if e.Version == "" && len(e.Requires) == 0 && e.Command.IsZero() && e.VersionCommand == "" && e.Completions.Zsh == nil {
+	if e.Version == "" && len(e.Requires) == 0 && len(e.AliasBinary) == 0 && e.Command.IsZero() && e.VersionCommand == "" && e.Completions.Zsh == nil {
 		return e.Items, nil
 	}
 	obj := map[string]any{"installMethods": e.Items}
@@ -142,6 +143,9 @@ func (e Entry) MarshalYAML() (any, error) {
 	}
 	if len(e.Requires) > 0 {
 		obj["requires"] = e.Requires
+	}
+	if len(e.AliasBinary) > 0 {
+		obj["aliasBinary"] = e.AliasBinary
 	}
 	if !e.Command.IsZero() {
 		obj["command"] = e.Command
@@ -209,12 +213,13 @@ func (e *Entry) UnmarshalYAML(node *yaml.Node) error {
 		return node.Decode(&e.Items)
 	}
 	var obj struct {
-		Managers       []Item      `yaml:"installMethods"`
-		Version        string      `yaml:"version"`
-		Requires       []string    `yaml:"requires"`
-		Command        Command     `yaml:"command"`
-		VersionCommand string      `yaml:"versionCommand"`
-		Completions    Completions `yaml:"completions"`
+		Managers       []Item            `yaml:"installMethods"`
+		Version        string            `yaml:"version"`
+		Requires       []string          `yaml:"requires"`
+		AliasBinary    map[string]string `yaml:"aliasBinary"`
+		Command        Command           `yaml:"command"`
+		VersionCommand string            `yaml:"versionCommand"`
+		Completions    Completions       `yaml:"completions"`
 	}
 	if err := node.Decode(&obj); err != nil {
 		return err
@@ -228,6 +233,7 @@ func (e *Entry) UnmarshalYAML(node *yaml.Node) error {
 	e.Items = obj.Managers
 	e.Version = obj.Version
 	e.Requires = obj.Requires
+	e.AliasBinary = obj.AliasBinary
 	e.Command = obj.Command
 	e.VersionCommand = obj.VersionCommand
 	e.Completions = obj.Completions

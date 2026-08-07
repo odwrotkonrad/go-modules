@@ -186,3 +186,44 @@ func TestPerOsCommandResolvesHostBinary(t *testing.T) {
 	require.NoError(t, mac.Install([]string{"bat"}))
 	require.Contains(t, strings.Join(mm.Calls(), "\n"), "brew install bat")
 }
+
+func TestAliasBinaryLinksRenamedBinary(t *testing.T) {
+	const y = `packages:
+  bat:
+    version: __unversioned_latest__
+    installMethods: [brew, apt]
+    command:
+      linux: batcat
+    aliasBinary:
+      batcat: bat
+`
+	cmds := cmdMap([]string{"apt-get"})
+	in, m := newInstaller(t, y, "linux", cmds, Options{})
+	m.Stub = func(argv []string) ([]byte, error) {
+		joined := strings.Join(argv, " ")
+		if strings.HasPrefix(joined, "dpkg -s") {
+			return nil, errNotInstalled
+		}
+		if strings.Contains(joined, "apt-get install") {
+			cmds["batcat"] = "/usr/bin/batcat"
+		}
+		return nil, nil
+	}
+	require.NoError(t, in.Install([]string{"bat"}))
+	calls := strings.Join(m.Calls(), "\n")
+	require.Contains(t, calls, "--no-install-recommends bat")
+	require.Contains(t, calls, "ln -sf /usr/bin/batcat /home/u/.local/bin/bat")
+}
+
+func TestAliasBinarySkippedWhenSourceAbsent(t *testing.T) {
+	const y = `packages:
+  bat:
+    version: __unversioned_latest__
+    installMethods: [brew]
+    aliasBinary:
+      batcat: bat
+`
+	in, m := newInstaller(t, y, "darwin", cmdMap([]string{"brew", "bat"}), Options{})
+	require.NoError(t, in.Install([]string{"bat"}))
+	require.NotContains(t, strings.Join(m.Calls(), "\n"), "ln -sf")
+}
