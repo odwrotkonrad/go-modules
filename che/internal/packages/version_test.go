@@ -168,3 +168,21 @@ func TestUnversionedLatestSentinelNotUsedAsArchiveVersion(t *testing.T) {
 	in, _ := newInstaller(t, y, "linux", cmdMap([]string{"sha256sum"}), Options{})
 	require.ErrorContains(t, in.Install([]string{"kind"}), "no version pinned")
 }
+
+func TestPerOsCommandResolvesHostBinary(t *testing.T) {
+	const y = `packages:
+  bat:
+    version: __unversioned_latest__
+    installMethods: [brew, apt]
+    command:
+      linux: batcat
+`
+	in, m := newInstaller(t, y, "linux", cmdMap([]string{"apt-get", "batcat"}), Options{})
+	require.NoError(t, in.Install([]string{"bat"}))
+	require.NotContains(t, strings.Join(m.Calls(), "\n"), "apt-get install")
+
+	mac, mm := newInstaller(t, y, "darwin", cmdMap([]string{"brew"}), Options{})
+	mm.Stub = failOn("brew list")
+	require.NoError(t, mac.Install([]string{"bat"}))
+	require.Contains(t, strings.Join(mm.Calls(), "\n"), "brew install bat")
+}

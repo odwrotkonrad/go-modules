@@ -40,11 +40,12 @@ func TestE2EInstallMethods(t *testing.T) {
 	}
 	require.NoError(t, yaml.Unmarshal(raw, &file))
 
-	ran := 0
+	ran, matched := 0, 0
 	for _, g := range file.Groups {
 		if selected != "all" && selected != g.Method && !strings.HasPrefix(g.Method, selected+"/") {
 			continue
 		}
+		matched++
 		if g.OS != "" && g.OS != runtime.GOOS {
 			t.Logf("skip %s: %s only", g.Method, g.OS)
 			continue
@@ -58,7 +59,12 @@ func TestE2EInstallMethods(t *testing.T) {
 		ran++
 		t.Run(g.Method, func(t *testing.T) { runInstallGroup(t, g) })
 	}
-	require.Positive(t, ran, "no group matched E2E_INSTALL_METHOD=%s", selected)
+	require.Positive(t, matched, "no group matched E2E_INSTALL_METHOD=%s", selected)
+	// [why] a group gated off by os/requiresCommand is a valid environment outcome, not a failure:
+	//   the runner simply cannot exercise that method
+	if ran == 0 {
+		t.Skipf("every %s group is gated off on this host", selected)
+	}
 }
 
 func runInstallGroup(t *testing.T, g installGroup) {
@@ -66,7 +72,14 @@ func runInstallGroup(t *testing.T, g installGroup) {
 	home := t.TempDir()
 	bin := filepath.Join(home, ".local", "bin")
 	pyenvRoot := filepath.Join(home, ".pyenv")
-	path := strings.Join([]string{bin, filepath.Join(pyenvRoot, "bin"), filepath.Join(pyenvRoot, "shims"), os.Getenv("PATH")}, ":")
+	// [why] go install writes to GOBIN, nvm/pyenv to their own roots: every destination a
+	//   method may use has to be visible to the verify step
+	goBin := filepath.Join(home, "go", "bin")
+	path := strings.Join([]string{
+		bin, goBin,
+		filepath.Join(pyenvRoot, "bin"), filepath.Join(pyenvRoot, "shims"),
+		os.Getenv("PATH"),
+	}, ":")
 	for _, d := range []string{bin, ".config", ".cache", ".local/state"} {
 		require.NoError(t, os.MkdirAll(filepath.Join(home, d), 0o755))
 	}
@@ -81,6 +94,7 @@ func runInstallGroup(t *testing.T, g installGroup) {
 		"CHE_LOG_LEVEL=debug",
 		"CHE_PACKAGES_PREBUILT_ARCHIVE_CHECK_PRESENT_ON_PATH=0",
 		"NVM_DIR=" + filepath.Join(home, ".config", "nvm"),
+		"GOBIN=" + goBin,
 	}
 	if v := os.Getenv("SSL_CERT_FILE"); v != "" {
 		env = append(env, "SSL_CERT_FILE="+v)

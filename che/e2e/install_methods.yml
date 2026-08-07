@@ -28,7 +28,8 @@ groups:
     packages: [jq, bat]
     verify:
       jq: jq --version
-      bat: bat --version
+      #[why] debian renames the binary (see the bat entry's per-os command)
+      bat: batcat --version
 
   - method: apt/repo
     os: linux

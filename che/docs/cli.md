@@ -228,13 +228,13 @@ inspect the resolved packages database.
 
 ### `$ che packages config show`
 
-print the packages database (--delta default: entries differing from the builtin; --all: the effective merged set; --defaults: the builtin only).
+print the packages database (--all default: the effective merged set; --delta: entries differing from the builtin; --defaults: the builtin only).
 
 | Option | Env | Values | Default | Description |
 | --- | --- | --- | --- | --- |
-| `--all` |  | `bool` | `false` | print the effective merged set (packages file or builtin, plus override) |
+| `--all` |  | `bool` | `false` | print the effective merged set (packages file or builtin, plus override; default mode) |
 | `--defaults` |  | `bool` | `false` | print the builtin packages.yml only |
-| `--delta` |  | `bool` | `false` | print only the entries differing from the builtin packages.yml (default mode) |
+| `--delta` |  | `bool` | `false` | print only the entries differing from the builtin packages.yml |
 | `--output` |  | `text (name = methods lines)` \| `yaml (packages.yml shape)` | `text` | output format |
 
 ### `$ che packages install`

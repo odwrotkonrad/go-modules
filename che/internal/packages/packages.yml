@@ -50,6 +50,9 @@ packages:
         installMethods:
             - brew
             - apt
+        #[why] debian renames the binary: the bat name is taken by bacula-console-qt
+        command:
+            linux: batcat
     bats:
         version: __unversioned_latest__
         installMethods:
@@ -456,6 +459,8 @@ packages:
     nvm:
         - script:
             remoteUrl: https://raw.githubusercontent.com/nvm-sh/nvm/v0.40.6/install.sh
+            #[why] the installer aborts unless it runs under bash
+            shell: /bin/bash
             env:
                 NVM_DIR: $XDG_CONFIG_HOME/nvm
                 PROFILE: /dev/null
@@ -499,6 +504,10 @@ packages:
         version: __unversioned_latest__
         installMethods:
             - brew
+            - apt
+    patch:
+        version: __unversioned_latest__
+        installMethods:
             - apt
     pcre2:
         version: __unversioned_latest__
@@ -552,6 +561,7 @@ packages:
         requires:
             - pyenv
             - gcc
+            - patch
             - make
             - openssl
             - readline

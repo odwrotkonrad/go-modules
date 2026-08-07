@@ -62,9 +62,40 @@ type Entry struct {
 	Items          []Item
 	Version        string
 	Requires       []string
-	Command        string
+	Command        Command
 	VersionCommand string
 	Completions    Completions
+}
+
+// Command is the canonical command a package provides: one name, or a per-os map
+// [why] distros rename binaries (debian ships bat as batcat), so presence checks need the host's name
+type Command struct {
+	Name  string
+	PerOS map[string]string
+}
+
+func (c Command) IsZero() bool { return c.Name == "" && len(c.PerOS) == 0 }
+
+func (c Command) For(os string) string {
+	if v, ok := c.PerOS[os]; ok {
+		return v
+	}
+	return c.Name
+}
+
+func (c *Command) UnmarshalYAML(node *yaml.Node) error {
+	if node.Kind == yaml.ScalarNode {
+		c.Name = node.Value
+		return nil
+	}
+	return node.Decode(&c.PerOS)
+}
+
+func (c Command) MarshalYAML() (any, error) {
+	if len(c.PerOS) > 0 {
+		return c.PerOS, nil
+	}
+	return c.Name, nil
 }
 
 type Completions struct {
@@ -102,7 +133,7 @@ func (it Item) MarshalYAML() (any, error) {
 }
 
 func (e Entry) MarshalYAML() (any, error) {
-	if e.Version == "" && len(e.Requires) == 0 && e.Command == "" && e.VersionCommand == "" && e.Completions.Zsh == nil {
+	if e.Version == "" && len(e.Requires) == 0 && e.Command.IsZero() && e.VersionCommand == "" && e.Completions.Zsh == nil {
 		return e.Items, nil
 	}
 	obj := map[string]any{"installMethods": e.Items}
@@ -112,7 +143,7 @@ func (e Entry) MarshalYAML() (any, error) {
 	if len(e.Requires) > 0 {
 		obj["requires"] = e.Requires
 	}
-	if e.Command != "" {
+	if !e.Command.IsZero() {
 		obj["command"] = e.Command
 	}
 	if e.VersionCommand != "" {
@@ -181,7 +212,7 @@ func (e *Entry) UnmarshalYAML(node *yaml.Node) error {
 		Managers       []Item      `yaml:"installMethods"`
 		Version        string      `yaml:"version"`
 		Requires       []string    `yaml:"requires"`
-		Command        string      `yaml:"command"`
+		Command        Command     `yaml:"command"`
 		VersionCommand string      `yaml:"versionCommand"`
 		Completions    Completions `yaml:"completions"`
 	}
@@ -232,6 +263,7 @@ type AptRepoSpec struct {
 
 type ScriptSpec struct {
 	Run     string            `yaml:"run,omitempty"`
+	Shell   string            `yaml:"shell,omitempty"`
 	Path    string            `yaml:"path,omitempty"`
 	URL     string            `yaml:"remoteUrl,omitempty"`
 	OS      string            `yaml:"os,omitempty"`

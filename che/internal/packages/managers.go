@@ -106,8 +106,10 @@ func (in *Installer) output(argv []string) (string, bool) {
 }
 
 func (in *Installer) cmdFor(pkg string) string {
-	if e, ok := in.File.Packages[pkg]; ok && e.Command != "" {
-		return e.Command
+	if e, ok := in.File.Packages[pkg]; ok && !e.Command.IsZero() {
+		if c := e.Command.For(in.Host.OS); c != "" {
+			return c
+		}
 	}
 	return pkg
 }
@@ -535,16 +537,24 @@ func (in *Installer) scriptEnv(pkg string, s *ScriptSpec) []string {
 	return env
 }
 
+// [why] some vendor installers refuse a POSIX sh (nvm checks $BASH_VERSION), so the item may name its shell
+func scriptShell(s *ScriptSpec) string {
+	if s.Shell != "" {
+		return s.Shell
+	}
+	return "/bin/sh"
+}
+
 func (in *Installer) scriptArgv(pkg string, s *ScriptSpec) ([]string, error) {
 	if s.Run != "" {
-		return []string{"/bin/sh", "-ec", s.Run}, nil
+		return []string{scriptShell(s), "-ec", s.Run}, nil
 	}
 	if s.URL != "" {
 		content, ok := in.output([]string{"curl", "-fsSL", "--connect-timeout", "30", "--retry", "10", "--retry-delay", "30", "--retry-all-errors", s.URL})
 		if !ok || content == "" {
 			return nil, fmt.Errorf("%s: install script fetch failed: %s", pkg, s.URL)
 		}
-		return []string{"/bin/sh", "-ec", content}, nil
+		return []string{scriptShell(s), "-ec", content}, nil
 	}
 	p := s.Path
 	if !filepath.IsAbs(p) && in.FilePath != BuiltinPath {
@@ -552,7 +562,7 @@ func (in *Installer) scriptArgv(pkg string, s *ScriptSpec) ([]string, error) {
 	}
 	if in.FilePath != BuiltinPath || filepath.IsAbs(p) {
 		if _, err := os.Stat(p); err == nil {
-			return []string{"/bin/sh", "-e", p}, nil
+			return []string{scriptShell(s), "-e", p}, nil
 		}
 	}
 	return nil, fmt.Errorf("%s: install script not found: %s", pkg, s.Path)

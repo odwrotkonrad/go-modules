@@ -66,7 +66,7 @@ func (a *app) packagesConfigCmd() *cobra.Command {
 	var output string
 	show := &cobra.Command{
 		Use:   "show",
-		Short: "print the packages database (--delta default: entries differing from the builtin; --all: the effective merged set; --defaults: the builtin only)",
+		Short: "print the packages database (--all default: the effective merged set; --delta: entries differing from the builtin; --defaults: the builtin only)",
 		RunE: func(cmd *cobra.Command, args []string) error {
 			builtin, err := packages.LoadBuiltin()
 			if err != nil {
@@ -79,7 +79,7 @@ func (a *app) packagesConfigCmd() *cobra.Command {
 					return err
 				}
 				file = in.File
-				if !all {
+				if delta {
 					file = file.Delta(builtin)
 				}
 			}
@@ -105,8 +105,8 @@ func (a *app) packagesConfigCmd() *cobra.Command {
 			}
 		},
 	}
-	show.Flags().BoolVar(&delta, "delta", false, "print only the entries differing from the builtin packages.yml (default mode)")
-	show.Flags().BoolVar(&all, "all", false, "print the effective merged set (packages file or builtin, plus override)")
+	show.Flags().BoolVar(&delta, "delta", false, "print only the entries differing from the builtin packages.yml")
+	show.Flags().BoolVar(&all, "all", false, "print the effective merged set (packages file or builtin, plus override; default mode)")
 	show.Flags().BoolVar(&defaults, "defaults", false, "print the builtin packages.yml only")
 	show.Flags().StringVar(&output, "output", "text",
 		"output format; values: text (name = methods lines) | yaml (packages.yml shape)")
