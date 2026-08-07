@@ -1,4 +1,3 @@
-// Get-term-open-files-with prints <ext>=<opener> zsh suffix-alias lines from the merged term-open-files-with.yml.
 package main
 
 // [>] 🤖🤖

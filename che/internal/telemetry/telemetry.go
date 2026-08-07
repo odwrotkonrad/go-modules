@@ -1,7 +1,3 @@
-// Package telemetry pushes che's run + operation counts as OTLP metrics and
-// mirrors its log lines as OTLP logs to a local collector. Hand-emitted counters
-// (no auto-instrumentation): che classifies every mutation by kind + op_type, the
-// native emission site. A nil *Telemetry is a no-op, so disabled/tests cost nothing.
 package telemetry
 
 // [>] 🤖🤖
@@ -35,13 +31,10 @@ import (
 
 // [>] 🤖🤖 config
 
-// Config is the resolved OTLP telemetry knobs the provider reads (the
-// options.Otel group, passed in to keep this package che-free). The collector is
-// a local plaintext endpoint, so exporters always dial without TLS.
 type Config struct {
 	Enabled  bool
 	Endpoint string
-	Protocol string // grpc | http
+	Protocol string
 	Metrics  bool
 	Logs     bool
 	Traces   bool
@@ -51,16 +44,12 @@ type Config struct {
 
 // [>] 🤖🤖 registry
 
-// metricSpec declares one che.* counter: its instrument name, one-line help,
-// and the label keys it carries.
 type metricSpec struct {
 	Name   string
 	Help   string
 	Labels []string
 }
 
-// Metrics is the complete che metric surface: the single source docgen renders
-// and registerCounters wires. Order is doc order.
 var Metrics = []metricSpec{
 	{"che.command.runs.total", "one increment per CLI command run, labeled by subcommand", []string{"command"}},
 	{"che.spec.runs.total", "one increment per spec resolution (one per invocation)", nil},
@@ -70,16 +59,12 @@ var Metrics = []metricSpec{
 	{"che.errors.total", "one increment per failed operation, labeled by op name", []string{"op"}},
 }
 
-// spanSpec declares one che span: its name, one-line help, and the attributes
-// it carries. Documentation-only (span emission is inline at each site).
 type spanSpec struct {
 	Name  string
 	Help  string
 	Attrs []string
 }
 
-// Spans is the che trace surface: the span tree docgen renders. Order is the
-// nesting order (each parents onto the one above it where they co-occur).
 var Spans = []spanSpec{
 	{"che run", "root span for the whole invocation", []string{"che.command", "che.run_id"}},
 	{"prepare-specs", "spec tree resolution (include.sources + sourced refs, recursive)", nil},
@@ -94,8 +79,6 @@ var Spans = []spanSpec{
 
 // [>] 🤖🤖 lifecycle
 
-// Telemetry owns the OTLP providers, the meter's counters, and the logger the
-// log bridge emits into. nil = telemetry off: every method is a no-op.
 type Telemetry struct {
 	meterProvider  *sdkmetric.MeterProvider
 	loggerProvider *sdklog.LoggerProvider
@@ -103,14 +86,9 @@ type Telemetry struct {
 	logger         otellog.Logger
 	tracer         trace.Tracer
 
-	counters map[string]metric.Int64Counter // keyed by metricSpec.Name
+	counters map[string]metric.Int64Counter
 }
 
-// Start builds the OTLP metric + log providers from cfg and the run's resource
-// attrs (service.name=che, che.run_id, che.command). Disabled -> (nil, nil):
-// telemetry off, the run continues. Exporter construction never blocks on the
-// collector (dial is lazy), so an unreachable endpoint surfaces only at Shutdown
-// flush, logged there, never failing the run.
 func Start(ctx context.Context, cfg Config, runID, command string) (*Telemetry, error) {
 	if !cfg.Enabled {
 		return nil, nil
@@ -139,8 +117,6 @@ func Start(ctx context.Context, cfg Config, runID, command string) (*Telemetry, 
 	return t, nil
 }
 
-// startMetrics builds the OTLP metric exporter + meter provider and registers
-// the che.* counters.
 func (t *Telemetry) startMetrics(ctx context.Context, cfg Config, res *resource.Resource) error {
 	exp, err := newMetricExporter(ctx, cfg)
 	if err != nil {
@@ -153,7 +129,6 @@ func (t *Telemetry) startMetrics(ctx context.Context, cfg Config, res *resource.
 	return t.registerCounters()
 }
 
-// startLogs builds the OTLP log exporter + logger provider and the run's logger.
 func (t *Telemetry) startLogs(ctx context.Context, cfg Config, res *resource.Resource) error {
 	exp, err := newLogExporter(ctx, cfg)
 	if err != nil {
@@ -167,8 +142,6 @@ func (t *Telemetry) startLogs(ctx context.Context, cfg Config, res *resource.Res
 	return nil
 }
 
-// startTraces builds the OTLP trace exporter + tracer provider and the run's
-// tracer (the parent of every che.* span).
 func (t *Telemetry) startTraces(ctx context.Context, cfg Config, res *resource.Resource) error {
 	exp, err := newTraceExporter(ctx, cfg)
 	if err != nil {
@@ -182,8 +155,6 @@ func (t *Telemetry) startTraces(ctx context.Context, cfg Config, res *resource.R
 	return nil
 }
 
-// registerCounters creates every Metrics counter on the meter provider, keyed
-// by name for the Count* methods to look up.
 func (t *Telemetry) registerCounters() error {
 	m := t.meterProvider.Meter("che")
 	t.counters = make(map[string]metric.Int64Counter, len(Metrics))
@@ -197,9 +168,6 @@ func (t *Telemetry) registerCounters() error {
 	return nil
 }
 
-// Shutdown force-flushes and closes both providers under a bounded timeout: an
-// unreachable collector surfaces here as an error the caller logs at debug, never
-// aborting the run.
 func (t *Telemetry) Shutdown(ctx context.Context) error {
 	if t == nil {
 		return nil
@@ -219,7 +187,6 @@ func (t *Telemetry) Shutdown(ctx context.Context) error {
 	return firstErr(errs)
 }
 
-// firstErr returns the first non-nil error, or nil.
 func firstErr(errs []error) error {
 	for _, e := range errs {
 		if e != nil {
@@ -233,8 +200,6 @@ func firstErr(errs []error) error {
 
 // [>] 🤖🤖 exporters
 
-// newMetricExporter builds the OTLP metric exporter for the configured transport,
-// always plaintext (local collector).
 func newMetricExporter(ctx context.Context, cfg Config) (sdkmetric.Exporter, error) {
 	if cfg.Protocol == "http" {
 		return metrichttp.New(ctx, metrichttp.WithEndpoint(cfg.Endpoint), metrichttp.WithInsecure())
@@ -242,8 +207,6 @@ func newMetricExporter(ctx context.Context, cfg Config) (sdkmetric.Exporter, err
 	return metricgrpc.New(ctx, metricgrpc.WithEndpoint(cfg.Endpoint), metricgrpc.WithInsecure())
 }
 
-// newLogExporter builds the OTLP log exporter for the configured transport,
-// always plaintext (local collector).
 func newLogExporter(ctx context.Context, cfg Config) (sdklog.Exporter, error) {
 	if cfg.Protocol == "http" {
 		return loghttp.New(ctx, loghttp.WithEndpoint(cfg.Endpoint), loghttp.WithInsecure())
@@ -251,8 +214,6 @@ func newLogExporter(ctx context.Context, cfg Config) (sdklog.Exporter, error) {
 	return loggrpc.New(ctx, loggrpc.WithEndpoint(cfg.Endpoint), loggrpc.WithInsecure())
 }
 
-// newTraceExporter builds the OTLP trace exporter for the configured transport,
-// always plaintext (local collector).
 func newTraceExporter(ctx context.Context, cfg Config) (*otlptrace.Exporter, error) {
 	if cfg.Protocol == "http" {
 		return tracehttp.New(ctx, tracehttp.WithEndpoint(cfg.Endpoint), tracehttp.WithInsecure())
@@ -264,10 +225,6 @@ func newTraceExporter(ctx context.Context, cfg Config) (*otlptrace.Exporter, err
 
 // [>] 🤖🤖 tracing
 
-// Span starts a span named name under ctx, returning the child ctx (carrying it
-// as parent) and the span the caller must End. A nil handle or disabled tracing
-// is a no-op: ctx passes through and the returned span is the otel non-recording
-// span, so callers End() / RecordError() unconditionally.
 func (t *Telemetry) Span(ctx context.Context, name string, attrs ...attribute.KeyValue) (context.Context, trace.Span) {
 	if t == nil || t.tracer == nil {
 		return ctx, tracenoop.Span{}
@@ -279,8 +236,6 @@ func (t *Telemetry) Span(ctx context.Context, name string, attrs ...attribute.Ke
 
 // [>] 🤖🤖 counters
 
-// count adds 1 to the named counter with attrs under ctx (so exemplars tie the
-// counter to the active span), no-op when off (nil handle or counter absent).
 func (t *Telemetry) count(ctx context.Context, name string, attrs ...attribute.KeyValue) {
 	if t == nil {
 		return
@@ -292,29 +247,22 @@ func (t *Telemetry) count(ctx context.Context, name string, attrs ...attribute.K
 	c.Add(ctx, 1, metric.WithAttributes(attrs...))
 }
 
-// CountCommand records one command run, labeled by subcommand.
 func (t *Telemetry) CountCommand(ctx context.Context, command string) {
 	t.count(ctx, "che.command.runs.total", attribute.String("command", command))
 }
 
-// CountSpec records one spec run (one per invocation).
 func (t *Telemetry) CountSpec(ctx context.Context) {
 	t.count(ctx, "che.spec.runs.total")
 }
 
-// CountProfile records one profile run, labeled by profile ref.
 func (t *Telemetry) CountProfile(ctx context.Context, ref string) {
 	t.count(ctx, "che.profile.runs.total", attribute.String("profile", ref))
 }
 
-// CountOperation records one operation run, labeled by op name.
 func (t *Telemetry) CountOperation(ctx context.Context, op string) {
 	t.count(ctx, "che.operation.runs.total", attribute.String("op", op))
 }
 
-// CountUnit records one smallest-unit mutation, labeled by kind, op_type, and
-// the invoking command (link created, file copied, render, dir, chmod/chown/rm,
-// script run).
 func (t *Telemetry) CountUnit(ctx context.Context, kind, opType, command string) {
 	t.count(ctx, "che.unit.total",
 		attribute.String("kind", kind),
@@ -323,7 +271,6 @@ func (t *Telemetry) CountUnit(ctx context.Context, kind, opType, command string)
 	)
 }
 
-// CountError records one failed operation, labeled by op name.
 func (t *Telemetry) CountError(ctx context.Context, op string) {
 	t.count(ctx, "che.errors.total", attribute.String("op", op))
 }
@@ -332,9 +279,6 @@ func (t *Telemetry) CountError(ctx context.Context, op string) {
 
 // [>] 🤖🤖 log bridge
 
-// LogRecord emits one che log event as an OTLP log record: event name
-// "<scope>.<action>", msg as body, attrs (+ joined reasons) as attributes,
-// level -> severity. No-op when logs are off.
 func (t *Telemetry) LogRecord(e log.Event) {
 	if t == nil || t.logger == nil {
 		return
@@ -360,7 +304,6 @@ func (t *Telemetry) LogRecord(e log.Event) {
 	t.logger.Emit(context.Background(), r)
 }
 
-// severity maps a che log level to its OTLP severity.
 func severity(l log.Level) otellog.Severity {
 	switch l {
 	case log.Levels.Error:

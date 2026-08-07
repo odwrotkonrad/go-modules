@@ -8,11 +8,6 @@ import (
 	"strings"
 )
 
-// ruleFromDest builds a destRule from a scalar dest, accepting two forms: the
-// sed-style rewrite (delegated to parseDestRule) or the prefix-swap sugar
-// {source: <src>/**, dest: <dst>/**}, which desugars to an anchored rewrite
-// s:^<src>:<dst>: (strip the trailing /** from both, graft dst under the src
-// prefix). $HOME in dst stays literal, expanded later at host mapping.
 func ruleFromDest(source, dest string) (*destRule, error) {
 	if len(dest) >= 2 && dest[0] == 's' && dest[1] != '\\' && !isWord(dest[1]) {
 		return parseDestRule(dest)
@@ -30,18 +25,10 @@ func ruleFromDest(source, dest string) (*destRule, error) {
 	return nil, fmt.Errorf("dest %q: want s<delim><pattern><delim><replacement><delim>[g] or <prefix>/** with source <prefix>/**", dest)
 }
 
-// isWord reports whether b is a regexp \w char, matching the schema pattern
-// that gates the sed-style form (s followed by a non-word delimiter).
 func isWord(b byte) bool {
 	return b == '_' || (b >= '0' && b <= '9') || (b >= 'a' && b <= 'z') || (b >= 'A' && b <= 'Z')
 }
 
-// parseDestRule parses a dest rewrite "s<delim><pattern><delim><replacement><delim>[g]",
-// where <delim> is the single char following the leading "s" (e.g. s:^_home:$HOME:).
-// The replacement is a literal string (no $ backref expansion), so dests like
-// $HOME survive to host mapping. `\<delim>` escapes a literal delimiter char.
-// Anything not starting with "s" + a delim errors: the 1:1 form is the bare glob
-// string, not a dest value.
 func parseDestRule(s string) (*destRule, error) {
 	malformed := fmt.Errorf("dest rule %q: want s<delim><pattern><delim><replacement><delim>[g]", s)
 	if len(s) < 2 || s[0] != 's' {
@@ -62,7 +49,6 @@ func parseDestRule(s string) (*destRule, error) {
 	return &destRule{re: re, repl: parts[1], global: parts[2] == "g"}, nil
 }
 
-// splitRule splits a rule body on the delim char, unescaping `\<delim>`.
 func splitRule(s string, delim byte) []string {
 	var parts []string
 	var b strings.Builder
@@ -81,8 +67,6 @@ func splitRule(s string, delim byte) []string {
 	return append(parts, b.String())
 }
 
-// apply rewrites rel with the literal replacement: every match with the g flag,
-// else the first only. No match -> rel unchanged.
 func (r *destRule) apply(rel string) string {
 	if r.global {
 		return r.re.ReplaceAllLiteralString(rel, r.repl)

@@ -33,7 +33,6 @@ func TestCacheDir(t *testing.T) {
 	})
 }
 
-// failingFetch materializes the named failure precondition, returns the fetch URL.
 func failingFetch(t *testing.T, precondition string) string {
 	t.Helper()
 	switch precondition {

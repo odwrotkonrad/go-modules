@@ -10,20 +10,11 @@ import (
 	"gitlab.com/konradodwrot/go-modules/che/internal/options"
 )
 
-// Uninstaller backs out everything the ledger marks installed onto this host,
-// across every run: it reverts each recorded dest (restore its pre-install
-// backup, or remove it — snapshotting first so uninstall is itself reversible),
-// recording inverse remove ops under its own run. It reuses ProfileReady as the
-// execution surface (FS writer, reader, ledger recording), so its inverse ops
-// record in the same normalized shape as installs.
 type Uninstaller struct {
 	p      *ProfileReady
 	dryRun bool
 }
 
-// NewUninstaller builds an Uninstaller: resolve the invoking home, open the
-// seams (FS writer + reader + ledger), and open this uninstall run's own
-// SpecDone + ProfileDone so its inverse ops record in the same shape.
 func NewUninstaller(ctx Context, opts options.Options) (*Uninstaller, error) {
 	home, err := resolveInvokingHome(ctx)
 	if err != nil {
@@ -52,11 +43,6 @@ func NewUninstaller(ctx Context, opts options.Options) (*Uninstaller, error) {
 	return &Uninstaller{p: p, dryRun: opts.DryRun != options.DryRun.Off}, nil
 }
 
-// Uninstall reverts every ledger-installed dest, newest-first (so nested dests
-// unwind cleanly, and profiles unwind in reverse application order). It groups
-// the output by owning profile: a `## profile <ref>` heading precedes each
-// profile's removals. A failing item does not stop the rest: failures collect,
-// report, and join. dry-run logs the actions and writes no rows.
 func (u *Uninstaller) Uninstall() error {
 	p := u.p
 	installed, err := p.Ledger.Installed()
@@ -80,9 +66,6 @@ func (u *Uninstaller) Uninstall() error {
 	return errors.Join(errs...)
 }
 
-// revert backs out one recorded op: skip when the live dest drifted from the
-// op's Next (don't clobber user changes), else snapshot the dest into a fresh
-// uninstall backup and dispatch on op.Kind, recording an inverse remove op.
 func (u *Uninstaller) revert(op database.OperationDone) error {
 	p := u.p
 	live := p.classifyDest(op.Dest)
@@ -105,10 +88,6 @@ func (u *Uninstaller) revert(op database.OperationDone) error {
 	return nil
 }
 
-// revertKind dispatches the inverse of op by its Kind: created dests (link/copy/
-// render/dir) restore their pre-install backup or are removed; chmod reapplies
-// the prev mode (dest stays); chown is a no-op (prev owner not recorded); rm
-// restores from backup if present.
 func (u *Uninstaller) revertKind(op database.OperationDone) error {
 	p := u.p
 	switch op.Kind {
@@ -131,8 +110,6 @@ func (u *Uninstaller) revertKind(op database.OperationDone) error {
 	}
 }
 
-// removeDir removes a che-created dir, tolerating a non-empty dir (still holds
-// other content) as a skip, not a failure — the safe uninstall guardrail.
 func (u *Uninstaller) removeDir(dest string) error {
 	err := u.p.FS.RemoveDir(dest)
 	if err != nil && u.p.Reader != nil {
@@ -144,8 +121,6 @@ func (u *Uninstaller) removeDir(dest string) error {
 	return err
 }
 
-// restoreOrRemove restores the op's pre-install backup entry onto the dest when
-// one exists, else removes the dest (che had created it fresh).
 func (u *Uninstaller) restoreOrRemove(op database.OperationDone) error {
 	restored, err := u.p.restoreFromBackup(op)
 	if err != nil {
@@ -157,7 +132,6 @@ func (u *Uninstaller) restoreOrRemove(op database.OperationDone) error {
 	return u.p.FS.RemoveFile(op.Dest)
 }
 
-// Close releases the uninstaller's ledger handle.
 func (u *Uninstaller) Close() error { return u.p.Ledger.Close() }
 
 // [<] 🤖🤖

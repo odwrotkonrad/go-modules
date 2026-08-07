@@ -1,0 +1,16 @@
+#!/bin/sh
+##[>] 🤖🤖
+out=""
+url=""
+while [ $# -gt 0 ]; do
+  case "$1" in
+    -o) out=$2; shift 2 ;;
+    http://*|https://*) url=$1; shift ;;
+    *) shift ;;
+  esac
+done
+case "$url" in
+  *bad*) echo "curl: (22) The requested URL returned error: 404 for $url" >&2; exit 22 ;;
+esac
+printf 'e2e-binary-payload\n' > "$out"
+##[<] 🤖🤖

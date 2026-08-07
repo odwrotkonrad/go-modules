@@ -1,5 +1,3 @@
-// Package e2e drives the built che binary through YAML-declared command flows
-// (e2e.spec.yml) over the local/remote fixtures in a hermetic temp HOME.
 package e2e
 
 // [>] 🤖🤖
@@ -11,23 +9,6 @@ import (
 
 	"gitlab.com/konradodwrot/go-modules/lib/testyml"
 )
-
-// Domain model (the e2e spec schema):
-//
-//	specFile
-//	  defs          anchor scratch space shared by all cases, ignored by the runner
-//	  testCases     named flows; each carries context.env (extra env for every
-//	                che invocation, e.g. CHE_LOG_LEVEL) and its ordered steps,
-//	                fail-fast, sharing one fresh workdir + HOME per case
-//	step: exactly one action (command | write | remove | gitRestore | extract).
-//	expected: stdOut substring matchers (literal with {{/regex/}} holes),
-//	stdOutFull (whole ANSI-stripped output, anchored), exitCode, files
-//	(exists: true entries with type/symlinkTo/content/countGlob).
-//	notExpected: stdOut matchers plus bare {path, exists: true} entries
-//	asserting absence. A files value is one mapping or a sequence; nested
-//	sequences (def anchors) flatten, so lists assemble from defs without
-//	repeating entries. Paths and matchers expand ${WORK} ${HOME} ${LOCAL}
-//	${REMOTE} ${XDG_STATE_HOME} ${XDG_CACHE_HOME}.
 
 type specFile struct {
 	Defs      any        `yaml:"defs"`
@@ -45,20 +26,17 @@ type specContext struct {
 }
 
 type step struct {
-	Name       string       `yaml:"name"`
-	Command    string       `yaml:"command"`
-	Write      *writeSpec   `yaml:"write"`
-	Remove     *removeSpec  `yaml:"remove"`
-	GitRestore *gitSpec     `yaml:"gitRestore"`
-	Extract    *extractSpec `yaml:"extract"`
-	// Capture extracts vars from a command step's output: var name -> regex
-	// with one capture group, stored for later steps' ${VAR} expansion.
+	Name        string            `yaml:"name"`
+	Command     string            `yaml:"command"`
+	Write       *writeSpec        `yaml:"write"`
+	Remove      *removeSpec       `yaml:"remove"`
+	GitRestore  *gitSpec          `yaml:"gitRestore"`
+	Extract     *extractSpec      `yaml:"extract"`
 	Capture     map[string]string `yaml:"capture"`
 	Expected    want              `yaml:"expected"`
 	NotExpected notWant           `yaml:"notExpected"`
 }
 
-// countActions counts the step's declared actions (exactly one is valid).
 func (s step) countActions() int {
 	n := 0
 	for _, set := range []bool{s.Command != "", s.Write != nil, s.Remove != nil, s.GitRestore != nil, s.Extract != nil} {
@@ -115,8 +93,6 @@ type absentAssert struct {
 	Exists bool   `yaml:"exists"`
 }
 
-// files accepts a single mapping or a sequence, flattening nested sequences
-// (def anchors spliced into a list), strict-decoding each entry.
 type files[T any] []T
 
 func (f *files[T]) UnmarshalYAML(node *yaml.Node) error {

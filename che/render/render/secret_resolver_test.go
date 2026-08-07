@@ -14,8 +14,6 @@ import (
 	"gitlab.com/konradodwrot/go-modules/lib/testyml"
 )
 
-// SecretMockResolver is the secretResolver test double: counts Resolve calls,
-// failing the first FailLeft with FailMsg, then serving Secret.
 type SecretMockResolver struct {
 	Calls    int
 	FailLeft int
@@ -32,8 +30,6 @@ func (m *SecretMockResolver) Resolve(_ context.Context, _ string) (string, error
 	return m.Secret, nil
 }
 
-// secretWant is secret_resolver's expected.output: the resolved value plus the
-// per-backend resolver/factory call counts (asserted on error cases too).
 type secretWant struct {
 	Value           string `yaml:"value"`
 	OpCalls         int    `yaml:"opCalls"`
@@ -42,7 +38,6 @@ type secretWant struct {
 	GcpFactoryCalls int    `yaml:"gcpFactoryCalls"`
 }
 
-// requireSecretResolverMock validates the package-local mockedInterfaces pair.
 func requireSecretResolverMock(t *testing.T, decl map[string]string) {
 	t.Helper()
 	for iface, mock := range decl {
@@ -63,7 +58,6 @@ func TestSecretFunc(t *testing.T) {
 		clientFail := a.Bool(t, 4)
 
 		opFactoryCalls, gcpFactoryCalls := 0, 0
-		// op factory mock: replicate the real token gate, then serve the mock.
 		testyml.Swap(t, &newOpBackend, func(_ context.Context) (secretResolver, error) {
 			opFactoryCalls++
 			if os.Getenv("OP_SERVICE_ACCOUNT_TOKEN") == "" {

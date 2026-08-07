@@ -27,8 +27,6 @@ func octal(t *testing.T, s string) os.FileMode {
 
 var specialBits = map[string]os.FileMode{"setgid": os.ModeSetgid, "sticky": os.ModeSticky}
 
-// permsDriftWant: settled asserts an empty delta run, deltaLine the reported
-// drift, wetPerm/wetSetgid the on-disk state after the wet run fixes it.
 type permsDriftWant struct {
 	Settled   bool   `yaml:"settled"`
 	DeltaLine string `yaml:"deltaLine"`
@@ -36,10 +34,6 @@ type permsDriftWant struct {
 	WetSetgid bool   `yaml:"wetSetgid"`
 }
 
-// TestPermsDrift: mode drift on an existing extra-dir. [why] regression:
-// os.FileMode encodes setgid/sticky outside 0o7000, so specs like 2775 must
-// round-trip without perpetual chmod; settled dests must print nothing and a
-// delta run must never mutate.
 func TestPermsDrift(t *testing.T) {
 	testyml.Run(t, td, "testdata/spec/funcs/perms_drift.test.spec.yml", func(t *testing.T, c testyml.Case[permsDriftWant]) {
 		var mkModeArg, setBits, chmodArg string

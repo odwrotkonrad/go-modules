@@ -35,10 +35,6 @@ func yamlInstance(t *testing.T, b []byte) any {
 	return inst
 }
 
-// TestSchemaValidate drives the compiled schema per arg shape: doc (inline
-// snippet), path (one file), globs (repo fixtures + every sibling-repo
-// che.yml reachable in the local workspace checkout), docExample (the first
-// yaml fence after docs/spec.md's Full Example heading).
 func TestSchemaValidate(t *testing.T) {
 	testyml.Run(t, td, "testdata/spec/funcs/schema_validate.test.spec.yml", func(t *testing.T, c testyml.Case[bool]) {
 		sch := compileSchema(t)

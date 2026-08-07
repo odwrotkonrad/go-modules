@@ -14,8 +14,6 @@ import (
 	"gitlab.com/konradodwrot/go-modules/che/internal/testutil"
 )
 
-// restorerOver runs the restore algorithm over p's ledger, reusing p's real
-// seams (its own run row keeps restore ops distinct).
 func restorerOver(t *testing.T, p *ProfileReady, opts options.Options) *Restorer {
 	t.Helper()
 	spec, err := p.Ledger.StartSpec(p.runID+"-re", "", "backup-restore")
@@ -28,7 +26,6 @@ func restorerOver(t *testing.T, p *ProfileReady, opts options.Options) *Restorer
 	return &Restorer{p: &rp, dryRun: opts.DryRun != options.DryRun.Off}
 }
 
-// nextRun clones p as a fresh run: its own spec/profile rows, run id, run ts.
 func nextRun(t *testing.T, p *ProfileReady, runID, runTs string) *ProfileReady {
 	t.Helper()
 	spec, err := p.Ledger.StartSpec(runID, "", "test")
@@ -41,8 +38,6 @@ func nextRun(t *testing.T, p *ProfileReady, runID, runTs string) *ProfileReady {
 	return &np
 }
 
-// mutateCopy runs one recorded make-copies mutation writing content onto dest,
-// its pre-state archived.
 func mutateCopy(t *testing.T, p *ProfileReady, dest, content string) {
 	t.Helper()
 	require.NoError(t, p.archiveBefore("make-copies", []string{dest}))
@@ -93,13 +88,12 @@ func TestRestoreByTimestampPicksLatestAtOrBefore(t *testing.T) {
 	mutateCopy(t, run2, dest, "v2")
 
 	// [why] latest backup <= T: between the runs only run1's archive qualifies,
-	// holding the pre-run1 state.
 	require.NoError(t, restorerOver(t, p, options.Options{}).Restore(RestoreSelector{Timestamp: "20240115T000000"}))
 	require.Equal(t, "v0", readFile(t, dest))
 
 	mutateCopy(t, nextRun(t, p, "run3cccccccc", "20240301T000000"), dest, "v3")
 	require.NoError(t, restorerOver(t, p, options.Options{}).Restore(RestoreSelector{Timestamp: "20240215T000000"}))
-	require.Equal(t, "v1", readFile(t, dest)) // run2's archive captured v1
+	require.Equal(t, "v1", readFile(t, dest))
 }
 
 func TestRestoreByTimestampBeforeEveryBackupErrors(t *testing.T) {
@@ -118,10 +112,10 @@ func TestRestoreSkipsDriftedDest(t *testing.T) {
 	mutateCopy(t, p, dest, "installed")
 	recorded, err := os.Stat(dest)
 	require.NoError(t, err)
-	require.NoError(t, os.Chmod(dest, recorded.Mode().Perm()^0o100)) // user drift
+	require.NoError(t, os.Chmod(dest, recorded.Mode().Perm()^0o100))
 
 	require.NoError(t, restorerOver(t, p, options.Options{}).Restore(RestoreSelector{RunID: testRunID}))
-	require.Equal(t, "installed", readFile(t, dest)) // drifted dest left untouched
+	require.Equal(t, "installed", readFile(t, dest))
 }
 
 func TestRestoreDryRunWritesNothing(t *testing.T) {
@@ -179,7 +173,7 @@ func TestListBackupsPrintsBackupPoints(t *testing.T) {
 	stripped := testutil.StripANSI(out)
 	require.Contains(t, stripped, "# backups")
 	require.Contains(t, stripped, "run "+testRunID+", backup "+backupID+", "+testRunID)
-	require.Contains(t, stripped, "~/") // abbreviated path
+	require.Contains(t, stripped, "~/")
 }
 
 func TestListBackupsEmptyPrintsNothing(t *testing.T) {

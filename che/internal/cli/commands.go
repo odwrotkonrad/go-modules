@@ -10,15 +10,11 @@ import (
 	"gitlab.com/konradodwrot/go-modules/che/internal/che"
 )
 
-// opCmd is one per-op subcommand shape: its cobra wiring plus the prepared
-// operation name it runs over every profile.
 type opCmd struct {
 	name  string
 	short string
 }
 
-// ops lists every op subcommand in run order: the one source for subcommand
-// construction (run order itself lives in che.prepareOperations).
 func ops() []opCmd {
 	return []opCmd{
 		{name: "prune-broken-links", short: "delete broken symlinks"},
@@ -30,8 +26,6 @@ func ops() []opCmd {
 	}
 }
 
-// opCmd builds an op's subcommand: RunE runs its prepared operation over every
-// profile. run-scripts and render-templates layer their arg filter / flag on top.
 func (a *app) opCmd(o opCmd) *cobra.Command {
 	name := o.name
 	cmd := &cobra.Command{Use: o.name, Short: o.short}

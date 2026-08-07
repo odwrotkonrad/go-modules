@@ -14,37 +14,24 @@ import (
 	"github.com/dsnet/compress/bzip2"
 )
 
-// TsLayout stamps backup filenames + log lines (one stamp per run).
 const TsLayout = "20060102T150405"
 
-// ResolveBackupArchivePath resolves one backup archive's path under the XDG
-// state backups dir: <ResolveStateHome>/backups/<profileSlug>/<op>/<ts>-<backupID>.tar.bz2
-// (default ~/.local/state/che/backups). Each archive carries its own backupID.
 func ResolveBackupArchivePath(home, profileSlug, op, ts, backupID string) string {
 	name := fmt.Sprintf("%s-%s.tar.bz2", ts, backupID)
 	return filepath.Join(ResolveStateHome(home), "backups", profileSlug, op, name)
 }
 
-// SlugRef sanitizes a profile ref into a path segment: path separators and
-// colons flattened to hyphens (cli/macos -> cli-macos).
 func SlugRef(ref string) string {
 	s := strings.NewReplacer("/", "-", ":", "-").Replace(ref)
 	return strings.Trim(s, "-")
 }
 
-// ParseBackupArchiveName splits an archive path's basename into its ts and
-// backup id (<ts>-<backupID>.tar.bz2); an unparseable name returns it whole as
-// ts with an empty id.
 func ParseBackupArchiveName(path string) (ts, backupID string) {
 	base := strings.TrimSuffix(filepath.Base(path), ".tar.bz2")
 	ts, backupID, _ = strings.Cut(base, "-")
 	return ts, backupID
 }
 
-// ArchiveDestinations snapshots each existing dest's contents into a single .tar.bz2
-// at archivePath, entries named by stripped-absolute path. Symlinks followed
-// (linked contents stored, not the link); missing dests, broken links + dirs
-// skipped. Always writes the archive, even empty.
 func (f FS) ArchiveDestinations(archivePath string, dests []string) error {
 	if err := os.MkdirAll(filepath.Dir(archivePath), 0o755); err != nil {
 		return err
@@ -93,8 +80,6 @@ func archiveDest(tw *tar.Writer, dest string) error {
 	return err
 }
 
-// ListArchiveEntries lists the dest paths archived at archivePath (entry names
-// restored to absolute form). Mirror of ArchiveDestinations.
 func ListArchiveEntries(archivePath string) ([]string, error) {
 	in, err := os.Open(archivePath)
 	if err != nil {
@@ -120,9 +105,6 @@ func ListArchiveEntries(archivePath string) ([]string, error) {
 	}
 }
 
-// ReadFromArchive finds dest's entry (stripped-absolute name) in the .tar.bz2 at
-// archivePath and returns its body + header mode. found=false when the archive
-// holds no such entry (dest pre-existed as absent). Mirror of ArchiveDestinations.
 func ReadFromArchive(archivePath, dest string) (body []byte, mode os.FileMode, found bool, err error) {
 	in, err := os.Open(archivePath)
 	if err != nil {

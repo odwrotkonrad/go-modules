@@ -15,8 +15,6 @@ import (
 	"gitlab.com/konradodwrot/go-modules/che/internal/log"
 )
 
-// nilTel is the disabled/no-op handle every counter and the log bridge must
-// tolerate without panicking.
 func TestNilTelemetryIsNoOp(t *testing.T) {
 	var tel *Telemetry
 	ctx := context.Background()
@@ -35,16 +33,12 @@ func TestNilTelemetryIsNoOp(t *testing.T) {
 	})
 }
 
-// TestStartDisabled: enabled=false -> (nil, nil), telemetry off.
 func TestStartDisabled(t *testing.T) {
 	tel, err := Start(context.Background(), Config{Enabled: false}, "run", "all")
 	require.NoError(t, err)
 	assert.Nil(t, tel)
 }
 
-// TestStartUnreachableDegrades: an enabled config against a dead endpoint starts
-// (lazy dial), counters run, Shutdown flushes under the bounded timeout without
-// failing the caller's run (an error may surface, but never a panic/block).
 func TestStartUnreachableDegrades(t *testing.T) {
 	cfg := Config{Enabled: true, Endpoint: "127.0.0.1:1", Protocol: "grpc", Metrics: true, Logs: true, Traces: true}
 	tel, err := Start(context.Background(), cfg, "run", "all")
@@ -62,8 +56,6 @@ func TestStartUnreachableDegrades(t *testing.T) {
 	})
 }
 
-// TestCountersWiring drives the counters against a manual-reader meter provider,
-// asserting each instrument records with its labels.
 func TestCountersWiring(t *testing.T) {
 	reader := sdkmetric.NewManualReader()
 	tel := &Telemetry{meterProvider: sdkmetric.NewMeterProvider(sdkmetric.WithReader(reader))}
@@ -92,8 +84,6 @@ func TestCountersWiring(t *testing.T) {
 	assert.Equal(t, int64(1), sums["che.errors.total|op=make-links"])
 }
 
-// collectSums flattens every int64 sum data point to "<metric>|<sorted labels>"
-// -> value.
 func collectSums(t *testing.T, rm *metricdata.ResourceMetrics) map[string]int64 {
 	t.Helper()
 	out := map[string]int64{}
@@ -109,7 +99,6 @@ func collectSums(t *testing.T, rm *metricdata.ResourceMetrics) map[string]int64 
 	return out
 }
 
-// labels renders a data point's attribute set (already key-sorted) as "k=v,k=v".
 func labels(dp metricdata.DataPoint[int64]) string {
 	var parts []string
 	for _, kv := range dp.Attributes.ToSlice() {

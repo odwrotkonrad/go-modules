@@ -1,0 +1,31 @@
+# [>] 🤖🤖
+context:
+  function: packages.File.Merge
+cases:
+  - name: ShouldReplaceSameNameAndAppendNew
+    input:
+      args:
+        - base: |
+            packages:
+              bat: [brew, apt]
+              fd: [brew]
+        - override: |
+            packages:
+              bat: [apt]
+              rg: [brew]
+    expected:
+      output:
+        bat: [apt]
+        fd: [brew]
+        rg: [brew]
+  - name: ShouldKeepBaseOnEmptyOverride
+    input:
+      args:
+        - base: |
+            packages:
+              bat: [brew]
+        - override: "packages: {}"
+    expected:
+      output:
+        bat: [brew]
+# [<] 🤖🤖

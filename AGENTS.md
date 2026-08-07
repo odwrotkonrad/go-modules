@@ -159,7 +159,8 @@ config loaders and main-shape boilerplate.
 `e2e-dryrun`: `build-cover` dry-run e2e flow (every command --dry-run=all, CHE_LOG_LEVEL=trace), binary covdata into ./cover-e2e-dryrun
 `e2e-run`: `build-cover` real full-flow e2e (CHE_LOG_LEVEL=info), binary covdata into ./cover-e2e-run
 `e2e-backup`: `build-cover` backup e2e flow (create/ls/restore selectors, CHE_LOG_LEVEL=info), binary covdata into ./cover-e2e-backup
-`e2e`: `e2e-dryrun -> e2e-run -> e2e-backup` run all e2e flows
+`e2e-packages`: `build-cover` packages e2e flow (install + checks against fake PATH managers, CHE_LOG_LEVEL=info), binary covdata into ./cover-e2e-packages
+`e2e`: `e2e-dryrun -> e2e-run -> e2e-backup -> e2e-packages` run all e2e flows
 `build` build the binary into ./dist
 `lint` golangci-lint all packages
 `vet` go vet all packages
@@ -231,6 +232,8 @@ che
     docs-agents
   docs
   e2e
+    fakebin
+    fakebin2
     local
       install
       root
@@ -269,6 +272,14 @@ che
                       zsh
                   etc
                 templates
+            packages
+              sample-tree
+                home
+                  .config
+                    packages
+                root
+              sample-tree-builtin
+                root
         spec
           cmds
           funcs
@@ -287,6 +298,11 @@ che
         spec
           funcs
     options
+      testdata
+        spec
+          funcs
+    packages
+      scripts
       testdata
         spec
           funcs

@@ -253,10 +253,17 @@ release-lib:
     - sed -i 's|(\.\./assets/data/che.schema.json)|(assets/data/che.schema.json)|g' che/docs/spec.md
     - printf '# che\n' > che/docs/index.md
     - tail -n +2 che/assets/docs-agents/purpose.md >> che/docs/index.md
+    ##[>] 🤖🤖
+    - printf '\n## Install\n\n' >> che/docs/index.md
+    - printf '```sh\ncurl -fsSL https://konradodwrot.gitlab.io/go-modules/install.sh | sh\n```\n' >> che/docs/index.md
+    ##[<] 🤖🤖
     - printf '# License\n\n```\n' > che/docs/license.md
     - cat LICENSE >> che/docs/license.md
     - printf '```\n' >> che/docs/license.md
     - cd che && mkdocs build --site-dir ../public
+    ##[>] 🤖🤖
+    - cp install.sh ../public/install.sh
+    ##[<] 🤖🤖
     - echo "docs preview -> https://konradodwrot.gitlab.io/-/go-modules/-/jobs/$CI_JOB_ID/artifacts/public/index.html"
   artifacts:
     paths:

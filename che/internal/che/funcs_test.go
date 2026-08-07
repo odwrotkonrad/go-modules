@@ -28,8 +28,6 @@ func TestSrc(t *testing.T) {
 	})
 }
 
-// TestResolveScripts: args name the fixture scripts to create and the rels to
-// resolve; expected.output rels are joined under the fixture dir.
 func TestResolveScripts(t *testing.T) {
 	testyml.Run(t, td, "testdata/spec/funcs/resolve_scripts.test.spec.yml", func(t *testing.T, c testyml.Case[[]string]) {
 		a := c.Input.Args

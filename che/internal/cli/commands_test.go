@@ -27,10 +27,6 @@ func findCmd(t *testing.T, root *cobra.Command, args []string) (*cobra.Command, 
 	return cmd, rest
 }
 
-// splitProfileArg strips a "--profile <name>" pair from args, returning the
-// remaining args plus the profile (default testutil.CheProfile). The harness
-// invokes RunE directly (no cobra flag parsing), so the flag maps onto
-// profileForce via setupMock.
 func splitProfileArg(args []string) ([]string, string) {
 	for i, a := range args {
 		if a == "--profile" && i+1 < len(args) {
@@ -41,7 +37,6 @@ func splitProfileArg(args []string) ([]string, string) {
 	return args, testutil.CheProfile
 }
 
-// TestCommands: dry-run off, safe-double set, log lines assert the behavior.
 func TestCommands(t *testing.T) {
 	specs, err := fs.Glob(td, "testdata/spec/cmds/che-*.test.spec.yml")
 	require.NoError(t, err)
@@ -51,7 +46,7 @@ func TestCommands(t *testing.T) {
 			t.Setenv(k, v)
 		}
 		args, profile := splitProfileArg(c.Context.CommandArgs())
-		a, root, home := setupMock(t, c.Context.Pwd, profile, c.Context.MockedInterfaces)
+		a, root, home := setupMock(t, c.Context.Pwd, profile, c.Context.MockedInterfaces, c.Context.Env)
 		require.NotEmpty(t, a.root.AllProfiles())
 		repo := a.root.AllProfiles()[0].Source.DirectoryPath
 		vars := map[string]string{

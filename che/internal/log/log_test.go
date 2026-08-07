@@ -31,7 +31,6 @@ func setLevel(t *testing.T, word string) {
 	t.Cleanup(func() { SetLevel(prev) })
 }
 
-// eventFromArgs builds the Event a case's args describe.
 func eventFromArgs(t *testing.T, a testyml.Args) Event {
 	t.Helper()
 	level, err := ParseLevel(a.String(t, 1))
@@ -71,8 +70,6 @@ func TestParseLevel(t *testing.T) {
 	})
 }
 
-// TestEmitMirrorsSinkWhenGated asserts every event reaches the sink, the
-// stdout gate notwithstanding.
 func TestEmitMirrorsSinkWhenGated(t *testing.T) {
 	setLevel(t, "error")
 	var got []Event
@@ -87,7 +84,6 @@ func TestEmitMirrorsSinkWhenGated(t *testing.T) {
 	assert.Equal(t, Levels.Trace, got[0].Level)
 }
 
-// TestEmitBoldsAction asserts the raw bytes carry SGR bold around the action.
 func TestEmitBoldsAction(t *testing.T) {
 	setLevel(t, "info")
 	out, _ := testutil.CaptureStdout(t, func() error {
@@ -97,7 +93,6 @@ func TestEmitBoldsAction(t *testing.T) {
 	assert.Contains(t, out, "\x1b[1mcreated\x1b[")
 }
 
-// TestPrintHelpers asserts heading/item print human-only, level-gated.
 func TestPrintHelpers(t *testing.T) {
 	setLevel(t, "info")
 	var sunk []Event

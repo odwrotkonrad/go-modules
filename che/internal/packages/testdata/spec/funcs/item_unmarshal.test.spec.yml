@@ -1,0 +1,89 @@
+# [>] 🤖🤖
+context:
+  function: packages.Item.UnmarshalYAML
+cases:
+  - name: ShouldDecodeBareManagerAsCanonicalName
+    input:
+      args:
+        - yaml: "brew"
+    expected:
+      output: {mgr: brew, name: ""}
+  - name: ShouldDecodePerManagerName
+    input:
+      args:
+        - yaml: "{apt: fd-find}"
+    expected:
+      output: {mgr: apt, name: fd-find}
+  - name: ShouldDecodeBrewCaskForm
+    input:
+      args:
+        - yaml: "{brew: {cask: beekeeper-studio}}"
+    expected:
+      output: {mgr: cask, name: beekeeper-studio}
+  - name: ShouldDecodeNpmScopedPin
+    input:
+      args:
+        - yaml: '{npm: "@anthropic-ai/claude-code"}'
+    expected:
+      output: {mgr: npm, name: "@anthropic-ai/claude-code"}
+  - name: ShouldDecodeBinaryProps
+    input:
+      args:
+        - yaml: |
+            binary:
+              version: 0.32.0
+              url: https://example.com/kind-{os}-{arch}
+              sha256:
+                linux-amd64: abc
+    expected:
+      output: {mgr: binary, name: "", version: 0.32.0, url: "https://example.com/kind-{os}-{arch}", sha256: {linux-amd64: abc}}
+  - name: ShouldDecodeScriptScalarForm
+    input:
+      args:
+        - yaml: '{script: "echo hi"}'
+    expected:
+      output: {mgr: script, name: "", run: "echo hi"}
+  - name: ShouldDecodeScriptMapFormWithOs
+    input:
+      args:
+        - yaml: |
+            script:
+              os: darwin
+              run: echo hi
+    expected:
+      output: {mgr: script, name: "", run: "echo hi", scriptOs: darwin}
+  - name: ShouldDecodeScriptPathForm
+    input:
+      args:
+        - yaml: "{script: {path: scripts/install-brew.sh, os: darwin}}"
+    expected:
+      output: {mgr: script, name: "", scriptPath: scripts/install-brew.sh, scriptOs: darwin}
+  - name: ShouldDecodeScriptUrlForm
+    input:
+      args:
+        - yaml: "{script: {url: https://example.com/install.sh}}"
+    expected:
+      output: {mgr: script, name: "", scriptUrl: https://example.com/install.sh}
+  - name: ShouldDecodePkgForm
+    input:
+      args:
+        - yaml: |
+            pkg:
+              url: https://awscli.amazonaws.com/AWSCLIV2.pkg
+              sha256:
+                darwin-arm64: abc
+    expected:
+      output: {mgr: pkg, name: "", url: "https://awscli.amazonaws.com/AWSCLIV2.pkg", sha256: {darwin-arm64: abc}}
+  - name: ShouldErrorOnMultiKeyMap
+    input:
+      args:
+        - yaml: "{apt: a, brew: b}"
+    expected:
+      errorOutput: "manager item must be a scalar or a single-key map"
+  - name: ShouldErrorOnMalformedBrewObject
+    input:
+      args:
+        - yaml: "{brew: {formula: x}}"
+    expected:
+      errorOutput: "brew object form must be {cask: <name>}"
+# [<] 🤖🤖

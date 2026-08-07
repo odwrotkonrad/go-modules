@@ -1,6 +1,3 @@
-// Package che assembles executable profiles from spec recipes: options
-// preparation, spec composition (include.sources + sourced include.profiles
-// refs, fully recursive), per-profile operation preparation and execution.
 package che
 
 // [>] 🤖🤖
@@ -28,35 +25,13 @@ import (
 	"gitlab.com/konradodwrot/go-modules/che/render/render"
 )
 
-// Domain model:
-//
-//	SpecRecipe  one che.yml, declared: Source + top-level options/env/include
-//	            + parsed ProfileRecipes
-//	SpecReady   its resolved counterpart: Include tree (composed specs,
-//	            recursive) + the profiles THIS spec assembled itself
-//	ProfileReady  one resolved profile, ready to install onto the OS:
-//	              effective options, env overlay, prepared operations
-//	Operations  per-subcommand Recipe/Ready pairs: a Recipe (spec) carries
-//	            UNRESOLVED subjects, its Ready the RESOLVED ones; execOperation
-//	            runs each op's logic against its owning *ProfileReady
-//
-// cli holds opts (options.Options) and the root *SpecReady as separately
-// initialized values: PrepareApplicationOptions, then PrepareSpecs.
-
-// Seams are the fs surfaces a profile drives to touch the host: mutating
-// writer, dest-facing reader, remote template fetcher. Exported so tests can
-// inject record-only mocks via the NewSeams swap point.
 type Seams struct {
 	FS      fsutil.FileSystemWriter
 	Reader  fsutil.FileSystemReader
 	Fetcher RemoteFetcher
-	Ledger  *database.DB // ops ledger; nil records nothing (tests, closed store)
+	Ledger  *database.DB
 }
 
-// NewSeams builds a profile's real fs seams (home-anchored writer, OS reader,
-// git remote fetcher, ops ledger); tests swap it to inject record-only mocks
-// with a nil Ledger. A failed ledger Open degrades to nil (recording off), never
-// aborting the run.
 var NewSeams = func(home string) Seams {
 	db, err := database.Open(filepath.Join(fsutil.ResolveStateHome(home), "ops.db"))
 	if err != nil {
@@ -71,20 +46,14 @@ var NewSeams = func(home string) Seams {
 	}
 }
 
-// RemoteFetcher fetches a remote template source ref's content
-// (<repo>//<path>[?ref=<ref>], marker stripped).
 type RemoteFetcher interface {
 	Fetch(ref string) (string, error)
 }
 
-// gitFetcher is the live RemoteFetcher: shallow in-memory git clones, one
-// clone cache shared across the profile's renders.
 type gitFetcher struct{ fetch func(string) (string, error) }
 
 func (g gitFetcher) Fetch(ref string) (string, error) { return g.fetch(ref) }
 
-// fetchRemote fetches ref under a "fetch-remote" span (child of the active op
-// ctx), recording the ref and any error.
 func (p *ProfileReady) fetchRemote(ref string) (string, error) {
 	_, span := p.tel.Span(p.opContext(), "fetch-remote", attribute.String("ref", ref))
 	defer span.End()
@@ -99,10 +68,6 @@ func (p *ProfileReady) fetchRemote(ref string) (string, error) {
 
 // [>] 🤖🤖 package-level funcs
 
-// PrepareApplicationOptions finalizes the runtime options: chdir (-C), locate the repo,
-// then resolve with per-field precedence flags > env vars > the user-config
-// file ($XDG_CONFIG_HOME/che/config.yml) > local che.yml options: > defaults.
-// ctx carries the captured launch world (env/cwd); -C shifts ctx.Cwd forward.
 func PrepareApplicationOptions(ctx Context, opts options.Options) (Context, options.Options, error) {
 	resolvedOptions := opts
 	resolvedOptions.CheWorkingDirectory = cmp.Or(resolvedOptions.CheWorkingDirectory, ctx.Env["CHE_WORKING_DIRECTORY"])
@@ -133,8 +98,6 @@ func PrepareApplicationOptions(ctx Context, opts options.Options) (Context, opti
 	return ctx, resolvedOptions, nil
 }
 
-// changeDir resolves the -C target against cwd (absolute stays, relative joins),
-// verifying it is an existing dir; returns the shifted working directory.
 func changeDir(cwd, dir string) (string, error) {
 	if !filepath.IsAbs(dir) {
 		dir = filepath.Join(cwd, dir)
@@ -145,9 +108,6 @@ func changeDir(cwd, dir string) (string, error) {
 	return dir, nil
 }
 
-// readUserLayer leniently reads the user-config file: a bare options: object
-// ($XDG_CONFIG_HOME/che/config.yml) mirroring the che.yml options: block
-// ([why] absent file -> empty layer; parse errors surface later).
 func readUserLayer(path string) options.Layer {
 	b, err := os.ReadFile(path)
 	if err != nil {
@@ -160,9 +120,6 @@ func readUserLayer(path string) options.Layer {
 	return o
 }
 
-// readSpecLayer leniently reads the local spec's options: block into a
-// resolution layer ([why] absent file / parse errors surface later, at
-// PrepareSpecs).
 func readSpecLayer(path string) options.Layer {
 	b, err := os.ReadFile(path)
 	if err != nil {
@@ -177,10 +134,6 @@ func readSpecLayer(path string) options.Layer {
 	return d.Options
 }
 
-// PrepareSpecs resolves the root spec and its whole Include tree (top-level
-// include.sources + sourced include.profiles refs), fully recursive,
-// cycle-guarded, deduped by source URI + profile name. ctx carries the captured
-// launch world, held once on specsPrep for the whole prepare pass.
 func PrepareSpecs(ctx Context, opts options.Options, src spec.SpecSourceRecipe) (*SpecReady, error) {
 	_, span := ctx.Tel.Span(ctx.runContext(), "prepare-specs")
 	defer span.End()
@@ -209,21 +162,18 @@ func PrepareSpecs(ctx Context, opts options.Options, src spec.SpecSourceRecipe) 
 	return root, err
 }
 
-// specsPrep threads the shared composition state through the recursion.
 type specsPrep struct {
 	ctx       Context
 	opts      options.Options
 	home      string
-	gitRoot   string               // the top-level spec's checkout anchor (findRepoRoot), injected as ${invokingSpecGitRoot}
-	tel       *telemetry.Telemetry // OTLP counters/logs (nil = no-op), threaded onto each ProfileReady
-	seenSpecs map[string]bool      // resolved spec dirs (include.sources cycle/dup guard)
-	seenRefs  map[string]bool      // <uri>::<profile> (sourced-ref dedup)
-	rejected  []spec.Rejection     // profiles whose runIf rejected them, discovery order
-	specDone  *database.SpecDone   // the run's ledger row, created lazily by the first recording profile
+	gitRoot   string
+	tel       *telemetry.Telemetry
+	seenSpecs map[string]bool
+	seenRefs  map[string]bool
+	rejected  []spec.Rejection
+	specDone  *database.SpecDone
 }
 
-// startSpec lazily creates (once per run) the ledger SpecDone row on the shared
-// ledger handle, keyed by the run's TsLayout stamp. Later profiles reuse it.
 func (p *specsPrep) startSpec(db *database.DB, uri string) *database.SpecDone {
 	if p.specDone != nil {
 		return p.specDone
@@ -237,10 +187,6 @@ func (p *specsPrep) startSpec(db *database.DB, uri string) *database.SpecDone {
 	return s
 }
 
-// prepare runs one spec through the full pipeline. forced pins the spec to a
-// single referenced profile (sourced include.profiles ref); root marks the
-// user-invoked spec (zero eligible profiles is fatal there only). Returns nil
-// for an include.sources duplicate.
 func (p *specsPrep) prepare(src spec.SpecSourceRecipe, anchor string, forced *spec.ProfileSourceRecipe, root bool) (*SpecReady, error) {
 	recipe := &SpecRecipe{Source: src}
 	if err := recipe.PrepareSpec(anchor, p.home); err != nil {
@@ -248,7 +194,6 @@ func (p *specsPrep) prepare(src spec.SpecSourceRecipe, anchor string, forced *sp
 	}
 	if forced != nil {
 		// [why] keyed on the resolved dir, not the raw URI: the same spec is
-		// referenced under different relative URIs across hops.
 		key := recipe.sourceReady.DirectoryPath + "::" + forced.ProfileName
 		if p.seenRefs[key] {
 			log.EmitSkip(log.Levels.Trace, "init-remote-sources", "prepare", forced.ProfileName, "duplicate ref "+forced.String())
@@ -266,10 +211,6 @@ func (p *specsPrep) prepare(src spec.SpecSourceRecipe, anchor string, forced *sp
 	return recipe.PrepareProfiles(p, forced, root)
 }
 
-// findRepoRoot: git toplevel of ctx.Cwd, che.yml must live there (che's
-// defining marker). Outside any git repo, the nearest ancestor dir (ctx.Cwd
-// included) carrying a che.yml anchors instead ([why] specs must run from
-// non-repo dirs too, e.g. a container home carrying only a che.yml).
 func findRepoRoot(ctx Context) (string, error) {
 	root, err := fsutil.ResolveRepoRoot(ctx.Cwd)
 	if err != nil {
@@ -284,7 +225,6 @@ func findRepoRoot(ctx Context) (string, error) {
 	return root, nil
 }
 
-// findSpecRoot walks up from dir to the nearest ancestor carrying a che.yml.
 func findSpecRoot(dir string) (string, error) {
 	d, err := filepath.Abs(dir)
 	if err != nil {
@@ -302,9 +242,6 @@ func findSpecRoot(dir string) (string, error) {
 	}
 }
 
-// resolveInvokingHome resolves the invoking user's home. Under sudo (EUID 0,
-// SUDO_USER set), looks up that user's home from passwd so dest paths derive
-// from the real user, not /var/root. Otherwise uses $HOME.
 func resolveInvokingHome(ctx Context) (string, error) {
 	if ctx.Euid == 0 {
 		if name := ctx.Env["SUDO_USER"]; name != "" {
@@ -322,9 +259,6 @@ func resolveInvokingHome(ctx Context) (string, error) {
 	return home, nil
 }
 
-// overlayEnv derives a new env map from base with overlay's keys applied
-// (overlay wins), the pure replacement for the old process-env shadowing. Empty
-// overlay returns base unchanged.
 func overlayEnv(base map[string]string, overlay map[string]string) map[string]string {
 	if len(overlay) == 0 {
 		return base
@@ -339,19 +273,15 @@ func overlayEnv(base map[string]string, overlay map[string]string) map[string]st
 
 // [>] 🤖🤖 SpecRecipe
 
-// SpecRecipe is one declared che.yml: where it comes from, its reserved
-// top-level blocks, its parsed profile recipes.
 type SpecRecipe struct {
-	Source         spec.SpecSourceRecipe   // where this che.yml comes from
-	Include        []spec.SpecSourceRecipe // top-level include.sources: other specs composed in
-	Options        spec.Options            // top-level options: block
-	Env            map[string]string       // top-level env: block
+	Source         spec.SpecSourceRecipe
+	Include        []spec.SpecSourceRecipe
+	Options        spec.Options
+	Env            map[string]string
 	ProfileRecipes []spec.ProfileRecipe
 	sourceReady    spec.SpecSourceReady
 }
 
-// PrepareSpec resolves the source (filesystem expand / remote clone) and
-// locates che.yml at its DirectoryPath.
 func (r *SpecRecipe) PrepareSpec(anchor, home string) error {
 	ready, err := r.Source.PrepareSource(anchor, home)
 	if err != nil {
@@ -361,11 +291,6 @@ func (r *SpecRecipe) PrepareSpec(anchor, home string) error {
 	return nil
 }
 
-// PrepareProfileRecipes parses and schema-validates the spec, then stamps each
-// recipe with its Source (effective directory in Source.DirectoryPath, option
-// cascade applied: profile > spec). root marks the user-invoked spec: the
-// che-level workingDirectory seeds only it, never a sourced/composed spec ([why]
-// workingDirectory is checkout-relative, meaningless in another repo's checkout).
 func (r *SpecRecipe) PrepareProfileRecipes(opts options.Options, root bool) error {
 	if err := r.validateSchema(opts.ValidateSpecCLI); err != nil {
 		return err
@@ -376,8 +301,6 @@ func (r *SpecRecipe) PrepareProfileRecipes(opts options.Options, root bool) erro
 	}
 	r.Options, r.Env, r.Include = doc.Options, doc.Env, doc.Include
 	// [why] che-level (flag/env/user-config) seeds the spec default, cascading
-	// down to each profile: profile > spec > user-config. workingDirectory seeds
-	// the root spec only: a sourced spec resolves it against its own checkout.
 	if root && r.Options.ProfileWorkingDirectory == "" {
 		r.Options.ProfileWorkingDirectory = opts.ProfileWorkingDirectory
 	}
@@ -391,10 +314,6 @@ func (r *SpecRecipe) PrepareProfileRecipes(opts options.Options, root bool) erro
 	return nil
 }
 
-// resolveWorkingDir resolves a profile's effective options.profileWorkingDirectory
-// onto the checkout anchor: empty -> the checkout itself, else env-expanded
-// (~/, $VAR, env vars against env), relative -> under the checkout. Must be an
-// existing dir.
 func resolveWorkingDir(env map[string]string, anchor, directory string) (string, error) {
 	if directory == "" {
 		directory = spec.DefaultWorkingDir
@@ -430,8 +349,6 @@ func (r *SpecRecipe) validateSchema(cli options.ValidateSpecMode) error {
 	return nil
 }
 
-// peekSpecValidateMode leniently peeks a spec's own options.validateSpec from
-// its bytes ("" if absent or unparseable; the schema check surfaces real errors).
 func peekSpecValidateMode(b []byte) string {
 	var d struct {
 		Options spec.Options `yaml:"options"`
@@ -442,9 +359,6 @@ func peekSpecValidateMode(b []byte) string {
 	return d.Options.ValidateSpec
 }
 
-// candidateSummary lists the spec's candidate profiles (each with the profiles
-// it is assembled from) and the autoDiscoverable subset
-// (spec/che/log.md).
 func (r *SpecRecipe) candidateSummary() (all, autoDiscoverable string) {
 	var profs, auto []string
 	for _, rec := range r.ProfileRecipes {
@@ -460,10 +374,6 @@ func (r *SpecRecipe) candidateSummary() (all, autoDiscoverable string) {
 	return "[" + strings.Join(profs, ",") + "]", "[" + strings.Join(auto, ",") + "]"
 }
 
-// PrepareProfiles assembles the SpecReady: spec-level runIf gate, top-level
-// include.sources composed (their recipes joining the local-ref lookup),
-// per-recipe eligibility, one MakeProfile per eligible recipe, sourced refs
-// spawning nested SpecReadys (recursive).
 func (r *SpecRecipe) PrepareProfiles(p *specsPrep, forced *spec.ProfileSourceRecipe, root bool) (*SpecReady, error) {
 	ready := &SpecReady{Source: r.sourceReady, Options: r.Options, Env: r.Env, recipes: r.ProfileRecipes, tel: p.tel}
 	if root { // [why] candidates log once, for the invoked spec only
@@ -495,17 +405,11 @@ func (r *SpecRecipe) PrepareProfiles(p *specsPrep, forced *spec.ProfileSourceRec
 	return ready, nil
 }
 
-// evalWith builds an runIf evaluator whose env: source reads the captured
-// launch env overlaid with the given profile/spec/ref env ([why] the overlay
-// wins, matching the old process-env shadowing without mutating it).
 func (p *specsPrep) evalWith(overlay map[string]string) func(string) (bool, error) {
 	env := overlayEnv(p.ctx.Env, overlay)
 	return spec.NewEvaluator(func(k string) string { return env[k] }).EvalRunIf
 }
 
-// composeIncludes prepares each include.sources spec (own anchor, own env
-// overlay), nests it under Include, and joins its recipes into the local-ref
-// lookup (bare-name collision: error).
 func (r *SpecRecipe) composeIncludes(p *specsPrep, ready *SpecReady) ([]spec.ProfileRecipe, error) {
 	lookup := slices.Clone(r.ProfileRecipes)
 	for _, inc := range r.Include {
@@ -528,9 +432,6 @@ func (r *SpecRecipe) composeIncludes(p *specsPrep, ready *SpecReady) ([]spec.Pro
 	return lookup, nil
 }
 
-// selectEligibleNames picks this spec's own profiles to assemble: the forced
-// ref's one profile (runIf gated inside its env overlay, skip on fail), or
-// EligibleRecipes (zero eligible fatal only at the root spec).
 func (r *SpecRecipe) selectEligibleNames(p *specsPrep, forced *spec.ProfileSourceRecipe, root bool) ([]string, error) {
 	if forced != nil {
 		rec, err := spec.FindRecipe(r.ProfileRecipes, forced.ProfileName)
@@ -553,7 +454,6 @@ func (r *SpecRecipe) selectEligibleNames(p *specsPrep, forced *spec.ProfileSourc
 		forcedProfiles = p.opts.Profiles
 	}
 	// [why] autoDiscover=false disables the discovery mechanism itself: only
-	// forced profiles and sourced refs run.
 	if len(forcedProfiles) == 0 && !p.opts.AutoDiscover {
 		if root {
 			return nil, fmt.Errorf("auto-discovery is disabled (options.autoDiscover=false): pass --profiles")
@@ -573,8 +473,6 @@ func (r *SpecRecipe) selectEligibleNames(p *specsPrep, forced *spec.ProfileSourc
 	return names, nil
 }
 
-// assembleProfiles runs MakeProfile per eligible recipe, prepares its
-// operations, and recurses into its sourced refs.
 func (r *SpecRecipe) assembleProfiles(p *specsPrep, ready *SpecReady, lookup []spec.ProfileRecipe, names []string, forced *spec.ProfileSourceRecipe) error {
 	for _, name := range names {
 		rec, err := spec.FindRecipe(lookup, name)
@@ -612,16 +510,10 @@ func (r *SpecRecipe) assembleProfiles(p *specsPrep, ready *SpecReady, lookup []s
 	return nil
 }
 
-// makeProfileReady resolves one recipe into an executable profile: MakeProfile
-// emits the operation recipes, the profile (anchored at the recipe's directory,
-// its fs seams built) prepares them (subjects resolved). The profile captures
-// the effective launch env (launch env overlaid with its own env: block) so
-// downstream op methods read p.env, never the process.
 func (r *SpecRecipe) makeProfileReady(p *specsPrep, rec spec.ProfileRecipe, lookup []spec.ProfileRecipe, env map[string]string) (*ProfileReady, []spec.ProfileSourceRecipe, error) {
 	name := rec.Source.GetProfileName()
 	effectiveEnv := overlayEnv(p.ctx.Env, env)
 	// [why] ${invokingSpecGitRoot} anchors dests at the top-level spec's checkout, letting a
-	// nested/sourced profile target the invoking repo without ../ workdir walks.
 	effectiveEnv = overlayEnv(effectiveEnv, map[string]string{"invokingSpecGitRoot": p.gitRoot})
 	wd, err := resolveWorkingDir(effectiveEnv, rec.Source.DirectoryPath, rec.Options.ProfileWorkingDirectory)
 	if err != nil {
@@ -669,24 +561,17 @@ func (r *SpecRecipe) makeProfileReady(p *specsPrep, rec spec.ProfileRecipe, look
 
 // [>] 🤖🤖 SpecReady
 
-// SpecReady is one resolved spec: the composed specs (a tree) and ONLY the
-// profiles this one spec assembled itself.
 type SpecReady struct {
 	Source   spec.SpecSourceReady
-	Include  []*SpecReady // composed specs, resolved recursively
+	Include  []*SpecReady
 	Options  spec.Options
 	Env      map[string]string
 	Profiles []*ProfileReady
-	// Rejected lists the profiles whose runIf rejected them (root spec only,
-	// discovery order), the discover-profiles noMatch lines.
 	Rejected []spec.Rejection
-	recipes  []spec.ProfileRecipe // this spec's recipes, joining the includer's lookup
-	tel      *telemetry.Telemetry // OTLP counters (nil = no-op), for the per-profile ExecEach count
+	recipes  []spec.ProfileRecipe
+	tel      *telemetry.Telemetry
 }
 
-// LogRejected logs each runIf-rejected profile at debug, its rejecting
-// condition as the reason (spec/che/log.md); nothing rejected
-// logs nothing.
 func (s *SpecReady) LogRejected() {
 	for _, r := range s.Rejected {
 		log.Emit(log.Event{
@@ -697,8 +582,6 @@ func (s *SpecReady) LogRejected() {
 	}
 }
 
-// LogDiscovered logs the rejected profiles (debug), then each discovered
-// profile's entry (info).
 func (s *SpecReady) LogDiscovered() {
 	s.LogRejected()
 	for _, p := range s.AllProfiles() {
@@ -706,8 +589,6 @@ func (s *SpecReady) LogDiscovered() {
 	}
 }
 
-// AllProfiles flattens the tree depth-first: own profiles, then each composed
-// spec's.
 func (s *SpecReady) AllProfiles() []*ProfileReady {
 	out := slices.Clone(s.Profiles)
 	for _, c := range s.Include {
@@ -716,13 +597,6 @@ func (s *SpecReady) AllProfiles() []*ProfileReady {
 	return out
 }
 
-// ExecEach runs fn over every profile in the tree, each under its own span
-// (child of ctx). It first logs the discovery summary: one
-// "discover-profiles(discovered)" info line per profile with per-op all/delta counts
-// (spec/che/log.md). A failing profile does not stop the rest: failures
-// collect (ref-wrapped), report as "<op>(report): fail <ref>: <err>" lines
-// after all profiles, and join into the returned error. An ErrErrexit-carrying
-// failure (--errexit script failure) stops the remaining profiles.
 func (s *SpecReady) ExecEach(ctx context.Context, opName string, fn func(context.Context, *ProfileReady) error) error {
 	ctx, span := s.tel.Span(ctx, opName, attribute.String("op", opName))
 	defer span.End()
@@ -730,8 +604,6 @@ func (s *SpecReady) ExecEach(ctx context.Context, opName string, fn func(context
 	var fails []error
 	for _, p := range s.AllProfiles() {
 		// [why] a profile whose command ops carry no delta at all is skipped
-		// wholesale: nothing would change (spec/che/che.md). The
-		// skip reason distinguishes config-skipped and undefined op sets.
 		if ops := p.commandOps(opName); len(ops) == 0 {
 			reasons := []string{"not defined"}
 			if scoped := p.commandScopedOps(opName); len(scoped) > 0 {
@@ -746,7 +618,6 @@ func (s *SpecReady) ExecEach(ctx context.Context, opName string, fn func(context
 			continue
 		} else if p.commandDelta(opName) == 0 && !p.isDryRunAll() {
 			// [why] dry-run=all wants every dest's true state, so it bypasses
-			// the zero-delta profile skip.
 			log.EmitSkip(log.Levels.Debug, opName, "run", "profile "+p.Ref(), "no changes")
 			continue
 		}
@@ -775,70 +646,55 @@ func (s *SpecReady) ExecEach(ctx context.Context, opName string, fn func(context
 
 // [>] 🤖🤖 ProfileReady
 
-// ProfileReady is one resolved profile, ready to install onto the OS: its
-// effective options, env overlay, prepared operations, and the fs seams the op
-// logic drives. It IS the execution context — op methods hang off it.
 type ProfileReady struct {
 	Source          spec.ProfileSourceReady
-	Options         spec.ProfileOptions        // effective values after the cascade
-	Env             map[string]string          // spec env: merged under the ref entry's env (ref wins)
-	Profiles        []spec.ProfileSourceRecipe // sourced refs, consumed by PrepareSpecs
-	OperationsReady []operationReady           // prepared, in run order
-	ref             string                     // display ref: bare name local, <source>::<name> sourced
-	logDepth        int                        // heading depth this profile's body lines sit beneath (2 under profile+op headings, 0 for standalone)
-	workingDir      string                     // resolved load-ops source tree (options.profileWorkingDirectory cascade)
-	refCtx          map[string]string          // sourced-ref ctx overlay, merged over each render item's ctx (ref wins)
+	Options         spec.ProfileOptions
+	Env             map[string]string
+	Profiles        []spec.ProfileSourceRecipe
+	OperationsReady []operationReady
+	ref             string
+	logDepth        int
+	workingDir      string
+	refCtx          map[string]string
 	opts            options.Options
 	home            string
-	env             map[string]string     // captured launch env overlaid with Env, read by expandEnv/buildScriptsEnv
-	runID           string                // the run's 12-char base36 id (ledger run key + restore --run-id)
-	runTs           string                // the run's TsLayout stamp (backup archive filenames)
-	tel             *telemetry.Telemetry  // OTLP counters (nil = no-op), emitted at mutate + scripts/services
-	opCtx           context.Context       // active operation span ctx, set at execOperation entry, read by leaf mutate/fetch/exec
-	command         string                // the invoked subcommand, the CountUnit command label
-	specDone        *database.SpecDone    // the run's ledger row (nil when not recording)
-	profileDone     *database.ProfileDone // this profile's ledger row (nil when not recording)
-	backedUp        bool                  // the run backup stage archived every op dest: ops skip their own archives
-	backupArchive   string                // the archive the run backup stage actually wrote ("" -> nothing existed, no archive)
-	currentArchive  string                // archive path the in-flight op's archiveBefore wrote ("" -> no backup)
-	currentSub      string                // that archive's sub (Backup.Sub)
-	Seams                                 // fs writer/reader/fetcher, defaulted in prepare, test-injectable
+	env             map[string]string
+	runID           string
+	runTs           string
+	tel             *telemetry.Telemetry
+	opCtx           context.Context
+	command         string
+	specDone        *database.SpecDone
+	profileDone     *database.ProfileDone
+	backedUp        bool
+	backupArchive   string
+	currentArchive  string
+	currentSub      string
+	Seams
 }
 
-// opInfo carries the kind-specific columns a mutate call fills for its
-// OperationDone row: only the fields the op's Kind uses are set.
 type opInfo struct {
-	kind   string // link | copy | render | dir | chmod | chown | rm
-	target string // link target / render header ("" if n/a)
-	srcRel string // copy/render source rel ("" if n/a)
-	mode   string // octal mode applied ("" if n/a)
-	owner  string // "owner:group" applied ("" if n/a)
+	kind   string
+	target string
+	srcRel string
+	mode   string
+	owner  string
 }
 
-// Ref is the profile's display ref (report lines, discover).
 func (p *ProfileReady) Ref() string { return p.ref }
 
 // [>] 🤖🤖 execution-context accessors: options + minimal state, profile-scoped
 
-// resolveRepoRoot is the checkout anchor (che.yml + repo-relative scripts/templates).
 func (p *ProfileReady) resolveRepoRoot() string { return p.Source.DirectoryPath }
 
-// resolveRoot is the resolved load-ops source tree (the options.profileWorkingDirectory
-// value; host op sources resolve against it).
 func (p *ProfileReady) resolveRoot() string { return p.workingDir }
 
-// resolveProfileName is the resolved profile name (CONFIGS_PROFILE, plist domain).
 func (p *ProfileReady) resolveProfileName() string { return p.Source.GetProfileName() }
 
-// isDryRun reports whether this is any dry run (delta or all).
 func (p *ProfileReady) isDryRun() bool { return p.opts.DryRun != options.DryRun.Off }
 
-// isDryRunAll reports the dry-run=all mode (every dest re-reports, never skips).
 func (p *ProfileReady) isDryRunAll() bool { return p.opts.DryRun == options.DryRun.All }
 
-// emit logs one profile-scoped body event, indented under the current heading
-// depth. The profile heading names the profile once, so lines beneath it carry
-// only the machine-side profile attr, not a name suffix.
 func (p *ProfileReady) emit(level log.Level, scope, action, msg string) {
 	log.Emit(log.Event{
 		Level: level, Scope: scope, Action: action, Msg: msg,
@@ -846,7 +702,6 @@ func (p *ProfileReady) emit(level log.Level, scope, action, msg string) {
 	})
 }
 
-// emitSkip logs one profile-scoped won't-happen body event with its reasons.
 func (p *ProfileReady) emitSkip(level log.Level, scope, action, msg string, reasons ...string) {
 	log.Emit(log.Event{
 		Level: level, Scope: scope, Action: action, Msg: msg, Reasons: reasons,
@@ -854,7 +709,6 @@ func (p *ProfileReady) emitSkip(level log.Level, scope, action, msg string, reas
 	})
 }
 
-// emitHeading logs one profile-scoped heading event at the given markdown level.
 func (p *ProfileReady) emitHeading(level log.Level, scope, action, msg string, heading int) {
 	log.Emit(log.Event{
 		Level: level, Scope: scope, Action: action, Msg: msg,
@@ -862,9 +716,6 @@ func (p *ProfileReady) emitHeading(level log.Level, scope, action, msg string, h
 	})
 }
 
-// emitDryRun logs one profile-scoped predicted-mutation event: the action
-// renders affirmatively with a "(dry run)" suffix ("create <msg> (dry run)"),
-// not as a "will not" skip.
 func (p *ProfileReady) emitDryRun(scope, action, msg string) {
 	log.Emit(log.Event{
 		Level: log.Levels.Info, Scope: scope, Action: action, Msg: msg, DryRun: true,
@@ -872,10 +723,6 @@ func (p *ProfileReady) emitDryRun(scope, action, msg string) {
 	})
 }
 
-// mutate is the one dry-run+log gate for every mutating op: dry run logs only
-// (fs untouched); real run executes fn, then logs. On a real run it also records
-// the dest mutation into the ops ledger (classify prev before fn, next after),
-// keyed by info.kind. dest "" / dry-run / no ledger -> nothing recorded.
 func (p *ProfileReady) mutate(scope, action, msg, dest string, info opInfo, fn func() error) error {
 	prev := p.classifyDest(dest)
 	if p.isDryRun() {
@@ -896,8 +743,6 @@ func (p *ProfileReady) mutate(scope, action, msg, dest string, info opInfo, fn f
 	return nil
 }
 
-// opContext returns the active operation span ctx, or Background when no op span
-// is in flight (per-op subcommands set it at execOperation entry).
 func (p *ProfileReady) opContext() context.Context {
 	if p.opCtx != nil {
 		return p.opCtx
@@ -905,8 +750,6 @@ func (p *ProfileReady) opContext() context.Context {
 	return context.Background()
 }
 
-// classifyDest reads a dest's current state (link/file/dir/absent) for the
-// ledger prev/next Object.
 func (p *ProfileReady) classifyDest(dest string) database.Object {
 	if dest == "" {
 		return database.Object{Kind: "absent"}
@@ -928,9 +771,6 @@ func (p *ProfileReady) classifyDest(dest string) database.Object {
 	return obj
 }
 
-// recordOperation classifies the dest's post-fn state, derives op_type, resolves
-// the in-flight archive as the Backup, and writes the OperationDone. Guarded off
-// when not recording (nil ledger/profileDone, no dest, no kind).
 func (p *ProfileReady) recordOperation(dest string, info opInfo, prev database.Object) {
 	if p.Ledger == nil || p.profileDone == nil || dest == "" || info.kind == "" {
 		return
@@ -955,17 +795,10 @@ func (p *ProfileReady) recordOperation(dest string, info opInfo, prev database.O
 	}
 }
 
-// skippedOps is the config-skipped op set (--skip-ops everywhere plus the run
-// sequence's), excluded from discovery output and profile-delta decisions.
 func (p *ProfileReady) skippedOps() []string {
 	return slices.Concat(p.opts.SkipOps, p.opts.RunSkipOps)
 }
 
-// logDiscovered emits the profile's discovered entry: one info event whose
-// human block lists the working directory and the per-op changes (delta only
-// at info, every op with declared counts at debug). Discovery never writes
-// the render-delta cache: only real renders do ([why] a cache refresh without
-// applying would zero the delta and skip the profile before it converges).
 func (p *ProfileReady) logDiscovered() {
 	attrs := map[string]string{"profile": p.Ref(), "workingDirectory": p.workingDir}
 	var lines []string
@@ -991,8 +824,6 @@ func (p *ProfileReady) logDiscovered() {
 	}
 }
 
-// formatChanges renders a delta count as prose: "no changes", "1 change",
-// "<n> changes".
 func formatChanges(n int) string {
 	switch n {
 	case 0:
@@ -1004,7 +835,6 @@ func formatChanges(n int) string {
 	}
 }
 
-// abbreviateHome renders path with the home prefix abbreviated to ~.
 func abbreviateHome(path, home string) string {
 	if home != "" && strings.HasPrefix(path, home+string(filepath.Separator)) {
 		return "~" + strings.TrimPrefix(path, home)
@@ -1012,9 +842,6 @@ func abbreviateHome(path, home string) string {
 	return path
 }
 
-// commandOps lists the selected, non-skipped ops the invoked command will run
-// over this profile: all of them for `run`, the file ops for `backup`, else
-// the command's own op.
 func (p *ProfileReady) commandOps(opName string) []operationReady {
 	skips := p.skippedOps()
 	var out []operationReady
@@ -1026,8 +853,6 @@ func (p *ProfileReady) commandOps(opName string) []operationReady {
 	return out
 }
 
-// commandScopedOps lists the selected ops within the command's scope,
-// config-skips ignored.
 func (p *ProfileReady) commandScopedOps(opName string) []operationReady {
 	var out []operationReady
 	for _, op := range p.OperationsReady {
@@ -1052,8 +877,6 @@ func (p *ProfileReady) commandScopedOps(opName string) []operationReady {
 	return out
 }
 
-// commandDelta sums the invoked command's op deltas over this profile: the
-// profile-skip decision (spec/che/che.md).
 func (p *ProfileReady) commandDelta(opName string) int {
 	total := 0
 	for _, op := range p.commandOps(opName) {
@@ -1063,8 +886,6 @@ func (p *ProfileReady) commandDelta(opName string) int {
 	return total
 }
 
-// describeOpDeltas lists the invoked command's ops with their discover deltas
-// as prose: "op (1 change), op (no changes)".
 func (p *ProfileReady) describeOpDeltas(opName string) string {
 	var parts []string
 	for _, op := range p.commandOps(opName) {
@@ -1074,12 +895,8 @@ func (p *ProfileReady) describeOpDeltas(opName string) string {
 	return strings.Join(parts, ", ")
 }
 
-// LogDiscovered is the exported per-profile discovered entry (standalone
-// discover-profiles).
 func (p *ProfileReady) LogDiscovered() { p.logDiscovered() }
 
-// resolvePastAction maps a mutation action to its past tense against the
-// dest's prior state: create -> created/overwritten, others pass through.
 func resolvePastAction(action string, existed bool) string {
 	if action != "create" {
 		return action
@@ -1090,7 +907,6 @@ func resolvePastAction(action string, existed bool) string {
 	return "created"
 }
 
-// skipOpsReason names the config option that skipped op.
 func (p *ProfileReady) skipOpsReason(op string) string {
 	if slices.Contains(p.opts.SkipOps, op) {
 		return "options.skipOps"
@@ -1098,8 +914,6 @@ func (p *ProfileReady) skipOpsReason(op string) string {
 	return "options.run.skipOps"
 }
 
-// wouldAction is the would-be mutation action for dest: create when absent,
-// overwrite when present.
 func (p *ProfileReady) wouldAction(dest string) string {
 	if _, err := p.Reader.LstatPath(dest); err == nil {
 		return "overwrite"
@@ -1107,14 +921,10 @@ func (p *ProfileReady) wouldAction(dest string) string {
 	return "create"
 }
 
-// skipReasons is the base reason list for a genuine no-op skip (already
-// settled dest). The reason itself explains why nothing changes; the dry-run
-// mode is not appended (these lines surface only under dry-run=all anyway).
 func (p *ProfileReady) skipReasons(reasons ...string) []string {
 	return reasons
 }
 
-// deriveOpType maps a prev/next Object pair to the op_type discriminator.
 func deriveOpType(prev, next database.Object) string {
 	switch {
 	case !prev.Present && next.Present:
@@ -1128,18 +938,10 @@ func deriveOpType(prev, next database.Object) string {
 	}
 }
 
-// resolveSrc maps a workingDirectory-relative path to its absolute source path.
 func (p *ProfileReady) resolveSrc(relativePath string) string {
 	return filepath.Join(p.resolveRoot(), relativePath)
 }
 
-// toDest maps a working-tree rel path to its live dest. Env vars expand first
-// (so specs can write $HOME/... dests), $HOME resolving to the invoking user's
-// home (p.home, correct under sudo where the process $HOME differs). Then: an
-// already-absolute path stays (make-extra-dirs entries, $HOME-rooted dests),
-// everything else is a system-root path. Home targeting is explicit: a spec
-// rewrites its dest to $HOME/... (e.g. dest: 's#^HOME#$HOME#'), no implicit
-// HOME/ folder mapping.
 func (p *ProfileReady) toDest(relativePath string) string {
 	relativePath = p.expandEnv(relativePath)
 	if strings.HasPrefix(relativePath, "/") {
@@ -1148,9 +950,6 @@ func (p *ProfileReady) toDest(relativePath string) string {
 	return "/" + relativePath
 }
 
-// expandEnv expands env vars in path from the captured profile env, with
-// $HOME/${HOME} bound to p.home ([why] the invoking user's home, not the
-// process env, which diverges under sudo).
 func (p *ProfileReady) expandEnv(path string) string {
 	return os.Expand(path, func(k string) string {
 		if k == "HOME" {
@@ -1160,16 +959,12 @@ func (p *ProfileReady) expandEnv(path string) string {
 	})
 }
 
-// expandHome expands env vars ($HOME bound to p.home) then the ~/ prefix, so a
-// dest may be written with $VAR / $HOME or ~/.
 func (p *ProfileReady) expandHome(path string) string {
 	return fsutil.ExpandHome(p.expandEnv(path), p.home)
 }
 
 // [<] 🤖🤖
 
-// withLogLevel runs fn under the profile's effective log level ([why] a
-// profile's options.logLevel overrides the che-level level for its ops).
 func (p *ProfileReady) withLogLevel(fn func() error) error {
 	if p.Options.LogLevel == "" {
 		return fn()
@@ -1184,14 +979,6 @@ func (p *ProfileReady) withLogLevel(fn func() error) error {
 	return fn()
 }
 
-// ExecOperations executes ALL of the profile's operations, in run order:
-// Selected() gated (all(skip) debug line), errors join, a failing op does not
-// stop the rest (except an ErrErrexit-carrying failure, which stops the
-// remaining ops). After the ops, it reconciles the ledger: any recorded dest of
-// an install kind (link/copy/render) whose op produced nothing this run — the op
-// was fully emptied and thus deselected — is swept (removed + archived). Ops that
-// ran already swept their own stale dests inline; this covers the emptied-op case
-// so a removed-entirely op still prunes its orphans.
 func (p *ProfileReady) ExecOperations(ctx context.Context) error {
 	return p.withLogLevel(func() error {
 		var fails []error
@@ -1199,7 +986,6 @@ func (p *ProfileReady) ExecOperations(ctx context.Context) error {
 		skipOps := slices.Concat(p.opts.SkipOps, p.opts.RunSkipOps)
 		for _, op := range p.OperationsReady {
 			// [why] a config-skipped op is a plain skip, never a sweep: skipping
-			// render-templates must not prune its previously rendered dests.
 			if slices.Contains(skipOps, op.Name()) {
 				p.emitSkip(log.Levels.Debug, "run", "run-op", op.Name(), p.skipOpsReason(op.Name()))
 				continue
@@ -1222,10 +1008,6 @@ func (p *ProfileReady) ExecOperations(ctx context.Context) error {
 	})
 }
 
-// execOp runs one selected operation under its own span (child of ctx), setting
-// p.opCtx so leaf mutate/fetch/exec calls parent onto it. Announces the op as an
-// indented heading under the profile, then indents its mutation lines one level
-// deeper (spec/che/log.md). Counts the run, and the error on failure.
 func (p *ProfileReady) execOp(ctx context.Context, op operationReady) error {
 	ctx, span := p.tel.Span(ctx, op.Name(), attribute.String("op", op.Name()))
 	defer span.End()
@@ -1242,11 +1024,6 @@ func (p *ProfileReady) execOp(ctx context.Context, op operationReady) error {
 	return err
 }
 
-// enterOp announces the op as a markdown sub-heading (one level below the
-// profile heading), then sets the profile's body depth so the op's mutation
-// lines indent beneath it (spec/che/log.md). A zero-delta op
-// notes "(no changes)" on its heading so it does not read as a dangling
-// section. The returned func restores the prior depth (deferred by the caller).
 func (p *ProfileReady) enterOp(name string) func() {
 	msg := name
 	if op := p.opNamed(name); op != nil {
@@ -1260,8 +1037,6 @@ func (p *ProfileReady) enterOp(name string) func() {
 	return func() { p.logDepth = prev }
 }
 
-// opNamed returns the profile's prepared op of that name, nil when absent
-// (backup is a stage, not an operationReady).
 func (p *ProfileReady) opNamed(name string) operationReady {
 	for _, op := range p.OperationsReady {
 		if op.Name() == name {
@@ -1271,8 +1046,6 @@ func (p *ProfileReady) opNamed(name string) operationReady {
 	return nil
 }
 
-// ExecOperation executes one prepared operation (per-op subcommands): same
-// log level and Selected() gating.
 func (p *ProfileReady) ExecOperation(ctx context.Context, op operationReady) error {
 	return p.withLogLevel(func() error {
 		if !op.Selected() {
@@ -1283,8 +1056,6 @@ func (p *ProfileReady) ExecOperation(ctx context.Context, op operationReady) err
 	})
 }
 
-// ExecOperationNamed executes the profile's operation named name (no-op if
-// the profile prepared none).
 func (p *ProfileReady) ExecOperationNamed(ctx context.Context, name string) error {
 	if slices.Contains(p.opts.SkipOps, name) {
 		p.emitSkip(log.Levels.Debug, "run", "run-op", name, p.skipOpsReason(name))
@@ -1298,8 +1069,6 @@ func (p *ProfileReady) ExecOperationNamed(ctx context.Context, name string) erro
 	return nil
 }
 
-// ExecRunScripts runs the profile's scripts filtered by name substrings,
-// returning how many matched.
 func (p *ProfileReady) ExecRunScripts(ctx context.Context, names []string) (int, error) {
 	if slices.Contains(p.opts.SkipOps, "run-scripts") {
 		p.emitSkip(log.Levels.Debug, "run", "run-op", "run-scripts", p.skipOpsReason("run-scripts"))
@@ -1344,25 +1113,15 @@ func filterScriptsByName(scripts, names []string) []string {
 
 // [>] 🤖🤖 operation parents
 
-// OperationReady is the shared resolved-operation parent: pure resolved data,
-// NO context field — the owning *ProfileReady is passed in at execution time.
 type OperationReady struct{}
 
-// operationReady is the one interface the heterogeneous ordered run list
-// forces: minimal, unexported. execOperation runs the op's logic against its
-// owning profile (the execution context).
 type operationReady interface {
 	execOperation(p *ProfileReady) error
 	Selected() bool
 	Name() string
-	// counts reports the op's discovery numbers against the owning profile:
-	// all os-mutating operations declared, delta of those that would change os
-	// state now.
 	counts(p *ProfileReady) (all, delta int)
 }
 
-// prepareOperations resolves each operation recipe's subjects against the
-// profile, returning the prepared operations in run order.
 func (p *ProfileReady) prepareOperations(ops spec.OperationRecipes) ([]operationReady, error) {
 	scripts, err := p.resolveScripts(ops.RunScripts.Scripts)
 	if err != nil {
@@ -1374,6 +1133,7 @@ func (p *ProfileReady) prepareOperations(ops spec.OperationRecipes) ([]operation
 		&MakeLinksOperationReady{Links: ops.MakeLinks.Links, Dirs: ops.MakeLinks.Dirs},
 		&MakeCopiesOperationReady{Copies: ops.MakeCopies.Copies, Dirs: ops.MakeCopies.Dirs},
 		&RenderTemplatesOperationReady{Templates: ops.RenderTemplates.Templates, SkipSecrets: p.opts.RenderSkipSecrets},
+		&InstallPackagesOperationReady{Packages: ops.InstallPackages.Packages},
 		&RunScriptsOperationReady{Scripts: scripts},
 	}, nil
 }
@@ -1382,8 +1142,6 @@ func (p *ProfileReady) prepareOperations(ops spec.OperationRecipes) ([]operation
 
 // [>] 🤖🤖 per-kind operations
 
-// PruneLinksOperationReady removes ledger-recorded link dests whose source is
-// gone. Selected when the profile manages links (declares prune-broken-links dirs).
 type PruneLinksOperationReady struct {
 	OperationReady
 	Dirs []string
@@ -1409,7 +1167,6 @@ func (o *PruneLinksOperationReady) counts(p *ProfileReady) (int, int) {
 	return len(links), broken
 }
 
-// MakeDirsOperationReady creates the profile's dirs (ancestors + makeDirs entries).
 type MakeDirsOperationReady struct {
 	OperationReady
 	Dirs []spec.FileItem
@@ -1434,7 +1191,6 @@ func (o *MakeDirsOperationReady) counts(p *ProfileReady) (int, int) {
 	return all, delta
 }
 
-// MakeLinksOperationReady symlinks configs into the system root.
 type MakeLinksOperationReady struct {
 	OperationReady
 	Links []spec.FileItem
@@ -1460,7 +1216,6 @@ func (o *MakeLinksOperationReady) counts(p *ProfileReady) (int, int) {
 	return all, delta
 }
 
-// MakeCopiesOperationReady copies *.ontoHost.cp sources onto their dests.
 type MakeCopiesOperationReady struct {
 	OperationReady
 	Copies []spec.FileItem
@@ -1487,8 +1242,6 @@ func (o *MakeCopiesOperationReady) counts(p *ProfileReady) (int, int) {
 	return all, delta
 }
 
-// RenderTemplatesOperationReady renders *.tpl sources; each dest path decides
-// the target (relative: repo, ~/ or absolute: host).
 type RenderTemplatesOperationReady struct {
 	OperationReady
 	Templates   []spec.FileItem
@@ -1505,7 +1258,21 @@ func (o *RenderTemplatesOperationReady) counts(p *ProfileReady) (int, int) {
 	return p.renderCounts(o.Templates)
 }
 
-// RunScriptsOperationReady runs the profile's scripts, absolute paths in run order.
+type InstallPackagesOperationReady struct {
+	OperationReady
+	Packages []string
+}
+
+func (o *InstallPackagesOperationReady) Name() string   { return "install-packages" }
+func (o *InstallPackagesOperationReady) Selected() bool { return len(o.Packages) > 0 }
+func (o *InstallPackagesOperationReady) execOperation(p *ProfileReady) error {
+	return p.installPackages(o.Packages)
+}
+
+func (o *InstallPackagesOperationReady) counts(_ *ProfileReady) (int, int) {
+	return len(o.Packages), len(o.Packages)
+}
+
 type RunScriptsOperationReady struct {
 	OperationReady
 	Scripts []string

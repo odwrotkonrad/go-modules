@@ -20,8 +20,6 @@ import (
 //go:embed all:testdata
 var td embed.FS
 
-// configDirs materializes user/system fixture refs as config dirs and points
-// yamlcfg.SystemDir at the system one (or an absent dir). Returns the user dir.
 func configDirs(t *testing.T, user, system string) string {
 	t.Helper()
 	sysDir := t.TempDir()

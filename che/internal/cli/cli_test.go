@@ -3,6 +3,7 @@ package cli
 // [>] 🤖🤖
 
 import (
+	"errors"
 	"os"
 	"path/filepath"
 	"strings"
@@ -14,12 +15,11 @@ import (
 
 	"gitlab.com/konradodwrot/go-modules/che/internal/che"
 	"gitlab.com/konradodwrot/go-modules/che/internal/options"
+	"gitlab.com/konradodwrot/go-modules/che/internal/packages"
 	"gitlab.com/konradodwrot/go-modules/che/internal/testutil"
 	"gitlab.com/konradodwrot/go-modules/lib/testyml"
 )
 
-// repoEnv: pwd fixture as a committed git repo plus on-disk HOME, fresh app
-// pointed at it.
 func repoEnv(t *testing.T, pwd string) (*app, *cobra.Command, string) {
 	t.Helper()
 	if os.Geteuid() == 0 {
@@ -41,16 +41,35 @@ func repoEnv(t *testing.T, pwd string) (*app, *cobra.Command, string) {
 	return a, root, home
 }
 
-// setupMock: safe doubles in every built Host, a.init() already run.
-func setupMock(t *testing.T, pwd, profile string, decl map[string]string) (*app, *cobra.Command, string) {
+func PackagesMockHost() packages.Host {
+	cmds := map[string]bool{"apt-get": true, "npm": true, "sha256sum": true, "jq": true, "curl": true}
+	return packages.Host{
+		OS: "linux", Arch: "amd64", ArchX: "x86_64", ArchG: "x86_64", Euid: 501,
+		LookPath: func(name string) (string, error) {
+			if cmds[name] {
+				return "/usr/bin/" + name, nil
+			}
+			return "", errors.New(name + " not found")
+		},
+		PathDirs: func() []string { return nil },
+		Getenv:   func(string) string { return "" },
+	}
+}
+
+func setupMock(t *testing.T, pwd, profile string, decl map[string]string, env map[string]string) (*app, *cobra.Command, string) {
 	t.Helper()
 	a, root, home := repoEnv(t, pwd)
-	t.Setenv("CHE_DRY_RUN", "")
+	if _, ok := env["CHE_DRY_RUN"]; !ok {
+		t.Setenv("CHE_DRY_RUN", "")
+	}
 	if profile != "" {
 		a.flags.Profiles = strings.Split(profile, ",")
 	}
 
 	m := testutil.ApplyMocks(t, decl)
+	if _, ok := decl["packages.Host"]; ok {
+		testyml.Swap(t, &che.NewPackagesHost, PackagesMockHost)
+	}
 	realSeams := che.NewSeams
 	testyml.Swap(t, &che.NewSeams, func(home string) che.Seams {
 		s := realSeams(home)

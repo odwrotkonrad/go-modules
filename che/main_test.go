@@ -15,7 +15,6 @@ import (
 //go:embed all:testdata
 var td embed.FS
 
-// cli.New().Root() wires every subcommand to root.
 func TestSubcommandsWired(t *testing.T) {
 	testyml.Run(t, td, "testdata/spec/funcs/subcommands.test.spec.yml", func(t *testing.T, c testyml.Case[[]string]) {
 		var got []string

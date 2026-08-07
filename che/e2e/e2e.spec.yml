@@ -484,4 +484,91 @@ testCases:
             - "${HOME}/plain"
         notExpected:
           files: *allProfilesAllFilesExists
+
+  - name: packages-e2e
+    context:
+      env:
+        PATH: "${FAKEBIN}:${FAKEBIN2}:${PATH}"
+        E2E_NPM_PREFIX: "${WORK}/npmprefix"
+    steps:
+      - name: SeedShadowedManagerBinary
+        write:
+          path: "${WORK}/npmprefix/bin/e2e-dup"
+          content: shadowed-manager-binary
+
+      - name: CheckPresentPassesForPresentCommand
+        command: che packages install --packages-file ${LOCAL}/packages.yml e2e-present
+        expected:
+          exitCode: 0
+        notExpected:
+          stdOut: ["missing e2e-present"]
+
+      - name: InstallWarnsMissingCommandAfterRun
+        command: che packages install --packages-file ${LOCAL}/packages.yml e2e-absent
+        expected:
+          exitCode: 0
+          stdOut:
+            - "installed e2e-absent via npm"
+            - "missing e2e-absent"
+
+      - name: InstallBinaryDownloadsVerifiesInstalls
+        command: che packages install --packages-file ${LOCAL}/packages.yml e2e-bin-new
+        expected:
+          exitCode: 0
+          stdOut:
+            - "installed e2e-bin-new via binary"
+
+      - name: InstallFailsOnManagerMissingPackage
+        command: che packages install --packages-file ${LOCAL}/packages.yml e2e-missing-pkg
+        expected:
+          exitCode: 1
+          stdOut:
+            - "npm install --global e2e-missing-pkg"
+
+      - name: InstallFailsOnWrongBinaryUrl
+        command: che packages install --packages-file ${LOCAL}/packages.yml e2e-bin-bad
+        expected:
+          exitCode: 1
+          stdOut:
+            - "curl"
+            - "e2e-bin-bad"
+        notExpected:
+          stdOut: ["installed e2e-bin-bad"]
+
+      - name: CheckPresentFailsOnAbsentCommand
+        command: che packages check-present --packages-file ${LOCAL}/packages.yml e2e-present e2e-absent
+        expected:
+          exitCode: 1
+          stdOut:
+            - "missing e2e-absent"
+        notExpected:
+          stdOut: ["missing e2e-present"]
+
+      - name: CheckUpgradableWarnsManagerAndBinaryDrift
+        command: che packages check-upgradable --packages-file ${LOCAL}/packages.yml
+        expected:
+          exitCode: 0
+          stdOut:
+            - "upgradable e2e-outdated via npm"
+            - "upgradable e2e-bin-old via binary: yaml pins 9.9.9"
+        notExpected:
+          stdOut: ["upgradable e2e-bin via binary"]
+
+      - name: CheckNotShadowedWarnsShadowedOnly
+        command: che packages check-not-shadowed --packages-file ${LOCAL}/packages.yml
+        expected:
+          exitCode: 0
+          stdOut:
+            - "e2e-dup shadowed by ${FAKEBIN}/e2e-dup (expected ${WORK}/npmprefix/bin/e2e-dup)"
+        notExpected:
+          stdOut: ["e2e-present shadowed"]
+
+      - name: CheckSinglePresentWarnsDuplicatesOnly
+        command: che packages check-single-present --packages-file ${LOCAL}/packages.yml
+        expected:
+          exitCode: 0
+          stdOut:
+            - "multiple present e2e-dup: ${FAKEBIN}/e2e-dup, ${FAKEBIN2}/e2e-dup"
+        notExpected:
+          stdOut: ["multiple present e2e-present"]
 ##[<] 🤖🤖

@@ -1,12 +1,9 @@
-// Package lib expands term-open-files-with.yml openers against cached GitHub-linguist language data into suffix-alias lines.
 package lib
 
 // [>] 🤖🤖
 
 import "strings"
 
-// appendAliases folds one section's rules into aliases (last rule wins),
-// returning order extended with each first-seen extension.
 func appendAliases(order []string, aliases map[string]string, rules []OpenerRule, byType map[string][]string) []string {
 	for _, rule := range rules {
 		if rule.Opener == "" {

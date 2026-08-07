@@ -51,19 +51,15 @@ func TestResolveSkipOps(t *testing.T) {
 	})
 }
 
-// settingsWant is the resolve_settings expected.output shape.
 type settingsWant struct {
 	Delta       string   `yaml:"delta"`
 	AllContains []string `yaml:"allContains"`
 }
 
-// settingsFlags decodes the case's flags arg into flag-layer option fields.
 type settingsFlags struct {
 	DryRun string `yaml:"dryRun"`
 }
 
-// TestResolveSettings: Resolve records every option's value + deciding source;
-// SettingsDelta keeps only the non-default ones.
 func TestResolveSettings(t *testing.T) {
 	testyml.Run(t, td, "testdata/spec/funcs/resolve_settings.test.spec.yml", func(t *testing.T, c testyml.Case[settingsWant]) {
 		var flags settingsFlags
@@ -84,10 +80,6 @@ func TestResolveSettings(t *testing.T) {
 	})
 }
 
-// TestSettingsDisplay: config show labeling + sorting. An unset default shows
-// "unset"; a source that set an option (even to its default value) shows the
-// source and sorts with the changed options, ahead of the unset defaults, both
-// groups in config order.
 func TestSettingsDisplay(t *testing.T) {
 	o := &Options{LogLevel: "info"} // [why] --log-level info: cliFlag set to the default value
 	env := func(k string) string {
@@ -110,7 +102,6 @@ func TestSettingsDisplay(t *testing.T) {
 
 	sorted := o.SettingsSorted()
 	require.Len(t, sorted, len(o.Settings), "sorted holds every setting once")
-	// changed group first, in config order; then unset, in config order.
 	firstUnset := -1
 	for i, s := range sorted {
 		if !s.IsChanged() {
@@ -129,8 +120,6 @@ func TestSettingsDisplay(t *testing.T) {
 	assert.True(t, configOrderPreserved(o.Settings, sorted[firstUnset:]), "unset group keeps config order")
 }
 
-// configOrderPreserved reports whether subset appears in the same relative
-// order as in the full Resolve-order settings list.
 func configOrderPreserved(full, subset []Setting) bool {
 	idx := map[string]int{}
 	for i, s := range full {

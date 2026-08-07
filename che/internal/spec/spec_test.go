@@ -37,8 +37,6 @@ type refWant struct {
 	Env     map[string]string `yaml:"env"`
 }
 
-// wantSet is make_profile's domain projection set, carried inside
-// expected/notExpected/contains (the canonical schema's one exception).
 type wantSet struct {
 	testyml.Expected[struct{}] `yaml:",inline"`
 
@@ -56,7 +54,6 @@ type wantSet struct {
 	Refs          []refWant                    `yaml:"refs"`
 }
 
-// makeProfileCase is make_profile's spec case: the canonical shape plus contains.
 type makeProfileCase struct {
 	Name        string          `yaml:"name"`
 	Context     testyml.Context `yaml:"context"`
@@ -82,8 +79,6 @@ func destPaths(item FileItem) []string {
 	return out
 }
 
-// extraDirs picks the mkdirs entries out of the merged MakeDirs list (the
-// ancestor items carry no Dests).
 func extraDirs(ops OperationRecipes) []FileItem {
 	var out []FileItem
 	for _, it := range ops.MakeDirs.Dirs {
@@ -224,8 +219,6 @@ func assertMembership(t *testing.T, ops OperationRecipes, w *wantSet, present bo
 	}
 }
 
-// loadAndMake loads dir's che.yml, anchors every recipe at dir, and resolves
-// the named profile.
 func loadAndMake(dir, profile string) (OperationRecipes, []ProfileSourceRecipe, error) {
 	d, err := Load(filepath.Join(dir, "che.yml"))
 	if err != nil {

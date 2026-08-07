@@ -14,20 +14,10 @@ import (
 	"gitlab.com/konradodwrot/go-modules/che/internal/spec"
 )
 
-// resolveArchivePath resolves a fresh backup archive path for this profile:
-// backups/<profile-slug>/<op>/<runTs>-<backupID>.tar.bz2, each archive minted
-// its own 12-char base36 backup id (the restore --backup-id selector).
 func (p *ProfileReady) resolveArchivePath(op string) string {
 	return fsutil.ResolveBackupArchivePath(p.home, fsutil.SlugRef(p.ref), op, p.runTs, newID())
 }
 
-// archiveBefore snapshots every existing dest into one per-run .tar.bz2 under
-// the XDG backups dir before a mutating op runs (sub = op identity). The archive
-// path/sub are stashed on the profile so the op's following mutate calls
-// reference this run's Backup row. The filename carries the run's shared
-// TsLayout stamp plus a per-archive backup id. Under `run` the backup stage already
-// archived every op dest (spec/che/backup.md): the op skips its own
-// archive and points its records at the stage archive.
 func (p *ProfileReady) archiveBefore(sub string, dests []string) error {
 	if p.backedUp {
 		p.currentArchive = p.backupArchive // [why] "" when the stage archived nothing: records carry no backup ref
@@ -40,9 +30,6 @@ func (p *ProfileReady) archiveBefore(sub string, dests []string) error {
 	return p.mutate("backup", "create", path, "", opInfo{}, func() error { return p.FS.ArchiveDestinations(path, dests) })
 }
 
-// backupDests lists the dests the profile's file ops WOULD CHANGE (unsettled
-// links, differing copies, differing renders), run order: only they need a
-// pre-mutation snapshot, settled dests are untouched.
 func (p *ProfileReady) backupDests() []string {
 	var out []string
 	for _, op := range p.commandOps("backup") {
@@ -78,7 +65,6 @@ func (p *ProfileReady) backupDests() []string {
 	return out
 }
 
-// existingDests counts the dests currently present on the host.
 func (p *ProfileReady) existingDests(dests []string) int {
 	n := 0
 	for _, dest := range dests {
@@ -89,11 +75,6 @@ func (p *ProfileReady) existingDests(dests []string) int {
 	return n
 }
 
-// ExecBackup archives every existing would-change dest into one per-run backup
-// archive and marks the profile backed up, so the following ops skip their own
-// archives. The showDelta line always logs (spec/che/backup.md);
-// the created line reports the written archive with its size, nothing to back
-// up writes and logs nothing more.
 func (p *ProfileReady) ExecBackup() error { return p.execBackup(p.backupDests()) }
 
 func (p *ProfileReady) execBackup(dests []string) error {
@@ -114,7 +95,6 @@ func (p *ProfileReady) execBackup(dests []string) error {
 		return err
 	}
 	// [why] the standalone archive carries no op records, so its ledger Backup
-	// row is written here (backup ls / restore select it).
 	if _, err := p.Ledger.EnsureBackup(p.specDone, path, "backup"); err != nil {
 		log.EmitTrace("ledger", "error", "ensure backup: "+err.Error())
 	}
@@ -123,8 +103,6 @@ func (p *ProfileReady) execBackup(dests []string) error {
 	return nil
 }
 
-// archiveSize is the written archive's size in bytes (0 when unreadable, e.g.
-// record-only test writers).
 func archiveSize(path string) int64 {
 	fi, err := os.Stat(path)
 	if err != nil {
@@ -133,7 +111,6 @@ func archiveSize(path string) int64 {
 	return fi.Size()
 }
 
-// humanSize renders bytes human-readable (B/KB/MB, one decimal above KB).
 func humanSize(n int64) string {
 	switch {
 	case n >= 1<<20:
@@ -144,22 +121,15 @@ func humanSize(n int64) string {
 	return fmt.Sprintf("%dB", n)
 }
 
-// ExecBackupStage is ExecBackup as the run sequence's backup stage: announced
-// and nested like the other wrapped ops (execBackup owns the op heading).
 func (p *ProfileReady) ExecBackupStage() error {
 	return p.execBackup(p.backupDests())
 }
 
-// failItem logs "fail <dest>: <err>" at error level and returns err, the
-// per-item continue-on-error hook: ops collect these and errors.Join at the end.
 func (p *ProfileReady) failItem(op, dest string, err error) error {
 	p.emit(log.Levels.Error, op, "fail", dest+": "+err.Error())
 	return err
 }
 
-// makeDirs creates the profile's dirs, one list: items without Dests are
-// repo-tree ancestor dirs (path in Rel, parents first, umask mode), items with
-// Dests are makeDirs extra-dirs (perms applied, -p).
 func (p *ProfileReady) makeDirs(dirs []spec.FileItem) error {
 	var errs []error
 	for _, item := range dirs {
@@ -200,9 +170,6 @@ func (p *ProfileReady) ensureConfigDir(relativePath string) error {
 	return nil
 }
 
-// makeExtraDir creates one extra-dir with -p. Owner applied via chown (not mkdir
-// -u). Mode 0 -> umask. Set-bits (>0777) reapplied via chmod since mkdir -m may
-// drop them.
 func (p *ProfileReady) makeExtraDir(item spec.FileItem, dest string) error {
 	mode, _ := fsutil.ParseMode(item.Chmod)
 	err := p.mutate("make-dirs", "create", dest, dest, opInfo{kind: "dir", mode: item.Chmod}, func() error { return p.FS.MakeDir(dest, mode, true) })
@@ -233,11 +200,6 @@ func (p *ProfileReady) chownIfSet(scope string, item spec.FileItem, dest string)
 	return nil
 }
 
-// fixPerms applies spec mode/owner to an existing dest when they drift, labeling
-// the fixes with the owning op ("<op>(chmod)" / "<op>(chown)"). In dry-run=delta
-// these lines report the drift; off they correct it. A settled dest (no drift)
-// emits nothing, except under dry-run=all, where the already-set state logs
-// (spec/che/log.md).
 func (p *ProfileReady) fixPerms(op, dest string, item spec.FileItem) error {
 	needChmod, needChown := fsutil.DetectPermsDrift(p.Reader, dest, item.Chmod, formatOwnerSpec(item))
 	if needChmod {
@@ -258,9 +220,6 @@ func (p *ProfileReady) fixPerms(op, dest string, item spec.FileItem) error {
 	return nil
 }
 
-// runFileOp is the shared shape of the archiving file ops: ensure config dirs,
-// archive every dest upfront (failure aborts), settle each item/dest pair, then
-// ledger-sweep any prior dest of kind this profile no longer produces.
 func (p *ProfileReady) runFileOp(archiveSub, failOp, kind string, dirRelativePaths []string, items []spec.FileItem,
 	destsOf func(spec.FileItem) []string, settle func(spec.FileItem, string) error,
 ) error {
@@ -288,15 +247,11 @@ func (p *ProfileReady) runFileOp(archiveSub, failOp, kind string, dirRelativePat
 	return errors.Join(errs...)
 }
 
-// makeLinks symlinks each config into its live dest (ln -fhs), archiving existing
-// dests upfront, skipping links already pointing into the repo.
 func (p *ProfileReady) makeLinks(links []spec.FileItem, dirRelativePaths []string) error {
 	return p.runFileOp("make-links", "make-links", "link", dirRelativePaths, links,
 		p.resolveLinkDests, p.makeLink)
 }
 
-// resolveLinkDests returns the explicit dests (~/ resolved), else the derived
-// dest (rewritten Dests[0] when a dest rule applied, else the source rel).
 func (p *ProfileReady) resolveLinkDests(item spec.FileItem) []string {
 	if len(item.Dests) == 0 || item.Derived {
 		return []string{p.toDest(spec.DestRel(item))}
@@ -319,9 +274,6 @@ func (p *ProfileReady) makeLink(item spec.FileItem, dest string) error {
 	return p.mutate("make-links", "create", dest, dest, opInfo{kind: "link", target: src, srcRel: item.Rel}, func() error { return p.FS.MakeSymlink(src, dest) })
 }
 
-// makeCopies copies each *.ontoHost.cp to its dest(s) (marker stripped, or explicit
-// dest) when contents differ, archiving existing dests upfront, applying spec
-// perms (else default).
 func (p *ProfileReady) makeCopies(copies []spec.FileItem, dirRelativePaths []string) error {
 	return p.runFileOp("make-copies", "make-copies", "copy", dirRelativePaths, copies, p.resolveCopyDests, p.makeCopy)
 }
@@ -342,12 +294,11 @@ func (p *ProfileReady) makeCopy(item spec.FileItem, dest string) error {
 	return p.chownIfSet("make-copies", item, dest)
 }
 
-// resolveCopyDests returns the explicit dests (~/ resolved), else the marker-stripped derived dest.
 func (p *ProfileReady) resolveCopyDests(item spec.FileItem) []string {
 	if len(item.Dests) == 0 {
 		return []string{p.toDest(strings.TrimSuffix(item.Rel, spec.CpExt))}
 	}
-	if item.Derived { // glob dest rewrite: derived dest through the host mapping
+	if item.Derived {
 		return []string{p.toDest(item.Dests[0].Path)}
 	}
 	out := make([]string, len(item.Dests))
@@ -357,7 +308,6 @@ func (p *ProfileReady) resolveCopyDests(item spec.FileItem) []string {
 	return out
 }
 
-// formatOwnerSpec combines owner + owner-group into "owner:group" for fs.Chown ("" -> no chown).
 func formatOwnerSpec(item spec.FileItem) string {
 	if item.Owner == "" {
 		return ""
@@ -368,8 +318,6 @@ func formatOwnerSpec(item spec.FileItem) string {
 	return item.Owner + ":" + item.OwnerGroup
 }
 
-// installedLinks lists the link dests the ledger recorded for this profile.
-// Records-off (nil ledger) -> empty.
 func (p *ProfileReady) installedLinks() ([]database.OperationDone, error) {
 	if p.Ledger == nil || p.profileDone == nil {
 		return nil, nil
@@ -387,8 +335,6 @@ func (p *ProfileReady) installedLinks() ([]database.OperationDone, error) {
 	return links, nil
 }
 
-// scanBrokenLinks lists the recorded links whose source (repo file the symlink
-// points at) no longer exists.
 func (p *ProfileReady) scanBrokenLinks() ([]database.OperationDone, error) {
 	links, err := p.installedLinks()
 	if err != nil {
@@ -403,9 +349,6 @@ func (p *ProfileReady) scanBrokenLinks() ([]database.OperationDone, error) {
 	return broken, nil
 }
 
-// pruneBrokenLinks removes link dests the ledger recorded for this profile whose
-// source (repo file the symlink points at) no longer exists — the ledger, not
-// git, is the source of truth. dry-run / records-off -> nothing pruned.
 func (p *ProfileReady) pruneBrokenLinks() error {
 	if p.Ledger == nil || p.profileDone == nil || p.isDryRun() {
 		return nil
@@ -423,8 +366,6 @@ func (p *ProfileReady) pruneBrokenLinks() error {
 	return errors.Join(errs...)
 }
 
-// linkSourcePresent reports whether a recorded link op's source (the symlink
-// target it was created with) still exists on disk.
 func (p *ProfileReady) linkSourcePresent(op database.OperationDone) bool {
 	if op.Target == "" {
 		return true // [why] no recorded source: leave it, only prune known-gone

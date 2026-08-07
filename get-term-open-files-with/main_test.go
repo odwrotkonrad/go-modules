@@ -27,7 +27,6 @@ func languagesFixture(t *testing.T) string {
 	return testyml.ReadFile(t, td, "testdata/fixture/common/languages.yml")
 }
 
-// configDir writes raw as the user config (system dir absent), returns the dir.
 func configDir(t *testing.T, raw string) string {
 	t.Helper()
 	testyml.Swap(t, &yamlcfg.SystemDir, filepath.Join(t.TempDir(), "no-system"))

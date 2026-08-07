@@ -15,7 +15,7 @@ sourced profile refs included).
 | `--log-level` | `CHE_LOG_LEVEL` | `error (failures only)` \| `warn` \| `info (what happened)` \| `debug (adds intentions and won't-happen with reasons)` \| `trace (adds details)` | `info` | human-log level |
 | `--profile-working-directory` | `CHE_PROFILE_WORKING_DIRECTORY` | `string` |  | the load-ops source tree (che level; spec/profile options.profileWorkingDirectory override); default root |
 | `--profiles` | `CHE_PROFILE (comma-separated)` | `stringSlice` | `[]` | run only these profiles (comma-separated or repeated; autoDiscover skipped, runIf still enforced) |
-| `--skip-ops` | `CHE_SKIP_OPS` | `prune-broken-links` \| `make-dirs` \| `make-links` \| `make-copies` \| `render-templates` \| `run-scripts` | `[]` | skip these ops everywhere (comma-separated or repeated; dropped from the run sequence, direct op subcommands become logged no-ops) |
+| `--skip-ops` | `CHE_SKIP_OPS` | `prune-broken-links` \| `make-dirs` \| `make-links` \| `make-copies` \| `render-templates` \| `install-packages` \| `run-scripts` | `[]` | skip these ops everywhere (comma-separated or repeated; dropped from the run sequence, direct op subcommands become logged no-ops) |
 | `--skip-remote-refs` | `CHE_SKIP_REMOTE_REFS` | `bool` | `false` | skip sourced include.profiles refs, load only the local repo's specs |
 | `--skip-run-if` | `CHE_SKIP_RUN_IF` | `bool` | `false` | treat every runIf predicate as passing |
 | `--validate-spec` | `CHE_VALIDATE_SPEC` | `warn (log violations)` \| `error (abort on violations)` | `warn` | validate each loaded che.yml spec against the JSON Schema |
@@ -186,6 +186,45 @@ create repo-tree dirs + extra-dirs.
 
 symlink op (configs into system root).
 
+### `$ che packages`
+
+install packages from packages.yml and check their state.
+
+| Option | Env | Values | Default | Description |
+| --- | --- | --- | --- | --- |
+| `--packages-file` | `CHE_PACKAGES_FILE` | `string` | `$XDG_CONFIG_HOME/packages/packages.yml` | packages.yml path |
+| `--packages-override` | `CHE_PACKAGES_OVERRIDE` | `string` | `$XDG_CONFIG_HOME/che/packages-override.yml if present` | override packages file (same-name entries replace, new names append) |
+| `--preferred-methods` | `CHE_PACKAGES_PREFERRED_METHODS` | `brew` \| `cask` \| `apt` \| `npm` \| `go` \| `gem` \| `binary` \| `script` \| `pkg` \| `code` | `[]` | installation-method preference order (comma-separated or repeated): listed managers try first within each package entry, unlisted follow in entry order |
+
+### `$ che packages check-not-shadowed`
+
+warn when a package's manager-expected binary is not the first PATH hit.
+
+### `$ che packages check-present`
+
+check the canonical commands resolve on PATH (errors on any missing).
+
+Usage: `che packages check-present [pkg...]`
+
+### `$ che packages check-single-present`
+
+warn when a canonical command resolves in more than one PATH dir, listing every location.
+
+### `$ che packages check-upgradable`
+
+warn on manager-reported outdated packages and binary pins drifted from --version output.
+
+### `$ che packages install`
+
+install packages by canonical name (no args: every resolved profile's include.installPackages).
+
+Usage: `che packages install [pkg...] [flags]`
+
+| Option | Env | Values | Default | Description |
+| --- | --- | --- | --- | --- |
+| `--if-missing` |  | `bool` | `false` | skip packages whose canonical command exists anywhere on PATH, regardless of manager |
+| `--update` |  | `bool` | `false` | refresh installed unpinned packages via their manager; pinned ones converge on the pin regardless |
+
 ### `$ che prune-broken-links`
 
 delete broken symlinks.
@@ -204,7 +243,7 @@ run every op each profile selects, profile by profile.
 
 | Option | Env | Values | Default | Description |
 | --- | --- | --- | --- | --- |
-| `--skip-ops` | `CHE_RUN_SKIP_OPS` | `prune-broken-links` \| `make-dirs` \| `make-links` \| `make-copies` \| `render-templates` \| `run-scripts` | `[]` | skip these ops in the run sequence only (comma-separated or repeated) |
+| `--skip-ops` | `CHE_RUN_SKIP_OPS` | `prune-broken-links` \| `make-dirs` \| `make-links` \| `make-copies` \| `render-templates` \| `install-packages` \| `run-scripts` | `[]` | skip these ops in the run sequence only (comma-separated or repeated) |
 
 ### `$ che run-scripts`
 

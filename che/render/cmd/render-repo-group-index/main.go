@@ -1,4 +1,3 @@
-// Render-repo-group-index generates a subgroup's repo index: dir structure with each repo's purpose doc inlined.
 package main
 
 // [>] 🤖🤖

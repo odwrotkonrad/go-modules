@@ -1,0 +1,4 @@
+#!/bin/sh
+##[>] 🤖🤖
+echo "e2e-bin version 9.9.9"
+##[<] 🤖🤖

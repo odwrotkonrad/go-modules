@@ -1,7 +1,3 @@
-// Package database persists every OS-mutating operation che performs into a
-// GORM-backed SQLite store (pure-Go glebarez driver, no CGO), so che can answer
-// "what is installed onto this host" and back it out (che uninstall) or prune
-// stale dests it no longer produces.
 package database
 
 // [>] 🤖🤖
@@ -18,16 +14,14 @@ import (
 
 // [>] 🤖🤖 models
 
-// SpecDone is one recorded che invocation (the root resolved spec of a run).
 type SpecDone struct {
 	ID            uint   `gorm:"primaryKey"`
-	RunID         string `gorm:"index"` // 12-char base36 per-run id, unique per invocation
+	RunID         string `gorm:"index"`
 	CreatedAt     time.Time
 	DefinitionURI string
 	Command       string
 }
 
-// ProfileDone is one profile resolved+run within a SpecDone (FK -> SpecDone).
 type ProfileDone struct {
 	ID            uint `gorm:"primaryKey"`
 	SpecDoneID    uint `gorm:"index"`
@@ -38,9 +32,6 @@ type ProfileDone struct {
 	DirectoryPath string
 }
 
-// OperationDone is the smallest unit of installation: one dest mutation. Kind
-// discriminates the op; kind-specific data rides in the nullable Target/SrcRel/
-// Mode/Owner columns (only the ones that kind uses are set).
 type OperationDone struct {
 	ID            uint `gorm:"primaryKey"`
 	ProfileDoneID uint `gorm:"index"`
@@ -56,12 +47,9 @@ type OperationDone struct {
 	Next          Object `gorm:"embedded;embeddedPrefix:next_"`
 	BackupID      *uint  `gorm:"index"`
 	Backup        *Backup
-	// ProfileRef is the owning profile's ref, populated by Installed's join
-	// (read-only projection; not a stored column).
-	ProfileRef string `gorm:"->;column:profile_ref"`
+	ProfileRef    string `gorm:"->;column:profile_ref"`
 }
 
-// Object is a dest's classified state, embedded twice (prev/next) on OperationDone.
 type Object struct {
 	Kind    string
 	Present bool
@@ -69,26 +57,19 @@ type Object struct {
 	Mode    string
 }
 
-// Backup is one per-run archive, FK'd to the SpecDone run it belongs to; many
-// OperationDone reference it. Deduped by Path.
 type Backup struct {
 	ID         uint `gorm:"primaryKey"`
 	SpecDoneID uint `gorm:"index"`
 	CreatedAt  time.Time
 	Path       string `gorm:"uniqueIndex"`
 	Sub        string
-	// RunID is the owning run's id, populated by Backups' join (read-only
-	// projection; not a stored column).
-	RunID string `gorm:"->;column:run_id"`
+	RunID      string `gorm:"->;column:run_id"`
 }
 
 // [<] 🤖🤖 models
 
-// DB is the ledger's GORM handle.
 type DB struct{ gorm *gorm.DB }
 
-// Open opens (creating if absent) the ledger DB at path over the pure-Go
-// glebarez sqlite driver, silences GORM's logger, and AutoMigrates the models.
 func Open(path string) (*DB, error) {
 	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
 		return nil, err
@@ -103,7 +84,6 @@ func Open(path string) (*DB, error) {
 	return &DB{gorm: g}, nil
 }
 
-// StartSpec records one che invocation (nil DB -> nil row, records nothing).
 func (d *DB) StartSpec(runID, uri, command string) (*SpecDone, error) {
 	if d == nil {
 		return nil, nil
@@ -115,7 +95,6 @@ func (d *DB) StartSpec(runID, uri, command string) (*SpecDone, error) {
 	return s, nil
 }
 
-// StartProfile records one profile run under spec (nil DB/spec -> nil row).
 func (d *DB) StartProfile(spec *SpecDone, ref, name, uri, dir string) (*ProfileDone, error) {
 	if d == nil || spec == nil {
 		return nil, nil
@@ -127,8 +106,6 @@ func (d *DB) StartProfile(spec *SpecDone, ref, name, uri, dir string) (*ProfileD
 	return p, nil
 }
 
-// EnsureBackup find-or-creates the Backup row for archive path under spec's run
-// (dedup: one row per archive). nil DB/spec/empty path -> nil row.
 func (d *DB) EnsureBackup(spec *SpecDone, path, sub string) (*Backup, error) {
 	if d == nil || spec == nil || path == "" {
 		return nil, nil
@@ -140,7 +117,6 @@ func (d *DB) EnsureBackup(spec *SpecDone, path, sub string) (*Backup, error) {
 	return b, nil
 }
 
-// RecordOperation sets the profile FK and writes op (nil DB/prof -> no-op).
 func (d *DB) RecordOperation(prof *ProfileDone, op OperationDone) error {
 	if d == nil || prof == nil {
 		return nil
@@ -149,20 +125,14 @@ func (d *DB) RecordOperation(prof *ProfileDone, op OperationDone) error {
 	return d.gorm.Create(&op).Error
 }
 
-// Installed returns the latest OperationDone per dest whose op_type != remove
-// (the current installed set), newest-first, Backup preloaded. nil DB -> nil.
 func (d *DB) Installed() ([]OperationDone, error) {
 	return d.installedWhere("")
 }
 
-// InstalledForProfile is Installed scoped to one profile ref (per-profile prune
-// stale set).
 func (d *DB) InstalledForProfile(ref string) ([]OperationDone, error) {
 	return d.installedWhere(ref)
 }
 
-// installedWhere returns the newest non-remove OperationDone per dest, optionally
-// filtered to one profile ref via the ProfileDone join.
 func (d *DB) installedWhere(ref string) ([]OperationDone, error) {
 	if d == nil {
 		return nil, nil
@@ -185,8 +155,6 @@ func (d *DB) installedWhere(ref string) ([]OperationDone, error) {
 	return ops, err
 }
 
-// Backups lists every backup archive row with its run's id projected, newest
-// first (backup ls). nil DB -> nil.
 func (d *DB) Backups() ([]Backup, error) {
 	if d == nil {
 		return nil, nil
@@ -200,9 +168,6 @@ func (d *DB) Backups() ([]Backup, error) {
 	return out, err
 }
 
-// LatestOps returns the newest OperationDone per dest, removes included, with
-// the owning profile's ref projected: the last recorded state of every dest che
-// ever touched (the restore drift guard + grouping). nil DB -> nil.
 func (d *DB) LatestOps() ([]OperationDone, error) {
 	if d == nil {
 		return nil, nil
@@ -220,7 +185,6 @@ func (d *DB) LatestOps() ([]OperationDone, error) {
 	return ops, err
 }
 
-// Close closes the underlying sql.DB (nil DB -> no-op).
 func (d *DB) Close() error {
 	if d == nil {
 		return nil

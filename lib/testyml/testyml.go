@@ -1,4 +1,3 @@
-// Package testyml runs <unit>.spec.yml table specs from embedded testdata and materializes fixture trees.
 package testyml
 
 // [>] 🤖🤖
@@ -19,7 +18,6 @@ import (
 	"gitlab.com/konradodwrot/go-modules/lib/yamlcfg"
 )
 
-// CommandArgs returns the context command's argv past the binary name.
 func (c Context) CommandArgs() []string {
 	f := strings.Fields(c.Command)
 	if len(f) <= 1 {
@@ -45,7 +43,6 @@ func (a *Args) UnmarshalYAML(node *yaml.Node) error {
 	return nil
 }
 
-// Name returns argument i's declared name ("" when bare or absent).
 func (a Args) Name(i int) string {
 	if i >= len(a) {
 		return ""
@@ -53,7 +50,6 @@ func (a Args) Name(i int) string {
 	return a[i].name
 }
 
-// To decodes argument i into out, absent arguments leave out untouched.
 func (a Args) To(t *testing.T, i int, out any) {
 	t.Helper()
 	if i >= len(a) {
@@ -90,14 +86,10 @@ func (a Args) Strings(t *testing.T, i int) []string {
 	return v
 }
 
-// IsErrorWanted: non-zero exitCode or error matchers (errorOutput/stdErr).
-// A bare "expect any error" is not expressible.
 func (e Expected[W]) IsErrorWanted() bool {
 	return e.ExitCode != 0 || len(e.ErrorOutput) > 0 || len(e.StdErr) > 0
 }
 
-// Check runs the error ladder, returning true when the case is done (error
-// wanted and asserted).
 func (e Expected[W]) Check(t *testing.T, err error) bool {
 	t.Helper()
 	if !e.IsErrorWanted() {
@@ -116,7 +108,6 @@ func (e Expected[W]) Check(t *testing.T, err error) bool {
 	return true
 }
 
-// Eq runs a function spec: context env, error ladder, expected.output equality.
 func Eq[W any](t *testing.T, fsys fs.FS, path string, fn func(t *testing.T, c Case[W]) (W, error)) {
 	t.Helper()
 	Run(t, fsys, path, func(t *testing.T, c Case[W]) {
@@ -131,7 +122,6 @@ func Eq[W any](t *testing.T, fsys fs.FS, path string, fn func(t *testing.T, c Ca
 	})
 }
 
-// Swap sets *ptr for the test, restoring the previous value on cleanup.
 func Swap[T any](t testing.TB, ptr *T, v T) {
 	t.Helper()
 	prev := *ptr
@@ -174,13 +164,10 @@ func compileMatcher(matcher string) *regexp.Regexp {
 	return regexp.MustCompile(matcherPattern(matcher))
 }
 
-// IsMatch reports whether s matches the literal-with-holes matcher.
 func IsMatch(s, matcher string) bool {
 	return compileMatcher(matcher).MatchString(s)
 }
 
-// IsMatchFull reports whether s wholly matches (anchored) the
-// literal-with-holes matcher.
 func IsMatchFull(s, matcher string) bool {
 	return regexp.MustCompile(`\A` + matcherPattern(matcher) + `\z`).MatchString(s)
 }
@@ -199,7 +186,6 @@ func MustNotMatch(t *testing.T, s, matcher string) {
 	}
 }
 
-// MustCount asserts s contains substr (literal) exactly n times.
 func MustCount(t *testing.T, s, substr string, n int) {
 	t.Helper()
 	if got := strings.Count(s, substr); got != n {
@@ -207,8 +193,6 @@ func MustCount(t *testing.T, s, substr string, n int) {
 	}
 }
 
-// Run decodes path's spec file ({context?, cases}), strict-decodes each case
-// into C, runs fn per case as a named subtest.
 func Run[C any](t *testing.T, fsys fs.FS, path string, fn func(t *testing.T, c C)) {
 	t.Helper()
 	if !strings.HasSuffix(path, ".test.spec.yml") {
@@ -236,14 +220,12 @@ func Run[C any](t *testing.T, fsys fs.FS, path string, fn func(t *testing.T, c C
 	}
 }
 
-// StrictDecode decodes raw YAML into out, rejecting unknown fields.
 func StrictDecode(raw []byte, out any) error {
 	dec := yaml.NewDecoder(bytes.NewReader(raw))
 	dec.KnownFields(true)
 	return dec.Decode(out)
 }
 
-// StrictDecodeNode re-encodes node and strict-decodes it into out.
 func StrictDecodeNode(node *yaml.Node, out any) error {
 	enc, err := yaml.Marshal(node)
 	if err != nil {
@@ -351,7 +333,6 @@ func setMapValue(m *yaml.Node, key string, val *yaml.Node) {
 		&yaml.Node{Kind: yaml.ScalarNode, Value: key}, val)
 }
 
-// Expand replaces ${VAR} holes in s from vars.
 func Expand(s string, vars map[string]string) string {
 	for k, v := range vars {
 		s = strings.ReplaceAll(s, "${"+k+"}", v)

@@ -15,8 +15,6 @@ import (
 	"gitlab.com/konradodwrot/go-modules/che/render/render"
 )
 
-// renderCachePath is a dest's stored mock-render hash file:
-// $XDG_STATE_HOME/che/render-cache/<sha256(dest)>, most recent hash only.
 func (p *ProfileReady) renderCachePath(dest string) string {
 	return filepath.Join(fsutil.ResolveStateHome(p.home), "render-cache", hashHex([]byte(dest)))
 }
@@ -42,13 +40,6 @@ func (p *ProfileReady) writeRenderHash(dest, hash string) {
 	_ = os.WriteFile(path, []byte(hash+"\n"), 0o644)
 }
 
-// renderSettled maps each of the item's dest paths to whether a render would
-// leave it unchanged, the render-delta signal. Secret-free templates compare
-// the mock render's composed output against the dest's current bytes (exact:
-// mock == real without secrets); secret-bearing templates compare the
-// mock-render hash against the cache ([why] mock values differ from resolved
-// ones, content comparison would always differ). A failing read or mock render
-// marks every dest unsettled.
 func (p *ProfileReady) renderSettled(item spec.FileItem) map[string]bool {
 	dests := p.resolveTemplateDests(item)
 	settled := make(map[string]bool, len(dests))
@@ -77,8 +68,6 @@ func (p *ProfileReady) renderSettled(item spec.FileItem) map[string]bool {
 	return settled
 }
 
-// renderCounts is the render-templates discovery numbers: all counts every
-// resolved dest, delta the unsettled ones (renderSettled).
 func (p *ProfileReady) renderCounts(templates []spec.FileItem) (int, int) {
 	all, delta := 0, 0
 	for _, item := range templates {
@@ -92,9 +81,6 @@ func (p *ProfileReady) renderCounts(templates []spec.FileItem) (int, int) {
 	return all, delta
 }
 
-// storeRenderHashes refreshes the render-delta cache after a real render: the
-// mock-render hash of src (mock re-render only when secrets are present, else
-// the rendered body hashes directly), written per dest.
 func (p *ProfileReady) storeRenderHashes(item spec.FileItem, dests []tmplDest, tmplPath string, src, body []byte) {
 	hash := hashHex(body)
 	if render.IsSecretRefPresent(src) {

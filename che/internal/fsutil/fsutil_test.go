@@ -54,9 +54,6 @@ func TestUnderHome(t *testing.T) {
 	})
 }
 
-// TestResolveHomes: each XDG base resolver honors CHE override (che's base
-// directly), else XDG base + /che, else the POSIX ~/<default>/che fallback.
-// context.env sets the envs; home is fixed at /h.
 func TestResolveHomes(t *testing.T) {
 	for spec, fn := range map[string]func(string) string{
 		"testdata/spec/funcs/resolve_cache_home.test.spec.yml":  ResolveCacheHome,
@@ -75,8 +72,6 @@ func TestExpandAll(t *testing.T) {
 	})
 }
 
-// TestTrackedFiles: subtree filtering, untracked exclusion, and go-git index
-// parity for the mock root/ tree shapes (hidden files, .gitkeep, markers, nesting).
 func TestTrackedFiles(t *testing.T) {
 	testyml.Eq(t, td, "testdata/spec/funcs/tracked_files.test.spec.yml", func(t *testing.T, c testyml.Case[[]string]) ([]string, error) {
 		dir := testutil.Repo(t, map[string]string{
@@ -106,15 +101,11 @@ func TestMkdirArgv(t *testing.T) {
 	})
 }
 
-// fsOpsWant is fs_ops' expected.output: the recorded argv (matcher) plus the
-// install body passed through the temp file.
 type fsOpsWant struct {
 	Argv string `yaml:"argv"`
 	Body string `yaml:"body"`
 }
 
-// TestFSOps runs each mutating FS op against the mock executor: recorded argv
-// asserts the command shape (sudo escalation, flags), nothing touches the host.
 func TestFSOps(t *testing.T) {
 	testyml.Run(t, td, "testdata/spec/funcs/fs_ops.test.spec.yml", func(t *testing.T, c testyml.Case[fsOpsWant]) {
 		if strings.HasPrefix(c.Expected.Output.Argv, "sudo ") && os.Geteuid() == 0 {
@@ -159,8 +150,6 @@ func TestFSOps(t *testing.T) {
 
 // [<] 🤖🤖
 
-// TestTrackedFilesNoRepo: outside any git repo the listing falls back to a
-// filesystem walk: nested files in, dirs and .git contents out.
 func TestTrackedFilesNoRepo(t *testing.T) {
 	dir := t.TempDir()
 	require.NoError(t, os.MkdirAll(filepath.Join(dir, "sub"), 0o755))

@@ -1,4 +1,3 @@
-// Render-dirs-tree prints an indented directory tree of git-tracked files.
 package main
 
 // [>] 🤖🤖

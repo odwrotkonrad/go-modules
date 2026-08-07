@@ -89,8 +89,6 @@ func TestMergeUpsertEnv(t *testing.T) {
 	})
 }
 
-// splitWant is split_frontmatter's expected.output: expected-file refs for the
-// front and body halves.
 type splitWant struct {
 	FrontFile string `yaml:"frontFile"`
 	BodyFile  string `yaml:"bodyFile"`
@@ -154,8 +152,6 @@ func TestIsRateLimitErr(t *testing.T) {
 	})
 }
 
-// retryWant is retry's expected.output: the returned value plus op call and
-// sleep counts (asserted on error cases too).
 type retryWant struct {
 	Value string `yaml:"value"`
 	Calls int    `yaml:"calls"`
@@ -206,9 +202,6 @@ func TestDirsTree(t *testing.T) {
 	})
 }
 
-// TestMakefileDoc reads its Makefile and expected doc from the
-// render-makefile-doc CLI's testdata via os ([why] embed FS cannot reach
-// outside the package dir).
 func TestMakefileDoc(t *testing.T) {
 	testyml.Run(t, td, "testdata/spec/funcs/makefile_doc.test.spec.yml", func(t *testing.T, c testyml.Case[struct{}]) {
 		got, err := MakefileDoc(c.Input.Args.String(t, 0))
@@ -234,8 +227,6 @@ func TestExecWithCtx(t *testing.T) {
 // [<] 🤖🤖
 
 // [>] 🤖🤖
-// TestLocalFileRelativeInclude: localFile resolves a relative path against the
-// render's anchor and inlines the file.
 func TestLocalFileRelativeInclude(t *testing.T) {
 	dir := t.TempDir()
 	require.NoError(t, os.WriteFile(filepath.Join(dir, "pwd.md"), []byte("LOCAL"), 0o644))

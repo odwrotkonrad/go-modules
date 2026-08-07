@@ -1,4 +1,3 @@
-// Package cli builds che's cobra command tree over the che package's prepared specs.
 package cli
 
 // [>] 🤖🤖
@@ -19,25 +18,20 @@ import (
 	"gitlab.com/konradodwrot/go-modules/che/internal/telemetry"
 )
 
-// version is injected at build time via -ldflags -X.
 var version = "dev"
 
-// app wires the cobra tree: init (PersistentPreRunE) prepares opts and the
-// root SpecReady as separately initialized values, read by each RunE.
 type app struct {
-	flags   options.Options      // cobra flag destinations
-	opts    options.Options      // finalized by che.PrepareApplicationOptions
-	ctx     che.Context          // captured launch world (env/cwd/runID/command), for spec-less commands (uninstall)
-	root    *che.SpecReady       // prepared by che.PrepareSpecs
-	tel     *telemetry.Telemetry // OTLP telemetry, started in init, flushed in PersistentPostRunE (nil = off)
-	runCtx  context.Context      // run root span ctx, opened in init, parent of every command span
-	runSpan trace.Span           // the run root span, ended in shutdownTelemetry
+	flags   options.Options
+	opts    options.Options
+	ctx     che.Context
+	root    *che.SpecReady
+	tel     *telemetry.Telemetry
+	runCtx  context.Context
+	runSpan trace.Span
 }
 
 func New() *app { return &app{} }
 
-// Root builds che's root command with every subcommand attached: the single
-// command-tree source for main and docgen.
 func (a *app) Root() *cobra.Command {
 	root := &cobra.Command{
 		Use:     "che",
@@ -54,9 +48,10 @@ sourced profile refs included).`,
 				switch p.Name() {
 				case "config":
 					name = "config"
+				case "packages":
+					name = "packages-" + name
 				case "backup":
 					// [why] backup create stays on the spec path under the
-					// command name "backup"; ls/restore are ledger-only.
 					if name == "create" {
 						name = "backup"
 					} else {
@@ -84,7 +79,7 @@ sourced profile refs included).`,
 	pf.StringSliceVar(&a.flags.Profiles, "profiles", nil,
 		"run only these profiles (comma-separated or repeated; autoDiscover skipped, runIf still enforced); env: CHE_PROFILE (comma-separated)")
 	pf.StringSliceVar(&a.flags.SkipOps, "skip-ops", nil,
-		"skip these ops everywhere (comma-separated or repeated; dropped from the run sequence, direct op subcommands become logged no-ops); values: prune-broken-links | make-dirs | make-links | make-copies | render-templates | run-scripts; env: CHE_SKIP_OPS")
+		"skip these ops everywhere (comma-separated or repeated; dropped from the run sequence, direct op subcommands become logged no-ops); values: prune-broken-links | make-dirs | make-links | make-copies | render-templates | install-packages | run-scripts; env: CHE_SKIP_OPS")
 	pf.BoolVar(&a.flags.SkipRunIf, "skip-run-if", false,
 		"treat every runIf predicate as passing; env: CHE_SKIP_RUN_IF")
 	pf.BoolVar(&a.flags.Errexit, "errexit", false,
@@ -94,18 +89,13 @@ sourced profile refs included).`,
 	pf.StringVar(&a.flags.LogLevel, "log-level", "",
 		"human-log level; values: error (failures only) | warn | info (what happened) | debug (adds intentions and won't-happen with reasons) | trace (adds details); default: info; env: CHE_LOG_LEVEL")
 
-	root.AddCommand(a.runCmd(), a.initCmd(), a.backupCmd(), a.discoverCmd(), a.uninstallCmd(), a.configCmd())
+	root.AddCommand(a.runCmd(), a.initCmd(), a.backupCmd(), a.discoverCmd(), a.uninstallCmd(), a.configCmd(), a.packagesCmd())
 	for _, o := range ops() {
 		root.AddCommand(a.opCmd(o))
 	}
 	return root
 }
 
-// init prepares the run: build the launch context from the process (the one
-// ambient-read site), resolve options (flags > env vars > local che.yml
-// options: > defaults), then the whole spec tree. command names the invoked
-// subcommand, carried to the ledger run (SpecDone.Command). uninstall reads the
-// ledger only, so it skips spec preparation (no che.yml needed).
 func (a *app) init(command string) error {
 	ctx, err := che.NewContext()
 	if err != nil {
@@ -117,9 +107,6 @@ func (a *app) init(command string) error {
 		return err
 	}
 	// [why] the dry-run announce opens the whole output, then the config
-	// delta at debug (spec/che/log.md). `che config show` owns
-	// its own config output, so it skips the startup delta line; completion
-	// commands print to stdout for shell eval, so they stay silent.
 	if command != "completion" && command != "__complete" {
 		if a.opts.DryRun != options.DryRun.Off {
 			desc := "no actual operations will be performed, reporting only dests that would change"
@@ -143,7 +130,6 @@ func (a *app) init(command string) error {
 		return nil
 	}
 	// [why] the init stage prefetches every remote spec source before
-	// discovery; run announces both stages as sub-headings like its ops.
 	if command == "run" {
 		log.EmitHeading(log.Levels.Info, 1, "run", "running", "init-remote-sources")
 	}
@@ -164,9 +150,6 @@ func (a *app) init(command string) error {
 	return nil
 }
 
-// startTelemetry starts the OTLP providers from the resolved otel config and
-// registers the log-mirror sink. A start error (unreachable collector is not one:
-// the dial is lazy) degrades to telemetry off, never failing the run.
 func (a *app) startTelemetry(ctx che.Context) {
 	cfg := telemetry.Config(a.opts.Otel)
 	tel, err := telemetry.Start(context.Background(), cfg, ctx.RunID, ctx.Command)
@@ -180,8 +163,6 @@ func (a *app) startTelemetry(ctx che.Context) {
 	}
 }
 
-// shutdownTelemetry flushes and closes the providers (bounded), clears the sink.
-// A flush error (unreachable collector) is logged at debug, never surfaced.
 func (a *app) shutdownTelemetry() {
 	if a.runSpan != nil {
 		a.runSpan.End()
@@ -192,8 +173,6 @@ func (a *app) shutdownTelemetry() {
 	}
 }
 
-// runCmd runs every profile's full op sequence, profile by profile. A failing
-// profile does not stop the rest: failures collect, report, and join.
 func (a *app) runCmd() *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "run",
@@ -201,7 +180,6 @@ func (a *app) runCmd() *cobra.Command {
 		RunE: func(cmd *cobra.Command, args []string) error {
 			return a.root.ExecEach(a.runCtx, "run", func(ctx context.Context, p *che.ProfileReady) error {
 				// [why] the backup stage archives every op dest once, before the
-				// other ops; they skip their own archives.
 				if err := p.ExecBackupStage(); err != nil {
 					return err
 				}
@@ -210,14 +188,10 @@ func (a *app) runCmd() *cobra.Command {
 		},
 	}
 	cmd.Flags().StringSliceVar(&a.flags.RunSkipOps, "skip-ops", nil,
-		"skip these ops in the run sequence only (comma-separated or repeated); values: prune-broken-links | make-dirs | make-links | make-copies | render-templates | run-scripts; env: CHE_RUN_SKIP_OPS")
+		"skip these ops in the run sequence only (comma-separated or repeated); values: prune-broken-links | make-dirs | make-links | make-copies | render-templates | install-packages | run-scripts; env: CHE_RUN_SKIP_OPS")
 	return cmd
 }
 
-// uninstallCmd backs out everything the ledger marks installed onto this host,
-// across every run: restore each dest's pre-install backup or remove it
-// (snapshotting first so uninstall is reversible). Reads the ledger, not the
-// spec, so it does not iterate profiles.
 func (a *app) uninstallCmd() *cobra.Command {
 	return &cobra.Command{
 		Use:   "uninstall",
@@ -233,8 +207,6 @@ func (a *app) uninstallCmd() *cobra.Command {
 	}
 }
 
-// initCmd runs only the init stage: prefetch every remote spec source
-// (clone/pull the run cache) and exit; the fetch itself happens in init().
 func (a *app) initCmd() *cobra.Command {
 	return &cobra.Command{
 		Use:   "init-remote-sources",
@@ -243,10 +215,6 @@ func (a *app) initCmd() *cobra.Command {
 	}
 }
 
-// backupCmd is the backup command group: `backup create` archives every
-// would-change op dest, `backup ls` lists the recorded backup points, `backup
-// restore` restores state by --run-id, --backup-id, or --timestamp. Bare
-// `backup` prints usage.
 func (a *app) backupCmd() *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "backup",
@@ -289,8 +257,6 @@ func (a *app) backupCmd() *cobra.Command {
 	return cmd
 }
 
-// discoverCmd logs each prepared profile's discovered entry (per-op change
-// counts) and exits.
 func (a *app) discoverCmd() *cobra.Command {
 	return &cobra.Command{
 		Use:   "discover-profiles",
@@ -302,9 +268,6 @@ func (a *app) discoverCmd() *cobra.Command {
 	}
 }
 
-// configCmd is the config command group: `config show` prints the resolved
-// options, one "key = value  (source)" line each, the non-default delta by
-// default (--delta), the full set with --all.
 func (a *app) configCmd() *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "config",
@@ -332,8 +295,6 @@ func (a *app) configCmd() *cobra.Command {
 	return cmd
 }
 
-// runScriptsRunE is the run-scripts RunE: the op plus the name-substring arg
-// filter and a no-match check across all profiles.
 func (a *app) runScriptsRunE(cmd *cobra.Command, args []string) error {
 	total := 0
 	err := a.root.ExecEach(a.runCtx, cmd.Name(), func(ctx context.Context, p *che.ProfileReady) error {

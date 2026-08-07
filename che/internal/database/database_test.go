@@ -9,7 +9,6 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-// openTemp opens a fresh ledger DB under a temp dir.
 func openTemp(t *testing.T) *DB {
 	t.Helper()
 	db, err := Open(filepath.Join(t.TempDir(), "ops.db"))
@@ -18,7 +17,6 @@ func openTemp(t *testing.T) *DB {
 	return db
 }
 
-// seedRun starts one spec + profile row for a case.
 func seedRun(t *testing.T, db *DB) *ProfileDone {
 	t.Helper()
 	spec, err := db.StartSpec("20240101T000000", "che.yml", "all")
@@ -49,8 +47,7 @@ func TestInstalledLatestPerDest(t *testing.T) {
 
 	got, err := db.Installed()
 	require.NoError(t, err)
-	require.Len(t, got, 2) // one per dest, latest wins
-	// newest-first
+	require.Len(t, got, 2)
 	require.Equal(t, "/b", got[0].Dest)
 	require.Equal(t, "/a", got[1].Dest)
 	require.Equal(t, "noop", got[1].OpType)
@@ -64,7 +61,7 @@ func TestInstalledExcludesRemoved(t *testing.T) {
 
 	got, err := db.Installed()
 	require.NoError(t, err)
-	require.Empty(t, got) // latest op for /a is a remove
+	require.Empty(t, got)
 }
 
 func TestInstalledForProfileScopes(t *testing.T) {
@@ -92,7 +89,7 @@ func TestEnsureBackupDedupsByPath(t *testing.T) {
 	require.NoError(t, err)
 	b2, err := db.EnsureBackup(spec, "/state/backups/che-make-links-ts.tar.bz2", "make-links")
 	require.NoError(t, err)
-	require.Equal(t, b1.ID, b2.ID) // one row per archive path
+	require.Equal(t, b1.ID, b2.ID)
 	require.Equal(t, spec.ID, b1.SpecDoneID)
 }
 
@@ -144,7 +141,7 @@ func TestBackupsProjectsRunIDNewestFirst(t *testing.T) {
 	got, err := db.Backups()
 	require.NoError(t, err)
 	require.Len(t, got, 2)
-	require.Equal(t, "/b/cli/backup/t2-idb.tar.bz2", got[0].Path) // newest first
+	require.Equal(t, "/b/cli/backup/t2-idb.tar.bz2", got[0].Path)
 	require.Equal(t, "runbbbbbbbbb", got[0].RunID)
 	require.Equal(t, "runaaaaaaaaa", got[1].RunID)
 }
@@ -158,7 +155,7 @@ func TestLatestOpsIncludesRemovesAndProjectsProfileRef(t *testing.T) {
 
 	got, err := db.LatestOps()
 	require.NoError(t, err)
-	require.Len(t, got, 2) // one per dest, remove kept as /a's latest
+	require.Len(t, got, 2)
 	require.Equal(t, "/b", got[0].Dest)
 	require.Equal(t, "cli", got[0].ProfileRef)
 	require.Equal(t, "/a", got[1].Dest)

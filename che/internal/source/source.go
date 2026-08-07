@@ -1,5 +1,3 @@
-// Package source manages the cache checkouts of remote source repos, kept at
-// ~/.cache/che/remote-sources.
 package source
 
 // [>] 🤖🤖
@@ -15,14 +13,10 @@ import (
 	"gitlab.com/konradodwrot/go-modules/che/internal/log"
 )
 
-// Dir is the managed cache checkout path for url:
-// <ResolveCacheHome>/remote-sources/<slug> (default ~/.cache/che/remote-sources).
 func Dir(home, url string) string {
 	return filepath.Join(fsutil.ResolveCacheHome(home), "remote-sources", slug(url))
 }
 
-// slug sanitizes url into a deterministic dir name: scheme/git@ stripped,
-// .git trimmed, path separators flattened.
 func slug(url string) string {
 	s := url
 	for _, p := range []string{"ssh://", "https://", "http://", "git://", "file://"} {
@@ -34,17 +28,9 @@ func slug(url string) string {
 	return strings.Trim(s, "-")
 }
 
-// EnsureCheckout clones url into its cache dir (first run: shallow, remote default
-// branch only) or updates it to the remote tip (shallow fetch + hard reset:
 // [why] a shallow --ff-only pull fails once the fetched history is truncated;
-// the dir is a managed cache, never edited in place), returning the checkout
-// path. Shells out to system git so the user's ssh
-// config and credential helpers apply.
-// checkouts caches ensured URLs for the run: the init stage clones/pulls,
-// later resolutions reuse the checkout silently (one fetch per URL per run).
 var checkouts = map[string]string{}
 
-// ResetCache clears the per-run checkout cache (tests simulating fresh runs).
 func ResetCache() { checkouts = map[string]string{} }
 
 func EnsureCheckout(home, url string) (string, error) {
@@ -58,9 +44,6 @@ func EnsureCheckout(home, url string) (string, error) {
 	return dir, err
 }
 
-// ensureCheckout logs one entry per remote (spec/che/log.md):
-// cloned, updated and up-to-date at info, the cache path home-abbreviated; a
-// failing update with a cached checkout warns and continues.
 func ensureCheckout(home, url string) (string, error) {
 	dir := Dir(home, url)
 	line := "remote " + url + " into " + abbreviateHome(dir, home)
@@ -79,7 +62,6 @@ func ensureCheckout(home, url string) (string, error) {
 	}
 	before, _ := gitOut("-C", dir, "rev-parse", "HEAD")
 	// [why] a failing update with a cached checkout is survivable: warn and use
-	// the cache; only a missing checkout is fatal (spec/che/init.md).
 	if err := git("-C", dir, "fetch", "--quiet", "--depth", "1"); err != nil {
 		log.EmitWarn("init-remote-sources", "warning", fmt.Sprintf("fetch failed, using cached checkout %s: %v", dir, err))
 		return dir, nil
@@ -96,7 +78,6 @@ func ensureCheckout(home, url string) (string, error) {
 	return dir, nil
 }
 
-// abbreviateHome renders path with the home prefix abbreviated to ~.
 func abbreviateHome(path, home string) string {
 	if home != "" && strings.HasPrefix(path, home+string(filepath.Separator)) {
 		return "~" + strings.TrimPrefix(path, home)
@@ -108,7 +89,6 @@ func git(args ...string) error {
 	return execx.Default.Exec(execx.Cmd{Argv: append([]string{"git"}, args...), Stderr: os.Stderr})
 }
 
-// gitOut runs git, returning its trimmed stdout.
 func gitOut(args ...string) (string, error) {
 	out, err := execx.Default.Output(execx.Cmd{Argv: append([]string{"git"}, args...), Stderr: os.Stderr})
 	return strings.TrimSpace(string(out)), err

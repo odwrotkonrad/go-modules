@@ -1,4 +1,3 @@
-// Render-makefile-doc generates the agents' Makefile doc from [genai-include] sections.
 package main
 
 // [>] 🤖🤖

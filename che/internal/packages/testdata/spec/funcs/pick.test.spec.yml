@@ -1,0 +1,94 @@
+# [>] 🤖🤖
+context:
+  function: packages.Host.pick
+cases:
+  - name: ShouldPickBrewOnMacBeforeApt
+    input:
+      args:
+        - os: darwin
+        - cmds: [brew, apt-get]
+        - entry: "[brew, apt]"
+    expected:
+      output: {mgr: brew, picked: true}
+  - name: ShouldPickAptOnLinux
+    input:
+      args:
+        - os: linux
+        - cmds: [apt-get]
+        - entry: "[brew, apt]"
+    expected:
+      output: {mgr: apt, picked: true}
+  - name: ShouldSkipNpmWithoutNpmCommand
+    input:
+      args:
+        - os: linux
+        - cmds: []
+        - entry: "[{npm: x}]"
+    expected:
+      output: {picked: false}
+  - name: ShouldPickBinaryWhenShaMatchesHost
+    input:
+      args:
+        - os: linux
+        - cmds: []
+        - entry: |
+            - brew
+            - binary:
+                url: https://example.com/x
+                sha256:
+                  linux-amd64: abc
+    expected:
+      output: {mgr: binary, picked: true}
+  - name: ShouldSkipBinaryWithoutHostSha
+    input:
+      args:
+        - os: darwin
+        - cmds: []
+        - entry: |
+            - binary:
+                url: https://example.com/x
+                sha256:
+                  linux-amd64: abc
+    expected:
+      output: {picked: false}
+  - name: ShouldPreferListedManagerOverEntryOrder
+    input:
+      args:
+        - os: darwin
+        - cmds: [brew]
+        - entry: |
+            - brew
+            - binary:
+                url: https://example.com/x
+                sha256:
+                  darwin-amd64: abc
+        - preferred: [binary]
+    expected:
+      output: {mgr: binary, picked: true}
+  - name: ShouldFallBackToEntryOrderWhenPreferredInapplicable
+    input:
+      args:
+        - os: linux
+        - cmds: [apt-get]
+        - entry: "[brew, apt]"
+        - preferred: [brew]
+    expected:
+      output: {mgr: apt, picked: true}
+  - name: ShouldKeepEntryOrderAmongUnlistedManagers
+    input:
+      args:
+        - os: darwin
+        - cmds: [brew, npm]
+        - entry: "[brew, npm]"
+        - preferred: [gem]
+    expected:
+      output: {mgr: brew, picked: true}
+  - name: ShouldErrorOnUnknownManager
+    input:
+      args:
+        - os: linux
+        - cmds: []
+        - entry: "[pacman]"
+    expected:
+      errorOutput: "unknown manager for pkg: pacman"
+# [<] 🤖🤖

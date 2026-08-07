@@ -27,9 +27,6 @@ func TestSlug(t *testing.T) {
 	})
 }
 
-// TestDir: the cache checkout lives under the resolved CACHE base — default
-// ~/.cache/che/remote-sources, CHE_CACHE_HOME (che's base directly), or
-// XDG_CACHE_HOME/che.
 func TestDir(t *testing.T) {
 	const url = "https://example.com/x.git"
 	for _, tc := range []struct {
@@ -47,17 +44,11 @@ func TestDir(t *testing.T) {
 	}
 }
 
-// ensureWant is ensure's expected.output: silence plus files the checkout
-// must carry.
 type ensureWant struct {
 	Silent bool     `yaml:"silent"`
 	Files  []string `yaml:"files"`
 }
 
-// TestEnsure: a first call clones into the cache dir (logged as cloneRemote), a
-// later one hard-resets to new upstream commits (logged as pulled); a
-// no-change pull stays silent (attempt lines are debug-gated). The git CLI
-// runs through the mock executor's go-git model: nothing spawns.
 func TestEnsure(t *testing.T) {
 	testyml.Run(t, td, "testdata/spec/funcs/ensure_checkout.test.spec.yml", func(t *testing.T, c testyml.Case[ensureWant]) {
 		execx.Swap(t, testutil.NewCmdMockExecutor())

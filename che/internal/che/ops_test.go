@@ -18,7 +18,6 @@ import (
 	"gitlab.com/konradodwrot/go-modules/lib/testyml"
 )
 
-// makeOpRecipes resolves one profile of dir's che.yml into its operation recipes.
 func makeOpRecipes(t *testing.T, dir string) spec.OperationRecipes {
 	t.Helper()
 	d, err := spec.Load(filepath.Join(dir, "che.yml"))
@@ -33,13 +32,8 @@ func makeOpRecipes(t *testing.T, dir string) spec.OperationRecipes {
 	return ops
 }
 
-// testRunID is the fixed per-run stamp tests use (backup filenames + ledger run).
 const testRunID = "00000000T000000"
 
-// newProfile builds a *ProfileReady anchored at dir/home under cfg, real seams
-// with a fresh on-disk ledger under home's state dir, so tests exercise the real
-// recording/prune/uninstall path against a throwaway DB. A started ledger
-// spec/profile row lets recording ops write.
 func newProfile(dir, home string, cfg options.Options) *ProfileReady {
 	seams := NewSeams(home)
 	specRow, _ := seams.Ledger.StartSpec(testRunID, "", "test")
@@ -64,7 +58,6 @@ func (p *ProfileReady) withDir(dir string) *ProfileReady {
 	return p
 }
 
-// setupProfile: mock che repo, returns profile under cfg, resolved op recipes, repo dir.
 func setupProfile(t *testing.T, cfg options.Options) (*ProfileReady, spec.OperationRecipes, string) {
 	t.Helper()
 	dir, home := testutil.CheRepo(t)
@@ -73,7 +66,6 @@ func setupProfile(t *testing.T, cfg options.Options) (*ProfileReady, spec.Operat
 	return p, makeOpRecipes(t, dir), dir
 }
 
-// ops maps a command word to the profile op it drives.
 var ops = map[string]func(*ProfileReady, spec.OperationRecipes) error{
 	"make-links": func(p *ProfileReady, r spec.OperationRecipes) error {
 		return p.makeLinks(r.MakeLinks.Links, r.MakeLinks.Dirs)
@@ -103,8 +95,6 @@ var ops = map[string]func(*ProfileReady, spec.OperationRecipes) error{
 	},
 }
 
-// applyScenario feeds the case's named scenario args to the generic mocks
-// (executor knobs) or the fixture tree (brokenLink).
 func applyScenario(t *testing.T, a testyml.Args, m *testutil.MockSet, p *ProfileReady) {
 	t.Helper()
 	for i := range a {
@@ -134,9 +124,6 @@ func applyScenario(t *testing.T, a testyml.Args, m *testutil.MockSet, p *Profile
 	}
 }
 
-// seedBrokenLink plants a symlink under HOME pointing at a missing root/ file
-// and records the matching ledger link op (source gone), so ledger-driven
-// prune-broken-links classifies it as broken and removes it.
 func seedBrokenLink(t *testing.T, p *ProfileReady) {
 	t.Helper()
 	dir := filepath.Join(p.home, ".config/zsh")
@@ -151,8 +138,6 @@ func seedBrokenLink(t *testing.T, p *ProfileReady) {
 	}))
 }
 
-// TestOps: dry-run off, record-only writer + mock executor, log lines assert
-// the behavior.
 func TestOps(t *testing.T) {
 	specs, err := fs.Glob(td, "testdata/spec/cmds/che-*.test.spec.yml")
 	require.NoError(t, err)

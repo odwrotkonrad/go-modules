@@ -10,7 +10,6 @@ import (
 	"syscall"
 )
 
-// ParseMode parses an octal chmod string ("" -> not set).
 func ParseMode(s string) (os.FileMode, bool) {
 	if s == "" {
 		return 0, false
@@ -22,9 +21,6 @@ func ParseMode(s string) (os.FileMode, bool) {
 	return os.FileMode(n), true
 }
 
-// DetectPermsDrift reports whether dest's live mode/owner differ from the spec chmod/
-// owner. Only set fields are enforced (empty chmod/owner -> no drift). Missing
-// dest -> no drift (the create path handles it).
 func DetectPermsDrift(reader FileSystemReader, dest, chmod, owner string) (needChmod, needChown bool) {
 	fi, err := reader.LstatPath(dest)
 	if err != nil {
@@ -40,8 +36,6 @@ func DetectPermsDrift(reader FileSystemReader, dest, chmod, owner string) (needC
 	return needChmod, needChown
 }
 
-// maskMode is the raw-unix bit set the spec controls: perm bits always, plus
-// setuid/setgid/sticky when the spec mode carries them (>0777, matching mkExtraDir).
 func maskMode(mode os.FileMode) os.FileMode {
 	if mode > 0o777 {
 		return 0o7777
@@ -49,9 +43,6 @@ func maskMode(mode os.FileMode) os.FileMode {
 	return 0o777
 }
 
-// toUnixMode maps an os.FileMode's Go-encoded special bits (ModeSetuid/Setgid/
-// Sticky live in high bits, not 0o7000) down to raw-unix perm+special bits, so
-// it compares equal to a ParseMode octal like 0o2775. Perm bits pass through.
 func toUnixMode(m os.FileMode) os.FileMode {
 	u := m.Perm()
 	if m&os.ModeSetuid != 0 {
@@ -66,8 +57,6 @@ func toUnixMode(m os.FileMode) os.FileMode {
 	return u
 }
 
-// IsOwnerDrifted reports whether fi's live uid/gid differ from the "owner[:group]"
-// spec. Unresolvable spec names or a missing Stat_t -> no drift (can't compare).
 func IsOwnerDrifted(fi os.FileInfo, owner string) bool {
 	st, ok := fi.Sys().(*syscall.Stat_t)
 	if !ok {
@@ -79,7 +68,6 @@ func IsOwnerDrifted(fi os.FileInfo, owner string) bool {
 	return (uidOK && uid != st.Uid) || (gidOK && gid != st.Gid)
 }
 
-// lookupID resolves name to a numeric id: empty or unresolvable -> ok=false (no drift).
 func lookupID[T any](name string, lookup func(string) (T, error), idOf func(T) string) (uint32, bool) {
 	if name == "" {
 		return 0, false

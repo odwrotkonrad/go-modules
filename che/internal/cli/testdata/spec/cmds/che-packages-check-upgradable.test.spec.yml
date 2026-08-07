@@ -1,0 +1,19 @@
+# [>] 🤖🤖
+context:
+  command: che packages check-upgradable
+  pwd: testdata/fixture/commands/packages/sample-tree
+  mockedInterfaces:
+    execx.CmdExecutor: testutil.CmdMockExecutor
+    fsutil.FileSystemWriter: testutil.FileSystemMockWriter
+    fsutil.FileSystemReader: testutil.FileSystemMockReader
+    packages.Host: cli.PackagesMockHost
+cases:
+  - name: ShouldWarnManagerReportedOutdatedPackage
+    expected:
+      exitCode: 0
+      stdOut:
+        - "[warn] upgradable jq via apt"
+    notExpected:
+      stdOut:
+        - "upgradable kubectx"
+# [<] 🤖🤖

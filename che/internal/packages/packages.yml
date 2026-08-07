@@ -1,0 +1,258 @@
+##[>] 🤖🤖
+packages:
+  anthropic.claude-code: [code]
+  aws:
+    - pkg:
+        url: https://awscli.amazonaws.com/AWSCLIV2.pkg
+    - script:
+        os: linux
+        path: scripts/install-aws.sh
+  az: [{brew: {cask: azure/azure-cli/azure-cli-preview}}]
+  bat: [brew, apt]
+  brew:
+    - script:
+        os: darwin
+        path: scripts/install-brew.sh
+  bats: [{brew: bats-core}, apt]
+  beekeeper-studio: [{brew: {cask: beekeeper-studio}}]
+  ccstatusline: [{npm: ccstatusline@2.2.22}]
+  charliermarsh.ruff: [code]
+  che:
+    - {brew: konradodwrot/tap/che}
+    - script:
+        run: curl -fsSL --connect-timeout 30 --retry 10 --retry-delay 30 --retry-all-errors https://konradodwrot.gitlab.io/go-modules/install.sh | sh
+  cilium:
+    - {brew: cilium-cli}
+    - binary:
+        version: 0.19.7
+        url: https://github.com/cilium/cilium-cli/releases/download/v{version}/cilium-{os}-{arch}.tar.gz
+        bin: cilium
+        sha256:
+          linux-amd64: cd15e0983bf0acc7946cd05d453d1e58376ea92dec2642e745212df2b07d8852
+          linux-arm64: 9482937f14061fb239f2dbb2f97f4103de1b101f5d5defbff319f294f9bd540f
+  claude: [{brew: {cask: claude-code}}, {npm: "@anthropic-ai/claude-code"}]
+  code: [{brew: {cask: visual-studio-code}}]
+  codex: [{brew: {cask: codex}}, {npm: "@openai/codex"}]
+  copilot: [{npm: "@github/copilot"}]
+  corepack: [npm]
+  duti: [brew]
+  editorconfig.editorconfig: [code]
+  esbenp.prettier-vscode: [code]
+  fd: [brew, {apt: fd-find}]
+  ffmpeg: [brew, apt]
+  font-jetbrains-mono: [{brew: {cask: font-jetbrains-mono}}]
+  gcc: [brew, apt]
+  gcloud:
+    - script:
+        os: linux
+        path: scripts/install-gcloud-apt.sh
+    - script:
+        os: darwin
+        version: 572.0.0
+        path: scripts/install-gcloud.sh
+        sha256:
+          darwin-arm64: 4220b398420f5a71ddbfc41a576a1a7fe02501d394feeb0e80f13108972ba4ab
+  get-os-open-files-with: [{go: "gitlab.com/konradodwrot/go-modules/get-os-open-files-with@latest"}]
+  gh: [brew, apt]
+  git: [brew, apt]
+  gitlab-runner: [brew]
+  gitlab-tart-executor: [{brew: cirruslabs/cli/gitlab-tart-executor}]
+  glab:
+    - brew
+    - binary:
+        version: 1.107.0
+        url: https://gitlab.com/gitlab-org/cli/-/releases/v{version}/downloads/glab_{version}_linux_{arch}.tar.gz
+        bin: bin/glab
+        sha256:
+          linux-amd64: eb42f56eb1a789cf4f22aa5960ff0ef60cf1e7fc1295327501f9f59030d5ae2c
+          linux-arm64: 8356e442ed42ff6973cbe267dd7371c65f9b810b01e7d70bb557cd284e7b35ba
+  go:
+    managers:
+      - binary:
+          version: 1.26.4
+          url: https://go.dev/dl/go{version}.{os}-{arch}.tar.gz
+          bin: go/bin/go go/bin/gofmt
+          sha256:
+            darwin-arm64: b62ad2b6d7d2464f12a5bcad7ff47f19d08325773b5efd21610e445a05a9bf53
+            linux-arm64: ef758ae7c6cf9267c9c0ef080b8965f453d89ab2d25d9eb22de4405925238768
+            linux-amd64: 1153d3d50e0ac764b447adfe05c2bcf08e889d42a02e0fe0259bd47f6733ad7f
+    completions:
+      zsh:
+        name: _golang
+        url: https://raw.githubusercontent.com/zsh-users/zsh-completions/398b4b74775102da7bc6a510a08d0914592f9e62/src/_golang
+        sha256: f36054c235ecc827b66b61deb5cf98221254feefd997751cdc85a07dc6c451c3
+  golang.go: [code]
+  gopls: [{go: "golang.org/x/tools/gopls@latest"}]
+  goreleaser:
+    - brew
+    - binary:
+        version: 2.16.0
+        url: https://github.com/goreleaser/goreleaser/releases/download/v{version}/goreleaser_Linux_{arch_g}.tar.gz
+        bin: goreleaser
+        sha256:
+          linux-amd64: eaae05b5eba07533bd0f06846b68c808399504784df00c62eb219541fc04e5e2
+          linux-arm64: 0102d974373fcdeb77042d1f5897caffa193be36620fdc6c1da43a01ef8e10d3
+  grafana: [brew]
+  hoovercj.vscode-settings-cycler: [code]
+  htop: [brew, apt]
+  jaeger:
+    - binary:
+        version: 2.18.0
+        url: https://github.com/jaegertracing/jaeger/releases/download/v{version}/jaeger-{version}-darwin-arm64.tar.gz
+        bin: jaeger-{version}-darwin-arm64/jaeger
+        sha256:
+          darwin-arm64: 839f01b46fe03deb91c920f26986d0cdf1af38d61d5badc40a8688410a69df17
+  jq: [brew, apt]
+  kind:
+    - brew
+    - binary:
+        version: 0.32.0
+        url: https://github.com/kubernetes-sigs/kind/releases/download/v{version}/kind-{os}-{arch}
+        sha256:
+          linux-amd64: 50030de23cf40a18505f20426f6a8506bedf13c6e509244bd1fa9463721b0f54
+          linux-arm64: b92cd615e97585de8ddade28ed5cd7feb4248d717c233eea5b03c37298900f5d
+  kubectl:
+    - brew
+    - binary:
+        version: 1.36.3
+        url: https://dl.k8s.io/release/v{version}/bin/{os}/{arch}/kubectl
+        sha256:
+          linux-amd64: ebbd080e7c2e275093b55915722043257eb24004363e20acb3c4d71919f88336
+          linux-arm64: 3d86f24401c41ae5a46ac50eef8865fe891d3647d324a0836f6c63757a126e62
+  kubectx:
+    - binary:
+        version: 0.11.0
+        url: https://github.com/ahmetb/kubectx/releases/download/v{version}/kubectx_v{version}_{os}_{arch_g}.tar.gz
+        bin: kubectx
+        sha256:
+          darwin-arm64: b8c9b5150ca6d902474a115cf7e535831081b9ae10cbe561ea36c82bb3823d02
+          linux-amd64: 08e031c54fbffb3f100e904e4eae94bba2730fedf4869921fda79e4d7a8f5d4c
+          linux-arm64: 1dac2072216689e773325cb7587b858ea7415706ebcf04e23bf80e7e70555340
+  kubens:
+    - binary:
+        version: 0.11.0
+        url: https://github.com/ahmetb/kubectx/releases/download/v{version}/kubens_v{version}_{os}_{arch_g}.tar.gz
+        bin: kubens
+        sha256:
+          darwin-arm64: b1c87ddca22f1afc3e980ac807a715cd1183750022798d28a0a4e0cf66bec4e3
+          linux-amd64: 326c021c7b35468ed9a187b361198d0f22ae32828139c65eb6670c0d8301cc09
+          linux-arm64: 37058abe82ef20c93b44f3dc8ca2382dbb95d416cec958fbf7b8f79f011be86c
+  lefthook:
+    - brew
+    - binary:
+        version: 2.1.9
+        url: https://github.com/evilmartians/lefthook/releases/download/v{version}/lefthook_{version}_Linux_{arch_g}
+        sha256:
+          linux-amd64: 0d60b0d350c923963729574f6431171f0277788884ad0c6284fa0160c36e3877
+          linux-arm64: 304321997336c450af6b5c0cc641c59141168866fca0b1fc3767e067812600a9
+    - binary:
+        version: 2.1.9
+        url: https://github.com/evilmartians/lefthook/releases/download/v{version}/lefthook_{version}_MacOS_{arch_g}
+        sha256:
+          darwin-amd64: 0868b9b5b9cd807b0f9e0135fadaff1bd99fa026cccc15cbfd4510f0ee3b5431
+          darwin-arm64: fd506e05954af2062ce320d59ac1f5bf13fad8d694694a72bc6ef91e8c284e3d
+    - {npm: lefthook@2.1.9}
+  libtool: [brew, apt]
+  logcli: [brew]
+  loki: [brew]
+  make: [brew, apt]
+  mindaro-dev.file-downloader: [code]
+  ms-azuretools.vscode-containers: [code]
+  ms-kubernetes-tools.vscode-kubernetes-tools: [code]
+  ms-python.debugpy: [code]
+  ms-python.python: [code]
+  ms-python.vscode-python-envs: [code]
+  ms-vscode-remote.remote-containers: [code]
+  nmap: [brew, apt]
+  node: [brew, {apt: nodejs}]
+  npm: [{apt: npm}]
+  op: [{brew: {cask: 1password-cli}}]
+  openai.chatgpt: [code]
+  openssh: [brew, {apt: openssh-client}]
+  openssl: [{brew: openssl@3}, {apt: libssl-dev}]
+  otelcol:
+    - binary:
+        version: 0.153.0
+        url: https://github.com/open-telemetry/opentelemetry-collector-releases/releases/download/v{version}/otelcol_{version}_{os}_{arch}.tar.gz
+        bin: otelcol
+        sha256:
+          darwin-arm64: 9585e6bf82aa36ae9dcdaaf2f8546c726e152c4d0374c6830dd488a3ba6d2dc2
+          linux-amd64: e48e44c934242efea56cbd5fab02fa0e2206ea9e456c4b71a463c5121452f0df
+          linux-arm64: 8616216fd37fc0f295c788f08e7ee4b58c8dedcf7dbbe9a1d4f141866b3d4b1d
+  packer: [{brew: hashicorp/tap/packer}]
+  pandoc: [brew, apt]
+  pcre2: [brew, {apt: libpcre2-dev}]
+  pipx: [brew, apt]
+  pkgconf: [brew, apt]
+  pnpm: [brew, npm]
+  procs: [brew]
+  prometheus:
+    - binary:
+        version: 3.5.3
+        url: https://github.com/prometheus/prometheus/releases/download/v{version}/prometheus-{version}.darwin-amd64.tar.gz
+        bin: prometheus-{version}.darwin-amd64/prometheus prometheus-{version}.darwin-amd64/promtool
+        sha256:
+          darwin-arm64: 408eec9f1138ad5d30509038b2e8ae798ed2910e7faaa0e7f61ca22db222aaf5
+          darwin-amd64: 408eec9f1138ad5d30509038b2e8ae798ed2910e7faaa0e7f61ca22db222aaf5
+  pstree: [brew, {apt: psmisc}]
+  pyenv: [brew]
+  pyright: [brew, npm]
+  python3:
+    - script:
+        os: darwin
+        version: 3.14.5
+        path: scripts/install-python-pyenv.sh
+    - {apt: python3}
+  python3-pip: [{apt: python3-pip}]
+  python3-venv: [{apt: python3-venv}]
+  readline: [brew, {apt: libreadline-dev}]
+  redhat.vscode-yaml: [code]
+  ruby: [brew, {apt: ruby-full}]
+  ruby-dev: [{apt: ruby-dev}]
+  ruby-lsp: [{gem: ruby-lsp}]
+  shellcheck: [brew, apt]
+  showkey: [brew, {apt: kbd}]
+  sqlite3: [{brew: sqlite}, apt]
+  stow: [brew, apt]
+  tamasfe.even-better-toml: [code]
+  tart: [{brew: cirruslabs/cli/tart}]
+  tcl: [{brew: tcl-tk}, apt]
+  terraform:
+    - binary:
+        version: 1.15.0
+        url: https://releases.hashicorp.com/terraform/{version}/terraform_{version}_{os}_{arch}.zip
+        sha256:
+          darwin-arm64: f2e52766a58f1e26e83200b4b4e5fe813c827786d20fa7aa01d9bcc1e9918b26
+          linux-amd64: dcd4b31225dd960404f744315c0c3823a7deeda43bca0256a17fc762092d7e1b
+          linux-arm64: 7d9b8ab81790771b5c872c06a8982bc25b66971928dccb244fe0a41e2451770a
+  tmux: [brew, apt]
+  tree: [brew, apt]
+  tsc: [{brew: typescript}, {npm: typescript}]
+  typescript-language-server: [brew, npm]
+  unzip: [apt]
+  uv: [brew]
+  watch: [brew, {apt: procps}]
+  xz: [brew, {apt: xz-utils}]
+  yq:
+    - brew
+    - binary:
+        version: 4.53.3
+        url: https://github.com/mikefarah/yq/releases/download/v{version}/yq_{os}_{arch}
+        sha256:
+          darwin-amd64: b4ba1ecce3c47f00803f4f964de38394326c7a32eb6540616e04fb2935a0f08d
+          darwin-arm64: 877de31753a4dd2401aa048937aa9a7fc4d5f6ce858cf31508c5802954297213
+          linux-amd64: fa52a4e758c63d38299163fbdd1edfb4c4963247918bf9c1c5d31d84789eded4
+          linux-arm64: 578648e463a11c1b6db6010cbf41eafed6bee79466fcffa1bb446672cf7945ea
+  yzhang.markdown-all-in-one: [code]
+  zig:
+    - brew
+    - binary:
+        version: 0.16.0
+        url: https://ziglang.org/download/{version}/zig-{arch_x}-linux-{version}.tar.xz
+        bin: zig-{arch_x}-linux-{version}/zig
+        sha256:
+          linux-amd64: 70e49664a74374b48b51e6f3fdfbf437f6395d42509050588bd49abe52ba3d00
+          linux-arm64: ea4b09bfb22ec6f6c6ceac57ab63efb6b46e17ab08d21f69f3a48b38e1534f17
+  zlib: [brew, {apt: zlib1g-dev}]
+  zstd: [brew, apt]
+##[<] 🤖🤖

@@ -12,7 +12,6 @@ import (
 //go:embed all:testdata
 var td embed.FS
 
-// sectionWant is section_open's expected.output.
 type sectionWant struct {
 	Label string `yaml:"label"`
 	Depth int    `yaml:"depth"`
@@ -29,7 +28,6 @@ func TestSectionOpen(t *testing.T) {
 	})
 }
 
-// valsWant is vals_comment's expected.output.
 type valsWant struct {
 	Vals string `yaml:"vals"`
 	OK   bool   `yaml:"ok"`

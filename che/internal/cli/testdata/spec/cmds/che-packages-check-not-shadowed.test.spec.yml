@@ -1,0 +1,17 @@
+# [>] 🤖🤖
+context:
+  command: che packages check-not-shadowed
+  pwd: testdata/fixture/commands/packages/sample-tree
+  mockedInterfaces:
+    execx.CmdExecutor: testutil.CmdMockExecutor
+    fsutil.FileSystemWriter: testutil.FileSystemMockWriter
+    fsutil.FileSystemReader: testutil.FileSystemMockReader
+    packages.Host: cli.PackagesMockHost
+cases:
+  - name: ShouldReportNothingWhenFirstPathHitMatchesManagerBin
+    expected:
+      exitCode: 0
+    notExpected:
+      stdOut:
+        - "shadowed by"
+# [<] 🤖🤖

@@ -24,8 +24,6 @@ func TestCompiledSchema(t *testing.T) {
 	})
 }
 
-// TestValidateSchema: the fixturesGlob case accepts every testutil fixture,
-// doc cases assert the findings (empty output: none wanted).
 func TestValidateSchema(t *testing.T) {
 	testyml.Run(t, td, "testdata/spec/funcs/validate_schema.test.spec.yml", func(t *testing.T, c testyml.Case[string]) {
 		a := c.Input.Args

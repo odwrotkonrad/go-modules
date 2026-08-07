@@ -31,8 +31,6 @@ func (m *Mock) Output(c Cmd) ([]byte, error) { return m.run(c.Argv) }
 
 func (m *Mock) Calls() []string { return m.calls }
 
-// swapT is the testing.TB subset Swap needs, kept local so this production file
-// does not import testing.
 type swapT interface {
 	Helper()
 	Cleanup(func())

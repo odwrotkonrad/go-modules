@@ -1,0 +1,65 @@
+# [>] 🤖🤖
+context:
+  command: che packages install
+  pwd: testdata/fixture/commands/packages/sample-tree
+  mockedInterfaces:
+    execx.CmdExecutor: testutil.CmdMockExecutor
+    fsutil.FileSystemWriter: testutil.FileSystemMockWriter
+    fsutil.FileSystemReader: testutil.FileSystemMockReader
+    packages.Host: cli.PackagesMockHost
+cases:
+  - name: ShouldInstallProfilePackagesViaFirstApplicableManager
+    expected:
+      stdOut:
+        - "# Run profile cli/macos"
+        - "installed jq via apt"
+        - "installed kubectx via binary"
+  - name: ShouldWarnMissingCommandAfterInstall
+    expected:
+      stdOut:
+        - "[warn]{{/ +/}}missing kubectx"
+    notExpected:
+      stdOut:
+        - "missing jq"
+  - name: ShouldInstallNamedPackageWithPerManagerName
+    context:
+      command: che packages install fd
+    expected:
+      stdOut:
+        - "installed fd via apt"
+    notExpected:
+      stdOut:
+        - "installed jq"
+  - name: ShouldErrorOnUnknownPackageNamingFile
+    context:
+      command: che packages install nope
+    expected:
+      exitCode: 1
+      stdErr:
+        - "unknown package: nope (add it to {{/.*/}}packages.yml)"
+  - name: ShouldAnnounceInsteadOfInstallingOnDryRun
+    context:
+      env: {CHE_DRY_RUN: delta}
+    expected:
+      stdOut:
+        - "install jq via apt (dry run)"
+        - "install kubectx via binary (dry run)"
+    notExpected:
+      stdOut:
+        - "installed jq via apt"
+  - name: ShouldSkipStageWhenGloballySkipped
+    context:
+      env: {CHE_SKIP_OPS: install-packages, CHE_LOG_LEVEL: debug}
+    expected:
+      stdOut:
+        - "will not run profile cli/macos: options.skipOps"
+    notExpected:
+      stdOut:
+        - "installed jq"
+  - name: ShouldFallBackToBuiltinPackagesFile
+    context:
+      pwd: testdata/fixture/commands/packages/sample-tree-builtin
+    expected:
+      stdOut:
+        - "installed jq via apt"
+# [<] 🤖🤖

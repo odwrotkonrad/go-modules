@@ -1,4 +1,3 @@
-// Package yamlcfg loads system + user YAML config files deep-merged, failing with coded errors.
 package yamlcfg
 
 // [>] 🤖🤖
@@ -62,7 +61,6 @@ func MapPairs(n *yaml.Node) iter.Seq2[*yaml.Node, *yaml.Node] {
 	}
 }
 
-// Unwrap returns a DocumentNode's root content node, n otherwise.
 func Unwrap(n *yaml.Node) *yaml.Node {
 	if n != nil && n.Kind == yaml.DocumentNode && len(n.Content) > 0 {
 		return n.Content[0]

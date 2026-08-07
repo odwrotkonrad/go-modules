@@ -1,0 +1,23 @@
+# [>] 🤖🤖
+context:
+  function: packages.Host.expand
+cases:
+  - name: ShouldExpandAllHolesOnLinuxAmd64
+    input:
+      args:
+        - os: linux
+        - arch: amd64
+        - template: "https://x/{version}/y_{version}_{os}_{arch}_{arch_x}_{arch_g}.tar.gz"
+        - version: "1.2.3"
+    expected:
+      output: "https://x/1.2.3/y_1.2.3_linux_amd64_x86_64_x86_64.tar.gz"
+  - name: ShouldExpandArchVariantsOnDarwinArm64
+    input:
+      args:
+        - os: darwin
+        - arch: arm64
+        - template: "{os}-{arch}-{arch_x}-{arch_g}"
+        - version: ""
+    expected:
+      output: "darwin-arm64-aarch64-arm64"
+# [<] 🤖🤖

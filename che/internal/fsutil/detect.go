@@ -17,18 +17,13 @@ func NormalizeOS(goos string) string {
 	return goos
 }
 
-// DetectReader is the fs read surface virtualization detection consults,
-// tests swap in a mock so live host markers never leak into results.
 var DetectReader FileSystemReader = OSReader{}
 
-// UserLookup and GroupLookup resolve passwd/group records, tests swap in
-// map-backed fakes so the live user db never leaks into results.
 var (
 	UserLookup  = user.Lookup
 	GroupLookup = user.LookupGroup
 )
 
-// IsVirtualized: mac via kern.hv_vmm_present==1 (Apple VZ guest); linux via systemd-detect-virt / container markers.
 func IsVirtualized() bool {
 	return isVirtualized(runtime.GOOS, execx.Default, DetectReader)
 }
@@ -55,7 +50,6 @@ func isVirtualized(goos string, exec execx.CmdExecutor, read FileSystemReader) b
 	}
 }
 
-// ResolveUserHome: named user's home from passwd.
 func ResolveUserHome(name string) (string, error) {
 	u, err := UserLookup(name)
 	if err != nil {

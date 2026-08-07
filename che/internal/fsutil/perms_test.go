@@ -21,7 +21,6 @@ func TestPrependEnvVar(t *testing.T) {
 	})
 }
 
-// fakeInfo is an os.FileInfo whose Sys() is test-crafted (a *syscall.Stat_t or nil).
 type fakeInfo struct{ sys any }
 
 func (f fakeInfo) Name() string       { return "f" }
@@ -31,8 +30,6 @@ func (f fakeInfo) ModTime() time.Time { return time.Time{} }
 func (f fakeInfo) IsDir() bool        { return false }
 func (f fakeInfo) Sys() any           { return f.sys }
 
-// swapLookups replaces the passwd/group lookups with the map-served mocks so
-// the live user db never leaks into results.
 func swapLookups(t *testing.T, users, groups map[string]int) {
 	t.Helper()
 	u := testutil.UserMockLookup{}

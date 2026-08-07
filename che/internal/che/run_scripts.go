@@ -18,18 +18,13 @@ import (
 	"gitlab.com/konradodwrot/go-modules/che/internal/log"
 )
 
-// scriptResult pairs a script with its run status ("ok" | "fail").
 type scriptResult struct {
 	script string
 	status string
 }
 
-// ErrErrexit marks a script failure that must stop the whole run (--errexit):
-// ExecOperations and ExecEach stop on errors carrying it instead of continuing.
 var ErrErrexit = errors.New("errexit")
 
-// resolveScripts maps spec-resolved script rels (globs already expanded by
-// spec.Resolve) to absolute paths, IN SPEC ORDER, verifying each exists.
 func (p *ProfileReady) resolveScripts(relativePaths []string) ([]string, error) {
 	out := make([]string, len(relativePaths))
 	for i, relativePath := range relativePaths {
@@ -42,11 +37,6 @@ func (p *ProfileReady) resolveScripts(relativePaths []string) ([]string, error) 
 	return out, nil
 }
 
-// runScripts runs profile scripts in spec order. A failing script is logged
-// and the rest still run; a per-script status report prints at the end, and
-// the run returns an error if any script failed. Under --errexit the first
-// failure stops immediately: remaining scripts never run and the returned
-// error carries ErrErrexit so the run stops too.
 func (p *ProfileReady) runScripts(scripts []string) error {
 	env := p.buildScriptsEnv()
 	var results []scriptResult
@@ -93,9 +83,6 @@ func (p *ProfileReady) runScripts(scripts []string) error {
 	return nil
 }
 
-// buildScriptsEnv materializes the child-process env from the captured profile
-// env plus the Makefile $(ZSH) wrapper vars and che profile exports ([why] the
-// one place captured env becomes a real []string: the child che spawns).
 func (p *ProfileReady) buildScriptsEnv() []string {
 	functions := filepath.Join(p.resolveRepoRoot(), "ci/zsh/functions")
 	scripts := filepath.Join(p.resolveRepoRoot(), "ci/zsh/scripts")

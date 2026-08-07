@@ -16,17 +16,11 @@ import (
 	"gitlab.com/konradodwrot/go-modules/lib/testyml"
 )
 
-// initFlags decodes the case's flags arg.
 type initFlags struct {
 	SkipRemoteRefs bool `yaml:"skipRemoteRefs"`
-	// PrepareAfter runs PrepareSpecs after init and asserts it fetches nothing
-	// (discovery reuses init's checkouts).
-	PrepareAfter bool `yaml:"prepareAfter"`
+	PrepareAfter   bool `yaml:"prepareAfter"`
 }
 
-// TestInitSources: the init stage prefetches every reachable remote spec
-// source — conditions unevaluated, ref fetches survive failures, skipRemoteRefs
-// honored, discovery reusing the checkouts.
 func TestInitSources(t *testing.T) {
 	testyml.Run(t, td, "testdata/spec/funcs/init_sources.test.spec.yml",
 		func(t *testing.T, c testyml.Case[struct{}]) {

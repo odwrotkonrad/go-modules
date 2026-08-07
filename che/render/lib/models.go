@@ -5,7 +5,7 @@ package lib
 type target struct {
 	name  string
 	what  string
-	vals  string // parameter accepted-values hint, rendered as name=vals
+	vals  string
 	chain []string
 }
 
