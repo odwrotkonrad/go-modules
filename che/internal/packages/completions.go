@@ -3,6 +3,7 @@ package packages
 // [>] 🤖🤖
 
 import (
+	"fmt"
 	"os"
 	"path/filepath"
 	"slices"
@@ -14,9 +15,6 @@ import (
 func (in *Installer) installCompletions(pkg string, e Entry) error {
 	def := e.Completions.Zsh
 	if def == nil || !in.Opts.CompletionsEnabled {
-		return nil
-	}
-	if len(in.Opts.CompletionsPackages) > 0 && !slices.Contains(in.Opts.CompletionsPackages, pkg) {
 		return nil
 	}
 	dir := in.completionsDir()
@@ -39,8 +37,18 @@ func (in *Installer) installCompletions(pkg string, e Entry) error {
 	}
 	defer func() { _ = os.RemoveAll(tmp) }()
 	asset := filepath.Join(tmp, name)
-	if err := in.exec([]string{"curl", "-fsSL", "--connect-timeout", "30", "--retry", "10", "--retry-delay", "30", "--retry-all-errors", "-o", asset, def.URL}); err != nil {
-		return err
+	if def.Cmd != "" {
+		out, ok := in.output([]string{"sh", "-ec", def.Cmd})
+		if !ok {
+			return fmt.Errorf("%s: completions cmd failed: %s", pkg, def.Cmd)
+		}
+		if err := os.WriteFile(asset, []byte(out), 0o644); err != nil {
+			return err
+		}
+	} else {
+		if err := in.exec([]string{"curl", "-fsSL", "--connect-timeout", "30", "--retry", "10", "--retry-delay", "30", "--retry-all-errors", "-o", asset, def.URL}); err != nil {
+			return err
+		}
 	}
 	if def.Sha256 != "" {
 		if err := in.verifySha256(pkg, asset, def.Sha256); err != nil {
@@ -63,7 +71,7 @@ func (in *Installer) completionsDir() string {
 	}
 	candidates := in.Opts.CompletionsDestinationCandidates
 	if len(candidates) == 0 {
-		candidates = []string{filepath.Join(in.Host.Getenv("HOME"), ".local", "share", "zsh", "site-functions")}
+		candidates = DefaultCompletionsDestinationCandidates
 	}
 	expanded := make([]string, len(candidates))
 	for i, c := range candidates {
@@ -77,7 +85,7 @@ func (in *Installer) completionsDir() string {
 			in.compDir = expanded[onFpath]
 		} else {
 			in.emit(log.Levels.Warn, "not-on-fpath",
-				"no packages.completions.installDestinationCandidates entry is on fpath ("+strings.Join(expanded, ", ")+"), using "+in.compDir)
+				"no packages.completions.zsh.installDestinationCandidates entry is on fpath ("+strings.Join(expanded, ", ")+"), using "+in.compDir)
 		}
 	}
 	return in.compDir

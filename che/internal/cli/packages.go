@@ -23,9 +23,9 @@ func (a *app) packagesCmd() *cobra.Command {
 	}
 	pf := cmd.PersistentFlags()
 	pf.StringVar(&a.flags.PackagesFile, "packages-file", "",
-		"packages.yml path; default: $XDG_CONFIG_HOME/packages/packages.yml; env: CHE_PACKAGES_FILE")
+		"packages.yml path, fully superseding the builtin packages.yml shipped in che (a set file must exist; the builtin serves only when no file exists at the default path); default: $XDG_CONFIG_HOME/packages/packages.yml; env: CHE_PACKAGES_FILE")
 	pf.StringVar(&a.flags.PackagesOverride, "packages-override", "",
-		"override packages file (same-name entries replace, new names append); default: $XDG_CONFIG_HOME/che/packages-override.yml if present; env: CHE_PACKAGES_OVERRIDE")
+		"override packages file merged over the effective base (the packages file, or the builtin when none exists): same-name entries replace, new names append; default: $XDG_CONFIG_HOME/che/packages-override.yml if present; env: CHE_PACKAGES_OVERRIDE")
 	pf.StringSliceVar(&a.flags.PackagesPreferredMethods, "preferred-methods", nil,
 		"installation-method preference order (comma-separated or repeated): listed managers try first within each package entry, unlisted follow in entry order; values: brew | cask | apt | npm | go | gem | binary | script | pkg | code; env: CHE_PACKAGES_PREFERRED_METHODS")
 
@@ -40,18 +40,18 @@ func (a *app) packagesCmd() *cobra.Command {
 		"skip packages whose canonical command exists anywhere on PATH, regardless of manager")
 
 	cmd.AddCommand(install,
-		a.packagesCheckCmd("check-present", "check the canonical commands resolve on PATH (errors on any missing)", true,
+		a.packagesCheckCmd("check-present", "check the canonical commands resolve on PATH (errors on any missing)",
 			func(in *packages.Installer, pkgs []string) error {
 				if missing := in.CheckPresent(pkgs); len(missing) > 0 {
 					return fmt.Errorf("missing commands: %s", strings.Join(missing, ", "))
 				}
 				return nil
 			}),
-		a.packagesCheckCmd("check-upgradable", "warn on manager-reported outdated packages and binary pins drifted from --version output", false,
+		a.packagesCheckCmd("check-upgradable", "warn on manager-reported outdated packages and binary pins drifted from --version output",
 			func(in *packages.Installer, pkgs []string) error { return in.CheckUpgradable(pkgs) }),
-		a.packagesCheckCmd("check-not-shadowed", "warn when a package's manager-expected binary is not the first PATH hit", false,
+		a.packagesCheckCmd("check-not-shadowed", "warn when a package's manager-expected binary is not the first PATH hit",
 			func(in *packages.Installer, pkgs []string) error { return in.CheckNotShadowed(pkgs) }),
-		a.packagesCheckCmd("check-single-present", "warn when a canonical command resolves in more than one PATH dir, listing every location", false,
+		a.packagesCheckCmd("check-single-present", "warn when a canonical command resolves in more than one PATH dir, listing every location",
 			func(in *packages.Installer, pkgs []string) error { return in.CheckSinglePresent(pkgs) }))
 	return cmd
 }
@@ -93,11 +93,8 @@ func (a *app) packagesInstallRunE(cmd *cobra.Command, args []string) error {
 	})
 }
 
-func (a *app) packagesCheckCmd(name, short string, takesArgs bool, run func(*packages.Installer, []string) error) *cobra.Command {
-	use := name
-	if takesArgs {
-		use = name + " [pkg...]"
-	}
+func (a *app) packagesCheckCmd(name, short string, run func(*packages.Installer, []string) error) *cobra.Command {
+	use := name + " [pkg...]"
 	return &cobra.Command{
 		Use:   use,
 		Short: short,

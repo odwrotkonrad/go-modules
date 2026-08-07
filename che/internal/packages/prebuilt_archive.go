@@ -13,16 +13,16 @@ import (
 	"gitlab.com/konradodwrot/go-modules/che/internal/log"
 )
 
-func (in *Installer) installBinary(pkg string, b *BinarySpec) error {
-	if in.Host.HasCmd(pkg) {
+func (in *Installer) installPrebuiltArchive(pkg string, b *PrebuiltArchiveSpec) error {
+	if in.hasCmd(pkg) {
 		if b.Version == "" || in.versionOutputHasPin(pkg, b.Version) {
-			in.emitSkip(log.Levels.Debug, pkg, "already installed via binary")
+			in.emitSkip(log.Levels.Debug, pkg, "already installed via prebuiltArchive")
 			return nil
 		}
 		in.emit(log.Levels.Info, "reinstall", pkg+": -> "+b.Version)
 	}
 	if in.Opts.DryRun {
-		in.emitDryRun("install", pkg+" via binary")
+		in.emitDryRun("install", pkg+" via prebuiltArchive")
 		return nil
 	}
 	url := in.Host.expand(b.URL, b.Version)
@@ -41,12 +41,12 @@ func (in *Installer) installBinary(pkg string, b *BinarySpec) error {
 	if err := in.installMembers(pkg, asset, b); err != nil {
 		return err
 	}
-	in.emit(log.Levels.Info, "installed", pkg+" via binary")
+	in.emit(log.Levels.Info, "installed", pkg+" via prebuiltArchive")
 	return nil
 }
 
 func (in *Installer) installPkg(pkg string, p *PkgSpec) error {
-	if in.Host.HasCmd(pkg) {
+	if in.hasCmd(pkg) {
 		if p.Version == "" || in.versionOutputHasPin(pkg, p.Version) {
 			in.emitSkip(log.Levels.Debug, pkg, "already installed via pkg")
 			return nil
@@ -84,10 +84,11 @@ func (in *Installer) installPkg(pkg string, p *PkgSpec) error {
 }
 
 func (in *Installer) versionOutputHasPin(pkg, pin string) bool {
-	if out, ok := in.output([]string{pkg, "--version"}); ok && strings.Contains(out, pin) {
+	cmd := in.cmdFor(pkg)
+	if out, ok := in.output([]string{cmd, "--version"}); ok && strings.Contains(out, pin) {
 		return true
 	}
-	out, ok := in.output([]string{pkg, "version"})
+	out, ok := in.output([]string{cmd, "version"})
 	return ok && strings.Contains(out, pin)
 }
 
@@ -107,7 +108,7 @@ func (in *Installer) verifySha256(pkg, asset, want string) error {
 	return nil
 }
 
-func (in *Installer) members(pkg string, b *BinarySpec) []string {
+func (in *Installer) members(pkg string, b *PrebuiltArchiveSpec) []string {
 	spec := b.Bin
 	if spec == "" {
 		spec = pkg
@@ -120,7 +121,7 @@ func (in *Installer) members(pkg string, b *BinarySpec) []string {
 	return out
 }
 
-func (in *Installer) installMembers(pkg, asset string, b *BinarySpec) error {
+func (in *Installer) installMembers(pkg, asset string, b *PrebuiltArchiveSpec) error {
 	binDir := in.userBinDir()
 	if err := in.exec([]string{"mkdir", "-p", binDir}); err != nil {
 		return err
@@ -166,22 +167,22 @@ func (in *Installer) userBinDir() string {
 	if in.binDir != "" {
 		return in.binDir
 	}
-	candidates := in.Opts.BinaryDestinationCandidates
+	candidates := in.Opts.PrebuiltArchiveDestinationCandidates
 	if len(candidates) == 0 {
-		candidates = []string{filepath.Join(in.Host.Getenv("HOME"), ".local", "bin")}
+		candidates = DefaultPrebuiltArchiveDestinationCandidates
 	}
 	expanded := make([]string, len(candidates))
 	for i, c := range candidates {
 		expanded[i] = in.expandPath(c)
 	}
 	in.binDir = expanded[0]
-	if in.Opts.BinaryCheckInPath {
+	if in.Opts.PrebuiltArchiveCheckInPath {
 		onPath := slices.IndexFunc(expanded, func(d string) bool { return slices.Contains(in.Host.PathDirs(), d) })
 		if onPath >= 0 {
 			in.binDir = expanded[onPath]
 		} else {
 			in.emit(log.Levels.Warn, "not-on-path",
-				"no packages.binary.installDestinationCandidates entry is on PATH ("+strings.Join(expanded, ", ")+"), using "+in.binDir)
+				"no packages.prebuiltArchive.installDestinationCandidates entry is on PATH ("+strings.Join(expanded, ", ")+"), using "+in.binDir)
 		}
 	}
 	return in.binDir

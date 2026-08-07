@@ -4,7 +4,7 @@
 
 `che packages` declaratively installs packages from a packages file
 (`$XDG_CONFIG_HOME/packages/packages.yml`): each canonical name lists managers
-in preference order (brew/cask/apt/npm/go/gem/binary), the first applicable on
+in preference order (brew/cask/apt/npm/go/gem/prebuiltArchive/script/pkg/code), the first applicable on
 this host wins. Profiles declare `include.installPackages` and the run
 sequence installs them before `runScripts`. Four check subcommands report
 presence, upgradability, shadowing, and duplicates.
@@ -25,9 +25,9 @@ Scenario: a user steers method selection with preferred installation methods
   And the cascade is flag/env > profile > spec > user config
   And an unknown method name is a hard error naming the valid set
 
-Scenario: a user relocates binary installs and knows when the target is off PATH
+Scenario: a user relocates prebuiltArchive installs and knows when the target is off PATH
   Status: tested
-  When `packages.binary.installDestinationCandidates` is set (user config, spec options, profile options, or CHE_PACKAGES_BINARY_INSTALL_DESTINATION_CANDIDATES; scalar or list, ~/ and $VARs expand; default ~/.local/bin)
+  When `packages.prebuiltArchive.installDestinationCandidates` is set (user config, spec options, profile options, or CHE_PACKAGES_PREBUILT_ARCHIVE_INSTALL_DESTINATION_CANDIDATES; scalar or list, ~/ and $VARs expand; default ~/.local/bin)
   Then with `checkInPath` (default true) the first candidate found on PATH becomes the install destination
   And when no candidate is on PATH a warning lists them once per run and the first entry is used
   And `checkInPath: false` skips the PATH probe and always uses the first entry
@@ -37,7 +37,7 @@ Scenario: a user lists managers in preference order and the first applicable one
   When a package lists several managers
   Then brew/cask apply on macos with brew present, apt on linux with apt-get present
   And npm/go/gem apply where their command is present
-  And binary applies when a sha256 exists for this os-arch
+  And prebuiltArchive applies when a sha256 exists for this os-arch
   And the first applicable item in entry order installs the package
   And an unknown manager is a hard error
   And a package with no applicable manager is a logged skip, not an error
@@ -63,7 +63,7 @@ Scenario: an installed package is left alone by default, no surprise updates
 
 Scenario: a version pin converges the host on exactly that version, downgrades included
   Status: tested
-  When a version is specified (binary `version:`, npm `name@ver`, apt `name=ver`) and the installed version differs
+  When a version is specified (prebuiltArchive `version:`, npm `name@ver`, apt `name=ver`) and the installed version differs
   Then install reinstalls to match the pin exactly
 
 Scenario: a user refreshes everything with one flag
@@ -89,9 +89,9 @@ Scenario: a user overrides single entries without forking the packages file
   Then its same-name entries replace the base entries and new names append
   And `--packages-file` / `packages.file` user config relocate the base file
 
-Scenario: a binary entry downloads, verifies, and lands in /usr/local/bin
+Scenario: a prebuiltArchive entry downloads, verifies, and lands on the destination candidate
   Status: tested
-  When a binary item applies (sha256 for this os-arch)
+  When a prebuiltArchive item applies (sha256 for this os-arch)
   Then url and bin members expand {version} {os} {arch} {arch_x} {arch_g}
   And the download sha256-verifies or the install aborts
   And .tar.* extract the listed members, .zip unzips, bare assets install as-is
@@ -107,10 +107,10 @@ Scenario: a vscode extension is a package like any other
 
 Scenario: a vendor installer becomes a declarative script entry
   Status: tested
-  When a package lists a `- script:` item (optional `os: darwin|linux` gate) with `run:` inline shell, `path:` a script file, or `url:` a fetched script
+  When a package lists a `- script:` item (optional `os: darwin|linux` gate) with `run:` inline shell, `path:` a script file, or `remoteUrl:` a fetched script
   Then it applies on matching hosts and runs via POSIX `/bin/sh -e` when the canonical command is missing
   And a `path:` resolves relative to the packages file, falling back to the POSIX sh scripts shipped inside che (install-brew.sh, install-aws.sh)
-  And a `url:` fetches with curl (retrying) and aborts the install when the fetch fails or returns empty
+  And a `remoteUrl:` fetches with curl (retrying) and aborts the install when the fetch fails or returns empty
   And a present canonical command skips the script (install-if-missing semantics)
   And an optional `version:` + per os-arch `sha256:` pin declaratively: the pin exports to the script as CHE_PKG_VERSION/CHE_PKG_SHA256 (plus CHE_PKG_NAME/OS/ARCH/ARCH_X/ARCH_G), a `--version` output lacking the pin reinstalls and check-upgradable warns, and a sha256 map gates applicability to hosts with a key (gcloud: apt-repo script on linux, pinned tarball script on macos)
   And dry run announces `install <pkg> via script` without executing
@@ -138,7 +138,7 @@ Scenario: a user sees what drifted with check-upgradable
   Status: tested
   When I invoke `che packages check-upgradable`
   Then manager-reported outdated packages warn (brew outdated, apt list --upgradable, npm outdated -g)
-  And binary entries whose installed --version output lacks the yaml pin warn
+  And prebuiltArchive entries whose installed --version output lacks the yaml pin warn
 
 Scenario: a user spots PATH shadowing with check-not-shadowed
   Status: tested

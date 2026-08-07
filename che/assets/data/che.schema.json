@@ -2,37 +2,11 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://gitlab.com/konradodwrot/go-modules/-/raw/main/che/assets/data/che.schema.json",
   "$defs": {
-    "BinaryInstall": {
-      "properties": {
-        "installDestinationCandidates": {
-          "$ref": "#/$defs/StringOrList",
-          "description": "where binary-method binaries install: one path or a candidate list (~/ and $VARs expand); with checkInPath the first candidate on PATH wins, else the first entry; default ~/.local/bin; cascades profile \u003e spec \u003e user config; overridden by CHE_PACKAGES_BINARY_INSTALL_DESTINATION_CANDIDATES (comma-separated)"
-        },
-        "checkInPath": {
-          "type": "boolean",
-          "description": "pick the first candidate destination found on PATH and warn when none is; default true; overridden by CHE_PACKAGES_BINARY_CHECK_IN_PATH"
-        }
-      },
-      "additionalProperties": false,
-      "type": "object"
-    },
     "CompletionsInstall": {
       "properties": {
-        "enabled": {
-          "type": "boolean",
-          "description": "install zsh completions for packages carrying a completions def; default false; cascades profile \u003e spec \u003e user config; overridden by CHE_PACKAGES_COMPLETIONS_ENABLED"
-        },
-        "packages": {
-          "$ref": "#/$defs/StringOrList",
-          "description": "restrict completions installs to these package names (empty: every installed package with a completions def); cascades profile \u003e spec \u003e user config; overridden by CHE_PACKAGES_COMPLETIONS_PACKAGES (comma-separated)"
-        },
-        "installDestinationCandidates": {
-          "$ref": "#/$defs/StringOrList",
-          "description": "where zsh completion files install: one path or a candidate list (~/ and $VARs expand); with checkInFpath the first candidate on fpath wins, else the first entry; default ~/.local/share/zsh/site-functions; cascades profile \u003e spec \u003e user config; overridden by CHE_PACKAGES_COMPLETIONS_INSTALL_DESTINATION_CANDIDATES (comma-separated)"
-        },
-        "checkInFpath": {
-          "type": "boolean",
-          "description": "pick the first candidate destination found on fpath ($FPATH, else zsh -c fpath) and warn when none is; default true; overridden by CHE_PACKAGES_COMPLETIONS_CHECK_IN_FPATH"
+        "zsh": {
+          "$ref": "#/$defs/ShellCompletionsInstall",
+          "description": "zsh completions installation options"
         }
       },
       "additionalProperties": false,
@@ -153,7 +127,7 @@
               "npm",
               "go",
               "gem",
-              "binary",
+              "prebuiltArchive",
               "script",
               "pkg",
               "code"
@@ -162,13 +136,27 @@
           "type": "array",
           "description": "manager preference order: listed managers are tried first (in this order) within each package entry, unlisted ones follow in entry order; cascades profile \u003e spec \u003e user config; overridden by CHE_PACKAGES_PREFERRED_METHODS"
         },
-        "binary": {
-          "$ref": "#/$defs/BinaryInstall",
-          "description": "binary installation method options"
+        "prebuiltArchive": {
+          "$ref": "#/$defs/PrebuiltArchiveInstall",
+          "description": "prebuiltArchive installation method options"
         },
         "completions": {
           "$ref": "#/$defs/CompletionsInstall",
           "description": "zsh completions installation options"
+        }
+      },
+      "additionalProperties": false,
+      "type": "object"
+    },
+    "PrebuiltArchiveInstall": {
+      "properties": {
+        "installDestinationCandidates": {
+          "$ref": "#/$defs/StringOrList",
+          "description": "where binary-method binaries install: one path or a candidate list (~/ and $VARs expand); with checkInPath the first candidate on PATH wins, else the first entry; default ~/.local/bin; cascades profile \u003e spec \u003e user config; overridden by CHE_PACKAGES_PREBUILT_ARCHIVE_INSTALL_DESTINATION_CANDIDATES (comma-separated)"
+        },
+        "checkInPath": {
+          "type": "boolean",
+          "description": "pick the first candidate destination found on PATH and warn when none is; default true; overridden by CHE_PACKAGES_PREBUILT_ARCHIVE_CHECK_IN_PATH"
         }
       },
       "additionalProperties": false,
@@ -293,6 +281,24 @@
           },
           "type": "array",
           "description": "ops skipped in the run sequence only (direct op subcommands unaffected); overridden by che run --skip-ops and CHE_RUN_SKIP_OPS"
+        }
+      },
+      "additionalProperties": false,
+      "type": "object"
+    },
+    "ShellCompletionsInstall": {
+      "properties": {
+        "enabled": {
+          "type": "boolean",
+          "description": "install zsh completions for packages carrying a completions def; default false; cascades profile \u003e spec \u003e user config; overridden by CHE_PACKAGES_COMPLETIONS_ZSH_ENABLED"
+        },
+        "installDestinationCandidates": {
+          "$ref": "#/$defs/StringOrList",
+          "description": "where zsh completion files install: one path or a candidate list (~/ and $VARs expand); with checkInFpath the first candidate on fpath wins, else the first entry; default [~/.local/share/zsh/site-functions, ~/.zfunc]; cascades profile \u003e spec \u003e user config; overridden by CHE_PACKAGES_COMPLETIONS_ZSH_INSTALL_DESTINATION_CANDIDATES (comma-separated)"
+        },
+        "checkInFpath": {
+          "type": "boolean",
+          "description": "pick the first candidate destination found on fpath ($FPATH, else zsh -c fpath) and warn when none is; default true; overridden by CHE_PACKAGES_COMPLETIONS_ZSH_CHECK_IN_FPATH"
         }
       },
       "additionalProperties": false,

@@ -83,22 +83,25 @@ type Run struct {
 }
 
 type Packages struct {
-	File                         string             `yaml:"file" jsonschema_description:"packages.yml path; default $XDG_CONFIG_HOME/packages/packages.yml; overridden by --packages-file and CHE_PACKAGES_FILE"`
-	PreferredInstallationMethods []string           `yaml:"preferredInstallationMethods" jsonschema:"enum=brew,enum=cask,enum=apt,enum=npm,enum=go,enum=gem,enum=binary,enum=script,enum=pkg,enum=code" jsonschema_description:"manager preference order: listed managers are tried first (in this order) within each package entry, unlisted ones follow in entry order; cascades profile > spec > user config; overridden by CHE_PACKAGES_PREFERRED_METHODS"`
-	Binary                       BinaryInstall      `yaml:"binary" jsonschema_description:"binary installation method options"`
-	Completions                  CompletionsInstall `yaml:"completions" jsonschema_description:"zsh completions installation options"`
+	File                         string                 `yaml:"file" jsonschema_description:"packages.yml path; default $XDG_CONFIG_HOME/packages/packages.yml; overridden by --packages-file and CHE_PACKAGES_FILE"`
+	PreferredInstallationMethods []string               `yaml:"preferredInstallationMethods" jsonschema:"enum=brew,enum=cask,enum=apt,enum=npm,enum=go,enum=gem,enum=prebuiltArchive,enum=script,enum=pkg,enum=code" jsonschema_description:"manager preference order: listed managers are tried first (in this order) within each package entry, unlisted ones follow in entry order; cascades profile > spec > user config; overridden by CHE_PACKAGES_PREFERRED_METHODS"`
+	PrebuiltArchive              PrebuiltArchiveInstall `yaml:"prebuiltArchive" jsonschema_description:"prebuiltArchive installation method options"`
+	Completions                  CompletionsInstall     `yaml:"completions" jsonschema_description:"zsh completions installation options"`
 }
 
 type CompletionsInstall struct {
-	Enabled                      *bool        `yaml:"enabled" jsonschema_description:"install zsh completions for packages carrying a completions def; default false; cascades profile > spec > user config; overridden by CHE_PACKAGES_COMPLETIONS_ENABLED"`
-	Packages                     StringOrList `yaml:"packages" jsonschema_description:"restrict completions installs to these package names (empty: every installed package with a completions def); cascades profile > spec > user config; overridden by CHE_PACKAGES_COMPLETIONS_PACKAGES (comma-separated)"`
-	InstallDestinationCandidates StringOrList `yaml:"installDestinationCandidates" jsonschema_description:"where zsh completion files install: one path or a candidate list (~/ and $VARs expand); with checkInFpath the first candidate on fpath wins, else the first entry; default ~/.local/share/zsh/site-functions; cascades profile > spec > user config; overridden by CHE_PACKAGES_COMPLETIONS_INSTALL_DESTINATION_CANDIDATES (comma-separated)"`
-	CheckInFpath                 *bool        `yaml:"checkInFpath" jsonschema_description:"pick the first candidate destination found on fpath ($FPATH, else zsh -c fpath) and warn when none is; default true; overridden by CHE_PACKAGES_COMPLETIONS_CHECK_IN_FPATH"`
+	Zsh ShellCompletionsInstall `yaml:"zsh" jsonschema_description:"zsh completions installation options"`
 }
 
-type BinaryInstall struct {
-	InstallDestinationCandidates StringOrList `yaml:"installDestinationCandidates" jsonschema_description:"where binary-method binaries install: one path or a candidate list (~/ and $VARs expand); with checkInPath the first candidate on PATH wins, else the first entry; default ~/.local/bin; cascades profile > spec > user config; overridden by CHE_PACKAGES_BINARY_INSTALL_DESTINATION_CANDIDATES (comma-separated)"`
-	CheckInPath                  *bool        `yaml:"checkInPath" jsonschema_description:"pick the first candidate destination found on PATH and warn when none is; default true; overridden by CHE_PACKAGES_BINARY_CHECK_IN_PATH"`
+type ShellCompletionsInstall struct {
+	Enabled                      *bool        `yaml:"enabled" jsonschema_description:"install zsh completions for packages carrying a completions def; default false; cascades profile > spec > user config; overridden by CHE_PACKAGES_COMPLETIONS_ZSH_ENABLED"`
+	InstallDestinationCandidates StringOrList `yaml:"installDestinationCandidates" jsonschema_description:"where zsh completion files install: one path or a candidate list (~/ and $VARs expand); with checkInFpath the first candidate on fpath wins, else the first entry; default [~/.local/share/zsh/site-functions, ~/.zfunc]; cascades profile > spec > user config; overridden by CHE_PACKAGES_COMPLETIONS_ZSH_INSTALL_DESTINATION_CANDIDATES (comma-separated)"`
+	CheckInFpath                 *bool        `yaml:"checkInFpath" jsonschema_description:"pick the first candidate destination found on fpath ($FPATH, else zsh -c fpath) and warn when none is; default true; overridden by CHE_PACKAGES_COMPLETIONS_ZSH_CHECK_IN_FPATH"`
+}
+
+type PrebuiltArchiveInstall struct {
+	InstallDestinationCandidates StringOrList `yaml:"installDestinationCandidates" jsonschema_description:"where binary-method binaries install: one path or a candidate list (~/ and $VARs expand); with checkInPath the first candidate on PATH wins, else the first entry; default ~/.local/bin; cascades profile > spec > user config; overridden by CHE_PACKAGES_PREBUILT_ARCHIVE_INSTALL_DESTINATION_CANDIDATES (comma-separated)"`
+	CheckInPath                  *bool        `yaml:"checkInPath" jsonschema_description:"pick the first candidate destination found on PATH and warn when none is; default true; overridden by CHE_PACKAGES_PREBUILT_ARCHIVE_CHECK_IN_PATH"`
 }
 
 type StringOrList []string

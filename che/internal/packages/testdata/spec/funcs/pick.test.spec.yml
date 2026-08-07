@@ -33,19 +33,19 @@ cases:
         - cmds: []
         - entry: |
             - brew
-            - binary:
+            - prebuiltArchive:
                 url: https://example.com/x
                 sha256:
                   linux-amd64: abc
     expected:
-      output: {mgr: binary, picked: true}
+      output: {mgr: prebuiltArchive, picked: true}
   - name: ShouldSkipBinaryWithoutHostSha
     input:
       args:
         - os: darwin
         - cmds: []
         - entry: |
-            - binary:
+            - prebuiltArchive:
                 url: https://example.com/x
                 sha256:
                   linux-amd64: abc
@@ -58,13 +58,13 @@ cases:
         - cmds: [brew]
         - entry: |
             - brew
-            - binary:
+            - prebuiltArchive:
                 url: https://example.com/x
                 sha256:
                   darwin-amd64: abc
-        - preferred: [binary]
+        - preferred: [prebuiltArchive]
     expected:
-      output: {mgr: binary, picked: true}
+      output: {mgr: prebuiltArchive, picked: true}
   - name: ShouldFallBackToEntryOrderWhenPreferredInapplicable
     input:
       args:

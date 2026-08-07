@@ -11,7 +11,7 @@ import (
 
 const kubectxYaml = `packages:
   kubectx:
-    - binary:
+    - prebuiltArchive:
         version: 0.11.0
         url: https://example.com/v{version}/kubectx_v{version}_{os}_{arch_g}.tar.gz
         bin: kubectx
@@ -21,7 +21,7 @@ const kubectxYaml = `packages:
 
 const kindYaml = `packages:
   kind:
-    - binary:
+    - prebuiltArchive:
         version: 0.32.0
         url: https://example.com/v{version}/kind-{os}-{arch}
         sha256:
@@ -72,7 +72,7 @@ func TestInstallBinaryBareAsset(t *testing.T) {
 
 const zigYaml = `packages:
   zig:
-    - binary:
+    - prebuiltArchive:
         version: 0.16.0
         url: https://example.com/{version}/zig-{arch_x}-linux-{version}.tar.xz
         bin: zig-{arch_x}-linux-{version}/zig
@@ -174,7 +174,7 @@ func TestInstallPkgDryRunAnnounces(t *testing.T) {
 }
 
 func TestInstallBinaryCustomDestination(t *testing.T) {
-	in, m := newInstaller(t, kindYaml, "linux", cmdMap([]string{"sha256sum"}), Options{BinaryDestinationCandidates: []string{"~/bin"}})
+	in, m := newInstaller(t, kindYaml, "linux", cmdMap([]string{"sha256sum"}), Options{PrebuiltArchiveDestinationCandidates: []string{"~/bin"}})
 	m.Stub = shaStub("goodsha")
 	require.NoError(t, in.Install([]string{"kind"}))
 	calls := strings.Join(m.Calls(), "\n")
@@ -184,7 +184,7 @@ func TestInstallBinaryCustomDestination(t *testing.T) {
 
 func TestInstallBinaryPicksFirstCandidateOnPath(t *testing.T) {
 	in, m := newInstaller(t, kindYaml, "linux", cmdMap([]string{"sha256sum"}),
-		Options{BinaryDestinationCandidates: []string{"/custom/bin", "~/bin"}, BinaryCheckInPath: true})
+		Options{PrebuiltArchiveDestinationCandidates: []string{"/custom/bin", "~/bin"}, PrebuiltArchiveCheckInPath: true})
 	in.Host.PathDirs = func() []string { return []string{"/usr/bin", "/home/u/bin"} }
 	m.Stub = shaStub("goodsha")
 	out, err := captureStdout(t, func() error { return in.Install([]string{"kind"}) })
@@ -195,18 +195,18 @@ func TestInstallBinaryPicksFirstCandidateOnPath(t *testing.T) {
 
 func TestInstallBinaryWarnsWhenNoCandidateOnPath(t *testing.T) {
 	in, m := newInstaller(t, kindYaml, "linux", cmdMap([]string{"sha256sum"}),
-		Options{BinaryDestinationCandidates: []string{"/custom/bin", "/other/bin"}, BinaryCheckInPath: true})
+		Options{PrebuiltArchiveDestinationCandidates: []string{"/custom/bin", "/other/bin"}, PrebuiltArchiveCheckInPath: true})
 	in.Host.PathDirs = func() []string { return []string{"/usr/bin"} }
 	m.Stub = shaStub("goodsha")
 	out, err := captureStdout(t, func() error { return in.Install([]string{"kind"}) })
 	require.NoError(t, err)
-	wantLines(t, out, "no packages.binary.installDestinationCandidates entry is on PATH (/custom/bin, /other/bin), using /custom/bin")
+	wantLines(t, out, "no packages.prebuiltArchive.installDestinationCandidates entry is on PATH (/custom/bin, /other/bin), using /custom/bin")
 	require.Contains(t, strings.Join(m.Calls(), "\n"), "/custom/bin/kind")
 }
 
-func TestInstallBinaryCheckInPathOffUsesFirstCandidate(t *testing.T) {
+func TestInstallPrebuiltArchiveCheckInPathOffUsesFirstCandidate(t *testing.T) {
 	in, m := newInstaller(t, kindYaml, "linux", cmdMap([]string{"sha256sum"}),
-		Options{BinaryDestinationCandidates: []string{"/custom/bin", "~/bin"}})
+		Options{PrebuiltArchiveDestinationCandidates: []string{"/custom/bin", "~/bin"}})
 	in.Host.PathDirs = func() []string { return []string{"/home/u/bin"} }
 	m.Stub = shaStub("goodsha")
 	out, err := captureStdout(t, func() error { return in.Install([]string{"kind"}) })

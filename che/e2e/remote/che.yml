@@ -11,6 +11,8 @@ ops-remote:
       - templates: [{source: remote/tpl.ontoHost.tpl, dest: 's:^remote:$HOME/remote:'}]
     makeDirs:
       - directories: [$HOME/remote/made-dir]
+    installPackages:
+      - e2e-remote
     runScripts:
-      - install/remote-script
+      - scripts/remote-script
 ##[<] 🤖🤖

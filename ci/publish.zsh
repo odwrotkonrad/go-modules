@@ -5,7 +5,7 @@
 # (build engine only: free goreleaser cannot parse dir-prefixed tags) unless
 # PUBLISH_PREBUILT=1 (dist/*.tar.gz prebuilt by earlier jobs: checksums only),
 # uploads
-# every archive + checksums (che: plus a docs-site tarball from the docs-che
+# every archive + deb + checksums (che: plus a docs-site tarball from the docs-che
 # job's public/ artifact) to the generic package registry at
 # packages/generic/<module>/<version>/<file> and links each upload as a release
 # asset on the existing <module>/v<version> release, then re-uploads each os/
@@ -23,7 +23,7 @@ if [[ "$MODULE" == che && -d ../public ]] {
   tar -czf "dist/che-docs_${MODULE_VERSION}.tar.gz" -C ../public .
 }
 if [[ "${PUBLISH_PREBUILT:-0}" == 1 ]] {
-  ( cd dist && sha256sum -- *.tar.gz > checksums.txt )
+  ( cd dist && sha256sum -- *.tar.gz *.deb(N) > checksums.txt )
 } else {
   MODULE_VERSION="$MODULE_VERSION" goreleaser release --verbose --snapshot --clean -f .goreleaser.yaml
 }
@@ -32,6 +32,7 @@ if [[ -d darwin-dist ]] ( cd darwin-dist && sha256sum -- *.tar.gz >> ../dist/che
 typeset -a FILES
 FILES=(
   dist/${MODULE}_*.tar.gz(N) darwin-dist/${MODULE}_*.tar.gz(N)
+  dist/${MODULE}_*.deb(N)
   dist/render-*.tar.gz(N) darwin-dist/render-*.tar.gz(N)
   dist/checksums.txt(N)
 )
@@ -43,7 +44,7 @@ TAG_ENC="${TAG//\//%2F}"
 for f in $FILES; do
   NAME="${f:t}"
   TYPE=other
-  if [[ "$NAME" == *.tar.gz && "$NAME" != che-docs_* ]] TYPE=package
+  if [[ ("$NAME" == *.tar.gz || "$NAME" == *.deb) && "$NAME" != che-docs_* ]] TYPE=package
   echo "uploading ${NAME} (${TYPE})"
   curl -fsSL --connect-timeout 30 --retry 10 --retry-delay 30 --header "JOB-TOKEN: ${CI_JOB_TOKEN}" --upload-file "$f" "${PKG}/${NAME}"
   echo

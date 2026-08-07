@@ -3,6 +3,7 @@ package packages
 // [>] 🤖🤖🤖
 
 import (
+	"context"
 	"fmt"
 	"os"
 	"os/exec"
@@ -10,6 +11,7 @@ import (
 	"runtime"
 	"slices"
 	"strings"
+	"time"
 )
 
 type Host struct {
@@ -40,20 +42,23 @@ func NewHost() Host {
 }
 
 func fpathDirs() []string {
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+	if out, err := exec.CommandContext(ctx, "zsh", "-ic", "print -rl -- $fpath").Output(); err == nil {
+		var dirs []string
+		for l := range strings.SplitSeq(strings.TrimSpace(string(out)), "\n") {
+			if l != "" {
+				dirs = append(dirs, l)
+			}
+		}
+		if len(dirs) > 0 {
+			return dirs
+		}
+	}
 	if v := os.Getenv("FPATH"); v != "" {
 		return filepath.SplitList(v)
 	}
-	out, err := exec.Command("zsh", "-c", "print -rl -- $fpath").Output()
-	if err != nil {
-		return nil
-	}
-	var dirs []string
-	for l := range strings.SplitSeq(strings.TrimSpace(string(out)), "\n") {
-		if l != "" {
-			dirs = append(dirs, l)
-		}
-	}
-	return dirs
+	return nil
 }
 
 func (h Host) ShaKey() string { return h.OS + "-" + h.Arch }
@@ -75,6 +80,9 @@ func (h Host) applicable(pkg string, it Item) (bool, error) {
 	case "brew", "cask":
 		return h.OS == "darwin" && h.HasCmd("brew"), nil
 	case "apt":
+		if it.Apt != nil && it.Apt.Repo != nil && (it.Apt.Repo.URL == "" || it.Apt.Repo.GpgURL == "") {
+			return false, fmt.Errorf("package %s: apt repo requires url and gpgUrl", pkg)
+		}
 		return h.OS == "linux" && h.HasCmd("apt-get"), nil
 	case "npm":
 		return h.HasCmd("npm"), nil
@@ -88,11 +96,11 @@ func (h Host) applicable(pkg string, it Item) (bool, error) {
 		}
 		fi, err := os.Stat("/usr/local/go/bin/go")
 		return err == nil && fi.Mode()&0o111 != 0, nil
-	case "binary":
-		if it.Binary == nil {
-			return false, fmt.Errorf("package %s: binary item missing props", pkg)
+	case "prebuiltArchive":
+		if it.PrebuiltArchive == nil {
+			return false, fmt.Errorf("package %s: prebuiltArchive item missing props", pkg)
 		}
-		_, ok := it.Binary.Sha256[h.ShaKey()]
+		_, ok := it.PrebuiltArchive.Sha256[h.ShaKey()]
 		return ok, nil
 	case "pkg":
 		if it.Pkg == nil || it.Pkg.URL == "" {
@@ -101,7 +109,7 @@ func (h Host) applicable(pkg string, it Item) (bool, error) {
 		return h.OS == "darwin", nil
 	case "script":
 		if it.Script == nil || (it.Script.Run == "" && it.Script.Path == "" && it.Script.URL == "") {
-			return false, fmt.Errorf("package %s: script item missing run, path, or url", pkg)
+			return false, fmt.Errorf("package %s: script item missing run, path, or remoteUrl", pkg)
 		}
 		if len(it.Script.Sha256) > 0 {
 			if _, ok := it.Script.Sha256[h.ShaKey()]; !ok {
@@ -131,7 +139,13 @@ func (h Host) pickPreferred(pkg string, entry Entry, preferred []string) (Item, 
 	return Item{}, false, nil
 }
 
-var KnownManagers = []string{"brew", "cask", "apt", "npm", "go", "gem", "binary", "script", "pkg", "code"}
+var KnownManagers = []string{"brew", "cask", "apt", "npm", "go", "gem", "prebuiltArchive", "script", "pkg", "code"}
+
+var DefaultPreferredMethods = []string{"brew", "cask", "apt", "pkg", "prebuiltArchive", "script", "npm", "go", "gem", "code"}
+
+var DefaultPrebuiltArchiveDestinationCandidates = []string{"~/.local/bin", "~/bin"}
+
+var DefaultCompletionsDestinationCandidates = []string{"~/.local/share/zsh/site-functions", "~/.zfunc"}
 
 func ValidateManagers(names []string) error {
 	for _, n := range names {

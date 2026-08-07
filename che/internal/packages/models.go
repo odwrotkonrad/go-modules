@@ -33,6 +33,7 @@ type File struct {
 
 type Entry struct {
 	Items       []Item
+	Command     string
 	Completions Completions
 }
 
@@ -42,6 +43,7 @@ type Completions struct {
 
 type CompletionFile struct {
 	Name   string `yaml:"name"`
+	Cmd    string `yaml:"cmd"`
 	URL    string `yaml:"url"`
 	Sha256 string `yaml:"sha256"`
 }
@@ -51,26 +53,44 @@ func (e *Entry) UnmarshalYAML(node *yaml.Node) error {
 		return node.Decode(&e.Items)
 	}
 	var obj struct {
-		Managers    []Item      `yaml:"managers"`
+		Managers    []Item      `yaml:"installMethods"`
+		Command     string      `yaml:"command"`
 		Completions Completions `yaml:"completions"`
 	}
 	if err := node.Decode(&obj); err != nil {
 		return err
 	}
-	if len(obj.Managers) == 0 {
-		return fmt.Errorf("package entry object form requires managers")
+	if len(obj.Managers) == 0 && obj.Completions.Zsh == nil {
+		return fmt.Errorf("package entry object form requires installMethods or completions")
+	}
+	if z := obj.Completions.Zsh; z != nil && (z.Cmd == "") == (z.URL == "") {
+		return fmt.Errorf("completions.zsh requires exactly one of cmd or url")
 	}
 	e.Items = obj.Managers
+	e.Command = obj.Command
 	e.Completions = obj.Completions
 	return nil
 }
 
 type Item struct {
-	Mgr    string
-	Name   string
-	Binary *BinarySpec
-	Script *ScriptSpec
-	Pkg    *PkgSpec
+	Mgr             string
+	Name            string
+	PrebuiltArchive *PrebuiltArchiveSpec
+	Script          *ScriptSpec
+	Pkg             *PkgSpec
+	Apt             *AptSpec
+}
+
+type AptSpec struct {
+	Packages []string     `yaml:"packages"`
+	Repo     *AptRepoSpec `yaml:"repo"`
+}
+
+type AptRepoSpec struct {
+	URL        string `yaml:"url"`
+	GpgURL     string `yaml:"gpgUrl"`
+	Suites     string `yaml:"suites"`
+	Components string `yaml:"components"`
 }
 
 type PkgSpec struct {
@@ -82,13 +102,13 @@ type PkgSpec struct {
 type ScriptSpec struct {
 	Run     string            `yaml:"run"`
 	Path    string            `yaml:"path"`
-	URL     string            `yaml:"url"`
+	URL     string            `yaml:"remoteUrl"`
 	OS      string            `yaml:"os"`
 	Version string            `yaml:"version"`
 	Sha256  map[string]string `yaml:"sha256"`
 }
 
-type BinarySpec struct {
+type PrebuiltArchiveSpec struct {
 	Version string            `yaml:"version"`
 	URL     string            `yaml:"url"`
 	Bin     string            `yaml:"bin"`
@@ -104,15 +124,20 @@ func (it *Item) UnmarshalYAML(node *yaml.Node) error {
 		return fmt.Errorf("manager item must be a scalar or a single-key map")
 	}
 	key, val := node.Content[0], node.Content[1]
-	if key.Value == "binary" {
-		it.Mgr = "binary"
-		it.Binary = &BinarySpec{}
-		return val.Decode(it.Binary)
+	if key.Value == "prebuiltArchive" {
+		it.Mgr = "prebuiltArchive"
+		it.PrebuiltArchive = &PrebuiltArchiveSpec{}
+		return val.Decode(it.PrebuiltArchive)
 	}
 	if key.Value == "pkg" {
 		it.Mgr = "pkg"
 		it.Pkg = &PkgSpec{}
 		return val.Decode(it.Pkg)
+	}
+	if key.Value == "apt" && val.Kind == yaml.MappingNode {
+		it.Mgr = "apt"
+		it.Apt = &AptSpec{}
+		return val.Decode(it.Apt)
 	}
 	if key.Value == "script" {
 		it.Mgr = "script"

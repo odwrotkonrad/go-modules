@@ -19,6 +19,7 @@ type Setting struct {
 	Key    string
 	Value  string
 	Source string
+	Kind   string
 }
 
 func (c Options) SettingsDelta() []Setting {
@@ -107,11 +108,20 @@ func (c *Options) resolveStr(key, def string, candidates ...cand) string {
 
 func (c *Options) resolveList(key string, candidates ...cand) []string {
 	v := c.resolveStr(key, "", candidates...)
+	c.setKind(key, "list")
 	if v == "" {
 		c.fillDefault(key, "[]")
 		return nil
 	}
 	return strings.Split(v, ",")
+}
+
+func (c *Options) setKind(key, kind string) {
+	for i := range c.Settings {
+		if c.Settings[i].Key == key {
+			c.Settings[i].Kind = kind
+		}
+	}
 }
 
 func (c *Options) setValue(key, value string) {
@@ -148,6 +158,7 @@ func (c *Options) resolveBool(key string, flagVal bool, envVal string, def bool,
 		}
 	}
 	c.record(key, strconv.FormatBool(v), src)
+	c.setKind(key, "bool")
 	return v
 }
 
@@ -224,26 +235,31 @@ func (c *Options) Resolve(env LookupEnv, user, spec Layer) error {
 	if err := packages.ValidateManagers(c.PackagesPreferredMethods); err != nil {
 		return err
 	}
-	c.PackagesBinaryDestinationCandidates = c.resolveList("packages.binary.installDestinationCandidates",
-		layerList(c.PackagesBinaryDestinationCandidates, "cliFlag"), envStr(env("CHE_PACKAGES_BINARY_INSTALL_DESTINATION_CANDIDATES")),
-		layerList(user.Packages.Binary.InstallDestinationCandidates, "config-file"), layerList(spec.Packages.Binary.InstallDestinationCandidates, "specFile"))
-	if len(c.PackagesBinaryDestinationCandidates) == 0 {
-		c.setValue("packages.binary.installDestinationCandidates", "[~/.local/bin]")
+	if len(c.PackagesPreferredMethods) == 0 {
+		c.PackagesPreferredMethods = packages.DefaultPreferredMethods
+		c.setValue("packages.preferredInstallationMethods", "["+strings.Join(packages.DefaultPreferredMethods, ", ")+"]")
 	}
-	c.PackagesBinaryCheckInPath = c.resolveBool("packages.binary.checkInPath", false, env("CHE_PACKAGES_BINARY_CHECK_IN_PATH"), true,
-		boolLayer{user.Packages.Binary.CheckInPath, "config-file"}, boolLayer{spec.Packages.Binary.CheckInPath, "specFile"})
-	c.PackagesCompletionsEnabled = c.resolveBool("packages.completions.enabled", false, env("CHE_PACKAGES_COMPLETIONS_ENABLED"), false,
-		boolLayer{user.Packages.Completions.Enabled, "config-file"}, boolLayer{spec.Packages.Completions.Enabled, "specFile"})
-	c.PackagesCompletionsPackages = c.resolveList("packages.completions.packages",
-		envStr(env("CHE_PACKAGES_COMPLETIONS_PACKAGES")),
-		layerList(user.Packages.Completions.Packages, "config-file"), layerList(spec.Packages.Completions.Packages, "specFile"))
-	c.PackagesCompletionsDestinationCandidates = c.resolveList("packages.completions.installDestinationCandidates",
-		envStr(env("CHE_PACKAGES_COMPLETIONS_INSTALL_DESTINATION_CANDIDATES")),
-		layerList(user.Packages.Completions.InstallDestinationCandidates, "config-file"),
-		layerList(spec.Packages.Completions.InstallDestinationCandidates, "specFile"))
-	c.fillDefault("packages.completions.installDestinationCandidates", "[~/.local/share/zsh/site-functions]")
-	c.PackagesCompletionsCheckInFpath = c.resolveBool("packages.completions.checkInFpath", false, env("CHE_PACKAGES_COMPLETIONS_CHECK_IN_FPATH"), true,
-		boolLayer{user.Packages.Completions.CheckInFpath, "config-file"}, boolLayer{spec.Packages.Completions.CheckInFpath, "specFile"})
+	c.PackagesPrebuiltArchiveDestinationCandidates = c.resolveList("packages.prebuiltArchive.installDestinationCandidates",
+		layerList(c.PackagesPrebuiltArchiveDestinationCandidates, "cliFlag"), envStr(env("CHE_PACKAGES_PREBUILT_ARCHIVE_INSTALL_DESTINATION_CANDIDATES")),
+		layerList(user.Packages.PrebuiltArchive.InstallDestinationCandidates, "config-file"), layerList(spec.Packages.PrebuiltArchive.InstallDestinationCandidates, "specFile"))
+	if len(c.PackagesPrebuiltArchiveDestinationCandidates) == 0 {
+		c.PackagesPrebuiltArchiveDestinationCandidates = packages.DefaultPrebuiltArchiveDestinationCandidates
+		c.setValue("packages.prebuiltArchive.installDestinationCandidates", "["+strings.Join(packages.DefaultPrebuiltArchiveDestinationCandidates, ", ")+"]")
+	}
+	c.PackagesPrebuiltArchiveCheckInPath = c.resolveBool("packages.prebuiltArchive.checkInPath", false, env("CHE_PACKAGES_PREBUILT_ARCHIVE_CHECK_IN_PATH"), true,
+		boolLayer{user.Packages.PrebuiltArchive.CheckInPath, "config-file"}, boolLayer{spec.Packages.PrebuiltArchive.CheckInPath, "specFile"})
+	c.PackagesCompletionsEnabled = c.resolveBool("packages.completions.zsh.enabled", false, env("CHE_PACKAGES_COMPLETIONS_ZSH_ENABLED"), false,
+		boolLayer{user.Packages.Completions.Zsh.Enabled, "config-file"}, boolLayer{spec.Packages.Completions.Zsh.Enabled, "specFile"})
+	c.PackagesCompletionsDestinationCandidates = c.resolveList("packages.completions.zsh.installDestinationCandidates",
+		envStr(env("CHE_PACKAGES_COMPLETIONS_ZSH_INSTALL_DESTINATION_CANDIDATES")),
+		layerList(user.Packages.Completions.Zsh.InstallDestinationCandidates, "config-file"),
+		layerList(spec.Packages.Completions.Zsh.InstallDestinationCandidates, "specFile"))
+	if len(c.PackagesCompletionsDestinationCandidates) == 0 {
+		c.PackagesCompletionsDestinationCandidates = packages.DefaultCompletionsDestinationCandidates
+		c.setValue("packages.completions.zsh.installDestinationCandidates", "["+strings.Join(packages.DefaultCompletionsDestinationCandidates, ", ")+"]")
+	}
+	c.PackagesCompletionsCheckInFpath = c.resolveBool("packages.completions.zsh.checkInFpath", false, env("CHE_PACKAGES_COMPLETIONS_ZSH_CHECK_IN_FPATH"), true,
+		boolLayer{user.Packages.Completions.Zsh.CheckInFpath, "config-file"}, boolLayer{spec.Packages.Completions.Zsh.CheckInFpath, "specFile"})
 	c.AutoDiscover = c.resolveBool("autoDiscover", false, env("CHE_AUTO_DISCOVER"), true,
 		boolLayer{user.AutoDiscover, "config-file"})
 	return c.resolveOtel(env, user, spec)

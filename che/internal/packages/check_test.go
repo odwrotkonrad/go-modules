@@ -44,7 +44,7 @@ func TestCheckUpgradableBinaryPinDrift(t *testing.T) {
 	}
 	out, err := captureStdout(t, func() error { return in.CheckUpgradable([]string{"kind"}) })
 	require.NoError(t, err)
-	wantLines(t, out, "upgradable kind via binary: yaml pins 0.32.0")
+	wantLines(t, out, "upgradable kind via prebuiltArchive: yaml pins 0.32.0")
 }
 
 func TestCheckNotShadowedWarns(t *testing.T) {

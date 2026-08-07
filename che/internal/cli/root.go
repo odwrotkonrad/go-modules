@@ -273,24 +273,46 @@ func (a *app) configCmd() *cobra.Command {
 		Use:   "config",
 		Short: "inspect che's resolved configuration",
 	}
-	var delta, all bool
+	var delta, all, defaults bool
+	var output string
 	show := &cobra.Command{
 		Use:   "show",
-		Short: "print the resolved options with their deciding sources (--delta default, --all for every option)",
+		Short: "print the resolved options with their deciding sources (--delta default, --all for every option, --defaults for the code defaults)",
 		RunE: func(cmd *cobra.Command, args []string) error {
 			settings := a.opts.SettingsDelta()
-			if all {
+			switch {
+			case defaults:
+				var err error
+				if settings, err = options.DefaultSettings(); err != nil {
+					return err
+				}
+			case all:
 				settings = a.opts.SettingsSorted()
 			}
-			for _, s := range settings {
-				fmt.Printf("%s = %s  (%s)\n", s.Key, s.Value, s.DisplaySource())
+			switch output {
+			case "", "text":
+				for _, s := range settings {
+					fmt.Printf("%s = %s  (%s)\n", s.Key, s.Value, s.DisplaySource())
+				}
+				return nil
+			case "yaml":
+				out, err := options.SettingsYAML(settings)
+				if err != nil {
+					return err
+				}
+				fmt.Print(out)
+				return nil
+			default:
+				return fmt.Errorf("invalid --output %q: want text or yaml", output)
 			}
-			return nil
 		},
 	}
 	show.Flags().BoolVar(&delta, "delta", false, "print only the options differing from defaults (default mode)")
 	show.Flags().BoolVar(&all, "all", false, "print every option with its value and source")
-	show.MarkFlagsMutuallyExclusive("delta", "all")
+	show.Flags().BoolVar(&defaults, "defaults", false, "print every option's default value (configured values ignored)")
+	show.Flags().StringVar(&output, "output", "text",
+		"output format; values: text (key = value (source) lines) | yaml (config-file shape, seedable as $XDG_CONFIG_HOME/che/config.yml)")
+	show.MarkFlagsMutuallyExclusive("delta", "all", "defaults")
 	cmd.AddCommand(show)
 	return cmd
 }

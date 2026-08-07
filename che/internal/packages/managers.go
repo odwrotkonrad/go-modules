@@ -16,16 +16,15 @@ import (
 const Scope = "install-packages"
 
 type Options struct {
-	Update                           bool
-	IfMissing                        bool
-	DryRun                           bool
-	PreferredMethods                 []string
-	BinaryDestinationCandidates      []string
-	BinaryCheckInPath                bool
-	CompletionsEnabled               bool
-	CompletionsPackages              []string
-	CompletionsDestinationCandidates []string
-	CompletionsCheckInFpath          bool
+	Update                               bool
+	IfMissing                            bool
+	DryRun                               bool
+	PreferredMethods                     []string
+	PrebuiltArchiveDestinationCandidates []string
+	PrebuiltArchiveCheckInPath           bool
+	CompletionsEnabled                   bool
+	CompletionsDestinationCandidates     []string
+	CompletionsCheckInFpath              bool
 }
 
 type Installer struct {
@@ -80,6 +79,15 @@ func (in *Installer) output(argv []string) (string, bool) {
 	return string(out), err == nil
 }
 
+func (in *Installer) cmdFor(pkg string) string {
+	if e, ok := in.File.Packages[pkg]; ok && e.Command != "" {
+		return e.Command
+	}
+	return pkg
+}
+
+func (in *Installer) hasCmd(pkg string) bool { return in.Host.HasCmd(in.cmdFor(pkg)) }
+
 func (in *Installer) sudo(argv ...string) []string {
 	if in.Host.OS == "linux" && in.Host.Euid != 0 {
 		return append([]string{"sudo"}, argv...)
@@ -96,6 +104,17 @@ func (in *Installer) Install(pkgs []string) error {
 			entry, err := in.File.Find(pkg, in.FilePath)
 			if err != nil {
 				return err
+			}
+			if len(entry.Items) == 0 {
+				progress = true
+				if !in.hasCmd(pkg) {
+					in.emitSkip(log.Levels.Info, pkg, "no install manager, command absent")
+					continue
+				}
+				if err := in.installCompletions(pkg, entry); err != nil {
+					return err
+				}
+				continue
 			}
 			it, ok, err := in.Host.pickPreferred(pkg, entry, in.Opts.PreferredMethods)
 			if err != nil {
@@ -119,18 +138,32 @@ func (in *Installer) Install(pkgs []string) error {
 		pending = still
 	}
 	for _, pkg := range pending {
+		if in.hasCmd(pkg) {
+			in.emitSkip(log.Levels.Debug, pkg, "no applicable manager, command present")
+			entry, err := in.File.Find(pkg, in.FilePath)
+			if err != nil {
+				return err
+			}
+			if err := in.installCompletions(pkg, entry); err != nil {
+				return err
+			}
+			continue
+		}
 		in.emitSkip(log.Levels.Info, pkg, "no applicable manager")
 	}
 	return nil
 }
 
 func (in *Installer) installVia(pkg string, it Item) error {
-	if in.Opts.IfMissing && in.Host.HasCmd(pkg) {
+	if in.Opts.IfMissing && in.hasCmd(pkg) {
 		in.emitSkip(log.Levels.Info, pkg, "command present (--if-missing)")
 		return nil
 	}
-	if it.Mgr == "binary" {
-		return in.installBinary(pkg, it.Binary)
+	if it.Mgr == "apt" && it.Apt != nil {
+		return in.installAptSpec(pkg, it.Apt)
+	}
+	if it.Mgr == "prebuiltArchive" {
+		return in.installPrebuiltArchive(pkg, it.PrebuiltArchive)
 	}
 	if it.Mgr == "script" {
 		return in.installScript(pkg, it.Script)
@@ -190,7 +223,7 @@ func (in *Installer) isInstalled(pkg, mgr, base string) bool {
 		_, ok := in.output([]string{"dpkg", "-s", base})
 		return ok
 	case "npm":
-		if in.Host.HasCmd(pkg) {
+		if in.hasCmd(pkg) {
 			return true
 		}
 		_, ok := in.output([]string{"npm", "ls", "--global", "--depth=0", base})
@@ -198,7 +231,7 @@ func (in *Installer) isInstalled(pkg, mgr, base string) bool {
 	case "code":
 		return in.codeExtensions()[strings.ToLower(base)]
 	default:
-		return in.Host.HasCmd(pkg)
+		return in.hasCmd(pkg)
 	}
 }
 
@@ -325,7 +358,7 @@ func (in *Installer) aptUpdate() error {
 }
 
 func (in *Installer) installScript(pkg string, s *ScriptSpec) error {
-	if in.Host.HasCmd(pkg) {
+	if in.hasCmd(pkg) {
 		if s.Version == "" || in.versionOutputHasPin(pkg, s.Version) {
 			in.emitSkip(log.Levels.Debug, pkg, "already installed via script")
 			return nil
@@ -389,7 +422,7 @@ func (in *Installer) scriptArgv(pkg string, s *ScriptSpec) ([]string, error) {
 func (in *Installer) goInstall(pkg, module string) error {
 	c := execx.Cmd{
 		Argv:   []string{"go", "install", module},
-		Env:    append(os.Environ(), "PATH=/usr/local/go/bin:"+in.Host.Getenv("PATH")),
+		Env:    append(os.Environ(), "PATH="+in.userBinDir()+":"+in.Host.Getenv("PATH")),
 		Stdout: os.Stdout, Stderr: os.Stderr,
 	}
 	if err := execx.Default.Exec(c); err != nil {

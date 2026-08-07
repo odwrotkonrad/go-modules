@@ -56,13 +56,13 @@ func (in *Installer) CheckUpgradable(pkgs []string) error {
 		if err != nil || !ok {
 			continue
 		}
-		if pin := pinnedVersion(it); pin != "" && (it.Mgr == "binary" || it.Mgr == "script" || it.Mgr == "pkg") {
-			if in.Host.HasCmd(pkg) && !in.versionOutputHasPin(pkg, pin) {
+		if pin := pinnedVersion(it); pin != "" && (it.Mgr == "prebuiltArchive" || it.Mgr == "script" || it.Mgr == "pkg") {
+			if in.hasCmd(pkg) && !in.versionOutputHasPin(pkg, pin) {
 				in.emit(log.Levels.Warn, "upgradable", pkg+" via "+it.Mgr+": yaml pins "+pin)
 			}
 			continue
 		}
-		if it.Mgr == "binary" || it.Mgr == "script" || it.Mgr == "pkg" {
+		if it.Mgr == "prebuiltArchive" || it.Mgr == "script" || it.Mgr == "pkg" {
 			continue
 		}
 		name := it.Name
@@ -79,8 +79,8 @@ func (in *Installer) CheckUpgradable(pkgs []string) error {
 
 func pinnedVersion(it Item) string {
 	switch {
-	case it.Binary != nil:
-		return it.Binary.Version
+	case it.PrebuiltArchive != nil:
+		return it.PrebuiltArchive.Version
 	case it.Script != nil:
 		return it.Script.Version
 	case it.Pkg != nil:
@@ -176,7 +176,7 @@ func (in *Installer) managerBinDir(mgr string) string {
 			return filepath.Join(d, "bin")
 		}
 		return filepath.Join(in.Host.Getenv("HOME"), "go", "bin")
-	case "binary":
+	case "prebuiltArchive":
 		return in.userBinDir()
 	}
 	return ""

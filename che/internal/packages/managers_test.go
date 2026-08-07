@@ -211,7 +211,7 @@ func TestInstallScriptPathMissingErrors(t *testing.T) {
 }
 
 func TestInstallScriptUrlFetchesAndRuns(t *testing.T) {
-	in, m := newInstaller(t, "packages:\n  x: [{script: {url: https://example.com/install.sh}}]", "darwin", cmdMap(nil), Options{})
+	in, m := newInstaller(t, "packages:\n  x: [{script: {remoteUrl: https://example.com/install.sh}}]", "darwin", cmdMap(nil), Options{})
 	m.Stub = func(argv []string) ([]byte, error) {
 		if argv[0] == "curl" {
 			return []byte("echo fetched"), nil
@@ -226,7 +226,7 @@ func TestInstallScriptUrlFetchesAndRuns(t *testing.T) {
 }
 
 func TestInstallScriptUrlFetchFailureAborts(t *testing.T) {
-	in, m := newInstaller(t, "packages:\n  x: [{script: {url: https://example.com/install.sh}}]", "darwin", cmdMap(nil), Options{})
+	in, m := newInstaller(t, "packages:\n  x: [{script: {remoteUrl: https://example.com/install.sh}}]", "darwin", cmdMap(nil), Options{})
 	m.Stub = failOn("curl")
 	err := in.Install([]string{"x"})
 	require.ErrorContains(t, err, "install script fetch failed: https://example.com/install.sh")

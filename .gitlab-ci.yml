@@ -263,6 +263,7 @@ release-lib:
     - cd che && mkdocs build --site-dir ../public
     ##[>] 🤖🤖
     - cp install.sh ../public/install.sh
+    - if [ -d ../public-apt ]; then cp -R ../public-apt ../public/apt; fi
     ##[<] 🤖🤖
     - echo "docs preview -> https://konradodwrot.gitlab.io/-/go-modules/-/jobs/$CI_JOB_ID/artifacts/public/index.html"
   artifacts:
@@ -273,7 +274,9 @@ pages-publish:
   extends: .pages-build
   stage: publish
   pages: true
-  needs: [release-che]
+  needs:
+    - release-che
+    - apt-build-che
   rules:
     - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
       changes: [che/**/*]
@@ -373,6 +376,7 @@ goreleaser-linux-che:
   artifacts:
     paths:
       - che/dist/*.tar.gz
+      - che/dist/*.deb
     expire_in: 1 day
 
 prerelease-darwin-che:
@@ -465,6 +469,33 @@ publish-che:
     - make publish
 
 ##[>] 🤖🤖
+apt-build-che:
+  stage: publish
+  image: $CI_IMAGE
+  needs:
+    - job: publish-che
+      optional: true
+  rules:
+    - if: $CI_COMMIT_TAG =~ /^che\/v/
+    - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
+      changes: [che/**/*]
+  script:
+    - apt-get update && apt-get install -y --no-install-recommends aptly gnupg
+    - make publish-apt
+  artifacts:
+    paths:
+      - public-apt
+    expire_in: 1 day
+
+pages-publish-tag:
+  extends: .pages-build
+  stage: publish
+  pages: true
+  needs:
+    - apt-build-che
+  rules:
+    - if: $CI_COMMIT_TAG =~ /^che\/v/
+
 publish-brew-che:
   stage: publish
   image: $CI_IMAGE

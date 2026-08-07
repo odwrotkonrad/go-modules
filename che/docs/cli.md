@@ -159,12 +159,14 @@ inspect che's resolved configuration.
 
 ### `$ che config show`
 
-print the resolved options with their deciding sources (--delta default, --all for every option).
+print the resolved options with their deciding sources (--delta default, --all for every option, --defaults for the code defaults).
 
 | Option | Env | Values | Default | Description |
 | --- | --- | --- | --- | --- |
 | `--all` |  | `bool` | `false` | print every option with its value and source |
+| `--defaults` |  | `bool` | `false` | print every option's default value (configured values ignored) |
 | `--delta` |  | `bool` | `false` | print only the options differing from defaults (default mode) |
+| `--output` |  | `text (key = value (source) lines)` \| `yaml (config-file shape, seedable as $XDG_CONFIG_HOME/che/config.yml)` | `text` | output format |
 
 ### `$ che discover-profiles`
 
@@ -192,13 +194,15 @@ install packages from packages.yml and check their state.
 
 | Option | Env | Values | Default | Description |
 | --- | --- | --- | --- | --- |
-| `--packages-file` | `CHE_PACKAGES_FILE` | `string` | `$XDG_CONFIG_HOME/packages/packages.yml` | packages.yml path |
-| `--packages-override` | `CHE_PACKAGES_OVERRIDE` | `string` | `$XDG_CONFIG_HOME/che/packages-override.yml if present` | override packages file (same-name entries replace, new names append) |
+| `--packages-file` | `CHE_PACKAGES_FILE` | `string` | `$XDG_CONFIG_HOME/packages/packages.yml` | packages.yml path, fully superseding the builtin packages.yml shipped in che (a set file must exist; the builtin serves only when no file exists at the default path) |
+| `--packages-override` | `CHE_PACKAGES_OVERRIDE` | `string` | `$XDG_CONFIG_HOME/che/packages-override.yml if present` | override packages file merged over the effective base (the packages file, or the builtin when none exists): same-name entries replace, new names append |
 | `--preferred-methods` | `CHE_PACKAGES_PREFERRED_METHODS` | `brew` \| `cask` \| `apt` \| `npm` \| `go` \| `gem` \| `binary` \| `script` \| `pkg` \| `code` | `[]` | installation-method preference order (comma-separated or repeated): listed managers try first within each package entry, unlisted follow in entry order |
 
 ### `$ che packages check-not-shadowed`
 
 warn when a package's manager-expected binary is not the first PATH hit.
+
+Usage: `che packages check-not-shadowed [pkg...]`
 
 ### `$ che packages check-present`
 
@@ -210,9 +214,13 @@ Usage: `che packages check-present [pkg...]`
 
 warn when a canonical command resolves in more than one PATH dir, listing every location.
 
+Usage: `che packages check-single-present [pkg...]`
+
 ### `$ che packages check-upgradable`
 
 warn on manager-reported outdated packages and binary pins drifted from --version output.
+
+Usage: `che packages check-upgradable [pkg...]`
 
 ### `$ che packages install`
 

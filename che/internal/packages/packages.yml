@@ -18,23 +18,43 @@ packages:
   ccstatusline: [{npm: ccstatusline@2.2.22}]
   charliermarsh.ruff: [code]
   che:
-    - {brew: konradodwrot/tap/che}
-    - script:
-        run: curl -fsSL --connect-timeout 30 --retry 10 --retry-delay 30 --retry-all-errors https://konradodwrot.gitlab.io/go-modules/install.sh | sh
+    installMethods:
+      - {brew: konradodwrot/tap/che}
+      - script:
+          run: curl -fsSL --connect-timeout 30 --retry 10 --retry-delay 30 --retry-all-errors https://konradodwrot.gitlab.io/go-modules/install.sh | sh
+    completions:
+      zsh: {cmd: che completion zsh}
   cilium:
     - {brew: cilium-cli}
-    - binary:
+    - prebuiltArchive:
         version: 0.19.7
         url: https://github.com/cilium/cilium-cli/releases/download/v{version}/cilium-{os}-{arch}.tar.gz
         bin: cilium
         sha256:
           linux-amd64: cd15e0983bf0acc7946cd05d453d1e58376ea92dec2642e745212df2b07d8852
           linux-arm64: 9482937f14061fb239f2dbb2f97f4103de1b101f5d5defbff319f294f9bd540f
-  claude: [{brew: {cask: claude-code}}, {npm: "@anthropic-ai/claude-code"}]
+  claude:
+    installMethods: [{brew: {cask: claude-code}}, {npm: "@anthropic-ai/claude-code"}]
+    completions:
+      zsh:
+        url: https://raw.githubusercontent.com/wbingli/zsh-claudecode-completion/01f50d4a8a98b91cf6d9359deb37d60668c49806/_claude
+        sha256: 9bf8cd7077082b03f17d6b595544879ee401d2c8a3afafcdedcf141a298f1d79
   code: [{brew: {cask: visual-studio-code}}]
-  codex: [{brew: {cask: codex}}, {npm: "@openai/codex"}]
+  codex:
+    installMethods: [{brew: {cask: codex}}, {npm: "@openai/codex"}]
+    completions:
+      zsh: {cmd: codex completion zsh}
   copilot: [{npm: "@github/copilot"}]
   corepack: [npm]
+  docker:
+    installMethods:
+      - apt:
+          packages: [docker-ce, docker-ce-cli, containerd.io, docker-buildx-plugin, docker-compose-plugin]
+          repo:
+            url: https://download.docker.com/linux/debian
+            gpgUrl: https://download.docker.com/linux/debian/gpg
+    completions:
+      zsh: {cmd: docker completion zsh}
   duti: [brew]
   editorconfig.editorconfig: [code]
   esbenp.prettier-vscode: [code]
@@ -59,7 +79,7 @@ packages:
   gitlab-tart-executor: [{brew: cirruslabs/cli/gitlab-tart-executor}]
   glab:
     - brew
-    - binary:
+    - prebuiltArchive:
         version: 1.107.0
         url: https://gitlab.com/gitlab-org/cli/-/releases/v{version}/downloads/glab_{version}_linux_{arch}.tar.gz
         bin: bin/glab
@@ -67,8 +87,8 @@ packages:
           linux-amd64: eb42f56eb1a789cf4f22aa5960ff0ef60cf1e7fc1295327501f9f59030d5ae2c
           linux-arm64: 8356e442ed42ff6973cbe267dd7371c65f9b810b01e7d70bb557cd284e7b35ba
   go:
-    managers:
-      - binary:
+    installMethods:
+      - prebuiltArchive:
           version: 1.26.4
           url: https://go.dev/dl/go{version}.{os}-{arch}.tar.gz
           bin: go/bin/go go/bin/gofmt
@@ -85,7 +105,7 @@ packages:
   gopls: [{go: "golang.org/x/tools/gopls@latest"}]
   goreleaser:
     - brew
-    - binary:
+    - prebuiltArchive:
         version: 2.16.0
         url: https://github.com/goreleaser/goreleaser/releases/download/v{version}/goreleaser_Linux_{arch_g}.tar.gz
         bin: goreleaser
@@ -96,7 +116,7 @@ packages:
   hoovercj.vscode-settings-cycler: [code]
   htop: [brew, apt]
   jaeger:
-    - binary:
+    - prebuiltArchive:
         version: 2.18.0
         url: https://github.com/jaegertracing/jaeger/releases/download/v{version}/jaeger-{version}-darwin-arm64.tar.gz
         bin: jaeger-{version}-darwin-arm64/jaeger
@@ -104,48 +124,64 @@ packages:
           darwin-arm64: 839f01b46fe03deb91c920f26986d0cdf1af38d61d5badc40a8688410a69df17
   jq: [brew, apt]
   kind:
-    - brew
-    - binary:
-        version: 0.32.0
-        url: https://github.com/kubernetes-sigs/kind/releases/download/v{version}/kind-{os}-{arch}
-        sha256:
-          linux-amd64: 50030de23cf40a18505f20426f6a8506bedf13c6e509244bd1fa9463721b0f54
-          linux-arm64: b92cd615e97585de8ddade28ed5cd7feb4248d717c233eea5b03c37298900f5d
+    installMethods:
+      - brew
+      - prebuiltArchive:
+          version: 0.32.0
+          url: https://github.com/kubernetes-sigs/kind/releases/download/v{version}/kind-{os}-{arch}
+          sha256:
+            linux-amd64: 50030de23cf40a18505f20426f6a8506bedf13c6e509244bd1fa9463721b0f54
+            linux-arm64: b92cd615e97585de8ddade28ed5cd7feb4248d717c233eea5b03c37298900f5d
+    completions:
+      zsh: {cmd: kind completion zsh}
   kubectl:
-    - brew
-    - binary:
-        version: 1.36.3
-        url: https://dl.k8s.io/release/v{version}/bin/{os}/{arch}/kubectl
-        sha256:
-          linux-amd64: ebbd080e7c2e275093b55915722043257eb24004363e20acb3c4d71919f88336
-          linux-arm64: 3d86f24401c41ae5a46ac50eef8865fe891d3647d324a0836f6c63757a126e62
+    installMethods:
+      - brew
+      - prebuiltArchive:
+          version: 1.36.3
+          url: https://dl.k8s.io/release/v{version}/bin/{os}/{arch}/kubectl
+          sha256:
+            linux-amd64: ebbd080e7c2e275093b55915722043257eb24004363e20acb3c4d71919f88336
+            linux-arm64: 3d86f24401c41ae5a46ac50eef8865fe891d3647d324a0836f6c63757a126e62
+    completions:
+      zsh: {cmd: kubectl completion zsh}
   kubectx:
-    - binary:
-        version: 0.11.0
-        url: https://github.com/ahmetb/kubectx/releases/download/v{version}/kubectx_v{version}_{os}_{arch_g}.tar.gz
-        bin: kubectx
-        sha256:
-          darwin-arm64: b8c9b5150ca6d902474a115cf7e535831081b9ae10cbe561ea36c82bb3823d02
-          linux-amd64: 08e031c54fbffb3f100e904e4eae94bba2730fedf4869921fda79e4d7a8f5d4c
-          linux-arm64: 1dac2072216689e773325cb7587b858ea7415706ebcf04e23bf80e7e70555340
+    installMethods:
+      - prebuiltArchive:
+          version: 0.11.0
+          url: https://github.com/ahmetb/kubectx/releases/download/v{version}/kubectx_v{version}_{os}_{arch_g}.tar.gz
+          bin: kubectx
+          sha256:
+            darwin-arm64: b8c9b5150ca6d902474a115cf7e535831081b9ae10cbe561ea36c82bb3823d02
+            linux-amd64: 08e031c54fbffb3f100e904e4eae94bba2730fedf4869921fda79e4d7a8f5d4c
+            linux-arm64: 1dac2072216689e773325cb7587b858ea7415706ebcf04e23bf80e7e70555340
+    completions:
+      zsh:
+        url: https://raw.githubusercontent.com/ahmetb/kubectx/v0.11.0/completion/_kubectx.zsh
+        sha256: 410b5315f7a91b1c210cbc86c9cc4dda065f2ac180b490f3ebbf7e764ab6b470
   kubens:
-    - binary:
-        version: 0.11.0
-        url: https://github.com/ahmetb/kubectx/releases/download/v{version}/kubens_v{version}_{os}_{arch_g}.tar.gz
-        bin: kubens
-        sha256:
-          darwin-arm64: b1c87ddca22f1afc3e980ac807a715cd1183750022798d28a0a4e0cf66bec4e3
-          linux-amd64: 326c021c7b35468ed9a187b361198d0f22ae32828139c65eb6670c0d8301cc09
-          linux-arm64: 37058abe82ef20c93b44f3dc8ca2382dbb95d416cec958fbf7b8f79f011be86c
+    installMethods:
+      - prebuiltArchive:
+          version: 0.11.0
+          url: https://github.com/ahmetb/kubectx/releases/download/v{version}/kubens_v{version}_{os}_{arch_g}.tar.gz
+          bin: kubens
+          sha256:
+            darwin-arm64: b1c87ddca22f1afc3e980ac807a715cd1183750022798d28a0a4e0cf66bec4e3
+            linux-amd64: 326c021c7b35468ed9a187b361198d0f22ae32828139c65eb6670c0d8301cc09
+            linux-arm64: 37058abe82ef20c93b44f3dc8ca2382dbb95d416cec958fbf7b8f79f011be86c
+    completions:
+      zsh:
+        url: https://raw.githubusercontent.com/ahmetb/kubectx/v0.11.0/completion/_kubens.zsh
+        sha256: 084c226035af951e582020b2bc055a6521929ee54d8942b4d19577e5d45fd8f7
   lefthook:
     - brew
-    - binary:
+    - prebuiltArchive:
         version: 2.1.9
         url: https://github.com/evilmartians/lefthook/releases/download/v{version}/lefthook_{version}_Linux_{arch_g}
         sha256:
           linux-amd64: 0d60b0d350c923963729574f6431171f0277788884ad0c6284fa0160c36e3877
           linux-arm64: 304321997336c450af6b5c0cc641c59141168866fca0b1fc3767e067812600a9
-    - binary:
+    - prebuiltArchive:
         version: 2.1.9
         url: https://github.com/evilmartians/lefthook/releases/download/v{version}/lefthook_{version}_MacOS_{arch_g}
         sha256:
@@ -171,7 +207,7 @@ packages:
   openssh: [brew, {apt: openssh-client}]
   openssl: [{brew: openssl@3}, {apt: libssl-dev}]
   otelcol:
-    - binary:
+    - prebuiltArchive:
         version: 0.153.0
         url: https://github.com/open-telemetry/opentelemetry-collector-releases/releases/download/v{version}/otelcol_{version}_{os}_{arch}.tar.gz
         bin: otelcol
@@ -187,7 +223,7 @@ packages:
   pnpm: [brew, npm]
   procs: [brew]
   prometheus:
-    - binary:
+    - prebuiltArchive:
         version: 3.5.3
         url: https://github.com/prometheus/prometheus/releases/download/v{version}/prometheus-{version}.darwin-amd64.tar.gz
         bin: prometheus-{version}.darwin-amd64/prometheus prometheus-{version}.darwin-amd64/promtool
@@ -207,6 +243,9 @@ packages:
   python3-venv: [{apt: python3-venv}]
   readline: [brew, {apt: libreadline-dev}]
   redhat.vscode-yaml: [code]
+  rg:
+    completions:
+      zsh: {cmd: rg --generate=complete-zsh}
   ruby: [brew, {apt: ruby-full}]
   ruby-dev: [{apt: ruby-dev}]
   ruby-lsp: [{gem: ruby-lsp}]
@@ -218,7 +257,7 @@ packages:
   tart: [{brew: cirruslabs/cli/tart}]
   tcl: [{brew: tcl-tk}, apt]
   terraform:
-    - binary:
+    - prebuiltArchive:
         version: 1.15.0
         url: https://releases.hashicorp.com/terraform/{version}/terraform_{version}_{os}_{arch}.zip
         sha256:
@@ -235,7 +274,7 @@ packages:
   xz: [brew, {apt: xz-utils}]
   yq:
     - brew
-    - binary:
+    - prebuiltArchive:
         version: 4.53.3
         url: https://github.com/mikefarah/yq/releases/download/v{version}/yq_{os}_{arch}
         sha256:
@@ -246,7 +285,7 @@ packages:
   yzhang.markdown-all-in-one: [code]
   zig:
     - brew
-    - binary:
+    - prebuiltArchive:
         version: 0.16.0
         url: https://ziglang.org/download/{version}/zig-{arch_x}-linux-{version}.tar.xz
         bin: zig-{arch_x}-linux-{version}/zig

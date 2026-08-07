@@ -11,7 +11,7 @@ Available Commands:
     powershell            Generate the autocompletion script for powershell
     zsh                   Generate the autocompletion script for zsh
   config                  inspect che's resolved configuration
-    show                  print the resolved options with their deciding sources (--delta default, --all for every option)
+    show                  print the resolved options with their deciding sources (--delta default, --all for every option, --defaults for the code defaults)
   discover-profiles       log the discovered profiles with their per-op changes and exit
   init-remote-sources     fetch the remote spec sources (clone/pull the cache checkouts) and exit
   make-copies             *.ontoHost.cp copy op

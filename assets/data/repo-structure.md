@@ -11,15 +11,15 @@ che
     fakebin
     fakebin2
     local
-      install
       root
         conditional
         dropped
         plain
+      scripts
     remote
-      install
       root
         remote
+      scripts
   internal
     che
       testdata

@@ -14,8 +14,8 @@ import (
 
 const goCompYaml = `packages:
   go:
-    managers:
-      - binary:
+    installMethods:
+      - prebuiltArchive:
           version: 1.26.4
           url: https://example.com/go{version}.{os}-{arch}.tar.gz
           bin: go/bin/go go/bin/gofmt
@@ -38,15 +38,52 @@ func TestEntryObjectFormParsesManagersAndCompletions(t *testing.T) {
 	entry, err := in.File.Find("go", "packages.yml")
 	require.NoError(t, err)
 	require.Len(t, entry.Items, 1)
-	require.Equal(t, "binary", entry.Items[0].Mgr)
+	require.Equal(t, "prebuiltArchive", entry.Items[0].Mgr)
 	require.Equal(t, "_golang", entry.Completions.Zsh.Name)
 	require.Equal(t, "https://example.com/_golang", entry.Completions.Zsh.URL)
 }
 
-func TestEntryObjectFormRequiresManagers(t *testing.T) {
+func TestEntryObjectFormRequiresManagersOrCompletions(t *testing.T) {
 	var f File
-	err := yaml.Unmarshal([]byte("packages:\n  go:\n    completions:\n      zsh: {url: https://example.com/_golang}\n"), &f)
-	require.ErrorContains(t, err, "managers")
+	err := yaml.Unmarshal([]byte("packages:\n  go: {}\n"), &f)
+	require.ErrorContains(t, err, "installMethods or completions")
+	err = yaml.Unmarshal([]byte("packages:\n  go:\n    completions:\n      zsh: {name: _go}\n"), &f)
+	require.ErrorContains(t, err, "exactly one of cmd or url")
+	err = yaml.Unmarshal([]byte("packages:\n  go:\n    completions:\n      zsh: {cmd: go env, url: https://example.com}\n"), &f)
+	require.ErrorContains(t, err, "exactly one of cmd or url")
+}
+
+const dockerCompYaml = `packages:
+  docker:
+    completions:
+      zsh: {cmd: docker completion zsh}
+`
+
+func TestManagerlessEntryInstallsCompletionsWhenPresent(t *testing.T) {
+	in, m := newInstaller(t, dockerCompYaml, "linux", cmdMap([]string{"docker"}), completionsOpts(Options{}))
+	m.Stub = func(argv []string) ([]byte, error) {
+		if argv[0] == "sh" {
+			return []byte("#compdef docker\n"), nil
+		}
+		return nil, nil
+	}
+	require.NoError(t, in.Install([]string{"docker"}))
+	calls := strings.Join(m.Calls(), "\n")
+	require.Contains(t, calls, "sh -ec docker completion zsh")
+	require.Contains(t, calls, "/home/u/.local/share/zsh/site-functions/_docker")
+}
+
+func TestManagerlessEntrySkipsWhenCommandAbsent(t *testing.T) {
+	in, m := newInstaller(t, dockerCompYaml, "linux", cmdMap(nil), completionsOpts(Options{}))
+	require.NoError(t, in.Install([]string{"docker"}))
+	require.Empty(t, m.Calls())
+}
+
+func TestInstallCompletionsCmdFailureAborts(t *testing.T) {
+	in, m := newInstaller(t, dockerCompYaml, "linux", cmdMap([]string{"docker"}), completionsOpts(Options{}))
+	m.Stub = failOn("sh -ec")
+	err := in.Install([]string{"docker"})
+	require.ErrorContains(t, err, "completions cmd failed")
 }
 
 func TestInstallCompletionsDisabledByDefault(t *testing.T) {
@@ -75,14 +112,6 @@ func TestInstallCompletionsSkipsWhenPresent(t *testing.T) {
 	m.Stub = shaStub("goodsha")
 	require.NoError(t, in.Install([]string{"go"}))
 	require.NotContains(t, strings.Join(m.Calls(), "\n"), "_golang https://example.com/_golang")
-}
-
-func TestInstallCompletionsPackagesFilter(t *testing.T) {
-	in, m := newInstaller(t, goCompYaml, "linux", cmdMap([]string{"sha256sum"}),
-		completionsOpts(Options{CompletionsPackages: []string{"other"}}))
-	m.Stub = shaStub("goodsha")
-	require.NoError(t, in.Install([]string{"go"}))
-	require.NotContains(t, strings.Join(m.Calls(), "\n"), "_golang")
 }
 
 func TestInstallCompletionsDryRunAnnounces(t *testing.T) {
@@ -115,7 +144,7 @@ func TestCompletionsDirWarnsWhenNoneOnFpath(t *testing.T) {
 	m.Stub = shaStub("goodsha")
 	out, err := captureStdout(t, func() error { return in.Install([]string{"go"}) })
 	require.NoError(t, err)
-	wantLines(t, out, "not on fpath no packages.completions.installDestinationCandidates entry is on fpath (/off/fpath), using /off/fpath")
+	wantLines(t, out, "not on fpath no packages.completions.zsh.installDestinationCandidates entry is on fpath (/off/fpath), using /off/fpath")
 }
 
 func TestInstallCompletionsShaMismatchAborts(t *testing.T) {

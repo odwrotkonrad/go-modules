@@ -30,13 +30,13 @@ cases:
     input:
       args:
         - yaml: |
-            binary:
+            prebuiltArchive:
               version: 0.32.0
               url: https://example.com/kind-{os}-{arch}
               sha256:
                 linux-amd64: abc
     expected:
-      output: {mgr: binary, name: "", version: 0.32.0, url: "https://example.com/kind-{os}-{arch}", sha256: {linux-amd64: abc}}
+      output: {mgr: prebuiltArchive, name: "", version: 0.32.0, url: "https://example.com/kind-{os}-{arch}", sha256: {linux-amd64: abc}}
   - name: ShouldDecodeScriptScalarForm
     input:
       args:
@@ -61,7 +61,7 @@ cases:
   - name: ShouldDecodeScriptUrlForm
     input:
       args:
-        - yaml: "{script: {url: https://example.com/install.sh}}"
+        - yaml: "{script: {remoteUrl: https://example.com/install.sh}}"
     expected:
       output: {mgr: script, name: "", scriptUrl: https://example.com/install.sh}
   - name: ShouldDecodePkgForm

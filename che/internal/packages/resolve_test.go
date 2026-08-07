@@ -67,8 +67,8 @@ func TestItemUnmarshal(t *testing.T) {
 			return itemGot{}, err
 		}
 		got := itemGot{Mgr: it.Mgr, Name: it.Name}
-		if it.Binary != nil {
-			got.Version, got.URL, got.Sha256 = it.Binary.Version, it.Binary.URL, it.Binary.Sha256
+		if it.PrebuiltArchive != nil {
+			got.Version, got.URL, got.Sha256 = it.PrebuiltArchive.Version, it.PrebuiltArchive.URL, it.PrebuiltArchive.Sha256
 		}
 		if it.Pkg != nil {
 			got.Version, got.URL, got.Sha256 = it.Pkg.Version, it.Pkg.URL, it.Pkg.Sha256

@@ -61,16 +61,15 @@ func NewPackagesInstaller(env map[string]string, home string, opts options.Optio
 	return &packages.Installer{
 		File: f, FilePath: path, Host: NewPackagesHost(),
 		Opts: packages.Options{
-			Update:                           opts.PackagesUpdate,
-			IfMissing:                        opts.PackagesIfMissing,
-			DryRun:                           opts.DryRun != options.DryRun.Off,
-			PreferredMethods:                 opts.PackagesPreferredMethods,
-			BinaryDestinationCandidates:      opts.PackagesBinaryDestinationCandidates,
-			BinaryCheckInPath:                opts.PackagesBinaryCheckInPath,
-			CompletionsEnabled:               opts.PackagesCompletionsEnabled,
-			CompletionsPackages:              opts.PackagesCompletionsPackages,
-			CompletionsDestinationCandidates: opts.PackagesCompletionsDestinationCandidates,
-			CompletionsCheckInFpath:          opts.PackagesCompletionsCheckInFpath,
+			Update:                               opts.PackagesUpdate,
+			IfMissing:                            opts.PackagesIfMissing,
+			DryRun:                               opts.DryRun != options.DryRun.Off,
+			PreferredMethods:                     opts.PackagesPreferredMethods,
+			PrebuiltArchiveDestinationCandidates: opts.PackagesPrebuiltArchiveDestinationCandidates,
+			PrebuiltArchiveCheckInPath:           opts.PackagesPrebuiltArchiveCheckInPath,
+			CompletionsEnabled:                   opts.PackagesCompletionsEnabled,
+			CompletionsDestinationCandidates:     opts.PackagesCompletionsDestinationCandidates,
+			CompletionsCheckInFpath:              opts.PackagesCompletionsCheckInFpath,
 		},
 	}, nil
 }
@@ -94,22 +93,19 @@ func (p *ProfileReady) newInstaller() (*packages.Installer, error) {
 		}
 		opts.PackagesPreferredMethods = m
 	}
-	if d := p.Options.Packages.Binary.InstallDestinationCandidates; len(d) > 0 {
-		opts.PackagesBinaryDestinationCandidates = d
+	if d := p.Options.Packages.PrebuiltArchive.InstallDestinationCandidates; len(d) > 0 {
+		opts.PackagesPrebuiltArchiveDestinationCandidates = d
 	}
-	if c := p.Options.Packages.Binary.CheckInPath; c != nil {
-		opts.PackagesBinaryCheckInPath = *c
+	if c := p.Options.Packages.PrebuiltArchive.CheckInPath; c != nil {
+		opts.PackagesPrebuiltArchiveCheckInPath = *c
 	}
-	if e := p.Options.Packages.Completions.Enabled; e != nil {
+	if e := p.Options.Packages.Completions.Zsh.Enabled; e != nil {
 		opts.PackagesCompletionsEnabled = *e
 	}
-	if l := p.Options.Packages.Completions.Packages; len(l) > 0 {
-		opts.PackagesCompletionsPackages = l
-	}
-	if d := p.Options.Packages.Completions.InstallDestinationCandidates; len(d) > 0 {
+	if d := p.Options.Packages.Completions.Zsh.InstallDestinationCandidates; len(d) > 0 {
 		opts.PackagesCompletionsDestinationCandidates = d
 	}
-	if c := p.Options.Packages.Completions.CheckInFpath; c != nil {
+	if c := p.Options.Packages.Completions.Zsh.CheckInFpath; c != nil {
 		opts.PackagesCompletionsCheckInFpath = *c
 	}
 	in, err := NewPackagesInstaller(p.env, p.home, opts)

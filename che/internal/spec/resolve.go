@@ -528,23 +528,20 @@ func (o ProfileOptions) Over(spec Options) ProfileOptions {
 	if len(o.Packages.PreferredInstallationMethods) == 0 {
 		o.Packages.PreferredInstallationMethods = spec.Packages.PreferredInstallationMethods
 	}
-	if len(o.Packages.Binary.InstallDestinationCandidates) == 0 {
-		o.Packages.Binary.InstallDestinationCandidates = spec.Packages.Binary.InstallDestinationCandidates
+	if len(o.Packages.PrebuiltArchive.InstallDestinationCandidates) == 0 {
+		o.Packages.PrebuiltArchive.InstallDestinationCandidates = spec.Packages.PrebuiltArchive.InstallDestinationCandidates
 	}
-	if o.Packages.Completions.Enabled == nil {
-		o.Packages.Completions.Enabled = spec.Packages.Completions.Enabled
+	if o.Packages.Completions.Zsh.Enabled == nil {
+		o.Packages.Completions.Zsh.Enabled = spec.Packages.Completions.Zsh.Enabled
 	}
-	if len(o.Packages.Completions.Packages) == 0 {
-		o.Packages.Completions.Packages = spec.Packages.Completions.Packages
+	if len(o.Packages.Completions.Zsh.InstallDestinationCandidates) == 0 {
+		o.Packages.Completions.Zsh.InstallDestinationCandidates = spec.Packages.Completions.Zsh.InstallDestinationCandidates
 	}
-	if len(o.Packages.Completions.InstallDestinationCandidates) == 0 {
-		o.Packages.Completions.InstallDestinationCandidates = spec.Packages.Completions.InstallDestinationCandidates
+	if o.Packages.Completions.Zsh.CheckInFpath == nil {
+		o.Packages.Completions.Zsh.CheckInFpath = spec.Packages.Completions.Zsh.CheckInFpath
 	}
-	if o.Packages.Completions.CheckInFpath == nil {
-		o.Packages.Completions.CheckInFpath = spec.Packages.Completions.CheckInFpath
-	}
-	if o.Packages.Binary.CheckInPath == nil {
-		o.Packages.Binary.CheckInPath = spec.Packages.Binary.CheckInPath
+	if o.Packages.PrebuiltArchive.CheckInPath == nil {
+		o.Packages.PrebuiltArchive.CheckInPath = spec.Packages.PrebuiltArchive.CheckInPath
 	}
 	return o
 }
@@ -568,23 +565,20 @@ func (o ProfileOptions) OverRef(entry ProfileOptions) ProfileOptions {
 	if len(entry.Packages.PreferredInstallationMethods) > 0 {
 		o.Packages.PreferredInstallationMethods = entry.Packages.PreferredInstallationMethods
 	}
-	if len(entry.Packages.Binary.InstallDestinationCandidates) > 0 {
-		o.Packages.Binary.InstallDestinationCandidates = entry.Packages.Binary.InstallDestinationCandidates
+	if len(entry.Packages.PrebuiltArchive.InstallDestinationCandidates) > 0 {
+		o.Packages.PrebuiltArchive.InstallDestinationCandidates = entry.Packages.PrebuiltArchive.InstallDestinationCandidates
 	}
-	if entry.Packages.Completions.Enabled != nil {
-		o.Packages.Completions.Enabled = entry.Packages.Completions.Enabled
+	if entry.Packages.Completions.Zsh.Enabled != nil {
+		o.Packages.Completions.Zsh.Enabled = entry.Packages.Completions.Zsh.Enabled
 	}
-	if len(entry.Packages.Completions.Packages) > 0 {
-		o.Packages.Completions.Packages = entry.Packages.Completions.Packages
+	if len(entry.Packages.Completions.Zsh.InstallDestinationCandidates) > 0 {
+		o.Packages.Completions.Zsh.InstallDestinationCandidates = entry.Packages.Completions.Zsh.InstallDestinationCandidates
 	}
-	if len(entry.Packages.Completions.InstallDestinationCandidates) > 0 {
-		o.Packages.Completions.InstallDestinationCandidates = entry.Packages.Completions.InstallDestinationCandidates
+	if entry.Packages.Completions.Zsh.CheckInFpath != nil {
+		o.Packages.Completions.Zsh.CheckInFpath = entry.Packages.Completions.Zsh.CheckInFpath
 	}
-	if entry.Packages.Completions.CheckInFpath != nil {
-		o.Packages.Completions.CheckInFpath = entry.Packages.Completions.CheckInFpath
-	}
-	if entry.Packages.Binary.CheckInPath != nil {
-		o.Packages.Binary.CheckInPath = entry.Packages.Binary.CheckInPath
+	if entry.Packages.PrebuiltArchive.CheckInPath != nil {
+		o.Packages.PrebuiltArchive.CheckInPath = entry.Packages.PrebuiltArchive.CheckInPath
 	}
 	return o
 }

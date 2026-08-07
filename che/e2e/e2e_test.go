@@ -121,6 +121,9 @@ func setup(t *testing.T, specEnv map[string]string) *world {
 	require.NoError(t, err)
 	require.NoError(t, os.WriteFile(cheYml, bytes.ReplaceAll(raw, []byte("__REMOTE_DIR__"), []byte(w.remote)), 0o644))
 	require.NoError(t, os.MkdirAll(w.home, 0o755))
+	if _, err := os.Stat("home"); err == nil {
+		require.NoError(t, os.CopyFS(w.home, os.DirFS("home")))
+	}
 	w.vars = map[string]string{
 		"WORK":           w.work,
 		"HOME":           w.home,

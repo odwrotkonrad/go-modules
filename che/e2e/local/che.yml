@@ -12,8 +12,10 @@ ops-plain:
       - templates: [{source: plain/tpl.ontoHost.tpl, dest: 's:^plain:$HOME/plain:'}]
     makeDirs:
       - directories: [$HOME/plain/made-dir]
+    installPackages:
+      - e2e-plain
     runScripts:
-      - install/plain-script
+      - scripts/plain-script
 
 ops-conditional:
   include:
@@ -25,8 +27,10 @@ ops-conditional:
       - templates: [{source: conditional/tpl.ontoHost.tpl, dest: 's:^conditional:$HOME/conditional:'}]
     makeDirs:
       - directories: [$HOME/conditional/made-dir]
+    installPackages:
+      - e2e-conditional
     runScripts:
-      - install/conditional-script
+      - scripts/conditional-script
 
 ops-dropped:
   include:
@@ -38,8 +42,10 @@ ops-dropped:
       - templates: [{source: dropped/tpl.ontoHost.tpl, dest: 's:^dropped:$HOME/dropped:'}]
     makeDirs:
       - directories: [$HOME/dropped/made-dir]
+    installPackages:
+      - e2e-dropped
     runScripts:
-      - install/dropped-script
+      - scripts/dropped-script
 
 dropped:
   options: {autoDiscover: true, runIf: ['env:CHE_E2E_DROPPED']}
