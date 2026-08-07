@@ -24,7 +24,7 @@ packages:
             - brew:
                 vscode: anthropic.claude-code
     apt-transport-https:
-        version: __unversioned_latest__
+        version: __the_one_published__
         installMethods:
             - apt
     aws:
@@ -37,12 +37,12 @@ packages:
                 platforms: [linux-amd64, linux-arm64]
                 extractBinaries: [aws/dist/aws, aws/dist/aws_completer]
     az:
-        version: __unversioned_latest__
+        version: __the_one_published__
         installMethods:
             - brew:
                 cask: azure/azure-cli/azure-cli-preview
     bat:
-        version: __unversioned_latest__
+        version: __the_one_published__
         installMethods:
             - brew
             - apt:
@@ -52,12 +52,12 @@ packages:
                         aliasBinary:
                             batcat: bat
     bats:
-        version: __unversioned_latest__
+        version: __the_one_published__
         installMethods:
             - brew: bats-core
             - apt
     beekeeper-studio:
-        version: __unversioned_latest__
+        version: __the_one_published__
         installMethods:
             - brew:
                 cask: beekeeper-studio
@@ -68,7 +68,7 @@ packages:
             env:
                 NONINTERACTIVE: "1"
     ca-certificates:
-        version: __unversioned_latest__
+        version: __the_one_published__
         installMethods:
             - apt
     ccstatusline:
@@ -115,7 +115,7 @@ packages:
                 cask: claude-code
             - npm: '@anthropic-ai/claude-code'
     code:
-        version: __unversioned_latest__
+        version: __the_one_published__
         installMethods:
             - brew:
                 cask: visual-studio-code
@@ -139,12 +139,12 @@ packages:
         installMethods:
             - npm
     curl:
-        version: __unversioned_latest__
+        version: __the_one_published__
         installMethods:
             - brew
             - apt
     docker:
-        version: __unversioned_latest__
+        version: __the_one_published__
         completions:
             zsh:
                 cmd: docker completion zsh
@@ -160,7 +160,7 @@ packages:
                     url: https://download.docker.com/linux/debian
                     gpgUrl: https://download.docker.com/linux/debian/gpg
     duti:
-        version: __unversioned_latest__
+        version: __the_one_published__
         installMethods:
             - brew
     editorconfig.editorconfig:
@@ -174,27 +174,27 @@ packages:
             - brew:
                 vscode: esbenp.prettier-vscode
     fd:
-        version: __unversioned_latest__
+        version: __the_one_published__
         installMethods:
             - brew
             - apt: fd-find
     ffmpeg:
-        version: __unversioned_latest__
+        version: __the_one_published__
         installMethods:
             - brew
             - apt
     font-jetbrains-mono:
-        version: __unversioned_latest__
+        version: __the_one_published__
         installMethods:
             - brew:
                 cask: font-jetbrains-mono
     gcc:
-        version: __unversioned_latest__
+        version: __the_one_published__
         installMethods:
             - brew
             - apt
     gcloud:
-        version: __unversioned_latest__
+        version: __the_one_published__
         installMethods:
             - apt:
                 packages:
@@ -212,21 +212,21 @@ packages:
         installMethods:
             - go: gitlab.com/konradodwrot/go-modules/get-os-open-files-with
     gh:
-        version: __unversioned_latest__
+        version: __the_one_published__
         installMethods:
             - brew
             - apt
     git:
-        version: __unversioned_latest__
+        version: __the_one_published__
         installMethods:
             - brew
             - apt
     gitlab-runner:
-        version: __unversioned_latest__
+        version: __the_one_published__
         installMethods:
             - brew
     gitlab-tart-executor:
-        version: __unversioned_latest__
+        version: __the_one_published__
         installMethods:
             - brew: cirruslabs/cli/gitlab-tart-executor
     glab:
@@ -241,7 +241,7 @@ packages:
                     linux-amd64: f1c52907558b665f2032b615787d353cd06e54240b501a81f9489bfc8f6a8ebf
                     linux-arm64: 54a5fe7de0db23e34151c55e561c28e59e6ef6a7731f7d0ce8a00fa58cd8d8f8
     gnupg:
-        version: __unversioned_latest__
+        version: __the_one_published__
         command: gpg
         installMethods:
             - brew
@@ -280,7 +280,7 @@ packages:
                     linux-amd64: a99bbc7ae0d8d897b07c4c497a9b62f222558804715ef219d1af05a7e417bc80
                     linux-arm64: 702f03769ac8bcb0e47839c82243cc614ae995633599a98c63062e13ea85f829
     grafana:
-        version: __unversioned_latest__
+        version: __the_one_published__
         installMethods:
             - brew
     hoovercj.vscode-settings-cycler:
@@ -289,7 +289,7 @@ packages:
             - brew:
                 vscode: hoovercj.vscode-settings-cycler
     htop:
-        version: __unversioned_latest__
+        version: __the_one_published__
         installMethods:
             - brew
             - apt
@@ -302,7 +302,7 @@ packages:
                 sha256:
                     darwin-arm64: b2d21051b27f06535c288dd63e15a42d5aae653d0113695014d7e6b502736e5d
     jq:
-        version: __unversioned_latest__
+        version: __the_one_published__
         installMethods:
             - brew
             - apt
@@ -320,7 +320,7 @@ packages:
                     linux-amd64: 50030de23cf40a18505f20426f6a8506bedf13c6e509244bd1fa9463721b0f54
                     linux-arm64: b92cd615e97585de8ddade28ed5cd7feb4248d717c233eea5b03c37298900f5d
     kitty:
-        version: __unversioned_latest__
+        version: __the_one_published__
         installMethods:
             - script:
                 os: darwin
@@ -385,36 +385,36 @@ packages:
                     darwin-arm64: d00711fcd2613d232a9bdc24a5e6704367ce505db27a88e670dd73bc40bb1fd9
             - npm
     libbz2:
-        version: __unversioned_latest__
+        version: __the_one_published__
         installMethods:
             - apt: libbz2-dev
     libffi:
-        version: __unversioned_latest__
+        version: __the_one_published__
         installMethods:
             - apt: libffi-dev
     liblzma:
-        version: __unversioned_latest__
+        version: __the_one_published__
         installMethods:
             - apt: liblzma-dev
     libsqlite3:
-        version: __unversioned_latest__
+        version: __the_one_published__
         installMethods:
             - apt: libsqlite3-dev
     libtool:
-        version: __unversioned_latest__
+        version: __the_one_published__
         installMethods:
             - brew
             - apt
     logcli:
-        version: __unversioned_latest__
+        version: __the_one_published__
         installMethods:
             - brew
     loki:
-        version: __unversioned_latest__
+        version: __the_one_published__
         installMethods:
             - brew
     make:
-        version: __unversioned_latest__
+        version: __the_one_published__
         installMethods:
             - brew
             - apt
@@ -454,7 +454,7 @@ packages:
             - brew:
                 vscode: ms-vscode-remote.remote-containers
     nmap:
-        version: __unversioned_latest__
+        version: __the_one_published__
         installMethods:
             - brew
             - apt
@@ -480,7 +480,7 @@ packages:
             #[why] nvm is a sourced function, never a binary on PATH: this file marks it installed
             validateArtifact: $XDG_CONFIG_HOME/nvm/nvm.sh
     ollama:
-        version: __unversioned_latest__
+        version: __the_one_published__
         installMethods:
             - brew:
                 cask: ollama
@@ -488,7 +488,7 @@ packages:
                 os: linux
                 remoteUrl: https://ollama.com/install.sh
     op:
-        version: __unversioned_latest__
+        version: __the_one_published__
         installMethods:
             - brew:
                 cask: 1password-cli
@@ -498,12 +498,12 @@ packages:
             - brew:
                 vscode: openai.chatgpt
     openssh:
-        version: __unversioned_latest__
+        version: __the_one_published__
         installMethods:
             - brew
             - apt: openssh-client
     openssl:
-        version: __unversioned_latest__
+        version: __the_one_published__
         installMethods:
             - brew: openssl@3
             - apt: libssl-dev
@@ -519,30 +519,30 @@ packages:
                     linux-amd64: 589da4823bca1e14f074c91e4d7f842548ee6d2662f0621cca57246bbe49e321
                     linux-arm64: e2c72ed188d5e27edca43b32ba6e07d271737bcca04f2869f270ed60750e3f83
     packer:
-        version: __unversioned_latest__
+        version: __the_one_published__
         installMethods:
             - brew: hashicorp/tap/packer
     pandoc:
-        version: __unversioned_latest__
+        version: __the_one_published__
         installMethods:
             - brew
             - apt
     patch:
-        version: __unversioned_latest__
+        version: __the_one_published__
         installMethods:
             - apt
     pcre2:
-        version: __unversioned_latest__
+        version: __the_one_published__
         installMethods:
             - brew
             - apt: libpcre2-dev
     pipx:
-        version: __unversioned_latest__
+        version: __the_one_published__
         installMethods:
             - brew
             - apt
     pkgconf:
-        version: __unversioned_latest__
+        version: __the_one_published__
         installMethods:
             - brew
             - apt
@@ -552,7 +552,7 @@ packages:
             - brew
             - npm
     procs:
-        version: __unversioned_latest__
+        version: __the_one_published__
         installMethods:
             - brew
     prometheus:
@@ -565,7 +565,7 @@ packages:
                 sha256:
                     darwin-arm64: f68ca4f1dbedd6366bbfdd8ac5d2c0b7ba1f273474acc8d38eb33202fbeec7a4
     pstree:
-        version: __unversioned_latest__
+        version: __the_one_published__
         installMethods:
             - brew
             - apt: psmisc
@@ -600,7 +600,7 @@ packages:
                     - 3.13.14
                 global: 3.14.6
     readline:
-        version: __unversioned_latest__
+        version: __the_one_published__
         installMethods:
             - brew
             - apt: libreadline-dev
@@ -616,7 +616,7 @@ packages:
                 cmd: rg --generate=complete-zsh
         installMethods:
             - brew: ripgrep
-            #[why] not apt: bookworm ships ripgrep 13.x; the arch token carries the whole rust target triple
+            #[why] not apt: bookworm ships ripgrep 13.x;
             - prebuiltArchive:
                 url: https://github.com/BurntSushi/ripgrep/releases/download/{version}/ripgrep-{version}-{arch}.tar.gz
                 archConvention: rust
@@ -625,12 +625,12 @@ packages:
                     linux-arm64: c827481c4ff4ea10c9dc7a4022c8de5db34a5737cb74484d62eb94a95841ab2f
                     linux-amd64: 4cf9f2741e6c465ffdb7c26f38056a59e2a2544b51f7cc128ef28337eeae4d8e
     ruby:
-        version: __unversioned_latest__
+        version: __the_one_published__
         installMethods:
             - brew
             - apt: ruby-full
     ruby-dev:
-        version: __unversioned_latest__
+        version: __the_one_published__
         installMethods:
             - apt: ruby-dev
     ruby-lsp:
@@ -638,22 +638,22 @@ packages:
         installMethods:
             - gem: ruby-lsp
     shellcheck:
-        version: __unversioned_latest__
+        version: __the_one_published__
         installMethods:
             - brew
             - apt
     showkey:
-        version: __unversioned_latest__
+        version: __the_one_published__
         installMethods:
             - brew
             - apt: kbd
     sqlite3:
-        version: __unversioned_latest__
+        version: __the_one_published__
         installMethods:
             - brew: sqlite
             - apt
     stow:
-        version: __unversioned_latest__
+        version: __the_one_published__
         installMethods:
             - brew
             - apt
@@ -663,11 +663,11 @@ packages:
             - brew:
                 vscode: tamasfe.even-better-toml
     tart:
-        version: __unversioned_latest__
+        version: __the_one_published__
         installMethods:
             - brew: cirruslabs/cli/tart
     tcl:
-        version: __unversioned_latest__
+        version: __the_one_published__
         installMethods:
             - brew: tcl-tk
             - apt
@@ -682,12 +682,12 @@ packages:
                     linux-amd64: d25ce7b6902013ad905db3d2eab0be4cd905887fe88b81a6171b8d5503c31f3d
                     linux-arm64: 8891e9dcedc9e3b8950bc6af9d4d8af1f4cfade3062f53b9dc403a89f6ce8c9c
     tmux:
-        version: __unversioned_latest__
+        version: __the_one_published__
         installMethods:
             - brew
             - apt
     tree:
-        version: __unversioned_latest__
+        version: __the_one_published__
         installMethods:
             - brew
             - apt
@@ -702,20 +702,20 @@ packages:
             - brew
             - npm
     unzip:
-        version: __unversioned_latest__
+        version: __the_one_published__
         installMethods:
             - apt
     uv:
-        version: __unversioned_latest__
+        version: __the_one_published__
         installMethods:
             - brew
     watch:
-        version: __unversioned_latest__
+        version: __the_one_published__
         installMethods:
             - brew
             - apt: procps
     xz:
-        version: __unversioned_latest__
+        version: __the_one_published__
         installMethods:
             - brew
             - apt: xz-utils
@@ -749,17 +749,17 @@ packages:
                     linux-amd64: 70e49664a74374b48b51e6f3fdfbf437f6395d42509050588bd49abe52ba3d00
                     linux-arm64: ea4b09bfb22ec6f6c6ceac57ab63efb6b46e17ab08d21f69f3a48b38e1534f17
     zlib:
-        version: __unversioned_latest__
+        version: __the_one_published__
         installMethods:
             - brew
             - apt: zlib1g-dev
     zsh:
-        version: __unversioned_latest__
+        version: __the_one_published__
         installMethods:
             - brew
             - apt
     zstd:
-        version: __unversioned_latest__
+        version: __the_one_published__
         installMethods:
             - brew
             - apt

@@ -144,7 +144,7 @@ func TestBrewVersionedFormulaIsNamedDirectly(t *testing.T) {
 func TestUnversionedLatestSentinelSkipsPinning(t *testing.T) {
 	const y = `packages:
   jq:
-    version: __unversioned_latest__
+    version: __the_one_published__
     installMethods: [brew, apt]
 `
 	in, m := newInstaller(t, y, "darwin", cmdMap([]string{"brew", "jq"}), Options{})
@@ -156,7 +156,7 @@ func TestUnversionedLatestSentinelSkipsPinning(t *testing.T) {
 	}
 	require.NoError(t, in.Install([]string{"jq"}))
 	calls := strings.Join(m.Calls(), "\n")
-	require.NotContains(t, calls, "__unversioned_latest__")
+	require.NotContains(t, calls, "__the_one_published__")
 	require.NotContains(t, calls, "brew install")
 	require.NotContains(t, calls, "brew upgrade")
 }
@@ -164,7 +164,7 @@ func TestUnversionedLatestSentinelSkipsPinning(t *testing.T) {
 func TestUnversionedLatestSentinelNotUsedAsArchiveVersion(t *testing.T) {
 	const y = `packages:
   kind:
-    version: __unversioned_latest__
+    version: __the_one_published__
     installMethods:
       - prebuiltArchive:
           url: https://example.com/kind-{version}
@@ -177,7 +177,7 @@ func TestUnversionedLatestSentinelNotUsedAsArchiveVersion(t *testing.T) {
 func TestAliasBinaryLinksRenamedBinary(t *testing.T) {
 	const y = `packages:
   bat:
-    version: __unversioned_latest__
+    version: __the_one_published__
     installMethods:
       - brew
       - apt:
@@ -207,7 +207,7 @@ func TestAliasBinaryLinksRenamedBinary(t *testing.T) {
 func TestAliasBinarySkippedWhenSourceAbsent(t *testing.T) {
 	const y = `packages:
   bat:
-    version: __unversioned_latest__
+    version: __the_one_published__
     installMethods:
       - apt:
           packages:

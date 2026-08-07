@@ -24,9 +24,9 @@ func PinMatches(out, pin string) bool {
 	return strings.Contains(out, pin)
 }
 
-// VersionUnversionedLatest marks a package the manager ships in exactly one, unversioned stream:
-// stating it explicitly keeps an absent version meaning "not yet decided" rather than "nothing to pin".
-const VersionUnversionedLatest = "__unversioned_latest__"
+// VersionTheOnePublished marks a package whose manager publishes exactly one version.
+// [why] stating it keeps an absent version meaning "not yet decided" rather than "nothing to pin"
+const VersionTheOnePublished = "__the_one_published__"
 
 // VersionLatest tracks a manager's newest release rather than a pin.
 // [why] for sources whose head we own or deliberately follow: no drift check, no version in the name
@@ -37,7 +37,7 @@ func (in *Installer) pinFor(pkg, specVersion string) string {
 		return r.globalVersion()
 	}
 	if e, ok := in.File.Packages[pkg]; ok && e.Version != "" {
-		if e.Version == VersionUnversionedLatest || e.Version == VersionLatest {
+		if e.Version == VersionTheOnePublished || e.Version == VersionLatest {
 			return ""
 		}
 		return e.Version
@@ -79,7 +79,7 @@ func (in *Installer) resolveArchiveVersion(pkg string, b *PrebuiltArchiveSpec) (
 	if b.Version != "" {
 		return b.Version, nil
 	}
-	if e, ok := in.File.Packages[pkg]; ok && e.Version != "" && e.Version != VersionUnversionedLatest && e.Version != VersionLatest {
+	if e, ok := in.File.Packages[pkg]; ok && e.Version != "" && e.Version != VersionTheOnePublished && e.Version != VersionLatest {
 		return e.Version, nil
 	}
 	// [why] a version-less url (vendor "latest" endpoint) needs no pin
