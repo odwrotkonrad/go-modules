@@ -51,7 +51,7 @@
 `e2e-run`: `build-cover` real full-flow e2e (CHE_LOG_LEVEL=info), binary covdata into ./cover-e2e-run
 `e2e-backup`: `build-cover` backup e2e flow (create/ls/restore selectors, CHE_LOG_LEVEL=info), binary covdata into ./cover-e2e-backup
 `e2e-packages`: `build-cover` packages e2e flow (install + checks against fake PATH managers, CHE_LOG_LEVEL=info), binary covdata into ./cover-e2e-packages
-`e2e-install-methods`: `build` real-install e2e for one installation method family (METHOD=<method>|all, prefix matches sub-groups, see e2e/install_methods.yml): installs live packages into a throwaway HOME, then runs each one
+`e2e-install-methods`: `build` real-install e2e per installation method family (METHOD=<method>, default all, prefix matches sub-groups, see e2e/install_methods.yml): installs live packages into a throwaway HOME, then runs each one
 `e2e`: `e2e-dryrun -> e2e-run -> e2e-backup -> e2e-packages` run all e2e flows
 `build` build the binary into ./dist
 `lint` golangci-lint all packages

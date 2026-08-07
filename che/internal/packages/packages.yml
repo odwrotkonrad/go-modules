@@ -21,7 +21,7 @@ basePackages:
         - unzip
 packages:
     anthropic.claude-code:
-        version: "2.1.224"
+        version: 2.1.224
         installMethods:
             - brew:
                 vscode: anthropic.claude-code
@@ -30,7 +30,7 @@ packages:
         installMethods:
             - apt
     aws:
-        version: "2.36.19"
+        version: 2.36.19
         installMethods:
             - script:
                 os: darwin
@@ -71,11 +71,11 @@ packages:
         installMethods:
             - apt
     ccstatusline:
-        version: "2.2.27"
+        version: 2.2.27
         installMethods:
             - npm
     charliermarsh.ruff:
-        version: "2026.68.0"
+        version: 2026.68.0
         installMethods:
             - brew:
                 vscode: charliermarsh.ruff
@@ -93,7 +93,7 @@ packages:
             - script:
                 remoteUrl: https://konradodwrot.gitlab.io/go-modules/install.sh
     cilium:
-        version: "0.19.7"
+        version: 0.19.7
         installMethods:
             - brew: cilium-cli
             - prebuiltArchive:
@@ -104,7 +104,7 @@ packages:
                     linux-amd64: cd15e0983bf0acc7946cd05d453d1e58376ea92dec2642e745212df2b07d8852
                     linux-arm64: 9482937f14061fb239f2dbb2f97f4103de1b101f5d5defbff319f294f9bd540f
     claude:
-        version: "2.1.224"
+        version: 2.1.224
         completions:
             zsh:
                 url: https://raw.githubusercontent.com/wbingli/zsh-claudecode-completion/01f50d4a8a98b91cf6d9359deb37d60668c49806/_claude
@@ -119,7 +119,7 @@ packages:
             - brew:
                 cask: visual-studio-code
     codex:
-        version: "0.147.0"
+        version: 0.147.0
         completions:
             zsh:
                 cmd: codex completion zsh
@@ -128,11 +128,11 @@ packages:
                 cask: codex
             - npm: '@openai/codex'
     copilot:
-        version: "1.0.78"
+        version: 1.0.78
         installMethods:
             - npm: '@github/copilot'
     corepack:
-        version: "0.35.0"
+        version: 0.35.0
         installMethods:
             - npm
     curl:
@@ -161,12 +161,12 @@ packages:
         installMethods:
             - brew
     editorconfig.editorconfig:
-        version: "0.18.2"
+        version: 0.18.2
         installMethods:
             - brew:
                 vscode: editorconfig.editorconfig
     esbenp.prettier-vscode:
-        version: "12.4.0"
+        version: 12.4.0
         installMethods:
             - brew:
                 vscode: esbenp.prettier-vscode
@@ -224,7 +224,7 @@ packages:
         installMethods:
             - brew: cirruslabs/cli/gitlab-tart-executor
     glab:
-        version: "1.112.0"
+        version: 1.112.0
         installMethods:
             - brew
             - prebuiltArchive:
@@ -241,7 +241,7 @@ packages:
             - brew
             - apt
     go:
-        version: "1.26.5"
+        version: 1.26.5
         completions:
             zsh:
                 name: _golang
@@ -254,16 +254,16 @@ packages:
                 bin: go/bin/go go/bin/gofmt
                 platforms: [darwin-arm64, linux-amd64, linux-arm64]
     golang.go:
-        version: "0.56.0"
+        version: 0.56.0
         installMethods:
             - brew:
                 vscode: golang.go
     gopls:
-        version: "0.23.0"
+        version: 0.23.0
         installMethods:
             - go: golang.org/x/tools/gopls@latest
     goreleaser:
-        version: "2.17.1"
+        version: 2.17.1
         installMethods:
             - brew
             - prebuiltArchive:
@@ -278,7 +278,7 @@ packages:
         installMethods:
             - brew
     hoovercj.vscode-settings-cycler:
-        version: "1.0.1"
+        version: 1.0.1
         installMethods:
             - brew:
                 vscode: hoovercj.vscode-settings-cycler
@@ -288,7 +288,7 @@ packages:
             - brew
             - apt
     jaeger:
-        version: "2.20.0"
+        version: 2.20.0
         installMethods:
             - prebuiltArchive:
                 url: https://github.com/jaegertracing/jaeger/releases/download/v{version}/jaeger-{version}-darwin-arm64.tar.gz
@@ -301,7 +301,7 @@ packages:
             - brew
             - apt
     kind:
-        version: "0.32.0"
+        version: 0.32.0
         completions:
             zsh:
                 cmd: kind completion zsh
@@ -314,7 +314,7 @@ packages:
                     linux-amd64: 50030de23cf40a18505f20426f6a8506bedf13c6e509244bd1fa9463721b0f54
                     linux-arm64: b92cd615e97585de8ddade28ed5cd7feb4248d717c233eea5b03c37298900f5d
     kubectl:
-        version: "1.36.3"
+        version: 1.36.3
         completions:
             zsh:
                 cmd: kubectl completion zsh
@@ -328,7 +328,7 @@ packages:
                     linux-arm64: 3d86f24401c41ae5a46ac50eef8865fe891d3647d324a0836f6c63757a126e62
         versionCommand: kubectl version --client
     kubectx:
-        version: "0.11.0"
+        version: 0.11.0
         completions:
             zsh:
                 url: https://raw.githubusercontent.com/ahmetb/kubectx/v0.11.0/completion/_kubectx.zsh
@@ -340,7 +340,7 @@ packages:
                 bin: kubectx
                 platforms: [darwin-arm64, linux-amd64, linux-arm64]
     kubens:
-        version: "0.11.0"
+        version: 0.11.0
         completions:
             zsh:
                 url: https://raw.githubusercontent.com/ahmetb/kubectx/v0.11.0/completion/_kubens.zsh
@@ -352,7 +352,7 @@ packages:
                 bin: kubens
                 platforms: [darwin-arm64, linux-amd64, linux-arm64]
     lefthook:
-        version: "2.1.10"
+        version: 2.1.10
         installMethods:
             - brew
             - prebuiltArchive:
@@ -403,37 +403,37 @@ packages:
             - brew
             - apt
     mindaro-dev.file-downloader:
-        version: "1.0.13"
+        version: 1.0.13
         installMethods:
             - brew:
                 vscode: mindaro-dev.file-downloader
     ms-azuretools.vscode-containers:
-        version: "2.4.5"
+        version: 2.4.5
         installMethods:
             - brew:
                 vscode: ms-azuretools.vscode-containers
     ms-kubernetes-tools.vscode-kubernetes-tools:
-        version: "1.4.1"
+        version: 1.4.1
         installMethods:
             - brew:
                 vscode: ms-kubernetes-tools.vscode-kubernetes-tools
     ms-python.debugpy:
-        version: "2026.6.0"
+        version: 2026.6.0
         installMethods:
             - brew:
                 vscode: ms-python.debugpy
     ms-python.python:
-        version: "2026.4.0"
+        version: 2026.4.0
         installMethods:
             - brew:
                 vscode: ms-python.python
     ms-python.vscode-python-envs:
-        version: "1.36.0"
+        version: 1.36.0
         installMethods:
             - brew:
                 vscode: ms-python.vscode-python-envs
     ms-vscode-remote.remote-containers:
-        version: "0.466.0"
+        version: 0.466.0
         installMethods:
             - brew:
                 vscode: ms-vscode-remote.remote-containers
@@ -443,7 +443,7 @@ packages:
             - brew
             - apt
     node:
-        version: "24.19.0"
+        version: 24.19.0
         requires:
             - nvm
         installMethods:
@@ -466,7 +466,7 @@ packages:
             - brew:
                 cask: 1password-cli
     openai.chatgpt:
-        version: "26.623.31921"
+        version: 26.623.31921
         installMethods:
             - brew:
                 vscode: openai.chatgpt
@@ -481,7 +481,7 @@ packages:
             - brew: openssl@3
             - apt: libssl-dev
     otelcol:
-        version: "0.158.0"
+        version: 0.158.0
         installMethods:
             - prebuiltArchive:
                 url: https://github.com/open-telemetry/opentelemetry-collector-releases/releases/download/v{version}/otelcol_{version}_{os}_{arch}.tar.gz
@@ -516,7 +516,7 @@ packages:
             - brew
             - apt
     pnpm:
-        version: "11.20.0"
+        version: 11.20.0
         installMethods:
             - brew
             - npm
@@ -525,7 +525,7 @@ packages:
         installMethods:
             - brew
     prometheus:
-        version: "3.13.2"
+        version: 3.13.2
         installMethods:
             - prebuiltArchive:
                 url: https://github.com/prometheus/prometheus/releases/download/v{version}/prometheus-{version}.{os}-{arch}.tar.gz
@@ -543,12 +543,12 @@ packages:
         - script:
             remoteUrl: https://pyenv.run
     pyright:
-        version: "1.1.411"
+        version: 1.1.411
         installMethods:
             - brew
             - npm
     python3:
-        version: "3.14.6"
+        version: 3.14.6
         requires:
             - pyenv
             - gcc
@@ -573,7 +573,7 @@ packages:
             - brew
             - apt: libreadline-dev
     redhat.vscode-yaml:
-        version: "1.24.0"
+        version: 1.24.0
         installMethods:
             - brew:
                 vscode: redhat.vscode-yaml
@@ -595,7 +595,7 @@ packages:
         installMethods:
             - apt: ruby-dev
     ruby-lsp:
-        version: "0.26.10"
+        version: 0.26.10
         installMethods:
             - gem: ruby-lsp
     shellcheck:
@@ -619,7 +619,7 @@ packages:
             - brew
             - apt
     tamasfe.even-better-toml:
-        version: "0.21.2"
+        version: 0.21.2
         installMethods:
             - brew:
                 vscode: tamasfe.even-better-toml
@@ -633,7 +633,7 @@ packages:
             - brew: tcl-tk
             - apt
     terraform:
-        version: "1.15.8"
+        version: 1.15.8
         installMethods:
             - prebuiltArchive:
                 url: https://releases.hashicorp.com/terraform/{version}/terraform_{version}_{os}_{arch}.zip
@@ -653,12 +653,12 @@ packages:
             - brew
             - apt
     tsc:
-        version: "7.0.2"
+        version: 7.0.2
         installMethods:
             - brew: typescript
             - npm: typescript
     typescript-language-server:
-        version: "5.3.0"
+        version: 5.3.0
         installMethods:
             - brew
             - npm
@@ -681,7 +681,7 @@ packages:
             - brew
             - apt: xz-utils
     yq:
-        version: "4.53.3"
+        version: 4.53.3
         installMethods:
             - brew
             - prebuiltArchive:
@@ -692,12 +692,12 @@ packages:
                     linux-amd64: fa52a4e758c63d38299163fbdd1edfb4c4963247918bf9c1c5d31d84789eded4
                     linux-arm64: 578648e463a11c1b6db6010cbf41eafed6bee79466fcffa1bb446672cf7945ea
     yzhang.markdown-all-in-one:
-        version: "3.6.3"
+        version: 3.6.3
         installMethods:
             - brew:
                 vscode: yzhang.markdown-all-in-one
     zig:
-        version: "0.16.0"
+        version: 0.16.0
         installMethods:
             - brew
             - prebuiltArchive:

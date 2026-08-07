@@ -92,10 +92,10 @@ e2e-packages: build-cover
 	if [[ -e cover-e2e-packages ]] rm -rf cover-e2e-packages; mkdir -p cover-e2e-packages
 	E2E_BIN=$(CURDIR)/dist/$(BIN) E2E_GOCOVERDIR=$(CURDIR)/cover-e2e-packages CC=$(CC) $(GO) test -v -run TestE2EPackages ./e2e
 
-#[what] real-install e2e for one installation method family (METHOD=<method>|all, prefix matches sub-groups, see e2e/install_methods.yml): installs live packages into a throwaway HOME, then runs each one
+#[what] real-install e2e per installation method family (METHOD=<method>, default all, prefix matches sub-groups, see e2e/install_methods.yml): installs live packages into a throwaway HOME, then runs each one
 #[vals] brew/formulae|brew/cask|brew/vscode|apt|prebuiltArchive|script|versionManager|npm|go|all
 e2e-install-methods: build
-	E2E_BIN=$(CURDIR)/dist/$(BIN) E2E_INSTALL_METHOD=$(METHOD) CC=$(CC) $(GO) test -v -count=1 -timeout 45m -run TestE2EInstallMethods ./e2e
+	E2E_BIN=$(CURDIR)/dist/$(BIN) E2E_INSTALL_METHOD=$(or $(METHOD),$(E2E_INSTALL_METHOD),all) CC=$(CC) $(GO) test -v -count=1 -timeout 45m -run TestE2EInstallMethods ./e2e
 
 #[what] run all e2e flows
 e2e: e2e-dryrun e2e-run e2e-backup e2e-packages
