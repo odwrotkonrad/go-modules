@@ -26,14 +26,14 @@ func (in *Installer) installBinariesRemoteArchive(pkg string, b *BinariesRemoteA
 		return err
 	}
 	if in.Opts.DryRun {
-		in.emitDryRun("install", labeled(pkg, pin)+" via binariesRemoteArchive")
+		in.emitDryRun("install", labelWithVersion(pkg, pin)+" via binariesRemoteArchive")
 		return nil
 	}
 	version, err := in.resolveArchiveVersion(pkg, b)
 	if err != nil {
 		return err
 	}
-	arch, err := in.archFor(b.ArchScheme)
+	arch, err := in.resolveArch(b.ArchScheme)
 	if err != nil {
 		return fmt.Errorf("%s: %w", pkg, err)
 	}
@@ -47,17 +47,17 @@ func (in *Installer) installBinariesRemoteArchive(pkg string, b *BinariesRemoteA
 	if err := in.exec(curlArgv(url, asset)); err != nil {
 		return err
 	}
-	if want, ok := b.PlatformEligibility.Sha[in.Host.ShaKey()]; ok {
+	if want, ok := b.PlatformEligibility.Checksums[in.Host.PlatformKey()]; ok {
 		if err := in.verifyChecksum(pkg, asset, want); err != nil {
 			return err
 		}
 	} else {
-		in.emit(log.Levels.Warn, "unverified", pkg+": no checksum declared for "+in.Host.ShaKey()+", skipping verification")
+		in.emit(log.Levels.Warn, "unverified", pkg+": no checksum declared for "+in.Host.PlatformKey()+", skipping verification")
 	}
 	if err := in.installMembers(pkg, asset, version, arch, b); err != nil {
 		return err
 	}
-	in.emit(log.Levels.Info, "installed", labeled(pkg, version)+" via binariesRemoteArchive")
+	in.emit(log.Levels.Info, "installed", labelWithVersion(pkg, version)+" via binariesRemoteArchive")
 	return nil
 }
 
@@ -75,7 +75,7 @@ func (in *Installer) versionOutputHasPin(pkg, pin string) bool {
 }
 
 func (in *Installer) verifyChecksum(pkg, asset, want string) error {
-	hex, err := checksumHex(want)
+	hex, err := parseChecksumHex(want)
 	if err != nil {
 		return fmt.Errorf("%s: %w", pkg, err)
 	}
@@ -94,7 +94,7 @@ func (in *Installer) verifyChecksum(pkg, asset, want string) error {
 	return nil
 }
 
-func (in *Installer) archFor(scheme string) (string, error) {
+func (in *Installer) resolveArch(scheme string) (string, error) {
 	if scheme == "" {
 		return in.Host.Arch, nil
 	}

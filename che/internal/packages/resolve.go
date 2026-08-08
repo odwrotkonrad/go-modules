@@ -53,7 +53,6 @@ func linuxDistro() string {
 	return ""
 }
 
-// [why] most specific key wins: linux-debian-arm64 > linux-debian > linux-arm64 > linux
 func (h Host) eligibilityKeys() []string {
 	var keys []string
 	if h.Distro != "" {
@@ -92,7 +91,7 @@ func (h Host) nvmDir() string {
 	return filepath.Join(h.Getenv("HOME"), ".nvm")
 }
 
-func (h Host) ShaKey() string { return h.OS + "-" + h.Arch }
+func (h Host) PlatformKey() string { return h.OS + "-" + h.Arch }
 
 func (h Host) HasCmd(name string) bool {
 	_, err := h.LookPath(name)
@@ -125,7 +124,7 @@ func (h Host) applicable(pkg string, it Item) (bool, error) {
 		if it.BinariesRemoteArchive == nil {
 			return false, fmt.Errorf("package %s: binariesRemoteArchive item missing props", pkg)
 		}
-		return slices.Contains(it.BinariesRemoteArchive.PlatformEligibility.Names, h.ShaKey()), nil
+		return slices.Contains(it.BinariesRemoteArchive.PlatformEligibility.Names, h.PlatformKey()), nil
 	case "pyenv", "nvm":
 		if it.VersionManager == nil || len(it.VersionManager.Versions) == 0 {
 			return false, fmt.Errorf("package %s: %s item requires versions", pkg, it.Mgr)
@@ -139,7 +138,7 @@ func (h Host) applicable(pkg string, it Item) (bool, error) {
 		if it.Script == nil || (it.Script.Run == "" && it.Script.Path == "" && it.Script.URL == "") {
 			return false, fmt.Errorf("package %s: script item missing run, path, or url", pkg)
 		}
-		if len(it.Script.PlatformEligibility.Names) > 0 && !slices.Contains(it.Script.PlatformEligibility.Names, h.ShaKey()) {
+		if len(it.Script.PlatformEligibility.Names) > 0 && !slices.Contains(it.Script.PlatformEligibility.Names, h.PlatformKey()) {
 			return false, nil
 		}
 		return it.Script.OS == "" || it.Script.OS == h.OS, nil

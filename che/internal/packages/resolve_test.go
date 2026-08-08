@@ -72,7 +72,7 @@ func TestItemUnmarshal(t *testing.T) {
 			got.Name = it.Apt.PackageName
 		}
 		if it.BinariesRemoteArchive != nil {
-			got.Version, got.URL, got.Platforms, got.Checksums = it.BinariesRemoteArchive.Version, it.BinariesRemoteArchive.URL, it.BinariesRemoteArchive.PlatformEligibility.Names, it.BinariesRemoteArchive.PlatformEligibility.Sha
+			got.Version, got.URL, got.Platforms, got.Checksums = it.BinariesRemoteArchive.Version, it.BinariesRemoteArchive.URL, it.BinariesRemoteArchive.PlatformEligibility.Names, it.BinariesRemoteArchive.PlatformEligibility.Checksums
 		}
 		if it.Script != nil {
 			got.Run, got.ScriptOs = strings.TrimSpace(it.Script.Run), it.Script.OS

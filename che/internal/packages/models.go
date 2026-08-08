@@ -43,10 +43,6 @@ type File struct {
 	Packages            map[string]Entry             `yaml:"packages,omitempty"`
 }
 
-// InstallerList flattens nested sequences so a key extends another via anchor/alias:
-//
-//	linux: &base [script, npm]
-//	linux-debian: [apt, *base]
 type InstallerList []string
 
 func (l *InstallerList) UnmarshalYAML(node *yaml.Node) error {
@@ -90,7 +86,7 @@ func (r *InstallerRegistriesSpec) brew() []string {
 	return r.Brew
 }
 
-func stripScheme(url string) string {
+func stripURLScheme(url string) string {
 	for _, p := range []string{"https://", "http://"} {
 		if v, ok := strings.CutPrefix(url, p); ok {
 			return v
@@ -99,7 +95,7 @@ func stripScheme(url string) string {
 	return url
 }
 
-func splitRegistryRef(ref string) (url, suites, components string) {
+func splitAptRegistryRef(ref string) (url, suites, components string) {
 	parts := strings.SplitN(ref, "::", 3)
 	url = parts[0]
 	if len(parts) > 1 {
@@ -112,10 +108,10 @@ func splitRegistryRef(ref string) (url, suites, components string) {
 }
 
 func matchAptRegistries(registries []*AptRepoSpec, ref string) []*AptRepoSpec {
-	url, suites, components := splitRegistryRef(ref)
+	url, suites, components := splitAptRegistryRef(ref)
 	var out []*AptRepoSpec
 	for _, r := range registries {
-		if stripScheme(r.URL) != url {
+		if stripURLScheme(r.URL) != url {
 			continue
 		}
 		if suites != "" && r.Suites != suites {
@@ -159,8 +155,8 @@ func (f *File) hasBrewTap(tap string) bool {
 	return err == nil && slices.Contains(builtin.InstallerRegistries.brew(), tap)
 }
 
-func registrySlug(r *AptRepoSpec) string {
-	parts := []string{stripScheme(r.URL)}
+func aptRegistrySlug(r *AptRepoSpec) string {
+	parts := []string{stripURLScheme(r.URL)}
 	if r.Suites != "" {
 		parts = append(parts, r.Suites)
 	}
@@ -225,9 +221,6 @@ type CompletionFile struct {
 	Checksum string `yaml:"checksum,omitempty"`
 }
 
-// InstallerVocabulary carries the installer's own terms for the package:
-// its package name, its version strings, its arch spelling, its binary renames,
-// its platforms and the binaries its asset ships.
 type InstallerVocabulary struct {
 	PackageName         string            `yaml:"packageName,omitempty"`
 	VersionMap          map[string]string `yaml:"versionMap,omitempty"`
@@ -248,7 +241,7 @@ type itemBody struct {
 	FromRegistry        string `yaml:"fromRegistry,omitempty"`
 }
 
-func itemKey(mgr string) string {
+func installerKey(mgr string) string {
 	switch mgr {
 	case "cask":
 		return "brew/cask"
@@ -258,7 +251,7 @@ func itemKey(mgr string) string {
 	return mgr
 }
 
-func brewKindMgr(key string) (string, bool) {
+func mgrForInstallerKey(key string) (string, bool) {
 	switch key {
 	case "brew":
 		return "brew", true
@@ -270,8 +263,7 @@ func brewKindMgr(key string) (string, bool) {
 	return "", false
 }
 
-// [why] checksums carry their algorithm (sha256:<hex>) so the format can grow beyond sha256
-func checksumHex(c string) (string, error) {
+func parseChecksumHex(c string) (string, error) {
 	hex, ok := strings.CutPrefix(c, "sha256:")
 	if !ok || hex == "" {
 		return "", fmt.Errorf("checksum must be sha256:<hex>: %q", c)
@@ -296,9 +288,9 @@ func (it Item) MarshalYAML() (any, error) {
 		FromRegistry:        it.Registry,
 	}
 	if body.isZero() && body.Version == "" && body.FromRegistry == "" {
-		return itemKey(it.Mgr), nil
+		return installerKey(it.Mgr), nil
 	}
-	return map[string]itemBody{itemKey(it.Mgr): body}, nil
+	return map[string]itemBody{installerKey(it.Mgr): body}, nil
 }
 
 func (e Entry) MarshalYAML() (any, error) {
@@ -408,7 +400,7 @@ func (e *Entry) UnmarshalYAML(node *yaml.Node) error {
 			return fmt.Errorf("completions.zsh requires exactly one of cmd or url")
 		}
 		if z.Checksum != "" {
-			if _, err := checksumHex(z.Checksum); err != nil {
+			if _, err := parseChecksumHex(z.Checksum); err != nil {
 				return fmt.Errorf("completions.zsh: %w", err)
 			}
 		}
@@ -423,7 +415,6 @@ func (e *Entry) UnmarshalYAML(node *yaml.Node) error {
 	return nil
 }
 
-// Strings is a yaml list that also accepts a single scalar
 type Strings []string
 
 func (s *Strings) UnmarshalYAML(node *yaml.Node) error {
@@ -457,10 +448,6 @@ type VersionManagerSpec struct {
 	Global   string   `yaml:"global"`
 }
 
-// AptSpec declares an apt item: the installer vocabulary and a registry reference.
-// [why] fromRegistry references an installerRegistries.apt entry by scheme-less url,
-//
-//	narrowed with ::suites[::components] when one url hosts several registries
 type AptSpec struct {
 	InstallerVocabulary `yaml:",inline"`
 	FromRegistry        string `yaml:"fromRegistry,omitempty"`
@@ -473,10 +460,6 @@ func (a *AptSpec) packageName(pkg string) string {
 	return pkg
 }
 
-// AptRepoSpec declares an external apt repo: source url, verification key, suites, components.
-// [why] verificationKey takes a url (key downloaded into /etc/apt/keyrings) or an
-//
-//	absolute path (keyring already on the host, nothing fetched)
 type AptRepoSpec struct {
 	URL             string `yaml:"url,omitempty"`
 	VerificationKey string `yaml:"verificationKey,omitempty"`
@@ -513,14 +496,9 @@ type ScriptSpec struct {
 	ValidateArtifact    string            `yaml:"validateArtifact,omitempty"`
 }
 
-// ItemPlatforms lists an item's supported platforms, each optionally carrying its asset's checksum.
-// [why] a checksum references exactly one platform, so one key holds both facts:
-//
-//   - darwin-arm64                    (supported, unverified)
-//   - linux-amd64: sha256:<hex>       (supported, verified)
 type ItemPlatforms struct {
-	Names []string
-	Sha   map[string]string
+	Names     []string
+	Checksums map[string]string
 }
 
 func (ip *ItemPlatforms) UnmarshalYAML(node *yaml.Node) error {
@@ -536,14 +514,14 @@ func (ip *ItemPlatforms) UnmarshalYAML(node *yaml.Node) error {
 			return fmt.Errorf("platformEligibility entry must be a platform name or a single platform: checksum pair")
 		}
 		name := el.Content[0].Value
-		if _, err := checksumHex(el.Content[1].Value); err != nil {
+		if _, err := parseChecksumHex(el.Content[1].Value); err != nil {
 			return fmt.Errorf("platformEligibility.%s: %w", name, err)
 		}
 		ip.Names = append(ip.Names, name)
-		if ip.Sha == nil {
-			ip.Sha = map[string]string{}
+		if ip.Checksums == nil {
+			ip.Checksums = map[string]string{}
 		}
-		ip.Sha[name] = el.Content[1].Value
+		ip.Checksums[name] = el.Content[1].Value
 	}
 	return nil
 }
@@ -551,8 +529,8 @@ func (ip *ItemPlatforms) UnmarshalYAML(node *yaml.Node) error {
 func (ip ItemPlatforms) MarshalYAML() (any, error) {
 	out := make([]any, 0, len(ip.Names))
 	for _, n := range ip.Names {
-		if sha, ok := ip.Sha[n]; ok {
-			out = append(out, map[string]string{n: sha})
+		if checksum, ok := ip.Checksums[n]; ok {
+			out = append(out, map[string]string{n: checksum})
 			continue
 		}
 		out = append(out, n)
@@ -639,7 +617,7 @@ func (it *Item) unmarshalScalar(v string) error {
 	if err := rejectBareBrewKind(v); err != nil {
 		return err
 	}
-	if mgr, ok := brewKindMgr(v); ok {
+	if mgr, ok := mgrForInstallerKey(v); ok {
 		it.Mgr = mgr
 		return nil
 	}
@@ -685,7 +663,7 @@ func (it *Item) unmarshalManager(key string, val *yaml.Node) error {
 		return err
 	}
 	it.Mgr = key
-	if mgr, ok := brewKindMgr(key); ok {
+	if mgr, ok := mgrForInstallerKey(key); ok {
 		it.Mgr = mgr
 	}
 	if val.Kind != yaml.MappingNode {
@@ -765,7 +743,7 @@ func (f *File) mergeRegistries(override *InstallerRegistriesSpec) {
 	}
 	regs := f.InstallerRegistries
 	for _, r := range override.Apt {
-		if len(matchAptRegistries(regs.Apt, registryRef(r))) == 0 {
+		if len(matchAptRegistries(regs.Apt, aptRegistryRef(r))) == 0 {
 			regs.Apt = append(regs.Apt, r)
 		}
 	}
@@ -776,8 +754,8 @@ func (f *File) mergeRegistries(override *InstallerRegistriesSpec) {
 	}
 }
 
-func registryRef(r *AptRepoSpec) string {
-	ref := stripScheme(r.URL)
+func aptRegistryRef(r *AptRepoSpec) string {
+	ref := stripURLScheme(r.URL)
 	if r.Suites != "" || r.Components != "" {
 		ref += "::" + r.Suites
 	}

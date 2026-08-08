@@ -116,7 +116,7 @@ func (in *Installer) output(argv []string) (string, bool) {
 	return string(out), err == nil
 }
 
-func labeled(pkg, version string) string {
+func labelWithVersion(pkg, version string) string {
 	if version == "" {
 		return pkg
 	}
@@ -221,7 +221,6 @@ func (in *Installer) InstallRequests(reqs []Request) error {
 	return nil
 }
 
-// [why] requires are expanded depth-first so a package's dependencies install before it
 func (in *Installer) plan(reqs []Request) ([]string, error) {
 	if in.requested == nil {
 		in.requested = map[string]Request{}
@@ -281,7 +280,6 @@ func (in *Installer) installVia(pkg string, it Item) error {
 		return in.installScript(pkg, it.Script)
 	}
 	pin := in.pinFor(pkg, it.Version)
-	// [why] casks ship only their current version, a pin cannot be enforced
 	if it.Mgr == "cask" && pin != "" {
 		in.emit(log.Levels.Warn, "unpinnable", pkg+": version "+pin+" cannot be enforced via brew/cask, installing the current release")
 		pin = ""
@@ -293,12 +291,12 @@ func (in *Installer) installVia(pkg string, it Item) error {
 	installed := in.isInstalled(pkg, it.Mgr, base)
 	switch {
 	case installed && pin != "" && !in.pinSatisfied(pkg, it.Mgr, base, pin):
-		if !pinnable(it.Mgr) && !in.managerHasNewer(it.Mgr, base) {
+		if !installAcceptsPin(it.Mgr) && !in.managerHasNewer(it.Mgr, base) {
 			in.emitSkip(log.Levels.Warn, pkg, fmt.Sprintf("pin %s unsatisfiable via %s: installed %s is the manager's latest", pin, it.Mgr, in.installedVersion(it.Mgr, base)))
 			return nil
 		}
 		in.emit(log.Levels.Info, "reinstall", pkg+": -> "+pin)
-		if !pinnable(it.Mgr) {
+		if !installAcceptsPin(it.Mgr) {
 			return in.update(pkg, it.Mgr, base)
 		}
 	case installed && in.Opts.Update && pin == "":
@@ -308,20 +306,17 @@ func (in *Installer) installVia(pkg string, it Item) error {
 		return nil
 	}
 	if in.Opts.DryRun {
-		in.emitDryRun("install", labeled(pkg, pin)+" via "+it.Mgr)
+		in.emitDryRun("install", labelWithVersion(pkg, pin)+" via "+it.Mgr)
 		return nil
 	}
 	if err := in.managerInstall(it.Mgr, pinnedName(it.Mgr, base, pin), pin); err != nil {
 		return err
 	}
-	in.emit(log.Levels.Info, "installed", labeled(pkg, pin)+" via "+it.Mgr)
+	in.emit(log.Levels.Info, "installed", labelWithVersion(pkg, pin)+" via "+it.Mgr)
 	return nil
 }
 
-// [why] managers whose install command takes the pinned version; brew is excluded on purpose:
-//
-//	it ships versions as separate formulae (node@24), so the packages file names the formula directly
-func pinnable(mgr string) bool {
+func installAcceptsPin(mgr string) bool {
 	return slices.Contains([]string{"npm", "apt", "gem", "go", "vscode"}, mgr)
 }
 
@@ -383,7 +378,6 @@ func splitPin(name string) (base, pin string) {
 
 func (in *Installer) isInstalled(pkg, mgr, base string) bool {
 	switch mgr {
-	// [why] a pinned brew formula is its own package (node@24): ask about the pinned name
 	case "brew":
 		_, ok := in.output([]string{"brew", "list", path.Base(base)})
 		return ok
@@ -407,7 +401,6 @@ func (in *Installer) isInstalled(pkg, mgr, base string) bool {
 	}
 }
 
-// [why] --show-versions prints "publisher.ext@1.2.3", the only way to check an extension pin
 func (in *Installer) codeExtensions() map[string]string {
 	if in.codeExts != nil {
 		return in.codeExts
@@ -565,7 +558,7 @@ func (in *Installer) installScript(pkg string, s *ScriptSpec) error {
 		in.emit(log.Levels.Info, "reinstall", pkg+": -> "+s.Version)
 	}
 	if in.Opts.DryRun {
-		in.emitDryRun("install", labeled(pkg, pin)+" via script")
+		in.emitDryRun("install", labelWithVersion(pkg, pin)+" via script")
 		return nil
 	}
 	argv, cleanup, err := in.scriptArgv(pkg, s)
@@ -579,7 +572,7 @@ func (in *Installer) installScript(pkg string, s *ScriptSpec) error {
 	if err := execx.Default.Exec(c); err != nil {
 		return fmt.Errorf("%s: install script: %w", pkg, err)
 	}
-	in.emit(log.Levels.Info, "installed", labeled(pkg, pin)+" via script")
+	in.emit(log.Levels.Info, "installed", labelWithVersion(pkg, pin)+" via script")
 	return nil
 }
 
@@ -587,7 +580,7 @@ func (in *Installer) scriptEnv(pkg string, s *ScriptSpec) []string {
 	env := append(os.Environ(),
 		"CHE_PKG_NAME="+pkg,
 		"CHE_PKG_VERSION="+s.Version,
-		"CHE_PKG_SHA256="+strings.TrimPrefix(s.PlatformEligibility.Sha[in.Host.ShaKey()], "sha256:"),
+		"CHE_PKG_SHA256="+strings.TrimPrefix(s.PlatformEligibility.Checksums[in.Host.PlatformKey()], "sha256:"),
 		"CHE_PKG_OS="+in.Host.OS,
 		"CHE_PKG_ARCH="+in.Host.Arch,
 	)
@@ -615,7 +608,6 @@ func (in *Installer) scriptArgv(pkg string, s *ScriptSpec) ([]string, func(), er
 	if s.Run != "" {
 		return withScriptArgs([]string{"/bin/sh", "-ec", s.Run}, s), nil, nil
 	}
-	// [why] the fetched script runs as a file so its shebang picks the interpreter (nvm insists on bash)
 	if s.URL != "" {
 		content, ok := in.output(curlArgv(s.URL))
 		if !ok || content == "" {
@@ -646,8 +638,6 @@ func (in *Installer) scriptArgv(pkg string, s *ScriptSpec) ([]string, func(), er
 			return append([]string{"/bin/sh", "-e", p}, s.Args...), nil, nil
 		}
 	}
-	// [why] only builtin entries reach the embedded scripts: a user file's missing script must
-	//   error, never silently run a same-named shipped one
 	if in.FilePath == BuiltinPath && !filepath.IsAbs(s.Path) {
 		if b, err := builtinScripts.ReadFile("scripts/" + path.Base(s.Path)); err == nil {
 			return withScriptArgs([]string{"/bin/sh", "-ec", string(b)}, s), nil, nil
@@ -656,7 +646,6 @@ func (in *Installer) scriptArgv(pkg string, s *ScriptSpec) ([]string, func(), er
 	return nil, nil, fmt.Errorf("%s: install script not found: %s", pkg, p)
 }
 
-// [why] go install demands a version suffix: an unpinned entry tracks the module's latest
 func (in *Installer) goInstall(pkg, module string) error {
 	if !strings.Contains(module, "@") {
 		module += "@latest"

@@ -390,7 +390,7 @@ func TestInstallGcloudPicksLinuxAptRepo(t *testing.T) {
 func TestScriptEnvCarriesPinShaAndHost(t *testing.T) {
 	in, _ := newInstaller(t, gcloudYaml, "darwin", cmdMap(nil), Options{})
 	in.Host.Arch = "arm64"
-	env := in.scriptEnv("gcloud", &ScriptSpec{Version: "572.0.0", InstallerVocabulary: InstallerVocabulary{PlatformEligibility: ItemPlatforms{Names: []string{"darwin-arm64"}, Sha: map[string]string{"darwin-arm64": "sha256:gsha"}}}})
+	env := in.scriptEnv("gcloud", &ScriptSpec{Version: "572.0.0", InstallerVocabulary: InstallerVocabulary{PlatformEligibility: ItemPlatforms{Names: []string{"darwin-arm64"}, Checksums: map[string]string{"darwin-arm64": "sha256:gsha"}}}})
 	joined := strings.Join(env, "\n")
 	for _, want := range []string{
 		"CHE_PKG_NAME=gcloud", "CHE_PKG_VERSION=572.0.0", "CHE_PKG_SHA256=gsha",

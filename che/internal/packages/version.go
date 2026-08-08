@@ -11,8 +11,6 @@ import (
 
 var versionTokenRe = regexp.MustCompile(`\d+(?:\.\d+)*(?:[.+~-][0-9A-Za-z.~+-]*)?`)
 
-// PinMatches reports whether prose version output carries the pinned version.
-// [why] output is prose ("go version go1.26.4 darwin/arm64"): compare against its version tokens
 func PinMatches(out, pin string) bool {
 	if pin == "" {
 		return true
@@ -20,13 +18,8 @@ func PinMatches(out, pin string) bool {
 	return slices.Contains(versionTokenRe.FindAllString(out, -1), pin) || strings.Contains(out, pin)
 }
 
-// VersionLatest tracks a manager's newest release rather than a pin.
-// [why] for sources whose head we own or deliberately follow: no drift check, no version in the name
 const VersionLatest = "latest"
 
-// [why] an absent version means rolling: the installer tracks its manager's current release;
-//
-//	an item-level version beats the entry version
 func (in *Installer) pinFor(pkg, specVersion string) string {
 	if r, ok := in.requested[pkg]; ok && len(r.Versions) > 0 {
 		return r.globalVersion()
@@ -56,7 +49,6 @@ func (r Request) globalVersion() string {
 	return ""
 }
 
-// [why] a pinned asset's sha256 only covers the version the item declares
 func (in *Installer) requestedOverridesPin(pkg, itemVersion string) error {
 	r, ok := in.requested[pkg]
 	if !ok || len(r.Versions) == 0 || itemVersion == "" {
@@ -83,7 +75,6 @@ func (in *Installer) resolveArchiveVersion(pkg string, b *BinariesRemoteArchiveS
 	if e, ok := in.File.Packages[pkg]; ok && e.Version != "" && e.Version != VersionLatest {
 		return e.Version, nil
 	}
-	// [why] a version-less url (vendor "latest" endpoint) needs no pin
 	if !strings.Contains(b.URL, "{version}") && !strings.Contains(strings.Join(b.ExtractBinaries, " "), "{version}") {
 		return "", nil
 	}

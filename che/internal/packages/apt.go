@@ -27,15 +27,13 @@ func (in *Installer) installAptSpec(pkg string, a *AptSpec) error {
 		in.emit(log.Levels.Info, "reinstall", pkg+": -> "+binPin)
 	}
 	if in.Opts.DryRun {
-		in.emitDryRun("install", labeled(pkg, binPin)+" via apt")
+		in.emitDryRun("install", labelWithVersion(pkg, binPin)+" via apt")
 		return nil
 	}
 	if err := in.aptUpdate(); err != nil {
 		return err
 	}
 	argv := []string{"apt-get", "install", "--yes", "--no-install-recommends"}
-	// [why] a source with explicit suites installs with -t so exact-version dependencies
-	//   resolve from that suite too (backports curl -> libcurl4)
 	if src != nil && src.Suites != "" {
 		argv = append(argv, "-t", src.Suites)
 	}
@@ -47,7 +45,7 @@ func (in *Installer) installAptSpec(pkg string, a *AptSpec) error {
 	if err := in.exec(in.sudo(argv...)); err != nil {
 		return err
 	}
-	in.emit(log.Levels.Info, "installed", labeled(pkg, binPin)+" via apt")
+	in.emit(log.Levels.Info, "installed", labelWithVersion(pkg, binPin)+" via apt")
 	return nil
 }
 
@@ -62,18 +60,14 @@ func (in *Installer) ensureAptRegistry(pkg string, a *AptSpec) (*AptRepoSpec, er
 	if src.URL == "" || src.VerificationKey == "" {
 		return nil, fmt.Errorf("%s: apt registry %q requires url and verificationKey", pkg, a.FromRegistry)
 	}
-	// [why] repo ensured before the installed-skip: a pruned repo file heals even when the package is present
 	if !in.Opts.DryRun {
-		if err := in.ensureAptRepo(registrySlug(src), src); err != nil {
+		if err := in.ensureAptRepo(aptRegistrySlug(src), src); err != nil {
 			return nil, err
 		}
 	}
 	return src, nil
 }
 
-// [why] versionMap key: the binary version the package delivers; value: the exact
-//
-//	debian package version apt pins to (epoch/revision decorated)
 func (in *Installer) aptPins(pkg string, a *AptSpec) (binPin, pkgPin string) {
 	if r, ok := in.requested[pkg]; ok && len(r.Versions) > 0 {
 		v := r.globalVersion()
