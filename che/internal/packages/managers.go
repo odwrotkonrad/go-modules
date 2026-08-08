@@ -286,10 +286,15 @@ func (in *Installer) installVia(pkg string, it Item) error {
 	installed := in.isInstalled(pkg, it.Mgr, base)
 	switch {
 	case installed && pin != "" && !in.pinSatisfied(pkg, it.Mgr, base, pin):
-		in.emit(log.Levels.Info, "reinstall", pkg+": -> "+pin)
 		if !pinnable(it.Mgr) {
+			if !in.managerHasNewer(it.Mgr, base) {
+				in.emitSkip(log.Levels.Warn, pkg, fmt.Sprintf("pin %s unsatisfiable via %s: installed %s is the manager's latest", pin, it.Mgr, in.installedVersion(it.Mgr, base)))
+				return nil
+			}
+			in.emit(log.Levels.Info, "reinstall", pkg+": -> "+pin)
 			return in.update(pkg, it.Mgr, base)
 		}
+		in.emit(log.Levels.Info, "reinstall", pkg+": -> "+pin)
 	case installed && in.Opts.Update && pin == "":
 		return in.update(pkg, it.Mgr, base)
 	case installed:
@@ -312,6 +317,18 @@ func (in *Installer) installVia(pkg string, it Item) error {
 //	it ships versions as separate formulae (node@24), so the packages file names the formula directly
 func pinnable(mgr string) bool {
 	return slices.Contains([]string{"npm", "apt", "gem", "go", "vscode"}, mgr)
+}
+
+func (in *Installer) managerHasNewer(mgr, base string) bool {
+	switch mgr {
+	case "brew":
+		out, ok := in.output([]string{"brew", "outdated", "--quiet", path.Base(base)})
+		return ok && strings.TrimSpace(out) != ""
+	case "cask":
+		out, ok := in.output([]string{"brew", "outdated", "--cask", "--quiet", path.Base(base)})
+		return ok && strings.TrimSpace(out) != ""
+	}
+	return true
 }
 
 func pinnedName(mgr, base, pin string) string {

@@ -62,10 +62,26 @@ func TestEntryVersionDriftRunsManagerUpdate(t *testing.T) {
 		if argv[0] == "bat" {
 			return []byte("bat 0.24.0\n"), nil
 		}
+		if argv[0] == "brew" && argv[1] == "outdated" {
+			return []byte("bat\n"), nil
+		}
 		return nil, nil
 	}
 	require.NoError(t, in.Install([]string{"bat"}))
 	require.Contains(t, m.Calls(), "brew upgrade bat")
+}
+
+func TestEntryVersionDriftSkipsWhenManagerHasNoNewer(t *testing.T) {
+	in, m := newInstaller(t, pinnedBatYaml, "darwin", cmdMap([]string{"brew", "bat"}), Options{})
+	m.Stub = func(argv []string) ([]byte, error) {
+		if argv[0] == "bat" {
+			return []byte("bat 0.24.0\n"), nil
+		}
+		return nil, nil
+	}
+	require.NoError(t, in.Install([]string{"bat"}))
+	require.NotContains(t, strings.Join(m.Calls(), "\n"), "brew upgrade")
+	require.NotContains(t, strings.Join(m.Calls(), "\n"), "brew install bat")
 }
 
 func TestEntryVersionPinsArchiveVersion(t *testing.T) {
