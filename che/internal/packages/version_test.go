@@ -40,7 +40,7 @@ func TestPinMatches(t *testing.T) {
 const pinnedBatYaml = `packages:
   bat:
     version: "0.25.0"
-    installMethods: [brew, apt]
+    installers: [brew, apt]
 `
 
 func TestEntryVersionSkipsWhenMatching(t *testing.T) {
@@ -68,7 +68,7 @@ func TestEntryVersionDriftRunsManagerUpdate(t *testing.T) {
 		return nil, nil
 	}
 	require.NoError(t, in.Install([]string{"bat"}))
-	require.Contains(t, m.Calls(), "brew upgrade bat")
+	require.Contains(t, m.Calls(), "brew upgrade bat@0.25.0")
 }
 
 func TestEntryVersionDriftSkipsWhenManagerHasNoNewer(t *testing.T) {
@@ -88,10 +88,10 @@ func TestEntryVersionPinsArchiveVersion(t *testing.T) {
 	const y = `packages:
   kind:
     version: "0.32.0"
-    installMethods:
-      - prebuiltBinariesArchive:
+    installers:
+      - binariesRemoteArchive:
+          platformEligibility: [{linux-amd64: sha256:goodsha}]
           url: https://example.com/kind-{version}
-          platforms: [{linux-amd64: goodsha}]
 `
 	in, m := newInstaller(t, y, "linux", cmdMap([]string{"sha256sum"}), Options{})
 	m.Stub = shaStub("goodsha")
@@ -102,10 +102,10 @@ func TestEntryVersionPinsArchiveVersion(t *testing.T) {
 func TestArchiveWithoutVersionNeedsNoPin(t *testing.T) {
 	const y = `packages:
   aws:
-    - prebuiltBinariesArchive:
-        url: https://example.com/aws-latest.zip
-        platforms: [linux-amd64]
+    - binariesRemoteArchive:
+        platformEligibility: [linux-amd64]
         extractBinaries: [aws/dist/aws]
+        url: https://example.com/aws-latest.zip
 `
 	in, m := newInstaller(t, y, "linux", cmdMap(nil), Options{})
 	require.NoError(t, in.Install([]string{"aws"}))
@@ -118,7 +118,7 @@ func TestVscodeExtensionPinInstallsVersionedAndSkips(t *testing.T) {
 	const y = `packages:
   golang.go:
     version: "0.50.0"
-    installMethods: [{brew: {vscode: golang.go}}]
+    installers: [brew/vscode]
 `
 	in, m := newInstaller(t, y, "darwin", cmdMap([]string{"code"}), Options{})
 	m.Stub = codeListStub("")
@@ -135,7 +135,7 @@ func TestVscodeExtensionPinDriftReinstalls(t *testing.T) {
 	const y = `packages:
   golang.go:
     version: "0.50.0"
-    installMethods: [{brew: {vscode: golang.go}}]
+    installers: [brew/vscode]
 `
 	in, m := newInstaller(t, y, "darwin", cmdMap([]string{"code"}), Options{})
 	m.Stub = codeListStub("golang.go@0.49.0\n")
@@ -143,11 +143,11 @@ func TestVscodeExtensionPinDriftReinstalls(t *testing.T) {
 	require.Contains(t, strings.Join(m.Calls(), "\n"), "code --install-extension golang.go@0.50.0")
 }
 
-func TestBrewVersionedFormulaReferencesEntryVersion(t *testing.T) {
+func TestBrewPinAppendsVersionedFormula(t *testing.T) {
 	const y = `packages:
   node:
     version: "24"
-    installMethods: [{brew: "node@{version}"}]
+    installers: [brew]
 `
 	in, m := newInstaller(t, y, "darwin", cmdMap([]string{"brew"}), Options{})
 	m.Stub = failOn("brew list")
@@ -155,33 +155,51 @@ func TestBrewVersionedFormulaReferencesEntryVersion(t *testing.T) {
 	calls := strings.Join(m.Calls(), "\n")
 	require.Contains(t, calls, "brew install node@24")
 	require.NotContains(t, calls, "node@24@24")
-	require.NotContains(t, calls, "{version}")
+}
+
+func TestRollingSentinelIsParseError(t *testing.T) {
+	err := yaml.Unmarshal([]byte("packages:\n  node:\n    version: __rolling__\n    installers: [brew]\n"), &File{})
+	require.ErrorContains(t, err, "__rolling__ sentinel is gone")
+	err = yaml.Unmarshal([]byte("packages:\n  node:\n    installers: [{brew: {version: __rolling__}}]\n"), &File{})
+	require.ErrorContains(t, err, "__rolling__ sentinel is gone")
+}
+
+func TestCaskPinWarnsAndInstallsCurrent(t *testing.T) {
+	const y = `packages:
+  claude:
+    version: "2.1.224"
+    installers: [{brew/cask: {packageName: claude-code}}]
+`
+	in, m := newInstaller(t, y, "darwin", cmdMap([]string{"brew"}), Options{})
+	m.Stub = failOn("brew list")
+	out, err := captureStdout(t, func() error { return in.Install([]string{"claude"}) })
+	require.NoError(t, err)
+	require.Contains(t, out, "cannot be enforced via brew/cask")
+	require.Contains(t, m.Calls(), "brew install --cask claude-code")
 }
 
 func TestBrewLiteralVersionSuffixIsParseError(t *testing.T) {
 	err := yaml.Unmarshal([]byte(`packages:
   node:
     version: "24"
-    installMethods: [{brew: node@24}]
+    installers: [{brew: {packageName: node@24}}]
 `), &File{})
-	require.ErrorContains(t, err, "referenced as @{version}")
+	require.ErrorContains(t, err, "appended automatically")
 }
 
-func TestBrewVersionTokenWithoutPinErrors(t *testing.T) {
-	const y = `packages:
+func TestBrewObjectFormVersionSuffixIsParseError(t *testing.T) {
+	err := yaml.Unmarshal([]byte(`packages:
   node:
-    installMethods: [{brew: "node@{version}"}]
-`
-	in, m := newInstaller(t, y, "darwin", cmdMap([]string{"brew"}), Options{})
-	m.Stub = failOn("brew list")
-	require.ErrorContains(t, in.Install([]string{"node"}), "references {version} but no version is pinned")
+    version: "24"
+    installers: [{brew: {formula: node@24}}]
+`), &File{})
+	require.ErrorContains(t, err, "is gone")
 }
 
 func TestUnversionedLatestSentinelSkipsPinning(t *testing.T) {
 	const y = `packages:
   jq:
-    version: __the_one_published__
-    installMethods: [brew, apt]
+    installers: [brew, apt]
 `
 	in, m := newInstaller(t, y, "darwin", cmdMap([]string{"brew", "jq"}), Options{})
 	m.Stub = func(argv []string) ([]byte, error) {
@@ -192,7 +210,7 @@ func TestUnversionedLatestSentinelSkipsPinning(t *testing.T) {
 	}
 	require.NoError(t, in.Install([]string{"jq"}))
 	calls := strings.Join(m.Calls(), "\n")
-	require.NotContains(t, calls, "__the_one_published__")
+	require.NotContains(t, calls, "__rolling__")
 	require.NotContains(t, calls, "brew install")
 	require.NotContains(t, calls, "brew upgrade")
 }
@@ -200,11 +218,10 @@ func TestUnversionedLatestSentinelSkipsPinning(t *testing.T) {
 func TestUnversionedLatestSentinelNotUsedAsArchiveVersion(t *testing.T) {
 	const y = `packages:
   kind:
-    version: __the_one_published__
-    installMethods:
-      - prebuiltBinariesArchive:
+    installers:
+      - binariesRemoteArchive:
+          platformEligibility: [{linux-amd64: sha256:goodsha}]
           url: https://example.com/kind-{version}
-          platforms: [{linux-amd64: goodsha}]
 `
 	in, _ := newInstaller(t, y, "linux", cmdMap([]string{"sha256sum"}), Options{})
 	require.ErrorContains(t, in.Install([]string{"kind"}), "no version pinned")
@@ -213,14 +230,11 @@ func TestUnversionedLatestSentinelNotUsedAsArchiveVersion(t *testing.T) {
 func TestAliasBinaryLinksRenamedBinary(t *testing.T) {
 	const y = `packages:
   bat:
-    version: __the_one_published__
-    installMethods:
+    installers:
       - brew
       - apt:
-          installPackages:
-            bat:
-              aliasBinary:
-                batcat: bat
+          aliasBinary:
+            batcat: bat
 `
 	cmds := cmdMap([]string{"apt-get"})
 	in, m := newInstaller(t, y, "linux", cmds, Options{})
@@ -243,13 +257,10 @@ func TestAliasBinaryLinksRenamedBinary(t *testing.T) {
 func TestAliasBinarySkippedWhenSourceAbsent(t *testing.T) {
 	const y = `packages:
   bat:
-    version: __the_one_published__
-    installMethods:
+    installers:
       - apt:
-          installPackages:
-            bat:
-              aliasBinary:
-                batcat: bat
+          aliasBinary:
+            batcat: bat
 `
 	in, m := newInstaller(t, y, "darwin", cmdMap([]string{"brew", "bat"}), Options{})
 	require.NoError(t, in.Install([]string{"bat"}))
@@ -259,9 +270,9 @@ func TestAliasBinarySkippedWhenSourceAbsent(t *testing.T) {
 func TestPostInstallRunsOnFreshInstallOnly(t *testing.T) {
 	const y = `packages:
   kitty:
-    installMethods:
+    installers:
       - script:
-          remoteUrl: https://example.com/installer.sh
+          url: https://example.com/installer.sh
           args: [launch=n]
     postInstall: ln -fs /Applications/kitty.app/Contents/MacOS/kitty "$HOME/.local/bin/kitty"
 `
@@ -286,9 +297,9 @@ func TestPostInstallRunsOnFreshInstallOnly(t *testing.T) {
 func TestPostInstallShippedScriptResolves(t *testing.T) {
 	const y = `packages:
   kitty:
-    installMethods:
+    installers:
       - script:
-          remoteUrl: https://example.com/installer.sh
+          url: https://example.com/installer.sh
     postInstall:
       path: scripts/post-install-kitty.sh
 `
@@ -338,7 +349,7 @@ func TestResolveScriptPaths(t *testing.T) {
 }
 
 func TestUserFileScriptNeverFallsBackToBuiltin(t *testing.T) {
-	yml := "packages:\n  kitty:\n    installMethods: [{script: {path: scripts/post-install-kitty.sh}}]\n"
+	yml := "packages:\n  kitty:\n    installers: [{script: {path: scripts/post-install-kitty.sh}}]\n"
 	in, m := newInstaller(t, yml, "darwin", cmdMap(nil), Options{})
 	in.FilePath = filepath.Join(t.TempDir(), "packages.yml")
 	err := in.Install([]string{"kitty"})
@@ -350,7 +361,7 @@ func TestOverrideAnchoredScriptRuns(t *testing.T) {
 	dir := t.TempDir()
 	require.NoError(t, os.MkdirAll(filepath.Join(dir, "scripts"), 0o755))
 	require.NoError(t, os.WriteFile(filepath.Join(dir, "scripts", "my-post.sh"), []byte("echo user-post\n"), 0o755))
-	yml := "packages:\n  mytool:\n    installMethods: [{script: {run: echo install}}]\n    postInstall: {path: scripts/my-post.sh}\n"
+	yml := "packages:\n  mytool:\n    installers: [{script: {run: echo install}}]\n    postInstall: {path: scripts/my-post.sh}\n"
 	require.NoError(t, os.WriteFile(filepath.Join(dir, "override.yml"), []byte(yml), 0o644))
 	o, err := Load(filepath.Join(dir, "override.yml"))
 	require.NoError(t, err)
@@ -371,42 +382,49 @@ func TestGoModulePinsFromEntryVersion(t *testing.T) {
 	const y = `packages:
   gopls:
     version: 0.23.0
-    installMethods:
-      - go: golang.org/x/tools/gopls
+    installers:
+      - go:
+          packageName: golang.org/x/tools/gopls
 `
 	in, m := newInstaller(t, y, "darwin", cmdMap([]string{"go"}), Options{})
 	require.NoError(t, in.Install([]string{"gopls"}))
 	require.Contains(t, strings.Join(m.Calls(), "\n"), "go install golang.org/x/tools/gopls@v0.23.0")
 }
 
-func TestAptPackagesAcceptListAndMapForms(t *testing.T) {
+func TestAptVocabularyCarriesNameAndAliases(t *testing.T) {
 	const y = `packages:
-  listform:
-    installMethods: [{apt: {installPackages: [a, b]}}]
-  mapform:
-    installMethods:
+  named:
+    installers:
       - apt:
-          installPackages:
-            a: {}
-            b:
-              aliasBinary: {bcat: b}
+          packageName: a
+          aliasBinary: {acat: a}
+  legacy:
+    installers: [{apt: {installPackages: [a, b]}}]
 `
 	var f File
-	require.NoError(t, yaml.Unmarshal([]byte(y), &f))
-	require.Equal(t, []string{"a", "b"}, f.Packages["listform"].Items[0].Apt.InstallPackages.Names)
-	require.Empty(t, f.Packages["listform"].Items[0].AliasBinary)
+	require.ErrorContains(t, yaml.Unmarshal([]byte(y), &f), "installPackages is gone")
 
-	m := f.Packages["mapform"].Items[0]
-	require.Equal(t, []string{"a", "b"}, m.Apt.InstallPackages.Names)
-	require.Equal(t, map[string]string{"bcat": "b"}, m.AliasBinary)
+	const ok = `packages:
+  named:
+    installers:
+      - apt:
+          packageName: a
+          aliasBinary: {acat: a}
+`
+	var g File
+	require.NoError(t, yaml.Unmarshal([]byte(ok), &g))
+	m := g.Packages["named"].Items[0]
+	require.Equal(t, "a", m.Apt.Vocabulary.PackageName)
+	require.Equal(t, map[string]string{"acat": "a"}, m.AliasBinary)
 }
 
 func TestVersionLatestTracksModuleHead(t *testing.T) {
 	const y = `packages:
   mytool:
     version: latest
-    installMethods:
-      - go: example.com/mytool
+    installers:
+      - go:
+          packageName: example.com/mytool
 `
 	in, m := newInstaller(t, y, "darwin", cmdMap([]string{"go"}), Options{})
 	require.NoError(t, in.Install([]string{"mytool"}))
@@ -419,7 +437,7 @@ func TestVersionLatestSkipsDriftChecks(t *testing.T) {
 	const y = `packages:
   mytool:
     version: latest
-    installMethods: [brew]
+    installers: [brew]
 `
 	in, m := newInstaller(t, y, "darwin", cmdMap([]string{"brew", "mytool"}), Options{})
 	require.NoError(t, in.Install([]string{"mytool"}))

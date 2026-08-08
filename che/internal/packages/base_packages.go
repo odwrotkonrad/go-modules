@@ -18,7 +18,7 @@ func (in *Installer) ensureBasePackages(mgr string) error {
 	if in.baseDone == nil {
 		in.baseDone = map[string]bool{}
 	}
-	for _, group := range []string{BaseCommon, mgr} {
+	for _, group := range []string{BaseCommon, itemKey(mgr)} {
 		if in.baseDone[group] {
 			continue
 		}

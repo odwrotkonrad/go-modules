@@ -35,6 +35,32 @@ func TestBasePackagesInstallBeforeMethod(t *testing.T) {
 	require.Less(t, gnupgAt, jqAt)
 }
 
+func TestBasePackagesVscodeInstallsCodeFirst(t *testing.T) {
+	const y = `basePackages:
+  brew/vscode: [code]
+packages:
+  code:
+    installers: [{brew/cask: {packageName: visual-studio-code}}]
+  golang.go:
+    version: "0.50.0"
+    installers: [brew/vscode]
+`
+	in, m := newInstaller(t, y, "darwin", cmdMap([]string{"brew", "code"}), Options{})
+	m.Stub = func(argv []string) ([]byte, error) {
+		if strings.HasPrefix(strings.Join(argv, " "), "brew list") {
+			return nil, errNotInstalled
+		}
+		return nil, nil
+	}
+	require.NoError(t, in.Install([]string{"golang.go"}))
+	calls := strings.Join(m.Calls(), "\n")
+	caskAt := strings.Index(calls, "brew install --cask visual-studio-code")
+	extAt := strings.Index(calls, "--install-extension golang.go@0.50.0")
+	require.Positive(t, caskAt)
+	require.Positive(t, extAt)
+	require.Less(t, caskAt, extAt)
+}
+
 func TestBasePackagesInstallOncePerRun(t *testing.T) {
 	in, m := newInstaller(t, basePackagesYaml, "linux", cmdMap([]string{"apt-get"}), Options{})
 	m.Stub = failOn("dpkg -s")

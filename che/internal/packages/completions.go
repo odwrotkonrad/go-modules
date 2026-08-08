@@ -48,8 +48,8 @@ func (in *Installer) installCompletions(pkg string, e Entry) error {
 			return err
 		}
 	}
-	if def.Sha256 != "" {
-		if err := in.verifySha256(pkg, asset, def.Sha256); err != nil {
+	if def.Checksum != "" {
+		if err := in.verifyChecksum(pkg, asset, def.Checksum); err != nil {
 			return err
 		}
 	}

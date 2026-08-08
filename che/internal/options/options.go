@@ -245,15 +245,15 @@ func (c *Options) Resolve(env LookupEnv, user, spec Layer) error {
 		c.PackagesPreferredMethods = packages.DefaultPreferredMethods
 		c.setValue("packages.preferredInstallationMethods", "["+strings.Join(packages.DefaultPreferredMethods, ", ")+"]")
 	}
-	c.PackagesPrebuiltBinariesArchiveDestinationCandidates = c.resolveList("packages.prebuiltBinariesArchive.installDestinationCandidates",
-		layerList(c.PackagesPrebuiltBinariesArchiveDestinationCandidates, "cliFlag"), envStr(env("CHE_PACKAGES_PREBUILT_BINARIES_ARCHIVE_INSTALL_DESTINATION_CANDIDATES")),
-		layerList(user.Packages.PrebuiltBinariesArchive.InstallDestinationCandidates, "config-file"), layerList(spec.Packages.PrebuiltBinariesArchive.InstallDestinationCandidates, "specFile"))
-	if len(c.PackagesPrebuiltBinariesArchiveDestinationCandidates) == 0 {
-		c.PackagesPrebuiltBinariesArchiveDestinationCandidates = packages.DefaultPrebuiltBinariesArchiveDestinationCandidates
-		c.setValue("packages.prebuiltBinariesArchive.installDestinationCandidates", "["+strings.Join(packages.DefaultPrebuiltBinariesArchiveDestinationCandidates, ", ")+"]")
+	c.PackagesBinariesRemoteArchiveDestinationCandidates = c.resolveList("packages.binariesRemoteArchive.installDestinationCandidates",
+		layerList(c.PackagesBinariesRemoteArchiveDestinationCandidates, "cliFlag"), envStr(env("CHE_PACKAGES_BINARIES_REMOTE_ARCHIVE_INSTALL_DESTINATION_CANDIDATES")),
+		layerList(user.Packages.BinariesRemoteArchive.InstallDestinationCandidates, "config-file"), layerList(spec.Packages.BinariesRemoteArchive.InstallDestinationCandidates, "specFile"))
+	if len(c.PackagesBinariesRemoteArchiveDestinationCandidates) == 0 {
+		c.PackagesBinariesRemoteArchiveDestinationCandidates = packages.DefaultBinariesRemoteArchiveDestinationCandidates
+		c.setValue("packages.binariesRemoteArchive.installDestinationCandidates", "["+strings.Join(packages.DefaultBinariesRemoteArchiveDestinationCandidates, ", ")+"]")
 	}
-	c.PackagesPrebuiltBinariesArchiveCheckPresentOnPath = c.resolveBool("packages.prebuiltBinariesArchive.checkPresentOnPath", false, env("CHE_PACKAGES_PREBUILT_BINARIES_ARCHIVE_CHECK_PRESENT_ON_PATH"), true,
-		boolLayer{user.Packages.PrebuiltBinariesArchive.CheckPresentOnPath, "config-file"}, boolLayer{spec.Packages.PrebuiltBinariesArchive.CheckPresentOnPath, "specFile"})
+	c.PackagesBinariesRemoteArchiveCheckPresentOnPath = c.resolveBool("packages.binariesRemoteArchive.checkPresentOnPath", false, env("CHE_PACKAGES_BINARIES_REMOTE_ARCHIVE_CHECK_PRESENT_ON_PATH"), true,
+		boolLayer{user.Packages.BinariesRemoteArchive.CheckPresentOnPath, "config-file"}, boolLayer{spec.Packages.BinariesRemoteArchive.CheckPresentOnPath, "specFile"})
 	c.PackagesCompletionsEnabled = c.resolveBool("packages.completions.zsh.enabled", false, env("CHE_PACKAGES_COMPLETIONS_ZSH_ENABLED"), false,
 		boolLayer{user.Packages.Completions.Zsh.Enabled, "config-file"}, boolLayer{spec.Packages.Completions.Zsh.Enabled, "specFile"})
 	c.PackagesCompletionsDestinationCandidates = c.resolveList("packages.completions.zsh.installDestinationCandidates",

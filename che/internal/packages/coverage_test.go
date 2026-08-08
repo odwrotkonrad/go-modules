@@ -71,19 +71,19 @@ func TestApplicableGemAndCask(t *testing.T) {
 
 func TestInstallGoModule(t *testing.T) {
 	in, m := newInstaller(t, `packages:
-  gopls: [{go: "golang.org/x/tools/gopls@latest"}]`, "darwin", cmdMap([]string{"go"}), Options{})
+  gopls: [{go: {packageName: "golang.org/x/tools/gopls@latest"}}]`, "darwin", cmdMap([]string{"go"}), Options{})
 	require.NoError(t, in.Install([]string{"gopls"}))
 	require.Equal(t, []string{"go install golang.org/x/tools/gopls@latest"}, m.Calls())
 }
 
 func TestInstallGemWithLinuxSudo(t *testing.T) {
-	in, m := newInstaller(t, "packages:\n  ruby-lsp: [{gem: ruby-lsp}]", "linux", cmdMap([]string{"gem"}), Options{})
+	in, m := newInstaller(t, "packages:\n  ruby-lsp: [{gem: {packageName: ruby-lsp}}]", "linux", cmdMap([]string{"gem"}), Options{})
 	require.NoError(t, in.Install([]string{"ruby-lsp"}))
 	require.Equal(t, []string{"sudo gem install ruby-lsp"}, m.Calls())
 }
 
 func TestInstallCaskWhenMissing(t *testing.T) {
-	in, m := newInstaller(t, "packages:\n  beekeeper-studio: [{brew: {cask: beekeeper-studio}}]", "darwin", cmdMap([]string{"brew"}), Options{})
+	in, m := newInstaller(t, "packages:\n  beekeeper-studio: [{brew/cask: {packageName: beekeeper-studio}}]", "darwin", cmdMap([]string{"brew"}), Options{})
 	m.Stub = failOn("brew list")
 	require.NoError(t, in.Install([]string{"beekeeper-studio"}))
 	require.Contains(t, m.Calls(), "brew install --cask beekeeper-studio")
@@ -96,7 +96,7 @@ func TestUpdateBranches(t *testing.T) {
 		want               []string
 	}{
 		{
-			"cask", "packages:\n  beekeeper-studio: [{brew: {cask: beekeeper-studio}}]", "darwin",
+			"cask", "packages:\n  beekeeper-studio: [{brew/cask: {packageName: beekeeper-studio}}]", "darwin",
 			[]string{"brew"},
 			[]string{"brew upgrade --cask beekeeper-studio"},
 		},
@@ -111,12 +111,12 @@ func TestUpdateBranches(t *testing.T) {
 			[]string{"npm update --global corepack"},
 		},
 		{
-			"gem", "packages:\n  ruby-lsp: [{gem: ruby-lsp}]", "linux",
+			"gem", "packages:\n  ruby-lsp: [{gem: {packageName: ruby-lsp}}]", "linux",
 			[]string{"gem", "ruby-lsp"},
 			[]string{"sudo gem update ruby-lsp"},
 		},
 		{
-			"go", "packages:\n  gopls: [{go: \"golang.org/x/tools/gopls@latest\"}]", "darwin",
+			"go", "packages:\n  gopls: [{go: {packageName: \"golang.org/x/tools/gopls@latest\"}}]", "darwin",
 			[]string{"go", "gopls"},
 			[]string{"go install golang.org/x/tools/gopls@latest"},
 		},
@@ -158,7 +158,7 @@ func TestInstalledVersionAptAndNpmMisses(t *testing.T) {
 }
 
 func TestInstallAptPinReinstallsOnDrift(t *testing.T) {
-	in, m := newInstaller(t, "packages:\n  jq:\n    version: 1.7-1\n    installMethods: [apt]", "linux", cmdMap([]string{"apt-get"}), Options{})
+	in, m := newInstaller(t, "packages:\n  jq:\n    version: 1.7-1\n    installers: [apt]", "linux", cmdMap([]string{"apt-get"}), Options{})
 	m.Stub = func(argv []string) ([]byte, error) {
 		if argv[0] == "dpkg-query" {
 			return []byte("1.6-2"), nil
@@ -209,7 +209,7 @@ func TestManagerBinDirs(t *testing.T) {
 	require.Equal(t, "", in.managerBinDir("script"))
 	require.Equal(t, "", in.managerBinDir("code"))
 	env["HOME"] = "/home/u"
-	require.Equal(t, "/home/u/.local/bin", in.managerBinDir("prebuiltBinariesArchive"))
+	require.Equal(t, "/home/u/.local/bin", in.managerBinDir("binariesRemoteArchive"))
 	require.Equal(t, "/home/u/go/bin", in.managerBinDir("go"))
 	env["GOPATH"] = "/gopath"
 	require.Equal(t, "/gopath/bin", in.managerBinDir("go"))
@@ -220,11 +220,11 @@ func TestManagerBinDirs(t *testing.T) {
 func TestInstallBinaryZipAsset(t *testing.T) {
 	const zipYaml = `packages:
   terraform:
-    - prebuiltBinariesArchive:
+    - binariesRemoteArchive:
+        platformEligibility:
+          - linux-amd64: sha256:goodsha
         version: 1.15.0
         url: https://example.com/terraform_{version}_{os}_{arch}.zip
-        platforms:
-          - linux-amd64: goodsha
 `
 	in, m := newInstaller(t, zipYaml, "linux", cmdMap([]string{"sha256sum"}), Options{})
 	m.Stub = shaStub("goodsha")

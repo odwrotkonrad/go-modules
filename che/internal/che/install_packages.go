@@ -80,11 +80,11 @@ func NewPackagesInstaller(env map[string]string, home string, opts options.Optio
 			IfMissing:        opts.PackagesIfMissing,
 			DryRun:           opts.DryRun != options.DryRun.Off,
 			PreferredMethods: opts.PackagesPreferredMethods,
-			PrebuiltBinariesArchiveDestinationCandidates: opts.PackagesPrebuiltBinariesArchiveDestinationCandidates,
-			PrebuiltBinariesArchiveCheckPresentOnPath:    opts.PackagesPrebuiltBinariesArchiveCheckPresentOnPath,
-			CompletionsEnabled:                           opts.PackagesCompletionsEnabled,
-			CompletionsDestinationCandidates:             opts.PackagesCompletionsDestinationCandidates,
-			CompletionsCheckPresentOnFpath:               opts.PackagesCompletionsCheckPresentOnFpath,
+			BinariesRemoteArchiveDestinationCandidates: opts.PackagesBinariesRemoteArchiveDestinationCandidates,
+			BinariesRemoteArchiveCheckPresentOnPath:    opts.PackagesBinariesRemoteArchiveCheckPresentOnPath,
+			CompletionsEnabled:                         opts.PackagesCompletionsEnabled,
+			CompletionsDestinationCandidates:           opts.PackagesCompletionsDestinationCandidates,
+			CompletionsCheckPresentOnFpath:             opts.PackagesCompletionsCheckPresentOnFpath,
 		},
 	}, nil
 }
@@ -108,11 +108,11 @@ func (p *ProfileReady) newInstaller() (*packages.Installer, error) {
 		}
 		opts.PackagesPreferredMethods = m
 	}
-	if d := p.Options.Packages.PrebuiltBinariesArchive.InstallDestinationCandidates; len(d) > 0 {
-		opts.PackagesPrebuiltBinariesArchiveDestinationCandidates = d
+	if d := p.Options.Packages.BinariesRemoteArchive.InstallDestinationCandidates; len(d) > 0 {
+		opts.PackagesBinariesRemoteArchiveDestinationCandidates = d
 	}
-	if c := p.Options.Packages.PrebuiltBinariesArchive.CheckPresentOnPath; c != nil {
-		opts.PackagesPrebuiltBinariesArchiveCheckPresentOnPath = *c
+	if c := p.Options.Packages.BinariesRemoteArchive.CheckPresentOnPath; c != nil {
+		opts.PackagesBinariesRemoteArchiveCheckPresentOnPath = *c
 	}
 	if e := p.Options.Packages.Completions.Zsh.Enabled; e != nil {
 		opts.PackagesCompletionsEnabled = *e

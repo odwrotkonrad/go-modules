@@ -38,28 +38,28 @@ groups:
     verify:
       gcloud: gcloud --version
 
-  - method: prebuiltBinariesArchive/bare
+  - method: binariesRemoteArchive/bare
     packages: [kubectl]
     verify:
       kubectl: kubectl version --client
 
-  - method: prebuiltBinariesArchive/tree
+  - method: binariesRemoteArchive/tree
     packages: [kubectx, glab]
     verify:
       kubectx: kubectx --help
       glab: glab --version
 
-  - method: script/remoteUrl
+  - method: script/url
     packages: [pyenv]
     verify:
       pyenv: pyenv --version
 
-  - method: versionManager/pyenv
+  - method: pyenv
     packages: [python3]
     verify:
       python3: python3 --version
 
-  - method: versionManager/nvm
+  - method: nvm
     packages: [node]
     verify:
       node: . "$NVM_DIR/nvm.sh" && node --version

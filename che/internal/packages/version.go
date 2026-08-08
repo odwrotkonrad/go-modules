@@ -23,26 +23,25 @@ func PinMatches(out, pin string) bool {
 	return strings.Contains(out, pin)
 }
 
-// VersionTheOnePublished marks a package whose manager publishes exactly one version.
-// [why] stating it keeps an absent version meaning "not yet decided" rather than "nothing to pin"
-const VersionTheOnePublished = "__the_one_published__"
-
 // VersionLatest tracks a manager's newest release rather than a pin.
 // [why] for sources whose head we own or deliberately follow: no drift check, no version in the name
 const VersionLatest = "latest"
 
-// [why] an item-level version beats the entry version: the item states what its
+// [why] an absent version means rolling: the installer tracks its manager's current release;
 //
-//	manager actually delivers when the streams diverge
+//	an item-level version beats the entry version
 func (in *Installer) pinFor(pkg, specVersion string) string {
 	if r, ok := in.requested[pkg]; ok && len(r.Versions) > 0 {
 		return r.globalVersion()
+	}
+	if specVersion == VersionLatest {
+		return ""
 	}
 	if specVersion != "" {
 		return specVersion
 	}
 	if e, ok := in.File.Packages[pkg]; ok && e.Version != "" {
-		if e.Version == VersionTheOnePublished || e.Version == VersionLatest {
+		if e.Version == VersionLatest {
 			return ""
 		}
 		return e.Version
@@ -75,7 +74,7 @@ func (in *Installer) requestedOverridesPin(pkg, itemVersion string) error {
 	return fmt.Errorf("%s: requested version %s but %s pins %s (no checksum for the requested version)", pkg, r.Versions[0], in.FilePath, itemVersion)
 }
 
-func (in *Installer) resolveArchiveVersion(pkg string, b *PrebuiltBinariesArchiveSpec) (string, error) {
+func (in *Installer) resolveArchiveVersion(pkg string, b *BinariesRemoteArchiveSpec) (string, error) {
 	if r, ok := in.requested[pkg]; ok {
 		if v := r.globalVersion(); v != "" {
 			return v, nil
@@ -84,14 +83,14 @@ func (in *Installer) resolveArchiveVersion(pkg string, b *PrebuiltBinariesArchiv
 	if b.Version != "" {
 		return b.Version, nil
 	}
-	if e, ok := in.File.Packages[pkg]; ok && e.Version != "" && e.Version != VersionTheOnePublished {
+	if e, ok := in.File.Packages[pkg]; ok && e.Version != "" && e.Version != VersionLatest {
 		return e.Version, nil
 	}
 	// [why] a version-less url (vendor "latest" endpoint) needs no pin
 	if !strings.Contains(b.URL, "{version}") && !strings.Contains(strings.Join(b.ExtractBinaries, " "), "{version}") {
 		return "", nil
 	}
-	return "", fmt.Errorf("%s: no version pinned: set version on the entry or the prebuiltBinariesArchive item", pkg)
+	return "", fmt.Errorf("%s: no version pinned: set version on the entry or the binariesRemoteArchive item", pkg)
 }
 
 // [<] 🤖🤖🤖

@@ -13,7 +13,7 @@ cases:
       stdOut:
         - "# Run profile cli/macos"
         - "installed jq via apt"
-        - "installed kubectx via prebuiltBinariesArchive"
+        - "installed kubectx 0.11.0 via binariesRemoteArchive"
   - name: ShouldWarnMissingCommandAfterInstall
     expected:
       stdOut:
@@ -43,7 +43,7 @@ cases:
     expected:
       stdOut:
         - "install jq via apt (dry run)"
-        - "install kubectx via prebuiltBinariesArchive (dry run)"
+        - "install kubectx 0.11.0 via binariesRemoteArchive (dry run)"
     notExpected:
       stdOut:
         - "installed jq via apt"

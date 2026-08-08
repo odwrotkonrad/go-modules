@@ -10,19 +10,21 @@ import (
 	"gopkg.in/yaml.v3"
 )
 
-const dockerAptYaml = `packages:
+const dockerAptYaml = `installerRegistries:
+  apt:
+    - url: https://download.docker.com/linux/debian
+      verificationKey: https://download.docker.com/linux/debian/gpg
+packages:
   docker:
-    installMethods:
+    installers:
       - apt:
-          installPackages: [docker-ce, docker-ce-cli, containerd.io]
-          fromSource:
-            url: https://download.docker.com/linux/debian
-            verificationKey: https://download.docker.com/linux/debian/gpg
+          packageName: docker-ce
+          fromRegistry: download.docker.com/linux/debian
     completions:
       zsh: {cmd: docker completion zsh}
   docker-desktop:
     command: docker
-    installMethods:
+    installers:
       - script:
           os: darwin
           run: echo install-desktop
@@ -57,10 +59,10 @@ func TestInstallAptRepoConfiguresAndInstalls(t *testing.T) {
 	calls := strings.Join(m.Calls(), "\n")
 	require.Contains(t, calls, "https://download.docker.com/linux/debian/gpg")
 	require.Contains(t, calls, "sudo install -m 0755 -d /etc/apt/keyrings")
-	require.Contains(t, calls, "/etc/apt/keyrings/docker.asc")
-	require.Contains(t, calls, "/etc/apt/sources.list.d/docker.sources")
+	require.Contains(t, calls, "/etc/apt/keyrings/download.docker.com-linux-debian.asc")
+	require.Contains(t, calls, "/etc/apt/sources.list.d/download.docker.com-linux-debian.sources")
 	require.Contains(t, calls, "sudo apt-get update")
-	require.Contains(t, calls, "sudo apt-get install --yes --no-install-recommends docker-ce docker-ce-cli containerd.io")
+	require.Contains(t, calls, "sudo apt-get install --yes --no-install-recommends docker-ce")
 }
 
 func TestInstallAptRepoSkipsWhenAllInstalled(t *testing.T) {
@@ -78,7 +80,7 @@ func TestInstallAptRepoSkipsWhenAllInstalled(t *testing.T) {
 	require.NoError(t, in.Install([]string{"docker"}))
 	calls := strings.Join(m.Calls(), "\n")
 	require.NotContains(t, calls, "apt-get install")
-	require.Contains(t, calls, "/etc/apt/sources.list.d/docker.sources")
+	require.Contains(t, calls, "/etc/apt/sources.list.d/download.docker.com-linux-debian.sources")
 }
 
 func TestInstallAptRepoDryRunAnnounces(t *testing.T) {
@@ -93,9 +95,9 @@ func TestInstallAptRepoDryRunAnnounces(t *testing.T) {
 func TestAptPrerequisitesSkippedWhenInstalled(t *testing.T) {
 	const yml = `packages:
   x:
-    installMethods:
+    installers:
       - apt:
-          installPackages: [x-cli]
+          packageName: x-cli
           prerequisitePackages: [gnupg]
 `
 	in, m := newInstaller(t, yml, "linux", cmdMap([]string{"apt-get"}), Options{})
@@ -112,22 +114,32 @@ func TestAptPrerequisitesSkippedWhenInstalled(t *testing.T) {
 }
 
 func TestAptRepoRequiresUrlAndGpg(t *testing.T) {
-	const yml = `packages:
+	const yml = `installerRegistries:
+  apt:
+    - url: https://example.com
+packages:
   x:
-    installMethods:
-      - apt:
-          fromSource: {url: https://example.com}
+    installers:
+      - apt: {fromRegistry: example.com}
 `
-	in, _ := newInstaller(t, yml, "linux", cmdMap([]string{"apt-get"}), Options{})
-	require.ErrorContains(t, in.Install([]string{"x"}), "apt fromSource requires url and verificationKey")
+	in, m := newInstaller(t, yml, "linux", cmdMap([]string{"apt-get"}), Options{})
+	m.Stub = aptStub(t)
+	require.ErrorContains(t, in.Install([]string{"x"}), `apt registry "example.com" requires url and verificationKey`)
 }
 
-const pinnedCurlYaml = `packages:
+const pinnedCurlYaml = `installerRegistries:
+  apt:
+    - url: https://deb.debian.org/debian
+      verificationKey: /usr/share/keyrings/debian-archive-keyring.gpg
+      suites: bookworm-backports
+      components: main
+packages:
   curl:
     version: 8.21.0
-    installMethods:
+    installers:
       - apt:
-          versions: {"8.14.1": "8.14.1-2+deb13u2~bpo13+1"}
+          versionMap: {"8.14.1": "8.14.1-2+deb13u2~bpo13+1"}
+          fromRegistry: deb.debian.org/debian
 `
 
 func TestInstallAptPinsMappedPackageVersion(t *testing.T) {
@@ -135,7 +147,7 @@ func TestInstallAptPinsMappedPackageVersion(t *testing.T) {
 	m.Stub = aptStub(t)
 	require.NoError(t, in.Install([]string{"curl"}))
 	require.Contains(t, strings.Join(m.Calls(), "\n"),
-		"sudo apt-get install --yes --no-install-recommends --allow-downgrades curl=8.14.1-2+deb13u2~bpo13+1")
+		"sudo apt-get install --yes --no-install-recommends -t bookworm-backports --allow-downgrades curl=8.14.1-2+deb13u2~bpo13+1")
 }
 
 func TestInstallAptReinstallsOnPinMismatch(t *testing.T) {
@@ -162,44 +174,74 @@ func TestInstallAptSkipsWhenPinInstalled(t *testing.T) {
 	require.NotContains(t, strings.Join(m.Calls(), "\n"), "apt-get install")
 }
 
-const backportsYaml = `packages:
-  debian-backports:
-    installMethods:
-      - apt:
-          installPackages: [debian-archive-keyring]
-          fromSource:
-            url: https://deb.debian.org/debian
-            verificationKey: /usr/share/keyrings/debian-archive-keyring.gpg
-            suites: bookworm-backports
-            components: main
-`
-
 func TestInstallAptPathKeySkipsKeyDownload(t *testing.T) {
-	in, m := newInstaller(t, backportsYaml, "linux", cmdMap([]string{"apt-get"}), Options{})
-	require.NoError(t, in.Install([]string{"debian-backports"}))
+	in, m := newInstaller(t, pinnedCurlYaml, "linux", cmdMap([]string{"apt-get"}), Options{})
+	m.Stub = func(argv []string) ([]byte, error) {
+		if strings.HasPrefix(strings.Join(argv, " "), "dpkg-query") {
+			return []byte("8.14.1-2+deb13u2~bpo13+1"), nil
+		}
+		return nil, nil
+	}
+	require.NoError(t, in.Install([]string{"curl"}))
 	calls := strings.Join(m.Calls(), "\n")
-	require.Contains(t, calls, "/etc/apt/sources.list.d/debian-backports.sources")
-	require.NotContains(t, calls, "curl")
+	require.Contains(t, calls, "/etc/apt/sources.list.d/deb.debian.org-debian-bookworm-backports-main.sources")
+	require.NotContains(t, calls, "curl -fsSL")
 	require.NotContains(t, calls, "/etc/apt/keyrings")
 	require.NotContains(t, calls, "apt-get install")
+}
+
+func TestInstallAptUnknownRegistryErrors(t *testing.T) {
+	const yml = `packages:
+  x:
+    installers:
+      - apt: {fromRegistry: nowhere.example.com}
+`
+	in, m := newInstaller(t, yml, "linux", cmdMap([]string{"apt-get"}), Options{})
+	m.Stub = aptStub(t)
+	require.ErrorContains(t, in.Install([]string{"x"}), `unknown apt registry "nowhere.example.com"`)
+}
+
+func TestAptAmbiguousRegistryNarrowsWithSuites(t *testing.T) {
+	const yml = `installerRegistries:
+  apt:
+    - url: https://deb.debian.org/debian
+      verificationKey: /usr/share/keyrings/debian-archive-keyring.gpg
+      suites: bookworm-backports
+      components: main
+    - url: https://deb.debian.org/debian
+      verificationKey: /usr/share/keyrings/debian-archive-keyring.gpg
+      suites: bookworm
+      components: main
+packages:
+  x:
+    installers:
+      - apt: {fromRegistry: deb.debian.org/debian}
+  y:
+    installers:
+      - apt: {fromRegistry: deb.debian.org/debian::bookworm-backports}
+`
+	in, m := newInstaller(t, yml, "linux", cmdMap([]string{"apt-get"}), Options{})
+	m.Stub = aptStub(t)
+	require.ErrorContains(t, in.Install([]string{"x"}), "ambiguous apt registry")
+	require.NoError(t, in.Install([]string{"y"}))
+	require.Contains(t, strings.Join(m.Calls(), "\n"), "-t bookworm-backports")
 }
 
 func TestAptVersionsMapValidation(t *testing.T) {
 	err := yaml.Unmarshal([]byte(`packages:
   x:
-    installMethods:
+    installers:
       - apt:
-          versions: {"1.0": "1.0-1", "2.0": "2.0-1"}
+          versionMap: {"1.0": "1.0-1", "2.0": "2.0-1"}
 `), &File{})
 	require.ErrorContains(t, err, "exactly one binary version")
 	err = yaml.Unmarshal([]byte(`packages:
   x:
-    installMethods:
+    installers:
       - apt:
           installPackages: [a, b]
-          versions: {"1.0": "1.0-1"}
 `), &File{})
-	require.ErrorContains(t, err, "single installPackages entry")
+	require.ErrorContains(t, err, "installPackages is gone")
 }
 
 func TestCommandOverrideSkipsScriptWhenPresent(t *testing.T) {

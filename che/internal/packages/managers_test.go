@@ -49,8 +49,15 @@ func TestInstallBrewSkipsWhenInstalled(t *testing.T) {
 	require.NotContains(t, m.Calls(), "brew install bat")
 }
 
+const tapYaml = `installerRegistries:
+  brew:
+    - konradodwrot/tap
+packages:
+  che: [{brew: {fromRegistry: konradodwrot/tap}}]
+`
+
 func TestInstallBrewTapQualified(t *testing.T) {
-	in, m := newInstaller(t, "packages:\n  che: [{brew: konradodwrot/tap/che}]", "darwin", cmdMap([]string{"brew"}), Options{})
+	in, m := newInstaller(t, tapYaml, "darwin", cmdMap([]string{"brew"}), Options{})
 	m.Stub = failOn("brew list")
 	require.NoError(t, in.Install([]string{"che"}))
 	require.Equal(t, []string{
@@ -61,8 +68,43 @@ func TestInstallBrewTapQualified(t *testing.T) {
 	}, m.Calls())
 }
 
+func TestInstallBrewUnknownRegistryErrors(t *testing.T) {
+	in, m := newInstaller(t, "packages:\n  che: [{brew: {fromRegistry: nowhere/tap}}]", "darwin", cmdMap([]string{"brew"}), Options{})
+	m.Stub = failOn("brew list")
+	require.ErrorContains(t, in.Install([]string{"che"}), `unknown brew registry "nowhere/tap"`)
+}
+
+func TestBrewTapQualifiedNameIsParseError(t *testing.T) {
+	err := yaml.Unmarshal([]byte("packages:\n  che: [{brew: {packageName: konradodwrot/tap/che}}]"), &File{})
+	require.ErrorContains(t, err, "installerRegistries.brew")
+	err = yaml.Unmarshal([]byte("packages:\n  az: [{brew/cask: {packageName: azure/azure-cli/azure-cli-preview}}]"), &File{})
+	require.ErrorContains(t, err, "installerRegistries.brew")
+}
+
+func TestAptIneligibleOnNonDebianLinux(t *testing.T) {
+	in, m := newInstaller(t, "packages:\n  jq: [apt]", "linux", cmdMap([]string{"apt-get"}), Options{})
+	in.Host.Distro = ""
+	out, err := captureStdout(t, func() error { return in.Install([]string{"jq"}) })
+	require.NoError(t, err)
+	wantLines(t, out, "will not install jq: no applicable manager")
+	require.Empty(t, m.Calls())
+}
+
+func TestEligibleInstallersMostSpecificKeyWins(t *testing.T) {
+	const y = `osInstallers:
+  linux: [npm]
+  linux-debian: [apt]
+packages:
+  jq: [apt]
+`
+	in, m := newInstaller(t, y, "linux", cmdMap([]string{"apt-get"}), Options{})
+	m.Stub = failOn("dpkg -s")
+	require.NoError(t, in.Install([]string{"jq"}))
+	require.Contains(t, m.Calls(), "sudo apt-get install --yes --no-install-recommends jq")
+}
+
 func TestInstallAptSudoAndUpdateOnce(t *testing.T) {
-	in, m := newInstaller(t, "packages:\n  fd: [brew, {apt: fd-find}]\n  jq: [apt]", "linux", cmdMap([]string{"apt-get"}), Options{})
+	in, m := newInstaller(t, "packages:\n  fd: [brew, {apt: {packageName: fd-find}}]\n  jq: [apt]", "linux", cmdMap([]string{"apt-get"}), Options{})
 	m.Stub = failOn("dpkg -s")
 	require.NoError(t, in.Install([]string{"fd", "jq"}))
 	calls := m.Calls()
@@ -73,7 +115,7 @@ func TestInstallAptSudoAndUpdateOnce(t *testing.T) {
 }
 
 func TestInstallNpmPinReinstallsOnDrift(t *testing.T) {
-	in, m := newInstaller(t, "packages:\n  ccstatusline:\n    version: 2.2.22\n    installMethods: [npm]", "darwin",
+	in, m := newInstaller(t, "packages:\n  ccstatusline:\n    version: 2.2.22\n    installers: [npm]", "darwin",
 		cmdMap([]string{"npm", "ccstatusline"}), Options{})
 	m.Stub = func(argv []string) ([]byte, error) {
 		if argv[0] == "npm" && argv[1] == "ls" {
@@ -86,7 +128,7 @@ func TestInstallNpmPinReinstallsOnDrift(t *testing.T) {
 }
 
 func TestInstallNpmPinSkipsWhenMatching(t *testing.T) {
-	in, m := newInstaller(t, "packages:\n  ccstatusline:\n    version: 2.2.22\n    installMethods: [npm]", "darwin",
+	in, m := newInstaller(t, "packages:\n  ccstatusline:\n    version: 2.2.22\n    installers: [npm]", "darwin",
 		cmdMap([]string{"npm", "ccstatusline"}), Options{})
 	m.Stub = func(argv []string) ([]byte, error) {
 		if argv[0] == "npm" && argv[1] == "ls" {
@@ -99,14 +141,14 @@ func TestInstallNpmPinSkipsWhenMatching(t *testing.T) {
 }
 
 func TestInstallGemPinPassesVersionRequirement(t *testing.T) {
-	in, m := newInstaller(t, "packages:\n  ruby-lsp:\n    version: 0.26.10\n    installMethods: [{gem: ruby-lsp}]", "linux",
+	in, m := newInstaller(t, "packages:\n  ruby-lsp:\n    version: 0.26.10\n    installers: [{gem: {packageName: ruby-lsp}}]", "linux",
 		cmdMap([]string{"gem"}), Options{})
 	require.NoError(t, in.Install([]string{"ruby-lsp"}))
 	require.Contains(t, m.Calls(), "sudo gem install ruby-lsp -v 0.26.10")
 }
 
 func TestInstallGoPinResolvesModuleVersion(t *testing.T) {
-	in, m := newInstaller(t, "packages:\n  gopls:\n    version: 0.23.0\n    installMethods: [{go: golang.org/x/tools/gopls@latest}]", "darwin",
+	in, m := newInstaller(t, "packages:\n  gopls:\n    version: 0.23.0\n    installers: [{go: {packageName: golang.org/x/tools/gopls@latest}}]", "darwin",
 		cmdMap([]string{"go"}), Options{})
 	require.NoError(t, in.Install([]string{"gopls"}))
 	require.Contains(t, m.Calls(), "go install golang.org/x/tools/gopls@v0.23.0")
@@ -140,7 +182,7 @@ func TestInstallDryRunAnnouncesWithoutInstalling(t *testing.T) {
 
 func TestInstallRoundsServeLaterPackages(t *testing.T) {
 	cmds := cmdMap([]string{"apt-get"})
-	in, m := newInstaller(t, "packages:\n  x: [{npm: x}]\n  npm: [{apt: npm}]", "linux", cmds, Options{})
+	in, m := newInstaller(t, "packages:\n  x: [{npm: {packageName: x}}]\n  npm: [{apt: {packageName: npm}}]", "linux", cmds, Options{})
 	m.Stub = func(argv []string) ([]byte, error) {
 		joined := strings.Join(argv, " ")
 		if strings.HasPrefix(joined, "dpkg -s") || strings.HasPrefix(joined, "npm ls") {
@@ -223,7 +265,7 @@ func TestInstallScriptRemoteUrlFetchesAndRuns(t *testing.T) {
   brew:
     - script:
         os: darwin
-        remoteUrl: https://example.com/install.sh
+        url: https://example.com/install.sh
         env: {NONINTERACTIVE: "1"}
 `
 	in, m := newInstaller(t, yml, "darwin", cmdMap(nil), Options{})
@@ -243,7 +285,7 @@ func TestInstallScriptRemoteUrlFetchesAndRuns(t *testing.T) {
 
 func TestInstallScriptRemoteUrlFetchFailureErrors(t *testing.T) {
 	const yml = `packages:
-  x: [{script: {remoteUrl: https://example.com/install.sh}}]
+  x: [{script: {url: https://example.com/install.sh}}]
 `
 	in, m := newInstaller(t, yml, "darwin", cmdMap(nil), Options{})
 	m.Stub = failOn("curl")
@@ -258,7 +300,7 @@ func TestInstallScriptPathMissingErrors(t *testing.T) {
 }
 
 func TestInstallScriptUrlFetchesAndRuns(t *testing.T) {
-	in, m := newInstaller(t, "packages:\n  x: [{script: {remoteUrl: https://example.com/install.sh}}]", "darwin", cmdMap(nil), Options{})
+	in, m := newInstaller(t, "packages:\n  x: [{script: {url: https://example.com/install.sh}}]", "darwin", cmdMap(nil), Options{})
 	m.Stub = func(argv []string) ([]byte, error) {
 		if argv[0] == "curl" {
 			return []byte("echo fetched"), nil
@@ -273,27 +315,29 @@ func TestInstallScriptUrlFetchesAndRuns(t *testing.T) {
 }
 
 func TestInstallScriptUrlFetchFailureAborts(t *testing.T) {
-	in, m := newInstaller(t, "packages:\n  x: [{script: {remoteUrl: https://example.com/install.sh}}]", "darwin", cmdMap(nil), Options{})
+	in, m := newInstaller(t, "packages:\n  x: [{script: {url: https://example.com/install.sh}}]", "darwin", cmdMap(nil), Options{})
 	m.Stub = failOn("curl")
 	err := in.Install([]string{"x"})
 	require.ErrorContains(t, err, "install script fetch failed: https://example.com/install.sh")
 }
 
-const gcloudYaml = `packages:
+const gcloudYaml = `installerRegistries:
+  apt:
+    - url: https://packages.cloud.google.com/apt
+      verificationKey: https://packages.cloud.google.com/apt/doc/apt-key.gpg
+      suites: cloud-sdk
+      components: main
+packages:
   gcloud:
     - apt:
-        installPackages: [google-cloud-cli]
-        fromSource:
-          url: https://packages.cloud.google.com/apt
-          verificationKey: https://packages.cloud.google.com/apt/doc/apt-key.gpg
-          suites: cloud-sdk
-          components: main
+        packageName: google-cloud-cli
+        fromRegistry: packages.cloud.google.com/apt
     - script:
+        platformEligibility:
+          - darwin-arm64: sha256:gsha
         os: darwin
         version: 572.0.0
         run: echo install-gcloud
-        platforms:
-          - darwin-arm64: gsha
 `
 
 func TestInstallScriptPinReinstallsOnDrift(t *testing.T) {
@@ -339,14 +383,14 @@ func TestInstallGcloudPicksLinuxAptRepo(t *testing.T) {
 	require.NoError(t, in.Install([]string{"gcloud"}))
 	calls := strings.Join(m.Calls(), "\n")
 	require.Contains(t, calls, "packages.cloud.google.com/apt/doc/apt-key.gpg")
-	require.Contains(t, calls, "/etc/apt/sources.list.d/gcloud.sources")
-	require.Contains(t, calls, "--no-install-recommends google-cloud-cli")
+	require.Contains(t, calls, "/etc/apt/sources.list.d/packages.cloud.google.com-apt-cloud-sdk-main.sources")
+	require.Contains(t, calls, "--no-install-recommends -t cloud-sdk google-cloud-cli")
 }
 
 func TestScriptEnvCarriesPinShaAndHost(t *testing.T) {
 	in, _ := newInstaller(t, gcloudYaml, "darwin", cmdMap(nil), Options{})
 	in.Host.Arch = "arm64"
-	env := in.scriptEnv("gcloud", &ScriptSpec{Version: "572.0.0", Platforms: ItemPlatforms{Names: []string{"darwin-arm64"}, Sha: map[string]string{"darwin-arm64": "gsha"}}})
+	env := in.scriptEnv("gcloud", &ScriptSpec{Version: "572.0.0", Platforms: ItemPlatforms{Names: []string{"darwin-arm64"}, Sha: map[string]string{"darwin-arm64": "sha256:gsha"}}})
 	joined := strings.Join(env, "\n")
 	for _, want := range []string{
 		"CHE_PKG_NAME=gcloud", "CHE_PKG_VERSION=572.0.0", "CHE_PKG_SHA256=gsha",
@@ -358,35 +402,35 @@ func TestScriptEnvCarriesPinShaAndHost(t *testing.T) {
 }
 
 func TestValidatePlatforms(t *testing.T) {
-	base := `archNameConventions:
+	base := `archSchemes:
   uname: {amd64: x86_64}
-platforms:
-  linux-amd64: [prebuiltBinariesArchive]
+osInstallers:
+  linux-amd64: [binariesRemoteArchive]
 packages:
   x:
-    - prebuiltBinariesArchive:
+    - binariesRemoteArchive:
         url: https://example.com/x-{arch}.tar.gz
 `
 	var f File
-	require.NoError(t, yaml.Unmarshal([]byte(base+"        archConvention: uname\n        platforms: [linux-amd64]\n"), &f))
+	require.NoError(t, yaml.Unmarshal([]byte(base+"        archScheme: uname\n        platformEligibility: [linux-amd64]\n"), &f))
 	require.NoError(t, f.ValidatePlatforms())
 
 	var missing File
-	require.NoError(t, yaml.Unmarshal([]byte(base+"        platforms: [linux-amd64]\n"), &missing))
-	require.ErrorContains(t, missing.ValidatePlatforms(), "{arch} requires archConvention")
+	require.NoError(t, yaml.Unmarshal([]byte(base+"        platformEligibility: [linux-amd64]\n"), &missing))
+	require.ErrorContains(t, missing.ValidatePlatforms(), "{arch} requires archScheme")
 
 	var bad File
-	require.NoError(t, yaml.Unmarshal([]byte(base+"        platforms: [drawin-arm64]\n"), &bad))
+	require.NoError(t, yaml.Unmarshal([]byte(base+"        platformEligibility: [drawin-arm64]\n"), &bad))
 	require.ErrorContains(t, bad.ValidatePlatforms(), `unknown platform "drawin-arm64"`)
 
 	var badConv File
-	require.NoError(t, yaml.Unmarshal([]byte(base+"        archConvention: gnu\n"), &badConv))
-	require.ErrorContains(t, badConv.ValidatePlatforms(), `unknown archConvention "gnu"`)
+	require.NoError(t, yaml.Unmarshal([]byte(base+"        archScheme: gnu\n"), &badConv))
+	require.ErrorContains(t, badConv.ValidatePlatforms(), `unknown archScheme "gnu"`)
 }
 
 func TestArchForUnknownConventionErrors(t *testing.T) {
-	in, _ := newInstaller(t, "packages:\n  x:\n    - prebuiltBinariesArchive:\n        version: \"1\"\n        url: https://example.com/x-{arch}\n        archConvention: gnu\n        platforms: [{linux-amd64: s}]", "linux", cmdMap(nil), Options{})
-	require.ErrorContains(t, in.Install([]string{"x"}), `unknown archConvention "gnu"`)
+	in, _ := newInstaller(t, "packages:\n  x:\n    - binariesRemoteArchive:\n        archScheme: gnu\n        platformEligibility: [{linux-amd64: sha256:s}]\n        version: \"1\"\n        url: https://example.com/x-{arch}", "linux", cmdMap(nil), Options{})
+	require.ErrorContains(t, in.Install([]string{"x"}), `unknown archScheme "gnu"`)
 }
 
 func TestCheckUpgradableScriptPinDrift(t *testing.T) {
@@ -437,12 +481,12 @@ func TestInstallPythonPyenvPinFromBuiltin(t *testing.T) {
 
 const kubectlYaml = `packages:
   kubectl:
-    installMethods:
-      - prebuiltBinariesArchive:
+    installers:
+      - binariesRemoteArchive:
+          platformEligibility:
+            - linux-amd64: sha256:goodsha
           version: 1.36.3
           url: https://example.com/v{version}/kubectl
-          platforms:
-            - linux-amd64: goodsha
     versionCommand: kubectl version --client
 `
 
@@ -470,7 +514,7 @@ func TestVersionCommandDriftReinstalls(t *testing.T) {
 	require.Contains(t, strings.Join(m.Calls(), "\n"), "curl -fsSL")
 }
 
-const codeExtYaml = "packages:\n  golang.go: [{brew: {vscode: golang.go}}]\n  redhat.vscode-yaml: [{brew: {vscode: redhat.vscode-yaml}}]\n  code: [{brew: {cask: visual-studio-code}}]"
+const codeExtYaml = "packages:\n  golang.go: [brew/vscode]\n  redhat.vscode-yaml: [brew/vscode]\n  code: [{brew/cask: {packageName: visual-studio-code}}]"
 
 func codeListStub(installed string) func(argv []string) ([]byte, error) {
 	return func(argv []string) ([]byte, error) {

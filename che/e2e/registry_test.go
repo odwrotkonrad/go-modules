@@ -34,7 +34,16 @@ func TestE2ERegistryBrewNames(t *testing.T) {
 			if ref == "" {
 				ref = name
 			}
-			ref = strings.ReplaceAll(ref, "{version}", entry.Version)
+			pin := entry.Version
+			if it.Version != "" {
+				pin = it.Version
+			}
+			if it.Mgr == "brew" && pin != "" && pin != packages.VersionLatest {
+				ref += "@" + pin
+			}
+			if it.Registry != "" {
+				ref = it.Registry + "/" + ref
+			}
 			t.Run(kind+"/"+ref, func(t *testing.T) {
 				t.Parallel()
 				requireBrewName(t, client, kind, ref)

@@ -14,18 +14,18 @@ import (
 
 const goCompYaml = `packages:
   go:
-    installMethods:
-      - prebuiltBinariesArchive:
+    installers:
+      - binariesRemoteArchive:
+          extractBinaries: [go/bin/go, go/bin/gofmt]
+          platformEligibility:
+            - linux-amd64: sha256:goodsha
           version: 1.26.4
           url: https://example.com/go{version}.{os}-{arch}.tar.gz
-          extractBinaries: [go/bin/go, go/bin/gofmt]
-          platforms:
-            - linux-amd64: goodsha
     completions:
       zsh:
         name: _golang
         url: https://example.com/_golang
-        sha256: goodsha
+        checksum: sha256:goodsha
 `
 
 func completionsOpts(extra Options) Options {
@@ -38,7 +38,7 @@ func TestEntryObjectFormParsesManagersAndCompletions(t *testing.T) {
 	entry, err := in.File.Find("go", "packages.yml")
 	require.NoError(t, err)
 	require.Len(t, entry.Items, 1)
-	require.Equal(t, "prebuiltBinariesArchive", entry.Items[0].Mgr)
+	require.Equal(t, "binariesRemoteArchive", entry.Items[0].Mgr)
 	require.Equal(t, "_golang", entry.Completions.Zsh.Name)
 	require.Equal(t, "https://example.com/_golang", entry.Completions.Zsh.URL)
 }
@@ -46,7 +46,7 @@ func TestEntryObjectFormParsesManagersAndCompletions(t *testing.T) {
 func TestEntryObjectFormRequiresManagersOrCompletions(t *testing.T) {
 	var f File
 	err := yaml.Unmarshal([]byte("packages:\n  go: {}\n"), &f)
-	require.ErrorContains(t, err, "installMethods or completions")
+	require.ErrorContains(t, err, "installers or completions")
 	err = yaml.Unmarshal([]byte("packages:\n  go:\n    completions:\n      zsh: {name: _go}\n"), &f)
 	require.ErrorContains(t, err, "exactly one of cmd or url")
 	err = yaml.Unmarshal([]byte("packages:\n  go:\n    completions:\n      zsh: {cmd: go env, url: https://example.com}\n"), &f)

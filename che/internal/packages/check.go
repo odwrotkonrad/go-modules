@@ -62,7 +62,7 @@ func (in *Installer) CheckUpgradable(pkgs []string) error {
 			}
 			continue
 		}
-		if it.Mgr == "prebuiltBinariesArchive" || it.Mgr == "script" {
+		if it.Mgr == "binariesRemoteArchive" || it.Mgr == "script" {
 			continue
 		}
 		name := it.Name
@@ -78,16 +78,16 @@ func (in *Installer) CheckUpgradable(pkgs []string) error {
 
 func pinnedVersion(it Item) string {
 	switch {
-	case it.PrebuiltBinariesArchive != nil:
-		return it.PrebuiltBinariesArchive.Version
+	case it.BinariesRemoteArchive != nil:
+		return it.BinariesRemoteArchive.Version
 	case it.Script != nil:
 		return it.Script.Version
 	case it.Apt != nil:
-		for bin := range it.Apt.Versions {
+		for bin := range it.Apt.Vocabulary.VersionMap {
 			return bin
 		}
 	}
-	return ""
+	return it.Version
 }
 
 func (in *Installer) managerOutdated(mgr string) map[string]bool {
@@ -187,7 +187,7 @@ func (in *Installer) managerBinDir(mgr string) string {
 			return filepath.Join(d, "bin")
 		}
 		return filepath.Join(in.Host.Getenv("HOME"), "go", "bin")
-	case "prebuiltBinariesArchive":
+	case "binariesRemoteArchive":
 		return in.userBinDir()
 	}
 	return ""

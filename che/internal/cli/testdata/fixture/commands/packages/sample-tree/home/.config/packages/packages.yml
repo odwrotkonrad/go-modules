@@ -1,16 +1,16 @@
 ##[>] 🤖🤖
 packages:
   jq: [brew, apt]
-  fd: [brew, {apt: fd-find}]
+  fd: [brew, {apt: {packageName: fd-find}}]
   npmtool:
     version: 1.2.3
-    installMethods: [npm]
+    installers: [npm]
   kubectx:
-    - prebuiltBinariesArchive:
+    - binariesRemoteArchive:
+        archScheme: odd
+        extractBinaries: [kubectx]
+        platformEligibility:
+          - linux-amd64: sha256:mocksha
         version: 0.11.0
         url: https://example.com/v{version}/kubectx_v{version}_{os}_{arch}.tar.gz
-        archConvention: odd
-        extractBinaries: [kubectx]
-        platforms:
-          - linux-amd64: mocksha
 ##[<] 🤖🤖

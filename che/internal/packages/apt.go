@@ -13,21 +13,25 @@ import (
 )
 
 func (in *Installer) installAptSpec(pkg string, a *AptSpec) error {
-	pkgs := a.InstallPackages.Names
-	if len(pkgs) == 0 {
-		pkgs = []string{pkg}
-	}
-	// [why] before the installed-skip: a pruned repo file heals, and repo-only entries
-	//   (debian-backports) configure their source even when their package is present
-	if a.FromSource != nil && !in.Opts.DryRun {
-		if err := in.ensureAptRepo(pkg, a.FromSource); err != nil {
-			return err
+	pkgs := []string{a.packageName(pkg)}
+	var src *AptRepoSpec
+	if a.FromRegistry != "" {
+		var err error
+		src, err = in.File.aptRegistry(a.FromRegistry)
+		if err != nil {
+			return fmt.Errorf("%s: %w", pkg, err)
+		}
+		if src.URL == "" || src.VerificationKey == "" {
+			return fmt.Errorf("%s: apt registry %q requires url and verificationKey", pkg, a.FromRegistry)
+		}
+		// [why] before the installed-skip: a pruned repo file heals even when the package is present
+		if !in.Opts.DryRun {
+			if err := in.ensureAptRepo(registrySlug(src), src); err != nil {
+				return err
+			}
 		}
 	}
 	binPin, pkgPin := in.aptPins(pkg, a)
-	if len(pkgs) != 1 {
-		binPin, pkgPin = "", ""
-	}
 	if in.aptAllInstalled(pkgs) {
 		if pkgPin == "" || in.aptVersionInstalled(pkgs[0], pkgPin) {
 			in.emitSkip(log.Levels.Debug, pkg, "already installed via apt")
@@ -36,13 +40,18 @@ func (in *Installer) installAptSpec(pkg string, a *AptSpec) error {
 		in.emit(log.Levels.Info, "reinstall", pkg+": -> "+binPin)
 	}
 	if in.Opts.DryRun {
-		in.emitDryRun("install", pkg+" via apt")
+		in.emitDryRun("install", labeled(pkg, binPin)+" via apt")
 		return nil
 	}
 	if err := in.aptUpdate(); err != nil {
 		return err
 	}
 	argv := []string{"apt-get", "install", "--yes", "--no-install-recommends"}
+	// [why] a source with explicit suites installs with -t so exact-version dependencies
+	//   resolve from that suite too (backports curl -> libcurl4)
+	if src != nil && src.Suites != "" {
+		argv = append(argv, "-t", src.Suites)
+	}
 	if pkgPin != "" {
 		argv = append(argv, "--allow-downgrades", pkgs[0]+"="+pkgPin)
 	} else {
@@ -51,7 +60,7 @@ func (in *Installer) installAptSpec(pkg string, a *AptSpec) error {
 	if err := in.exec(in.sudo(argv...)); err != nil {
 		return err
 	}
-	in.emit(log.Levels.Info, "installed", pkg+" via apt")
+	in.emit(log.Levels.Info, "installed", labeled(pkg, binPin)+" via apt")
 	return nil
 }
 
@@ -63,7 +72,7 @@ func (in *Installer) aptPins(pkg string, a *AptSpec) (string, string) {
 		v := r.globalVersion()
 		return v, v
 	}
-	for bin, pkgVer := range a.Versions {
+	for bin, pkgVer := range a.Vocabulary.VersionMap {
 		return bin, pkgVer
 	}
 	pin := in.pinFor(pkg, "")

@@ -11,22 +11,22 @@ import (
 
 const kubectxYaml = `packages:
   kubectx:
-    - prebuiltBinariesArchive:
+    - binariesRemoteArchive:
+        archScheme: odd
+        extractBinaries: [kubectx]
+        platformEligibility:
+          - linux-amd64: sha256:goodsha
         version: 0.11.0
         url: https://example.com/v{version}/kubectx_v{version}_{os}_{arch}.tar.gz
-        archConvention: odd
-        extractBinaries: [kubectx]
-        platforms:
-          - linux-amd64: goodsha
 `
 
 const kindYaml = `packages:
   kind:
-    - prebuiltBinariesArchive:
+    - binariesRemoteArchive:
+        platformEligibility:
+          - linux-amd64: sha256:goodsha
         version: 0.32.0
         url: https://example.com/v{version}/kind-{os}-{arch}
-        platforms:
-          - linux-amd64: goodsha
 `
 
 func shaStub(sha string) func(argv []string) ([]byte, error) {
@@ -73,13 +73,13 @@ func TestInstallBinaryBareAsset(t *testing.T) {
 
 const zigYaml = `packages:
   zig:
-    - prebuiltBinariesArchive:
+    - binariesRemoteArchive:
+        archScheme: uname
+        extractBinaries: ["zig-{arch}-linux-{version}/zig"]
+        platformEligibility:
+          - linux-amd64: sha256:goodsha
         version: 0.16.0
         url: https://example.com/{version}/zig-{arch}-linux-{version}.tar.xz
-        archConvention: uname
-        extractBinaries: ["zig-{arch}-linux-{version}/zig"]
-        platforms:
-          - linux-amd64: goodsha
 `
 
 func TestInstallBinaryTreeFlow(t *testing.T) {
@@ -94,20 +94,20 @@ func TestInstallBinaryTreeFlow(t *testing.T) {
 	require.NotContains(t, calls, "install -m 0755")
 }
 
-const gcloudArchiveYaml = `archNameConventions:
+const gcloudArchiveYaml = `archSchemes:
   vendor: {arm64: arm, amd64: x86_64}
 packages:
   gcloud:
-    - prebuiltBinariesArchive:
+    - binariesRemoteArchive:
+        archScheme: vendor
+        extractBinaries: [sdk/bin/gcloud, sdk/bin/gsutil]
+        platformEligibility:
+          - darwin-arm64: sha256:goodsha
         version: 572.0.0
         url: https://example.com/cli-{version}-{os}-{arch}.tar.gz
-        archConvention: vendor
-        extractBinaries: [sdk/bin/gcloud, sdk/bin/gsutil]
-        platforms:
-          - darwin-arm64: goodsha
 `
 
-func TestInstallPrebuiltBinariesArchiveArchConvention(t *testing.T) {
+func TestInstallBinariesRemoteArchiveArchScheme(t *testing.T) {
 	in, m := newInstaller(t, gcloudArchiveYaml, "darwin", cmdMap([]string{"sha256sum"}), Options{})
 	in.Host.Arch = "arm64"
 	m.Stub = shaStub("goodsha")
@@ -146,12 +146,12 @@ const awsYaml = `packages:
   aws:
     - script:
         os: darwin
-        remoteUrl: https://awscli.amazonaws.com/v2/install.sh
-    - prebuiltBinariesArchive:
-        url: https://awscli.amazonaws.com/awscli-exe-linux-{arch}.zip
-        archConvention: uname
-        platforms: [linux-amd64, linux-arm64]
+        url: https://awscli.amazonaws.com/v2/install.sh
+    - binariesRemoteArchive:
+        archScheme: uname
+        platformEligibility: [linux-amd64, linux-arm64]
         extractBinaries: [aws/dist/aws, aws/dist/aws_completer]
+        url: https://awscli.amazonaws.com/awscli-exe-linux-{arch}.zip
 `
 
 func TestInstallAwsScriptOnDarwin(t *testing.T) {
@@ -186,7 +186,7 @@ func TestInstallAwsLinuxArchive(t *testing.T) {
 }
 
 func TestInstallBinaryCustomDestination(t *testing.T) {
-	in, m := newInstaller(t, kindYaml, "linux", cmdMap([]string{"sha256sum"}), Options{PrebuiltBinariesArchiveDestinationCandidates: []string{"~/bin"}})
+	in, m := newInstaller(t, kindYaml, "linux", cmdMap([]string{"sha256sum"}), Options{BinariesRemoteArchiveDestinationCandidates: []string{"~/bin"}})
 	m.Stub = shaStub("goodsha")
 	require.NoError(t, in.Install([]string{"kind"}))
 	calls := strings.Join(m.Calls(), "\n")
@@ -196,7 +196,7 @@ func TestInstallBinaryCustomDestination(t *testing.T) {
 
 func TestInstallBinaryPicksFirstCandidateOnPath(t *testing.T) {
 	in, m := newInstaller(t, kindYaml, "linux", cmdMap([]string{"sha256sum"}),
-		Options{PrebuiltBinariesArchiveDestinationCandidates: []string{"/custom/bin", "~/bin"}, PrebuiltBinariesArchiveCheckPresentOnPath: true})
+		Options{BinariesRemoteArchiveDestinationCandidates: []string{"/custom/bin", "~/bin"}, BinariesRemoteArchiveCheckPresentOnPath: true})
 	in.Host.PathDirs = func() []string { return []string{"/usr/bin", "/home/u/bin"} }
 	m.Stub = shaStub("goodsha")
 	out, err := captureStdout(t, func() error { return in.Install([]string{"kind"}) })
@@ -207,18 +207,18 @@ func TestInstallBinaryPicksFirstCandidateOnPath(t *testing.T) {
 
 func TestInstallBinaryWarnsWhenNoCandidateOnPath(t *testing.T) {
 	in, m := newInstaller(t, kindYaml, "linux", cmdMap([]string{"sha256sum"}),
-		Options{PrebuiltBinariesArchiveDestinationCandidates: []string{"/custom/bin", "/other/bin"}, PrebuiltBinariesArchiveCheckPresentOnPath: true})
+		Options{BinariesRemoteArchiveDestinationCandidates: []string{"/custom/bin", "/other/bin"}, BinariesRemoteArchiveCheckPresentOnPath: true})
 	in.Host.PathDirs = func() []string { return []string{"/usr/bin"} }
 	m.Stub = shaStub("goodsha")
 	out, err := captureStdout(t, func() error { return in.Install([]string{"kind"}) })
 	require.NoError(t, err)
-	wantLines(t, out, "no packages.prebuiltBinariesArchive.installDestinationCandidates entry is on PATH (/custom/bin, /other/bin), using /custom/bin")
+	wantLines(t, out, "no packages.binariesRemoteArchive.installDestinationCandidates entry is on PATH (/custom/bin, /other/bin), using /custom/bin")
 	require.Contains(t, strings.Join(m.Calls(), "\n"), "/custom/bin/kind")
 }
 
-func TestInstallPrebuiltBinariesArchiveCheckPresentOnPathOffUsesFirstCandidate(t *testing.T) {
+func TestInstallBinariesRemoteArchiveCheckPresentOnPathOffUsesFirstCandidate(t *testing.T) {
 	in, m := newInstaller(t, kindYaml, "linux", cmdMap([]string{"sha256sum"}),
-		Options{PrebuiltBinariesArchiveDestinationCandidates: []string{"/custom/bin", "~/bin"}})
+		Options{BinariesRemoteArchiveDestinationCandidates: []string{"/custom/bin", "~/bin"}})
 	in.Host.PathDirs = func() []string { return []string{"/home/u/bin"} }
 	m.Stub = shaStub("goodsha")
 	out, err := captureStdout(t, func() error { return in.Install([]string{"kind"}) })

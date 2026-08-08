@@ -13,16 +13,14 @@ import (
 
 const pythonVmYaml = `packages:
   python3:
-    - versionManager:
-        tool: pyenv
+    - pyenv:
         versions: ["3.14.5", "3.12.9"]
         global: "3.14.5"
 `
 
 const nodeVmYaml = `packages:
   node:
-    - versionManager:
-        tool: nvm
+    - nvm:
         versions: ["24.16.0"]
         global: "24.16.0"
 `
@@ -113,23 +111,23 @@ func TestVersionManagerDryRunAnnounces(t *testing.T) {
 
 func TestVersionManagerUnknownToolErrors(t *testing.T) {
 	const yml = `packages:
-  x: [{versionManager: {tool: rbenv, versions: ["3.4.0"]}}]
+  x: [{rbenv: {versions: ["3.4.0"]}}]
 `
 	in, _ := newInstaller(t, yml, "linux", cmdMap(nil), Options{})
-	require.ErrorContains(t, in.Install([]string{"x"}), `unknown versionManager tool "rbenv"`)
+	require.ErrorContains(t, in.Install([]string{"x"}), `unknown manager for x: rbenv`)
 }
 
 func TestInstallScriptValidateArtifactSkipsWhenPresent(t *testing.T) {
 	dir := t.TempDir()
 	require.NoError(t, os.WriteFile(filepath.Join(dir, "nvm.sh"), []byte(""), 0o644))
-	yml := "packages:\n  nvm: [{script: {remoteUrl: https://example.com/i.sh, validateArtifact: " + dir + "/nvm.sh}}]\n"
+	yml := "packages:\n  nvm: [{script: {url: https://example.com/i.sh, validateArtifact: " + dir + "/nvm.sh}}]\n"
 	in, m := newInstaller(t, yml, "linux", cmdMap(nil), Options{})
 	require.NoError(t, in.Install([]string{"nvm"}))
 	require.Empty(t, m.Calls())
 }
 
 func TestInstallScriptValidateArtifactRunsWhenAbsent(t *testing.T) {
-	yml := "packages:\n  nvm: [{script: {remoteUrl: https://example.com/i.sh, validateArtifact: " + t.TempDir() + "/nvm.sh}}]\n"
+	yml := "packages:\n  nvm: [{script: {url: https://example.com/i.sh, validateArtifact: " + t.TempDir() + "/nvm.sh}}]\n"
 	in, m := newInstaller(t, yml, "linux", cmdMap(nil), Options{})
 	m.Stub = func(argv []string) ([]byte, error) {
 		if argv[0] == "curl" {

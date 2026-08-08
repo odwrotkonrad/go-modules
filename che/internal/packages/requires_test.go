@@ -11,15 +11,16 @@ import (
 
 const requiresYaml = `packages:
   libffi:
-    - apt: libffi-dev
+    - apt:
+        packageName: libffi-dev
   pyenv:
-    - apt: pyenv
+    - apt:
+        packageName: pyenv
   python3:
     version: "3.14.*"
     requires: [pyenv, libffi]
-    installMethods:
-      - versionManager:
-          tool: pyenv
+    installers:
+      - pyenv:
           versions: ["3.14.5"]
           global: "3.14.5"
 `
@@ -53,10 +54,10 @@ func TestRequiresCycleErrors(t *testing.T) {
 	const yml = `packages:
   a:
     requires: [b]
-    installMethods: [brew]
+    installers: [brew]
   b:
     requires: [a]
-    installMethods: [brew]
+    installers: [brew]
 `
 	in, _ := newInstaller(t, yml, "darwin", cmdMap([]string{"brew"}), Options{})
 	require.ErrorContains(t, in.Install([]string{"a"}), "requires cycle")
@@ -66,7 +67,7 @@ func TestRequiresUnknownPackageErrors(t *testing.T) {
 	const yml = `packages:
   a:
     requires: [nope]
-    installMethods: [brew]
+    installers: [brew]
 `
 	in, _ := newInstaller(t, yml, "darwin", cmdMap([]string{"brew"}), Options{})
 	require.ErrorContains(t, in.Install([]string{"a"}), "unknown package: nope")
@@ -133,11 +134,11 @@ func TestRequestedGlobalDefaultsToFirstVersion(t *testing.T) {
 func TestRequestedMultipleVersionsNeedVersionManager(t *testing.T) {
 	const yml = `packages:
   kind:
-    installMethods:
-      - prebuiltBinariesArchive:
+    installers:
+      - binariesRemoteArchive:
+          platformEligibility: [{linux-amd64: sha256:goodsha}]
           version: 0.32.0
           url: https://example.com/kind-{version}
-          platforms: [{linux-amd64: goodsha}]
 `
 	in, _ := newInstaller(t, yml, "linux", cmdMap([]string{"sha256sum"}), Options{})
 	err := in.InstallRequests([]Request{{Name: "kind", Versions: []string{"0.32.0", "0.31.0"}}})
@@ -148,11 +149,11 @@ func TestRequestedVersionRejectedWhenPinnedAssetDiffers(t *testing.T) {
 	const yml = `packages:
   kind:
     version: "0.32.*"
-    installMethods:
-      - prebuiltBinariesArchive:
+    installers:
+      - binariesRemoteArchive:
+          platformEligibility: [{linux-amd64: sha256:goodsha}]
           version: 0.32.0
           url: https://example.com/kind-{version}
-          platforms: [{linux-amd64: goodsha}]
 `
 	in, _ := newInstaller(t, yml, "linux", cmdMap([]string{"sha256sum"}), Options{})
 	err := in.InstallRequests([]Request{{Name: "kind", Versions: []string{"0.32.1"}}})

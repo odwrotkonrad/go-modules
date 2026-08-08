@@ -18,15 +18,15 @@ import (
 const Scope = "install-packages"
 
 type Options struct {
-	Update                                       bool
-	IfMissing                                    bool
-	DryRun                                       bool
-	PreferredMethods                             []string
-	PrebuiltBinariesArchiveDestinationCandidates []string
-	PrebuiltBinariesArchiveCheckPresentOnPath    bool
-	CompletionsEnabled                           bool
-	CompletionsDestinationCandidates             []string
-	CompletionsCheckPresentOnFpath               bool
+	Update                                     bool
+	IfMissing                                  bool
+	DryRun                                     bool
+	PreferredMethods                           []string
+	BinariesRemoteArchiveDestinationCandidates []string
+	BinariesRemoteArchiveCheckPresentOnPath    bool
+	CompletionsEnabled                         bool
+	CompletionsDestinationCandidates           []string
+	CompletionsCheckPresentOnFpath             bool
 }
 
 type Installer struct {
@@ -115,6 +115,13 @@ func (in *Installer) output(argv []string) (string, bool) {
 	return string(out), err == nil
 }
 
+func labeled(pkg, version string) string {
+	if version == "" {
+		return pkg
+	}
+	return pkg + " " + version
+}
+
 func (in *Installer) cmdFor(pkg string) string {
 	if e, ok := in.File.Packages[pkg]; ok && e.Command != "" {
 		return e.Command
@@ -127,7 +134,7 @@ func (in *Installer) hasCmd(pkg string) bool { return in.Host.HasCmd(in.cmdFor(p
 func (in *Installer) findEntry(pkg string) (Entry, error) { return in.File.Find(pkg, in.FilePath) }
 
 func (in *Installer) pickItem(pkg string, entry Entry) (Item, bool, error) {
-	return in.Host.pickPreferred(pkg, entry, in.Opts.PreferredMethods, in.File.platformsOrBuiltin()[in.Host.ShaKey()])
+	return in.Host.pickPreferred(pkg, entry, in.Opts.PreferredMethods, in.File.eligibleInstallers(in.Host))
 }
 
 func (in *Installer) sudo(argv ...string) []string {
@@ -265,10 +272,10 @@ func (in *Installer) installVia(pkg string, it Item) error {
 	switch {
 	case it.Mgr == "apt" && it.Apt != nil:
 		return in.installAptSpec(pkg, it.Apt)
-	case it.Mgr == "versionManager":
+	case it.VersionManager != nil:
 		return in.installVersionManager(pkg, it.VersionManager)
-	case it.Mgr == "prebuiltBinariesArchive":
-		return in.installPrebuiltBinariesArchive(pkg, it.PrebuiltBinariesArchive)
+	case it.Mgr == "binariesRemoteArchive":
+		return in.installBinariesRemoteArchive(pkg, it.BinariesRemoteArchive)
 	case it.Mgr == "script":
 		return in.installScript(pkg, it.Script)
 	}
@@ -276,12 +283,20 @@ func (in *Installer) installVia(pkg string, it Item) error {
 	if base == "" {
 		base = pkg
 	}
-	pin := in.pinFor(pkg, "")
-	if strings.Contains(base, "{version}") {
-		if pin == "" {
-			return fmt.Errorf("%s: item name %s references {version} but no version is pinned", pkg, it.Name)
+	pin := in.pinFor(pkg, it.Version)
+	// [why] casks ship only their current version: a pin is a wish brew cannot grant
+	if it.Mgr == "cask" && pin != "" {
+		in.emit(log.Levels.Warn, "unpinnable", pkg+": version "+pin+" cannot be enforced via brew/cask, installing the current release")
+		pin = ""
+	}
+	if it.Mgr == "brew" && pin != "" {
+		base += "@" + pin
+	}
+	if it.Registry != "" {
+		if !in.File.brewRegistry(it.Registry) {
+			return fmt.Errorf("%s: unknown brew registry %q (installerRegistries.brew)", pkg, it.Registry)
 		}
-		base = strings.ReplaceAll(base, "{version}", pin)
+		base = it.Registry + "/" + base
 	}
 	installed := in.isInstalled(pkg, it.Mgr, base)
 	switch {
@@ -302,13 +317,13 @@ func (in *Installer) installVia(pkg string, it Item) error {
 		return nil
 	}
 	if in.Opts.DryRun {
-		in.emitDryRun("install", pkg+" via "+it.Mgr)
+		in.emitDryRun("install", labeled(pkg, pin)+" via "+it.Mgr)
 		return nil
 	}
 	if err := in.managerInstall(it.Mgr, pinnedName(it.Mgr, base, pin), pin); err != nil {
 		return err
 	}
-	in.emit(log.Levels.Info, "installed", pkg+" via "+it.Mgr)
+	in.emit(log.Levels.Info, "installed", labeled(pkg, pin)+" via "+it.Mgr)
 	return nil
 }
 
@@ -544,7 +559,7 @@ func (in *Installer) installScript(pkg string, s *ScriptSpec) error {
 		in.emit(log.Levels.Info, "reinstall", pkg+": -> "+s.Version)
 	}
 	if in.Opts.DryRun {
-		in.emitDryRun("install", pkg+" via script")
+		in.emitDryRun("install", labeled(pkg, in.pinFor(pkg, s.Version))+" via script")
 		return nil
 	}
 	argv, cleanup, err := in.scriptArgv(pkg, s)
@@ -558,7 +573,7 @@ func (in *Installer) installScript(pkg string, s *ScriptSpec) error {
 	if err := execx.Default.Exec(c); err != nil {
 		return fmt.Errorf("%s: install script: %w", pkg, err)
 	}
-	in.emit(log.Levels.Info, "installed", pkg+" via script")
+	in.emit(log.Levels.Info, "installed", labeled(pkg, in.pinFor(pkg, s.Version))+" via script")
 	return nil
 }
 
@@ -566,11 +581,11 @@ func (in *Installer) scriptEnv(pkg string, s *ScriptSpec) []string {
 	env := append(os.Environ(),
 		"CHE_PKG_NAME="+pkg,
 		"CHE_PKG_VERSION="+s.Version,
-		"CHE_PKG_SHA256="+s.Platforms.Sha[in.Host.ShaKey()],
+		"CHE_PKG_SHA256="+strings.TrimPrefix(s.Platforms.Sha[in.Host.ShaKey()], "sha256:"),
 		"CHE_PKG_OS="+in.Host.OS,
 		"CHE_PKG_ARCH="+in.Host.Arch,
 	)
-	names := in.File.archNameConventionsOrBuiltin()
+	names := in.File.archSchemesOrBuiltin()
 	for _, set := range slices.Sorted(maps.Keys(names)) {
 		if v, ok := names[set][in.Host.Arch]; ok {
 			env = append(env, "CHE_PKG_ARCH_"+strings.ToUpper(set)+"="+v)

@@ -543,8 +543,8 @@ func (o ProfileOptions) Over(spec Options) ProfileOptions {
 	if len(o.Packages.PreferredInstallationMethods) == 0 {
 		o.Packages.PreferredInstallationMethods = spec.Packages.PreferredInstallationMethods
 	}
-	if len(o.Packages.PrebuiltBinariesArchive.InstallDestinationCandidates) == 0 {
-		o.Packages.PrebuiltBinariesArchive.InstallDestinationCandidates = spec.Packages.PrebuiltBinariesArchive.InstallDestinationCandidates
+	if len(o.Packages.BinariesRemoteArchive.InstallDestinationCandidates) == 0 {
+		o.Packages.BinariesRemoteArchive.InstallDestinationCandidates = spec.Packages.BinariesRemoteArchive.InstallDestinationCandidates
 	}
 	if o.Packages.Completions.Zsh.Enabled == nil {
 		o.Packages.Completions.Zsh.Enabled = spec.Packages.Completions.Zsh.Enabled
@@ -555,8 +555,8 @@ func (o ProfileOptions) Over(spec Options) ProfileOptions {
 	if o.Packages.Completions.Zsh.CheckPresentOnFpath == nil {
 		o.Packages.Completions.Zsh.CheckPresentOnFpath = spec.Packages.Completions.Zsh.CheckPresentOnFpath
 	}
-	if o.Packages.PrebuiltBinariesArchive.CheckPresentOnPath == nil {
-		o.Packages.PrebuiltBinariesArchive.CheckPresentOnPath = spec.Packages.PrebuiltBinariesArchive.CheckPresentOnPath
+	if o.Packages.BinariesRemoteArchive.CheckPresentOnPath == nil {
+		o.Packages.BinariesRemoteArchive.CheckPresentOnPath = spec.Packages.BinariesRemoteArchive.CheckPresentOnPath
 	}
 	return o
 }
@@ -580,8 +580,8 @@ func (o ProfileOptions) OverRef(entry ProfileOptions) ProfileOptions {
 	if len(entry.Packages.PreferredInstallationMethods) > 0 {
 		o.Packages.PreferredInstallationMethods = entry.Packages.PreferredInstallationMethods
 	}
-	if len(entry.Packages.PrebuiltBinariesArchive.InstallDestinationCandidates) > 0 {
-		o.Packages.PrebuiltBinariesArchive.InstallDestinationCandidates = entry.Packages.PrebuiltBinariesArchive.InstallDestinationCandidates
+	if len(entry.Packages.BinariesRemoteArchive.InstallDestinationCandidates) > 0 {
+		o.Packages.BinariesRemoteArchive.InstallDestinationCandidates = entry.Packages.BinariesRemoteArchive.InstallDestinationCandidates
 	}
 	if entry.Packages.Completions.Zsh.Enabled != nil {
 		o.Packages.Completions.Zsh.Enabled = entry.Packages.Completions.Zsh.Enabled
@@ -592,8 +592,8 @@ func (o ProfileOptions) OverRef(entry ProfileOptions) ProfileOptions {
 	if entry.Packages.Completions.Zsh.CheckPresentOnFpath != nil {
 		o.Packages.Completions.Zsh.CheckPresentOnFpath = entry.Packages.Completions.Zsh.CheckPresentOnFpath
 	}
-	if entry.Packages.PrebuiltBinariesArchive.CheckPresentOnPath != nil {
-		o.Packages.PrebuiltBinariesArchive.CheckPresentOnPath = entry.Packages.PrebuiltBinariesArchive.CheckPresentOnPath
+	if entry.Packages.BinariesRemoteArchive.CheckPresentOnPath != nil {
+		o.Packages.BinariesRemoteArchive.CheckPresentOnPath = entry.Packages.BinariesRemoteArchive.CheckPresentOnPath
 	}
 	return o
 }
