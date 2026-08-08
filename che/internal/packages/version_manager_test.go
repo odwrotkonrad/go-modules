@@ -38,10 +38,8 @@ func TestVersionManagerPyenvInstallsMissingAndSetsGlobal(t *testing.T) {
 		return nil, nil
 	}
 	require.NoError(t, in.Install([]string{"python3"}))
-	calls := strings.Join(m.Calls(), "\n")
-	require.Contains(t, calls, "pyenv install --skip-existing 3.14.5")
-	require.NotContains(t, calls, "pyenv install --skip-existing 3.12.9")
-	require.Contains(t, calls, "pyenv global 3.14.5")
+	requireCalls(t, m, "pyenv install --skip-existing 3.14.5", "pyenv global 3.14.5")
+	refuteCalls(t, m, "pyenv install --skip-existing 3.12.9")
 }
 
 func TestVersionManagerPyenvSkipsWhenSatisfied(t *testing.T) {
@@ -57,7 +55,7 @@ func TestVersionManagerPyenvSkipsWhenSatisfied(t *testing.T) {
 		return nil, nil
 	}
 	require.NoError(t, in.Install([]string{"python3"}))
-	require.NotContains(t, strings.Join(m.Calls(), "\n"), "pyenv install")
+	refuteCalls(t, m, "pyenv install")
 }
 
 func TestVersionManagerPendsUntilToolPresent(t *testing.T) {
@@ -86,9 +84,7 @@ func TestVersionManagerNvmInstallsAndAliasesDefault(t *testing.T) {
 	in, m := newInstaller(t, nodeVmYaml, "linux", cmdMap(nil), Options{})
 	dir := nvmHome(t, in)
 	require.NoError(t, in.Install([]string{"node"}))
-	calls := strings.Join(m.Calls(), "\n")
-	require.Contains(t, calls, `. "`+dir+`/nvm.sh" && nvm install 24.16.0`)
-	require.Contains(t, calls, "nvm alias default 24.16.0")
+	requireCalls(t, m, `. "`+dir+`/nvm.sh" && nvm install 24.16.0`, "nvm alias default 24.16.0")
 }
 
 func TestVersionManagerNvmSkipsWhenSatisfied(t *testing.T) {
@@ -106,7 +102,7 @@ func TestVersionManagerDryRunAnnounces(t *testing.T) {
 	out, err := captureStdout(t, func() error { return in.Install([]string{"python3"}) })
 	require.NoError(t, err)
 	wantLines(t, out, "install python3 via pyenv (versions: 3.14.5 3.12.9, global: 3.14.5) (dry run)")
-	require.NotContains(t, strings.Join(m.Calls(), "\n"), "pyenv install")
+	refuteCalls(t, m, "pyenv install")
 }
 
 func TestVersionManagerUnknownToolErrors(t *testing.T) {
@@ -129,14 +125,9 @@ func TestInstallScriptValidateArtifactSkipsWhenPresent(t *testing.T) {
 func TestInstallScriptValidateArtifactRunsWhenAbsent(t *testing.T) {
 	yml := "packages:\n  nvm: [{script: {url: https://example.com/i.sh, validateArtifact: " + t.TempDir() + "/nvm.sh}}]\n"
 	in, m := newInstaller(t, yml, "linux", cmdMap(nil), Options{})
-	m.Stub = func(argv []string) ([]byte, error) {
-		if argv[0] == "curl" {
-			return []byte("echo hi\n"), nil
-		}
-		return nil, nil
-	}
+	m.Stub = stubOutputs("curl ", "echo hi\n")
 	require.NoError(t, in.Install([]string{"nvm"}))
-	require.Contains(t, strings.Join(m.Calls(), "\n"), "che-script-")
+	requireCalls(t, m, "che-script-")
 }
 
 // [<] 🤖🤖

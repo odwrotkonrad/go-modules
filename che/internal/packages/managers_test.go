@@ -36,6 +36,45 @@ func failOn(prefixes ...string) func(argv []string) ([]byte, error) {
 	}
 }
 
+func stubOutputs(pairs ...string) func(argv []string) ([]byte, error) {
+	return func(argv []string) ([]byte, error) {
+		joined := strings.Join(argv, " ")
+		for i := 0; i+1 < len(pairs); i += 2 {
+			if strings.HasPrefix(joined, pairs[i]) {
+				return []byte(pairs[i+1]), nil
+			}
+		}
+		return nil, nil
+	}
+}
+
+func chainStubs(stubs ...func(argv []string) ([]byte, error)) func(argv []string) ([]byte, error) {
+	return func(argv []string) ([]byte, error) {
+		for _, s := range stubs {
+			if out, err := s(argv); out != nil || err != nil {
+				return out, err
+			}
+		}
+		return nil, nil
+	}
+}
+
+func requireCalls(t *testing.T, m *execx.Mock, fragments ...string) {
+	t.Helper()
+	joined := strings.Join(m.Calls(), "\n")
+	for _, f := range fragments {
+		require.Contains(t, joined, f)
+	}
+}
+
+func refuteCalls(t *testing.T, m *execx.Mock, fragments ...string) {
+	t.Helper()
+	joined := strings.Join(m.Calls(), "\n")
+	for _, f := range fragments {
+		require.NotContains(t, joined, f)
+	}
+}
+
 func TestInstallBrewWhenMissing(t *testing.T) {
 	in, m := newInstaller(t, "packages:\n  bat: [brew, apt]", "darwin", cmdMap([]string{"brew"}), Options{})
 	m.Stub = failOn("brew list")
@@ -117,12 +156,7 @@ func TestInstallAptSudoAndUpdateOnce(t *testing.T) {
 func TestInstallNpmPinReinstallsOnDrift(t *testing.T) {
 	in, m := newInstaller(t, "packages:\n  ccstatusline:\n    version: 2.2.22\n    installers: [npm]", "darwin",
 		cmdMap([]string{"npm", "ccstatusline"}), Options{})
-	m.Stub = func(argv []string) ([]byte, error) {
-		if argv[0] == "npm" && argv[1] == "ls" {
-			return []byte("ccstatusline@2.2.0\n"), nil
-		}
-		return nil, nil
-	}
+	m.Stub = stubOutputs("npm ls ", "ccstatusline@2.2.0\n")
 	require.NoError(t, in.Install([]string{"ccstatusline"}))
 	require.Contains(t, m.Calls(), "npm install --global ccstatusline@2.2.22")
 }
@@ -130,12 +164,7 @@ func TestInstallNpmPinReinstallsOnDrift(t *testing.T) {
 func TestInstallNpmPinSkipsWhenMatching(t *testing.T) {
 	in, m := newInstaller(t, "packages:\n  ccstatusline:\n    version: 2.2.22\n    installers: [npm]", "darwin",
 		cmdMap([]string{"npm", "ccstatusline"}), Options{})
-	m.Stub = func(argv []string) ([]byte, error) {
-		if argv[0] == "npm" && argv[1] == "ls" {
-			return []byte("ccstatusline@2.2.22\n"), nil
-		}
-		return nil, nil
-	}
+	m.Stub = stubOutputs("npm ls ", "ccstatusline@2.2.22\n")
 	require.NoError(t, in.Install([]string{"ccstatusline"}))
 	require.NotContains(t, m.Calls(), "npm install --global ccstatusline@2.2.22")
 }
@@ -269,12 +298,7 @@ func TestInstallScriptRemoteUrlFetchesAndRuns(t *testing.T) {
         env: {NONINTERACTIVE: "1"}
 `
 	in, m := newInstaller(t, yml, "darwin", cmdMap(nil), Options{})
-	m.Stub = func(argv []string) ([]byte, error) {
-		if argv[0] == "curl" {
-			return []byte("echo installing\n"), nil
-		}
-		return nil, nil
-	}
+	m.Stub = stubOutputs("curl ", "echo installing\n")
 	require.NoError(t, in.Install([]string{"brew"}))
 	calls := m.Calls()
 	require.Contains(t, calls[0], "curl -fsSL")
@@ -290,35 +314,6 @@ func TestInstallScriptRemoteUrlFetchFailureErrors(t *testing.T) {
 	in, m := newInstaller(t, yml, "darwin", cmdMap(nil), Options{})
 	m.Stub = failOn("curl")
 	require.ErrorContains(t, in.Install([]string{"x"}), "install script fetch failed")
-}
-
-func TestInstallScriptPathMissingErrors(t *testing.T) {
-	in, _ := newInstaller(t, "packages:\n  x: [{script: {path: scripts/nope.sh}}]", "darwin", cmdMap(nil), Options{})
-	in.FilePath = BuiltinPath
-	err := in.Install([]string{"x"})
-	require.ErrorContains(t, err, "install script not found: scripts/nope.sh")
-}
-
-func TestInstallScriptUrlFetchesAndRuns(t *testing.T) {
-	in, m := newInstaller(t, "packages:\n  x: [{script: {url: https://example.com/install.sh}}]", "darwin", cmdMap(nil), Options{})
-	m.Stub = func(argv []string) ([]byte, error) {
-		if argv[0] == "curl" {
-			return []byte("echo fetched"), nil
-		}
-		return nil, nil
-	}
-	require.NoError(t, in.Install([]string{"x"}))
-	calls := m.Calls()
-	require.Len(t, calls, 2)
-	require.Contains(t, calls[0], "curl -fsSL")
-	require.Contains(t, calls[1], "che-script-")
-}
-
-func TestInstallScriptUrlFetchFailureAborts(t *testing.T) {
-	in, m := newInstaller(t, "packages:\n  x: [{script: {url: https://example.com/install.sh}}]", "darwin", cmdMap(nil), Options{})
-	m.Stub = failOn("curl")
-	err := in.Install([]string{"x"})
-	require.ErrorContains(t, err, "install script fetch failed: https://example.com/install.sh")
 }
 
 const gcloudYaml = `installerRegistries:
@@ -344,25 +339,15 @@ func TestInstallScriptPinReinstallsOnDrift(t *testing.T) {
 	in, m := newInstaller(t, gcloudYaml, "darwin", cmdMap([]string{"gcloud"}), Options{})
 	in.Host.Arch = "arm64"
 	in.FilePath = BuiltinPath
-	m.Stub = func(argv []string) ([]byte, error) {
-		if argv[0] == "gcloud" {
-			return []byte("Google Cloud SDK 570.0.0\n"), nil
-		}
-		return nil, nil
-	}
+	m.Stub = stubOutputs("gcloud ", "Google Cloud SDK 570.0.0\n")
 	require.NoError(t, in.Install([]string{"gcloud"}))
-	require.Contains(t, strings.Join(m.Calls(), "\n"), "/bin/sh -ec")
+	requireCalls(t, m, "/bin/sh -ec")
 }
 
 func TestInstallScriptPinSkipsWhenMatching(t *testing.T) {
 	in, m := newInstaller(t, gcloudYaml, "darwin", cmdMap([]string{"gcloud"}), Options{})
 	in.Host.Arch = "arm64"
-	m.Stub = func(argv []string) ([]byte, error) {
-		if argv[0] == "gcloud" {
-			return []byte("Google Cloud SDK 572.0.0\n"), nil
-		}
-		return nil, nil
-	}
+	m.Stub = stubOutputs("gcloud ", "Google Cloud SDK 572.0.0\n")
 	require.NoError(t, in.Install([]string{"gcloud"}))
 	require.Equal(t, []string{"gcloud --version"}, m.Calls())
 }
@@ -381,10 +366,10 @@ func TestInstallGcloudPicksLinuxAptRepo(t *testing.T) {
 	in.FilePath = BuiltinPath
 	m.Stub = aptStub(t)
 	require.NoError(t, in.Install([]string{"gcloud"}))
-	calls := strings.Join(m.Calls(), "\n")
-	require.Contains(t, calls, "packages.cloud.google.com/apt/doc/apt-key.gpg")
-	require.Contains(t, calls, "/etc/apt/sources.list.d/packages.cloud.google.com-apt-cloud-sdk-main.sources")
-	require.Contains(t, calls, "--no-install-recommends -t cloud-sdk google-cloud-cli")
+	requireCalls(t, m,
+		"packages.cloud.google.com/apt/doc/apt-key.gpg",
+		"/etc/apt/sources.list.d/packages.cloud.google.com-apt-cloud-sdk-main.sources",
+		"--no-install-recommends -t cloud-sdk google-cloud-cli")
 }
 
 func TestScriptEnvCarriesPinShaAndHost(t *testing.T) {
@@ -436,12 +421,7 @@ func TestArchForUnknownConventionErrors(t *testing.T) {
 func TestCheckUpgradableScriptPinDrift(t *testing.T) {
 	in, m := newInstaller(t, gcloudYaml, "darwin", cmdMap([]string{"gcloud"}), Options{})
 	in.Host.Arch = "arm64"
-	m.Stub = func(argv []string) ([]byte, error) {
-		if argv[0] == "gcloud" {
-			return []byte("Google Cloud SDK 570.0.0\n"), nil
-		}
-		return nil, nil
-	}
+	m.Stub = stubOutputs("gcloud ", "Google Cloud SDK 570.0.0\n")
 	out, err := captureStdout(t, func() error { return in.CheckUpgradable([]string{"gcloud"}) })
 	require.NoError(t, err)
 	wantLines(t, out, "upgradable gcloud via script: yaml pins 572.0.0")
@@ -460,9 +440,7 @@ func TestInstallPythonPyenvPinFromBuiltin(t *testing.T) {
 		return nil, nil
 	}
 	require.NoError(t, in.Install([]string{"python3"}))
-	calls := strings.Join(m.Calls(), "\n")
-	require.Contains(t, calls, "pyenv install --skip-existing 3.14.6")
-	require.Contains(t, calls, "pyenv global 3.14.6")
+	requireCalls(t, m, "pyenv install --skip-existing 3.14.6", "pyenv global 3.14.6")
 
 	m.Stub = func(argv []string) ([]byte, error) {
 		joined := strings.Join(argv, " ")
@@ -504,14 +482,9 @@ func TestVersionCommandOverridesProbe(t *testing.T) {
 
 func TestVersionCommandDriftReinstalls(t *testing.T) {
 	in, m := newInstaller(t, kubectlYaml, "linux", cmdMap([]string{"kubectl", "sha256sum"}), Options{})
-	m.Stub = func(argv []string) ([]byte, error) {
-		if argv[0] == "kubectl" {
-			return []byte("Client Version: v1.36.0\n"), nil
-		}
-		return shaStub("goodsha")(argv)
-	}
+	m.Stub = chainStubs(stubOutputs("kubectl ", "Client Version: v1.36.0\n"), shaStub("goodsha"))
 	require.NoError(t, in.Install([]string{"kubectl"}))
-	require.Contains(t, strings.Join(m.Calls(), "\n"), "curl -fsSL")
+	requireCalls(t, m, "curl -fsSL")
 }
 
 const codeExtYaml = "packages:\n  golang.go: [brew/vscode]\n  redhat.vscode-yaml: [brew/vscode]\n  code: [{brew/cask: {packageName: visual-studio-code}}]"

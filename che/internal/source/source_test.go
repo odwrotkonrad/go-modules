@@ -13,6 +13,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"gitlab.com/konradodwrot/go-modules/che/internal/execx"
+	"gitlab.com/konradodwrot/go-modules/che/internal/fsutil"
 	"gitlab.com/konradodwrot/go-modules/che/internal/log"
 	"gitlab.com/konradodwrot/go-modules/che/internal/testutil"
 	"gitlab.com/konradodwrot/go-modules/lib/testyml"
@@ -58,9 +59,7 @@ func TestEnsure(t *testing.T) {
 		if c.Input.Args.Bool(t, 2) {
 			level = log.Levels.Debug
 		}
-		prev := log.GetLevel()
-		log.SetLevel(level)
-		t.Cleanup(func() { log.SetLevel(prev) })
+		t.Cleanup(log.SwapLevel(level))
 		up := testutil.Repo(t, map[string]string{"che.yml": "p: {}\n"})
 		home := t.TempDir()
 		url := "file://" + up
@@ -89,7 +88,7 @@ func TestEnsure(t *testing.T) {
 		require.NoError(t, err)
 		assert.Equal(t, Dir(home, url), dir)
 		out = testutil.StripANSI(out)
-		vars := map[string]string{"URL": url, "DIR": dir, "ABBRDIR": abbreviateHome(dir, home)}
+		vars := map[string]string{"URL": url, "DIR": dir, "ABBRDIR": fsutil.AbbreviateHome(dir, home)}
 		for _, m := range c.Expected.StdOut {
 			testyml.MustMatch(t, out, testyml.Expand(m, vars))
 		}

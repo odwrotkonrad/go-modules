@@ -53,6 +53,13 @@ func (f FS) IsUnderHome(dest string) bool {
 	return IsUnder(dest, f.Home)
 }
 
+func AbbreviateHome(path, home string) string {
+	if home != "" && strings.HasPrefix(path, home+string(filepath.Separator)) {
+		return "~" + strings.TrimPrefix(path, home)
+	}
+	return path
+}
+
 func (f FS) escalate(dest string, argv []string) []string {
 	if !f.IsUnderHome(dest) && os.Geteuid() != 0 {
 		return append([]string{"sudo"}, argv...)

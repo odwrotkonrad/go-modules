@@ -3,7 +3,6 @@ package packages
 // [>] 🤖🤖
 
 import (
-	"strings"
 	"testing"
 
 	"github.com/stretchr/testify/require"
@@ -32,18 +31,10 @@ packages:
 
 func aptStub(t *testing.T) func(argv []string) ([]byte, error) {
 	t.Helper()
-	return func(argv []string) ([]byte, error) {
-		joined := strings.Join(argv, " ")
-		switch {
-		case strings.HasPrefix(joined, "dpkg -s"):
-			return nil, errNotInstalled
-		case strings.HasPrefix(joined, "dpkg --print-architecture"):
-			return []byte("amd64\n"), nil
-		case strings.HasPrefix(joined, "sh -ec . /etc/os-release"):
-			return []byte("bookworm\n"), nil
-		}
-		return nil, nil
-	}
+	return chainStubs(
+		failOn("dpkg -s"),
+		stubOutputs("dpkg --print-architecture", "amd64\n", "sh -ec . /etc/os-release", "bookworm\n"),
+	)
 }
 
 var errNotInstalled = &notInstalledErr{}
@@ -56,31 +47,21 @@ func TestInstallAptRepoConfiguresAndInstalls(t *testing.T) {
 	in, m := newInstaller(t, dockerAptYaml, "linux", cmdMap([]string{"apt-get"}), Options{})
 	m.Stub = aptStub(t)
 	require.NoError(t, in.Install([]string{"docker"}))
-	calls := strings.Join(m.Calls(), "\n")
-	require.Contains(t, calls, "https://download.docker.com/linux/debian/gpg")
-	require.Contains(t, calls, "sudo install -m 0755 -d /etc/apt/keyrings")
-	require.Contains(t, calls, "/etc/apt/keyrings/download.docker.com-linux-debian.asc")
-	require.Contains(t, calls, "/etc/apt/sources.list.d/download.docker.com-linux-debian.sources")
-	require.Contains(t, calls, "sudo apt-get update")
-	require.Contains(t, calls, "sudo apt-get install --yes --no-install-recommends docker-ce")
+	requireCalls(t, m,
+		"https://download.docker.com/linux/debian/gpg",
+		"sudo install -m 0755 -d /etc/apt/keyrings",
+		"/etc/apt/keyrings/download.docker.com-linux-debian.asc",
+		"/etc/apt/sources.list.d/download.docker.com-linux-debian.sources",
+		"sudo apt-get update",
+		"sudo apt-get install --yes --no-install-recommends docker-ce")
 }
 
 func TestInstallAptRepoSkipsWhenAllInstalled(t *testing.T) {
 	in, m := newInstaller(t, dockerAptYaml, "linux", cmdMap([]string{"apt-get"}), Options{})
-	m.Stub = func(argv []string) ([]byte, error) {
-		joined := strings.Join(argv, " ")
-		switch {
-		case strings.HasPrefix(joined, "dpkg --print-architecture"):
-			return []byte("amd64\n"), nil
-		case strings.HasPrefix(joined, "sh -ec . /etc/os-release"):
-			return []byte("bookworm\n"), nil
-		}
-		return nil, nil
-	}
+	m.Stub = stubOutputs("dpkg --print-architecture", "amd64\n", "sh -ec . /etc/os-release", "bookworm\n")
 	require.NoError(t, in.Install([]string{"docker"}))
-	calls := strings.Join(m.Calls(), "\n")
-	require.NotContains(t, calls, "apt-get install")
-	require.Contains(t, calls, "/etc/apt/sources.list.d/download.docker.com-linux-debian.sources")
+	refuteCalls(t, m, "apt-get install")
+	requireCalls(t, m, "/etc/apt/sources.list.d/download.docker.com-linux-debian.sources")
 }
 
 func TestInstallAptRepoDryRunAnnounces(t *testing.T) {
@@ -89,7 +70,7 @@ func TestInstallAptRepoDryRunAnnounces(t *testing.T) {
 	out, err := captureStdout(t, func() error { return in.Install([]string{"docker"}) })
 	require.NoError(t, err)
 	wantLines(t, out, "install docker via apt (dry run)")
-	require.NotContains(t, strings.Join(m.Calls(), "\n"), "curl")
+	refuteCalls(t, m, "curl")
 }
 
 func TestAptPrerequisitesSkippedWhenInstalled(t *testing.T) {
@@ -101,16 +82,10 @@ func TestAptPrerequisitesSkippedWhenInstalled(t *testing.T) {
           prerequisitePackages: [gnupg]
 `
 	in, m := newInstaller(t, yml, "linux", cmdMap([]string{"apt-get"}), Options{})
-	m.Stub = func(argv []string) ([]byte, error) {
-		if strings.HasPrefix(strings.Join(argv, " "), "dpkg -s x-cli") {
-			return nil, errNotInstalled
-		}
-		return nil, nil
-	}
+	m.Stub = failOn("dpkg -s x-cli")
 	require.NoError(t, in.Install([]string{"x"}))
-	calls := strings.Join(m.Calls(), "\n")
-	require.NotContains(t, calls, "--no-install-recommends gnupg")
-	require.Contains(t, calls, "--no-install-recommends x-cli")
+	refuteCalls(t, m, "--no-install-recommends gnupg")
+	requireCalls(t, m, "--no-install-recommends x-cli")
 }
 
 func TestAptRepoRequiresUrlAndGpg(t *testing.T) {
@@ -146,48 +121,30 @@ func TestInstallAptPinsMappedPackageVersion(t *testing.T) {
 	in, m := newInstaller(t, pinnedCurlYaml, "linux", cmdMap([]string{"apt-get"}), Options{})
 	m.Stub = aptStub(t)
 	require.NoError(t, in.Install([]string{"curl"}))
-	require.Contains(t, strings.Join(m.Calls(), "\n"),
+	requireCalls(t, m,
 		"sudo apt-get install --yes --no-install-recommends -t bookworm-backports --allow-downgrades curl=8.14.1-2+deb13u2~bpo13+1")
 }
 
 func TestInstallAptReinstallsOnPinMismatch(t *testing.T) {
 	in, m := newInstaller(t, pinnedCurlYaml, "linux", cmdMap([]string{"apt-get"}), Options{})
-	m.Stub = func(argv []string) ([]byte, error) {
-		if strings.HasPrefix(strings.Join(argv, " "), "dpkg-query") {
-			return []byte("7.88.1-10+deb12u15"), nil
-		}
-		return nil, nil
-	}
+	m.Stub = stubOutputs("dpkg-query", "7.88.1-10+deb12u15")
 	require.NoError(t, in.Install([]string{"curl"}))
-	require.Contains(t, strings.Join(m.Calls(), "\n"), "--allow-downgrades curl=8.14.1-2+deb13u2~bpo13+1")
+	requireCalls(t, m, "--allow-downgrades curl=8.14.1-2+deb13u2~bpo13+1")
 }
 
 func TestInstallAptSkipsWhenPinInstalled(t *testing.T) {
 	in, m := newInstaller(t, pinnedCurlYaml, "linux", cmdMap([]string{"apt-get"}), Options{})
-	m.Stub = func(argv []string) ([]byte, error) {
-		if strings.HasPrefix(strings.Join(argv, " "), "dpkg-query") {
-			return []byte("8.14.1-2+deb13u2~bpo13+1"), nil
-		}
-		return nil, nil
-	}
+	m.Stub = stubOutputs("dpkg-query", "8.14.1-2+deb13u2~bpo13+1")
 	require.NoError(t, in.Install([]string{"curl"}))
-	require.NotContains(t, strings.Join(m.Calls(), "\n"), "apt-get install")
+	refuteCalls(t, m, "apt-get install")
 }
 
 func TestInstallAptPathKeySkipsKeyDownload(t *testing.T) {
 	in, m := newInstaller(t, pinnedCurlYaml, "linux", cmdMap([]string{"apt-get"}), Options{})
-	m.Stub = func(argv []string) ([]byte, error) {
-		if strings.HasPrefix(strings.Join(argv, " "), "dpkg-query") {
-			return []byte("8.14.1-2+deb13u2~bpo13+1"), nil
-		}
-		return nil, nil
-	}
+	m.Stub = stubOutputs("dpkg-query", "8.14.1-2+deb13u2~bpo13+1")
 	require.NoError(t, in.Install([]string{"curl"}))
-	calls := strings.Join(m.Calls(), "\n")
-	require.Contains(t, calls, "/etc/apt/sources.list.d/deb.debian.org-debian-bookworm-backports-main.sources")
-	require.NotContains(t, calls, "curl -fsSL")
-	require.NotContains(t, calls, "/etc/apt/keyrings")
-	require.NotContains(t, calls, "apt-get install")
+	requireCalls(t, m, "/etc/apt/sources.list.d/deb.debian.org-debian-bookworm-backports-main.sources")
+	refuteCalls(t, m, "curl -fsSL", "/etc/apt/keyrings", "apt-get install")
 }
 
 func TestInstallAptUnknownRegistryErrors(t *testing.T) {
@@ -224,7 +181,7 @@ packages:
 	m.Stub = aptStub(t)
 	require.ErrorContains(t, in.Install([]string{"x"}), "ambiguous apt registry")
 	require.NoError(t, in.Install([]string{"y"}))
-	require.Contains(t, strings.Join(m.Calls(), "\n"), "-t bookworm-backports")
+	requireCalls(t, m, "-t bookworm-backports")
 }
 
 func TestAptVersionsMapValidation(t *testing.T) {
@@ -247,25 +204,20 @@ func TestAptVersionsMapValidation(t *testing.T) {
 func TestCommandOverrideSkipsScriptWhenPresent(t *testing.T) {
 	in, m := newInstaller(t, dockerAptYaml, "darwin", cmdMap([]string{"docker"}), Options{})
 	require.NoError(t, in.Install([]string{"docker-desktop"}))
-	require.NotContains(t, strings.Join(m.Calls(), "\n"), "install-desktop")
+	refuteCalls(t, m, "install-desktop")
 }
 
 func TestCommandOverrideRunsScriptWhenAbsent(t *testing.T) {
 	in, m := newInstaller(t, dockerAptYaml, "darwin", cmdMap(nil), Options{})
 	require.NoError(t, in.Install([]string{"docker-desktop"}))
-	require.Contains(t, strings.Join(m.Calls(), "\n"), "install-desktop")
+	requireCalls(t, m, "install-desktop")
 }
 
 func TestNoApplicableManagerStillInstallsCompletions(t *testing.T) {
 	in, m := newInstaller(t, dockerAptYaml, "darwin", cmdMap([]string{"docker"}), completionsOpts(Options{}))
-	m.Stub = func(argv []string) ([]byte, error) {
-		if argv[0] == "sh" {
-			return []byte("#compdef docker\n"), nil
-		}
-		return nil, nil
-	}
+	m.Stub = stubOutputs("sh ", "#compdef docker\n")
 	require.NoError(t, in.Install([]string{"docker"}))
-	require.Contains(t, strings.Join(m.Calls(), "\n"), "/home/u/.local/share/zsh/site-functions/_docker")
+	requireCalls(t, m, "/home/u/.local/share/zsh/site-functions/_docker")
 }
 
 // [<] 🤖🤖

@@ -61,16 +61,9 @@ const dockerCompYaml = `packages:
 
 func TestManagerlessEntryInstallsCompletionsWhenPresent(t *testing.T) {
 	in, m := newInstaller(t, dockerCompYaml, "linux", cmdMap([]string{"docker"}), completionsOpts(Options{}))
-	m.Stub = func(argv []string) ([]byte, error) {
-		if argv[0] == "sh" {
-			return []byte("#compdef docker\n"), nil
-		}
-		return nil, nil
-	}
+	m.Stub = stubOutputs("sh ", "#compdef docker\n")
 	require.NoError(t, in.Install([]string{"docker"}))
-	calls := strings.Join(m.Calls(), "\n")
-	require.Contains(t, calls, "sh -ec docker completion zsh")
-	require.Contains(t, calls, "/home/u/.local/share/zsh/site-functions/_docker")
+	requireCalls(t, m, "sh -ec docker completion zsh", "/home/u/.local/share/zsh/site-functions/_docker")
 }
 
 func TestManagerlessEntrySkipsWhenCommandAbsent(t *testing.T) {
@@ -90,18 +83,18 @@ func TestInstallCompletionsDisabledByDefault(t *testing.T) {
 	in, m := newInstaller(t, goCompYaml, "linux", cmdMap([]string{"sha256sum"}), Options{})
 	m.Stub = shaStub("goodsha")
 	require.NoError(t, in.Install([]string{"go"}))
-	require.NotContains(t, strings.Join(m.Calls(), "\n"), "_golang")
+	refuteCalls(t, m, "_golang")
 }
 
 func TestInstallCompletionsFetchesVerifiesInstalls(t *testing.T) {
 	in, m := newInstaller(t, goCompYaml, "linux", cmdMap([]string{"sha256sum"}), completionsOpts(Options{}))
 	m.Stub = shaStub("goodsha")
 	require.NoError(t, in.Install([]string{"go"}))
-	calls := strings.Join(m.Calls(), "\n")
-	require.Contains(t, calls, "_golang https://example.com/_golang")
-	require.Contains(t, calls, "mkdir -p /home/u/.local/share/zsh/site-functions")
-	require.Contains(t, calls, "install -m 0644")
-	require.Contains(t, calls, "/home/u/.local/share/zsh/site-functions/_golang")
+	requireCalls(t, m,
+		"_golang https://example.com/_golang",
+		"mkdir -p /home/u/.local/share/zsh/site-functions",
+		"install -m 0644",
+		"/home/u/.local/share/zsh/site-functions/_golang")
 }
 
 func TestInstallCompletionsSkipsWhenPresent(t *testing.T) {
@@ -111,7 +104,7 @@ func TestInstallCompletionsSkipsWhenPresent(t *testing.T) {
 		completionsOpts(Options{CompletionsDestinationCandidates: []string{dir}}))
 	m.Stub = shaStub("goodsha")
 	require.NoError(t, in.Install([]string{"go"}))
-	require.NotContains(t, strings.Join(m.Calls(), "\n"), "_golang https://example.com/_golang")
+	refuteCalls(t, m, "_golang https://example.com/_golang")
 }
 
 func TestInstallCompletionsDryRunAnnounces(t *testing.T) {
@@ -131,7 +124,7 @@ func TestCompletionsDirPicksFpathCandidate(t *testing.T) {
 	in.Host.FpathDirs = func() []string { return []string{"/on/fpath"} }
 	m.Stub = shaStub("goodsha")
 	require.NoError(t, in.Install([]string{"go"}))
-	require.Contains(t, strings.Join(m.Calls(), "\n"), "/on/fpath/_golang")
+	requireCalls(t, m, "/on/fpath/_golang")
 }
 
 func TestCompletionsDirWarnsWhenNoneOnFpath(t *testing.T) {

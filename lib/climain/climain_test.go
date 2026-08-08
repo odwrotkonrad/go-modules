@@ -1,4 +1,4 @@
-package climain
+package climain_test
 
 // [>] 🤖🤖
 
@@ -6,6 +6,7 @@ import (
 	"embed"
 	"testing"
 
+	"gitlab.com/konradodwrot/go-modules/lib/climain"
 	"gitlab.com/konradodwrot/go-modules/lib/testyml"
 )
 
@@ -19,7 +20,7 @@ type helpVersionOut struct {
 
 func TestHelpVersion(t *testing.T) {
 	testyml.Eq(t, td, "testdata/spec/funcs/help_version.test.spec.yml", func(t *testing.T, c testyml.Case[helpVersionOut]) (helpVersionOut, error) {
-		out, done := HelpVersion(c.Input.Args.Strings(t, 0), "usage text", "tool", "1.2.3")
+		out, done := climain.HelpVersion(c.Input.Args.Strings(t, 0), "usage text", "tool", "1.2.3")
 		return helpVersionOut{Out: out, Done: done}, nil
 	})
 }

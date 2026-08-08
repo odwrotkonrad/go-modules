@@ -33,33 +33,11 @@ func (p *ProfileReady) archiveBefore(sub string, dests []string) error {
 func (p *ProfileReady) backupDests() []string {
 	var out []string
 	for _, op := range p.commandOps("backup") {
-		switch o := op.(type) {
-		case *MakeLinksOperationReady:
-			for _, item := range o.Links {
-				for _, dest := range p.resolveLinkDests(item) {
-					if !fsutil.IsLinkSettled(p.Reader, p.resolveSrc(item.Rel), dest) {
-						out = append(out, dest)
-					}
-				}
-			}
-		case *MakeCopiesOperationReady:
-			for _, item := range o.Copies {
-				src := p.resolveSrc(item.Rel)
-				for _, dest := range p.resolveCopyDests(item) {
-					if !fsutil.IsSameContent(p.Reader, src, dest) {
-						out = append(out, dest)
-					}
-				}
-			}
-		case *RenderTemplatesOperationReady:
-			for _, item := range o.Templates {
-				settled := p.renderSettled(item)
-				for _, d := range p.resolveTemplateDests(item) {
-					if d.host && !settled[d.path] {
-						out = append(out, d.path)
-					}
-				}
-			}
+		if o, ok := op.(interface {
+			unsettledDests(*ProfileReady) (int, int, []string)
+		}); ok {
+			_, _, unsettled := o.unsettledDests(p)
+			out = append(out, unsettled...)
 		}
 	}
 	return out
@@ -121,10 +99,6 @@ func humanSize(n int64) string {
 	return fmt.Sprintf("%dB", n)
 }
 
-func (p *ProfileReady) ExecBackupStage() error {
-	return p.execBackup(p.backupDests())
-}
-
 func (p *ProfileReady) failItem(op, dest string, err error) error {
 	p.emit(log.Levels.Error, op, "fail", dest+": "+err.Error())
 	return err
@@ -148,7 +122,7 @@ func (p *ProfileReady) makeDirs(dirs []spec.FileItem) error {
 func (p *ProfileReady) upsertExtraDir(item spec.FileItem, dest string) error {
 	if fsutil.IsDirSettled(p.Reader, dest) {
 		if p.isDryRunAll() {
-			p.emitSkip(log.Levels.Info, "make-dirs", p.wouldAction(dest), dest, p.skipReasons("already exists")...)
+			p.emit(log.Levels.Info, "make-dirs", p.wouldAction(dest), dest, "already exists")
 		}
 		return p.fixPerms("make-dirs", dest, item)
 	}
@@ -159,7 +133,7 @@ func (p *ProfileReady) ensureConfigDir(relativePath string) error {
 	dest := p.toDest(relativePath)
 	if fsutil.IsDirSettled(p.Reader, dest) {
 		if p.isDryRunAll() {
-			p.emitSkip(log.Levels.Info, "make-dirs", p.wouldAction(dest), dest, p.skipReasons("already exists")...)
+			p.emit(log.Levels.Info, "make-dirs", p.wouldAction(dest), dest, "already exists")
 		}
 		return nil
 	}
@@ -208,14 +182,14 @@ func (p *ProfileReady) fixPerms(op, dest string, item spec.FileItem) error {
 			return err
 		}
 	} else if p.isDryRunAll() && item.Chmod != "" {
-		p.emitSkip(log.Levels.Info, op, "chmod", dest, p.skipReasons("already set")...)
+		p.emit(log.Levels.Info, op, "chmod", dest, "already set")
 	}
 	if needChown {
 		if err := p.chown(op, formatOwnerSpec(item), dest); err != nil {
 			return err
 		}
 	} else if p.isDryRunAll() && formatOwnerSpec(item) != "" {
-		p.emitSkip(log.Levels.Info, op, "chown", dest, p.skipReasons("already set")...)
+		p.emit(log.Levels.Info, op, "chown", dest, "already set")
 	}
 	return nil
 }
@@ -267,7 +241,7 @@ func (p *ProfileReady) makeLink(item spec.FileItem, dest string) error {
 	src := p.resolveSrc(item.Rel)
 	if fsutil.IsLinkSettled(p.Reader, src, dest) {
 		if p.isDryRunAll() {
-			p.emitSkip(log.Levels.Info, "make-links", p.wouldAction(dest), dest, p.skipReasons("already linked")...)
+			p.emit(log.Levels.Info, "make-links", p.wouldAction(dest), dest, "already linked")
 		}
 		return nil
 	}
@@ -282,7 +256,7 @@ func (p *ProfileReady) makeCopy(item spec.FileItem, dest string) error {
 	src := p.resolveSrc(item.Rel)
 	if fsutil.IsSameContent(p.Reader, src, dest) {
 		if p.isDryRunAll() {
-			p.emitSkip(log.Levels.Info, "make-copies", p.wouldAction(dest), dest, p.skipReasons("same content")...)
+			p.emit(log.Levels.Info, "make-copies", p.wouldAction(dest), dest, "same content")
 		}
 		return p.fixPerms("make-copies", dest, item)
 	}

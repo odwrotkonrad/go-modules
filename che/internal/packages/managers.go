@@ -334,15 +334,19 @@ func (in *Installer) managerPkgName(pkg string, it Item, pin string) (string, er
 	return base, nil
 }
 
+func brewArgv(mgr, sub string, args ...string) []string {
+	argv := []string{"brew", sub}
+	if mgr == "cask" {
+		argv = append(argv, "--cask")
+	}
+	return append(argv, args...)
+}
+
 func (in *Installer) managerHasNewer(mgr, base string) bool {
 	if mgr != "brew" && mgr != "cask" {
 		return true
 	}
-	argv := []string{"brew", "outdated", "--quiet", path.Base(base)}
-	if mgr == "cask" {
-		argv = slices.Insert(argv, 2, "--cask")
-	}
-	out, ok := in.output(argv)
+	out, ok := in.output(brewArgv(mgr, "outdated", "--quiet", path.Base(base)))
 	return ok && strings.TrimSpace(out) != ""
 }
 
@@ -378,11 +382,8 @@ func splitPin(name string) (base, pin string) {
 
 func (in *Installer) isInstalled(pkg, mgr, base string) bool {
 	switch mgr {
-	case "brew":
-		_, ok := in.output([]string{"brew", "list", path.Base(base)})
-		return ok
-	case "cask":
-		_, ok := in.output([]string{"brew", "list", "--cask", path.Base(base)})
+	case "brew", "cask":
+		_, ok := in.output(brewArgv(mgr, "list", path.Base(base)))
 		return ok
 	case "apt":
 		_, ok := in.output([]string{"dpkg", "-s", base})
@@ -453,32 +454,79 @@ func (in *Installer) installedVersion(mgr, base string) string {
 	}
 }
 
+type managerRoutine struct {
+	install func(in *Installer, mgr, name, pin string) error
+	update  func(in *Installer, mgr, base string) error
+}
+
+var brewRoutine = managerRoutine{
+	install: func(in *Installer, mgr, name, _ string) error { return in.brewInstall(mgr, name) },
+	update:  func(in *Installer, mgr, base string) error { return in.exec(brewArgv(mgr, "upgrade", base)) },
+}
+
+var managerRoutines = map[string]managerRoutine{
+	"brew": brewRoutine,
+	"cask": brewRoutine,
+	"apt": {
+		install: func(in *Installer, _, name, _ string) error {
+			if err := in.aptUpdate(); err != nil {
+				return err
+			}
+			return in.exec(in.sudo("apt-get", "install", "--yes", "--no-install-recommends", name))
+		},
+		update: func(in *Installer, _, base string) error {
+			if err := in.aptUpdate(); err != nil {
+				return err
+			}
+			return in.exec(in.sudo("apt-get", "install", "--only-upgrade", "--yes", base))
+		},
+	},
+	"npm": {
+		install: func(in *Installer, _, name, _ string) error {
+			return in.exec(in.sudo("npm", "install", "--global", name))
+		},
+		update: func(in *Installer, _, base string) error { return in.exec(in.sudo("npm", "update", "--global", base)) },
+	},
+	"vscode": {
+		install: func(in *Installer, _, name, _ string) error {
+			if err := in.exec([]string{"code", "--install-extension", name}); err != nil {
+				return err
+			}
+			base, version, _ := strings.Cut(strings.ToLower(name), "@")
+			in.codeExtensions()[base] = version
+			return nil
+		},
+		update: func(in *Installer, _, base string) error {
+			return in.exec([]string{"code", "--install-extension", base, "--force"})
+		},
+	},
+	"gem": {
+		install: func(in *Installer, _, name, pin string) error {
+			if pin != "" {
+				return in.exec(in.sudo("gem", "install", name, "-v", pin))
+			}
+			return in.exec(in.sudo("gem", "install", name))
+		},
+		update: func(in *Installer, _, base string) error { return in.exec(in.sudo("gem", "update", base)) },
+	},
+	"go": {
+		install: func(in *Installer, _, name, _ string) error { return in.goInstall(name, name) },
+	},
+}
+
 func (in *Installer) update(pkg, mgr, base string) error {
 	if in.Opts.DryRun {
 		in.emitDryRun("update", pkg+" via "+mgr)
 		return nil
 	}
-	var argv []string
-	switch mgr {
-	case "brew":
-		argv = []string{"brew", "upgrade", base}
-	case "cask":
-		argv = []string{"brew", "upgrade", "--cask", base}
-	case "apt":
-		if err := in.aptUpdate(); err != nil {
-			return err
-		}
-		argv = in.sudo("apt-get", "install", "--only-upgrade", "--yes", base)
-	case "npm":
-		argv = in.sudo("npm", "update", "--global", base)
-	case "vscode":
-		argv = []string{"code", "--install-extension", base, "--force"}
-	case "gem":
-		argv = in.sudo("gem", "update", base)
-	case "go":
+	if mgr == "go" {
 		return in.goInstall(pkg, base)
 	}
-	if err := in.exec(argv); err != nil {
+	r, ok := managerRoutines[mgr]
+	if !ok || r.update == nil {
+		return fmt.Errorf("no update routine for manager %s", mgr)
+	}
+	if err := r.update(in, mgr, base); err != nil {
 		return err
 	}
 	in.emit(log.Levels.Info, "updated", pkg+" via "+mgr)
@@ -486,33 +534,11 @@ func (in *Installer) update(pkg, mgr, base string) error {
 }
 
 func (in *Installer) managerInstall(mgr, name, pin string) error {
-	switch mgr {
-	case "brew", "cask":
-		return in.brewInstall(mgr, name)
-	case "apt":
-		if err := in.aptUpdate(); err != nil {
-			return err
-		}
-		return in.exec(in.sudo("apt-get", "install", "--yes", "--no-install-recommends", name))
-	case "npm":
-		return in.exec(in.sudo("npm", "install", "--global", name))
-	case "vscode":
-		if err := in.exec([]string{"code", "--install-extension", name}); err != nil {
-			return err
-		}
-		base, version, _ := strings.Cut(strings.ToLower(name), "@")
-		in.codeExtensions()[base] = version
-		return nil
-	case "gem":
-		if pin != "" {
-			return in.exec(in.sudo("gem", "install", name, "-v", pin))
-		}
-		return in.exec(in.sudo("gem", "install", name))
-	case "go":
-		return in.goInstall(name, name)
-	default:
+	r, ok := managerRoutines[mgr]
+	if !ok {
 		return fmt.Errorf("no install routine for manager %s", mgr)
 	}
+	return r.install(in, mgr, name, pin)
 }
 
 func (in *Installer) brewInstall(mgr, name string) error {
@@ -528,11 +554,7 @@ func (in *Installer) brewInstall(mgr, name string) error {
 			return err
 		}
 	}
-	argv := []string{"brew", "install", name}
-	if mgr == "cask" {
-		argv = []string{"brew", "install", "--cask", name}
-	}
-	return in.exec(argv)
+	return in.exec(brewArgv(mgr, "install", name))
 }
 
 func (in *Installer) aptUpdate() error {
@@ -543,24 +565,19 @@ func (in *Installer) aptUpdate() error {
 	return in.exec(in.sudo("apt-get", "update"))
 }
 
-func (in *Installer) installScript(pkg string, s *ScriptSpec) error {
-	pin := in.pinFor(pkg, s.Version)
-	if s.ValidateArtifact != "" {
-		if fileExists(in.expandPath(s.ValidateArtifact)) {
-			in.emitSkip(log.Levels.Debug, pkg, "already installed via script ("+s.ValidateArtifact+" present)")
-			return nil
-		}
-	} else if in.hasCmd(pkg) {
-		if pin == "" || in.versionOutputHasPin(pkg, pin) {
-			in.emitSkip(log.Levels.Debug, pkg, "already installed via script")
-			return nil
-		}
-		in.emit(log.Levels.Info, "reinstall", pkg+": -> "+s.Version)
+func (in *Installer) skipInstalledOrEmitReinstall(pkg, method, pin, to string, checkInstalled, checkPin func() bool) bool {
+	if !checkInstalled() {
+		return false
 	}
-	if in.Opts.DryRun {
-		in.emitDryRun("install", labelWithVersion(pkg, pin)+" via script")
-		return nil
+	if pin == "" || checkPin() {
+		in.emitSkip(log.Levels.Debug, pkg, "already installed via "+method)
+		return true
 	}
+	in.emit(log.Levels.Info, "reinstall", pkg+": -> "+to)
+	return false
+}
+
+func (in *Installer) runScript(pkg string, s *ScriptSpec, errLabel string) error {
 	argv, cleanup, err := in.scriptArgv(pkg, s)
 	if err != nil {
 		return err
@@ -570,7 +587,29 @@ func (in *Installer) installScript(pkg string, s *ScriptSpec) error {
 	}
 	c := execx.Cmd{Argv: argv, Env: in.scriptEnv(pkg, s), Stdout: os.Stdout, Stderr: os.Stderr}
 	if err := execx.Default.Exec(c); err != nil {
-		return fmt.Errorf("%s: install script: %w", pkg, err)
+		return fmt.Errorf("%s: %s: %w", pkg, errLabel, err)
+	}
+	return nil
+}
+
+func (in *Installer) installScript(pkg string, s *ScriptSpec) error {
+	pin := in.pinFor(pkg, s.Version)
+	if s.ValidateArtifact != "" {
+		if fileExists(in.expandPath(s.ValidateArtifact)) {
+			in.emitSkip(log.Levels.Debug, pkg, "already installed via script ("+s.ValidateArtifact+" present)")
+			return nil
+		}
+	} else if in.skipInstalledOrEmitReinstall(pkg, "script", pin, s.Version,
+		func() bool { return in.hasCmd(pkg) },
+		func() bool { return in.versionOutputHasPin(pkg, pin) }) {
+		return nil
+	}
+	if in.Opts.DryRun {
+		in.emitDryRun("install", labelWithVersion(pkg, pin)+" via script")
+		return nil
+	}
+	if err := in.runScript(pkg, s, "install script"); err != nil {
+		return err
 	}
 	in.emit(log.Levels.Info, "installed", labelWithVersion(pkg, pin)+" via script")
 	return nil

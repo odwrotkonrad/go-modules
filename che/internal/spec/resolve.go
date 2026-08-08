@@ -446,20 +446,10 @@ func (ex *excludeSet) append(o excludeSet) {
 
 func splitEntries(entries []entry, globs *globSet, rich *[]FileItem) error {
 	for _, e := range entries {
-		for _, f := range e.Files {
-			if f.glob != "" {
-				globs.add(f.glob, e.Perms)
-				continue
-			}
-			if f.DestRule != "" {
-				rule, err := ruleFromDest(f.Source, f.DestRule)
-				if err != nil {
-					return err
-				}
-				globs.addRule(f.Source, e.Perms, rule)
-				continue
-			}
-			*rich = append(*rich, FileItem{Rel: f.Source, Dests: f.Dest, Perms: e.Perms})
+		if err := splitGroupFiles(e.Files, e.Perms, globs, rich, nil, func(f fileSpec) FileItem {
+			return FileItem{Rel: f.Source, Dests: f.Dest, Perms: e.Perms}
+		}); err != nil {
+			return err
 		}
 	}
 	return nil
@@ -467,34 +457,54 @@ func splitEntries(entries []entry, globs *globSet, rich *[]FileItem) error {
 
 func splitTemplates(entries []templateGroup, globs *globSet, rich *[]FileItem) error {
 	for _, e := range entries {
-		for _, f := range e.Files {
-			if f.glob != "" {
-				if IsRemoteSrc(f.glob) {
-					return fmt.Errorf("renderTemplates glob cannot be remote: %q", f.glob)
-				}
-				globs.add(f.glob, e.Perms)
-				continue
+		if err := splitGroupFiles(e.Files, e.Perms, globs, rich, checkTemplateSpec, func(f fileSpec) FileItem {
+			return FileItem{Rel: f.Source, Dests: mergeDestOptions(e.Options, f.Dest), Ctx: fsutil.MergeMap(e.Ctx, f.Ctx), Perms: e.Perms}
+		}); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func splitGroupFiles(files []fileSpec, perms Perms, globs *globSet, rich *[]FileItem, check func(fileSpec) error, makeItem func(fileSpec) FileItem) error {
+	for _, f := range files {
+		if check != nil {
+			if err := check(f); err != nil {
+				return err
 			}
-			if f.DestRule != "" {
-				if IsRemoteSrc(f.Source) {
-					return fmt.Errorf("renderTemplates dest rewrite cannot be remote: %q", f.Source)
-				}
-				rule, err := ruleFromDest(f.Source, f.DestRule)
-				if err != nil {
-					return err
-				}
-				globs.addRule(f.Source, e.Perms, rule)
-				continue
+		}
+		switch {
+		case f.glob != "":
+			globs.add(f.glob, perms)
+		case f.DestRule != "":
+			rule, err := ruleFromDest(f.Source, f.DestRule)
+			if err != nil {
+				return err
 			}
-			if IsRemoteSrc(f.Source) {
-				if !render.IsRemoteRef(RemoteSrcRef(f.Source)) {
-					return fmt.Errorf("renderTemplates remote source malformed, want @<repo>//<path>[?ref=<ref>]: %q", f.Source)
-				}
-				if len(f.Dest) == 0 {
-					return fmt.Errorf("renderTemplates remote source requires explicit dest: %q", f.Source)
-				}
-			}
-			*rich = append(*rich, FileItem{Rel: f.Source, Dests: mergeDestOptions(e.Options, f.Dest), Ctx: fsutil.MergeMap(e.Ctx, f.Ctx), Perms: e.Perms})
+			globs.addRule(f.Source, perms, rule)
+		default:
+			*rich = append(*rich, makeItem(f))
+		}
+	}
+	return nil
+}
+
+func checkTemplateSpec(f fileSpec) error {
+	switch {
+	case f.glob != "":
+		if IsRemoteSrc(f.glob) {
+			return fmt.Errorf("renderTemplates glob cannot be remote: %q", f.glob)
+		}
+	case f.DestRule != "":
+		if IsRemoteSrc(f.Source) {
+			return fmt.Errorf("renderTemplates dest rewrite cannot be remote: %q", f.Source)
+		}
+	case IsRemoteSrc(f.Source):
+		if !render.IsRemoteRef(RemoteSrcRef(f.Source)) {
+			return fmt.Errorf("renderTemplates remote source malformed, want @<repo>//<path>[?ref=<ref>]: %q", f.Source)
+		}
+		if len(f.Dest) == 0 {
+			return fmt.Errorf("renderTemplates remote source requires explicit dest: %q", f.Source)
 		}
 	}
 	return nil
@@ -528,74 +538,58 @@ func dirItems(e dirGroup) []FileItem {
 }
 
 func (o ProfileOptions) Over(spec Options) ProfileOptions {
-	if o.AutoDiscover == nil {
-		o.AutoDiscover = spec.AutoDiscover
-	}
-	if o.LogLevel == "" {
-		o.LogLevel = spec.LogLevel
-	}
-	if o.ProfileWorkingDirectory == "" {
-		o.ProfileWorkingDirectory = spec.ProfileWorkingDirectory
-	}
-	if o.Packages.File == "" {
-		o.Packages.File = spec.Packages.File
-	}
-	if len(o.Packages.PreferredInstallationMethods) == 0 {
-		o.Packages.PreferredInstallationMethods = spec.Packages.PreferredInstallationMethods
-	}
-	if len(o.Packages.BinariesRemoteArchive.InstallDestinationCandidates) == 0 {
-		o.Packages.BinariesRemoteArchive.InstallDestinationCandidates = spec.Packages.BinariesRemoteArchive.InstallDestinationCandidates
-	}
-	if o.Packages.Completions.Zsh.Enabled == nil {
-		o.Packages.Completions.Zsh.Enabled = spec.Packages.Completions.Zsh.Enabled
-	}
-	if len(o.Packages.Completions.Zsh.InstallDestinationCandidates) == 0 {
-		o.Packages.Completions.Zsh.InstallDestinationCandidates = spec.Packages.Completions.Zsh.InstallDestinationCandidates
-	}
-	if o.Packages.Completions.Zsh.CheckPresentOnFpath == nil {
-		o.Packages.Completions.Zsh.CheckPresentOnFpath = spec.Packages.Completions.Zsh.CheckPresentOnFpath
-	}
-	if o.Packages.BinariesRemoteArchive.CheckPresentOnPath == nil {
-		o.Packages.BinariesRemoteArchive.CheckPresentOnPath = spec.Packages.BinariesRemoteArchive.CheckPresentOnPath
-	}
-	return o
+	return overlayProfileOptions(o, ProfileOptions{
+		AutoDiscover:            spec.AutoDiscover,
+		LogLevel:                spec.LogLevel,
+		ProfileWorkingDirectory: spec.ProfileWorkingDirectory,
+		Packages:                spec.Packages,
+	})
 }
 
 func (o ProfileOptions) OverRef(entry ProfileOptions) ProfileOptions {
-	if entry.RunIf != nil {
-		o.RunIf = entry.RunIf
+	if entry.RunIf == nil {
+		entry.RunIf = o.RunIf
 	}
-	if entry.AutoDiscover != nil {
-		o.AutoDiscover = entry.AutoDiscover
+	return overlayProfileOptions(entry, o)
+}
+
+func overlayProfileOptions(hi, lo ProfileOptions) ProfileOptions {
+	if hi.AutoDiscover == nil {
+		hi.AutoDiscover = lo.AutoDiscover
 	}
-	if entry.LogLevel != "" {
-		o.LogLevel = entry.LogLevel
+	if hi.LogLevel == "" {
+		hi.LogLevel = lo.LogLevel
 	}
-	if entry.ProfileWorkingDirectory != "" {
-		o.ProfileWorkingDirectory = entry.ProfileWorkingDirectory
+	if hi.ProfileWorkingDirectory == "" {
+		hi.ProfileWorkingDirectory = lo.ProfileWorkingDirectory
 	}
-	if entry.Packages.File != "" {
-		o.Packages.File = entry.Packages.File
+	hi.Packages = overlayPackages(hi.Packages, lo.Packages)
+	return hi
+}
+
+func overlayPackages(hi, lo Packages) Packages {
+	if hi.File == "" {
+		hi.File = lo.File
 	}
-	if len(entry.Packages.PreferredInstallationMethods) > 0 {
-		o.Packages.PreferredInstallationMethods = entry.Packages.PreferredInstallationMethods
+	if len(hi.PreferredInstallationMethods) == 0 {
+		hi.PreferredInstallationMethods = lo.PreferredInstallationMethods
 	}
-	if len(entry.Packages.BinariesRemoteArchive.InstallDestinationCandidates) > 0 {
-		o.Packages.BinariesRemoteArchive.InstallDestinationCandidates = entry.Packages.BinariesRemoteArchive.InstallDestinationCandidates
+	if len(hi.BinariesRemoteArchive.InstallDestinationCandidates) == 0 {
+		hi.BinariesRemoteArchive.InstallDestinationCandidates = lo.BinariesRemoteArchive.InstallDestinationCandidates
 	}
-	if entry.Packages.Completions.Zsh.Enabled != nil {
-		o.Packages.Completions.Zsh.Enabled = entry.Packages.Completions.Zsh.Enabled
+	if hi.BinariesRemoteArchive.CheckPresentOnPath == nil {
+		hi.BinariesRemoteArchive.CheckPresentOnPath = lo.BinariesRemoteArchive.CheckPresentOnPath
 	}
-	if len(entry.Packages.Completions.Zsh.InstallDestinationCandidates) > 0 {
-		o.Packages.Completions.Zsh.InstallDestinationCandidates = entry.Packages.Completions.Zsh.InstallDestinationCandidates
+	if hi.Completions.Zsh.Enabled == nil {
+		hi.Completions.Zsh.Enabled = lo.Completions.Zsh.Enabled
 	}
-	if entry.Packages.Completions.Zsh.CheckPresentOnFpath != nil {
-		o.Packages.Completions.Zsh.CheckPresentOnFpath = entry.Packages.Completions.Zsh.CheckPresentOnFpath
+	if len(hi.Completions.Zsh.InstallDestinationCandidates) == 0 {
+		hi.Completions.Zsh.InstallDestinationCandidates = lo.Completions.Zsh.InstallDestinationCandidates
 	}
-	if entry.Packages.BinariesRemoteArchive.CheckPresentOnPath != nil {
-		o.Packages.BinariesRemoteArchive.CheckPresentOnPath = entry.Packages.BinariesRemoteArchive.CheckPresentOnPath
+	if hi.Completions.Zsh.CheckPresentOnFpath == nil {
+		hi.Completions.Zsh.CheckPresentOnFpath = lo.Completions.Zsh.CheckPresentOnFpath
 	}
-	return o
+	return hi
 }
 
 // [<] 🤖🤖

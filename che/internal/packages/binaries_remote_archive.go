@@ -15,12 +15,10 @@ import (
 
 func (in *Installer) installBinariesRemoteArchive(pkg string, b *BinariesRemoteArchiveSpec) error {
 	pin := in.pinFor(pkg, b.Version)
-	if in.hasCmd(pkg) {
-		if pin == "" || in.versionOutputHasPin(pkg, pin) {
-			in.emitSkip(log.Levels.Debug, pkg, "already installed via binariesRemoteArchive")
-			return nil
-		}
-		in.emit(log.Levels.Info, "reinstall", pkg+": -> "+pin)
+	if in.skipInstalledOrEmitReinstall(pkg, "binariesRemoteArchive", pin, pin,
+		func() bool { return in.hasCmd(pkg) },
+		func() bool { return in.versionOutputHasPin(pkg, pin) }) {
+		return nil
 	}
 	if err := in.requestedOverridesPin(pkg, b.Version); err != nil {
 		return err

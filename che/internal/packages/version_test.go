@@ -45,43 +45,23 @@ const pinnedBatYaml = `packages:
 
 func TestEntryVersionSkipsWhenMatching(t *testing.T) {
 	in, m := newInstaller(t, pinnedBatYaml, "darwin", cmdMap([]string{"brew", "bat"}), Options{})
-	m.Stub = func(argv []string) ([]byte, error) {
-		if argv[0] == "bat" {
-			return []byte("bat 0.25.0 (871abd2)\n"), nil
-		}
-		return nil, nil
-	}
+	m.Stub = stubOutputs("bat ", "bat 0.25.0 (871abd2)\n")
 	require.NoError(t, in.Install([]string{"bat"}))
-	require.NotContains(t, strings.Join(m.Calls(), "\n"), "brew install")
-	require.NotContains(t, strings.Join(m.Calls(), "\n"), "brew upgrade")
+	refuteCalls(t, m, "brew install", "brew upgrade")
 }
 
 func TestEntryVersionDriftRunsManagerUpdate(t *testing.T) {
 	in, m := newInstaller(t, pinnedBatYaml, "darwin", cmdMap([]string{"brew", "bat"}), Options{})
-	m.Stub = func(argv []string) ([]byte, error) {
-		if argv[0] == "bat" {
-			return []byte("bat 0.24.0\n"), nil
-		}
-		if argv[0] == "brew" && argv[1] == "outdated" {
-			return []byte("bat\n"), nil
-		}
-		return nil, nil
-	}
+	m.Stub = stubOutputs("bat ", "bat 0.24.0\n", "brew outdated", "bat\n")
 	require.NoError(t, in.Install([]string{"bat"}))
 	require.Contains(t, m.Calls(), "brew upgrade bat@0.25.0")
 }
 
 func TestEntryVersionDriftSkipsWhenManagerHasNoNewer(t *testing.T) {
 	in, m := newInstaller(t, pinnedBatYaml, "darwin", cmdMap([]string{"brew", "bat"}), Options{})
-	m.Stub = func(argv []string) ([]byte, error) {
-		if argv[0] == "bat" {
-			return []byte("bat 0.24.0\n"), nil
-		}
-		return nil, nil
-	}
+	m.Stub = stubOutputs("bat ", "bat 0.24.0\n")
 	require.NoError(t, in.Install([]string{"bat"}))
-	require.NotContains(t, strings.Join(m.Calls(), "\n"), "brew upgrade")
-	require.NotContains(t, strings.Join(m.Calls(), "\n"), "brew install bat")
+	refuteCalls(t, m, "brew upgrade", "brew install bat")
 }
 
 func TestEntryVersionPinsArchiveVersion(t *testing.T) {
@@ -96,7 +76,7 @@ func TestEntryVersionPinsArchiveVersion(t *testing.T) {
 	in, m := newInstaller(t, y, "linux", cmdMap([]string{"sha256sum"}), Options{})
 	m.Stub = shaStub("goodsha")
 	require.NoError(t, in.Install([]string{"kind"}))
-	require.Contains(t, strings.Join(m.Calls(), "\n"), "https://example.com/kind-0.32.0")
+	requireCalls(t, m, "https://example.com/kind-0.32.0")
 }
 
 func TestArchiveWithoutVersionNeedsNoPin(t *testing.T) {
@@ -109,7 +89,7 @@ func TestArchiveWithoutVersionNeedsNoPin(t *testing.T) {
 `
 	in, m := newInstaller(t, y, "linux", cmdMap(nil), Options{})
 	require.NoError(t, in.Install([]string{"aws"}))
-	require.Contains(t, strings.Join(m.Calls(), "\n"), "aws-latest.zip")
+	requireCalls(t, m, "aws-latest.zip")
 }
 
 // [<] 🤖🤖
@@ -123,12 +103,12 @@ func TestVscodeExtensionPinInstallsVersionedAndSkips(t *testing.T) {
 	in, m := newInstaller(t, y, "darwin", cmdMap([]string{"code"}), Options{})
 	m.Stub = codeListStub("")
 	require.NoError(t, in.Install([]string{"golang.go"}))
-	require.Contains(t, strings.Join(m.Calls(), "\n"), "code --install-extension golang.go@0.50.0")
+	requireCalls(t, m, "code --install-extension golang.go@0.50.0")
 
 	in2, m2 := newInstaller(t, y, "darwin", cmdMap([]string{"code"}), Options{})
 	m2.Stub = codeListStub("golang.go@0.50.0\n")
 	require.NoError(t, in2.Install([]string{"golang.go"}))
-	require.NotContains(t, strings.Join(m2.Calls(), "\n"), "--install-extension")
+	refuteCalls(t, m2, "--install-extension")
 }
 
 func TestVscodeExtensionPinDriftReinstalls(t *testing.T) {
@@ -140,7 +120,7 @@ func TestVscodeExtensionPinDriftReinstalls(t *testing.T) {
 	in, m := newInstaller(t, y, "darwin", cmdMap([]string{"code"}), Options{})
 	m.Stub = codeListStub("golang.go@0.49.0\n")
 	require.NoError(t, in.Install([]string{"golang.go"}))
-	require.Contains(t, strings.Join(m.Calls(), "\n"), "code --install-extension golang.go@0.50.0")
+	requireCalls(t, m, "code --install-extension golang.go@0.50.0")
 }
 
 func TestBrewPinAppendsVersionedFormula(t *testing.T) {
@@ -152,9 +132,8 @@ func TestBrewPinAppendsVersionedFormula(t *testing.T) {
 	in, m := newInstaller(t, y, "darwin", cmdMap([]string{"brew"}), Options{})
 	m.Stub = failOn("brew list")
 	require.NoError(t, in.Install([]string{"node"}))
-	calls := strings.Join(m.Calls(), "\n")
-	require.Contains(t, calls, "brew install node@24")
-	require.NotContains(t, calls, "node@24@24")
+	requireCalls(t, m, "brew install node@24")
+	refuteCalls(t, m, "node@24@24")
 }
 
 func TestRollingSentinelIsParseError(t *testing.T) {
@@ -202,17 +181,9 @@ func TestUnversionedLatestSentinelSkipsPinning(t *testing.T) {
     installers: [brew, apt]
 `
 	in, m := newInstaller(t, y, "darwin", cmdMap([]string{"brew", "jq"}), Options{})
-	m.Stub = func(argv []string) ([]byte, error) {
-		if argv[0] == "jq" {
-			return []byte("jq-1.7.1\n"), nil
-		}
-		return nil, nil
-	}
+	m.Stub = stubOutputs("jq ", "jq-1.7.1\n")
 	require.NoError(t, in.Install([]string{"jq"}))
-	calls := strings.Join(m.Calls(), "\n")
-	require.NotContains(t, calls, "__rolling__")
-	require.NotContains(t, calls, "brew install")
-	require.NotContains(t, calls, "brew upgrade")
+	refuteCalls(t, m, "__rolling__", "brew install", "brew upgrade")
 }
 
 func TestUnversionedLatestSentinelNotUsedAsArchiveVersion(t *testing.T) {
@@ -249,9 +220,7 @@ func TestAliasBinaryLinksRenamedBinary(t *testing.T) {
 		return nil, nil
 	}
 	require.NoError(t, in.Install([]string{"bat"}))
-	calls := strings.Join(m.Calls(), "\n")
-	require.Contains(t, calls, "--no-install-recommends bat")
-	require.Contains(t, calls, "ln -sf /usr/bin/batcat /home/u/.local/bin/bat")
+	requireCalls(t, m, "--no-install-recommends bat", "ln -sf /usr/bin/batcat /home/u/.local/bin/bat")
 }
 
 func TestAliasBinarySkippedWhenSourceAbsent(t *testing.T) {
@@ -264,7 +233,7 @@ func TestAliasBinarySkippedWhenSourceAbsent(t *testing.T) {
 `
 	in, m := newInstaller(t, y, "darwin", cmdMap([]string{"brew", "bat"}), Options{})
 	require.NoError(t, in.Install([]string{"bat"}))
-	require.NotContains(t, strings.Join(m.Calls(), "\n"), "ln -sf")
+	refuteCalls(t, m, "ln -sf")
 }
 
 func TestPostInstallRunsOnFreshInstallOnly(t *testing.T) {
@@ -277,21 +246,13 @@ func TestPostInstallRunsOnFreshInstallOnly(t *testing.T) {
     postInstall: ln -fs /Applications/kitty.app/Contents/MacOS/kitty "$HOME/.local/bin/kitty"
 `
 	in, m := newInstaller(t, y, "darwin", cmdMap(nil), Options{})
-	m.Stub = func(argv []string) ([]byte, error) {
-		if argv[0] == "curl" {
-			return []byte("echo installing\n"), nil
-		}
-		return nil, nil
-	}
+	m.Stub = stubOutputs("curl ", "echo installing\n")
 	require.NoError(t, in.Install([]string{"kitty"}))
-	calls := strings.Join(m.Calls(), "\n")
-	require.Contains(t, calls, "che-script-")
-	require.Contains(t, calls, " launch=n")
-	require.Contains(t, calls, `ln -fs /Applications/kitty.app/Contents/MacOS/kitty "$HOME/.local/bin/kitty"`)
+	requireCalls(t, m, "che-script-", " launch=n", `ln -fs /Applications/kitty.app/Contents/MacOS/kitty "$HOME/.local/bin/kitty"`)
 
 	present, mp := newInstaller(t, y, "darwin", cmdMap([]string{"kitty"}), Options{})
 	require.NoError(t, present.Install([]string{"kitty"}))
-	require.NotContains(t, strings.Join(mp.Calls(), "\n"), "ln -fs")
+	refuteCalls(t, mp, "ln -fs")
 }
 
 func TestPostInstallShippedScriptResolves(t *testing.T) {
@@ -305,16 +266,9 @@ func TestPostInstallShippedScriptResolves(t *testing.T) {
 `
 	in, m := newInstaller(t, y, "darwin", cmdMap(nil), Options{})
 	in.FilePath = BuiltinPath
-	m.Stub = func(argv []string) ([]byte, error) {
-		if argv[0] == "curl" {
-			return []byte("echo installing\n"), nil
-		}
-		return nil, nil
-	}
+	m.Stub = stubOutputs("curl ", "echo installing\n")
 	require.NoError(t, in.Install([]string{"kitty"}))
-	calls := strings.Join(m.Calls(), "\n")
-	require.Contains(t, calls, `ln -fs "$app/MacOS/kitten" "$bin/kitten"`)
-	require.Contains(t, calls, `ln -fs "$app/MacOS/kitty" "$bin/kitty"`)
+	requireCalls(t, m, `ln -fs "$app/MacOS/kitten" "$bin/kitten"`, `ln -fs "$app/MacOS/kitty" "$bin/kitty"`)
 }
 
 // [>] 🤖🤖
@@ -354,7 +308,7 @@ func TestUserFileScriptNeverFallsBackToBuiltin(t *testing.T) {
 	in.FilePath = filepath.Join(t.TempDir(), "packages.yml")
 	err := in.Install([]string{"kitty"})
 	require.ErrorContains(t, err, "install script not found")
-	require.NotContains(t, strings.Join(m.Calls(), "\n"), "kitty.app")
+	refuteCalls(t, m, "kitty.app")
 }
 
 func TestOverrideAnchoredScriptRuns(t *testing.T) {
@@ -373,7 +327,7 @@ func TestOverrideAnchoredScriptRuns(t *testing.T) {
 	base.Merge(o)
 	in.File, in.FilePath = base, BuiltinPath
 	require.NoError(t, in.Install([]string{"mytool"}))
-	require.Contains(t, strings.Join(m.Calls(), "\n"), filepath.Join(dir, "scripts", "my-post.sh"))
+	requireCalls(t, m, filepath.Join(dir, "scripts", "my-post.sh"))
 }
 
 // [<] 🤖🤖
@@ -388,7 +342,7 @@ func TestGoModulePinsFromEntryVersion(t *testing.T) {
 `
 	in, m := newInstaller(t, y, "darwin", cmdMap([]string{"go"}), Options{})
 	require.NoError(t, in.Install([]string{"gopls"}))
-	require.Contains(t, strings.Join(m.Calls(), "\n"), "go install golang.org/x/tools/gopls@v0.23.0")
+	requireCalls(t, m, "go install golang.org/x/tools/gopls@v0.23.0")
 }
 
 func TestAptVocabularyCarriesNameAndAliases(t *testing.T) {
@@ -428,9 +382,8 @@ func TestVersionLatestTracksModuleHead(t *testing.T) {
 `
 	in, m := newInstaller(t, y, "darwin", cmdMap([]string{"go"}), Options{})
 	require.NoError(t, in.Install([]string{"mytool"}))
-	calls := strings.Join(m.Calls(), "\n")
-	require.Contains(t, calls, "go install example.com/mytool@latest")
-	require.NotContains(t, calls, "@vlatest")
+	requireCalls(t, m, "go install example.com/mytool@latest")
+	refuteCalls(t, m, "@vlatest")
 }
 
 func TestVersionLatestSkipsDriftChecks(t *testing.T) {
@@ -441,7 +394,5 @@ func TestVersionLatestSkipsDriftChecks(t *testing.T) {
 `
 	in, m := newInstaller(t, y, "darwin", cmdMap([]string{"brew", "mytool"}), Options{})
 	require.NoError(t, in.Install([]string{"mytool"}))
-	calls := strings.Join(m.Calls(), "\n")
-	require.NotContains(t, calls, "brew install")
-	require.NotContains(t, calls, "brew upgrade")
+	refuteCalls(t, m, "brew install", "brew upgrade")
 }

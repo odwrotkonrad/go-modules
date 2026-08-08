@@ -90,7 +90,7 @@ func TestDiscoverSummary(t *testing.T) {
 		var events []log.Event
 		log.SetSink(func(e log.Event) { events = append(events, e) })
 		t.Cleanup(func() { log.SetSink(nil) })
-		_, err = testutil.CaptureStdout(t, func() error { p.logDiscovered(); return nil })
+		_, err = testutil.CaptureStdout(t, func() error { p.LogDiscovered(); return nil })
 		require.NoError(t, err)
 		require.NotEmpty(t, events, "a discovered heading event")
 		attrs := events[0].Attrs

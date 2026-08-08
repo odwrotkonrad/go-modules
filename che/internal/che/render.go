@@ -36,7 +36,7 @@ func (p *ProfileReady) renderTemplates(templates []spec.FileItem, skipSecrets bo
 		dests := p.resolveTemplateDests(item)
 		if skipSecrets && p.isSecretRefInItem(item) {
 			for _, d := range dests {
-				p.emitSkip(log.Levels.Debug, "render-templates", p.wouldAction(d.path), d.path, p.skipReasons("options.renderTemplates.skipSecrets")...)
+				p.emit(log.Levels.Debug, "render-templates", p.wouldAction(d.path), d.path, "options.renderTemplates.skipSecrets")
 			}
 			continue
 		}
@@ -60,7 +60,7 @@ func (p *ProfileReady) renderTemplates(templates []spec.FileItem, skipSecrets bo
 				settled := settledMap[d.path]
 				switch {
 				case settled && p.isDryRunAll():
-					p.emitSkip(log.Levels.Info, "render-templates", p.wouldAction(d.path), d.path, p.skipReasons("same content")...)
+					p.emit(log.Levels.Info, "render-templates", p.wouldAction(d.path), d.path, "same content")
 				case settled: // [why] delta mode: an unchanged render logs nothing
 				default:
 					p.emitDryRun("render-templates", p.wouldAction(d.path), d.path)
@@ -195,7 +195,7 @@ func (p *ProfileReady) renderTemplate(item spec.FileItem, dests []tmplDest) erro
 		}
 		current, err := os.ReadFile(d.path)
 		if err == nil && bytes.Equal(current, out) {
-			p.emitSkip(log.Levels.Debug, "render-templates", "overwrite", d.path, "same content")
+			p.emit(log.Levels.Debug, "render-templates", "overwrite", d.path, "same content")
 			continue
 		}
 		p.emit(log.Levels.Info, "render-templates", resolvePastAction("create", err == nil), d.path)
@@ -233,7 +233,7 @@ func (p *ProfileReady) readExistingDest(d tmplDest) ([]byte, error) {
 
 func (p *ProfileReady) placeFile(dest string, body []byte, item spec.FileItem) error {
 	if cur, err := p.Reader.ReadFileBytes(dest); err == nil && bytes.Equal(cur, body) {
-		p.emitSkip(log.Levels.Debug, "render-templates", "overwrite", dest, "same content")
+		p.emit(log.Levels.Debug, "render-templates", "overwrite", dest, "same content")
 		return p.fixPerms("render-templates", dest, item)
 	}
 	mode, _ := fsutil.ParseMode(item.Chmod)

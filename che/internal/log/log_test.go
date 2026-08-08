@@ -26,9 +26,7 @@ func setLevel(t *testing.T, word string) {
 	t.Helper()
 	l, err := ParseLevel(word)
 	require.NoError(t, err)
-	prev := GetLevel()
-	SetLevel(l)
-	t.Cleanup(func() { SetLevel(prev) })
+	t.Cleanup(SwapLevel(l))
 }
 
 func eventFromArgs(t *testing.T, a testyml.Args) Event {

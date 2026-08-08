@@ -129,7 +129,7 @@ func (p *ProfileReady) newInstaller() (*packages.Installer, error) {
 	}
 	in.Emit = func(level log.Level, action, msg string) { p.emit(level, packages.Scope, action, msg) }
 	in.EmitSkip = func(level log.Level, action, msg string, reasons ...string) {
-		p.emitSkip(level, packages.Scope, action, msg, reasons...)
+		p.emit(level, packages.Scope, action, msg, reasons...)
 	}
 	in.EmitDryRun = func(action, msg string) { p.emitDryRun(packages.Scope, action, msg) }
 	return in, nil

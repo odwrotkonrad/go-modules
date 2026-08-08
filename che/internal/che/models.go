@@ -109,29 +109,33 @@ func changeDir(cwd, dir string) (string, error) {
 }
 
 func readUserLayer(path string) options.Layer {
-	b, err := os.ReadFile(path)
-	if err != nil {
-		return options.Layer{}
-	}
-	var o spec.Options
-	if err := yaml.Unmarshal(b, &o); err != nil {
-		return options.Layer{}
-	}
-	return o
+	return readYAMLQuiet[spec.Options](path)
 }
 
 func readSpecLayer(path string) options.Layer {
+	return readYAMLQuiet[specOptionsDoc](path).Options
+}
+
+type specOptionsDoc struct {
+	Options spec.Options `yaml:"options"`
+}
+
+func decodeYAMLQuiet[T any](b []byte) T {
+	var out T
+	if err := yaml.Unmarshal(b, &out); err != nil {
+		var zero T
+		return zero
+	}
+	return out
+}
+
+func readYAMLQuiet[T any](path string) T {
 	b, err := os.ReadFile(path)
 	if err != nil {
-		return options.Layer{}
+		var zero T
+		return zero
 	}
-	var d struct {
-		Options spec.Options `yaml:"options"`
-	}
-	if err := yaml.Unmarshal(b, &d); err != nil {
-		return options.Layer{}
-	}
-	return d.Options
+	return decodeYAMLQuiet[T](b)
 }
 
 func PrepareSpecs(ctx Context, opts options.Options, src spec.SpecSourceRecipe) (*SpecReady, error) {
@@ -350,13 +354,7 @@ func (r *SpecRecipe) validateSchema(cli options.ValidateSpecMode) error {
 }
 
 func peekSpecValidateMode(b []byte) string {
-	var d struct {
-		Options spec.Options `yaml:"options"`
-	}
-	if err := yaml.Unmarshal(b, &d); err != nil {
-		return ""
-	}
-	return d.Options.ValidateSpec
+	return decodeYAMLQuiet[specOptionsDoc](b).Options.ValidateSpec
 }
 
 func (r *SpecRecipe) candidateSummary() (all, autoDiscoverable string) {
@@ -585,7 +583,7 @@ func (s *SpecReady) LogRejected() {
 func (s *SpecReady) LogDiscovered() {
 	s.LogRejected()
 	for _, p := range s.AllProfiles() {
-		p.logDiscovered()
+		p.LogDiscovered()
 	}
 }
 
@@ -695,14 +693,7 @@ func (p *ProfileReady) isDryRun() bool { return p.opts.DryRun != options.DryRun.
 
 func (p *ProfileReady) isDryRunAll() bool { return p.opts.DryRun == options.DryRun.All }
 
-func (p *ProfileReady) emit(level log.Level, scope, action, msg string) {
-	log.Emit(log.Event{
-		Level: level, Scope: scope, Action: action, Msg: msg,
-		Attrs: map[string]string{"profile": p.Ref()}, Depth: p.logDepth,
-	})
-}
-
-func (p *ProfileReady) emitSkip(level log.Level, scope, action, msg string, reasons ...string) {
+func (p *ProfileReady) emit(level log.Level, scope, action, msg string, reasons ...string) {
 	log.Emit(log.Event{
 		Level: level, Scope: scope, Action: action, Msg: msg, Reasons: reasons,
 		Attrs: map[string]string{"profile": p.Ref()}, Depth: p.logDepth,
@@ -799,7 +790,7 @@ func (p *ProfileReady) skippedOps() []string {
 	return slices.Concat(p.opts.SkipOps, p.opts.RunSkipOps)
 }
 
-func (p *ProfileReady) logDiscovered() {
+func (p *ProfileReady) LogDiscovered() {
 	attrs := map[string]string{"profile": p.Ref(), "workingDirectory": p.workingDir}
 	var lines []string
 	for _, op := range p.commandOps("run") {
@@ -817,7 +808,7 @@ func (p *ProfileReady) logDiscovered() {
 		lines = append(lines, "no changes")
 	}
 	heading := fmt.Sprintf("Profile %s  (profile workdir: %s)",
-		p.Ref(), abbreviateHome(p.workingDir, p.home))
+		p.Ref(), fsutil.AbbreviateHome(p.workingDir, p.home))
 	log.Emit(log.Event{Level: log.Levels.Info, Scope: "discover-profiles", Action: "discovered", Msg: heading, Attrs: attrs, Heading: 2})
 	for _, l := range lines {
 		log.Emit(log.Event{Level: log.Levels.Info, Scope: "discover-profiles", Msg: l, Depth: 1})
@@ -833,13 +824,6 @@ func formatChanges(n int) string {
 	default:
 		return fmt.Sprintf("%d changes", n)
 	}
-}
-
-func abbreviateHome(path, home string) string {
-	if home != "" && strings.HasPrefix(path, home+string(filepath.Separator)) {
-		return "~" + strings.TrimPrefix(path, home)
-	}
-	return path
 }
 
 func (p *ProfileReady) commandOps(opName string) []operationReady {
@@ -895,8 +879,6 @@ func (p *ProfileReady) describeOpDeltas(opName string) string {
 	return strings.Join(parts, ", ")
 }
 
-func (p *ProfileReady) LogDiscovered() { p.logDiscovered() }
-
 func resolvePastAction(action string, existed bool) string {
 	if action != "create" {
 		return action
@@ -919,10 +901,6 @@ func (p *ProfileReady) wouldAction(dest string) string {
 		return "overwrite"
 	}
 	return "create"
-}
-
-func (p *ProfileReady) skipReasons(reasons ...string) []string {
-	return reasons
 }
 
 func deriveOpType(prev, next database.Object) string {
@@ -973,9 +951,7 @@ func (p *ProfileReady) withLogLevel(fn func() error) error {
 	if err != nil {
 		return fn() // [why] schema validation reports the bad value; the che level stays
 	}
-	prev := log.GetLevel()
-	log.SetLevel(level)
-	defer log.SetLevel(prev)
+	defer log.SwapLevel(level)()
 	return fn()
 }
 
@@ -987,11 +963,11 @@ func (p *ProfileReady) ExecOperations(ctx context.Context) error {
 		for _, op := range p.OperationsReady {
 			// [why] a config-skipped op is a plain skip, never a sweep: skipping
 			if slices.Contains(skipOps, op.Name()) {
-				p.emitSkip(log.Levels.Debug, "run", "run-op", op.Name(), p.skipOpsReason(op.Name()))
+				p.emit(log.Levels.Debug, "run", "run-op", op.Name(), p.skipOpsReason(op.Name()))
 				continue
 			}
 			if !op.Selected() {
-				p.emitSkip(log.Levels.Debug, "run", "run-op", op.Name(), "not defined")
+				p.emit(log.Levels.Debug, "run", "run-op", op.Name(), "not defined")
 				if kind, ok := skippedKinds[op.Name()]; ok && !p.isDryRun() {
 					fails = append(fails, p.sweepStale(kind, nil)) // [why] emptied op: sweep all prior dests of its kind
 				}
@@ -1049,7 +1025,7 @@ func (p *ProfileReady) opNamed(name string) operationReady {
 func (p *ProfileReady) ExecOperation(ctx context.Context, op operationReady) error {
 	return p.withLogLevel(func() error {
 		if !op.Selected() {
-			p.emitSkip(log.Levels.Debug, "run", "run-op", op.Name(), "not defined")
+			p.emit(log.Levels.Debug, "run", "run-op", op.Name(), "not defined")
 			return nil
 		}
 		return p.execOp(ctx, op)
@@ -1058,7 +1034,7 @@ func (p *ProfileReady) ExecOperation(ctx context.Context, op operationReady) err
 
 func (p *ProfileReady) ExecOperationNamed(ctx context.Context, name string) error {
 	if slices.Contains(p.opts.SkipOps, name) {
-		p.emitSkip(log.Levels.Debug, "run", "run-op", name, p.skipOpsReason(name))
+		p.emit(log.Levels.Debug, "run", "run-op", name, p.skipOpsReason(name))
 		return nil
 	}
 	for _, op := range p.OperationsReady {
@@ -1071,7 +1047,7 @@ func (p *ProfileReady) ExecOperationNamed(ctx context.Context, name string) erro
 
 func (p *ProfileReady) ExecRunScripts(ctx context.Context, names []string) (int, error) {
 	if slices.Contains(p.opts.SkipOps, "run-scripts") {
-		p.emitSkip(log.Levels.Debug, "run", "run-op", "run-scripts", p.skipOpsReason("run-scripts"))
+		p.emit(log.Levels.Debug, "run", "run-op", "run-scripts", p.skipOpsReason("run-scripts"))
 		return 0, nil
 	}
 	matched := 0
@@ -1208,16 +1184,22 @@ func (o *MakeLinksOperationReady) execOperation(p *ProfileReady) error {
 }
 
 func (o *MakeLinksOperationReady) counts(p *ProfileReady) (int, int) {
-	all, delta := 0, 0
+	all, delta, _ := o.unsettledDests(p)
+	return all, delta
+}
+
+func (o *MakeLinksOperationReady) unsettledDests(p *ProfileReady) (int, int, []string) {
+	all := 0
+	var unsettled []string
 	for _, item := range o.Links {
 		for _, dest := range p.resolveLinkDests(item) {
 			all++
 			if !fsutil.IsLinkSettled(p.Reader, p.resolveSrc(item.Rel), dest) {
-				delta++
+				unsettled = append(unsettled, dest)
 			}
 		}
 	}
-	return all, delta
+	return all, len(unsettled), unsettled
 }
 
 type MakeCopiesOperationReady struct {
@@ -1233,17 +1215,23 @@ func (o *MakeCopiesOperationReady) execOperation(p *ProfileReady) error {
 }
 
 func (o *MakeCopiesOperationReady) counts(p *ProfileReady) (int, int) {
-	all, delta := 0, 0
+	all, delta, _ := o.unsettledDests(p)
+	return all, delta
+}
+
+func (o *MakeCopiesOperationReady) unsettledDests(p *ProfileReady) (int, int, []string) {
+	all := 0
+	var unsettled []string
 	for _, item := range o.Copies {
 		src := p.resolveSrc(item.Rel)
 		for _, dest := range p.resolveCopyDests(item) {
 			all++
 			if !fsutil.IsSameContent(p.Reader, src, dest) {
-				delta++
+				unsettled = append(unsettled, dest)
 			}
 		}
 	}
-	return all, delta
+	return all, len(unsettled), unsettled
 }
 
 type RenderTemplatesOperationReady struct {
@@ -1259,7 +1247,27 @@ func (o *RenderTemplatesOperationReady) execOperation(p *ProfileReady) error {
 }
 
 func (o *RenderTemplatesOperationReady) counts(p *ProfileReady) (int, int) {
-	return p.renderCounts(o.Templates)
+	all, delta, _ := o.unsettledDests(p)
+	return all, delta
+}
+
+func (o *RenderTemplatesOperationReady) unsettledDests(p *ProfileReady) (int, int, []string) {
+	all, delta := 0, 0
+	var unsettled []string
+	for _, item := range o.Templates {
+		settled := p.renderSettled(item)
+		for _, d := range p.resolveTemplateDests(item) {
+			all++
+			if settled[d.path] {
+				continue
+			}
+			delta++
+			if d.host {
+				unsettled = append(unsettled, d.path)
+			}
+		}
+	}
+	return all, delta, unsettled
 }
 
 type InstallPackagesOperationReady struct {

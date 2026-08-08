@@ -64,16 +64,8 @@ func (in *Installer) requestedOverridesPin(pkg, itemVersion string) error {
 }
 
 func (in *Installer) resolveArchiveVersion(pkg string, b *BinariesRemoteArchiveSpec) (string, error) {
-	if r, ok := in.requested[pkg]; ok {
-		if v := r.globalVersion(); v != "" {
-			return v, nil
-		}
-	}
-	if b.Version != "" {
-		return b.Version, nil
-	}
-	if e, ok := in.File.Packages[pkg]; ok && e.Version != "" && e.Version != VersionLatest {
-		return e.Version, nil
+	if v := in.pinFor(pkg, b.Version); v != "" {
+		return v, nil
 	}
 	if !strings.Contains(b.URL, "{version}") && !strings.Contains(strings.Join(b.ExtractBinaries, " "), "{version}") {
 		return "", nil

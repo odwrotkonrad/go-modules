@@ -68,19 +68,6 @@ func (p *ProfileReady) renderSettled(item spec.FileItem) map[string]bool {
 	return settled
 }
 
-func (p *ProfileReady) renderCounts(templates []spec.FileItem) (int, int) {
-	all, delta := 0, 0
-	for _, item := range templates {
-		for _, ok := range p.renderSettled(item) {
-			all++
-			if !ok {
-				delta++
-			}
-		}
-	}
-	return all, delta
-}
-
 func (p *ProfileReady) storeRenderHashes(item spec.FileItem, dests []tmplDest, tmplPath string, src, body []byte) {
 	hash := hashHex(body)
 	if render.IsSecretRefPresent(src) {

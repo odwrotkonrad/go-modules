@@ -51,7 +51,7 @@ func ListBackups(ctx Context) error {
 	for _, b := range backups {
 		ts, backupID := fsutil.ParseBackupArchiveName(b.Path)
 		line := fmt.Sprintf("run %s, backup %s, %s, %s, %s",
-			b.RunID, backupID, ts, humanSize(archiveSize(b.Path)), abbreviateHome(b.Path, home))
+			b.RunID, backupID, ts, humanSize(archiveSize(b.Path)), fsutil.AbbreviateHome(b.Path, home))
 		log.Emit(log.Event{
 			Level: log.Levels.Info, Scope: "backup-ls", Msg: line, Depth: 1,
 			Attrs: map[string]string{"runId": b.RunID, "backupId": backupID, "path": b.Path},
@@ -72,31 +72,38 @@ type Restorer struct {
 }
 
 func NewRestorer(ctx Context, opts options.Options) (*Restorer, error) {
+	p, err := newLedgerProfile(ctx, opts, "backup-restore", "restore")
+	if err != nil {
+		return nil, err
+	}
+	return &Restorer{p: p, dryRun: opts.DryRun != options.DryRun.Off}, nil
+}
+
+func newLedgerProfile(ctx Context, opts options.Options, specLabel, ref string) (*ProfileReady, error) {
 	home, err := resolveInvokingHome(ctx)
 	if err != nil {
 		return nil, err
 	}
 	seams := NewSeams(home)
-	spec, err := seams.Ledger.StartSpec(ctx.RunID, "", "backup-restore")
+	spec, err := seams.Ledger.StartSpec(ctx.RunID, "", specLabel)
 	if err != nil {
-		log.EmitTrace("ledger", "error", "restore start spec: "+err.Error())
+		log.EmitTrace("ledger", "error", ref+" start spec: "+err.Error())
 	}
-	prof, err := seams.Ledger.StartProfile(spec, "restore", "restore", "", home)
+	prof, err := seams.Ledger.StartProfile(spec, ref, ref, "", home)
 	if err != nil {
-		log.EmitTrace("ledger", "error", "restore start profile: "+err.Error())
+		log.EmitTrace("ledger", "error", ref+" start profile: "+err.Error())
 	}
-	p := &ProfileReady{
-		ref:         "restore",
+	return &ProfileReady{
+		ref:         ref,
 		home:        home,
 		opts:        opts,
 		runID:       ctx.RunID,
 		runTs:       ctx.RunTs,
 		specDone:    spec,
 		profileDone: prof,
-		logDepth:    1, // [why] restores nest under their per-profile `## profile` heading
+		logDepth:    1, // [why] restores/removals nest under their per-profile `## profile` heading
 		Seams:       seams,
-	}
-	return &Restorer{p: p, dryRun: opts.DryRun != options.DryRun.Off}, nil
+	}, nil
 }
 
 type restoreUnit struct {
@@ -218,7 +225,7 @@ func (r *Restorer) restoreUnit(u restoreUnit, latest map[string]database.Operati
 	live := p.classifyDest(u.dest)
 	last, known := latest[u.dest]
 	if known && driftedFromNext(live, last.Next) {
-		p.emitSkip(log.Levels.Debug, "restore", "restore", u.dest, "dest drifted from the recorded state")
+		p.emit(log.Levels.Debug, "restore", "restore", u.dest, "dest drifted from the recorded state")
 		return nil
 	}
 	if r.dryRun {

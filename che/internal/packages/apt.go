@@ -19,12 +19,10 @@ func (in *Installer) installAptSpec(pkg string, a *AptSpec) error {
 		return err
 	}
 	binPin, pkgPin := in.aptPins(pkg, a)
-	if in.aptInstalled(name) {
-		if pkgPin == "" || in.aptVersionInstalled(name, pkgPin) {
-			in.emitSkip(log.Levels.Debug, pkg, "already installed via apt")
-			return nil
-		}
-		in.emit(log.Levels.Info, "reinstall", pkg+": -> "+binPin)
+	if in.skipInstalledOrEmitReinstall(pkg, "apt", pkgPin, binPin,
+		func() bool { return in.isInstalled(pkg, "apt", name) },
+		func() bool { return in.installedVersion("apt", name) == pkgPin }) {
+		return nil
 	}
 	if in.Opts.DryRun {
 		in.emitDryRun("install", labelWithVersion(pkg, binPin)+" via apt")
@@ -78,16 +76,6 @@ func (in *Installer) aptPins(pkg string, a *AptSpec) (binPin, pkgPin string) {
 	}
 	pin := in.pinFor(pkg, "")
 	return pin, pin
-}
-
-func (in *Installer) aptVersionInstalled(name, pkgVer string) bool {
-	out, ok := in.output([]string{"dpkg-query", "-W", "-f=${Version}", name})
-	return ok && strings.TrimSpace(out) == pkgVer
-}
-
-func (in *Installer) aptInstalled(name string) bool {
-	_, ok := in.output([]string{"dpkg", "-s", name})
-	return ok
 }
 
 func (in *Installer) ensureAptRepo(name string, r *AptRepoSpec) error {

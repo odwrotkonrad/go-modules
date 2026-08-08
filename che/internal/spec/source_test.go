@@ -49,9 +49,7 @@ func TestRunIfGate(t *testing.T) {
 			t.Setenv(k, v)
 		}
 		if c.Input.Args.Bool(t, 1) {
-			prev := log.GetLevel()
-			log.SetLevel(log.Levels.Trace)
-			t.Cleanup(func() { log.SetLevel(prev) })
+			t.Cleanup(log.SwapLevel(log.Levels.Trace))
 		}
 		dir := testutil.Tree(t, map[string]string{"che.yml": "p:\n  options:\n    runIf: ['env:X']\n"})
 		d, err := Load(filepath.Join(dir, "che.yml"))

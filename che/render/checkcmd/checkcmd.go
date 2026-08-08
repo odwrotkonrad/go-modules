@@ -18,13 +18,9 @@ const (
 	codeDrift   = 22
 )
 
-func (t Tool) Main() { climain.RunRaw(t.Run) }
+func (t Tool) Main() { climain.RunNamed(t.Name, t.Version, t.Usage, t.Run) }
 
 func (t Tool) Run(args []string) (string, error) {
-	usage := strings.TrimSuffix(t.Usage, "\n")
-	if out, done := climain.HelpVersion(args, usage, t.Name, t.Version); done {
-		return out + "\n", nil
-	}
 	switch {
 	case t.FlagArg != "" && len(args) == 2 && args[0] == t.FlagArg:
 		return t.generate(args[1])
@@ -35,7 +31,7 @@ func (t Tool) Run(args []string) (string, error) {
 	case t.FlagArg == "" && !t.NeedsArg && len(args) == 0:
 		return t.generate("")
 	default:
-		return "", &yamlcfg.CodedError{Code: yamlcfg.CodeArgs, Msg: fmt.Sprintf("invalid arguments: %v\n\n%s", args, usage)}
+		return "", &yamlcfg.CodedError{Code: yamlcfg.CodeArgs, Msg: fmt.Sprintf("invalid arguments: %v\n\n%s", args, strings.TrimSuffix(t.Usage, "\n"))}
 	}
 }
 

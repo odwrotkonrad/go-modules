@@ -159,12 +159,7 @@ func TestInstalledVersionAptAndNpmMisses(t *testing.T) {
 
 func TestInstallAptPinReinstallsOnDrift(t *testing.T) {
 	in, m := newInstaller(t, "packages:\n  jq:\n    version: 1.7-1\n    installers: [apt]", "linux", cmdMap([]string{"apt-get"}), Options{})
-	m.Stub = func(argv []string) ([]byte, error) {
-		if argv[0] == "dpkg-query" {
-			return []byte("1.6-2"), nil
-		}
-		return nil, nil
-	}
+	m.Stub = stubOutputs("dpkg-query", "1.6-2")
 	require.NoError(t, in.Install([]string{"jq"}))
 	require.Contains(t, m.Calls(), "sudo apt-get install --yes --no-install-recommends jq=1.7-1")
 }
@@ -172,16 +167,9 @@ func TestInstallAptPinReinstallsOnDrift(t *testing.T) {
 func TestCheckUpgradableAptAndNpmOutdated(t *testing.T) {
 	in, m := newInstaller(t, "packages:\n  jq: [apt]\n  corepack: [npm]\n  fd: [apt]", "linux",
 		cmdMap([]string{"apt-get", "npm", "corepack", "jq", "fd"}), Options{})
-	m.Stub = func(argv []string) ([]byte, error) {
-		joined := strings.Join(argv, " ")
-		switch {
-		case strings.HasPrefix(joined, "apt list"):
-			return []byte("Listing...\njq/stable 1.7 amd64 [upgradable from: 1.6]\n"), nil
-		case strings.HasPrefix(joined, "npm outdated"):
-			return []byte("/g:corepack@0.30.0:corepack@0.29.0:\n"), nil
-		}
-		return nil, nil
-	}
+	m.Stub = stubOutputs(
+		"apt list", "Listing...\njq/stable 1.7 amd64 [upgradable from: 1.6]\n",
+		"npm outdated", "/g:corepack@0.30.0:corepack@0.29.0:\n")
 	out, err := captureStdout(t, func() error { return in.CheckUpgradable([]string{"jq", "corepack", "fd"}) })
 	require.NoError(t, err)
 	wantLines(t, out, "upgradable jq via apt", "upgradable corepack via npm")
@@ -190,15 +178,7 @@ func TestCheckUpgradableAptAndNpmOutdated(t *testing.T) {
 
 func TestManagerBinDirs(t *testing.T) {
 	in, m := newInstaller(t, "packages: {}", "linux", cmdMap(nil), Options{})
-	m.Stub = func(argv []string) ([]byte, error) {
-		switch argv[0] {
-		case "brew":
-			return []byte("/opt/homebrew\n"), nil
-		case "npm":
-			return []byte("/usr/local\n"), nil
-		}
-		return nil, nil
-	}
+	m.Stub = stubOutputs("brew ", "/opt/homebrew\n", "npm ", "/usr/local\n")
 	env := map[string]string{}
 	in.Host.Getenv = func(k string) string { return env[k] }
 	require.Equal(t, "/opt/homebrew/bin", in.managerBinDir("brew"))
@@ -229,9 +209,7 @@ func TestInstallBinaryZipAsset(t *testing.T) {
 	in, m := newInstaller(t, zipYaml, "linux", cmdMap([]string{"sha256sum"}), Options{})
 	m.Stub = shaStub("goodsha")
 	require.NoError(t, in.Install([]string{"terraform"}))
-	calls := strings.Join(m.Calls(), "\n")
-	require.Contains(t, calls, "unzip -oq")
-	require.Contains(t, calls, "/home/u/.local/bin/terraform")
+	requireCalls(t, m, "unzip -oq", "/home/u/.local/bin/terraform")
 }
 
 func TestDefaultEmittersWriteStdout(t *testing.T) {

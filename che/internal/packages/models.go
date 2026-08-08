@@ -137,22 +137,25 @@ func (f *File) aptRegistry(ref string) (*AptRepoSpec, error) {
 	}
 }
 
-func (f *File) aptRegistriesOrBuiltin() []*AptRepoSpec {
-	if regs := f.InstallerRegistries.apt(); len(regs) > 0 {
-		return regs
+func orBuiltin[T any](own T, present bool, pick func(*File) T) T {
+	if present {
+		return own
 	}
 	if builtin, err := builtinFile(); err == nil {
-		return builtin.InstallerRegistries.apt()
+		return pick(builtin)
 	}
-	return nil
+	var zero T
+	return zero
+}
+
+func (f *File) aptRegistriesOrBuiltin() []*AptRepoSpec {
+	regs := f.InstallerRegistries.apt()
+	return orBuiltin(regs, len(regs) > 0, func(b *File) []*AptRepoSpec { return b.InstallerRegistries.apt() })
 }
 
 func (f *File) hasBrewTap(tap string) bool {
-	if slices.Contains(f.InstallerRegistries.brew(), tap) {
-		return true
-	}
-	builtin, err := builtinFile()
-	return err == nil && slices.Contains(builtin.InstallerRegistries.brew(), tap)
+	return slices.Contains(f.InstallerRegistries.brew(), tap) ||
+		slices.Contains(orBuiltin(nil, false, func(b *File) []string { return b.InstallerRegistries.brew() }), tap)
 }
 
 func aptRegistrySlug(r *AptRepoSpec) string {
@@ -169,23 +172,11 @@ func aptRegistrySlug(r *AptRepoSpec) string {
 var builtinFile = sync.OnceValues(LoadBuiltin)
 
 func (f *File) archSchemesOrBuiltin() map[string]map[string]string {
-	if f.ArchSchemes != nil {
-		return f.ArchSchemes
-	}
-	if builtin, err := builtinFile(); err == nil {
-		return builtin.ArchSchemes
-	}
-	return nil
+	return orBuiltin(f.ArchSchemes, f.ArchSchemes != nil, func(b *File) map[string]map[string]string { return b.ArchSchemes })
 }
 
 func (f *File) eligibleInstallersOrBuiltin() map[string]InstallerList {
-	if f.OSInstallers != nil {
-		return f.OSInstallers
-	}
-	if builtin, err := builtinFile(); err == nil {
-		return builtin.OSInstallers
-	}
-	return nil
+	return orBuiltin(f.OSInstallers, f.OSInstallers != nil, func(b *File) map[string]InstallerList { return b.OSInstallers })
 }
 
 func (f *File) eligibleInstallers(h Host) []string {

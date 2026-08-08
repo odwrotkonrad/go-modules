@@ -15,6 +15,7 @@ import (
 	"github.com/stretchr/testify/require"
 	"gopkg.in/yaml.v3"
 
+	"gitlab.com/konradodwrot/go-modules/lib/climain"
 	"gitlab.com/konradodwrot/go-modules/lib/yamlcfg"
 )
 
@@ -24,6 +25,14 @@ func (c Context) CommandArgs() []string {
 		return nil
 	}
 	return f[1:]
+}
+
+func (c Context) CommandArgsExpanded(vars map[string]string) []string {
+	args := c.CommandArgs()
+	for i, a := range args {
+		args[i] = Expand(a, vars)
+	}
+	return args
 }
 
 func (a *Args) UnmarshalYAML(node *yaml.Node) error {
@@ -119,6 +128,29 @@ func Eq[W any](t *testing.T, fsys fs.FS, path string, fn func(t *testing.T, c Ca
 			return
 		}
 		assert.Equal(t, c.Expected.Output, got)
+	})
+}
+
+func ConfigDir(t *testing.T, configName, raw string) string {
+	t.Helper()
+	Swap(t, &yamlcfg.SystemDir, filepath.Join(t.TempDir(), "no-system"))
+	dir := t.TempDir()
+	if raw != "" {
+		require.NoError(t, os.WriteFile(filepath.Join(dir, configName), []byte(raw), 0o644))
+	}
+	return dir
+}
+
+type helpVersionWant struct {
+	Usage bool `yaml:"usage"`
+	Done  bool `yaml:"done"`
+}
+
+func RunHelpVersionSpec(t *testing.T, fsys fs.FS, path, usage, name, version string) {
+	t.Helper()
+	Eq(t, fsys, path, func(t *testing.T, c Case[helpVersionWant]) (helpVersionWant, error) {
+		out, done := climain.HelpVersion(c.Input.Args.Strings(t, 0), usage, name, version)
+		return helpVersionWant{Usage: out == usage, Done: done}, nil
 	})
 }
 
@@ -246,8 +278,8 @@ func caseName(t *testing.T, path string, i int, node *yaml.Node) string {
 
 func requireWantKey(t *testing.T, path, name string, node *yaml.Node) {
 	t.Helper()
-	for i := 0; i+1 < len(node.Content); i += 2 {
-		switch node.Content[i].Value {
+	for k := range yamlcfg.MapPairs(node) {
+		switch k.Value {
 		case "expected", "notExpected", "contains":
 			return
 		}
@@ -257,7 +289,7 @@ func requireWantKey(t *testing.T, path, name string, node *yaml.Node) {
 
 func mergeCaseContext(t *testing.T, path, name string, fileCtx, node *yaml.Node) {
 	t.Helper()
-	merged := mergeNode(cloneNode(t, fileCtx), mapValue(node, "context"))
+	merged := yamlcfg.MergeNodes(cloneNode(t, fileCtx), mapValue(node, "context"))
 	var ctx Context
 	if merged != nil {
 		require.NoErrorf(t, StrictDecodeNode(merged, &ctx), "%s: case %q: context", path, name)
@@ -286,34 +318,10 @@ func cloneNode(t *testing.T, n *yaml.Node) *yaml.Node {
 	return doc.Content[0]
 }
 
-func mergeNode(base, over *yaml.Node) *yaml.Node {
-	if over == nil || over.Kind == 0 {
-		return base
-	}
-	if base == nil || base.Kind != yaml.MappingNode || over.Kind != yaml.MappingNode {
-		return over
-	}
-	for i := 0; i+1 < len(over.Content); i += 2 {
-		key, val := over.Content[i], over.Content[i+1]
-		found := false
-		for j := 0; j+1 < len(base.Content); j += 2 {
-			if base.Content[j].Value == key.Value {
-				base.Content[j+1] = mergeNode(base.Content[j+1], val)
-				found = true
-				break
-			}
-		}
-		if !found {
-			base.Content = append(base.Content, key, val)
-		}
-	}
-	return base
-}
-
 func mapValue(m *yaml.Node, key string) *yaml.Node {
-	for i := 0; i+1 < len(m.Content); i += 2 {
-		if m.Content[i].Value == key {
-			return m.Content[i+1]
+	for k, v := range yamlcfg.MapPairs(m) {
+		if k.Value == key {
+			return v
 		}
 	}
 	return nil

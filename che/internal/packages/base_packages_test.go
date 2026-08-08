@@ -46,12 +46,7 @@ packages:
     installers: [brew/vscode]
 `
 	in, m := newInstaller(t, y, "darwin", cmdMap([]string{"brew", "code"}), Options{})
-	m.Stub = func(argv []string) ([]byte, error) {
-		if strings.HasPrefix(strings.Join(argv, " "), "brew list") {
-			return nil, errNotInstalled
-		}
-		return nil, nil
-	}
+	m.Stub = failOn("brew list")
 	require.NoError(t, in.Install([]string{"golang.go"}))
 	calls := strings.Join(m.Calls(), "\n")
 	caskAt := strings.Index(calls, "brew install --cask visual-studio-code")
@@ -74,23 +69,22 @@ func TestBasePackagesCommonOnlyForOtherMethods(t *testing.T) {
 	in, m := newInstaller(t, basePackagesYaml, "darwin", cmdMap([]string{"brew"}), Options{})
 	m.Stub = failOn("brew list")
 	require.NoError(t, in.Install([]string{"jq"}))
-	calls := strings.Join(m.Calls(), "\n")
-	require.Contains(t, calls, "brew install curl")
-	require.NotContains(t, calls, "brew install ca-certificates")
+	requireCalls(t, m, "brew install curl")
+	refuteCalls(t, m, "brew install ca-certificates")
 }
 
 func TestBasePackagesSkippedOnDryRun(t *testing.T) {
 	in, m := newInstaller(t, basePackagesYaml, "linux", cmdMap([]string{"apt-get"}), Options{DryRun: true})
 	m.Stub = failOn("dpkg -s")
 	require.NoError(t, in.Install([]string{"jq"}))
-	require.NotContains(t, strings.Join(m.Calls(), "\n"), "--no-install-recommends curl")
+	refuteCalls(t, m, "--no-install-recommends curl")
 }
 
 func TestBasePackagesAbsentIsNoop(t *testing.T) {
 	in, m := newInstaller(t, "packages:\n  jq: [apt]\n", "linux", cmdMap([]string{"apt-get"}), Options{})
 	m.Stub = failOn("dpkg -s")
 	require.NoError(t, in.Install([]string{"jq"}))
-	require.Contains(t, strings.Join(m.Calls(), "\n"), "--no-install-recommends jq")
+	requireCalls(t, m, "--no-install-recommends jq")
 }
 
 // [<] 🤖🤖

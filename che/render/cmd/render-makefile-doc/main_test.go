@@ -28,10 +28,7 @@ func TestRun(t *testing.T) {
 			"stale.md": "stale\n",
 		})
 		t.Chdir(dir)
-		args := c.Context.CommandArgs()
-		for i, a := range args {
-			args[i] = testyml.Expand(a, map[string]string{"DIR": dir})
-		}
+		args := c.Context.CommandArgsExpanded(map[string]string{"DIR": dir})
 		out, err := tool.Run(args)
 		if c.Expected.Check(t, err) {
 			return

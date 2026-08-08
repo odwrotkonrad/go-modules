@@ -27,10 +27,7 @@ func TestRunCheck(t *testing.T) {
 		testutil.WriteFile(t, filepath.Join(dir, "good.tree"), tree)
 		testutil.WriteFile(t, filepath.Join(dir, "stale.tree"), "stale\n")
 		t.Chdir(dir)
-		args := c.Context.CommandArgs()
-		for i, a := range args {
-			args[i] = testyml.Expand(a, map[string]string{"DIR": dir})
-		}
+		args := c.Context.CommandArgsExpanded(map[string]string{"DIR": dir})
 		_, err = tool.Run(args)
 		c.Expected.Check(t, err)
 	})

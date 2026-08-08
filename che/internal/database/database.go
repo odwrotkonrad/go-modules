@@ -126,32 +126,34 @@ func (d *DB) RecordOperation(prof *ProfileDone, op OperationDone) error {
 }
 
 func (d *DB) Installed() ([]OperationDone, error) {
-	return d.installedWhere("")
+	return d.latestOps("", true)
 }
 
 func (d *DB) InstalledForProfile(ref string) ([]OperationDone, error) {
-	return d.installedWhere(ref)
+	return d.latestOps(ref, true)
 }
 
-func (d *DB) installedWhere(ref string) ([]OperationDone, error) {
+func (d *DB) latestOps(ref string, excludeRemoved bool) ([]OperationDone, error) {
 	if d == nil {
 		return nil, nil
 	}
 	sub := d.gorm.Model(&OperationDone{}).
-		Joins("JOIN profile_dones ON profile_dones.id = operation_dones.profile_done_id").
 		Select("MAX(operation_dones.id) as id").
 		Group("operation_dones.dest")
 	if ref != "" {
-		sub = sub.Where("profile_dones.ref = ?", ref)
+		sub = sub.Joins("JOIN profile_dones ON profile_dones.id = operation_dones.profile_done_id").
+			Where("profile_dones.ref = ?", ref)
 	}
-	var ops []OperationDone
-	err := d.gorm.Model(&OperationDone{}).Preload("Backup").
+	q := d.gorm.Model(&OperationDone{}).
 		Joins("JOIN profile_dones ON profile_dones.id = operation_dones.profile_done_id").
 		Select("operation_dones.*, profile_dones.ref as profile_ref").
 		Where("operation_dones.id IN (?)", sub).
-		Where("operation_dones.op_type <> ?", "remove").
-		Order("operation_dones.id DESC").
-		Find(&ops).Error
+		Order("operation_dones.id DESC")
+	if excludeRemoved {
+		q = q.Preload("Backup").Where("operation_dones.op_type <> ?", "remove")
+	}
+	var ops []OperationDone
+	err := q.Find(&ops).Error
 	return ops, err
 }
 
@@ -169,20 +171,7 @@ func (d *DB) Backups() ([]Backup, error) {
 }
 
 func (d *DB) LatestOps() ([]OperationDone, error) {
-	if d == nil {
-		return nil, nil
-	}
-	sub := d.gorm.Model(&OperationDone{}).
-		Select("MAX(operation_dones.id) as id").
-		Group("operation_dones.dest")
-	var ops []OperationDone
-	err := d.gorm.Model(&OperationDone{}).
-		Joins("JOIN profile_dones ON profile_dones.id = operation_dones.profile_done_id").
-		Select("operation_dones.*, profile_dones.ref as profile_ref").
-		Where("operation_dones.id IN (?)", sub).
-		Order("operation_dones.id DESC").
-		Find(&ops).Error
-	return ops, err
+	return d.latestOps("", false)
 }
 
 func (d *DB) Close() error {
