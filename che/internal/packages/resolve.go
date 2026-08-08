@@ -164,18 +164,15 @@ func (h Host) pickPreferred(pkg string, entry Entry, preferred, allowed []string
 }
 
 func methodFamily(mgr string) string {
-	switch mgr {
-	case "cask":
+	if mgr == "cask" {
 		return "brew/cask"
-	case "vscode":
-		return "brew/vscode"
 	}
 	return mgr
 }
 
 var KnownManagers = []string{"brew", "cask", "apt", "npm", "go", "gem", "binariesRemoteArchive", "script", "vscode", "pyenv", "nvm"}
 
-var PlatformMethods = []string{"brew", "brew/cask", "brew/vscode", "apt", "npm", "go", "gem", "binariesRemoteArchive", "script", "pyenv", "nvm"}
+var PlatformMethods = []string{"brew", "brew/cask", "vscode", "apt", "npm", "go", "gem", "binariesRemoteArchive", "script", "pyenv", "nvm"}
 
 var DefaultPreferredMethods = []string{"brew", "cask", "apt", "binariesRemoteArchive", "script", "npm", "go", "gem", "vscode"}
 

@@ -37,13 +37,13 @@ func TestBasePackagesInstallBeforeMethod(t *testing.T) {
 
 func TestBasePackagesVscodeInstallsCodeFirst(t *testing.T) {
 	const y = `basePackages:
-  brew/vscode: [code]
+  vscode: [code]
 packages:
   code:
     installers: [{brew/cask: {packageName: visual-studio-code}}]
   golang.go:
     version: "0.50.0"
-    installers: [brew/vscode]
+    installers: [vscode]
 `
 	in, m := newInstaller(t, y, "darwin", cmdMap([]string{"brew", "code"}), Options{})
 	m.Stub = failOn("brew list")

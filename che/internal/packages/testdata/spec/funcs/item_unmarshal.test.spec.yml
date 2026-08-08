@@ -67,7 +67,7 @@ cases:
   - name: ShouldDecodeBrewCodeExtensionForm
     input:
       args:
-        - yaml: "{brew/vscode: {packageName: golang.go}}"
+        - yaml: "{vscode: {packageName: golang.go}}"
     expected:
       output: {mgr: vscode, name: golang.go}
   - name: ShouldRejectBareCodeItem
@@ -75,13 +75,13 @@ cases:
       args:
         - yaml: "code"
     expected:
-      errorOutput: "brew kinds are installer keys: brew/cask or brew/vscode"
+      errorOutput: "casks and extensions are installer keys: brew/cask or vscode"
   - name: ShouldRejectDirectCodeMap
     input:
       args:
         - yaml: "{code: golang.go}"
     expected:
-      errorOutput: "brew kinds are installer keys: brew/cask or brew/vscode"
+      errorOutput: "casks and extensions are installer keys: brew/cask or vscode"
   - name: ShouldErrorOnMultiKeyMap
     input:
       args:

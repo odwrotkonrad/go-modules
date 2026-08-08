@@ -7,7 +7,7 @@ archSchemes:
 osInstallers:
     linux: &base [binariesRemoteArchive, script, npm, go, gem, pyenv, nvm]
     linux-debian: [apt, *base]
-    darwin: [brew, brew/cask, brew/vscode, *base]
+    darwin: [brew, brew/cask, vscode, *base]
 installerRegistries:
     brew:
         - azure/azure-cli
@@ -38,13 +38,13 @@ basePackages:
         - apt-transport-https
         - ca-certificates
         - gpg
-    brew/vscode:
+    vscode:
         - code
 packages:
     anthropic.claude-code:
         version: 2.1.224
         installers:
-            - brew/vscode
+            - vscode
     apt-transport-https:
         installers:
             - apt
@@ -94,7 +94,7 @@ packages:
     charliermarsh.ruff:
         version: 2026.68.0
         installers:
-            - brew/vscode
+            - vscode
     che:
         #[why] our own module
         version: latest
@@ -213,11 +213,11 @@ packages:
     editorconfig.editorconfig:
         version: 0.18.2
         installers:
-            - brew/vscode
+            - vscode
     esbenp.prettier-vscode:
         version: 12.4.0
         installers:
-            - brew/vscode
+            - vscode
     fd:
         installers:
             - brew
@@ -301,7 +301,7 @@ packages:
     golang.go:
         version: 0.56.0
         installers:
-            - brew/vscode
+            - vscode
     gopls:
         version: 0.23.0
         installers:
@@ -324,7 +324,7 @@ packages:
     hoovercj.vscode-settings-cycler:
         version: 1.0.1
         installers:
-            - brew/vscode
+            - vscode
     htop:
         installers:
             - brew
@@ -454,31 +454,31 @@ packages:
     mindaro-dev.file-downloader:
         version: 1.0.13
         installers:
-            - brew/vscode
+            - vscode
     ms-azuretools.vscode-containers:
         version: 2.4.5
         installers:
-            - brew/vscode
+            - vscode
     ms-kubernetes-tools.vscode-kubernetes-tools:
         version: 1.4.1
         installers:
-            - brew/vscode
+            - vscode
     ms-python.debugpy:
         version: 2026.6.0
         installers:
-            - brew/vscode
+            - vscode
     ms-python.python:
         version: 2026.4.0
         installers:
-            - brew/vscode
+            - vscode
     ms-python.vscode-python-envs:
         version: 1.36.0
         installers:
-            - brew/vscode
+            - vscode
     ms-vscode-remote.remote-containers:
         version: 0.466.0
         installers:
-            - brew/vscode
+            - vscode
     nmap:
         installers:
             - brew
@@ -519,7 +519,7 @@ packages:
     openai.chatgpt:
         version: 26.623.31921
         installers:
-            - brew/vscode
+            - vscode
     openssh:
         installers:
             - brew
@@ -628,7 +628,7 @@ packages:
     redhat.vscode-yaml:
         version: 1.24.0
         installers:
-            - brew/vscode
+            - vscode
     rg:
         completions:
             zsh:
@@ -680,7 +680,7 @@ packages:
     tamasfe.even-better-toml:
         version: 0.21.2
         installers:
-            - brew/vscode
+            - vscode
     tart:
         installers:
             - brew:
@@ -755,7 +755,7 @@ packages:
     yzhang.markdown-all-in-one:
         version: 3.6.3
         installers:
-            - brew/vscode
+            - vscode
     zig:
         installers:
             - brew

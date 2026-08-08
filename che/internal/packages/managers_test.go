@@ -487,7 +487,7 @@ func TestVersionCommandDriftReinstalls(t *testing.T) {
 	requireCalls(t, m, "curl -fsSL")
 }
 
-const codeExtYaml = "packages:\n  golang.go: [brew/vscode]\n  redhat.vscode-yaml: [brew/vscode]\n  code: [{brew/cask: {packageName: visual-studio-code}}]"
+const codeExtYaml = "packages:\n  golang.go: [vscode]\n  redhat.vscode-yaml: [vscode]\n  code: [{brew/cask: {packageName: visual-studio-code}}]"
 
 func codeListStub(installed string) func(argv []string) ([]byte, error) {
 	return func(argv []string) ([]byte, error) {

@@ -17,7 +17,7 @@ groups:
     verify:
       font-jetbrains-mono: brew list --cask font-jetbrains-mono
 
-  - method: brew/vscode
+  - method: vscode
     os: darwin
     requiresCommand: code
     packages: [golang.go]

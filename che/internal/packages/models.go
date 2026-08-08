@@ -233,11 +233,8 @@ type itemBody struct {
 }
 
 func installerKey(mgr string) string {
-	switch mgr {
-	case "cask":
+	if mgr == "cask" {
 		return "brew/cask"
-	case "vscode":
-		return "brew/vscode"
 	}
 	return mgr
 }
@@ -248,8 +245,6 @@ func mgrForInstallerKey(key string) (string, bool) {
 		return "brew", true
 	case "brew/cask":
 		return "cask", true
-	case "brew/vscode":
-		return "vscode", true
 	}
 	return "", false
 }
@@ -543,7 +538,7 @@ var legacyItemKeys = map[string][]string{
 	"apt":                   {"installerVocabulary", "installPackages", "versions"},
 	"brew":                  {"installerVocabulary", "formula", "cask", "vscode", "package"},
 	"brew/cask":             {"installerVocabulary", "formula", "cask", "vscode", "package"},
-	"brew/vscode":           {"installerVocabulary", "formula", "cask", "vscode", "package"},
+	"vscode":                {"installerVocabulary", "formula", "cask", "vscode", "package"},
 	"npm":                   {"installerVocabulary", "package"},
 	"gem":                   {"installerVocabulary", "package"},
 	"go":                    {"installerVocabulary", "package"},
@@ -562,8 +557,8 @@ func rejectLegacyKeys(key string, val *yaml.Node) error {
 }
 
 func rejectBareBrewKind(v string) error {
-	if v == "code" || v == "vscode" || v == "cask" {
-		return fmt.Errorf("brew kinds are installer keys: brew/cask or brew/vscode")
+	if v == "code" || v == "cask" {
+		return fmt.Errorf("casks and extensions are installer keys: brew/cask or vscode")
 	}
 	return nil
 }
@@ -676,7 +671,7 @@ func (it *Item) unmarshalManager(key string, val *yaml.Node) error {
 	isBrew := it.Mgr == "brew" || it.Mgr == "cask"
 	switch {
 	case it.Mgr == "vscode" && it.Registry != "":
-		return fmt.Errorf("brew/vscode item %s: extensions have no registry", it.Name)
+		return fmt.Errorf("vscode item %s: extensions have no registry", it.Name)
 	case it.Registry != "" && !isBrew:
 		return fmt.Errorf("%s item %s: fromRegistry applies to brew, brew/cask, and apt items", key, it.Name)
 	case it.Mgr == "npm" && strings.LastIndex(it.Name, "@") > 0:

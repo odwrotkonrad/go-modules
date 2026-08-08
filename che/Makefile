@@ -106,7 +106,7 @@ e2e-packages: $(BUILD_DEP)
 	E2E_BIN=$(CURDIR)/dist/$(BIN) E2E_GOCOVERDIR=$(CURDIR)/cover-e2e-packages $(E2E_RUN) TestE2EPackages
 
 #[what] real-install e2e per installation method family (METHOD=<method>, default all, prefix matches sub-groups, see e2e/install_methods.yml): installs live packages into a throwaway HOME, then runs each one, binary covdata into ./cover-e2e-install-methods
-#[vals] brew/formulae|brew/cask|brew/vscode|apt|binariesRemoteArchive|script|pyenv|nvm|npm|go|all
+#[vals] brew/formulae|brew/cask|vscode|apt|binariesRemoteArchive|script|pyenv|nvm|npm|go|all
 e2e-install-methods: $(BUILD_DEP)
 	if [[ -e cover-e2e-install-methods ]] rm -rf cover-e2e-install-methods; mkdir -p cover-e2e-install-methods
 	E2E_BIN=$(CURDIR)/dist/$(BIN) E2E_GOCOVERDIR=$(CURDIR)/cover-e2e-install-methods E2E_INSTALL_METHOD=$(or $(METHOD),$(E2E_INSTALL_METHOD),all) $(E2E_RUN) TestE2EInstallMethods

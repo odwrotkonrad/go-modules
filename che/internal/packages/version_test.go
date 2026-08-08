@@ -98,7 +98,7 @@ func TestVscodeExtensionPinInstallsVersionedAndSkips(t *testing.T) {
 	const y = `packages:
   golang.go:
     version: "0.50.0"
-    installers: [brew/vscode]
+    installers: [vscode]
 `
 	in, m := newInstaller(t, y, "darwin", cmdMap([]string{"code"}), Options{})
 	m.Stub = codeListStub("")
@@ -115,7 +115,7 @@ func TestVscodeExtensionPinDriftReinstalls(t *testing.T) {
 	const y = `packages:
   golang.go:
     version: "0.50.0"
-    installers: [brew/vscode]
+    installers: [vscode]
 `
 	in, m := newInstaller(t, y, "darwin", cmdMap([]string{"code"}), Options{})
 	m.Stub = codeListStub("golang.go@0.49.0\n")

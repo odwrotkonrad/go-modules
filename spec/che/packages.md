@@ -4,7 +4,7 @@
 
 `che packages` declaratively installs packages from a packages file
 (`$XDG_CONFIG_HOME/packages/packages.yml`): each canonical name lists managers
-in preference order (brew, brew/cask, brew/vscode, apt, npm, go, gem, prebuiltBinariesArchive, script, pyenv, nvm), the first applicable on
+in preference order (brew, brew/cask, vscode, apt, npm, go, gem, prebuiltBinariesArchive, script, pyenv, nvm), the first applicable on
 this host wins. Profiles declare `include.installPackages` and the run
 sequence installs them before `runScripts`. Four check subcommands report
 presence, upgradability, shadowing, and duplicates.
@@ -14,7 +14,7 @@ Scenario: a user names a package once, by its CLI name, and every host resolves 
   When I declare a package in packages.yml under its canonical name (the CLI program name when the package ships one)
   Then `che packages install <name>` installs it on any supported host
   And a bare installer item uses the canonical name, `installerVocabulary.packageName` overrides it per installer
-  And brew kinds are installer keys: `brew/cask` and `brew/vscode` items install casks and vscode extensions
+  And casks and extensions are installer keys: `brew/cask` items install casks via brew, `vscode` items install extensions via the code CLI
 
 Scenario: a user steers method selection with preferred installation methods
   Status: tested
@@ -151,7 +151,7 @@ Scenario: top-level archLabelSchemes and osInstallers blocks standardize arch la
   Then the most specific key matching the host wins (`<os>-<distro>-<arch>` > `<os>-<distro>` > `<os>-<arch>` > `<os>`) and only its listed installers are applicable; a host matching no key falls back to the built-in applicability rules
   And apt is eligible only under `linux-debian` (the linux distro read from /etc/os-release ID): apt is not common to every distro, plain `linux` hosts skip apt items
   And item `installerVocabulary.platformEligibility:` ids are `<os>-<arch>`, validated against the block's os prefixes and archLabelSchemes' arches; an unknown value is a hard error naming both
-  And on a host whose platform id is a key, only its listed methods are applicable, named explicitly: `brew`, `brew/cask`, `brew/vscode`, apt, npm, go, gem, prebuiltBinariesArchive, script, pyenv, nvm; an unlisted host platform falls back to the built-in applicability rules
+  And on a host whose platform id is a key, only its listed methods are applicable, named explicitly: `brew`, `brew/cask`, `vscode`, apt, npm, go, gem, prebuiltBinariesArchive, script, pyenv, nvm; an unlisted host platform falls back to the built-in applicability rules
   And a key extends another with a yaml anchor/alias, no installer repetition (`linux: &common [script, npm]`, `linux-debian: [apt, *common]`): alias lists flatten
   And a file without the blocks inherits the builtin's
   And an item's `installerVocabulary.archLabelScheme: <set>` picks the spelling `{arch}` expands to; every item using `{arch}` must declare it (the builtin ships `go`, `uname`, `odd`)
