@@ -45,6 +45,12 @@ func SetLevel(l Level) { current = l }
 
 func GetLevel() Level { return current }
 
+func SwapLevel(l Level) func() {
+	prev := current
+	current = l
+	return func() { current = prev }
+}
+
 func IsEnabled(l Level) bool { return l <= current }
 
 // [<] 🤖🤖 levels

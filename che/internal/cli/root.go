@@ -180,7 +180,7 @@ func (a *app) runCmd() *cobra.Command {
 		RunE: func(cmd *cobra.Command, args []string) error {
 			return a.root.ExecEach(a.runCtx, "run", func(ctx context.Context, p *che.ProfileReady) error {
 				// [why] the backup stage archives every op dest once, before the
-				if err := p.ExecBackupStage(); err != nil {
+				if err := p.ExecBackup(); err != nil {
 					return err
 				}
 				return p.ExecOperations(ctx)
@@ -269,52 +269,89 @@ func (a *app) discoverCmd() *cobra.Command {
 }
 
 func (a *app) configCmd() *cobra.Command {
+	return makeConfigShowCmd(
+		"inspect che's resolved configuration",
+		"print the resolved options with their deciding sources (--delta default, --all for every option, --defaults for the code defaults)",
+		showHelp{
+			delta:    "print only the options differing from defaults (default mode)",
+			all:      "print every option with its value and source",
+			defaults: "print every option's default value (configured values ignored)",
+			output:   "output format; values: text (key = value (source) lines) | yaml (config-file shape, seedable as $XDG_CONFIG_HOME/che/config.yml)",
+		},
+		"delta",
+		func(mode, output string) error {
+			settings := a.opts.SettingsDelta()
+			switch mode {
+			case "defaults":
+				var err error
+				if settings, err = options.DefaultSettings(); err != nil {
+					return err
+				}
+			case "all":
+				settings = a.opts.SettingsSorted()
+			}
+			return emitShowOutput(output, func() {
+				for _, s := range settings {
+					fmt.Printf("%s = %s  (%s)\n", s.Key, s.Value, s.DisplaySource())
+				}
+			}, func() (string, error) { return options.SettingsYAML(settings) })
+		})
+}
+
+type showHelp struct {
+	delta    string
+	all      string
+	defaults string
+	output   string
+}
+
+func makeConfigShowCmd(parentShort, short string, help showHelp, defaultMode string, run func(mode, output string) error) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "config",
-		Short: "inspect che's resolved configuration",
+		Short: parentShort,
 	}
 	var delta, all, defaults bool
 	var output string
 	show := &cobra.Command{
 		Use:   "show",
-		Short: "print the resolved options with their deciding sources (--delta default, --all for every option, --defaults for the code defaults)",
+		Short: short,
 		RunE: func(cmd *cobra.Command, args []string) error {
-			settings := a.opts.SettingsDelta()
+			mode := defaultMode
 			switch {
-			case defaults:
-				var err error
-				if settings, err = options.DefaultSettings(); err != nil {
-					return err
-				}
+			case delta:
+				mode = "delta"
 			case all:
-				settings = a.opts.SettingsSorted()
+				mode = "all"
+			case defaults:
+				mode = "defaults"
 			}
-			switch output {
-			case "", "text":
-				for _, s := range settings {
-					fmt.Printf("%s = %s  (%s)\n", s.Key, s.Value, s.DisplaySource())
-				}
-				return nil
-			case "yaml":
-				out, err := options.SettingsYAML(settings)
-				if err != nil {
-					return err
-				}
-				fmt.Print(out)
-				return nil
-			default:
-				return fmt.Errorf("invalid --output %q: want text or yaml", output)
-			}
+			return run(mode, output)
 		},
 	}
-	show.Flags().BoolVar(&delta, "delta", false, "print only the options differing from defaults (default mode)")
-	show.Flags().BoolVar(&all, "all", false, "print every option with its value and source")
-	show.Flags().BoolVar(&defaults, "defaults", false, "print every option's default value (configured values ignored)")
-	show.Flags().StringVar(&output, "output", "text",
-		"output format; values: text (key = value (source) lines) | yaml (config-file shape, seedable as $XDG_CONFIG_HOME/che/config.yml)")
+	show.Flags().BoolVar(&delta, "delta", false, help.delta)
+	show.Flags().BoolVar(&all, "all", false, help.all)
+	show.Flags().BoolVar(&defaults, "defaults", false, help.defaults)
+	show.Flags().StringVar(&output, "output", "text", help.output)
 	show.MarkFlagsMutuallyExclusive("delta", "all", "defaults")
 	cmd.AddCommand(show)
 	return cmd
+}
+
+func emitShowOutput(output string, text func(), yaml func() (string, error)) error {
+	switch output {
+	case "", "text":
+		text()
+		return nil
+	case "yaml":
+		out, err := yaml()
+		if err != nil {
+			return err
+		}
+		fmt.Print(out)
+		return nil
+	default:
+		return fmt.Errorf("invalid --output %q: want text or yaml", output)
+	}
 }
 
 func (a *app) runScriptsRunE(cmd *cobra.Command, args []string) error {

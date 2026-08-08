@@ -9,7 +9,7 @@ cases:
         - file: |
             packages:
               mytool:
-                installMethods:
+                installers:
                   - script: {path: scripts/install-mytool.sh}
                 postInstall:
                   path: scripts/post-mytool.sh
@@ -25,10 +25,10 @@ cases:
         - file: |
             packages:
               mytool:
-                installMethods:
+                installers:
                   - script: {path: /abs/install.sh}
                   - script: {run: echo inline}
-                  - script: {remoteUrl: https://example.com/i.sh}
+                  - script: {url: https://example.com/i.sh}
                 postInstall: echo inline-post
     expected:
       output:

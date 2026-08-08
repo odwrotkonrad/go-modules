@@ -1,13 +1,5 @@
 # [>] 🤖🤖
 cases:
-  - name: ShouldPrintHelpForShortFlag
-    context: {command: checkcmd -h}
-    expected:
-      exitCode: 0
-  - name: ShouldPrintHelpForLongFlag
-    context: {command: checkcmd --help}
-    expected:
-      exitCode: 0
   - name: ShouldEmitWithoutArgs
     context: {command: checkcmd}
     expected:

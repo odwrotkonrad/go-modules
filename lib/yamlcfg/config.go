@@ -68,18 +68,18 @@ func Unwrap(n *yaml.Node) *yaml.Node {
 	return n
 }
 
-func mergeNodes(base, over *yaml.Node) *yaml.Node {
-	if base == nil {
-		return over
+func MergeNodes(base, over *yaml.Node) *yaml.Node {
+	if over == nil || over.Kind == 0 {
+		return base
 	}
-	if base.Kind != yaml.MappingNode || over.Kind != yaml.MappingNode {
+	if base == nil || base.Kind != yaml.MappingNode || over.Kind != yaml.MappingNode {
 		return over
 	}
 	for key, val := range MapPairs(over) {
 		found := false
 		for j := 0; j+1 < len(base.Content); j += 2 {
 			if base.Content[j].Value == key.Value {
-				base.Content[j+1] = mergeNodes(base.Content[j+1], val)
+				base.Content[j+1] = MergeNodes(base.Content[j+1], val)
 				found = true
 				break
 			}
@@ -115,7 +115,7 @@ func LoadConfigNode(name, customDir string) (*yaml.Node, error) {
 		if len(node.Content) == 0 {
 			continue
 		}
-		merged = mergeNodes(merged, Unwrap(&node))
+		merged = MergeNodes(merged, Unwrap(&node))
 	}
 	return merged, nil
 }

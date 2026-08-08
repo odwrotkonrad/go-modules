@@ -23,28 +23,24 @@ type Setting struct {
 }
 
 func (c Options) SettingsDelta() []Setting {
-	var out []Setting
-	for _, s := range c.Settings {
-		if s.IsChanged() {
-			out = append(out, s)
-		}
-	}
-	return out
+	changed, _ := c.partitionSettings()
+	return changed
 }
 
 func (c Options) SettingsSorted() []Setting {
-	out := make([]Setting, 0, len(c.Settings))
+	changed, unchanged := c.partitionSettings()
+	return append(changed, unchanged...)
+}
+
+func (c Options) partitionSettings() (changed, unchanged []Setting) {
 	for _, s := range c.Settings {
 		if s.IsChanged() {
-			out = append(out, s)
+			changed = append(changed, s)
+		} else {
+			unchanged = append(unchanged, s)
 		}
 	}
-	for _, s := range c.Settings {
-		if !s.IsChanged() {
-			out = append(out, s)
-		}
-	}
-	return out
+	return changed, unchanged
 }
 
 func (s Setting) IsChanged() bool { return s.Source != "default" }
@@ -116,28 +112,28 @@ func (c *Options) resolveList(key string, candidates ...cand) []string {
 	return strings.Split(v, ",")
 }
 
-func (c *Options) setKind(key, kind string) {
+func (c *Options) updateSetting(key string, fn func(*Setting)) {
 	for i := range c.Settings {
 		if c.Settings[i].Key == key {
-			c.Settings[i].Kind = kind
+			fn(&c.Settings[i])
 		}
 	}
+}
+
+func (c *Options) setKind(key, kind string) {
+	c.updateSetting(key, func(s *Setting) { s.Kind = kind })
 }
 
 func (c *Options) setValue(key, value string) {
-	for i := range c.Settings {
-		if c.Settings[i].Key == key {
-			c.Settings[i].Value = value
-		}
-	}
+	c.updateSetting(key, func(s *Setting) { s.Value = value })
 }
 
 func (c *Options) fillDefault(key, value string) {
-	for i := range c.Settings {
-		if c.Settings[i].Key == key && c.Settings[i].Source == "default" && c.Settings[i].Value == "" {
-			c.Settings[i].Value = value
+	c.updateSetting(key, func(s *Setting) {
+		if s.Source == "default" && s.Value == "" {
+			s.Value = value
 		}
-	}
+	})
 }
 
 func (c *Options) FillDefaultSetting(key, value string) { c.fillDefault(key, value) }
@@ -245,15 +241,15 @@ func (c *Options) Resolve(env LookupEnv, user, spec Layer) error {
 		c.PackagesPreferredMethods = packages.DefaultPreferredMethods
 		c.setValue("packages.preferredInstallationMethods", "["+strings.Join(packages.DefaultPreferredMethods, ", ")+"]")
 	}
-	c.PackagesPrebuiltBinariesArchiveDestinationCandidates = c.resolveList("packages.prebuiltBinariesArchive.installDestinationCandidates",
-		layerList(c.PackagesPrebuiltBinariesArchiveDestinationCandidates, "cliFlag"), envStr(env("CHE_PACKAGES_PREBUILT_BINARIES_ARCHIVE_INSTALL_DESTINATION_CANDIDATES")),
-		layerList(user.Packages.PrebuiltBinariesArchive.InstallDestinationCandidates, "config-file"), layerList(spec.Packages.PrebuiltBinariesArchive.InstallDestinationCandidates, "specFile"))
-	if len(c.PackagesPrebuiltBinariesArchiveDestinationCandidates) == 0 {
-		c.PackagesPrebuiltBinariesArchiveDestinationCandidates = packages.DefaultPrebuiltBinariesArchiveDestinationCandidates
-		c.setValue("packages.prebuiltBinariesArchive.installDestinationCandidates", "["+strings.Join(packages.DefaultPrebuiltBinariesArchiveDestinationCandidates, ", ")+"]")
+	c.PackagesBinariesRemoteArchiveDestinationCandidates = c.resolveList("packages.binariesRemoteArchive.installDestinationCandidates",
+		layerList(c.PackagesBinariesRemoteArchiveDestinationCandidates, "cliFlag"), envStr(env("CHE_PACKAGES_BINARIES_REMOTE_ARCHIVE_INSTALL_DESTINATION_CANDIDATES")),
+		layerList(user.Packages.BinariesRemoteArchive.InstallDestinationCandidates, "config-file"), layerList(spec.Packages.BinariesRemoteArchive.InstallDestinationCandidates, "specFile"))
+	if len(c.PackagesBinariesRemoteArchiveDestinationCandidates) == 0 {
+		c.PackagesBinariesRemoteArchiveDestinationCandidates = packages.DefaultBinariesRemoteArchiveDestinationCandidates
+		c.setValue("packages.binariesRemoteArchive.installDestinationCandidates", "["+strings.Join(packages.DefaultBinariesRemoteArchiveDestinationCandidates, ", ")+"]")
 	}
-	c.PackagesPrebuiltBinariesArchiveCheckPresentOnPath = c.resolveBool("packages.prebuiltBinariesArchive.checkPresentOnPath", false, env("CHE_PACKAGES_PREBUILT_BINARIES_ARCHIVE_CHECK_PRESENT_ON_PATH"), true,
-		boolLayer{user.Packages.PrebuiltBinariesArchive.CheckPresentOnPath, "config-file"}, boolLayer{spec.Packages.PrebuiltBinariesArchive.CheckPresentOnPath, "specFile"})
+	c.PackagesBinariesRemoteArchiveCheckPresentOnPath = c.resolveBool("packages.binariesRemoteArchive.checkPresentOnPath", false, env("CHE_PACKAGES_BINARIES_REMOTE_ARCHIVE_CHECK_PRESENT_ON_PATH"), true,
+		boolLayer{user.Packages.BinariesRemoteArchive.CheckPresentOnPath, "config-file"}, boolLayer{spec.Packages.BinariesRemoteArchive.CheckPresentOnPath, "specFile"})
 	c.PackagesCompletionsEnabled = c.resolveBool("packages.completions.zsh.enabled", false, env("CHE_PACKAGES_COMPLETIONS_ZSH_ENABLED"), false,
 		boolLayer{user.Packages.Completions.Zsh.Enabled, "config-file"}, boolLayer{spec.Packages.Completions.Zsh.Enabled, "specFile"})
 	c.PackagesCompletionsDestinationCandidates = c.resolveList("packages.completions.zsh.installDestinationCandidates",

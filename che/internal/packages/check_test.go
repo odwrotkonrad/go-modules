@@ -22,12 +22,7 @@ func TestCheckPresentReportsMissing(t *testing.T) {
 
 func TestCheckUpgradableBrewOutdated(t *testing.T) {
 	in, m := newInstaller(t, "packages:\n  bat: [brew]\n  fd: [brew]", "darwin", cmdMap([]string{"brew"}), Options{})
-	m.Stub = func(argv []string) ([]byte, error) {
-		if argv[0] == "brew" && argv[1] == "outdated" {
-			return []byte("bat\n"), nil
-		}
-		return nil, nil
-	}
+	m.Stub = stubOutputs("brew outdated", "bat\n")
 	out, err := captureStdout(t, func() error { return in.CheckUpgradable([]string{"bat", "fd"}) })
 	require.NoError(t, err)
 	wantLines(t, out, "upgradable bat via brew")
@@ -36,15 +31,10 @@ func TestCheckUpgradableBrewOutdated(t *testing.T) {
 
 func TestCheckUpgradableBinaryPinDrift(t *testing.T) {
 	in, m := newInstaller(t, kindYaml, "linux", cmdMap([]string{"kind"}), Options{})
-	m.Stub = func(argv []string) ([]byte, error) {
-		if argv[0] == "kind" {
-			return []byte("kind version 0.30.0\n"), nil
-		}
-		return nil, nil
-	}
+	m.Stub = stubOutputs("kind ", "kind version 0.30.0\n")
 	out, err := captureStdout(t, func() error { return in.CheckUpgradable([]string{"kind"}) })
 	require.NoError(t, err)
-	wantLines(t, out, "upgradable kind via prebuiltBinariesArchive: yaml pins 0.32.0")
+	wantLines(t, out, "upgradable kind via binariesRemoteArchive: yaml pins 0.32.0")
 }
 
 func TestCheckNotShadowedWarns(t *testing.T) {
@@ -54,12 +44,7 @@ func TestCheckNotShadowedWarns(t *testing.T) {
 	require.NoError(t, os.WriteFile(expected, []byte(""), 0o755))
 	cmds := map[string]string{"brew": "/opt/homebrew/bin/brew", "kind": "/usr/local/bin/kind"}
 	in, m := newInstaller(t, "packages:\n  kind: [brew]", "darwin", cmds, Options{})
-	m.Stub = func(argv []string) ([]byte, error) {
-		if argv[0] == "brew" && argv[1] == "--prefix" {
-			return []byte(prefix + "\n"), nil
-		}
-		return nil, nil
-	}
+	m.Stub = stubOutputs("brew --prefix", prefix+"\n")
 	out, err := captureStdout(t, func() error { return in.CheckNotShadowed([]string{"kind"}) })
 	require.NoError(t, err)
 	wantLines(t, out, "kind shadowed by /usr/local/bin/kind (expected "+expected+")")

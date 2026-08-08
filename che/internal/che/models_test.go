@@ -160,9 +160,7 @@ func TestPrepareSpecs(t *testing.T) {
 			}
 			level, err := log.ParseLevel(logLevel)
 			require.NoError(t, err)
-			prevLevel := log.GetLevel()
-			log.SetLevel(level)
-			t.Cleanup(func() { log.SetLevel(prevLevel) })
+			t.Cleanup(log.SwapLevel(level))
 			var root *SpecReady
 			out, err := testutil.CaptureStdout(t, func() error {
 				var e error
@@ -208,9 +206,9 @@ func TestPrepareSpecs(t *testing.T) {
 					got[r.Ref] = r.Cond
 				}
 				assert.Equal(t, want, got, "rejected profiles\n%s", out)
-				log.SetLevel(log.Levels.Debug)
+				restore := log.SwapLevel(log.Levels.Debug)
 				line, err := testutil.CaptureStdout(t, func() error { root.LogRejected(); return nil })
-				log.SetLevel(prevLevel)
+				restore()
 				require.NoError(t, err)
 				for ref, cond := range want {
 					assert.Contains(t, testutil.StripANSI(line),
@@ -464,9 +462,7 @@ func TestExecOperations(t *testing.T) {
 			&stubOperation{name: "last", selected: true, delta: 1, ran: &ran},
 		},
 	}
-	prev := log.GetLevel()
-	log.SetLevel(log.Levels.Debug)
-	t.Cleanup(func() { log.SetLevel(prev) })
+	t.Cleanup(log.SwapLevel(log.Levels.Debug))
 	out, err := testutil.CaptureStdout(t, func() error { return p.ExecOperations(context.Background()) })
 	require.ErrorIs(t, err, boom)
 	assert.Equal(t, []string{"one", "failing", "last"}, ran, "run order, failure does not stop")
@@ -483,9 +479,7 @@ func TestExecOperationsSkipOpsNoSweep(t *testing.T) {
 			&stubOperation{name: "render-templates", selected: false, ran: &ran},
 		},
 	}
-	prev := log.GetLevel()
-	log.SetLevel(log.Levels.Debug)
-	t.Cleanup(func() { log.SetLevel(prev) })
+	t.Cleanup(log.SwapLevel(log.Levels.Debug))
 	out, err := testutil.CaptureStdout(t, func() error { return p.ExecOperations(context.Background()) })
 	require.NoError(t, err)
 	assert.Empty(t, ran)
@@ -502,9 +496,7 @@ func TestExecEachSkipsZeroDeltaProfile(t *testing.T) {
 		}}
 	}
 	s := &SpecReady{Profiles: []*ProfileReady{mk("settled", 0), mk("drifted", 1)}}
-	prev := log.GetLevel()
-	log.SetLevel(log.Levels.Debug)
-	t.Cleanup(func() { log.SetLevel(prev) })
+	t.Cleanup(log.SwapLevel(log.Levels.Debug))
 	var executed []string
 	out, err := testutil.CaptureStdout(t, func() error {
 		return s.ExecEach(context.Background(), "run", func(_ context.Context, p *ProfileReady) error {

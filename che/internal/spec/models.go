@@ -86,10 +86,10 @@ type Run struct {
 }
 
 type Packages struct {
-	File                         string                         `yaml:"file" jsonschema_description:"packages.yml path; default $XDG_CONFIG_HOME/packages/packages.yml; overridden by --packages-file and CHE_PACKAGES_FILE"`
-	PreferredInstallationMethods []string                       `yaml:"preferredInstallationMethods" jsonschema:"enum=brew,enum=cask,enum=apt,enum=npm,enum=go,enum=gem,enum=prebuiltBinariesArchive,enum=script,enum=vscode,enum=versionManager" jsonschema_description:"manager preference order: listed managers are tried first (in this order) within each package entry, unlisted ones follow in entry order; cascades profile > spec > user config; overridden by CHE_PACKAGES_PREFERRED_METHODS"`
-	PrebuiltBinariesArchive      PrebuiltBinariesArchiveInstall `yaml:"prebuiltBinariesArchive" jsonschema_description:"prebuiltBinariesArchive installation method options"`
-	Completions                  CompletionsInstall             `yaml:"completions" jsonschema_description:"zsh completions installation options"`
+	File                         string                       `yaml:"file" jsonschema_description:"packages.yml path; default $XDG_CONFIG_HOME/packages/packages.yml; overridden by --packages-file and CHE_PACKAGES_FILE"`
+	PreferredInstallationMethods []string                     `yaml:"preferredInstallationMethods" jsonschema:"enum=brew,enum=cask,enum=apt,enum=npm,enum=go,enum=gem,enum=binariesRemoteArchive,enum=script,enum=vscode,enum=pyenv,enum=nvm" jsonschema_description:"manager preference order: listed managers are tried first (in this order) within each package entry, unlisted ones follow in entry order; cascades profile > spec > user config; overridden by CHE_PACKAGES_PREFERRED_METHODS"`
+	BinariesRemoteArchive        BinariesRemoteArchiveInstall `yaml:"binariesRemoteArchive" jsonschema_description:"binariesRemoteArchive installation method options"`
+	Completions                  CompletionsInstall           `yaml:"completions" jsonschema_description:"zsh completions installation options"`
 }
 
 type CompletionsInstall struct {
@@ -102,9 +102,9 @@ type ShellCompletionsInstall struct {
 	CheckPresentOnFpath          *bool        `yaml:"checkPresentOnFpath" jsonschema_description:"pick the first candidate destination found on fpath ($FPATH, else zsh -c fpath) and warn when none is; default true; overridden by CHE_PACKAGES_COMPLETIONS_ZSH_CHECK_PRESENT_ON_FPATH"`
 }
 
-type PrebuiltBinariesArchiveInstall struct {
-	InstallDestinationCandidates StringOrList `yaml:"installDestinationCandidates" jsonschema_description:"where binary-method binaries install: one path or a candidate list (~/ and $VARs expand); with checkPresentOnPath the first candidate on PATH wins, else the first entry; default ~/.local/bin; cascades profile > spec > user config; overridden by CHE_PACKAGES_PREBUILT_BINARIES_ARCHIVE_INSTALL_DESTINATION_CANDIDATES (comma-separated)"`
-	CheckPresentOnPath           *bool        `yaml:"checkPresentOnPath" jsonschema_description:"pick the first candidate destination found on PATH and warn when none is; default true; overridden by CHE_PACKAGES_PREBUILT_BINARIES_ARCHIVE_CHECK_PRESENT_ON_PATH"`
+type BinariesRemoteArchiveInstall struct {
+	InstallDestinationCandidates StringOrList `yaml:"installDestinationCandidates" jsonschema_description:"where binary-method binaries install: one path or a candidate list (~/ and $VARs expand); with checkPresentOnPath the first candidate on PATH wins, else the first entry; default ~/.local/bin; cascades profile > spec > user config; overridden by CHE_PACKAGES_BINARIES_REMOTE_ARCHIVE_INSTALL_DESTINATION_CANDIDATES (comma-separated)"`
+	CheckPresentOnPath           *bool        `yaml:"checkPresentOnPath" jsonschema_description:"pick the first candidate destination found on PATH and warn when none is; default true; overridden by CHE_PACKAGES_BINARIES_REMOTE_ARCHIVE_CHECK_PRESENT_ON_PATH"`
 }
 
 type PackageRef struct {

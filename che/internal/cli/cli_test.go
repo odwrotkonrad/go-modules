@@ -44,7 +44,7 @@ func repoEnv(t *testing.T, pwd string) (*app, *cobra.Command, string) {
 func PackagesMockHost() packages.Host {
 	cmds := map[string]bool{"apt-get": true, "npm": true, "sha256sum": true, "jq": true, "curl": true}
 	return packages.Host{
-		OS: "linux", Arch: "amd64", Euid: 501,
+		OS: "linux", Arch: "amd64", Distro: "debian", Euid: 501,
 		LookPath: func(name string) (string, error) {
 			if cmds[name] {
 				return "/usr/bin/" + name, nil

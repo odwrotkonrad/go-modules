@@ -16,29 +16,9 @@ type Uninstaller struct {
 }
 
 func NewUninstaller(ctx Context, opts options.Options) (*Uninstaller, error) {
-	home, err := resolveInvokingHome(ctx)
+	p, err := newLedgerProfile(ctx, opts, "uninstall", "uninstall")
 	if err != nil {
 		return nil, err
-	}
-	seams := NewSeams(home)
-	spec, err := seams.Ledger.StartSpec(ctx.RunID, "", "uninstall")
-	if err != nil {
-		log.EmitTrace("ledger", "error", "uninstall start spec: "+err.Error())
-	}
-	prof, err := seams.Ledger.StartProfile(spec, "uninstall", "uninstall", "", home)
-	if err != nil {
-		log.EmitTrace("ledger", "error", "uninstall start profile: "+err.Error())
-	}
-	p := &ProfileReady{
-		ref:         "uninstall",
-		home:        home,
-		opts:        opts,
-		runID:       ctx.RunID,
-		runTs:       ctx.RunTs,
-		specDone:    spec,
-		profileDone: prof,
-		logDepth:    1, // [why] removals nest under their per-profile `## profile` heading
-		Seams:       seams,
 	}
 	return &Uninstaller{p: p, dryRun: opts.DryRun != options.DryRun.Off}, nil
 }
@@ -70,7 +50,7 @@ func (u *Uninstaller) revert(op database.OperationDone) error {
 	p := u.p
 	live := p.classifyDest(op.Dest)
 	if driftedFromNext(live, op.Next) {
-		p.emitSkip(log.Levels.Debug, "uninstall", "remove", op.Dest, "dest drifted from the recorded state")
+		p.emit(log.Levels.Debug, "uninstall", "remove", op.Dest, "dest drifted from the recorded state")
 		return nil
 	}
 	if u.dryRun {
@@ -114,7 +94,7 @@ func (u *Uninstaller) removeDir(dest string) error {
 	err := u.p.FS.RemoveDir(dest)
 	if err != nil && u.p.Reader != nil {
 		if entries, derr := u.p.Reader.ReadDirectory(dest); derr == nil && len(entries) > 0 {
-			u.p.emitSkip(log.Levels.Debug, "uninstall", "remove-dir", dest, "directory not empty")
+			u.p.emit(log.Levels.Debug, "uninstall", "remove-dir", dest, "directory not empty")
 			return nil
 		}
 	}

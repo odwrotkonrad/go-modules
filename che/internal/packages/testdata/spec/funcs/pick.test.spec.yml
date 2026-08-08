@@ -23,7 +23,7 @@ cases:
       args:
         - os: linux
         - cmds: []
-        - entry: "[{npm: x}]"
+        - entry: "[{npm: {packageName: x}}]"
     expected:
       output: {picked: false}
   - name: ShouldPickBinaryWhenShaMatchesHost
@@ -33,22 +33,22 @@ cases:
         - cmds: []
         - entry: |
             - brew
-            - prebuiltBinariesArchive:
+            - binariesRemoteArchive:
+                platformEligibility:
+                  - linux-amd64: sha256:abc
                 url: https://example.com/x
-                platforms:
-                  - linux-amd64: abc
     expected:
-      output: {mgr: prebuiltBinariesArchive, picked: true}
+      output: {mgr: binariesRemoteArchive, picked: true}
   - name: ShouldSkipBinaryWithoutHostSha
     input:
       args:
         - os: darwin
         - cmds: []
         - entry: |
-            - prebuiltBinariesArchive:
+            - binariesRemoteArchive:
+                platformEligibility:
+                  - linux-amd64: sha256:abc
                 url: https://example.com/x
-                platforms:
-                  - linux-amd64: abc
     expected:
       output: {picked: false}
   - name: ShouldPreferListedManagerOverEntryOrder
@@ -58,13 +58,13 @@ cases:
         - cmds: [brew]
         - entry: |
             - brew
-            - prebuiltBinariesArchive:
+            - binariesRemoteArchive:
+                platformEligibility:
+                  - darwin-amd64: sha256:abc
                 url: https://example.com/x
-                platforms:
-                  - darwin-amd64: abc
-        - preferred: [prebuiltBinariesArchive]
+        - preferred: [binariesRemoteArchive]
     expected:
-      output: {mgr: prebuiltBinariesArchive, picked: true}
+      output: {mgr: binariesRemoteArchive, picked: true}
   - name: ShouldFallBackToEntryOrderWhenPreferredInapplicable
     input:
       args:

@@ -94,7 +94,7 @@ func runInstallGroup(t *testing.T, g installGroup) {
 		"XDG_CACHE_HOME=" + filepath.Join(home, ".cache"),
 		"CHE_E2E=1",
 		"CHE_LOG_LEVEL=debug",
-		"CHE_PACKAGES_PREBUILT_BINARIES_ARCHIVE_CHECK_PRESENT_ON_PATH=0",
+		"CHE_PACKAGES_BINARIES_REMOTE_ARCHIVE_CHECK_PRESENT_ON_PATH=0",
 		"NVM_DIR=" + filepath.Join(home, ".config", "nvm"),
 		"GOBIN=" + goBin,
 		//[why] GOPATH defaults into the throwaway HOME: without this the module cache's
@@ -103,6 +103,9 @@ func runInstallGroup(t *testing.T, g installGroup) {
 	}
 	if v := os.Getenv("SSL_CERT_FILE"); v != "" {
 		env = append(env, "SSL_CERT_FILE="+v)
+	}
+	if dir := os.Getenv("E2E_GOCOVERDIR"); dir != "" {
+		env = append(env, "GOCOVERDIR="+dir)
 	}
 
 	work := t.TempDir()

@@ -70,9 +70,7 @@ func TestRenderTemplates(t *testing.T) {
 			return testutil.CaptureStdout(t, func() error { return p.renderTemplates(items, skipSecrets) })
 		}
 
-		prev := log.GetLevel()
-		log.SetLevel(log.Levels.Debug)
-		t.Cleanup(func() { log.SetLevel(prev) })
+		t.Cleanup(log.SwapLevel(log.Levels.Debug))
 		out, err := renderOnce()
 		c.Expected.Check(t, err)
 		stripped := testutil.StripANSI(out)

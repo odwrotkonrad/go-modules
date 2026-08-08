@@ -3,19 +3,14 @@ package packages
 // [>] 🤖🤖
 
 import (
-	"fmt"
 	"maps"
 	"os"
 	"path/filepath"
 	"slices"
 
-	"gitlab.com/konradodwrot/go-modules/che/internal/execx"
 	"gitlab.com/konradodwrot/go-modules/che/internal/log"
 )
 
-// [why] some distros rename a package's binary (debian ships bat as batcat): aliasing gives the
-//
-//	command one name on every host, so specs and muscle memory stay portable
 func (in *Installer) aliasBinaries(pkg string, it Item) error {
 	if len(it.AliasBinary) == 0 {
 		return nil
@@ -52,7 +47,6 @@ func (in *Installer) aliasBinaries(pkg string, it Item) error {
 
 // [<] 🤖🤖
 
-// [why] a literal post-install step: runs once, right after a method actually installed the package
 func (in *Installer) runEntryPostInstall(pkg string, e Entry) error {
 	if e.PostInstall == nil {
 		return nil
@@ -61,16 +55,8 @@ func (in *Installer) runEntryPostInstall(pkg string, e Entry) error {
 		in.emitDryRun("postInstall", pkg)
 		return nil
 	}
-	argv, cleanup, err := in.scriptArgv(pkg, e.PostInstall)
-	if err != nil {
+	if err := in.runScript(pkg, e.PostInstall, "postInstall"); err != nil {
 		return err
-	}
-	if cleanup != nil {
-		defer cleanup()
-	}
-	c := execx.Cmd{Argv: argv, Env: in.scriptEnv(pkg, e.PostInstall), Stdout: os.Stdout, Stderr: os.Stderr}
-	if err := execx.Default.Exec(c); err != nil {
-		return fmt.Errorf("%s: postInstall: %w", pkg, err)
 	}
 	in.emit(log.Levels.Info, "post-installed", pkg)
 	return nil

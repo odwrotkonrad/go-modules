@@ -54,9 +54,7 @@ func TestInitSources(t *testing.T) {
 			t.Setenv("XDG_CACHE_HOME", filepath.Join(home, ".cache"))
 			ctx := newContext(env, hostRepo)
 
-			prev := log.GetLevel()
-			log.SetLevel(log.Levels.Trace)
-			t.Cleanup(func() { log.SetLevel(prev) })
+			t.Cleanup(log.SwapLevel(log.Levels.Trace))
 			out, err := testutil.CaptureStdout(t, func() error {
 				return InitSources(ctx, options.Options{SkipRemoteRefs: flags.SkipRemoteRefs})
 			})

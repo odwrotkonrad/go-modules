@@ -2,6 +2,20 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://gitlab.com/konradodwrot/go-modules/-/raw/main/che/assets/data/che.schema.json",
   "$defs": {
+    "BinariesRemoteArchiveInstall": {
+      "properties": {
+        "installDestinationCandidates": {
+          "$ref": "#/$defs/StringOrList",
+          "description": "where binary-method binaries install: one path or a candidate list (~/ and $VARs expand); with checkPresentOnPath the first candidate on PATH wins, else the first entry; default ~/.local/bin; cascades profile \u003e spec \u003e user config; overridden by CHE_PACKAGES_BINARIES_REMOTE_ARCHIVE_INSTALL_DESTINATION_CANDIDATES (comma-separated)"
+        },
+        "checkPresentOnPath": {
+          "type": "boolean",
+          "description": "pick the first candidate destination found on PATH and warn when none is; default true; overridden by CHE_PACKAGES_BINARIES_REMOTE_ARCHIVE_CHECK_PRESENT_ON_PATH"
+        }
+      },
+      "additionalProperties": false,
+      "type": "object"
+    },
     "CompletionsInstall": {
       "properties": {
         "zsh": {
@@ -164,36 +178,23 @@
               "npm",
               "go",
               "gem",
-              "prebuiltBinariesArchive",
+              "binariesRemoteArchive",
               "script",
               "vscode",
-              "versionManager"
+              "pyenv",
+              "nvm"
             ]
           },
           "type": "array",
           "description": "manager preference order: listed managers are tried first (in this order) within each package entry, unlisted ones follow in entry order; cascades profile \u003e spec \u003e user config; overridden by CHE_PACKAGES_PREFERRED_METHODS"
         },
-        "prebuiltBinariesArchive": {
-          "$ref": "#/$defs/PrebuiltBinariesArchiveInstall",
-          "description": "prebuiltBinariesArchive installation method options"
+        "binariesRemoteArchive": {
+          "$ref": "#/$defs/BinariesRemoteArchiveInstall",
+          "description": "binariesRemoteArchive installation method options"
         },
         "completions": {
           "$ref": "#/$defs/CompletionsInstall",
           "description": "zsh completions installation options"
-        }
-      },
-      "additionalProperties": false,
-      "type": "object"
-    },
-    "PrebuiltBinariesArchiveInstall": {
-      "properties": {
-        "installDestinationCandidates": {
-          "$ref": "#/$defs/StringOrList",
-          "description": "where binary-method binaries install: one path or a candidate list (~/ and $VARs expand); with checkPresentOnPath the first candidate on PATH wins, else the first entry; default ~/.local/bin; cascades profile \u003e spec \u003e user config; overridden by CHE_PACKAGES_PREBUILT_BINARIES_ARCHIVE_INSTALL_DESTINATION_CANDIDATES (comma-separated)"
-        },
-        "checkPresentOnPath": {
-          "type": "boolean",
-          "description": "pick the first candidate destination found on PATH and warn when none is; default true; overridden by CHE_PACKAGES_PREBUILT_BINARIES_ARCHIVE_CHECK_PRESENT_ON_PATH"
         }
       },
       "additionalProperties": false,

@@ -17,6 +17,7 @@ import (
 type Host struct {
 	OS        string
 	Arch      string
+	Distro    string
 	Euid      int
 	LookPath  func(string) (string, error)
 	PathDirs  func() []string
@@ -25,7 +26,7 @@ type Host struct {
 }
 
 func NewHost() Host {
-	return Host{
+	h := Host{
 		OS: runtime.GOOS, Arch: runtime.GOARCH,
 		Euid:      os.Geteuid(),
 		LookPath:  exec.LookPath,
@@ -33,6 +34,31 @@ func NewHost() Host {
 		FpathDirs: fpathDirs,
 		Getenv:    os.Getenv,
 	}
+	if h.OS == "linux" {
+		h.Distro = linuxDistro()
+	}
+	return h
+}
+
+func linuxDistro() string {
+	b, err := os.ReadFile("/etc/os-release")
+	if err != nil {
+		return ""
+	}
+	for line := range strings.Lines(string(b)) {
+		if v, ok := strings.CutPrefix(strings.TrimSpace(line), "ID="); ok {
+			return strings.Trim(v, `"`)
+		}
+	}
+	return ""
+}
+
+func (h Host) eligibilityKeys() []string {
+	var keys []string
+	if h.Distro != "" {
+		keys = append(keys, h.OS+"-"+h.Distro+"-"+h.Arch, h.OS+"-"+h.Distro)
+	}
+	return append(keys, h.OS+"-"+h.Arch, h.OS)
 }
 
 func fpathDirs() []string {
@@ -65,7 +91,7 @@ func (h Host) nvmDir() string {
 	return filepath.Join(h.Getenv("HOME"), ".nvm")
 }
 
-func (h Host) ShaKey() string { return h.OS + "-" + h.Arch }
+func (h Host) PlatformKey() string { return h.OS + "-" + h.Arch }
 
 func (h Host) HasCmd(name string) bool {
 	_, err := h.LookPath(name)
@@ -81,9 +107,6 @@ func (h Host) applicable(pkg string, it Item) (bool, error) {
 	case "brew", "cask":
 		return h.OS == "darwin" && h.HasCmd("brew"), nil
 	case "apt":
-		if it.Apt != nil && it.Apt.FromSource != nil && (it.Apt.FromSource.URL == "" || it.Apt.FromSource.VerificationKey == "") {
-			return false, fmt.Errorf("package %s: apt fromSource requires url and verificationKey", pkg)
-		}
 		return h.OS == "linux" && h.HasCmd("apt-get"), nil
 	case "npm":
 		return h.HasCmd("npm"), nil
@@ -97,35 +120,25 @@ func (h Host) applicable(pkg string, it Item) (bool, error) {
 		}
 		fi, err := os.Stat("/usr/local/go/bin/go")
 		return err == nil && fi.Mode()&0o111 != 0, nil
-	case "prebuiltBinariesArchive":
-		if it.PrebuiltBinariesArchive == nil {
-			return false, fmt.Errorf("package %s: prebuiltBinariesArchive item missing props", pkg)
+	case "binariesRemoteArchive":
+		if it.BinariesRemoteArchive == nil {
+			return false, fmt.Errorf("package %s: binariesRemoteArchive item missing props", pkg)
 		}
-		for _, p := range it.PrebuiltBinariesArchive.Platforms.Names {
-			if p == h.ShaKey() {
-				return true, nil
-			}
+		return slices.Contains(it.BinariesRemoteArchive.PlatformEligibility.Names, h.PlatformKey()), nil
+	case "pyenv", "nvm":
+		if it.VersionManager == nil || len(it.VersionManager.Versions) == 0 {
+			return false, fmt.Errorf("package %s: %s item requires versions", pkg, it.Mgr)
 		}
-		return false, nil
-	case "versionManager":
-		vm := it.VersionManager
-		if vm == nil || len(vm.Versions) == 0 {
-			return false, fmt.Errorf("package %s: versionManager item requires versions", pkg)
-		}
-		switch vm.Tool {
-		case "pyenv":
+		if it.Mgr == "pyenv" {
 			return h.HasCmd("pyenv"), nil
-		case "nvm":
-			_, err := os.Stat(filepath.Join(h.nvmDir(), "nvm.sh"))
-			return err == nil, nil
-		default:
-			return false, fmt.Errorf("package %s: unknown versionManager tool %q (want pyenv or nvm)", pkg, vm.Tool)
 		}
+		_, err := os.Stat(filepath.Join(h.nvmDir(), "nvm.sh"))
+		return err == nil, nil
 	case "script":
 		if it.Script == nil || (it.Script.Run == "" && it.Script.Path == "" && it.Script.URL == "") {
-			return false, fmt.Errorf("package %s: script item missing run, path, or remoteUrl", pkg)
+			return false, fmt.Errorf("package %s: script item missing run, path, or url", pkg)
 		}
-		if len(it.Script.Platforms.Names) > 0 && !slices.Contains(it.Script.Platforms.Names, h.ShaKey()) {
+		if len(it.Script.PlatformEligibility.Names) > 0 && !slices.Contains(it.Script.PlatformEligibility.Names, h.PlatformKey()) {
 			return false, nil
 		}
 		return it.Script.OS == "" || it.Script.OS == h.OS, nil
@@ -151,22 +164,19 @@ func (h Host) pickPreferred(pkg string, entry Entry, preferred, allowed []string
 }
 
 func methodFamily(mgr string) string {
-	switch mgr {
-	case "cask":
+	if mgr == "cask" {
 		return "brew/cask"
-	case "vscode":
-		return "brew/vscode"
 	}
 	return mgr
 }
 
-var KnownManagers = []string{"brew", "cask", "apt", "npm", "go", "gem", "prebuiltBinariesArchive", "script", "vscode", "versionManager"}
+var KnownManagers = []string{"brew", "cask", "apt", "npm", "go", "gem", "binariesRemoteArchive", "script", "vscode", "pyenv", "nvm"}
 
-var PlatformMethods = []string{"brew", "brew/cask", "brew/vscode", "apt", "npm", "go", "gem", "prebuiltBinariesArchive", "script", "versionManager"}
+var PlatformMethods = []string{"brew", "brew/cask", "vscode", "apt", "npm", "go", "gem", "binariesRemoteArchive", "script", "pyenv", "nvm"}
 
-var DefaultPreferredMethods = []string{"brew", "cask", "apt", "prebuiltBinariesArchive", "script", "npm", "go", "gem", "vscode"}
+var DefaultPreferredMethods = []string{"brew", "cask", "apt", "binariesRemoteArchive", "script", "npm", "go", "gem", "vscode"}
 
-var DefaultPrebuiltBinariesArchiveDestinationCandidates = []string{"~/.local/bin", "~/bin"}
+var DefaultBinariesRemoteArchiveDestinationCandidates = []string{"~/.local/bin", "~/bin"}
 
 var DefaultCompletionsDestinationCandidates = []string{"~/.local/share/zsh/site-functions", "~/.zfunc"}
 

@@ -358,22 +358,23 @@ func resolveUnder(base, path string) string {
 	return filepath.Join(base, path)
 }
 
-func ReadFrontmatter(repoRoot, path string) (string, error) {
+func readSplit(repoRoot, path string) (front, body string, err error) {
 	content, err := os.ReadFile(resolveUnder(repoRoot, path))
 	if err != nil {
-		return "", err
+		return "", "", err
 	}
-	front, _ := SplitFrontmatter(string(content))
-	return front, nil
+	front, body = SplitFrontmatter(string(content))
+	return front, body, nil
+}
+
+func ReadFrontmatter(repoRoot, path string) (string, error) {
+	front, _, err := readSplit(repoRoot, path)
+	return front, err
 }
 
 func ReadBody(repoRoot, path string) (string, error) {
-	content, err := os.ReadFile(resolveUnder(repoRoot, path))
-	if err != nil {
-		return "", err
-	}
-	_, body := SplitFrontmatter(string(content))
-	return body, nil
+	_, body, err := readSplit(repoRoot, path)
+	return body, err
 }
 
 var mdComment = regexp.MustCompile(`(?s)<!--.*?-->\n?`)

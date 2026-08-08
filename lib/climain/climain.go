@@ -6,16 +6,24 @@ import (
 	"fmt"
 	"os"
 	"runtime/debug"
+	"strings"
 
 	"gitlab.com/konradodwrot/go-modules/lib/yamlcfg"
 )
 
 func Run(name, version, usage string, run func(args []string) (string, error)) {
-	version = resolveVersion(version)
-	if out, done := HelpVersion(os.Args[1:], usage, name, version); done {
+	RunNamed(name, version, usage, func(args []string) (string, error) {
+		out, err := run(args)
+		return out + "\n", err
+	})
+}
+
+func RunNamed(name, version, usage string, run func(args []string) (string, error)) {
+	usage = strings.TrimSuffix(usage, "\n")
+	if out, done := HelpVersion(os.Args[1:], usage, name, resolveVersion(version)); done {
 		Exit(out, nil)
 	}
-	Exit(run(os.Args[1:]))
+	RunRaw(run)
 }
 
 func RunRaw(run func(args []string) (string, error)) {

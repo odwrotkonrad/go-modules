@@ -27,7 +27,7 @@ func (a *app) packagesCmd() *cobra.Command {
 	pf.StringVar(&a.flags.PackagesOverride, "packages-override", "",
 		"override packages file merged over the effective base (the packages file, or the builtin when none exists): same-name entries replace, new names append; default: $XDG_CONFIG_HOME/che/packages-override.yml if present; env: CHE_PACKAGES_OVERRIDE")
 	pf.StringSliceVar(&a.flags.PackagesPreferredMethods, "preferred-methods", nil,
-		"installation-method preference order (comma-separated or repeated): listed managers try first within each package entry, unlisted follow in entry order; values: brew | cask | apt | npm | go | gem | prebuiltBinariesArchive | script | vscode | versionManager; env: CHE_PACKAGES_PREFERRED_METHODS")
+		"installation-method preference order (comma-separated or repeated): listed managers try first within each package entry, unlisted follow in entry order; values: brew | cask | apt | npm | go | gem | binariesRemoteArchive | script | vscode | pyenv | nvm; env: CHE_PACKAGES_PREFERRED_METHODS")
 
 	install := &cobra.Command{
 		Use:   "install [pkg...]",
@@ -58,33 +58,33 @@ func (a *app) packagesCmd() *cobra.Command {
 }
 
 func (a *app) packagesConfigCmd() *cobra.Command {
-	cmd := &cobra.Command{
-		Use:   "config",
-		Short: "inspect the resolved packages database",
-	}
-	var delta, all, defaults bool
-	var output string
-	show := &cobra.Command{
-		Use:   "show",
-		Short: "print the packages database (--all default: the effective merged set; --delta: entries differing from the builtin; --defaults: the builtin only)",
-		RunE: func(cmd *cobra.Command, args []string) error {
+	return makeConfigShowCmd(
+		"inspect the resolved packages database",
+		"print the packages database (--all default: the effective merged set; --delta: entries differing from the builtin; --defaults: the builtin only)",
+		showHelp{
+			delta:    "print only the entries differing from the builtin packages.yml",
+			all:      "print the effective merged set (packages file or builtin, plus override; default mode)",
+			defaults: "print the builtin packages.yml only",
+			output:   "output format; values: text (name = methods lines) | yaml (packages.yml shape)",
+		},
+		"all",
+		func(mode, output string) error {
 			builtin, err := packages.LoadBuiltin()
 			if err != nil {
 				return err
 			}
 			file := builtin
-			if !defaults {
+			if mode != "defaults" {
 				in, err := che.NewPackagesInstallerFromContext(a.ctx, a.opts)
 				if err != nil {
 					return err
 				}
 				file = in.File
-				if delta {
+				if mode == "delta" {
 					file = file.Delta(builtin)
 				}
 			}
-			switch output {
-			case "", "text":
+			return emitShowOutput(output, func() {
 				for _, name := range slices.Sorted(maps.Keys(file.Packages)) {
 					var mgrs []string
 					for _, it := range file.Packages[name].Items {
@@ -92,27 +92,8 @@ func (a *app) packagesConfigCmd() *cobra.Command {
 					}
 					fmt.Printf("%s = %s\n", name, strings.Join(mgrs, ", "))
 				}
-				return nil
-			case "yaml":
-				out, err := file.YAML()
-				if err != nil {
-					return err
-				}
-				fmt.Print(out)
-				return nil
-			default:
-				return fmt.Errorf("invalid --output %q: want text or yaml", output)
-			}
-		},
-	}
-	show.Flags().BoolVar(&delta, "delta", false, "print only the entries differing from the builtin packages.yml")
-	show.Flags().BoolVar(&all, "all", false, "print the effective merged set (packages file or builtin, plus override; default mode)")
-	show.Flags().BoolVar(&defaults, "defaults", false, "print the builtin packages.yml only")
-	show.Flags().StringVar(&output, "output", "text",
-		"output format; values: text (name = methods lines) | yaml (packages.yml shape)")
-	show.MarkFlagsMutuallyExclusive("delta", "all", "defaults")
-	cmd.AddCommand(show)
-	return cmd
+			}, file.YAML)
+		})
 }
 
 func (a *app) packagesInstallRunE(cmd *cobra.Command, args []string) error {

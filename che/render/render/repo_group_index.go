@@ -74,11 +74,10 @@ func scanGroup(dir string) (groupNode, error) {
 }
 
 func repoPurpose(repoDir string, repoLevel int) string {
-	content, err := os.ReadFile(filepath.Join(repoDir, purposeRelPath))
+	_, body, err := readSplit(repoDir, purposeRelPath)
 	if err != nil {
 		return noPurposePlaceholder
 	}
-	_, body := SplitFrontmatter(string(content))
 	return strings.TrimSpace(demoteHeadings(body, repoLevel))
 }
 

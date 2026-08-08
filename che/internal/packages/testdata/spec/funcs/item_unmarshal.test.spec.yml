@@ -11,32 +11,32 @@ cases:
   - name: ShouldDecodePerManagerName
     input:
       args:
-        - yaml: "{apt: fd-find}"
+        - yaml: "{apt: {packageName: fd-find}}"
     expected:
       output: {mgr: apt, name: fd-find}
   - name: ShouldDecodeBrewCaskForm
     input:
       args:
-        - yaml: "{brew: {cask: beekeeper-studio}}"
+        - yaml: "{brew/cask: {packageName: beekeeper-studio}}"
     expected:
       output: {mgr: cask, name: beekeeper-studio}
   - name: ShouldDecodeNpmScopedPin
     input:
       args:
-        - yaml: '{npm: "@anthropic-ai/claude-code"}'
+        - yaml: '{npm: {packageName: "@anthropic-ai/claude-code"}}'
     expected:
       output: {mgr: npm, name: "@anthropic-ai/claude-code"}
   - name: ShouldDecodeBinaryProps
     input:
       args:
         - yaml: |
-            prebuiltBinariesArchive:
+            binariesRemoteArchive:
+              platformEligibility:
+                - linux-amd64: sha256:abc
               version: 0.32.0
               url: https://example.com/kind-{os}-{arch}
-              platforms:
-                - linux-amd64: abc
     expected:
-      output: {mgr: prebuiltBinariesArchive, name: "", version: 0.32.0, url: "https://example.com/kind-{os}-{arch}", platformNames: [linux-amd64], sha256: {linux-amd64: abc}}
+      output: {mgr: binariesRemoteArchive, name: "", version: 0.32.0, url: "https://example.com/kind-{os}-{arch}", platformNames: [linux-amd64], checksums: {linux-amd64: "sha256:abc"}}
   - name: ShouldDecodeScriptScalarForm
     input:
       args:
@@ -61,13 +61,13 @@ cases:
   - name: ShouldDecodeScriptUrlForm
     input:
       args:
-        - yaml: "{script: {remoteUrl: https://example.com/install.sh}}"
+        - yaml: "{script: {url: https://example.com/install.sh}}"
     expected:
       output: {mgr: script, name: "", scriptUrl: https://example.com/install.sh}
   - name: ShouldDecodeBrewCodeExtensionForm
     input:
       args:
-        - yaml: "{brew: {vscode: golang.go}}"
+        - yaml: "{vscode: {packageName: golang.go}}"
     expected:
       output: {mgr: vscode, name: golang.go}
   - name: ShouldRejectBareCodeItem
@@ -75,13 +75,13 @@ cases:
       args:
         - yaml: "code"
     expected:
-      errorOutput: "vscode extension items must be written {brew: {vscode: <extension-id>}}"
+      errorOutput: "casks and extensions are installer keys: brew/cask or vscode"
   - name: ShouldRejectDirectCodeMap
     input:
       args:
         - yaml: "{code: golang.go}"
     expected:
-      errorOutput: "vscode extension items must be written {brew: {vscode: <extension-id>}}"
+      errorOutput: "casks and extensions are installer keys: brew/cask or vscode"
   - name: ShouldErrorOnMultiKeyMap
     input:
       args:
@@ -91,31 +91,31 @@ cases:
   - name: ShouldErrorOnMalformedBrewObject
     input:
       args:
-        - yaml: "{brew: {formula: x}}"
+        - yaml: "{brew: {formula: x, cask: y}}"
     expected:
-      errorOutput: "brew object form must be {cask: <name>}"
+      errorOutput: "brew item: formula is gone"
   - name: ShouldRejectNpmEmbeddedPin
     input:
       args:
-        - yaml: "{npm: lefthook@2.1.9}"
+        - yaml: "{npm: {packageName: lefthook@2.1.9}}"
     expected:
-      errorOutput: "npm item lefthook@2.1.9: version pins go in the entry version field"
-  - name: ShouldAllowNpmScopedName
+      errorOutput: "npm item lefthook@2.1.9: version pins go in the version field"
+  - name: ShouldRejectStringItemValue
     input:
       args:
-        - yaml: "{npm: '@github/copilot'}"
+        - yaml: "{npm: lefthook}"
     expected:
-      output: {mgr: npm, name: '@github/copilot'}
+      errorOutput: "npm item: package names go in packageName"
   - name: ShouldRejectLegacyArchTokens
     input:
       args:
-        - yaml: "{prebuiltBinariesArchive: {url: 'https://x/y-{arch_x}.zip'}}"
+        - yaml: "{binariesRemoteArchive: {url: 'https://x/y-{arch_x}.zip'}}"
     expected:
-      errorOutput: "prebuiltBinariesArchive tokens {arch_x}/{arch_g} are gone: use {arch} with archConvention"
+      errorOutput: "binariesRemoteArchive tokens {arch_x}/{arch_g} are gone: use {arch} with archScheme"
   - name: ShouldRejectAptEmbeddedPin
     input:
       args:
-        - yaml: "{apt: jq=1.7-1}"
+        - yaml: "{apt: {packageName: jq=1.7-1}}"
     expected:
-      errorOutput: "apt item jq=1.7-1: version pins go in the entry version field"
+      errorOutput: "apt item jq=1.7-1: version pins go in versionMap"
 # [<] 🤖🤖

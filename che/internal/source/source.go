@@ -46,7 +46,7 @@ func EnsureCheckout(home, url string) (string, error) {
 
 func ensureCheckout(home, url string) (string, error) {
 	dir := Dir(home, url)
-	line := "remote " + url + " into " + abbreviateHome(dir, home)
+	line := "remote " + url + " into " + fsutil.AbbreviateHome(dir, home)
 	emit := func(action string) {
 		log.Emit(log.Event{
 			Level: log.Levels.Info, Scope: "init-remote-sources", Action: action,
@@ -76,13 +76,6 @@ func ensureCheckout(home, url string) (string, error) {
 		emit("up-to-date")
 	}
 	return dir, nil
-}
-
-func abbreviateHome(path, home string) string {
-	if home != "" && strings.HasPrefix(path, home+string(filepath.Separator)) {
-		return "~" + strings.TrimPrefix(path, home)
-	}
-	return path
 }
 
 func git(args ...string) error {

@@ -11,15 +11,16 @@ import (
 
 const requiresYaml = `packages:
   libffi:
-    - apt: libffi-dev
+    - apt:
+        packageName: libffi-dev
   pyenv:
-    - apt: pyenv
+    - apt:
+        packageName: pyenv
   python3:
     version: "3.14.*"
     requires: [pyenv, libffi]
-    installMethods:
-      - versionManager:
-          tool: pyenv
+    installers:
+      - pyenv:
           versions: ["3.14.5"]
           global: "3.14.5"
 `
@@ -53,10 +54,10 @@ func TestRequiresCycleErrors(t *testing.T) {
 	const yml = `packages:
   a:
     requires: [b]
-    installMethods: [brew]
+    installers: [brew]
   b:
     requires: [a]
-    installMethods: [brew]
+    installers: [brew]
 `
 	in, _ := newInstaller(t, yml, "darwin", cmdMap([]string{"brew"}), Options{})
 	require.ErrorContains(t, in.Install([]string{"a"}), "requires cycle")
@@ -66,7 +67,7 @@ func TestRequiresUnknownPackageErrors(t *testing.T) {
 	const yml = `packages:
   a:
     requires: [nope]
-    installMethods: [brew]
+    installers: [brew]
 `
 	in, _ := newInstaller(t, yml, "darwin", cmdMap([]string{"brew"}), Options{})
 	require.ErrorContains(t, in.Install([]string{"a"}), "unknown package: nope")
@@ -74,70 +75,48 @@ func TestRequiresUnknownPackageErrors(t *testing.T) {
 
 func TestRequestedVersionDrivesVersionManager(t *testing.T) {
 	in, m := newInstaller(t, requiresYaml, "linux", cmdMap([]string{"apt-get", "pyenv"}), Options{})
-	m.Stub = func(argv []string) ([]byte, error) {
-		if strings.HasPrefix(strings.Join(argv, " "), "dpkg -s") {
-			return nil, errNotInstalled
-		}
-		return nil, nil
-	}
+	m.Stub = failOn("dpkg -s")
 	require.NoError(t, in.InstallRequests([]Request{{Name: "python3", Versions: []string{"3.14.2"}}}))
-	calls := strings.Join(m.Calls(), "\n")
-	require.Contains(t, calls, "pyenv install --skip-existing 3.14.2")
-	require.Contains(t, calls, "pyenv global 3.14.2")
-	require.NotContains(t, calls, "3.14.5")
+	requireCalls(t, m, "pyenv install --skip-existing 3.14.2", "pyenv global 3.14.2")
+	refuteCalls(t, m, "3.14.5")
 }
 
 func TestRequestedVersionOverridesEntryDefault(t *testing.T) {
 	in, m := newInstaller(t, requiresYaml, "linux", cmdMap([]string{"apt-get", "pyenv"}), Options{})
-	m.Stub = func(argv []string) ([]byte, error) {
-		if strings.HasPrefix(strings.Join(argv, " "), "dpkg -s") {
-			return nil, errNotInstalled
-		}
-		return nil, nil
-	}
+	m.Stub = failOn("dpkg -s")
 	require.NoError(t, in.InstallRequests([]Request{{Name: "python3", Versions: []string{"3.13.1"}}}))
-	require.Contains(t, strings.Join(m.Calls(), "\n"), "pyenv install --skip-existing 3.13.1")
+	requireCalls(t, m, "pyenv install --skip-existing 3.13.1")
 }
 
 func TestRequestedMultipleVersionsWithGlobal(t *testing.T) {
 	in, m := newInstaller(t, requiresYaml, "linux", cmdMap([]string{"apt-get", "pyenv"}), Options{})
-	m.Stub = func(argv []string) ([]byte, error) {
-		if strings.HasPrefix(strings.Join(argv, " "), "dpkg -s") {
-			return nil, errNotInstalled
-		}
-		return nil, nil
-	}
+	m.Stub = failOn("dpkg -s")
 	require.NoError(t, in.InstallRequests([]Request{
 		{Name: "python3", Versions: []string{"3.14.5", "3.13.1"}, Global: "3.13.1"},
 	}))
-	calls := strings.Join(m.Calls(), "\n")
-	require.Contains(t, calls, "pyenv install --skip-existing 3.14.5")
-	require.Contains(t, calls, "pyenv install --skip-existing 3.13.1")
-	require.Contains(t, calls, "pyenv global 3.13.1")
+	requireCalls(t, m,
+		"pyenv install --skip-existing 3.14.5",
+		"pyenv install --skip-existing 3.13.1",
+		"pyenv global 3.13.1")
 }
 
 func TestRequestedGlobalDefaultsToFirstVersion(t *testing.T) {
 	in, m := newInstaller(t, requiresYaml, "linux", cmdMap([]string{"apt-get", "pyenv"}), Options{})
-	m.Stub = func(argv []string) ([]byte, error) {
-		if strings.HasPrefix(strings.Join(argv, " "), "dpkg -s") {
-			return nil, errNotInstalled
-		}
-		return nil, nil
-	}
+	m.Stub = failOn("dpkg -s")
 	require.NoError(t, in.InstallRequests([]Request{
 		{Name: "python3", Versions: []string{"3.14.5", "3.13.1"}},
 	}))
-	require.Contains(t, strings.Join(m.Calls(), "\n"), "pyenv global 3.14.5")
+	requireCalls(t, m, "pyenv global 3.14.5")
 }
 
 func TestRequestedMultipleVersionsNeedVersionManager(t *testing.T) {
 	const yml = `packages:
   kind:
-    installMethods:
-      - prebuiltBinariesArchive:
+    installers:
+      - binariesRemoteArchive:
+          platformEligibility: [{linux-amd64: sha256:goodsha}]
           version: 0.32.0
           url: https://example.com/kind-{version}
-          platforms: [{linux-amd64: goodsha}]
 `
 	in, _ := newInstaller(t, yml, "linux", cmdMap([]string{"sha256sum"}), Options{})
 	err := in.InstallRequests([]Request{{Name: "kind", Versions: []string{"0.32.0", "0.31.0"}}})
@@ -148,11 +127,11 @@ func TestRequestedVersionRejectedWhenPinnedAssetDiffers(t *testing.T) {
 	const yml = `packages:
   kind:
     version: "0.32.*"
-    installMethods:
-      - prebuiltBinariesArchive:
+    installers:
+      - binariesRemoteArchive:
+          platformEligibility: [{linux-amd64: sha256:goodsha}]
           version: 0.32.0
           url: https://example.com/kind-{version}
-          platforms: [{linux-amd64: goodsha}]
 `
 	in, _ := newInstaller(t, yml, "linux", cmdMap([]string{"sha256sum"}), Options{})
 	err := in.InstallRequests([]Request{{Name: "kind", Versions: []string{"0.32.1"}}})

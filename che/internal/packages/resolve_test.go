@@ -18,8 +18,12 @@ import (
 var td embed.FS
 
 func testHost(osname, arch string, cmds map[string]string) Host {
+	distro := ""
+	if osname == "linux" {
+		distro = "debian"
+	}
 	return Host{
-		OS: osname, Arch: arch, Euid: 501,
+		OS: osname, Arch: arch, Distro: distro, Euid: 501,
 		LookPath: func(name string) (string, error) {
 			if p, ok := cmds[name]; ok {
 				return p, nil
@@ -50,7 +54,7 @@ type itemGot struct {
 	Version    string            `yaml:"version,omitempty"`
 	URL        string            `yaml:"url,omitempty"`
 	Platforms  []string          `yaml:"platformNames,omitempty"`
-	Sha256     map[string]string `yaml:"sha256,omitempty"`
+	Checksums  map[string]string `yaml:"checksums,omitempty"`
 	Run        string            `yaml:"run,omitempty"`
 	ScriptOs   string            `yaml:"scriptOs,omitempty"`
 	ScriptPath string            `yaml:"scriptPath,omitempty"`
@@ -64,8 +68,11 @@ func TestItemUnmarshal(t *testing.T) {
 			return itemGot{}, err
 		}
 		got := itemGot{Mgr: it.Mgr, Name: it.Name}
-		if it.PrebuiltBinariesArchive != nil {
-			got.Version, got.URL, got.Platforms, got.Sha256 = it.PrebuiltBinariesArchive.Version, it.PrebuiltBinariesArchive.URL, it.PrebuiltBinariesArchive.Platforms.Names, it.PrebuiltBinariesArchive.Platforms.Sha
+		if it.Apt != nil {
+			got.Name = it.Apt.PackageName
+		}
+		if it.BinariesRemoteArchive != nil {
+			got.Version, got.URL, got.Platforms, got.Checksums = it.BinariesRemoteArchive.Version, it.BinariesRemoteArchive.URL, it.BinariesRemoteArchive.PlatformEligibility.Names, it.BinariesRemoteArchive.PlatformEligibility.Checksums
 		}
 		if it.Script != nil {
 			got.Run, got.ScriptOs = strings.TrimSpace(it.Script.Run), it.Script.OS

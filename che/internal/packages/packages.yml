@@ -1,13 +1,34 @@
 ##[>] 🤖🤖
-archNameConventions:
+archSchemes:
     go: {amd64: amd64, arm64: arm64}
     uname: {amd64: x86_64, arm64: aarch64}
     odd: {amd64: x86_64, arm64: arm64}
     rust: {amd64: "x86_64-unknown-{os}-musl", arm64: "aarch64-unknown-{os}-gnu"}
-platforms:
-    darwin-arm64: [brew, brew/cask, brew/vscode, prebuiltBinariesArchive, script, npm, go, gem, versionManager]
-    linux-amd64: [apt, prebuiltBinariesArchive, script, npm, go, gem, versionManager]
-    linux-arm64: [apt, prebuiltBinariesArchive, script, npm, go, gem, versionManager]
+osInstallers:
+    linux: &base [binariesRemoteArchive, script, npm, go, gem, pyenv, nvm]
+    linux-debian: [apt, *base]
+    darwin: [brew, brew/cask, vscode, *base]
+installerRegistries:
+    brew:
+        - azure/azure-cli
+        - cirruslabs/cli
+        - hashicorp/tap
+        - konradodwrot/tap
+    apt:
+        - url: https://deb.debian.org/debian
+          verificationKey: /usr/share/keyrings/debian-archive-keyring.gpg
+          suites: bookworm-backports
+          components: main
+        - url: https://download.docker.com/linux/debian
+          verificationKey: https://download.docker.com/linux/debian/gpg
+        - url: https://packages.cloud.google.com/apt
+          verificationKey: https://packages.cloud.google.com/apt/doc/apt-key.gpg
+          suites: cloud-sdk
+          components: main
+        - url: https://konradodwrot.gitlab.io/go-modules/apt
+          verificationKey: https://konradodwrot.gitlab.io/go-modules/apt/gpg.key
+          suites: stable
+          components: main
 basePackages:
     common:
         - curl
@@ -16,462 +37,467 @@ basePackages:
     apt:
         - apt-transport-https
         - ca-certificates
-        - gnupg
+        - gpg
+    vscode:
+        - code
 packages:
     anthropic.claude-code:
         version: 2.1.224
-        installMethods:
-            - brew:
-                vscode: anthropic.claude-code
+        installers:
+            - vscode
     apt-transport-https:
-        version: __the_one_published__
-        installMethods:
+        installers:
             - apt
     aws:
-        version: 2.36.18
-        installMethods:
-            - brew: awscli
-            - prebuiltBinariesArchive:
-                url: https://awscli.amazonaws.com/awscli-exe-linux-{arch}-{version}.zip
-                archConvention: uname
-                platforms: [linux-amd64, linux-arm64]
-                extractBinaries: [aws/dist/aws, aws/dist/aws_completer]
-    az:
-        version: __the_one_published__
-        installMethods:
+        installers:
             - brew:
-                cask: azure/azure-cli/azure-cli-preview
+                packageName: awscli
+            - binariesRemoteArchive:
+                archScheme: uname
+                platformEligibility: [linux-amd64, linux-arm64]
+                extractBinaries: [aws/dist/aws, aws/dist/aws_completer]
+                version: 2.36.18
+                url: https://awscli.amazonaws.com/awscli-exe-linux-{arch}-{version}.zip
+    az:
+        installers:
+            - brew/cask:
+                packageName: azure-cli-preview
+                fromRegistry: azure/azure-cli
     bat:
-        version: __the_one_published__
-        installMethods:
+        installers:
             - brew
             - apt:
-                installPackages:
-                    bat:
-                        #[why] debian renames the binary (bat is taken by bacula-console-qt): alias it back
-                        aliasBinary:
-                            batcat: bat
+                #[why] debian renames the binary (bat is taken by bacula-console-qt): alias it back
+                aliasBinary:
+                    batcat: bat
     bats:
-        version: __the_one_published__
-        installMethods:
-            - brew: bats-core
+        installers:
+            - brew:
+                packageName: bats-core
             - apt
     beekeeper-studio:
-        version: __the_one_published__
-        installMethods:
-            - brew:
-                cask: beekeeper-studio
+        installers:
+            - brew/cask
     brew:
         - script:
-            remoteUrl: https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh
+            url: https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh
             os: darwin
             env:
                 NONINTERACTIVE: "1"
     ca-certificates:
-        version: __the_one_published__
-        installMethods:
+        installers:
             - apt
     ccstatusline:
         version: 2.2.27
-        installMethods:
+        installers:
             - npm
     charliermarsh.ruff:
         version: 2026.68.0
-        installMethods:
-            - brew:
-                vscode: charliermarsh.ruff
+        installers:
+            - vscode
     che:
         #[why] our own module
         version: latest
         completions:
             zsh:
                 cmd: che completion zsh
-        installMethods:
-            - brew: konradodwrot/tap/che
-            - prebuiltBinariesArchive:
-                url: https://gitlab.com/api/v4/projects/konradodwrot%2Fgo-modules/packages/generic/che/{version}/che_{version}_{os}_{arch}.tar.gz
-                archConvention: go
-                platforms: [darwin-arm64, linux-amd64, linux-arm64]
+        installers:
+            - brew:
+                fromRegistry: konradodwrot/tap
+            - apt:
+                fromRegistry: konradodwrot.gitlab.io/go-modules/apt
+            - binariesRemoteArchive:
+                archScheme: go
+                platformEligibility: [darwin-arm64, linux-amd64, linux-arm64]
                 extractBinaries: [che, render-tpl, render-dirs-tree, render-makefile-doc, render-repo-group-index]
+                url: https://gitlab.com/api/v4/projects/konradodwrot%2Fgo-modules/packages/generic/che/{version}/che_{version}_{os}_{arch}.tar.gz
             - script:
-                remoteUrl: https://konradodwrot.gitlab.io/go-modules/install.sh
+                url: https://konradodwrot.gitlab.io/go-modules/install.sh
     cilium:
-        version: 0.19.7
-        installMethods:
-            - brew: cilium-cli
-            - prebuiltBinariesArchive:
-                url: https://github.com/cilium/cilium-cli/releases/download/v{version}/cilium-{os}-{arch}.tar.gz
-                archConvention: go
+        installers:
+            - brew:
+                packageName: cilium-cli
+            - binariesRemoteArchive:
+                archScheme: go
                 extractBinaries: [cilium]
-                platforms:
-                    - linux-amd64: cd15e0983bf0acc7946cd05d453d1e58376ea92dec2642e745212df2b07d8852
-                    - linux-arm64: 9482937f14061fb239f2dbb2f97f4103de1b101f5d5defbff319f294f9bd540f
+                platformEligibility:
+                    - linux-amd64: sha256:cd15e0983bf0acc7946cd05d453d1e58376ea92dec2642e745212df2b07d8852
+                    - linux-arm64: sha256:9482937f14061fb239f2dbb2f97f4103de1b101f5d5defbff319f294f9bd540f
+                version: 0.19.7
+                url: https://github.com/cilium/cilium-cli/releases/download/v{version}/cilium-{os}-{arch}.tar.gz
     claude:
-        version: 2.1.224
         completions:
             zsh:
                 url: https://raw.githubusercontent.com/wbingli/zsh-claudecode-completion/01f50d4a8a98b91cf6d9359deb37d60668c49806/_claude
-                sha256: 9bf8cd7077082b03f17d6b595544879ee401d2c8a3afafcdedcf141a298f1d79
-        installMethods:
-            - brew:
-                cask: claude-code
-            - npm: '@anthropic-ai/claude-code'
+                checksum: sha256:9bf8cd7077082b03f17d6b595544879ee401d2c8a3afafcdedcf141a298f1d79
+        installers:
+            - brew/cask:
+                packageName: claude-code
+            - npm:
+                packageName: '@anthropic-ai/claude-code'
+                version: 2.1.224
     code:
-        version: __the_one_published__
-        installMethods:
-            - brew:
-                cask: visual-studio-code
+        installers:
+            - brew/cask:
+                packageName: visual-studio-code
     codex:
-        version: 0.147.0
         requires:
             - ruby
         completions:
             zsh:
                 cmd: codex completion zsh
-        installMethods:
-            - brew:
-                cask: codex
-            - npm: '@openai/codex'
+        installers:
+            - brew/cask
+            - npm:
+                packageName: '@openai/codex'
+                version: 0.147.0
     copilot:
         version: 1.0.78
-        installMethods:
-            - npm: '@github/copilot'
+        installers:
+            - npm:
+                packageName: '@github/copilot'
     corepack:
         version: 0.35.0
-        installMethods:
+        installers:
             - npm
+    containerd:
+        version: 2.3.3
+        installers:
+            - apt:
+                packageName: containerd.io
+                versionMap: {"2.3.3": "2.3.3-1~debian.12~bookworm"}
+                fromRegistry: download.docker.com/linux/debian
     curl:
-        version: __the_one_published__
-        installMethods:
+        installers:
             - brew
-            - apt
+            - apt:
+                versionMap: {"8.14.1": "8.14.1-2+deb13u2~bpo13+1"}
+                fromRegistry: deb.debian.org/debian
     docker:
-        version: __the_one_published__
+        version: 29.7.2
+        requires:
+            - dockerd
+            - containerd
+            - docker-buildx-plugin
+            - docker-compose-plugin
         completions:
             zsh:
                 cmd: docker completion zsh
-        installMethods:
+        installers:
             - apt:
-                installPackages:
-                    - docker-ce
-                    - docker-ce-cli
-                    - containerd.io
-                    - docker-buildx-plugin
-                    - docker-compose-plugin
-                fromSource:
-                    url: https://download.docker.com/linux/debian
-                    verificationKey: https://download.docker.com/linux/debian/gpg
+                packageName: docker-ce-cli
+                versionMap: {"29.7.2": "5:29.7.2-1~debian.12~bookworm"}
+                fromRegistry: download.docker.com/linux/debian
+    docker-buildx-plugin:
+        version: 0.36.1
+        installers:
+            - apt:
+                versionMap: {"0.36.1": "0.36.1-1~debian.12~bookworm"}
+                fromRegistry: download.docker.com/linux/debian
+    docker-compose-plugin:
+        version: 5.4.0
+        installers:
+            - apt:
+                versionMap: {"5.4.0": "5.4.0-1~debian.12~bookworm"}
+                fromRegistry: download.docker.com/linux/debian
+    dockerd:
+        version: 29.7.2
+        installers:
+            - apt:
+                packageName: docker-ce
+                versionMap: {"29.7.2": "5:29.7.2-1~debian.12~bookworm"}
+                fromRegistry: download.docker.com/linux/debian
     duti:
-        version: __the_one_published__
-        installMethods:
+        installers:
             - brew
     editorconfig.editorconfig:
         version: 0.18.2
-        installMethods:
-            - brew:
-                vscode: editorconfig.editorconfig
+        installers:
+            - vscode
     esbenp.prettier-vscode:
         version: 12.4.0
-        installMethods:
-            - brew:
-                vscode: esbenp.prettier-vscode
+        installers:
+            - vscode
     fd:
-        version: __the_one_published__
-        installMethods:
+        installers:
             - brew
-            - apt: fd-find
-    ffmpeg:
-        version: __the_one_published__
-        installMethods:
-            - brew
-            - apt
-    font-jetbrains-mono:
-        version: __the_one_published__
-        installMethods:
-            - brew:
-                cask: font-jetbrains-mono
-    gcc:
-        version: __the_one_published__
-        installMethods:
-            - brew
-            - apt
-    gcloud:
-        version: __the_one_published__
-        installMethods:
             - apt:
-                installPackages:
-                    - google-cloud-cli
-                fromSource:
-                    url: https://packages.cloud.google.com/apt
-                    verificationKey: https://packages.cloud.google.com/apt/doc/apt-key.gpg
-                    suites: cloud-sdk
-                    components: main
-            - brew:
-                cask: gcloud-cli
+                packageName: fd-find
+    ffmpeg:
+        version: "5"
+        installers:
+            - brew
+            - apt:
+                versionMap: {"5": "7:5.1.9-0+deb12u1"}
+    font-jetbrains-mono:
+        installers:
+            - brew/cask
+    gcc:
+        version: "12"
+        installers:
+            - brew
+            - apt:
+                versionMap: {"12": "4:12.2.0-3"}
+    gcloud:
+        installers:
+            - apt:
+                packageName: google-cloud-cli
+                versionMap: {"579.0.0": "579.0.0-0"}
+                fromRegistry: packages.cloud.google.com/apt
+            - brew/cask:
+                packageName: gcloud-cli
     get-os-open-files-with:
         version: latest #[why] own module
-        installMethods:
-            - go: gitlab.com/konradodwrot/go-modules/get-os-open-files-with
+        installers:
+            - go:
+                packageName: gitlab.com/konradodwrot/go-modules/get-os-open-files-with
     gh:
-        version: __the_one_published__
-        installMethods:
+        installers:
             - brew
             - apt
     git:
-        version: __the_one_published__
-        installMethods:
+        installers:
             - brew
-            - apt
+            - apt:
+                versionMap: {"2.39.5": "1:2.39.5-0+deb12u3"}
     gitlab-runner:
-        version: __the_one_published__
-        installMethods:
+        installers:
             - brew
     gitlab-tart-executor:
-        version: __the_one_published__
-        installMethods:
-            - brew: cirruslabs/cli/gitlab-tart-executor
+        installers:
+            - brew:
+                fromRegistry: cirruslabs/cli
     glab:
-        version: 1.112.0
-        installMethods:
+        installers:
             - brew
-            - prebuiltBinariesArchive:
-                url: https://gitlab.com/gitlab-org/cli/-/releases/v{version}/downloads/glab_{version}_linux_{arch}.tar.gz
-                archConvention: go
+            - binariesRemoteArchive:
+                archScheme: go
                 extractBinaries: [bin/glab]
-                platforms:
-                    - linux-amd64: f1c52907558b665f2032b615787d353cd06e54240b501a81f9489bfc8f6a8ebf
-                    - linux-arm64: 54a5fe7de0db23e34151c55e561c28e59e6ef6a7731f7d0ce8a00fa58cd8d8f8
-    gnupg:
-        version: __the_one_published__
-        command: gpg
-        installMethods:
-            - brew
-            - apt
+                platformEligibility:
+                    - linux-amd64: sha256:f1c52907558b665f2032b615787d353cd06e54240b501a81f9489bfc8f6a8ebf
+                    - linux-arm64: sha256:54a5fe7de0db23e34151c55e561c28e59e6ef6a7731f7d0ce8a00fa58cd8d8f8
+                version: 1.112.0
+                url: https://gitlab.com/gitlab-org/cli/-/releases/v{version}/downloads/glab_{version}_linux_{arch}.tar.gz
+    gpg:
+        installers:
+            - brew:
+                packageName: gnupg
+            - apt:
+                packageName: gnupg
+                versionMap: {"2": "2.2.40-1.1+deb12u2"}
     go:
         version: 1.26.5
         completions:
             zsh:
                 name: _golang
                 url: https://raw.githubusercontent.com/zsh-users/zsh-completions/398b4b74775102da7bc6a510a08d0914592f9e62/src/_golang
-                sha256: f36054c235ecc827b66b61deb5cf98221254feefd997751cdc85a07dc6c451c3
-        installMethods:
-            - prebuiltBinariesArchive:
-                url: https://go.dev/dl/go{version}.{os}-{arch}.tar.gz
-                archConvention: go
+                checksum: sha256:f36054c235ecc827b66b61deb5cf98221254feefd997751cdc85a07dc6c451c3
+        installers:
+            - binariesRemoteArchive:
+                archScheme: go
                 extractBinaries: [go/bin/go, go/bin/gofmt]
-                platforms: [darwin-arm64, linux-amd64, linux-arm64]
+                platformEligibility: [darwin-arm64, linux-amd64, linux-arm64]
+                url: https://go.dev/dl/go{version}.{os}-{arch}.tar.gz
     golang.go:
         version: 0.56.0
-        installMethods:
-            - brew:
-                vscode: golang.go
+        installers:
+            - vscode
     gopls:
         version: 0.23.0
-        installMethods:
-            - go: golang.org/x/tools/gopls
+        installers:
+            - go:
+                packageName: golang.org/x/tools/gopls
     goreleaser:
-        version: 2.17.1
-        installMethods:
+        installers:
             - brew
-            - prebuiltBinariesArchive:
-                url: https://github.com/goreleaser/goreleaser/releases/download/v{version}/goreleaser_Linux_{arch}.tar.gz
-                archConvention: odd
+            - binariesRemoteArchive:
+                archScheme: odd
                 extractBinaries: [goreleaser]
-                platforms:
-                    - linux-amd64: a99bbc7ae0d8d897b07c4c497a9b62f222558804715ef219d1af05a7e417bc80
-                    - linux-arm64: 702f03769ac8bcb0e47839c82243cc614ae995633599a98c63062e13ea85f829
+                platformEligibility:
+                    - linux-amd64: sha256:a99bbc7ae0d8d897b07c4c497a9b62f222558804715ef219d1af05a7e417bc80
+                    - linux-arm64: sha256:702f03769ac8bcb0e47839c82243cc614ae995633599a98c63062e13ea85f829
+                version: 2.17.1
+                url: https://github.com/goreleaser/goreleaser/releases/download/v{version}/goreleaser_Linux_{arch}.tar.gz
     grafana:
-        version: __the_one_published__
-        installMethods:
+        installers:
             - brew
     hoovercj.vscode-settings-cycler:
         version: 1.0.1
-        installMethods:
-            - brew:
-                vscode: hoovercj.vscode-settings-cycler
+        installers:
+            - vscode
     htop:
-        version: __the_one_published__
-        installMethods:
+        installers:
             - brew
             - apt
     jaeger:
         version: 2.20.0
-        installMethods:
-            - prebuiltBinariesArchive:
-                url: https://github.com/jaegertracing/jaeger/releases/download/v{version}/jaeger-{version}-darwin-arm64.tar.gz
+        installers:
+            - binariesRemoteArchive:
                 extractBinaries: ["jaeger-{version}-darwin-arm64/jaeger"]
-                platforms:
-                    - darwin-arm64: b2d21051b27f06535c288dd63e15a42d5aae653d0113695014d7e6b502736e5d
+                platformEligibility:
+                    - darwin-arm64: sha256:b2d21051b27f06535c288dd63e15a42d5aae653d0113695014d7e6b502736e5d
+                url: https://github.com/jaegertracing/jaeger/releases/download/v{version}/jaeger-{version}-darwin-arm64.tar.gz
     jq:
-        version: __the_one_published__
-        installMethods:
+        installers:
             - brew
             - apt
     kind:
-        version: 0.32.0
         completions:
             zsh:
                 cmd: kind completion zsh
-        installMethods:
+        installers:
             - brew
-            - prebuiltBinariesArchive:
+            - binariesRemoteArchive:
+                archScheme: go
+                platformEligibility:
+                    - linux-amd64: sha256:50030de23cf40a18505f20426f6a8506bedf13c6e509244bd1fa9463721b0f54
+                    - linux-arm64: sha256:b92cd615e97585de8ddade28ed5cd7feb4248d717c233eea5b03c37298900f5d
+                version: 0.32.0
                 url: https://github.com/kubernetes-sigs/kind/releases/download/v{version}/kind-{os}-{arch}
-                archConvention: go
-                platforms:
-                    - linux-amd64: 50030de23cf40a18505f20426f6a8506bedf13c6e509244bd1fa9463721b0f54
-                    - linux-arm64: b92cd615e97585de8ddade28ed5cd7feb4248d717c233eea5b03c37298900f5d
     kitty:
-        version: __the_one_published__
-        installMethods:
+        installers:
             - script:
                 os: darwin
-                remoteUrl: https://sw.kovidgoyal.net/kitty/installer.sh
+                url: https://sw.kovidgoyal.net/kitty/installer.sh
                 args: [launch=n]
         #[why] the installer only drops kitty.app: without the links the binary never reaches PATH
         postInstall:
             path: scripts/post-install-kitty.sh
     kubectl:
-        version: 1.36.3
         completions:
             zsh:
                 cmd: kubectl completion zsh
-        installMethods:
+        installers:
             - brew
-            - prebuiltBinariesArchive:
+            - binariesRemoteArchive:
+                archScheme: go
+                platformEligibility:
+                    - linux-amd64: sha256:ebbd080e7c2e275093b55915722043257eb24004363e20acb3c4d71919f88336
+                    - linux-arm64: sha256:3d86f24401c41ae5a46ac50eef8865fe891d3647d324a0836f6c63757a126e62
+                version: 1.36.3
                 url: https://dl.k8s.io/release/v{version}/bin/{os}/{arch}/kubectl
-                archConvention: go
-                platforms:
-                    - linux-amd64: ebbd080e7c2e275093b55915722043257eb24004363e20acb3c4d71919f88336
-                    - linux-arm64: 3d86f24401c41ae5a46ac50eef8865fe891d3647d324a0836f6c63757a126e62
         versionCommand: kubectl version --client
     kubectx:
         version: 0.11.0
         completions:
             zsh:
                 url: https://raw.githubusercontent.com/ahmetb/kubectx/v0.11.0/completion/_kubectx.zsh
-                sha256: 410b5315f7a91b1c210cbc86c9cc4dda065f2ac180b490f3ebbf7e764ab6b470
-        installMethods:
-            - prebuiltBinariesArchive:
-                url: https://github.com/ahmetb/kubectx/releases/download/v{version}/kubectx_v{version}_{os}_{arch}.tar.gz
-                archConvention: odd
+                checksum: sha256:410b5315f7a91b1c210cbc86c9cc4dda065f2ac180b490f3ebbf7e764ab6b470
+        installers:
+            - binariesRemoteArchive:
+                archScheme: odd
                 extractBinaries: [kubectx]
-                platforms: [darwin-arm64, linux-amd64, linux-arm64]
+                platformEligibility: [darwin-arm64, linux-amd64, linux-arm64]
+                url: https://github.com/ahmetb/kubectx/releases/download/v{version}/kubectx_v{version}_{os}_{arch}.tar.gz
     kubens:
         version: 0.11.0
         completions:
             zsh:
                 url: https://raw.githubusercontent.com/ahmetb/kubectx/v0.11.0/completion/_kubens.zsh
-                sha256: 084c226035af951e582020b2bc055a6521929ee54d8942b4d19577e5d45fd8f7
-        installMethods:
-            - prebuiltBinariesArchive:
-                url: https://github.com/ahmetb/kubectx/releases/download/v{version}/kubens_v{version}_{os}_{arch}.tar.gz
-                archConvention: odd
+                checksum: sha256:084c226035af951e582020b2bc055a6521929ee54d8942b4d19577e5d45fd8f7
+        installers:
+            - binariesRemoteArchive:
+                archScheme: odd
                 extractBinaries: [kubens]
-                platforms: [darwin-arm64, linux-amd64, linux-arm64]
+                platformEligibility: [darwin-arm64, linux-amd64, linux-arm64]
+                url: https://github.com/ahmetb/kubectx/releases/download/v{version}/kubens_v{version}_{os}_{arch}.tar.gz
     lefthook:
-        version: 2.1.10
-        installMethods:
+        installers:
             - brew
-            - prebuiltBinariesArchive:
+            - binariesRemoteArchive:
+                archScheme: odd
+                platformEligibility:
+                    - linux-amd64: sha256:f1de34ea0572363a525a2000d40f5a646733893ad28c924b34ac98304518073f
+                    - linux-arm64: sha256:9e4e2eac3f72eb6757eb01ff147622dd16a4805d3a5c2c7a701982df79eb1bd5
+                version: 2.1.10
                 url: https://github.com/evilmartians/lefthook/releases/download/v{version}/lefthook_{version}_Linux_{arch}
-                archConvention: odd
-                platforms:
-                    - linux-amd64: f1de34ea0572363a525a2000d40f5a646733893ad28c924b34ac98304518073f
-                    - linux-arm64: 9e4e2eac3f72eb6757eb01ff147622dd16a4805d3a5c2c7a701982df79eb1bd5
-            - prebuiltBinariesArchive:
+            - binariesRemoteArchive:
+                archScheme: odd
+                platformEligibility:
+                    - darwin-arm64: sha256:d00711fcd2613d232a9bdc24a5e6704367ce505db27a88e670dd73bc40bb1fd9
+                version: 2.1.10
                 url: https://github.com/evilmartians/lefthook/releases/download/v{version}/lefthook_{version}_MacOS_{arch}
-                archConvention: odd
-                platforms:
-                    - darwin-arm64: d00711fcd2613d232a9bdc24a5e6704367ce505db27a88e670dd73bc40bb1fd9
-            - npm
+            - npm:
+                version: 2.1.10
     libbz2:
-        version: __the_one_published__
-        installMethods:
-            - apt: libbz2-dev
+        installers:
+            - apt:
+                packageName: libbz2-dev
     libffi:
-        version: __the_one_published__
-        installMethods:
-            - apt: libffi-dev
+        installers:
+            - apt:
+                packageName: libffi-dev
     liblzma:
-        version: __the_one_published__
-        installMethods:
-            - apt: liblzma-dev
+        version: 5.4.1
+        installers:
+            - apt:
+                packageName: liblzma-dev
+                versionMap: {"5.4.1": "5.4.1-1+deb12u1"}
     libsqlite3:
-        version: __the_one_published__
-        installMethods:
-            - apt: libsqlite3-dev
+        installers:
+            - apt:
+                packageName: libsqlite3-dev
     libtool:
-        version: __the_one_published__
-        installMethods:
+        installers:
             - brew
             - apt
     logcli:
-        version: __the_one_published__
-        installMethods:
+        installers:
             - brew
     loki:
-        version: __the_one_published__
-        installMethods:
+        installers:
             - brew
     make:
-        version: __the_one_published__
-        installMethods:
+        installers:
             - brew
             - apt
     mindaro-dev.file-downloader:
         version: 1.0.13
-        installMethods:
-            - brew:
-                vscode: mindaro-dev.file-downloader
+        installers:
+            - vscode
     ms-azuretools.vscode-containers:
         version: 2.4.5
-        installMethods:
-            - brew:
-                vscode: ms-azuretools.vscode-containers
+        installers:
+            - vscode
     ms-kubernetes-tools.vscode-kubernetes-tools:
         version: 1.4.1
-        installMethods:
-            - brew:
-                vscode: ms-kubernetes-tools.vscode-kubernetes-tools
+        installers:
+            - vscode
     ms-python.debugpy:
         version: 2026.6.0
-        installMethods:
-            - brew:
-                vscode: ms-python.debugpy
+        installers:
+            - vscode
     ms-python.python:
         version: 2026.4.0
-        installMethods:
-            - brew:
-                vscode: ms-python.python
+        installers:
+            - vscode
     ms-python.vscode-python-envs:
         version: 1.36.0
-        installMethods:
-            - brew:
-                vscode: ms-python.vscode-python-envs
+        installers:
+            - vscode
     ms-vscode-remote.remote-containers:
         version: 0.466.0
-        installMethods:
-            - brew:
-                vscode: ms-vscode-remote.remote-containers
+        installers:
+            - vscode
     nmap:
-        version: __the_one_published__
-        installMethods:
+        installers:
             - brew
-            - apt
+            - apt:
+                versionMap: {"7.94": "7.94+git20230807.3be01efb1+dfsg-4~bpo12+1"}
+                fromRegistry: deb.debian.org/debian
     node:
         version: 24.19.0
         requires:
             - nvm
-        installMethods:
-            - versionManager:
-                tool: nvm
+        installers:
+            - nvm:
                 versions:
                     - 24.19.0
                     - 22.23.2
                 global: 24.19.0
     nvm:
         - script:
-            remoteUrl: https://raw.githubusercontent.com/nvm-sh/nvm/v0.40.6/install.sh
+            url: https://raw.githubusercontent.com/nvm-sh/nvm/v0.40.6/install.sh
             env:
                 NVM_DIR: $XDG_CONFIG_HOME/nvm
                 #[why] the installer otherwise appends its bootstrap lines to ~/.zshrc, a che-managed
@@ -480,104 +506,100 @@ packages:
             #[why] nvm is a sourced function, never a binary on PATH: this file marks it installed
             validateArtifact: $XDG_CONFIG_HOME/nvm/nvm.sh
     ollama:
-        version: __the_one_published__
-        installMethods:
-            - brew:
-                cask: ollama
+        installers:
+            - brew/cask:
+                packageName: ollama-app
             - script:
                 os: linux
-                remoteUrl: https://ollama.com/install.sh
+                url: https://ollama.com/install.sh
     op:
-        version: __the_one_published__
-        installMethods:
-            - brew:
-                cask: 1password-cli
+        installers:
+            - brew/cask:
+                packageName: 1password-cli
     openai.chatgpt:
         version: 26.623.31921
-        installMethods:
-            - brew:
-                vscode: openai.chatgpt
+        installers:
+            - vscode
     openssh:
-        version: __the_one_published__
-        installMethods:
+        installers:
             - brew
-            - apt: openssh-client
+            - apt:
+                packageName: openssh-client
+                versionMap: {"10.0p1": "1:10.0p1-7~bpo12+1"}
+                fromRegistry: deb.debian.org/debian
     openssl:
-        version: __the_one_published__
-        installMethods:
-            - brew: openssl@3
-            - apt: libssl-dev
+        version: "3.0"
+        installers:
+            - brew
+            - apt:
+                packageName: libssl-dev
+                versionMap: {"3.0": "3.0.20-1~deb12u2"}
     otelcol:
         version: 0.158.0
-        installMethods:
-            - prebuiltBinariesArchive:
-                url: https://github.com/open-telemetry/opentelemetry-collector-releases/releases/download/v{version}/otelcol_{version}_{os}_{arch}.tar.gz
-                archConvention: go
+        installers:
+            - binariesRemoteArchive:
+                archScheme: go
                 extractBinaries: [otelcol]
-                platforms:
-                    - darwin-arm64: a4fc106889faa4ffcd43c062cc8fd14c1eff6d2f53bef64930b3199bd8303095
-                    - linux-amd64: 589da4823bca1e14f074c91e4d7f842548ee6d2662f0621cca57246bbe49e321
-                    - linux-arm64: e2c72ed188d5e27edca43b32ba6e07d271737bcca04f2869f270ed60750e3f83
+                platformEligibility:
+                    - darwin-arm64: sha256:a4fc106889faa4ffcd43c062cc8fd14c1eff6d2f53bef64930b3199bd8303095
+                    - linux-amd64: sha256:589da4823bca1e14f074c91e4d7f842548ee6d2662f0621cca57246bbe49e321
+                    - linux-arm64: sha256:e2c72ed188d5e27edca43b32ba6e07d271737bcca04f2869f270ed60750e3f83
+                url: https://github.com/open-telemetry/opentelemetry-collector-releases/releases/download/v{version}/otelcol_{version}_{os}_{arch}.tar.gz
     packer:
-        version: __the_one_published__
-        installMethods:
-            - brew: hashicorp/tap/packer
+        installers:
+            - brew:
+                fromRegistry: hashicorp/tap
     pandoc:
-        version: __the_one_published__
-        installMethods:
+        installers:
             - brew
             - apt
     patch:
-        version: __the_one_published__
-        installMethods:
+        installers:
             - apt
     pcre2:
-        version: __the_one_published__
-        installMethods:
+        installers:
             - brew
-            - apt: libpcre2-dev
+            - apt:
+                packageName: libpcre2-dev
     pipx:
-        version: __the_one_published__
-        installMethods:
+        installers:
             - brew
             - apt
     pkgconf:
-        version: __the_one_published__
-        installMethods:
+        installers:
             - brew
             - apt
     pnpm:
-        version: 11.20.0
-        installMethods:
+        installers:
             - brew
-            - npm
+            - npm:
+                version: 11.20.0
     procs:
-        version: __the_one_published__
-        installMethods:
+        installers:
             - brew
     prometheus:
         version: 3.13.2
-        installMethods:
-            - prebuiltBinariesArchive:
-                url: https://github.com/prometheus/prometheus/releases/download/v{version}/prometheus-{version}.{os}-{arch}.tar.gz
-                archConvention: go
+        installers:
+            - binariesRemoteArchive:
+                archScheme: go
                 extractBinaries: ["prometheus-{version}.{os}-{arch}/prometheus", "prometheus-{version}.{os}-{arch}/promtool"]
-                platforms:
-                    - darwin-arm64: f68ca4f1dbedd6366bbfdd8ac5d2c0b7ba1f273474acc8d38eb33202fbeec7a4
+                platformEligibility:
+                    - darwin-arm64: sha256:f68ca4f1dbedd6366bbfdd8ac5d2c0b7ba1f273474acc8d38eb33202fbeec7a4
+                url: https://github.com/prometheus/prometheus/releases/download/v{version}/prometheus-{version}.{os}-{arch}.tar.gz
     pstree:
-        version: __the_one_published__
-        installMethods:
+        installers:
             - brew
-            - apt: psmisc
+            - apt:
+                packageName: psmisc
     pyenv:
         - brew
         - script:
-            remoteUrl: https://pyenv.run
+            url: https://pyenv.run
     pyright:
-        version: 1.1.411
-        installMethods:
+        installers:
             - brew
-            - npm
+            - npm:
+                version: 1.1.411
     python3:
         version: 3.14.6
         requires:
@@ -592,174 +614,171 @@ packages:
             - libffi
             - liblzma
             - libsqlite3
-        installMethods:
-            - versionManager:
-                tool: pyenv
+        installers:
+            - pyenv:
                 versions:
                     - 3.14.6
                     - 3.13.14
                 global: 3.14.6
     readline:
-        version: __the_one_published__
-        installMethods:
+        installers:
             - brew
-            - apt: libreadline-dev
+            - apt:
+                packageName: libreadline-dev
     redhat.vscode-yaml:
         version: 1.24.0
-        installMethods:
-            - brew:
-                vscode: redhat.vscode-yaml
+        installers:
+            - vscode
     rg:
-        version: 14.1.1
         completions:
             zsh:
                 cmd: rg --generate=complete-zsh
-        installMethods:
-            - brew: ripgrep
+        installers:
+            - brew:
+                packageName: ripgrep
             #[why] not apt: bookworm ships ripgrep 13.x;
-            - prebuiltBinariesArchive:
-                url: https://github.com/BurntSushi/ripgrep/releases/download/{version}/ripgrep-{version}-{arch}.tar.gz
-                archConvention: rust
+            - binariesRemoteArchive:
+                archScheme: rust
                 extractBinaries: ["ripgrep-{version}-{arch}/rg"]
-                platforms:
-                    - linux-arm64: c827481c4ff4ea10c9dc7a4022c8de5db34a5737cb74484d62eb94a95841ab2f
-                    - linux-amd64: 4cf9f2741e6c465ffdb7c26f38056a59e2a2544b51f7cc128ef28337eeae4d8e
+                platformEligibility:
+                    - linux-arm64: sha256:c827481c4ff4ea10c9dc7a4022c8de5db34a5737cb74484d62eb94a95841ab2f
+                    - linux-amd64: sha256:4cf9f2741e6c465ffdb7c26f38056a59e2a2544b51f7cc128ef28337eeae4d8e
+                version: 14.1.1
+                url: https://github.com/BurntSushi/ripgrep/releases/download/{version}/ripgrep-{version}-{arch}.tar.gz
     ruby:
-        version: __the_one_published__
-        installMethods:
+        version: "3.1"
+        installers:
             - brew
-            - apt: ruby-full
+            - apt:
+                packageName: ruby-full
+                versionMap: {"3.1": "1:3.1"}
     ruby-dev:
-        version: __the_one_published__
-        installMethods:
-            - apt: ruby-dev
+        installers:
+            - apt
     ruby-lsp:
         version: 0.26.10
-        installMethods:
-            - gem: ruby-lsp
+        installers:
+            - gem
     shellcheck:
-        version: __the_one_published__
-        installMethods:
+        installers:
             - brew
             - apt
     showkey:
-        version: __the_one_published__
-        installMethods:
+        installers:
             - brew
-            - apt: kbd
+            - apt:
+                packageName: kbd
     sqlite3:
-        version: __the_one_published__
-        installMethods:
-            - brew: sqlite
+        installers:
+            - brew:
+                packageName: sqlite
             - apt
     stow:
-        version: __the_one_published__
-        installMethods:
+        installers:
             - brew
             - apt
     tamasfe.even-better-toml:
         version: 0.21.2
-        installMethods:
-            - brew:
-                vscode: tamasfe.even-better-toml
+        installers:
+            - vscode
     tart:
-        version: __the_one_published__
-        installMethods:
-            - brew: cirruslabs/cli/tart
+        installers:
+            - brew:
+                fromRegistry: cirruslabs/cli
     tcl:
-        version: __the_one_published__
-        installMethods:
-            - brew: tcl-tk
-            - apt
+        version: "8"
+        installers:
+            - brew:
+                packageName: tcl-tk
+            - apt:
+                versionMap: {"8": "8.6.13"}
     terraform:
         version: 1.15.8
-        installMethods:
-            - prebuiltBinariesArchive:
+        installers:
+            - binariesRemoteArchive:
+                archScheme: go
+                platformEligibility:
+                    - darwin-arm64: sha256:f210110c5698b94d803a7a63cdb0251b5455c150841478808e2bbb343f95ed68
+                    - linux-amd64: sha256:d25ce7b6902013ad905db3d2eab0be4cd905887fe88b81a6171b8d5503c31f3d
+                    - linux-arm64: sha256:8891e9dcedc9e3b8950bc6af9d4d8af1f4cfade3062f53b9dc403a89f6ce8c9c
                 url: https://releases.hashicorp.com/terraform/{version}/terraform_{version}_{os}_{arch}.zip
-                archConvention: go
-                platforms:
-                    - darwin-arm64: f210110c5698b94d803a7a63cdb0251b5455c150841478808e2bbb343f95ed68
-                    - linux-amd64: d25ce7b6902013ad905db3d2eab0be4cd905887fe88b81a6171b8d5503c31f3d
-                    - linux-arm64: 8891e9dcedc9e3b8950bc6af9d4d8af1f4cfade3062f53b9dc403a89f6ce8c9c
     tmux:
-        version: __the_one_published__
-        installMethods:
+        installers:
             - brew
-            - apt
+            - apt:
+                versionMap: {"3.5a": "3.5a-2~bpo12+1"}
+                fromRegistry: deb.debian.org/debian
     tree:
-        version: __the_one_published__
-        installMethods:
+        installers:
             - brew
             - apt
     tsc:
-        version: 7.0.2
-        installMethods:
-            - brew: typescript
-            - npm: typescript
+        installers:
+            - brew:
+                packageName: typescript
+            - npm:
+                packageName: typescript
+                version: 7.0.2
     typescript-language-server:
-        version: 5.3.0
-        installMethods:
+        installers:
             - brew
-            - npm
+            - npm:
+                version: 5.3.0
     unzip:
-        version: __the_one_published__
-        installMethods:
+        installers:
             - apt
     uv:
-        version: __the_one_published__
-        installMethods:
+        installers:
             - brew
     watch:
-        version: __the_one_published__
-        installMethods:
+        installers:
             - brew
-            - apt: procps
+            - apt:
+                packageName: procps
     xz:
-        version: __the_one_published__
-        installMethods:
+        installers:
             - brew
-            - apt: xz-utils
+            - apt:
+                packageName: xz-utils
+                versionMap: {"5.4.1": "5.4.1-1+deb12u1"}
     yq:
-        version: 4.53.3
-        installMethods:
+        installers:
             - brew
-            - prebuiltBinariesArchive:
+            - binariesRemoteArchive:
+                archScheme: go
+                platformEligibility:
+                    - darwin-arm64: sha256:877de31753a4dd2401aa048937aa9a7fc4d5f6ce858cf31508c5802954297213
+                    - linux-amd64: sha256:fa52a4e758c63d38299163fbdd1edfb4c4963247918bf9c1c5d31d84789eded4
+                    - linux-arm64: sha256:578648e463a11c1b6db6010cbf41eafed6bee79466fcffa1bb446672cf7945ea
+                version: 4.53.3
                 url: https://github.com/mikefarah/yq/releases/download/v{version}/yq_{os}_{arch}
-                archConvention: go
-                platforms:
-                    - darwin-arm64: 877de31753a4dd2401aa048937aa9a7fc4d5f6ce858cf31508c5802954297213
-                    - linux-amd64: fa52a4e758c63d38299163fbdd1edfb4c4963247918bf9c1c5d31d84789eded4
-                    - linux-arm64: 578648e463a11c1b6db6010cbf41eafed6bee79466fcffa1bb446672cf7945ea
     yzhang.markdown-all-in-one:
         version: 3.6.3
-        installMethods:
-            - brew:
-                vscode: yzhang.markdown-all-in-one
+        installers:
+            - vscode
     zig:
-        version: 0.16.0
-        installMethods:
+        installers:
             - brew
-            - prebuiltBinariesArchive:
-                url: https://ziglang.org/download/{version}/zig-{arch}-linux-{version}.tar.xz
-                archConvention: uname
+            - binariesRemoteArchive:
+                archScheme: uname
                 extractBinaries: ["zig-{arch}-linux-{version}/zig"]
-                platforms:
-                    - darwin-arm64: b23d70deaa879b5c2d486ed3316f7eaa53e84acf6fc9cc747de152450d401489
-                    - linux-amd64: 70e49664a74374b48b51e6f3fdfbf437f6395d42509050588bd49abe52ba3d00
-                    - linux-arm64: ea4b09bfb22ec6f6c6ceac57ab63efb6b46e17ab08d21f69f3a48b38e1534f17
+                platformEligibility:
+                    - darwin-arm64: sha256:b23d70deaa879b5c2d486ed3316f7eaa53e84acf6fc9cc747de152450d401489
+                    - linux-amd64: sha256:70e49664a74374b48b51e6f3fdfbf437f6395d42509050588bd49abe52ba3d00
+                    - linux-arm64: sha256:ea4b09bfb22ec6f6c6ceac57ab63efb6b46e17ab08d21f69f3a48b38e1534f17
+                version: 0.16.0
+                url: https://ziglang.org/download/{version}/zig-{arch}-linux-{version}.tar.xz
     zlib:
-        version: __the_one_published__
-        installMethods:
+        installers:
             - brew
-            - apt: zlib1g-dev
+            - apt:
+                packageName: zlib1g-dev
     zsh:
-        version: __the_one_published__
-        installMethods:
+        installers:
             - brew
             - apt
     zstd:
-        version: __the_one_published__
-        installMethods:
+        installers:
             - brew
             - apt
 ##[<] 🤖🤖

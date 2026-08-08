@@ -90,7 +90,7 @@ func TestDiscoverSummary(t *testing.T) {
 		var events []log.Event
 		log.SetSink(func(e log.Event) { events = append(events, e) })
 		t.Cleanup(func() { log.SetSink(nil) })
-		_, err = testutil.CaptureStdout(t, func() error { p.logDiscovered(); return nil })
+		_, err = testutil.CaptureStdout(t, func() error { p.LogDiscovered(); return nil })
 		require.NoError(t, err)
 		require.NotEmpty(t, events, "a discovered heading event")
 		attrs := events[0].Attrs
@@ -98,6 +98,22 @@ func TestDiscoverSummary(t *testing.T) {
 			assert.Equalf(t, want, countOf(t, attrs, op), "op %s in %v", op, attrs)
 		}
 	})
+}
+
+func TestMakeDirsCountsPermsDrift(t *testing.T) {
+	p, _, _ := setupProfile(t, options.Options{})
+	dest := filepath.Join(p.home, "drift-dir")
+	require.NoError(t, os.MkdirAll(dest, 0o755))
+	require.NoError(t, os.Chmod(dest, 0o775))
+	op := &MakeDirsOperationReady{Dirs: []spec.FileItem{{
+		Dests: []spec.DestSpec{{Path: dest}},
+		Perms: spec.Perms{Chmod: "0755"},
+	}}}
+	_, delta := op.counts(p)
+	assert.Equal(t, 1, delta)
+	require.NoError(t, os.Chmod(dest, 0o755))
+	_, delta = op.counts(p)
+	assert.Equal(t, 0, delta)
 }
 
 // [<] 🤖🤖

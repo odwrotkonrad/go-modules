@@ -13,43 +13,79 @@ import (
 )
 
 func (in *Installer) installAptSpec(pkg string, a *AptSpec) error {
-	pkgs := a.InstallPackages.Names
-	if len(pkgs) == 0 {
-		pkgs = []string{pkg}
+	name := a.packageName(pkg)
+	src, err := in.ensureAptRegistry(pkg, a)
+	if err != nil {
+		return err
 	}
-	if in.aptAllInstalled(pkgs) {
-		in.emitSkip(log.Levels.Debug, pkg, "already installed via apt")
+	binPin, pkgPin := in.aptPins(pkg, a)
+	if in.skipInstalledOrEmitReinstall(pkg, "apt", pkgPin, binPin,
+		func() bool { return in.isInstalled(pkg, "apt", name) },
+		func() bool { return in.installedVersion("apt", name) == pkgPin }) {
 		return nil
 	}
 	if in.Opts.DryRun {
-		in.emitDryRun("install", pkg+" via apt")
+		in.emitDryRun("install", labelWithVersion(pkg, binPin)+" via apt")
 		return nil
-	}
-	if a.FromSource != nil {
-		if err := in.ensureAptRepo(pkg, a.FromSource); err != nil {
-			return err
-		}
 	}
 	if err := in.aptUpdate(); err != nil {
 		return err
 	}
-	argv := append([]string{"apt-get", "install", "--yes", "--no-install-recommends"}, pkgs...)
+	argv := []string{"apt-get", "install", "--yes", "--no-install-recommends"}
+	if src != nil && src.Suites != "" {
+		argv = append(argv, "-t", src.Suites)
+	}
+	if pkgPin != "" {
+		argv = append(argv, "--allow-downgrades", name+"="+pkgPin)
+	} else {
+		argv = append(argv, name)
+	}
 	if err := in.exec(in.sudo(argv...)); err != nil {
 		return err
 	}
-	in.emit(log.Levels.Info, "installed", pkg+" via apt")
+	in.emit(log.Levels.Info, "installed", labelWithVersion(pkg, binPin)+" via apt")
 	return nil
 }
 
-func (in *Installer) aptAllInstalled(pkgs []string) bool {
-	_, ok := in.output(append([]string{"dpkg", "-s"}, pkgs...))
-	return ok
+func (in *Installer) ensureAptRegistry(pkg string, a *AptSpec) (*AptRepoSpec, error) {
+	if a.FromRegistry == "" {
+		return nil, nil
+	}
+	src, err := in.File.aptRegistry(a.FromRegistry)
+	if err != nil {
+		return nil, fmt.Errorf("%s: %w", pkg, err)
+	}
+	if src.URL == "" || src.VerificationKey == "" {
+		return nil, fmt.Errorf("%s: apt registry %q requires url and verificationKey", pkg, a.FromRegistry)
+	}
+	if !in.Opts.DryRun {
+		if err := in.ensureAptRepo(aptRegistrySlug(src), src); err != nil {
+			return nil, err
+		}
+	}
+	return src, nil
+}
+
+func (in *Installer) aptPins(pkg string, a *AptSpec) (binPin, pkgPin string) {
+	if r, ok := in.requested[pkg]; ok && len(r.Versions) > 0 {
+		v := r.globalVersion()
+		return v, v
+	}
+	for bin, pkgVer := range a.VersionMap {
+		return bin, pkgVer
+	}
+	pin := in.pinFor(pkg, "")
+	return pin, pin
 }
 
 func (in *Installer) ensureAptRepo(name string, r *AptRepoSpec) error {
-	key := "/etc/apt/keyrings/" + name + ".asc"
+	key := r.VerificationKey
+	download := strings.HasPrefix(key, "http://") || strings.HasPrefix(key, "https://")
+	if download {
+		key = "/etc/apt/keyrings/" + name + ".asc"
+	}
 	src := "/etc/apt/sources.list.d/" + name + ".sources"
-	if fileExists(key) && fileExists(src) {
+	if (!download || fileExists(key)) && fileExists(src) {
 		return nil
 	}
 	suites := r.Suites
@@ -69,20 +105,22 @@ func (in *Installer) ensureAptRepo(name string, r *AptRepoSpec) error {
 		return err
 	}
 	defer func() { _ = os.RemoveAll(tmp) }()
-	asc := filepath.Join(tmp, name+".asc")
-	if err := in.exec(curlArgv(r.VerificationKey, asc)); err != nil {
-		return err
+	if download {
+		asc := filepath.Join(tmp, name+".asc")
+		if err := in.exec(curlArgv(r.VerificationKey, asc)); err != nil {
+			return err
+		}
+		if err := in.exec(in.sudo("install", "-m", "0755", "-d", "/etc/apt/keyrings")); err != nil {
+			return err
+		}
+		if err := in.exec(in.sudo("install", "-m", "0644", asc, key)); err != nil {
+			return err
+		}
 	}
 	sources := filepath.Join(tmp, name+".sources")
 	content := fmt.Sprintf("Types: deb\nURIs: %s\nSuites: %s\nComponents: %s\nArchitectures: %s\nSigned-By: %s\n",
 		r.URL, suites, cmp.Or(r.Components, "stable"), strings.TrimSpace(arch), key)
 	if err := os.WriteFile(sources, []byte(content), 0o644); err != nil {
-		return err
-	}
-	if err := in.exec(in.sudo("install", "-m", "0755", "-d", "/etc/apt/keyrings")); err != nil {
-		return err
-	}
-	if err := in.exec(in.sudo("install", "-m", "0644", asc, key)); err != nil {
 		return err
 	}
 	if err := in.exec(in.sudo("install", "-m", "0644", sources, src)); err != nil {
