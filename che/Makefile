@@ -59,7 +59,7 @@ test-cover:
 
 #[what] merge every present cover-* covdata dir into coverage.out/coverage.xml, print the combined total
 cover-report:
-	@dirs=$$(print -l cover-unit(N) cover-e2e-dryrun(N) cover-e2e-run(N) cover-e2e-backup(N) cover-e2e-packages(N) | paste -sd, -); \
+	@dirs=$$(print -l cover-unit(N) cover-e2e-dryrun(N) cover-e2e-run(N) cover-e2e-backup(N) cover-e2e-packages(N) cover-e2e-install-methods(N) | paste -sd, -); \
 		[[ -n $$dirs ]] || { print "no cover-* covdata dirs"; exit 1 }; \
 		print "merging covdata: $$dirs"; \
 		$(GO) tool covdata textfmt -i=$$dirs -o coverage.out
@@ -92,10 +92,11 @@ e2e-packages: build-cover
 	if [[ -e cover-e2e-packages ]] rm -rf cover-e2e-packages; mkdir -p cover-e2e-packages
 	E2E_BIN=$(CURDIR)/dist/$(BIN) E2E_GOCOVERDIR=$(CURDIR)/cover-e2e-packages CC=$(CC) $(GO) test -v -run TestE2EPackages ./e2e
 
-#[what] real-install e2e per installation method family (METHOD=<method>, default all, prefix matches sub-groups, see e2e/install_methods.yml): installs live packages into a throwaway HOME, then runs each one
+#[what] real-install e2e per installation method family (METHOD=<method>, default all, prefix matches sub-groups, see e2e/install_methods.yml): installs live packages into a throwaway HOME, then runs each one, binary covdata into ./cover-e2e-install-methods
 #[vals] brew/formulae|brew/cask|brew/vscode|apt|prebuiltArchive|script|versionManager|npm|go|all
-e2e-install-methods: build
-	E2E_BIN=$(CURDIR)/dist/$(BIN) E2E_INSTALL_METHOD=$(or $(METHOD),$(E2E_INSTALL_METHOD),all) CC=$(CC) $(GO) test -v -count=1 -timeout 45m -run TestE2EInstallMethods ./e2e
+e2e-install-methods: build-cover
+	if [[ -e cover-e2e-install-methods ]] rm -rf cover-e2e-install-methods; mkdir -p cover-e2e-install-methods
+	E2E_BIN=$(CURDIR)/dist/$(BIN) E2E_GOCOVERDIR=$(CURDIR)/cover-e2e-install-methods E2E_INSTALL_METHOD=$(or $(METHOD),$(E2E_INSTALL_METHOD),all) CC=$(CC) $(GO) test -v -count=1 -timeout 45m -run TestE2EInstallMethods ./e2e
 
 #[what] registry e2e: every brew formula and cask name in the builtin packages file resolves upstream
 e2e-registry:

@@ -104,6 +104,9 @@ func runInstallGroup(t *testing.T, g installGroup) {
 	if v := os.Getenv("SSL_CERT_FILE"); v != "" {
 		env = append(env, "SSL_CERT_FILE="+v)
 	}
+	if dir := os.Getenv("E2E_GOCOVERDIR"); dir != "" {
+		env = append(env, "GOCOVERDIR="+dir)
+	}
 
 	work := t.TempDir()
 	require.NoError(t, os.WriteFile(filepath.Join(work, "che.yml"),

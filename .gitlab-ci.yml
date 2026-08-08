@@ -170,6 +170,9 @@ test-e2e-che-registry:
       allow_failure: true
   script:
     - make -C che e2e-install-methods METHOD="$METHOD"
+  artifacts:
+    paths:
+      - che/cover-e2e-install-methods/
 
 test-install-methods-linux:
   extends: .test-install-methods
@@ -201,7 +204,16 @@ test-install-methods-darwin:
 coverage-che:
   image: $CI_IMAGE
   stage: coverage
-  needs: [test-che, test-e2e-che-dryrun, test-e2e-che-run, test-e2e-che-backup]
+  needs:
+    - test-che
+    - test-e2e-che-dryrun
+    - test-e2e-che-run
+    - test-e2e-che-backup
+    #[why] conditional/manual allow_failure jobs: optional so skipped runs don't block the report
+    - job: test-install-methods-linux
+      optional: true
+    - job: test-install-methods-darwin
+      optional: true
   cache:
     - key: go-mod
       paths:
