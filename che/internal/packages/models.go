@@ -254,8 +254,9 @@ type VersionManagerSpec struct {
 }
 
 type AptSpec struct {
-	InstallPackages AptPackages  `yaml:"installPackages,omitempty"`
-	FromSource      *AptRepoSpec `yaml:"fromSource,omitempty"`
+	InstallPackages AptPackages       `yaml:"installPackages,omitempty"`
+	Versions        map[string]string `yaml:"versions,omitempty"`
+	FromSource      *AptRepoSpec      `yaml:"fromSource,omitempty"`
 }
 
 // AptPackages maps each debian package name to its attributes, preserving file order.
@@ -312,6 +313,10 @@ func (a AptPackages) Aliases() map[string]string {
 	return out
 }
 
+// AptRepoSpec declares an external apt repo: source url, verification key, suites, components.
+// [why] verificationKey takes a url (key downloaded into /etc/apt/keyrings) or an
+//
+//	absolute path (keyring already on the host, nothing fetched)
 type AptRepoSpec struct {
 	URL             string `yaml:"url,omitempty"`
 	VerificationKey string `yaml:"verificationKey,omitempty"`
@@ -423,6 +428,12 @@ func (it *Item) UnmarshalYAML(node *yaml.Node) error {
 		if err := val.Decode(it.Apt); err != nil {
 			return err
 		}
+		if len(it.Apt.Versions) > 1 {
+			return fmt.Errorf("apt versions must map exactly one binary version to one package version")
+		}
+		if len(it.Apt.Versions) == 1 && len(it.Apt.InstallPackages.Names) > 1 {
+			return fmt.Errorf("apt versions requires a single installPackages entry")
+		}
 		it.AliasBinary = it.Apt.InstallPackages.Aliases()
 		return nil
 	}
@@ -465,6 +476,9 @@ func (it *Item) UnmarshalYAML(node *yaml.Node) error {
 	}
 	if it.Mgr == "npm" && strings.LastIndex(it.Name, "@") > 0 {
 		return fmt.Errorf("npm item %s: version pins go in the entry version field", it.Name)
+	}
+	if it.Mgr == "brew" && strings.Contains(it.Name, "@") && !strings.HasSuffix(it.Name, "@{version}") {
+		return fmt.Errorf("brew item %s: version pins go in the entry version field, referenced as @{version}", it.Name)
 	}
 	if it.Mgr == "apt" && strings.Contains(it.Name, "=") {
 		return fmt.Errorf("apt item %s: version pins go in the entry version field", it.Name)

@@ -127,11 +127,11 @@ func TestVscodeExtensionPinDriftReinstalls(t *testing.T) {
 	require.Contains(t, strings.Join(m.Calls(), "\n"), "code --install-extension golang.go@0.50.0")
 }
 
-func TestBrewVersionedFormulaIsNamedDirectly(t *testing.T) {
+func TestBrewVersionedFormulaReferencesEntryVersion(t *testing.T) {
 	const y = `packages:
   node:
     version: "24"
-    installMethods: [{brew: node@24}]
+    installMethods: [{brew: "node@{version}"}]
 `
 	in, m := newInstaller(t, y, "darwin", cmdMap([]string{"brew"}), Options{})
 	m.Stub = failOn("brew list")
@@ -139,6 +139,26 @@ func TestBrewVersionedFormulaIsNamedDirectly(t *testing.T) {
 	calls := strings.Join(m.Calls(), "\n")
 	require.Contains(t, calls, "brew install node@24")
 	require.NotContains(t, calls, "node@24@24")
+	require.NotContains(t, calls, "{version}")
+}
+
+func TestBrewLiteralVersionSuffixIsParseError(t *testing.T) {
+	err := yaml.Unmarshal([]byte(`packages:
+  node:
+    version: "24"
+    installMethods: [{brew: node@24}]
+`), &File{})
+	require.ErrorContains(t, err, "referenced as @{version}")
+}
+
+func TestBrewVersionTokenWithoutPinErrors(t *testing.T) {
+	const y = `packages:
+  node:
+    installMethods: [{brew: "node@{version}"}]
+`
+	in, m := newInstaller(t, y, "darwin", cmdMap([]string{"brew"}), Options{})
+	m.Stub = failOn("brew list")
+	require.ErrorContains(t, in.Install([]string{"node"}), "references {version} but no version is pinned")
 }
 
 func TestUnversionedLatestSentinelSkipsPinning(t *testing.T) {

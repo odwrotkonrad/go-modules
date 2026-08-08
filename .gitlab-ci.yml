@@ -146,6 +146,16 @@ test-e2e-che-backup:
       - che/cover-e2e-backup/
 
 ##[>] 🤖🤖
+#[what] registry e2e: every brew formula/cask name in the builtin packages file resolves upstream
+#[why] the real-install e2e samples one package per method and brew only runs on darwin:
+#   a renamed upstream name (cask ollama -> ollama-app) is invisible without this sweep
+test-e2e-che-registry:
+  extends: .test-e2e-che
+  script:
+    - make -C che e2e-registry
+##[<] 🤖🤖
+
+##[>] 🤖🤖
 #[what] real-install e2e: each installation method installs live packages into a throwaway HOME, then runs each one
 #[why] every other test stubs exec: only these prove the methods against real registries, archives and repos
 .test-install-methods:

@@ -277,6 +277,12 @@ func (in *Installer) installVia(pkg string, it Item) error {
 		base = pkg
 	}
 	pin := in.pinFor(pkg, "")
+	if strings.Contains(base, "{version}") {
+		if pin == "" {
+			return fmt.Errorf("%s: item name %s references {version} but no version is pinned", pkg, it.Name)
+		}
+		base = strings.ReplaceAll(base, "{version}", pin)
+	}
 	installed := in.isInstalled(pkg, it.Mgr, base)
 	switch {
 	case installed && pin != "" && !in.pinSatisfied(pkg, it.Mgr, base, pin):

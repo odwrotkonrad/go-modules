@@ -100,4 +100,20 @@ func TestDiscoverSummary(t *testing.T) {
 	})
 }
 
+func TestMakeDirsCountsPermsDrift(t *testing.T) {
+	p, _, _ := setupProfile(t, options.Options{})
+	dest := filepath.Join(p.home, "drift-dir")
+	require.NoError(t, os.MkdirAll(dest, 0o755))
+	require.NoError(t, os.Chmod(dest, 0o775))
+	op := &MakeDirsOperationReady{Dirs: []spec.FileItem{{
+		Dests: []spec.DestSpec{{Path: dest}},
+		Perms: spec.Perms{Chmod: "0755"},
+	}}}
+	_, delta := op.counts(p)
+	assert.Equal(t, 1, delta)
+	require.NoError(t, os.Chmod(dest, 0o755))
+	_, delta = op.counts(p)
+	assert.Equal(t, 0, delta)
+}
+
 // [<] 🤖🤖

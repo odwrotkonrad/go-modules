@@ -5,6 +5,7 @@ package packages
 import (
 	"fmt"
 	"regexp"
+	"slices"
 	"strings"
 )
 
@@ -16,10 +17,8 @@ func PinMatches(out, pin string) bool {
 	if pin == "" {
 		return true
 	}
-	for _, token := range versionTokenRe.FindAllString(out, -1) {
-		if token == pin {
-			return true
-		}
+	if slices.Contains(versionTokenRe.FindAllString(out, -1), pin) {
+		return true
 	}
 	return strings.Contains(out, pin)
 }
@@ -32,9 +31,15 @@ const VersionTheOnePublished = "__the_one_published__"
 // [why] for sources whose head we own or deliberately follow: no drift check, no version in the name
 const VersionLatest = "latest"
 
+// [why] an item-level version beats the entry version: the item states what its
+//
+//	manager actually delivers when the streams diverge
 func (in *Installer) pinFor(pkg, specVersion string) string {
 	if r, ok := in.requested[pkg]; ok && len(r.Versions) > 0 {
 		return r.globalVersion()
+	}
+	if specVersion != "" {
+		return specVersion
 	}
 	if e, ok := in.File.Packages[pkg]; ok && e.Version != "" {
 		if e.Version == VersionTheOnePublished || e.Version == VersionLatest {
@@ -42,7 +47,7 @@ func (in *Installer) pinFor(pkg, specVersion string) string {
 		}
 		return e.Version
 	}
-	return specVersion
+	return ""
 }
 
 func (r Request) globalVersion() string {

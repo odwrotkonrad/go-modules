@@ -1186,6 +1186,10 @@ func (o *MakeDirsOperationReady) counts(p *ProfileReady) (int, int) {
 		all++
 		if !fsutil.IsDirSettled(p.Reader, dest) {
 			delta++
+			continue
+		}
+		if needChmod, needChown := fsutil.DetectPermsDrift(p.Reader, dest, item.Chmod, formatOwnerSpec(item)); needChmod || needChown {
+			delta++
 		}
 	}
 	return all, delta

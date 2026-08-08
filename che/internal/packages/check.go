@@ -82,6 +82,10 @@ func pinnedVersion(it Item) string {
 		return it.PrebuiltBinariesArchive.Version
 	case it.Script != nil:
 		return it.Script.Version
+	case it.Apt != nil:
+		for bin := range it.Apt.Versions {
+			return bin
+		}
 	}
 	return ""
 }

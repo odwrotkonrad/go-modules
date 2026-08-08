@@ -11,7 +11,7 @@ DB := $(STATE_HOME)/ops.db
 BK_APPDB := $(HOME)/Library/Application Support/beekeeper-studio/app.db
 
 WRAPPERS :=
-COMMANDS := render-docs test test-cover cover-report e2e e2e-dryrun e2e-run build build-cover vet lint install release-check release-darwin release-snapshot inspect-db dump-db open-db
+COMMANDS := render-docs test test-cover cover-report e2e e2e-dryrun e2e-run e2e-registry build build-cover vet lint install release-check release-darwin release-snapshot inspect-db dump-db open-db
 
 .PHONY: $(WRAPPERS) $(COMMANDS)
 
@@ -96,6 +96,10 @@ e2e-packages: build-cover
 #[vals] brew/formulae|brew/cask|brew/vscode|apt|prebuiltArchive|script|versionManager|npm|go|all
 e2e-install-methods: build
 	E2E_BIN=$(CURDIR)/dist/$(BIN) E2E_INSTALL_METHOD=$(or $(METHOD),$(E2E_INSTALL_METHOD),all) CC=$(CC) $(GO) test -v -count=1 -timeout 45m -run TestE2EInstallMethods ./e2e
+
+#[what] registry e2e: every brew formula and cask name in the builtin packages file resolves upstream
+e2e-registry:
+	E2E_REGISTRY=1 CC=$(CC) $(GO) test -v -count=1 -run TestE2ERegistry ./e2e
 
 #[what] run all e2e flows
 e2e: e2e-dryrun e2e-run e2e-backup e2e-packages

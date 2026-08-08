@@ -65,7 +65,22 @@ Scenario: a version pin converges the host on exactly that version, downgrades i
   Status: tested
   When a version is specified (entry-level or spec-level `version:`) and the installed version differs
   Then install reinstalls to match the pin: npm installs `name@<pin>`, apt installs `name=<pin>`, go installs `module@v<pin>`, gem installs `-v <pin>`; unpinnable managers run their update path
-  And embedded pins in item names (npm `name@ver`, apt `name=ver`) are parse errors naming the version field
+  And embedded pins in item names (npm `name@ver`, apt `name=ver`, brew `name@ver`) are parse errors naming the version field
+
+Scenario: a versioned brew formula carries its version once, as the entry version
+  Status: tested
+  When a brew item targets a versioned formula line (`ffmpeg@5`, `ruby@3.1`)
+  Then the entry pins the line as its `version:` and the item references it as `name@{version}` (`version: "5"` + `brew: ffmpeg@{version}` installs `ffmpeg@5`)
+  And a literal version suffix in a brew item name (`brew: ffmpeg@5`) is a parse error naming the version field
+  And a brew item referencing `{version}` without a pinned version is a hard error
+  And a formula line that auto-updates within its suffix needs no finer entry version: the suffix is the pin
+
+Scenario: an apt package whose version string differs from the binary version maps it once
+  Status: tested
+  When an apt item's debian package version is decorated beyond the binary version (epoch, revision: `1:2.39.5-0+deb12u3`) or its stream diverges from the entry version
+  Then the item declares `versions: {"<binary-version>": "<package-version>"}`: apt installs `name=<package-version>` (downgrades allowed), the drift check compares dpkg's version to the package string, check-upgradable probes for the binary version
+  And the map holds exactly one pair and requires a single installPackages entry; more of either is a parse error
+  And a repo-only entry (debian-backports) configures its `fromSource` even when its package is already installed, and `verificationKey` accepts a url (key downloaded into /etc/apt/keyrings) or an absolute path (keyring already on the host, nothing fetched)
 
 Scenario: an entry-level version guards any package's installed version
   Status: tested
