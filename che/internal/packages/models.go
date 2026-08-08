@@ -76,6 +76,20 @@ type InstallerRegistriesSpec struct {
 	Brew []string       `yaml:"brew,omitempty"`
 }
 
+func (r *InstallerRegistriesSpec) apt() []*AptRepoSpec {
+	if r == nil {
+		return nil
+	}
+	return r.Apt
+}
+
+func (r *InstallerRegistriesSpec) brew() []string {
+	if r == nil {
+		return nil
+	}
+	return r.Brew
+}
+
 func stripScheme(url string) string {
 	for _, p := range []string{"https://", "http://"} {
 		if v, ok := strings.CutPrefix(url, p); ok {
@@ -116,35 +130,33 @@ func matchAptRegistries(registries []*AptRepoSpec, ref string) []*AptRepoSpec {
 }
 
 func (f *File) aptRegistry(ref string) (*AptRepoSpec, error) {
-	registries := f.aptRegistriesOrBuiltin()
-	matches := matchAptRegistries(registries, ref)
+	matches := matchAptRegistries(f.aptRegistriesOrBuiltin(), ref)
 	switch len(matches) {
 	case 1:
 		return matches[0], nil
 	case 0:
 		return nil, fmt.Errorf("unknown apt registry %q (installerRegistries.apt, referenced by scheme-less url)", ref)
+	default:
+		return nil, fmt.Errorf("ambiguous apt registry %q: narrow with url::suites[::components]", ref)
 	}
-	return nil, fmt.Errorf("ambiguous apt registry %q: narrow with url::suites[::components]", ref)
 }
 
 func (f *File) aptRegistriesOrBuiltin() []*AptRepoSpec {
-	if f.InstallerRegistries != nil && len(f.InstallerRegistries.Apt) > 0 {
-		return f.InstallerRegistries.Apt
+	if regs := f.InstallerRegistries.apt(); len(regs) > 0 {
+		return regs
 	}
-	if builtin, err := builtinFile(); err == nil && builtin.InstallerRegistries != nil {
-		return builtin.InstallerRegistries.Apt
+	if builtin, err := builtinFile(); err == nil {
+		return builtin.InstallerRegistries.apt()
 	}
 	return nil
 }
 
-func (f *File) brewRegistry(tap string) bool {
-	if f.InstallerRegistries != nil && slices.Contains(f.InstallerRegistries.Brew, tap) {
+func (f *File) hasBrewTap(tap string) bool {
+	if slices.Contains(f.InstallerRegistries.brew(), tap) {
 		return true
 	}
-	if builtin, err := builtinFile(); err == nil && builtin.InstallerRegistries != nil {
-		return slices.Contains(builtin.InstallerRegistries.Brew, tap)
-	}
-	return false
+	builtin, err := builtinFile()
+	return err == nil && slices.Contains(builtin.InstallerRegistries.brew(), tap)
 }
 
 func registrySlug(r *AptRepoSpec) string {
@@ -231,9 +243,9 @@ func (v InstallerVocabulary) isZero() bool {
 }
 
 type itemBody struct {
-	Vocabulary   InstallerVocabulary `yaml:",inline"`
-	Version      string              `yaml:"version,omitempty"`
-	FromRegistry string              `yaml:"fromRegistry,omitempty"`
+	InstallerVocabulary `yaml:",inline"`
+	Version             string `yaml:"version,omitempty"`
+	FromRegistry        string `yaml:"fromRegistry,omitempty"`
 }
 
 func itemKey(mgr string) string {
@@ -279,11 +291,11 @@ func (it Item) MarshalYAML() (any, error) {
 		return map[string]*VersionManagerSpec{it.VersionManager.Tool: it.VersionManager}, nil
 	}
 	body := itemBody{
-		Vocabulary:   InstallerVocabulary{PackageName: it.Name, AliasBinary: it.AliasBinary},
-		Version:      it.Version,
-		FromRegistry: it.Registry,
+		InstallerVocabulary: InstallerVocabulary{PackageName: it.Name, AliasBinary: it.AliasBinary},
+		Version:             it.Version,
+		FromRegistry:        it.Registry,
 	}
-	if body.Vocabulary.isZero() && body.Version == "" && body.FromRegistry == "" {
+	if body.isZero() && body.Version == "" && body.FromRegistry == "" {
 		return itemKey(it.Mgr), nil
 	}
 	return map[string]itemBody{itemKey(it.Mgr): body}, nil
@@ -374,7 +386,7 @@ func (e *Entry) UnmarshalYAML(node *yaml.Node) error {
 		return node.Decode(&e.Items)
 	}
 	var obj struct {
-		Managers       []Item      `yaml:"installers"`
+		Installers     []Item      `yaml:"installers"`
 		Version        string      `yaml:"version"`
 		Requires       []string    `yaml:"requires"`
 		PostInstall    *ScriptSpec `yaml:"postInstall"`
@@ -385,7 +397,7 @@ func (e *Entry) UnmarshalYAML(node *yaml.Node) error {
 	if err := node.Decode(&obj); err != nil {
 		return err
 	}
-	if len(obj.Managers) == 0 && obj.Completions.Zsh == nil {
+	if len(obj.Installers) == 0 && obj.Completions.Zsh == nil {
 		return fmt.Errorf("package entry object form requires installers or completions")
 	}
 	if obj.Version == "__rolling__" {
@@ -401,7 +413,7 @@ func (e *Entry) UnmarshalYAML(node *yaml.Node) error {
 			}
 		}
 	}
-	e.Items = obj.Managers
+	e.Items = obj.Installers
 	e.Version = obj.Version
 	e.Requires = obj.Requires
 	e.Command = obj.Command
@@ -450,13 +462,13 @@ type VersionManagerSpec struct {
 //
 //	narrowed with ::suites[::components] when one url hosts several registries
 type AptSpec struct {
-	Vocabulary   InstallerVocabulary `yaml:",inline"`
-	FromRegistry string              `yaml:"fromRegistry,omitempty"`
+	InstallerVocabulary `yaml:",inline"`
+	FromRegistry        string `yaml:"fromRegistry,omitempty"`
 }
 
 func (a *AptSpec) packageName(pkg string) string {
-	if a.Vocabulary.PackageName != "" {
-		return a.Vocabulary.PackageName
+	if a.PackageName != "" {
+		return a.PackageName
 	}
 	return pkg
 }
@@ -481,24 +493,24 @@ func (s *ScriptSpec) UnmarshalYAML(node *yaml.Node) error {
 	if err := node.Decode((*plain)(s)); err != nil {
 		return err
 	}
-	if len(s.Vocabulary.ExtractBinaries) > 0 || s.Vocabulary.PackageName != "" || len(s.Vocabulary.VersionMap) > 0 || s.Vocabulary.ArchScheme != "" || len(s.Vocabulary.AliasBinary) > 0 {
+	probe := s.InstallerVocabulary
+	probe.PlatformEligibility = ItemPlatforms{}
+	if !probe.isZero() {
 		return fmt.Errorf("script item: of the vocabulary fields only platformEligibility applies")
 	}
-	s.Platforms = s.Vocabulary.PlatformEligibility
 	return nil
 }
 
 type ScriptSpec struct {
-	Vocabulary       InstallerVocabulary `yaml:",inline"`
-	Run              string              `yaml:"run,omitempty"`
-	Args             []string            `yaml:"args,omitempty"`
-	Path             string              `yaml:"path,omitempty"`
-	URL              string              `yaml:"url,omitempty"`
-	OS               string              `yaml:"os,omitempty"`
-	Version          string              `yaml:"version,omitempty"`
-	Platforms        ItemPlatforms       `yaml:"-"`
-	Env              map[string]string   `yaml:"env,omitempty"`
-	ValidateArtifact string              `yaml:"validateArtifact,omitempty"`
+	InstallerVocabulary `yaml:",inline"`
+	Run                 string            `yaml:"run,omitempty"`
+	Args                []string          `yaml:"args,omitempty"`
+	Path                string            `yaml:"path,omitempty"`
+	URL                 string            `yaml:"url,omitempty"`
+	OS                  string            `yaml:"os,omitempty"`
+	Version             string            `yaml:"version,omitempty"`
+	Env                 map[string]string `yaml:"env,omitempty"`
+	ValidateArtifact    string            `yaml:"validateArtifact,omitempty"`
 }
 
 // ItemPlatforms lists an item's supported platforms, each optionally carrying its asset's checksum.
@@ -551,87 +563,67 @@ func (ip ItemPlatforms) MarshalYAML() (any, error) {
 func (ip ItemPlatforms) IsZero() bool { return len(ip.Names) == 0 }
 
 type BinariesRemoteArchiveSpec struct {
-	Vocabulary      InstallerVocabulary `yaml:",inline"`
-	Version         string              `yaml:"version,omitempty"`
-	URL             string              `yaml:"url,omitempty"`
-	ArchScheme      string              `yaml:"-"`
-	ExtractBinaries Strings             `yaml:"-"`
-	Platforms       ItemPlatforms       `yaml:"-"`
+	InstallerVocabulary `yaml:",inline"`
+	Version             string `yaml:"version,omitempty"`
+	URL                 string `yaml:"url,omitempty"`
+}
+
+var legacyItemKeys = map[string][]string{
+	"binariesRemoteArchive": {"installerVocabulary"},
+	"script":                {"installerVocabulary"},
+	"apt":                   {"installerVocabulary", "installPackages", "versions"},
+	"brew":                  {"installerVocabulary", "formula", "cask", "vscode", "package"},
+	"brew/cask":             {"installerVocabulary", "formula", "cask", "vscode", "package"},
+	"brew/vscode":           {"installerVocabulary", "formula", "cask", "vscode", "package"},
+	"npm":                   {"installerVocabulary", "package"},
+	"gem":                   {"installerVocabulary", "package"},
+	"go":                    {"installerVocabulary", "package"},
+}
+
+func rejectLegacyKeys(key string, val *yaml.Node) error {
+	if val.Kind != yaml.MappingNode {
+		return nil
+	}
+	for _, legacy := range legacyItemKeys[key] {
+		if mappingHasKey(val, legacy) {
+			return fmt.Errorf("%s item: %s is gone: vocabulary fields (packageName, versionMap, archScheme, aliasBinary, platformEligibility, extractBinaries) live directly on the item", key, legacy)
+		}
+	}
+	return nil
+}
+
+func rejectBareBrewKind(v string) error {
+	if v == "code" || v == "vscode" || v == "cask" {
+		return fmt.Errorf("brew kinds are installer keys: brew/cask or brew/vscode")
+	}
+	return nil
 }
 
 func (it *Item) UnmarshalYAML(node *yaml.Node) error {
 	if node.Kind == yaml.ScalarNode {
-		if node.Value == "code" || node.Value == "vscode" || node.Value == "cask" {
-			return fmt.Errorf("brew kinds are installer keys: brew/cask or brew/vscode")
-		}
-		if mgr, ok := brewKindMgr(node.Value); ok {
-			it.Mgr = mgr
-			return nil
-		}
-		it.Mgr = node.Value
-		return nil
+		return it.unmarshalScalar(node.Value)
 	}
 	if node.Kind != yaml.MappingNode || len(node.Content) != 2 {
 		return fmt.Errorf("manager item must be a scalar or a single-key map")
 	}
 	key, val := node.Content[0], node.Content[1]
-	legacyKeys := map[string][]string{
-		"binariesRemoteArchive": {"installerVocabulary"},
-		"script":                {"installerVocabulary"},
-		"apt":                   {"installerVocabulary", "installPackages", "versions"},
-		"brew":                  {"installerVocabulary", "formula", "cask", "vscode", "package"},
-		"brew/cask":             {"installerVocabulary", "formula", "cask", "vscode", "package"},
-		"brew/vscode":           {"installerVocabulary", "formula", "cask", "vscode", "package"},
-		"npm":                   {"installerVocabulary", "package"},
-		"gem":                   {"installerVocabulary", "package"},
-		"go":                    {"installerVocabulary", "package"},
+	if err := rejectLegacyKeys(key.Value, val); err != nil {
+		return err
 	}
-	for _, legacy := range legacyKeys[key.Value] {
-		if val.Kind == yaml.MappingNode && mappingHasKey(val, legacy) {
-			return fmt.Errorf("%s item: %s is gone: vocabulary fields (packageName, versionMap, archScheme, aliasBinary, platformEligibility, extractBinaries) live directly on the item", key.Value, legacy)
+	switch key.Value {
+	case "binariesRemoteArchive":
+		return it.unmarshalBinariesRemoteArchive(val)
+	case "apt":
+		if val.Kind == yaml.MappingNode {
+			return it.unmarshalApt(val)
 		}
-	}
-	if key.Value == "binariesRemoteArchive" {
-		it.Mgr = "binariesRemoteArchive"
-		it.BinariesRemoteArchive = &BinariesRemoteArchiveSpec{}
-		if err := val.Decode(it.BinariesRemoteArchive); err != nil {
-			return err
-		}
-		it.BinariesRemoteArchive.ArchScheme = it.BinariesRemoteArchive.Vocabulary.ArchScheme
-		it.BinariesRemoteArchive.ExtractBinaries = it.BinariesRemoteArchive.Vocabulary.ExtractBinaries
-		it.BinariesRemoteArchive.Platforms = it.BinariesRemoteArchive.Vocabulary.PlatformEligibility
-		if strings.Contains(it.BinariesRemoteArchive.URL+" "+strings.Join(it.BinariesRemoteArchive.ExtractBinaries, " "), "{arch_") {
-			return fmt.Errorf("binariesRemoteArchive tokens {arch_x}/{arch_g} are gone: use {arch} with archScheme")
-		}
-		return nil
-	}
-	if key.Value == "apt" && val.Kind == yaml.MappingNode {
-		it.Mgr = "apt"
-		it.Apt = &AptSpec{}
-		if err := val.Decode(it.Apt); err != nil {
-			return err
-		}
-		if len(it.Apt.Vocabulary.VersionMap) > 1 {
-			return fmt.Errorf("apt versionMap must map exactly one binary version to one package version")
-		}
-		if len(it.Apt.Vocabulary.PlatformEligibility.Names) > 0 || len(it.Apt.Vocabulary.ExtractBinaries) > 0 || it.Apt.Vocabulary.ArchScheme != "" {
-			return fmt.Errorf("apt item: platformEligibility, extractBinaries, and archScheme apply to binariesRemoteArchive and script items")
-		}
-		if strings.Contains(it.Apt.Vocabulary.PackageName, "=") {
-			return fmt.Errorf("apt item %s: version pins go in versionMap", it.Apt.Vocabulary.PackageName)
-		}
-		it.AliasBinary = it.Apt.Vocabulary.AliasBinary
-		return nil
-	}
-	if key.Value == "versionManager" {
+	case "versionManager":
 		return fmt.Errorf("versionManager items are gone: name the tool as the installer ({pyenv: ...} or {nvm: ...})")
-	}
-	if key.Value == "pyenv" || key.Value == "nvm" {
+	case "pyenv", "nvm":
 		it.Mgr = key.Value
 		it.VersionManager = &VersionManagerSpec{Tool: key.Value}
 		return val.Decode(it.VersionManager)
-	}
-	if key.Value == "script" {
+	case "script":
 		it.Mgr = "script"
 		it.Script = &ScriptSpec{}
 		if val.Kind == yaml.ScalarNode {
@@ -640,42 +632,89 @@ func (it *Item) UnmarshalYAML(node *yaml.Node) error {
 		}
 		return val.Decode(it.Script)
 	}
-	if key.Value == "code" || key.Value == "vscode" || key.Value == "cask" {
-		return fmt.Errorf("brew kinds are installer keys: brew/cask or brew/vscode")
+	return it.unmarshalManager(key.Value, val)
+}
+
+func (it *Item) unmarshalScalar(v string) error {
+	if err := rejectBareBrewKind(v); err != nil {
+		return err
 	}
-	mgr := key.Value
-	if m, ok := brewKindMgr(key.Value); ok {
-		mgr = m
+	if mgr, ok := brewKindMgr(v); ok {
+		it.Mgr = mgr
+		return nil
 	}
-	it.Mgr = mgr
+	it.Mgr = v
+	return nil
+}
+
+func (it *Item) unmarshalBinariesRemoteArchive(val *yaml.Node) error {
+	it.Mgr = "binariesRemoteArchive"
+	b := &BinariesRemoteArchiveSpec{}
+	if err := val.Decode(b); err != nil {
+		return err
+	}
+	if strings.Contains(b.URL+" "+strings.Join(b.ExtractBinaries, " "), "{arch_") {
+		return fmt.Errorf("binariesRemoteArchive tokens {arch_x}/{arch_g} are gone: use {arch} with archScheme")
+	}
+	it.BinariesRemoteArchive = b
+	return nil
+}
+
+func (it *Item) unmarshalApt(val *yaml.Node) error {
+	it.Mgr = "apt"
+	a := &AptSpec{}
+	if err := val.Decode(a); err != nil {
+		return err
+	}
+	if len(a.VersionMap) > 1 {
+		return fmt.Errorf("apt versionMap must map exactly one binary version to one package version")
+	}
+	if len(a.PlatformEligibility.Names) > 0 || len(a.ExtractBinaries) > 0 || a.ArchScheme != "" {
+		return fmt.Errorf("apt item: platformEligibility, extractBinaries, and archScheme apply to binariesRemoteArchive and script items")
+	}
+	if strings.Contains(a.PackageName, "=") {
+		return fmt.Errorf("apt item %s: version pins go in versionMap", a.PackageName)
+	}
+	it.Apt = a
+	it.AliasBinary = a.AliasBinary
+	return nil
+}
+
+func (it *Item) unmarshalManager(key string, val *yaml.Node) error {
+	if err := rejectBareBrewKind(key); err != nil {
+		return err
+	}
+	it.Mgr = key
+	if mgr, ok := brewKindMgr(key); ok {
+		it.Mgr = mgr
+	}
 	if val.Kind != yaml.MappingNode {
-		return fmt.Errorf("%s item: package names go in packageName", key.Value)
+		return fmt.Errorf("%s item: package names go in packageName", key)
 	}
 	var body itemBody
 	if err := val.Decode(&body); err != nil {
 		return err
 	}
-	if len(body.Vocabulary.VersionMap) > 0 || body.Vocabulary.ArchScheme != "" ||
-		len(body.Vocabulary.PlatformEligibility.Names) > 0 || len(body.Vocabulary.ExtractBinaries) > 0 {
-		return fmt.Errorf("%s item: versionMap, archScheme, platformEligibility, and extractBinaries apply to apt, binariesRemoteArchive, and script items", key.Value)
+	probe := body.InstallerVocabulary
+	probe.PackageName, probe.AliasBinary = "", nil
+	if !probe.isZero() {
+		return fmt.Errorf("%s item: versionMap, archScheme, platformEligibility, and extractBinaries apply to apt, binariesRemoteArchive, and script items", key)
 	}
 	if body.Version == "__rolling__" {
-		return fmt.Errorf("%s item: the __rolling__ sentinel is gone: omit version, absence means rolling", key.Value)
+		return fmt.Errorf("%s item: the __rolling__ sentinel is gone: omit version, absence means rolling", key)
 	}
-	it.Name, it.Version, it.Registry, it.AliasBinary = body.Vocabulary.PackageName, body.Version, body.FromRegistry, body.Vocabulary.AliasBinary
-	if it.Mgr == "vscode" && it.Registry != "" {
+	it.Name, it.Version, it.Registry, it.AliasBinary = body.PackageName, body.Version, body.FromRegistry, body.AliasBinary
+	isBrew := it.Mgr == "brew" || it.Mgr == "cask"
+	switch {
+	case it.Mgr == "vscode" && it.Registry != "":
 		return fmt.Errorf("brew/vscode item %s: extensions have no registry", it.Name)
-	}
-	if it.Registry != "" && it.Mgr != "brew" && it.Mgr != "cask" {
-		return fmt.Errorf("%s item %s: fromRegistry applies to brew, brew/cask, and apt items", key.Value, it.Name)
-	}
-	if it.Mgr == "npm" && strings.LastIndex(it.Name, "@") > 0 {
+	case it.Registry != "" && !isBrew:
+		return fmt.Errorf("%s item %s: fromRegistry applies to brew, brew/cask, and apt items", key, it.Name)
+	case it.Mgr == "npm" && strings.LastIndex(it.Name, "@") > 0:
 		return fmt.Errorf("npm item %s: version pins go in the version field", it.Name)
-	}
-	if (it.Mgr == "brew" || it.Mgr == "cask") && strings.Contains(it.Name, "@") {
+	case isBrew && strings.Contains(it.Name, "@"):
 		return fmt.Errorf("brew item %s: names stay bare, the pinned version is appended automatically", it.Name)
-	}
-	if (it.Mgr == "brew" || it.Mgr == "cask") && strings.Contains(it.Name, "/") {
+	case isBrew && strings.Contains(it.Name, "/"):
 		return fmt.Errorf("brew item %s: tap-qualified names go in installerRegistries.brew, referenced as fromRegistry: <tap>", it.Name)
 	}
 	return nil
@@ -714,20 +753,25 @@ func (f *File) Merge(override *File) {
 	}
 	f.BasePackages = fsutil.MergeMap(f.BasePackages, override.BasePackages)
 	f.Packages = fsutil.MergeMap(f.Packages, override.Packages)
-	if override.InstallerRegistries == nil {
+	f.mergeRegistries(override.InstallerRegistries)
+}
+
+func (f *File) mergeRegistries(override *InstallerRegistriesSpec) {
+	if override == nil {
 		return
 	}
 	if f.InstallerRegistries == nil {
 		f.InstallerRegistries = &InstallerRegistriesSpec{}
 	}
-	for _, r := range override.InstallerRegistries.Apt {
-		if len(matchAptRegistries(f.InstallerRegistries.Apt, registryRef(r))) == 0 {
-			f.InstallerRegistries.Apt = append(f.InstallerRegistries.Apt, r)
+	regs := f.InstallerRegistries
+	for _, r := range override.Apt {
+		if len(matchAptRegistries(regs.Apt, registryRef(r))) == 0 {
+			regs.Apt = append(regs.Apt, r)
 		}
 	}
-	for _, tap := range override.InstallerRegistries.Brew {
-		if !slices.Contains(f.InstallerRegistries.Brew, tap) {
-			f.InstallerRegistries.Brew = append(f.InstallerRegistries.Brew, tap)
+	for _, tap := range override.Brew {
+		if !slices.Contains(regs.Brew, tap) {
+			regs.Brew = append(regs.Brew, tap)
 		}
 	}
 }
@@ -751,8 +795,8 @@ func (f *File) ValidatePlatforms() error {
 	}
 	oses := map[string]bool{}
 	for id, methods := range eligible {
-		os, _, _ := strings.Cut(id, "-")
-		oses[os] = true
+		osName, _, _ := strings.Cut(id, "-")
+		oses[osName] = true
 		for _, m := range methods {
 			if !slices.Contains(PlatformMethods, m) {
 				return fmt.Errorf("osInstallers.%s: unknown installation method %q: want one of %s", id, m, strings.Join(PlatformMethods, ", "))
@@ -767,24 +811,22 @@ func (f *File) ValidatePlatforms() error {
 	}
 	for _, name := range slices.Sorted(maps.Keys(f.Packages)) {
 		for _, it := range f.Packages[name].Items {
-			if it.BinariesRemoteArchive == nil {
+			b := it.BinariesRemoteArchive
+			if b == nil {
 				continue
 			}
-			for _, p := range it.BinariesRemoteArchive.Platforms.Names {
-				os, arch, ok := strings.Cut(p, "-")
-				if !ok || !oses[os] || !arches[arch] {
+			for _, p := range b.PlatformEligibility.Names {
+				osName, arch, ok := strings.Cut(p, "-")
+				if !ok || !oses[osName] || !arches[arch] {
 					return fmt.Errorf("package %s: unknown platform %q (want <os>-<arch>: os from osInstallers keys %s, arch from archSchemes %s)",
 						name, p, strings.Join(slices.Sorted(maps.Keys(oses)), ", "), strings.Join(slices.Sorted(maps.Keys(arches)), ", "))
 				}
 			}
-			c := it.BinariesRemoteArchive.ArchScheme
-			if c == "" && strings.Contains(it.BinariesRemoteArchive.URL+" "+strings.Join(it.BinariesRemoteArchive.ExtractBinaries, " "), "{arch}") {
+			if b.ArchScheme == "" && strings.Contains(b.URL+" "+strings.Join(b.ExtractBinaries, " "), "{arch}") {
 				return fmt.Errorf("package %s: {arch} requires archScheme (archSchemes sets: %s)", name, strings.Join(slices.Sorted(maps.Keys(archSchemes)), ", "))
 			}
-			if c != "" {
-				if _, ok := archSchemes[c]; !ok {
-					return fmt.Errorf("package %s: unknown archScheme %q (archSchemes sets: %s)", name, c, strings.Join(slices.Sorted(maps.Keys(archSchemes)), ", "))
-				}
+			if _, ok := archSchemes[b.ArchScheme]; b.ArchScheme != "" && !ok {
+				return fmt.Errorf("package %s: unknown archScheme %q (archSchemes sets: %s)", name, b.ArchScheme, strings.Join(slices.Sorted(maps.Keys(archSchemes)), ", "))
 			}
 		}
 	}
@@ -799,14 +841,6 @@ func (f *File) Find(pkg, path string) (Entry, error) {
 	return e, nil
 }
 
-// [<] 🤖🤖🤖
-
-// [>] 🤖🤖
-
-// ResolveScriptPaths anchors relative script paths to the file that declared them.
-// [why] override entries merge into a base file: without anchoring, their relative
-//
-//	paths would resolve against the base (or the builtin embed, by basename)
 func (f *File) ResolveScriptPaths(dir string) {
 	for _, e := range f.Packages {
 		for _, it := range e.Items {
@@ -823,4 +857,4 @@ func anchorScriptPath(dir string, s *ScriptSpec) {
 	s.Path = filepath.Join(dir, s.Path)
 }
 
-// [<] 🤖🤖
+// [<] 🤖🤖🤖

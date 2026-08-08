@@ -125,20 +125,13 @@ func (h Host) applicable(pkg string, it Item) (bool, error) {
 		if it.BinariesRemoteArchive == nil {
 			return false, fmt.Errorf("package %s: binariesRemoteArchive item missing props", pkg)
 		}
-		for _, p := range it.BinariesRemoteArchive.Platforms.Names {
-			if p == h.ShaKey() {
-				return true, nil
-			}
-		}
-		return false, nil
-	case "pyenv":
+		return slices.Contains(it.BinariesRemoteArchive.PlatformEligibility.Names, h.ShaKey()), nil
+	case "pyenv", "nvm":
 		if it.VersionManager == nil || len(it.VersionManager.Versions) == 0 {
-			return false, fmt.Errorf("package %s: pyenv item requires versions", pkg)
+			return false, fmt.Errorf("package %s: %s item requires versions", pkg, it.Mgr)
 		}
-		return h.HasCmd("pyenv"), nil
-	case "nvm":
-		if it.VersionManager == nil || len(it.VersionManager.Versions) == 0 {
-			return false, fmt.Errorf("package %s: nvm item requires versions", pkg)
+		if it.Mgr == "pyenv" {
+			return h.HasCmd("pyenv"), nil
 		}
 		_, err := os.Stat(filepath.Join(h.nvmDir(), "nvm.sh"))
 		return err == nil, nil
@@ -146,7 +139,7 @@ func (h Host) applicable(pkg string, it Item) (bool, error) {
 		if it.Script == nil || (it.Script.Run == "" && it.Script.Path == "" && it.Script.URL == "") {
 			return false, fmt.Errorf("package %s: script item missing run, path, or url", pkg)
 		}
-		if len(it.Script.Platforms.Names) > 0 && !slices.Contains(it.Script.Platforms.Names, h.ShaKey()) {
+		if len(it.Script.PlatformEligibility.Names) > 0 && !slices.Contains(it.Script.PlatformEligibility.Names, h.ShaKey()) {
 			return false, nil
 		}
 		return it.Script.OS == "" || it.Script.OS == h.OS, nil

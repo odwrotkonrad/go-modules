@@ -414,7 +414,7 @@ func TestAptVocabularyCarriesNameAndAliases(t *testing.T) {
 	var g File
 	require.NoError(t, yaml.Unmarshal([]byte(ok), &g))
 	m := g.Packages["named"].Items[0]
-	require.Equal(t, "a", m.Apt.Vocabulary.PackageName)
+	require.Equal(t, "a", m.Apt.PackageName)
 	require.Equal(t, map[string]string{"acat": "a"}, m.AliasBinary)
 }
 

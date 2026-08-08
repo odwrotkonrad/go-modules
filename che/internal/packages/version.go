@@ -17,10 +17,7 @@ func PinMatches(out, pin string) bool {
 	if pin == "" {
 		return true
 	}
-	if slices.Contains(versionTokenRe.FindAllString(out, -1), pin) {
-		return true
-	}
-	return strings.Contains(out, pin)
+	return slices.Contains(versionTokenRe.FindAllString(out, -1), pin) || strings.Contains(out, pin)
 }
 
 // VersionLatest tracks a manager's newest release rather than a pin.

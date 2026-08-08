@@ -13,27 +13,14 @@ import (
 )
 
 func (in *Installer) installAptSpec(pkg string, a *AptSpec) error {
-	pkgs := []string{a.packageName(pkg)}
-	var src *AptRepoSpec
-	if a.FromRegistry != "" {
-		var err error
-		src, err = in.File.aptRegistry(a.FromRegistry)
-		if err != nil {
-			return fmt.Errorf("%s: %w", pkg, err)
-		}
-		if src.URL == "" || src.VerificationKey == "" {
-			return fmt.Errorf("%s: apt registry %q requires url and verificationKey", pkg, a.FromRegistry)
-		}
-		// [why] before the installed-skip: a pruned repo file heals even when the package is present
-		if !in.Opts.DryRun {
-			if err := in.ensureAptRepo(registrySlug(src), src); err != nil {
-				return err
-			}
-		}
+	name := a.packageName(pkg)
+	src, err := in.ensureAptRegistry(pkg, a)
+	if err != nil {
+		return err
 	}
 	binPin, pkgPin := in.aptPins(pkg, a)
-	if in.aptAllInstalled(pkgs) {
-		if pkgPin == "" || in.aptVersionInstalled(pkgs[0], pkgPin) {
+	if in.aptInstalled(name) {
+		if pkgPin == "" || in.aptVersionInstalled(name, pkgPin) {
 			in.emitSkip(log.Levels.Debug, pkg, "already installed via apt")
 			return nil
 		}
@@ -53,9 +40,9 @@ func (in *Installer) installAptSpec(pkg string, a *AptSpec) error {
 		argv = append(argv, "-t", src.Suites)
 	}
 	if pkgPin != "" {
-		argv = append(argv, "--allow-downgrades", pkgs[0]+"="+pkgPin)
+		argv = append(argv, "--allow-downgrades", name+"="+pkgPin)
 	} else {
-		argv = append(argv, pkgs...)
+		argv = append(argv, name)
 	}
 	if err := in.exec(in.sudo(argv...)); err != nil {
 		return err
@@ -64,15 +51,35 @@ func (in *Installer) installAptSpec(pkg string, a *AptSpec) error {
 	return nil
 }
 
-// [why] the map key is the binary version the package delivers, the value the exact
+func (in *Installer) ensureAptRegistry(pkg string, a *AptSpec) (*AptRepoSpec, error) {
+	if a.FromRegistry == "" {
+		return nil, nil
+	}
+	src, err := in.File.aptRegistry(a.FromRegistry)
+	if err != nil {
+		return nil, fmt.Errorf("%s: %w", pkg, err)
+	}
+	if src.URL == "" || src.VerificationKey == "" {
+		return nil, fmt.Errorf("%s: apt registry %q requires url and verificationKey", pkg, a.FromRegistry)
+	}
+	// [why] repo ensured before the installed-skip: a pruned repo file heals even when the package is present
+	if !in.Opts.DryRun {
+		if err := in.ensureAptRepo(registrySlug(src), src); err != nil {
+			return nil, err
+		}
+	}
+	return src, nil
+}
+
+// [why] versionMap key: the binary version the package delivers; value: the exact
 //
-//	debian package string apt pins to (epoch/revision decorated)
-func (in *Installer) aptPins(pkg string, a *AptSpec) (string, string) {
+//	debian package version apt pins to (epoch/revision decorated)
+func (in *Installer) aptPins(pkg string, a *AptSpec) (binPin, pkgPin string) {
 	if r, ok := in.requested[pkg]; ok && len(r.Versions) > 0 {
 		v := r.globalVersion()
 		return v, v
 	}
-	for bin, pkgVer := range a.Vocabulary.VersionMap {
+	for bin, pkgVer := range a.VersionMap {
 		return bin, pkgVer
 	}
 	pin := in.pinFor(pkg, "")
@@ -84,8 +91,8 @@ func (in *Installer) aptVersionInstalled(name, pkgVer string) bool {
 	return ok && strings.TrimSpace(out) == pkgVer
 }
 
-func (in *Installer) aptAllInstalled(pkgs []string) bool {
-	_, ok := in.output(append([]string{"dpkg", "-s"}, pkgs...))
+func (in *Installer) aptInstalled(name string) bool {
+	_, ok := in.output([]string{"dpkg", "-s", name})
 	return ok
 }
 

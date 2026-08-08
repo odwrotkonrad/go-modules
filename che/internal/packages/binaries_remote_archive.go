@@ -14,18 +14,19 @@ import (
 )
 
 func (in *Installer) installBinariesRemoteArchive(pkg string, b *BinariesRemoteArchiveSpec) error {
+	pin := in.pinFor(pkg, b.Version)
 	if in.hasCmd(pkg) {
-		if pin := in.pinFor(pkg, b.Version); pin == "" || in.versionOutputHasPin(pkg, pin) {
+		if pin == "" || in.versionOutputHasPin(pkg, pin) {
 			in.emitSkip(log.Levels.Debug, pkg, "already installed via binariesRemoteArchive")
 			return nil
 		}
-		in.emit(log.Levels.Info, "reinstall", pkg+": -> "+in.pinFor(pkg, b.Version))
+		in.emit(log.Levels.Info, "reinstall", pkg+": -> "+pin)
 	}
 	if err := in.requestedOverridesPin(pkg, b.Version); err != nil {
 		return err
 	}
 	if in.Opts.DryRun {
-		in.emitDryRun("install", labeled(pkg, in.pinFor(pkg, b.Version))+" via binariesRemoteArchive")
+		in.emitDryRun("install", labeled(pkg, pin)+" via binariesRemoteArchive")
 		return nil
 	}
 	version, err := in.resolveArchiveVersion(pkg, b)
@@ -46,7 +47,7 @@ func (in *Installer) installBinariesRemoteArchive(pkg string, b *BinariesRemoteA
 	if err := in.exec(curlArgv(url, asset)); err != nil {
 		return err
 	}
-	if want, ok := b.Platforms.Sha[in.Host.ShaKey()]; ok {
+	if want, ok := b.PlatformEligibility.Sha[in.Host.ShaKey()]; ok {
 		if err := in.verifyChecksum(pkg, asset, want); err != nil {
 			return err
 		}
@@ -93,17 +94,17 @@ func (in *Installer) verifyChecksum(pkg, asset, want string) error {
 	return nil
 }
 
-func (in *Installer) archFor(convention string) (string, error) {
-	if convention == "" {
+func (in *Installer) archFor(scheme string) (string, error) {
+	if scheme == "" {
 		return in.Host.Arch, nil
 	}
-	if v, ok := in.File.archSchemesOrBuiltin()[convention][in.Host.Arch]; ok {
+	if v, ok := in.File.archSchemesOrBuiltin()[scheme][in.Host.Arch]; ok {
 		return strings.ReplaceAll(v, "{os}", in.Host.OS), nil
 	}
-	return "", fmt.Errorf("unknown archScheme %q for arch %s (declare it under archSchemes)", convention, in.Host.Arch)
+	return "", fmt.Errorf("unknown archScheme %q for arch %s (declare it under archSchemes)", scheme, in.Host.Arch)
 }
 
-func (in *Installer) members(pkg, version, arch string, b *BinariesRemoteArchiveSpec) []string {
+func (in *Installer) expandMembers(pkg, version, arch string, b *BinariesRemoteArchiveSpec) []string {
 	names := b.ExtractBinaries
 	if len(names) == 0 {
 		names = Strings{pkg}
@@ -133,7 +134,7 @@ func (in *Installer) installMembers(pkg, asset, version, arch string, b *Binarie
 	if err := in.extract(asset, opt); err != nil {
 		return err
 	}
-	for _, m := range in.members(pkg, version, arch, b) {
+	for _, m := range in.expandMembers(pkg, version, arch, b) {
 		if err := in.exec([]string{"ln", "-sf", filepath.Join(opt, m), filepath.Join(binDir, path.Base(m))}); err != nil {
 			return err
 		}

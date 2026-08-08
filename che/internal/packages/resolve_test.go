@@ -69,10 +69,10 @@ func TestItemUnmarshal(t *testing.T) {
 		}
 		got := itemGot{Mgr: it.Mgr, Name: it.Name}
 		if it.Apt != nil {
-			got.Name = it.Apt.Vocabulary.PackageName
+			got.Name = it.Apt.PackageName
 		}
 		if it.BinariesRemoteArchive != nil {
-			got.Version, got.URL, got.Platforms, got.Checksums = it.BinariesRemoteArchive.Version, it.BinariesRemoteArchive.URL, it.BinariesRemoteArchive.Platforms.Names, it.BinariesRemoteArchive.Platforms.Sha
+			got.Version, got.URL, got.Platforms, got.Checksums = it.BinariesRemoteArchive.Version, it.BinariesRemoteArchive.URL, it.BinariesRemoteArchive.PlatformEligibility.Names, it.BinariesRemoteArchive.PlatformEligibility.Sha
 		}
 		if it.Script != nil {
 			got.Run, got.ScriptOs = strings.TrimSpace(it.Script.Run), it.Script.OS

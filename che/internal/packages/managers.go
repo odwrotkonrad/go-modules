@@ -3,6 +3,7 @@ package packages
 // [>] 🤖🤖🤖
 
 import (
+	"cmp"
 	"fmt"
 	"maps"
 	"os"
@@ -279,37 +280,27 @@ func (in *Installer) installVia(pkg string, it Item) error {
 	case it.Mgr == "script":
 		return in.installScript(pkg, it.Script)
 	}
-	base := it.Name
-	if base == "" {
-		base = pkg
-	}
 	pin := in.pinFor(pkg, it.Version)
-	// [why] casks ship only their current version: a pin is a wish brew cannot grant
+	// [why] casks ship only their current version, a pin cannot be enforced
 	if it.Mgr == "cask" && pin != "" {
 		in.emit(log.Levels.Warn, "unpinnable", pkg+": version "+pin+" cannot be enforced via brew/cask, installing the current release")
 		pin = ""
 	}
-	if it.Mgr == "brew" && pin != "" {
-		base += "@" + pin
-	}
-	if it.Registry != "" {
-		if !in.File.brewRegistry(it.Registry) {
-			return fmt.Errorf("%s: unknown brew registry %q (installerRegistries.brew)", pkg, it.Registry)
-		}
-		base = it.Registry + "/" + base
+	base, err := in.managerPkgName(pkg, it, pin)
+	if err != nil {
+		return err
 	}
 	installed := in.isInstalled(pkg, it.Mgr, base)
 	switch {
 	case installed && pin != "" && !in.pinSatisfied(pkg, it.Mgr, base, pin):
-		if !pinnable(it.Mgr) {
-			if !in.managerHasNewer(it.Mgr, base) {
-				in.emitSkip(log.Levels.Warn, pkg, fmt.Sprintf("pin %s unsatisfiable via %s: installed %s is the manager's latest", pin, it.Mgr, in.installedVersion(it.Mgr, base)))
-				return nil
-			}
-			in.emit(log.Levels.Info, "reinstall", pkg+": -> "+pin)
-			return in.update(pkg, it.Mgr, base)
+		if !pinnable(it.Mgr) && !in.managerHasNewer(it.Mgr, base) {
+			in.emitSkip(log.Levels.Warn, pkg, fmt.Sprintf("pin %s unsatisfiable via %s: installed %s is the manager's latest", pin, it.Mgr, in.installedVersion(it.Mgr, base)))
+			return nil
 		}
 		in.emit(log.Levels.Info, "reinstall", pkg+": -> "+pin)
+		if !pinnable(it.Mgr) {
+			return in.update(pkg, it.Mgr, base)
+		}
 	case installed && in.Opts.Update && pin == "":
 		return in.update(pkg, it.Mgr, base)
 	case installed:
@@ -334,16 +325,30 @@ func pinnable(mgr string) bool {
 	return slices.Contains([]string{"npm", "apt", "gem", "go", "vscode"}, mgr)
 }
 
-func (in *Installer) managerHasNewer(mgr, base string) bool {
-	switch mgr {
-	case "brew":
-		out, ok := in.output([]string{"brew", "outdated", "--quiet", path.Base(base)})
-		return ok && strings.TrimSpace(out) != ""
-	case "cask":
-		out, ok := in.output([]string{"brew", "outdated", "--cask", "--quiet", path.Base(base)})
-		return ok && strings.TrimSpace(out) != ""
+func (in *Installer) managerPkgName(pkg string, it Item, pin string) (string, error) {
+	base := cmp.Or(it.Name, pkg)
+	if it.Mgr == "brew" && pin != "" {
+		base += "@" + pin
 	}
-	return true
+	if it.Registry != "" {
+		if !in.File.hasBrewTap(it.Registry) {
+			return "", fmt.Errorf("%s: unknown brew registry %q (installerRegistries.brew)", pkg, it.Registry)
+		}
+		base = it.Registry + "/" + base
+	}
+	return base, nil
+}
+
+func (in *Installer) managerHasNewer(mgr, base string) bool {
+	if mgr != "brew" && mgr != "cask" {
+		return true
+	}
+	argv := []string{"brew", "outdated", "--quiet", path.Base(base)}
+	if mgr == "cask" {
+		argv = slices.Insert(argv, 2, "--cask")
+	}
+	out, ok := in.output(argv)
+	return ok && strings.TrimSpace(out) != ""
 }
 
 func pinnedName(mgr, base, pin string) string {
@@ -546,20 +551,21 @@ func (in *Installer) aptUpdate() error {
 }
 
 func (in *Installer) installScript(pkg string, s *ScriptSpec) error {
+	pin := in.pinFor(pkg, s.Version)
 	if s.ValidateArtifact != "" {
 		if fileExists(in.expandPath(s.ValidateArtifact)) {
 			in.emitSkip(log.Levels.Debug, pkg, "already installed via script ("+s.ValidateArtifact+" present)")
 			return nil
 		}
 	} else if in.hasCmd(pkg) {
-		if pin := in.pinFor(pkg, s.Version); pin == "" || in.versionOutputHasPin(pkg, pin) {
+		if pin == "" || in.versionOutputHasPin(pkg, pin) {
 			in.emitSkip(log.Levels.Debug, pkg, "already installed via script")
 			return nil
 		}
 		in.emit(log.Levels.Info, "reinstall", pkg+": -> "+s.Version)
 	}
 	if in.Opts.DryRun {
-		in.emitDryRun("install", labeled(pkg, in.pinFor(pkg, s.Version))+" via script")
+		in.emitDryRun("install", labeled(pkg, pin)+" via script")
 		return nil
 	}
 	argv, cleanup, err := in.scriptArgv(pkg, s)
@@ -573,7 +579,7 @@ func (in *Installer) installScript(pkg string, s *ScriptSpec) error {
 	if err := execx.Default.Exec(c); err != nil {
 		return fmt.Errorf("%s: install script: %w", pkg, err)
 	}
-	in.emit(log.Levels.Info, "installed", labeled(pkg, in.pinFor(pkg, s.Version))+" via script")
+	in.emit(log.Levels.Info, "installed", labeled(pkg, pin)+" via script")
 	return nil
 }
 
@@ -581,7 +587,7 @@ func (in *Installer) scriptEnv(pkg string, s *ScriptSpec) []string {
 	env := append(os.Environ(),
 		"CHE_PKG_NAME="+pkg,
 		"CHE_PKG_VERSION="+s.Version,
-		"CHE_PKG_SHA256="+strings.TrimPrefix(s.Platforms.Sha[in.Host.ShaKey()], "sha256:"),
+		"CHE_PKG_SHA256="+strings.TrimPrefix(s.PlatformEligibility.Sha[in.Host.ShaKey()], "sha256:"),
 		"CHE_PKG_OS="+in.Host.OS,
 		"CHE_PKG_ARCH="+in.Host.Arch,
 	)

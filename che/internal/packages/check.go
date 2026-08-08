@@ -83,7 +83,7 @@ func pinnedVersion(it Item) string {
 	case it.Script != nil:
 		return it.Script.Version
 	case it.Apt != nil:
-		for bin := range it.Apt.Vocabulary.VersionMap {
+		for bin := range it.Apt.VersionMap {
 			return bin
 		}
 	}

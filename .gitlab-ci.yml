@@ -214,11 +214,49 @@ test-install-methods-linux:
     - tar -xzf /tmp/go.tar.gz -C /usr/local
     - export PATH=/usr/local/go/bin:$PATH
 
+#[what] darwin build of the cover binary + e2e harness, shared by the darwin install jobs
+#[why] the linux artifact is the wrong platform: without this every darwin matrix job links its own
+build-che-cover-darwin:
+  stage: warm
+  tags:
+    - saas-macos-medium-m1
+  image: macos-26-xcode-26
+  needs: []
+  #[why] shares goreleaser-darwin-che's cache keys: both compile che on darwin, tag and MR pipelines warm each other
+  cache:
+    - key: go-mod-che
+      paths:
+        - .cache/go-mod
+      policy: pull-push
+    - key: go-build-che-darwin
+      paths:
+        - .cache/go-build
+      policy: pull-push
+  rules:
+    - if: $CI_PIPELINE_SOURCE == "merge_request_event" || $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
+      changes: [che/internal/packages/**/*, che/e2e/install_methods*]
+      allow_failure: true
+    - if: $CI_PIPELINE_SOURCE == "merge_request_event" || $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
+      when: manual
+      allow_failure: true
+  before_script:
+    - curl -fsSL --connect-timeout 30 --retry 10 --retry-delay 30 --retry-all-errors -o /tmp/go.tar.gz "https://go.dev/dl/go1.26.4.darwin-arm64.tar.gz"
+    - sudo tar -xzf /tmp/go.tar.gz -C /usr/local
+    - export PATH=/usr/local/go/bin:$PATH
+  script:
+    - make -C che build-cover build-e2e-test
+  artifacts:
+    paths:
+      - che/dist/
+
 test-install-methods-darwin:
   extends: .test-install-methods
   tags:
     - saas-macos-medium-m1
   image: macos-26-xcode-26
+  needs:
+    - job: build-che-cover-darwin
+      optional: true
   parallel:
     matrix:
       - METHOD: [brew/formulae, brew/cask, binariesRemoteArchive, script, pyenv, nvm]
