@@ -1,28 +1,28 @@
 ##[>] 🤖🤖
 packages:
-  e2e-present: [{npm: e2e-present}]
-  e2e-absent: [{npm: e2e-absent}]
-  e2e-dup: [{npm: e2e-dup}]
-  e2e-outdated: [{npm: e2e-outdated}]
-  e2e-missing-pkg: [{npm: e2e-missing-pkg}]
+  e2e-present: [{npm: {packageName: e2e-present}}]
+  e2e-absent: [{npm: {packageName: e2e-absent}}]
+  e2e-dup: [{npm: {packageName: e2e-dup}}]
+  e2e-outdated: [{npm: {packageName: e2e-outdated}}]
+  e2e-missing-pkg: [{npm: {packageName: e2e-missing-pkg}}]
   e2e-bin:
     - binariesRemoteArchive:
-        platformEligibility: [{darwin-arm64: e2esha}, {linux-amd64: e2esha}, {linux-arm64: e2esha}]
+        platformEligibility: [{darwin-arm64: sha256:e2esha}, {linux-amd64: sha256:e2esha}, {linux-arm64: sha256:e2esha}]
         version: 9.9.9
         url: https://e2e.invalid/good/e2e-bin
   e2e-bin-new:
     - binariesRemoteArchive:
-        platformEligibility: [{darwin-arm64: e2esha}, {linux-amd64: e2esha}, {linux-arm64: e2esha}]
+        platformEligibility: [{darwin-arm64: sha256:e2esha}, {linux-amd64: sha256:e2esha}, {linux-arm64: sha256:e2esha}]
         version: 9.9.9
         url: https://e2e.invalid/good/e2e-bin-new
   e2e-bin-old:
     - binariesRemoteArchive:
-        platformEligibility: [{darwin-arm64: e2esha}, {linux-amd64: e2esha}, {linux-arm64: e2esha}]
+        platformEligibility: [{darwin-arm64: sha256:e2esha}, {linux-amd64: sha256:e2esha}, {linux-arm64: sha256:e2esha}]
         version: 9.9.9
         url: https://e2e.invalid/good/e2e-bin-old
   e2e-bin-bad:
     - binariesRemoteArchive:
-        platformEligibility: [{darwin-arm64: e2esha}, {linux-amd64: e2esha}, {linux-arm64: e2esha}]
+        platformEligibility: [{darwin-arm64: sha256:e2esha}, {linux-amd64: sha256:e2esha}, {linux-arm64: sha256:e2esha}]
         version: 1.0.0
         url: https://e2e.invalid/bad/e2e-bin-bad
 ##[<] 🤖🤖

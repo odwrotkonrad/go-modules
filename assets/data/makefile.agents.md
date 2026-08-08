@@ -47,11 +47,12 @@
 `test-cover` run all tests with coverage (binary covdata into ./cover-unit), print the per-package and total percentages
 `cover-report` merge every present cover-* covdata dir into coverage.out/coverage.xml, print the combined total
 `build-cover` build the coverage-instrumented binary into ./dist (e2e prerequisite)
-`e2e-dryrun`: `build-cover` dry-run e2e flow (every command --dry-run=all, CHE_LOG_LEVEL=trace), binary covdata into ./cover-e2e-dryrun
-`e2e-run`: `build-cover` real full-flow e2e (CHE_LOG_LEVEL=info), binary covdata into ./cover-e2e-run
-`e2e-backup`: `build-cover` backup e2e flow (create/ls/restore selectors, CHE_LOG_LEVEL=info), binary covdata into ./cover-e2e-backup
-`e2e-packages`: `build-cover` packages e2e flow (install + checks against fake PATH managers, CHE_LOG_LEVEL=info), binary covdata into ./cover-e2e-packages
-`e2e-install-methods`: `build-cover` real-install e2e per installation method family (METHOD=<method>, default all, prefix matches sub-groups, see e2e/install_methods.yml): installs live packages into a throwaway HOME, then runs each one, binary covdata into ./cover-e2e-install-methods
+`build-e2e-test` compile the e2e harness into ./dist/e2e.test (with the binary, the only artifacts CI e2e jobs need)
+`e2e-dryrun`: `$(BUILD_DEP)` dry-run e2e flow (every command --dry-run=all, CHE_LOG_LEVEL=trace), binary covdata into ./cover-e2e-dryrun
+`e2e-run`: `$(BUILD_DEP)` real full-flow e2e (CHE_LOG_LEVEL=info), binary covdata into ./cover-e2e-run
+`e2e-backup`: `$(BUILD_DEP)` backup e2e flow (create/ls/restore selectors, CHE_LOG_LEVEL=info), binary covdata into ./cover-e2e-backup
+`e2e-packages`: `$(BUILD_DEP)` packages e2e flow (install + checks against fake PATH managers, CHE_LOG_LEVEL=info), binary covdata into ./cover-e2e-packages
+`e2e-install-methods`: `$(BUILD_DEP)` real-install e2e per installation method family (METHOD=<method>, default all, prefix matches sub-groups, see e2e/install_methods.yml): installs live packages into a throwaway HOME, then runs each one, binary covdata into ./cover-e2e-install-methods
 `e2e-registry` registry e2e: every brew formula and cask name in the builtin packages file resolves upstream
 `e2e`: `e2e-dryrun -> e2e-run -> e2e-backup -> e2e-packages` run all e2e flows
 `build` build the binary into ./dist

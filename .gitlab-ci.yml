@@ -100,9 +100,12 @@ test-che:
     - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
       changes: [che/**/*, lib/**/*, go.work, .gitlab-ci.yml]
 
-.test-e2e-che:
+##[>] 🤖🤖
+#[what] one cover-instrumented che build shared by every e2e job via artifact
+#[why] each e2e job linking the cgo-heavy binary itself repeats the most expensive step per pipeline
+build-che-cover:
   image: $CI_IMAGE
-  stage: test-e2e
+  stage: warm
   needs:
     - job: warm-go
       optional: true
@@ -115,6 +118,24 @@ test-che:
       paths:
         - .cache/go-build
       policy: pull
+  script:
+    - make -C che build-cover build-e2e-test
+  artifacts:
+    paths:
+      - che/dist/
+  rules:
+    - if: $CI_PIPELINE_SOURCE == "merge_request_event"
+      changes: [che/**/*, lib/**/*, go.work, .gitlab-ci.yml]
+    - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
+      changes: [che/**/*, lib/**/*, go.work, .gitlab-ci.yml]
+##[<] 🤖🤖
+
+.test-e2e-che:
+  image: $CI_IMAGE
+  stage: test-e2e
+  #[why] only the built artifacts move: the prebuilt binary and e2e harness, no go caches
+  needs:
+    - build-che-cover
   rules:
     - if: $CI_PIPELINE_SOURCE == "merge_request_event"
       changes: [che/**/*, lib/**/*, go.work, .gitlab-ci.yml]
@@ -124,7 +145,7 @@ test-che:
 test-e2e-che-dryrun:
   extends: .test-e2e-che
   script:
-    - make -C che e2e-dryrun
+    - make -C che e2e-dryrun BUILD_DEP= E2E_USE_TEST_BIN=1
   artifacts:
     paths:
       - che/cover-e2e-dryrun/
@@ -132,7 +153,7 @@ test-e2e-che-dryrun:
 test-e2e-che-run:
   extends: .test-e2e-che
   script:
-    - make -C che e2e-run
+    - make -C che e2e-run BUILD_DEP= E2E_USE_TEST_BIN=1
   artifacts:
     paths:
       - che/cover-e2e-run/
@@ -140,7 +161,7 @@ test-e2e-che-run:
 test-e2e-che-backup:
   extends: .test-e2e-che
   script:
-    - make -C che e2e-backup
+    - make -C che e2e-backup BUILD_DEP= E2E_USE_TEST_BIN=1
   artifacts:
     paths:
       - che/cover-e2e-backup/
@@ -152,7 +173,7 @@ test-e2e-che-backup:
 test-e2e-che-registry:
   extends: .test-e2e-che
   script:
-    - make -C che e2e-registry
+    - make -C che e2e-registry E2E_USE_TEST_BIN=1
 ##[<] 🤖🤖
 
 ##[>] 🤖🤖
@@ -168,8 +189,11 @@ test-e2e-che-registry:
     - if: $CI_PIPELINE_SOURCE == "merge_request_event" || $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
       when: manual
       allow_failure: true
+  #[why] reuse the build-che-cover artifact when present (linux only, optional: the manual
+  #   rule runs on pipelines where the build job does not exist); darwin never fetches it
+  #   and builds its own binary
   script:
-    - make -C che e2e-install-methods METHOD="$METHOD"
+    - make -C che e2e-install-methods METHOD="$METHOD" $(test -x che/dist/e2e.test && echo "BUILD_DEP= E2E_USE_TEST_BIN=1")
   artifacts:
     paths:
       - che/cover-e2e-install-methods/
@@ -177,9 +201,12 @@ test-e2e-che-registry:
 test-install-methods-linux:
   extends: .test-install-methods
   image: debian:bookworm-slim
+  needs:
+    - job: build-che-cover
+      optional: true
   parallel:
     matrix:
-      - METHOD: [apt, prebuiltBinariesArchive, script, pyenv, nvm, npm, go]
+      - METHOD: [apt, binariesRemoteArchive, script, pyenv, nvm, npm, go]
   before_script:
     #[why] bootstrap minimum only: zsh + clang run the Makefile itself, the rest installs through basePackages and each package's requires
     - apt-get update && apt-get install -y --no-install-recommends ca-certificates curl make sudo zsh clang
@@ -194,7 +221,7 @@ test-install-methods-darwin:
   image: macos-26-xcode-26
   parallel:
     matrix:
-      - METHOD: [brew/formulae, brew/cask, prebuiltBinariesArchive, script, pyenv, nvm]
+      - METHOD: [brew/formulae, brew/cask, binariesRemoteArchive, script, pyenv, nvm]
   before_script:
     - curl -fsSL --connect-timeout 30 --retry 10 --retry-delay 30 --retry-all-errors -o /tmp/go.tar.gz "https://go.dev/dl/go1.26.4.darwin-arm64.tar.gz"
     - sudo tar -xzf /tmp/go.tar.gz -C /usr/local

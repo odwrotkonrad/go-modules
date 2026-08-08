@@ -540,7 +540,7 @@ testCases:
         expected:
           exitCode: 0
           stdOut:
-            - "installed e2e-bin-new via binariesRemoteArchive"
+            - "installed e2e-bin-new 9.9.9 via binariesRemoteArchive"
 
       - name: InstallFailsOnManagerMissingPackage
         command: che packages install --packages-file ${LOCAL}/packages.yml e2e-missing-pkg
