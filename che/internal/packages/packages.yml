@@ -657,6 +657,9 @@ packages:
             - apt
     ruby-lsp:
         version: 0.26.10
+        requires:
+            - gcc
+            - make
         installers:
             - gem
     shellcheck:
