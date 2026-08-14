@@ -70,6 +70,12 @@ func (in *Installer) linkNvmGlobalBin(global string) {
 	}
 }
 
+func (in *Installer) linkNvmNpmBins() {
+	if v := vmTools["nvm"].global(in); v != "" {
+		in.linkNvmGlobalBin(v)
+	}
+}
+
 func (in *Installer) execNvm(cmd string) error {
 	sh := filepath.Join(in.Host.nvmDir(), "nvm.sh")
 	return in.exec([]string{"bash", "-c", fmt.Sprintf(". %q && %s", sh, cmd)})
@@ -103,6 +109,7 @@ func (in *Installer) installVersionManager(pkg string, s *VersionManagerSpec) er
 		if err := tool.install(in, v); err != nil {
 			return err
 		}
+		in.emit(log.Levels.Info, "installed", labelWithVersion(in.pkgLabel(pkg), v)+" via "+s.Tool)
 	}
 	if err := tool.setGlobal(in, global); err != nil {
 		return err
@@ -110,7 +117,6 @@ func (in *Installer) installVersionManager(pkg string, s *VersionManagerSpec) er
 	if s.Tool == "nvm" {
 		in.linkNvmGlobalBin(global)
 	}
-	in.emit(log.Levels.Info, "installed", fmt.Sprintf("%s via %s (versions: %s, global: %s)", in.pkgLabel(pkg), s.Tool, strings.Join(versions, " "), global))
 	return nil
 }
 

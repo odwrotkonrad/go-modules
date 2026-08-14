@@ -37,13 +37,19 @@ import (
 type installJob struct {
 	packages    []string
 	onlyMethods []string
-	verify      map[string][]verifyCmd
+	verify      map[string]pkgVerify
 	warnMissing bool
 }
 
 type verifyCmd struct {
 	cmd     string
 	wantOut bool
+}
+
+type pkgVerify struct {
+	cmds      []verifyCmd
+	cmd       string
+	checkPath bool
 }
 
 type runCfg struct {
@@ -228,14 +234,14 @@ func runPackageMethods(t *testing.T, entry packages.Entry, pkg, method string, c
 			runJob(t, installJob{
 				packages:    []string{pkg},
 				onlyMethods: []string{m},
-				verify:      map[string][]verifyCmd{pkg: resolveVerify(t, entry, pkg, m)},
+				verify:      map[string]pkgVerify{pkg: resolveVerify(t, entry, pkg, m)},
 				warnMissing: lenient || os.Getenv("E2E_INSTALL_MISSING_METHOD") == "warn",
 			}, cfg)
 		})
 	}
 }
 
-func resolveVerify(t *testing.T, entry packages.Entry, pkg, mgr string) []verifyCmd {
+func resolveVerify(t *testing.T, entry packages.Entry, pkg, mgr string) pkgVerify {
 	t.Helper()
 	spec := entry.Verify
 	for _, it := range entry.Items {
@@ -243,27 +249,55 @@ func resolveVerify(t *testing.T, entry packages.Entry, pkg, mgr string) []verify
 			spec = it.Verify
 		}
 	}
-	var cmds []verifyCmd
+	name := pkg
+	if entry.Command != "" {
+		name = entry.Command
+	}
+	pv := pkgVerify{cmd: name, checkPath: spec.ChecksPath() && mgr != "vscode"}
 	if spec != nil {
 		if spec.VersionCmd {
-			cmds = append(cmds, defaultVerify(entry, pkg))
+			pv.cmds = append(pv.cmds, defaultVerify(entry, pkg))
 		}
 		if spec.PkgMgrVersionCheck {
 			cmd, err := pkgMgrVersionCheck(entry, pkg, mgr)
 			require.NoError(t, err)
-			cmds = append(cmds, verifyCmd{cmd: cmd, wantOut: true})
+			pv.cmds = append(pv.cmds, verifyCmd{cmd: cmd, wantOut: true})
 		}
 		if spec.Cmd != "" {
-			cmds = append(cmds, verifyCmd{cmd: spec.Cmd})
+			pv.cmds = append(pv.cmds, verifyCmd{cmd: spec.Cmd})
 		}
-		if len(cmds) > 0 {
-			return cmds
+		if len(pv.cmds) > 0 {
+			return pv
 		}
 	}
 	if spec == nil && entry.VersionCommand != "" {
-		return []verifyCmd{{cmd: entry.VersionCommand, wantOut: true}}
+		pv.cmds = []verifyCmd{{cmd: entry.VersionCommand, wantOut: true}}
+		return pv
 	}
-	return []verifyCmd{defaultVerify(entry, pkg)}
+	if mgr == "pyenv" || mgr == "nvm" {
+		for _, it := range entry.Items {
+			if it.Mgr != mgr || it.VersionManager == nil {
+				continue
+			}
+			for _, v := range it.VersionManager.Versions {
+				if mgr == "pyenv" {
+					pv.cmds = append(pv.cmds, verifyCmd{cmd: fmt.Sprintf("pyenv versions --bare | grep -Fx %q", v), wantOut: true})
+					continue
+				}
+				pv.cmds = append(pv.cmds, verifyCmd{cmd: fmt.Sprintf(`test -x "$NVM_DIR/versions/node/v%s/bin/node" && echo v%s`, v, v), wantOut: true})
+			}
+		}
+		pv.cmds = append(pv.cmds, defaultVerify(entry, pkg))
+		return pv
+	}
+	if mgr == "vscode" {
+		cmd, err := pkgMgrVersionCheck(entry, pkg, mgr)
+		require.NoError(t, err)
+		pv.cmds = []verifyCmd{{cmd: cmd, wantOut: true}}
+		return pv
+	}
+	pv.cmds = []verifyCmd{defaultVerify(entry, pkg)}
+	return pv
 }
 
 func defaultVerify(entry packages.Entry, pkg string) verifyCmd {
@@ -416,18 +450,34 @@ func runJobHost(t *testing.T, job installJob) (string, bool) {
 		return out, true
 	}
 
-	for pkg, vs := range job.verify {
-		for _, v := range vs {
+	for pkg, pv := range job.verify {
+		for _, v := range pv.cmds {
 			verify := exec.Command("/bin/bash", "-ec", verifyShell(v.cmd))
 			verify.Env = env
 			verify.Dir = home
 			vout, verr := verify.CombinedOutput()
-			t.Logf("verify %s: %s\n%s", pkg, v.cmd, vout)
+			mark := "✅"
+			if verr != nil {
+				mark = "❌"
+			}
+			t.Logf("verify %s via `%s`: %s %s", pkg, v.cmd, strings.TrimSpace(string(vout)), mark)
 			require.NoError(t, verr, "verify %s via %q", pkg, v.cmd)
 			if v.wantOut {
 				require.NotEmpty(t, strings.TrimSpace(string(vout)), "verify %s produced no output", pkg)
 			}
 		}
+		if !pv.checkPath {
+			t.Logf("verify %s on PATH: skipped (checkInPath: false)", pkg)
+			continue
+		}
+		probe := exec.Command("/bin/bash", "-ec", "command -v "+pv.cmd)
+		probe.Env = env
+		pout, perr := probe.Output()
+		if perr != nil {
+			t.Logf("verify %s not on PATH ❌", pv.cmd)
+			require.Fail(t, fmt.Sprintf("%s not on PATH after install", pv.cmd))
+		}
+		t.Logf("verify %s on PATH: %s ✅", pv.cmd, strings.TrimSpace(string(pout)))
 	}
 	return out, false
 }
@@ -486,14 +536,20 @@ func appendRunVerify(b *strings.Builder, che string, job installJob) {
 		fmt.Fprintf(b, "case \"$out\" in (*'%s: no applicable installation method'*) ;; (*) skip=0;; esac\n", pkg)
 	}
 	fmt.Fprintf(b, "if [ \"$skip\" = 1 ]; then echo %s; exit 0; fi\n", noDepsSkipMarker)
-	for pkg, vs := range job.verify {
-		for _, v := range vs {
-			fmt.Fprintf(b, "vout=$(bash -c %s 2>&1) || { printf '%%s\\n' \"$vout\"; exit 1; }\n", shq(verifyShell(v.cmd)))
-			fmt.Fprintf(b, "printf 'verify %s: %%s\\n' \"$vout\"\n", pkg)
+	for pkg, pv := range job.verify {
+		for _, v := range pv.cmds {
+			label := fmt.Sprintf("verify %s via `%s`", pkg, v.cmd)
+			fmt.Fprintf(b, "vout=$(bash -c %s 2>&1) || { printf '%%s: %%s ❌\\n' %s \"$vout\"; exit 1; }\n", shq(verifyShell(v.cmd)), shq(label))
+			fmt.Fprintf(b, "printf '%%s: %%s ✅\\n' %s \"$vout\"\n", shq(label))
 			if v.wantOut {
 				b.WriteString("test -n \"$vout\"\n")
 			}
 		}
+		if !pv.checkPath {
+			fmt.Fprintf(b, "printf 'verify %s on PATH: skipped (checkInPath: false)\\n'\n", pkg)
+			continue
+		}
+		fmt.Fprintf(b, "if p=$(command -v %s); then printf 'verify %s on PATH: %%s ✅\\n' \"$p\"; else printf 'verify %s not on PATH ❌\\n'; exit 1; fi\n", pv.cmd, pv.cmd, pv.cmd)
 	}
 }
 

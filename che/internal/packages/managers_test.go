@@ -248,6 +248,22 @@ func TestInstallAptSudoAndUpdateOnce(t *testing.T) {
 	require.Equal(t, 1, strings.Count(strings.Join(calls, "\n"), "apt-get update"))
 }
 
+func TestInstallNpmLinksNvmGlobalBins(t *testing.T) {
+	in, m := newInstaller(t, "packages:\n  tsc: [npm]", "linux", cmdMap([]string{"npm"}), Options{})
+	home := tempHome(t, in)
+	bin := filepath.Join(home, ".nvm", "versions", "node", "v24.0.0", "bin")
+	require.NoError(t, os.MkdirAll(bin, 0o755))
+	require.NoError(t, os.WriteFile(filepath.Join(bin, "tsc"), []byte("#!/bin/sh\n"), 0o755))
+	require.NoError(t, os.MkdirAll(filepath.Join(home, ".nvm", "alias"), 0o755))
+	require.NoError(t, os.WriteFile(filepath.Join(home, ".nvm", "alias", "default"), []byte("v24.0.0\n"), 0o644))
+	m.Stub = failOn("npm ls")
+	require.NoError(t, in.Install([]string{"tsc"}))
+	requireCalls(t, m, "npm install --global tsc")
+	target, err := os.Readlink(filepath.Join(home, ".local", "bin", "tsc"))
+	require.NoError(t, err)
+	require.Equal(t, filepath.Join(bin, "tsc"), target)
+}
+
 func TestInstallNpmPinReinstallsOnDrift(t *testing.T) {
 	in, m := newInstaller(t, "packages:\n  ccstatusline:\n    version: 2.2.22\n    installers: [npm]", "darwin",
 		cmdMap([]string{"npm", "ccstatusline"}), Options{})

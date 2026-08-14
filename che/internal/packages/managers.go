@@ -601,10 +601,18 @@ var managerRoutines = map[string]managerRoutine{
 	},
 	"npm": {
 		install: func(in *Installer, _, name, _ string) error {
-			return in.exec(in.sudo(in.npmBin(), "install", "--global", name))
+			if err := in.exec(in.sudo(in.npmBin(), "install", "--global", name)); err != nil {
+				return err
+			}
+			in.linkNvmNpmBins()
+			return nil
 		},
 		update: func(in *Installer, _, base string) error {
-			return in.exec(in.sudo(in.npmBin(), "update", "--global", base))
+			if err := in.exec(in.sudo(in.npmBin(), "update", "--global", base)); err != nil {
+				return err
+			}
+			in.linkNvmNpmBins()
+			return nil
 		},
 	},
 	"vscode": {
