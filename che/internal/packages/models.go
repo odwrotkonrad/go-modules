@@ -202,6 +202,7 @@ type Entry struct {
 	Command        string
 	PostInstall    *ScriptSpec
 	VersionCommand string
+	Verify         *VerifySpec
 	Completions    Completions
 }
 
@@ -232,8 +233,9 @@ func (v InstallerVocabulary) isZero() bool {
 
 type itemBody struct {
 	InstallerVocabulary `yaml:",inline"`
-	Version             string `yaml:"version,omitempty"`
-	FromRegistry        string `yaml:"fromRegistry,omitempty"`
+	Version             string      `yaml:"version,omitempty"`
+	FromRegistry        string      `yaml:"fromRegistry,omitempty"`
+	Verify              *VerifySpec `yaml:"verify,omitempty"`
 }
 
 func installerKey(mgr string) string {
@@ -276,15 +278,16 @@ func (it Item) MarshalYAML() (any, error) {
 		InstallerVocabulary: InstallerVocabulary{PackageName: it.Name, AliasBinary: it.AliasBinary},
 		Version:             it.Version,
 		FromRegistry:        it.Registry,
+		Verify:              it.Verify,
 	}
-	if body.isZero() && body.Version == "" && body.FromRegistry == "" {
+	if body.isZero() && body.Version == "" && body.FromRegistry == "" && body.Verify == nil {
 		return installerKey(it.Mgr), nil
 	}
 	return map[string]itemBody{installerKey(it.Mgr): body}, nil
 }
 
 func (e Entry) MarshalYAML() (any, error) {
-	if e.Version == "" && len(e.Requires) == 0 && e.PostInstall == nil && e.Command == "" && e.VersionCommand == "" && e.Completions.Zsh == nil {
+	if e.Version == "" && len(e.Requires) == 0 && e.PostInstall == nil && e.Command == "" && e.VersionCommand == "" && e.Verify == nil && e.Completions.Zsh == nil {
 		return e.Items, nil
 	}
 	obj := map[string]any{"installers": e.Items}
@@ -302,6 +305,9 @@ func (e Entry) MarshalYAML() (any, error) {
 	}
 	if e.VersionCommand != "" {
 		obj["versionCommand"] = e.VersionCommand
+	}
+	if e.Verify != nil {
+		obj["verify"] = e.Verify
 	}
 	if e.Completions.Zsh != nil {
 		obj["completions"] = e.Completions
@@ -374,6 +380,7 @@ func (e *Entry) UnmarshalYAML(node *yaml.Node) error {
 		PostInstall    *ScriptSpec `yaml:"postInstall"`
 		Command        string      `yaml:"command"`
 		VersionCommand string      `yaml:"versionCommand"`
+		Verify         *VerifySpec `yaml:"verify"`
 		Completions    Completions `yaml:"completions"`
 	}
 	if err := node.Decode(&obj); err != nil {
@@ -401,6 +408,7 @@ func (e *Entry) UnmarshalYAML(node *yaml.Node) error {
 	e.Command = obj.Command
 	e.PostInstall = obj.PostInstall
 	e.VersionCommand = obj.VersionCommand
+	e.Verify = obj.Verify
 	e.Completions = obj.Completions
 	return nil
 }
@@ -426,10 +434,49 @@ type Item struct {
 	Version               string
 	Registry              string
 	AliasBinary           map[string]string
+	Verify                *VerifySpec
 	BinariesRemoteArchive *BinariesRemoteArchiveSpec
 	Script                *ScriptSpec
 	Apt                   *AptSpec
 	VersionManager        *VersionManagerSpec
+}
+
+const (
+	VerifyVersionCmd    = "versionCmd"
+	VerifyPkgVersionCmd = "pkgVersionCmd"
+)
+
+type VerifySpec struct {
+	Strategy string
+	Cmd      string
+}
+
+func (v *VerifySpec) UnmarshalYAML(node *yaml.Node) error {
+	if node.Kind == yaml.ScalarNode {
+		if node.Value != VerifyVersionCmd && node.Value != VerifyPkgVersionCmd {
+			return fmt.Errorf("verify: want %s, %s or {cmd: <command>}, got %q", VerifyVersionCmd, VerifyPkgVersionCmd, node.Value)
+		}
+		v.Strategy = node.Value
+		return nil
+	}
+	var obj struct {
+		Cmd string `yaml:"cmd"`
+	}
+	if err := node.Decode(&obj); err != nil {
+		return err
+	}
+	if obj.Cmd == "" {
+		return fmt.Errorf("verify: object form requires a non-empty cmd")
+	}
+	v.Cmd = obj.Cmd
+	return nil
+}
+
+func (v VerifySpec) MarshalYAML() (any, error) {
+	if v.Cmd != "" {
+		return map[string]string{"cmd": v.Cmd}, nil
+	}
+	return v.Strategy, nil
 }
 
 type VersionManagerSpec struct {
@@ -440,8 +487,8 @@ type VersionManagerSpec struct {
 
 type AptSpec struct {
 	InstallerVocabulary `yaml:",inline"`
-	FromRegistry        string `yaml:"fromRegistry,omitempty"`
-	VersionCommand      string `yaml:"versionCommand,omitempty"`
+	FromRegistry        string      `yaml:"fromRegistry,omitempty"`
+	Verify              *VerifySpec `yaml:"verify,omitempty"`
 }
 
 func (a *AptSpec) packageName(pkg string) string {
@@ -533,8 +580,9 @@ func (ip ItemPlatforms) IsZero() bool { return len(ip.Names) == 0 }
 
 type BinariesRemoteArchiveSpec struct {
 	InstallerVocabulary `yaml:",inline"`
-	Version             string `yaml:"version,omitempty"`
-	URL                 string `yaml:"url,omitempty"`
+	Version             string      `yaml:"version,omitempty"`
+	URL                 string      `yaml:"url,omitempty"`
+	Verify              *VerifySpec `yaml:"verify,omitempty"`
 }
 
 var legacyItemKeys = map[string][]string{
@@ -627,6 +675,7 @@ func (it *Item) unmarshalBinariesRemoteArchive(val *yaml.Node) error {
 	}
 	it.BinariesRemoteArchive = b
 	it.AliasBinary = b.AliasBinary
+	it.Verify = b.Verify
 	return nil
 }
 
@@ -647,6 +696,7 @@ func (it *Item) unmarshalApt(val *yaml.Node) error {
 	}
 	it.Apt = a
 	it.AliasBinary = a.AliasBinary
+	it.Verify = a.Verify
 	return nil
 }
 
@@ -673,7 +723,7 @@ func (it *Item) unmarshalManager(key string, val *yaml.Node) error {
 	if body.Version == "__rolling__" {
 		return fmt.Errorf("%s item: the __rolling__ sentinel is gone: omit version, absence means rolling", key)
 	}
-	it.Name, it.Version, it.Registry, it.AliasBinary = body.PackageName, body.Version, body.FromRegistry, body.AliasBinary
+	it.Name, it.Version, it.Registry, it.AliasBinary, it.Verify = body.PackageName, body.Version, body.FromRegistry, body.AliasBinary, body.Verify
 	isBrew := it.Mgr == "brew" || it.Mgr == "cask"
 	switch {
 	case it.Mgr == "vscode" && it.Registry != "":

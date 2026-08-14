@@ -27,6 +27,7 @@ func Schema() *jsonschema.Schema {
 		"Apt":                   aptDef(),
 		"VersionManager":        versionManagerDef(),
 		"PlatformEligibility":   platformEligibilityDef(),
+		"Verify":                verifyDef(),
 		"ExtractBinaries":       extractBinariesDef(),
 		"Completions":           completionsDef(),
 	}
@@ -94,6 +95,7 @@ func entryDef() *jsonschema.Schema {
 	o.Properties.Set("postInstall", ref("Script"))
 	o.Properties.Set("command", str("binary name when it differs from the entry key"))
 	o.Properties.Set("versionCommand", str("command printing the installed version"))
+	o.Properties.Set("verify", ref("Verify"))
 	o.Properties.Set("completions", ref("Completions"))
 	return &jsonschema.Schema{
 		Description: "one package: installer item list, or an object adding version/requires/postInstall/command/versionCommand/completions",
@@ -141,6 +143,7 @@ func itemBodyDef() *jsonschema.Schema {
 	o.Properties.Set("aliasBinary", stringMap("alias name to target binary"))
 	o.Properties.Set("version", str("pinned version, absent means rolling"))
 	o.Properties.Set("fromRegistry", str("installerRegistries ref (brew tap, apt url), brew/brew-cask/apt only"))
+	o.Properties.Set("verify", ref("Verify"))
 	return o
 }
 
@@ -154,6 +157,7 @@ func binariesRemoteArchiveDef() *jsonschema.Schema {
 	o.Properties.Set("extractBinaries", ref("ExtractBinaries"))
 	o.Properties.Set("version", str("pinned version, absent means rolling"))
 	o.Properties.Set("url", str("archive url with {version}/{os}/{arch} tokens"))
+	o.Properties.Set("verify", ref("Verify"))
 	return o
 }
 
@@ -180,8 +184,20 @@ func aptDef() *jsonschema.Schema {
 	o.Properties.Set("versionMap", vm)
 	o.Properties.Set("aliasBinary", stringMap("alias name to target binary"))
 	o.Properties.Set("fromRegistry", str("installerRegistries.apt ref: scheme-less url[::suites[::components]]"))
-	o.Properties.Set("versionCommand", str("command printing the installed version, for packages without a binary"))
+	o.Properties.Set("verify", ref("Verify"))
 	return o
+}
+
+func verifyDef() *jsonschema.Schema {
+	o := obj("custom verify command, exit 0 proves the install", []string{"cmd"})
+	o.Properties.Set("cmd", str("command run after install, exit 0 = verified"))
+	return &jsonschema.Schema{
+		Description: "install verification: a named strategy or a custom command",
+		OneOf: []*jsonschema.Schema{
+			{Description: "strategy: versionCmd runs the entry command with --version, pkgVersionCmd asks the installing manager for the installed version", Type: "string", Enum: []any{VerifyVersionCmd, VerifyPkgVersionCmd}},
+			o,
+		},
+	}
 }
 
 func versionManagerDef() *jsonschema.Schema {

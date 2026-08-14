@@ -36,7 +36,12 @@ import (
 type installJob struct {
 	packages    []string
 	onlyMethods []string
-	verify      map[string]string
+	verify      map[string]verifyCmd
+}
+
+type verifyCmd struct {
+	cmd     string
+	wantOut bool
 }
 
 type runCfg struct {
@@ -210,14 +215,6 @@ func runPackageMethods(t *testing.T, entry packages.Entry, pkg, method string, c
 	if len(methods) == 0 {
 		t.Skipf("package %s has no %s method for the target platform", pkg, cmp.Or(method, "install"))
 	}
-	cmd := pkg
-	if entry.Command != "" {
-		cmd = entry.Command
-	}
-	verify := entry.VersionCommand
-	if verify == "" {
-		verify = fmt.Sprintf("%s --version 2>/dev/null || %s version", cmd, cmd)
-	}
 	for _, m := range methods {
 		key := methodKey(m)
 		if limit > 0 && used[key] >= limit {
@@ -229,19 +226,62 @@ func runPackageMethods(t *testing.T, entry packages.Entry, pkg, method string, c
 			runJob(t, installJob{
 				packages:    []string{pkg},
 				onlyMethods: []string{m},
-				verify:      map[string]string{pkg: cmp.Or(methodVerify(entry, m), verify)},
+				verify:      map[string]verifyCmd{pkg: resolveVerify(t, entry, pkg, m)},
 			}, cfg, lenient)
 		})
 	}
 }
 
-func methodVerify(entry packages.Entry, mgr string) string {
+func resolveVerify(t *testing.T, entry packages.Entry, pkg, mgr string) verifyCmd {
+	t.Helper()
+	spec := entry.Verify
 	for _, it := range entry.Items {
-		if it.Mgr == mgr && it.Apt != nil {
-			return it.Apt.VersionCommand
+		if it.Mgr == mgr && it.Verify != nil {
+			spec = it.Verify
 		}
 	}
-	return ""
+	switch {
+	case spec != nil && spec.Cmd != "":
+		return verifyCmd{cmd: spec.Cmd}
+	case spec != nil && spec.Strategy == packages.VerifyPkgVersionCmd:
+		cmd, err := pkgVersionCmd(entry, pkg, mgr)
+		require.NoError(t, err)
+		return verifyCmd{cmd: cmd, wantOut: true}
+	case spec == nil && entry.VersionCommand != "":
+		return verifyCmd{cmd: entry.VersionCommand, wantOut: true}
+	}
+	cmd := pkg
+	if entry.Command != "" {
+		cmd = entry.Command
+	}
+	return verifyCmd{cmd: fmt.Sprintf("%s --version 2>/dev/null || %s version", cmd, cmd), wantOut: true}
+}
+
+func pkgVersionCmd(entry packages.Entry, pkg, mgr string) (string, error) {
+	name := pkg
+	for _, it := range entry.Items {
+		if it.Mgr != mgr {
+			continue
+		}
+		if it.Apt != nil && it.Apt.PackageName != "" {
+			name = it.Apt.PackageName
+		} else if it.Name != "" {
+			name = it.Name
+		}
+	}
+	switch mgr {
+	case "apt":
+		return fmt.Sprintf("dpkg-query -W -f '${Version}\\n' %s", name), nil
+	case "brew":
+		return "brew list --versions " + name, nil
+	case "cask":
+		return "brew list --cask --versions " + name, nil
+	case "npm":
+		return "npm ls --global " + name, nil
+	case "vscode":
+		return fmt.Sprintf("code --list-extensions --show-versions | grep -i '^%s@'", name), nil
+	}
+	return "", fmt.Errorf("verify pkgVersionCmd: no version query for method %s", mgr)
 }
 
 func runJob(t *testing.T, job installJob, cfg runCfg, lenient bool) {
@@ -349,14 +389,16 @@ func runJobHost(t *testing.T, job installJob) (string, bool) {
 		return out, true
 	}
 
-	for pkg, cmdline := range job.verify {
-		verify := exec.Command("/bin/bash", "-ec", cmdline)
+	for pkg, v := range job.verify {
+		verify := exec.Command("/bin/bash", "-ec", v.cmd)
 		verify.Env = env
 		verify.Dir = home
 		vout, verr := verify.CombinedOutput()
-		t.Logf("verify %s: %s\n%s", pkg, cmdline, vout)
-		require.NoError(t, verr, "verify %s via %q", pkg, cmdline)
-		require.NotEmpty(t, strings.TrimSpace(string(vout)), "verify %s produced no output", pkg)
+		t.Logf("verify %s: %s\n%s", pkg, v.cmd, vout)
+		require.NoError(t, verr, "verify %s via %q", pkg, v.cmd)
+		if v.wantOut {
+			require.NotEmpty(t, strings.TrimSpace(string(vout)), "verify %s produced no output", pkg)
+		}
 	}
 	return out, false
 }
@@ -414,10 +456,12 @@ func appendRunVerify(b *strings.Builder, che string, job installJob) {
 		fmt.Fprintf(b, "case \"$out\" in (*'%s: no applicable manager'*) ;; (*) skip=0;; esac\n", pkg)
 	}
 	fmt.Fprintf(b, "if [ \"$skip\" = 1 ]; then echo %s; exit 0; fi\n", noDepsSkipMarker)
-	for pkg, cmdline := range job.verify {
-		fmt.Fprintf(b, "vout=$(bash -ec %s 2>&1) || { printf '%%s\\n' \"$vout\"; exit 1; }\n", shq(cmdline))
+	for pkg, v := range job.verify {
+		fmt.Fprintf(b, "vout=$(bash -ec %s 2>&1) || { printf '%%s\\n' \"$vout\"; exit 1; }\n", shq(v.cmd))
 		fmt.Fprintf(b, "printf 'verify %s: %%s\\n' \"$vout\"\n", pkg)
-		b.WriteString("test -n \"$vout\"\n")
+		if v.wantOut {
+			b.WriteString("test -n \"$vout\"\n")
+		}
 	}
 }
 

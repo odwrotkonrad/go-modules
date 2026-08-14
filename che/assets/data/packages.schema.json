@@ -27,9 +27,8 @@
           "type": "string",
           "description": "installerRegistries.apt ref: scheme-less url[::suites[::components]]"
         },
-        "versionCommand": {
-          "type": "string",
-          "description": "command printing the installed version, for packages without a binary"
+        "verify": {
+          "$ref": "#/$defs/Verify"
         }
       },
       "additionalProperties": false,
@@ -96,6 +95,9 @@
         "url": {
           "type": "string",
           "description": "archive url with {version}/{os}/{arch} tokens"
+        },
+        "verify": {
+          "$ref": "#/$defs/Verify"
         }
       },
       "additionalProperties": false,
@@ -169,6 +171,9 @@
             "versionCommand": {
               "type": "string",
               "description": "command printing the installed version"
+            },
+            "verify": {
+              "$ref": "#/$defs/Verify"
             },
             "completions": {
               "$ref": "#/$defs/Completions"
@@ -293,6 +298,9 @@
         "fromRegistry": {
           "type": "string",
           "description": "installerRegistries ref (brew tap, apt url), brew/brew-cask/apt only"
+        },
+        "verify": {
+          "$ref": "#/$defs/Verify"
         }
       },
       "additionalProperties": false,
@@ -374,6 +382,33 @@
           "description": "script spec: run inline, path on disk, or url"
         }
       ]
+    },
+    "Verify": {
+      "oneOf": [
+        {
+          "type": "string",
+          "enum": [
+            "versionCmd",
+            "pkgVersionCmd"
+          ],
+          "description": "strategy: versionCmd runs the entry command with --version, pkgVersionCmd asks the installing manager for the installed version"
+        },
+        {
+          "properties": {
+            "cmd": {
+              "type": "string",
+              "description": "command run after install, exit 0 = verified"
+            }
+          },
+          "additionalProperties": false,
+          "type": "object",
+          "required": [
+            "cmd"
+          ],
+          "description": "custom verify command, exit 0 proves the install"
+        }
+      ],
+      "description": "install verification: a named strategy or a custom command"
     },
     "VersionManager": {
       "properties": {
