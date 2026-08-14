@@ -58,11 +58,11 @@ func TestVersionManagerPyenvSkipsWhenSatisfied(t *testing.T) {
 	refuteCalls(t, m, "pyenv install")
 }
 
-func TestVersionManagerPendsUntilToolPresent(t *testing.T) {
+func TestVersionManagerInstallsWithoutToolPresent(t *testing.T) {
 	in, m := newInstaller(t, pythonVmYaml, "linux", cmdMap(nil), Options{})
 	_, err := captureStdout(t, func() error { return in.Install([]string{"python3"}) })
-	require.ErrorContains(t, err, "no applicable installation method for python3")
-	require.Empty(t, m.Calls())
+	require.NoError(t, err)
+	requireCalls(t, m, "pyenv install")
 }
 
 func nvmHome(t *testing.T, in *Installer) string {

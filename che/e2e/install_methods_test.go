@@ -307,7 +307,8 @@ func runJob(t *testing.T, job installJob, cfg runCfg, lenient bool) {
 	//   preinstalled package is an environment outcome, not a failure
 	stripped := ansiRe.ReplaceAllString(out, "")
 	for _, pkg := range job.packages {
-		if !strings.Contains(stripped, "will not install "+pkg+":") {
+		if !strings.Contains(stripped, "will not install "+pkg+":") &&
+			!strings.Contains(stripped, pkg+": ✅ already") {
 			continue
 		}
 		if lenient {

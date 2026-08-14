@@ -132,9 +132,9 @@ func (h Host) applicable(pkg string, it Item, strict bool) (bool, error) {
 	case "vscode":
 		return h.HasCmd("code"), nil
 	case "gem":
-		return h.HasCmd("gem"), nil
+		return !strict || h.HasCmd("gem"), nil
 	case "go":
-		if h.HasCmd("go") {
+		if !strict || h.HasCmd("go") {
 			return true, nil
 		}
 		fi, err := os.Stat("/usr/local/go/bin/go")
@@ -147,6 +147,9 @@ func (h Host) applicable(pkg string, it Item, strict bool) (bool, error) {
 	case "pyenv", "nvm":
 		if it.VersionManager == nil || len(it.VersionManager.Versions) == 0 {
 			return false, fmt.Errorf("package %s: %s item requires versions", pkg, it.Mgr)
+		}
+		if !strict {
+			return true, nil
 		}
 		if it.Mgr == "pyenv" {
 			return h.HasCmd("pyenv"), nil

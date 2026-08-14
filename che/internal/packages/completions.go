@@ -22,7 +22,7 @@ func (in *Installer) installCompletions(pkg string, e Entry) error {
 	}
 	dest := filepath.Join(dir, name)
 	if _, err := os.Stat(dest); err == nil {
-		in.emitSkip(log.Levels.Debug, pkg+" zsh completions", "already present at "+dest)
+		in.emitPresent(log.Levels.Debug, pkg+" zsh completions", "already present at "+dest)
 		return nil
 	}
 	if in.Opts.DryRun {

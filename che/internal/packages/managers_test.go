@@ -170,6 +170,18 @@ packages:
   che: [{brew: {fromRegistry: konradodwrot/tap}}]
 `
 
+func TestOnlyMethodsSpareDependencies(t *testing.T) {
+	const y = `packages:
+  nvm: [{script: {url: https://example.com/nvm.sh}}]
+  node:
+    requires: [nvm]
+    installers: [{nvm: {versions: ["24.0.0"], global: "24.0.0"}}]
+`
+	in, m := newInstaller(t, y, "linux", cmdMap(nil), Options{OnlyMethods: []string{"nvm"}})
+	require.NoError(t, in.Install([]string{"node"}))
+	requireCalls(t, m, "che-script-", "nvm install 24.0.0")
+}
+
 func TestInstallBrewUpdatesIndexOncePerRun(t *testing.T) {
 	in, m := newInstaller(t, "packages:\n  bat: [brew]\n  fd: [brew]", "darwin", cmdMap([]string{"brew"}), Options{})
 	m.Stub = failOn("brew list")

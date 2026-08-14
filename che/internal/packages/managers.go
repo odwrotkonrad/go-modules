@@ -108,6 +108,10 @@ func (in *Installer) emitSkip(level log.Level, msg string, reasons ...string) {
 	log.EmitSkip(level, Scope, "install", msg, reasons...)
 }
 
+func (in *Installer) emitPresent(level log.Level, msg, reason string) {
+	in.emit(level, "", msg+": ✅ "+reason)
+}
+
 func (in *Installer) emitDryRun(action, msg string) {
 	if in.EmitDryRun != nil {
 		in.EmitDryRun(action, msg)
@@ -191,7 +195,11 @@ func (in *Installer) hasCmd(pkg string) bool {
 func (in *Installer) findEntry(pkg string) (Entry, error) { return in.File.Find(pkg, in.FilePath) }
 
 func (in *Installer) pickItem(pkg string, entry Entry) (Item, bool, error) {
-	return in.Host.pickPreferred(pkg, entry, in.Opts.PreferredMethods, in.Opts.OnlyMethods, in.File.eligibleInstallers(in.Host), in.baseInstalling)
+	only := in.Opts.OnlyMethods
+	if by, ok := in.requiredBy[pkg]; ok && by != pkg {
+		only = nil
+	}
+	return in.Host.pickPreferred(pkg, entry, in.Opts.PreferredMethods, only, in.File.eligibleInstallers(in.Host), in.baseInstalling)
 }
 
 func (in *Installer) sudo(argv ...string) []string {
@@ -374,7 +382,7 @@ func (in *Installer) installVia(pkg string, it Item) error {
 	case installed && in.Opts.Update && pin == "":
 		return in.update(pkg, it.Mgr, base)
 	case installed:
-		in.emitSkip(log.Levels.Info, in.pkgLabel(pkg), "already installed via "+it.Mgr)
+		in.emitPresent(log.Levels.Info, in.pkgLabel(pkg), "already installed via "+it.Mgr)
 		return nil
 	}
 	if in.Opts.DryRun {
@@ -685,7 +693,7 @@ func (in *Installer) skipInstalledOrEmitReinstall(pkg, method, pin, to string, c
 		return false
 	}
 	if pin == "" || checkPin() {
-		in.emitSkip(log.Levels.Info, in.pkgLabel(pkg), "already installed via "+method)
+		in.emitPresent(log.Levels.Info, in.pkgLabel(pkg), "already installed via "+method)
 		return true
 	}
 	cur := ""
@@ -714,7 +722,7 @@ func (in *Installer) installScript(pkg string, s *ScriptSpec) error {
 	pin := in.pinFor(pkg, s.Version)
 	if s.ValidateArtifact != "" {
 		if fileExists(in.expandPath(s.ValidateArtifact)) {
-			in.emitSkip(log.Levels.Info, in.pkgLabel(pkg), "already installed via script ("+s.ValidateArtifact+" present)")
+			in.emitPresent(log.Levels.Info, in.pkgLabel(pkg), "already installed via script ("+s.ValidateArtifact+" present)")
 			return nil
 		}
 	} else if in.skipInstalledOrEmitReinstall(pkg, "script", pin, s.Version,

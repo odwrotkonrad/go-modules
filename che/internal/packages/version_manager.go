@@ -56,6 +56,20 @@ var vmTools = map[string]vmTool{
 	},
 }
 
+func (in *Installer) linkNvmGlobalBin(global string) {
+	bin := filepath.Join(in.Host.nvmDir(), "versions", "node", "v"+global, "bin")
+	entries, err := os.ReadDir(bin)
+	if err != nil {
+		in.emit(log.Levels.Debug, "alias", "nvm global bin absent, nothing to link: "+bin)
+		return
+	}
+	dest := in.userBinDir()
+	_ = in.exec([]string{"mkdir", "-p", dest})
+	for _, e := range entries {
+		_ = in.exec([]string{"ln", "-sf", filepath.Join(bin, e.Name()), filepath.Join(dest, e.Name())})
+	}
+}
+
 func (in *Installer) execNvm(cmd string) error {
 	sh := filepath.Join(in.Host.nvmDir(), "nvm.sh")
 	return in.exec([]string{"bash", "-c", fmt.Sprintf(". %q && %s", sh, cmd)})
@@ -78,7 +92,7 @@ func (in *Installer) installVersionManager(pkg string, s *VersionManagerSpec) er
 	}
 	globalOK := tool.global(in) == global
 	if len(missing) == 0 && globalOK {
-		in.emitSkip(log.Levels.Debug, in.pkgLabel(pkg), "versions present via "+s.Tool)
+		in.emitPresent(log.Levels.Debug, in.pkgLabel(pkg), "versions present via "+s.Tool)
 		return nil
 	}
 	if in.Opts.DryRun {
@@ -92,6 +106,9 @@ func (in *Installer) installVersionManager(pkg string, s *VersionManagerSpec) er
 	}
 	if err := tool.setGlobal(in, global); err != nil {
 		return err
+	}
+	if s.Tool == "nvm" {
+		in.linkNvmGlobalBin(global)
 	}
 	in.emit(log.Levels.Info, "installed", fmt.Sprintf("%s via %s (versions: %s, global: %s)", in.pkgLabel(pkg), s.Tool, strings.Join(versions, " "), global))
 	return nil
