@@ -273,7 +273,7 @@ func (in *Installer) installVia(pkg string, it Item) error {
 		return nil
 	}
 	if !in.baseInstalling {
-		if err := in.ensureBasePackages(it.Mgr); err != nil {
+		if err := in.ensureBasePackages(it.Mgr, pkg); err != nil {
 			return err
 		}
 	}

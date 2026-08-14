@@ -52,7 +52,8 @@ packages:
             - vscode
     apt-transport-https:
         installers:
-            - apt
+            - apt:
+                versionCommand: dpkg-query -W -f '${Version}\n' apt-transport-https
     aws:
         installers:
             - brew:
@@ -236,6 +237,8 @@ packages:
             - brew
             - apt:
                 packageName: fd-find
+                aliasBinary:
+                    fdfind: fd
     ffmpeg:
         version: "5"
         installers:
@@ -509,15 +512,17 @@ packages:
                     - 22.23.2
                 global: 24.19.0
     nvm:
-        - script:
-            url: https://raw.githubusercontent.com/nvm-sh/nvm/v0.40.6/install.sh
-            env:
-                NVM_DIR: $XDG_CONFIG_HOME/nvm
-                #[why] the installer otherwise appends its bootstrap lines to ~/.zshrc, a che-managed
-                #   symlink into the configs repo; the zsh config sources nvm itself
-                PROFILE: /dev/null
-            #[why] nvm is a sourced function, never a binary on PATH: this file marks it installed
-            validateArtifact: $XDG_CONFIG_HOME/nvm/nvm.sh
+        versionCommand: . "$NVM_DIR/nvm.sh" && nvm --version
+        installers:
+            - script:
+                url: https://raw.githubusercontent.com/nvm-sh/nvm/v0.40.6/install.sh
+                env:
+                    NVM_DIR: $XDG_CONFIG_HOME/nvm
+                    #[why] the installer otherwise appends its bootstrap lines to ~/.zshrc, a che-managed
+                    #   symlink into the configs repo; the zsh config sources nvm itself
+                    PROFILE: /dev/null
+                #[why] nvm is a sourced function, never a binary on PATH: this file marks it installed
+                validateArtifact: $XDG_CONFIG_HOME/nvm/nvm.sh
     ollama:
         installers:
             - brew/cask:

@@ -441,6 +441,7 @@ type VersionManagerSpec struct {
 type AptSpec struct {
 	InstallerVocabulary `yaml:",inline"`
 	FromRegistry        string `yaml:"fromRegistry,omitempty"`
+	VersionCommand      string `yaml:"versionCommand,omitempty"`
 }
 
 func (a *AptSpec) packageName(pkg string) string {

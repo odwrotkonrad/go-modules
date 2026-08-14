@@ -180,6 +180,7 @@ func aptDef() *jsonschema.Schema {
 	o.Properties.Set("versionMap", vm)
 	o.Properties.Set("aliasBinary", stringMap("alias name to target binary"))
 	o.Properties.Set("fromRegistry", str("installerRegistries.apt ref: scheme-less url[::suites[::components]]"))
+	o.Properties.Set("versionCommand", str("command printing the installed version, for packages without a binary"))
 	return o
 }
 

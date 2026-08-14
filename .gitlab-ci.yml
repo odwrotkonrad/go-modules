@@ -244,7 +244,7 @@ build-che-cover-darwin:
 
 #[what] no-deps install e2e: 3 chosen packages per method, each install in a fresh debian container via dind
 #[why] with_no_deps proves each package pulls its own dependencies; the curated per-method subset keeps MR pipelines fast and deterministic, the manual per-package jobs and local PACKAGE=all cover the full set
-test-install-methods-no-deps:
+test-install-methods:
   stage: test-e2e-installs
   image: $CI_IMAGE
   services: [docker:dind]
@@ -302,7 +302,7 @@ coverage-che:
     - test-e2e-che-run
     - test-e2e-che-backup
     #[why] conditional/manual allow_failure jobs: optional so skipped runs don't block the report
-    - job: test-install-methods-no-deps
+    - job: test-install-methods
       optional: true
   cache:
     - key: go-mod

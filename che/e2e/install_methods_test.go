@@ -229,10 +229,19 @@ func runPackageMethods(t *testing.T, entry packages.Entry, pkg, method string, c
 			runJob(t, installJob{
 				packages:    []string{pkg},
 				onlyMethods: []string{m},
-				verify:      map[string]string{pkg: verify},
+				verify:      map[string]string{pkg: cmp.Or(methodVerify(entry, m), verify)},
 			}, cfg, lenient)
 		})
 	}
+}
+
+func methodVerify(entry packages.Entry, mgr string) string {
+	for _, it := range entry.Items {
+		if it.Mgr == mgr && it.Apt != nil {
+			return it.Apt.VersionCommand
+		}
+	}
+	return ""
 }
 
 func runJob(t *testing.T, job installJob, cfg runCfg, lenient bool) {

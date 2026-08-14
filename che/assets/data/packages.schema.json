@@ -26,6 +26,10 @@
         "fromRegistry": {
           "type": "string",
           "description": "installerRegistries.apt ref: scheme-less url[::suites[::components]]"
+        },
+        "versionCommand": {
+          "type": "string",
+          "description": "command printing the installed version, for packages without a binary"
         }
       },
       "additionalProperties": false,
