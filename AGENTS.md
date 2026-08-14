@@ -159,6 +159,8 @@ config loaders and main-shape boilerplate.
 `build-cover`: `dist/$(BIN)` build the coverage-instrumented binary into ./dist (e2e prerequisite, skipped when current)
 `build-e2e-test`: `dist/e2e.test` compile the e2e harness into ./dist/e2e.test (skipped when current)
 `build-linux` cross-build the linux binary into ./dist/che-linux-<arch> (zig cc, arch from PLATFORM=linux-<arch>, default host arch), the linux-container binary
+`build-cover-linux` cross-build the coverage-instrumented binary for PLATFORM=linux-<arch> into ./dist/linux-<arch>/che (zig cc)
+`build-e2e-test-linux` cross-compile the e2e harness for PLATFORM=linux-<arch> into ./dist/linux-<arch>/e2e.test (zig cc)
 `e2e-dryrun`: `$(BUILD_DEP)` dry-run e2e flow (every command --dry-run=all, CHE_LOG_LEVEL=trace), binary covdata into ./cover-e2e-dryrun
 `e2e-run`: `$(BUILD_DEP)` real full-flow e2e (CHE_LOG_LEVEL=info), binary covdata into ./cover-e2e-run
 `e2e-backup`: `$(BUILD_DEP)` backup e2e flow (create/ls/restore selectors, CHE_LOG_LEVEL=info), binary covdata into ./cover-e2e-backup

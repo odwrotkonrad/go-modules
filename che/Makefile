@@ -12,7 +12,7 @@ DB := $(STATE_HOME)/ops.db
 BK_APPDB := $(HOME)/Library/Application Support/beekeeper-studio/app.db
 
 WRAPPERS :=
-COMMANDS := render-docs test test-cover cover-report e2e e2e-dryrun e2e-run e2e-registry e2e-install-methods-vm-template build build-cover build-e2e-test build-linux vet lint install release-check release-darwin release-snapshot inspect-db dump-db open-db
+COMMANDS := render-docs test test-cover cover-report e2e e2e-dryrun e2e-run e2e-registry e2e-install-methods-vm-template build build-cover build-e2e-test build-linux build-cover-linux build-e2e-test-linux vet lint install release-check release-darwin release-snapshot inspect-db dump-db open-db
 
 .PHONY: $(WRAPPERS) $(COMMANDS)
 
@@ -86,9 +86,18 @@ build-e2e-test: dist/e2e.test
 HOST_GOARCH := $(if $(filter arm64 aarch64,$(shell uname -m)),arm64,amd64)
 E2E_LINUX_ARCH := $(or $(patsubst linux-%,%,$(filter linux-%,$(PLATFORM))),$(HOST_GOARCH))
 ZIG_LINUX_TARGET := $(if $(filter arm64,$(E2E_LINUX_ARCH)),aarch64,x86_64)-linux-gnu
+ZIG_CC := CC="zig cc -target $(ZIG_LINUX_TARGET)" CXX="zig c++ -target $(ZIG_LINUX_TARGET)"
 #[what] cross-build the linux binary into ./dist/che-linux-<arch> (zig cc, arch from PLATFORM=linux-<arch>, default host arch), the linux-container binary
 build-linux:
-	GOOS=linux GOARCH=$(E2E_LINUX_ARCH) CGO_ENABLED=1 CC="zig cc -target $(ZIG_LINUX_TARGET)" CXX="zig c++ -target $(ZIG_LINUX_TARGET)" $(GO) build -o dist/che-linux-$(E2E_LINUX_ARCH) .
+	GOOS=linux GOARCH=$(E2E_LINUX_ARCH) CGO_ENABLED=1 $(ZIG_CC) $(GO) build -o dist/che-linux-$(E2E_LINUX_ARCH) .
+
+#[what] cross-build the coverage-instrumented binary for PLATFORM=linux-<arch> into ./dist/linux-<arch>/che (zig cc)
+build-cover-linux:
+	GOOS=linux GOARCH=$(E2E_LINUX_ARCH) CGO_ENABLED=1 $(ZIG_CC) $(GO) build -cover -coverpkg=./... -o dist/linux-$(E2E_LINUX_ARCH)/$(BIN) .
+
+#[what] cross-compile the e2e harness for PLATFORM=linux-<arch> into ./dist/linux-<arch>/e2e.test (zig cc)
+build-e2e-test-linux:
+	GOOS=linux GOARCH=$(E2E_LINUX_ARCH) CGO_ENABLED=1 $(ZIG_CC) $(GO) test -c -o dist/linux-$(E2E_LINUX_ARCH)/e2e.test ./e2e
 
 ifeq ($(E2E_USE_TEST_BIN),1)
 E2E_RUN = sh -c 'cd e2e && exec ../dist/e2e.test -test.v -test.count=1 -test.timeout 45m -test.run "$$0"'

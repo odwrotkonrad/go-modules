@@ -28,12 +28,15 @@ variables:
   GOCACHE: $CI_PROJECT_DIR/.cache/go-build
   CC: clang
 
+#[what] one linux warm build: go caches plus every che artifact the e2e jobs reuse, native amd64 and zig-cross arm64
 warm-go:
   stage: warm
   image: $CI_IMAGE
   needs: []
   rules:
     - if: $CI_PIPELINE_SOURCE == "merge_request_event"
+    - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
+      changes: [che/**/*, lib/**/*, go.work, .gitlab-ci.yml]
   cache:
     - key: go-mod
       paths:
@@ -46,6 +49,11 @@ warm-go:
   script:
     - for m in lib che get-os-open-files-with get-term-open-files-with; do (cd $m && echo "## download $m" && go mod download all) || exit 1; done
     - for m in lib che; do (cd $m && echo "## build $m" && go build -v ./...) || exit 1; done
+    - make -C che build-cover build-e2e-test build-linux
+    - make -C che build-linux build-cover-linux build-e2e-test-linux PLATFORM=linux-arm64
+  artifacts:
+    paths:
+      - che/dist/
 
 verify-precommit-all:
   stage: verify
@@ -107,68 +115,12 @@ test-che:
     - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
       changes: [che/**/*, lib/**/*, go.work, .gitlab-ci.yml]
 
-##[>] 🤖🤖
-#[what] one cover-instrumented che build shared by every e2e job via artifact
-#[why] each e2e job linking the cgo-heavy binary itself repeats the most expensive step per pipeline
-build-che-cover:
-  image: $CI_IMAGE
-  stage: warm
-  needs:
-    - job: warm-go
-      optional: true
-  cache:
-    - key: go-mod
-      paths:
-        - .cache/go-mod
-      policy: pull
-    - key: go-build
-      paths:
-        - .cache/go-build
-      policy: pull
-  script:
-    - make -C che build-cover build-e2e-test build-linux
-  artifacts:
-    paths:
-      - che/dist/
-  rules:
-    - if: $CI_PIPELINE_SOURCE == "merge_request_event"
-      changes: [che/**/*, lib/**/*, go.work, .gitlab-ci.yml]
-    - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
-      changes: [che/**/*, lib/**/*, go.work, .gitlab-ci.yml]
-
-#[what] optional manual arm64 warm build: cover binary, e2e harness and the linux-arm64 container binary, shared by the arm64 per-package install jobs via artifact
-build-che-cover-linux-arm64:
-  stage: warm
-  tags:
-    - saas-linux-small-arm64
-  image: $CI_IMAGE_ARM64
-  needs: []
-  cache:
-    - key: go-mod
-      paths:
-        - .cache/go-mod
-      policy: pull
-    - key: go-build-arm64
-      paths:
-        - .cache/go-build
-      policy: pull-push
-  script:
-    - make -C che build-cover build-e2e-test build-linux
-  artifacts:
-    paths:
-      - che/dist/
-  rules:
-    - if: $CI_PIPELINE_SOURCE == "merge_request_event" || $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
-      when: manual
-      allow_failure: true
-##[<] 🤖🤖
-
 .test-e2e-che:
   image: $CI_IMAGE
   stage: test-e2e
   #[why] only the built artifacts move: the prebuilt binary and e2e harness, no go caches
   needs:
-    - build-che-cover
+    - warm-go
   rules:
     - if: $CI_PIPELINE_SOURCE == "merge_request_event"
       changes: [che/**/*, lib/**/*, go.work, .gitlab-ci.yml]
@@ -210,9 +162,9 @@ test-e2e-che-registry:
 ##[<] 🤖🤖
 
 ##[>] 🤖🤖
-#[what] darwin build of the cover binary + e2e harness, shared by the darwin install jobs
+#[what] darwin warm build: cover binary + e2e harness, shared by the darwin install jobs via artifact
 #[why] the linux artifact is the wrong platform: without this every darwin matrix job links its own
-build-che-cover-darwin:
+warm-go-darwin:
   stage: warm
   tags:
     - saas-macos-medium-m1
@@ -244,12 +196,12 @@ build-che-cover-darwin:
 
 #[what] no-deps install e2e: 3 chosen packages per method, each install in a fresh debian container via dind
 #[why] with_no_deps proves each package pulls its own dependencies; the curated per-method subset keeps MR pipelines fast and deterministic, the manual per-package jobs and local PACKAGE=all cover the full set
-test-install-methods:
+test-e2e-install-methods:
   stage: test-e2e-method-installs
   image: $CI_IMAGE
   services: [docker:dind]
   needs:
-    - job: build-che-cover
+    - job: warm-go
       optional: true
   variables:
     DOCKER_HOST: tcp://docker:2376
@@ -264,9 +216,9 @@ test-install-methods:
   #[why] MR changes-triggered runs block the merge; main keeps allow_failure, manual stays optional
   rules:
     - if: $CI_PIPELINE_SOURCE == "merge_request_event"
-      changes: [che/internal/packages/**/*, che/e2e/install_methods*]
+      changes: [che/**/*, lib/**/*, go.work, .gitlab-ci.yml]
     - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
-      changes: [che/internal/packages/**/*, che/e2e/install_methods*]
+      changes: [che/**/*, lib/**/*, go.work, .gitlab-ci.yml]
       allow_failure: true
     - if: $CI_PIPELINE_SOURCE == "merge_request_event" || $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
       when: manual
