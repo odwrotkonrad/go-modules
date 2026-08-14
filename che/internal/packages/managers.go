@@ -3,8 +3,10 @@ package packages
 // [>] 🤖🤖🤖
 
 import (
+	"bytes"
 	"cmp"
 	"fmt"
+	"io"
 	"maps"
 	"os"
 	"path"
@@ -30,6 +32,7 @@ type Options struct {
 	CompletionsEnabled                         bool
 	CompletionsDestinationCandidates           []string
 	CompletionsCheckPresentOnFpath             bool
+	SilenceInstallStdout                       bool
 }
 
 type Installer struct {
@@ -37,6 +40,7 @@ type Installer struct {
 	FilePath   string
 	Host       Host
 	Opts       Options
+	Out        io.Writer
 	Emit       func(level log.Level, action, msg string)
 	EmitSkip   func(level log.Level, action, msg string, reasons ...string)
 	EmitDryRun func(action, msg string)
@@ -105,9 +109,29 @@ func (in *Installer) emitDryRun(action, msg string) {
 	log.Emit(log.Event{Level: log.Levels.Info, Scope: Scope, Action: action, Msg: msg, DryRun: true})
 }
 
-func (in *Installer) exec(argv []string) error {
-	c := execx.Cmd{Argv: argv, Stdout: os.Stdout, Stderr: os.Stderr}
+func (in *Installer) out() io.Writer {
+	if in.Out != nil {
+		return in.Out
+	}
+	return os.Stdout
+}
+
+func (in *Installer) runCmd(c execx.Cmd) error {
+	if !in.Opts.SilenceInstallStdout {
+		c.Stdout, c.Stderr = in.out(), in.out()
+		return execx.Default.Exec(c)
+	}
+	var buf bytes.Buffer
+	c.Stdout, c.Stderr = &buf, &buf
 	if err := execx.Default.Exec(c); err != nil {
+		_, _ = in.out().Write(buf.Bytes())
+		return err
+	}
+	return nil
+}
+
+func (in *Installer) exec(argv []string) error {
+	if err := in.runCmd(execx.Cmd{Argv: argv}); err != nil {
 		return fmt.Errorf("%s: %w", strings.Join(argv, " "), err)
 	}
 	return nil
@@ -603,8 +627,7 @@ func (in *Installer) runScript(pkg string, s *ScriptSpec, errLabel string) error
 	if cleanup != nil {
 		defer cleanup()
 	}
-	c := execx.Cmd{Argv: argv, Env: in.scriptEnv(pkg, s), Stdout: os.Stdout, Stderr: os.Stderr}
-	if err := execx.Default.Exec(c); err != nil {
+	if err := in.runCmd(execx.Cmd{Argv: argv, Env: in.scriptEnv(pkg, s)}); err != nil {
 		return fmt.Errorf("%s: %s: %w", pkg, errLabel, err)
 	}
 	return nil
@@ -708,11 +731,10 @@ func (in *Installer) goInstall(pkg, module string) error {
 		module += "@latest"
 	}
 	c := execx.Cmd{
-		Argv:   []string{"go", "install", module},
-		Env:    append(os.Environ(), "PATH="+in.userBinDir()+":"+in.Host.Getenv("PATH")),
-		Stdout: os.Stdout, Stderr: os.Stderr,
+		Argv: []string{"go", "install", module},
+		Env:  append(os.Environ(), "PATH="+in.userBinDir()+":"+in.Host.Getenv("PATH")),
 	}
-	if err := execx.Default.Exec(c); err != nil {
+	if err := in.runCmd(c); err != nil {
 		return fmt.Errorf("go install %s: %w", module, err)
 	}
 	in.emit(log.Levels.Info, "installed", pkg+" via go")

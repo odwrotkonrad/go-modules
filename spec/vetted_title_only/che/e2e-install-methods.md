@@ -80,7 +80,7 @@ Scenario: an already-built che binary is reused, install tests never rebuild it 
 Scenario: developer have ability to run installation test on preinstalled dependencies to speed up the test (MODE=with_deps)
   Status: tested
   When I invoke `make e2e-install-methods ... MODE=with_deps`
-  Then the install runs in a throwaway HOME on this host, leveraging dependencies already present
+  Then the install runs in a throwaway HOME on this host, using dependencies already present
   And the run finishes faster at the cost of not proving dependencies
 
 Scenario: developer have ability to run installation test in environment with absolute minimal dependencies (MODE=with_no_deps)

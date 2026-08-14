@@ -9,7 +9,7 @@ this host wins. Profiles declare `include.installPackages` and the run
 sequence installs them before `runScripts`. Four check subcommands report
 presence, upgradability, shadowing, and duplicates.
 
-Scenario: a user names a package once, by its CLI name, and every host resolves it
+Scenario: a package named once, by its CLI name, resolves on every host
   Status: tested
   When I declare a package in packages.yml under its canonical name (the CLI program name when the package ships one)
   Then `che packages install <name>` installs it on any supported host
@@ -38,7 +38,7 @@ Scenario: a user relocates prebuiltBinariesArchive installs and knows when the t
   And when no candidate is on PATH a warning lists them once per run and the first entry is used
   And `checkPresentOnPath: false` skips the PATH probe and always uses the first entry
 
-Scenario: a user lists managers in preference order and the first applicable one wins
+Scenario: managers list in preference order, the first applicable wins
   Status: tested
   When a package lists several managers
   Then brew/cask apply on macos with brew present, apt on linux with apt-get present
@@ -62,7 +62,7 @@ Scenario: a profile installs its packages before its scripts
   And composed profiles' package lists concatenate and dedupe
   And `--skip-ops install-packages` skips the stage
 
-Scenario: an installed package is left alone by default, no surprise updates
+Scenario: an installed package is left alone by default
   Status: tested
   When a package is installed by its selected manager and no version is specified
   Then install leaves it untouched
@@ -122,13 +122,13 @@ Scenario: an entry-level version guards any package's installed version
   And a manager-installed package drifting from the pin runs the manager's update path; check-upgradable warns while drifted
   And entries whose manager ships one recent version stay unpinned by convention; the builtin pins every version-distributing entry (archives, scripts, pyenv/nvm, npm/gem/go tools)
 
-Scenario: a user refreshes everything with one flag
+Scenario: --update refreshes everything
   Status: tested
   When I invoke `che packages install --update`
   Then unpinned installed packages update via their manager (brew upgrade, apt-get install --only-upgrade, npm update -g)
   And pinned packages still converge on the pin
 
-Scenario: a user fills only the gaps with --if-missing
+Scenario: --if-missing fills only the gaps
   Status: tested
   When I invoke `che packages install --if-missing`
   Then a package whose canonical command exists anywhere on PATH is skipped, regardless of manager
@@ -139,7 +139,7 @@ Scenario: a bare host installs packages with no packages file at all
   Then che falls back to its builtin packages.yml (shipped in the binary)
   And an explicitly configured path that is missing stays a hard error
 
-Scenario: a user overrides single entries without forking the packages file
+Scenario: an override file replaces single entries, no fork of the packages file
   Status: tested
   When an override file exists (`--packages-override` or `$XDG_CONFIG_HOME/che/packages-override.yml`)
   Then its same-name entries replace the base entries and new names append

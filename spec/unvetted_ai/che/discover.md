@@ -8,7 +8,7 @@ An os-mutating che command mutates os state: `run`, `backup`, `prune-broken-link
 `make-dirs`, `make-links`, `make-copies`, `render-templates`, `run-scripts`,
 `uninstall` (ledger-driven, no discovery).
 
-Scenario: a user never mutates os state from a stale plan, every mutating command works from fresh discovery
+Scenario: every mutating command works from fresh discovery, never a stale plan
   Status: tested
   When I invoke an os-mutating che command other than `uninstall` (ledger-driven, no profiles)
   Then discover runs first
@@ -25,13 +25,13 @@ Scenario: a config author previews exactly what a run would do without touching 
   Then the log lists discovered profiles
   And each profile lists the os-mutating operations it would perform
 
-Scenario: an operator scans discovered profiles as headings, each profile's ops indented beneath
+Scenario: discovered profiles log as headings, ops indented beneath
   Status: tested
   Given a profile whose runtime spec contains os-mutating operations
   When I invoke an os-mutating che command
   Then the log reports each discovered profile as a `### Profile <ref>` heading, its ops indented beneath
 
-Scenario: an operator reads the runtime spec once at the top, never repeated through the log
+Scenario: the runtime spec logs once, at the top
   Status: tested
   Given a profile whose runtime spec contains os-mutating operations
   When I invoke `run`
@@ -45,7 +45,7 @@ Scenario: a user running one op directly still sees the full plan before it exec
   And the log lists discovered profiles
   And each profile lists the os-mutating operations it would perform
 
-Scenario: a user gets consistent results across a run's wrapped commands, all working from one discovery
+Scenario: a run's wrapped commands all work from one discovery
   Status: tested
   When `run` executes its wrapped commands
   Then no wrapped command runs discover again
@@ -57,7 +57,7 @@ Scenario: a user sees the discovery plan with no log-level tuning
   When I invoke `discover-profiles` standalone or an os-mutating che command
   Then the log lists discovered profiles
 
-Scenario: a config author opting out of auto-discovery gets a clear ask for --profiles, never a surprise full run
+Scenario: opting out of auto-discovery gets a clear ask for --profiles
   Status: tested
   Given options.autoDiscover is false (che config, default true)
   When I invoke a che command without --profiles

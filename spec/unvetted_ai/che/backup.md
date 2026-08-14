@@ -3,12 +3,11 @@
 <!-- [>] 🤖🤖 -->
 
 `backup` archives every existing op dest that would change (unsettled links,
-differing copies, differing renders) into the per-run backup archive. It has
-three subcommands: `backup create` (archive), `backup restore` (restore state
-by `--run-id`, `--backup-id`, or `--timestamp`), `backup ls` (list the backup
-points).
+differing copies, differing renders) into the per-run archive. Subcommands:
+`backup create` (archive), `backup restore` (by `--run-id`, `--backup-id`, or
+`--timestamp`), `backup ls` (list backup points).
 
-Scenario: a user reaches archive, restore, and listing from one backup command, bare usage names all three
+Scenario: one backup command covers archive, restore, and listing
   Status: tested
   When I invoke `backup` with a subcommand
   Then `backup create` archives every would-change dest into a per-run archive
@@ -24,7 +23,7 @@ Scenario: an operator locates any archive by profile, op, and run from its path 
   And every archive of one run shares the run's timestamp and run id (the ledger run key)
   And each archive carries its own unique 12-char backup id
 
-Scenario: a user archives only what the run would touch, settled dests add no bulk
+Scenario: a user archives only what the run would touch
   Status: tested
   When I invoke `backup create`
   Then it archives every existing dest an op would change into one per-run archive
@@ -32,7 +31,7 @@ Scenario: a user archives only what the run would touch, settled dests add no bu
   And nothing to change archives nothing
   And it is the default archive action the run stage and direct ops invoke
 
-Scenario: a user picks a restore point from a newest-first listing, no digging through the state dir
+Scenario: a user picks a restore point from a newest-first listing
   Status: tested
   When I invoke `backup ls`
   Then it lists each ledger-recorded backup point under a `# backups` heading
@@ -92,7 +91,7 @@ Scenario: an operator verifies what was backed up and where from two log lines
   And nothing to back up writes and logs nothing more
   And dry run writes no archive, predicting `create <path> (dry run)` instead
 
-Scenario: a user snapshots on demand without the bulk of settled dests
+Scenario: a user snapshots on demand, settled dests excluded
   Status: tested
   When I invoke `backup create` standalone
   Then every existing dest an op would change archives into the per-run backup archive

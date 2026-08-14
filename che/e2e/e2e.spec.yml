@@ -534,6 +534,8 @@ testCases:
           stdOut:
             - "installed e2e-absent via npm"
             - "missing e2e-absent"
+        notExpected:
+          stdOut: ["e2e-npm-install-noise"]
 
       - name: InstallBinaryDownloadsVerifiesInstalls
         command: che packages install --packages-file ${LOCAL}/packages.yml e2e-bin-new
