@@ -135,6 +135,32 @@ build-che-cover:
       changes: [che/**/*, lib/**/*, go.work, .gitlab-ci.yml]
     - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
       changes: [che/**/*, lib/**/*, go.work, .gitlab-ci.yml]
+
+#[what] optional manual arm64 warm build: cover binary, e2e harness and the linux-arm64 container binary, shared by the arm64 per-package install jobs via artifact
+build-che-cover-linux-arm64:
+  stage: warm
+  tags:
+    - saas-linux-small-arm64
+  image: $CI_IMAGE_ARM64
+  needs: []
+  cache:
+    - key: go-mod
+      paths:
+        - .cache/go-mod
+      policy: pull
+    - key: go-build-arm64
+      paths:
+        - .cache/go-build
+      policy: pull-push
+  script:
+    - make -C che build-cover build-e2e-test build-linux
+  artifacts:
+    paths:
+      - che/dist/
+  rules:
+    - if: $CI_PIPELINE_SOURCE == "merge_request_event" || $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
+      when: manual
+      allow_failure: true
 ##[<] 🤖🤖
 
 .test-e2e-che:

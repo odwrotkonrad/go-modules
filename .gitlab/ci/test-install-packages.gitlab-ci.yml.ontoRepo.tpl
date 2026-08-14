@@ -66,9 +66,11 @@ test-install-package-linux-arm64:
   tags:
     - saas-linux-small-arm64
   image: $CI_IMAGE_ARM64
-  needs: []
+  needs:
+    - job: build-che-cover-linux-arm64
+      optional: true
   script:
-    - make -C che e2e-install-methods PACKAGE="$PACKAGE" METHOD="$METHOD" PLATFORM=linux-arm64 MODE=with_no_deps
+    - make -C che e2e-install-methods PACKAGE="$PACKAGE" METHOD="$METHOD" PLATFORM=linux-arm64 MODE=with_no_deps $(test -x che/dist/e2e.test && echo "BUILD_DEP= E2E_USE_TEST_BIN=1") $(test -x che/dist/che-linux-arm64 && echo "E2E_INSTALL_METHODS_DEPS=")
   parallel:
     matrix:
       - PACKAGE: *packages
