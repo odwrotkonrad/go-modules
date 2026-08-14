@@ -16,6 +16,7 @@ import (
 	"slices"
 	"strconv"
 	"strings"
+	"sync"
 	"sync/atomic"
 	"testing"
 	"time"
@@ -427,11 +428,7 @@ func noDepsCacheDir(t *testing.T) string {
 
 func noDepsScript(job installJob) string {
 	var b strings.Builder
-	b.WriteString(`rm -f /etc/apt/apt.conf.d/docker-clean
-export DEBIAN_FRONTEND=noninteractive
-apt-get -qq update
-apt-get -qq install --yes --no-install-recommends curl ca-certificates git unzip >/dev/null
-export HOME=/root
+	b.WriteString(`export HOME=/root
 export PATH=/root/.local/bin:/root/go/bin:/root/.pyenv/bin:/root/.pyenv/shims:$PATH
 export XDG_CONFIG_HOME=/root/.config XDG_DATA_HOME=/root/.local/share XDG_BIN_HOME=/root/.local/bin
 export XDG_STATE_HOME=/root/.local/state XDG_CACHE_HOME=/root/.cache
@@ -475,21 +472,38 @@ func runJobNoDeps(t *testing.T, job installJob, cfg runCfg) (string, bool) {
 		t.Skip("E2E_BIN_LINUX not set; run via make e2e-install-methods MODE=with_no_deps")
 	}
 	require.FileExists(t, binLinux)
+	arch := cmp.Or(cfg.linuxArch, runtime.GOARCH)
+	image := noDepsImage(t, arch)
 	cache := noDepsCacheDir(t)
 	argv := []string{
-		"run", "--rm", "--quiet", "--platform", "linux/" + cmp.Or(cfg.linuxArch, runtime.GOARCH),
+		"run", "--rm", "--quiet", "--platform", "linux/" + arch,
 		"-v", binLinux + ":/usr/local/bin/che:ro",
 		"-v", filepath.Join(cache, "apt-cache") + ":/var/cache/apt",
 		"-v", filepath.Join(cache, "apt-lists") + ":/var/lib/apt/lists",
 		"-v", filepath.Join(cache, "xdg") + ":/root/.cache",
 		"-v", filepath.Join(cache, "downloads") + ":/che-cache",
 		"-e", "CHE_PACKAGES_DOWNLOAD_CACHE_DIR=/che-cache",
-		"debian:bookworm-slim", "sh", "-ec", noDepsScript(job),
+		image, "sh", "-ec", noDepsScript(job),
 	}
 	run := exec.Command("docker", argv...)
 	out, err := runStreamed(t, run, "with_no_deps install "+strings.Join(job.packages, " "))
 	require.NoError(t, err, "with_no_deps install %s", strings.Join(job.packages, " "))
 	return out, strings.Contains(out, noDepsSkipMarker)
+}
+
+var noDepsImages sync.Map
+
+func noDepsImage(t *testing.T, arch string) string {
+	t.Helper()
+	tag := "che-e2e-install-methods:" + arch
+	once, _ := noDepsImages.LoadOrStore(arch, new(sync.Once))
+	once.(*sync.Once).Do(func() {
+		build := exec.Command("docker", "build", "--quiet", "--platform", "linux/"+arch,
+			"--file", "install-methods.Dockerfile", "--tag", tag, ".")
+		out, err := build.CombinedOutput()
+		require.NoError(t, err, "build %s: %s", tag, out)
+	})
+	return tag
 }
 
 func runStreamed(t *testing.T, cmd *exec.Cmd, label string) (string, error) {
