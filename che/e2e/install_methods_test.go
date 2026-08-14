@@ -429,8 +429,8 @@ func noDepsScript(job installJob) string {
 	var b strings.Builder
 	b.WriteString(`rm -f /etc/apt/apt.conf.d/docker-clean
 export DEBIAN_FRONTEND=noninteractive
-apt-get update
-apt-get install --yes --no-install-recommends curl ca-certificates git unzip
+apt-get -qq update
+apt-get -qq install --yes --no-install-recommends curl ca-certificates git unzip >/dev/null
 export HOME=/root
 export PATH=/root/.local/bin:/root/go/bin:/root/.pyenv/bin:/root/.pyenv/shims:$PATH
 export XDG_CONFIG_HOME=/root/.config XDG_DATA_HOME=/root/.local/share XDG_BIN_HOME=/root/.local/bin
@@ -477,7 +477,7 @@ func runJobNoDeps(t *testing.T, job installJob, cfg runCfg) (string, bool) {
 	require.FileExists(t, binLinux)
 	cache := noDepsCacheDir(t)
 	argv := []string{
-		"run", "--rm", "--platform", "linux/" + cmp.Or(cfg.linuxArch, runtime.GOARCH),
+		"run", "--rm", "--quiet", "--platform", "linux/" + cmp.Or(cfg.linuxArch, runtime.GOARCH),
 		"-v", binLinux + ":/usr/local/bin/che:ro",
 		"-v", filepath.Join(cache, "apt-cache") + ":/var/cache/apt",
 		"-v", filepath.Join(cache, "apt-lists") + ":/var/lib/apt/lists",
