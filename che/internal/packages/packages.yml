@@ -125,7 +125,7 @@ packages:
         installers:
             - npm
     charliermarsh.ruff:
-        version: 2026.68.0
+        version: 2026.72.0
         installers:
             - vscode
     che:
