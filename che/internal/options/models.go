@@ -33,6 +33,8 @@ type Options struct {
 	PackagesUpdate                                     bool
 	PackagesIfMissing                                  bool
 	PackagesPreferredMethods                           []string
+	PackagesOnlyMethods                                []string
+	PackagesDownloadCacheDir                           string
 	PackagesBinariesRemoteArchiveDestinationCandidates []string
 	PackagesBinariesRemoteArchiveCheckPresentOnPath    bool
 	PackagesCompletionsEnabled                         bool

@@ -16,6 +16,12 @@ Scenario: a user names a package once, by its CLI name, and every host resolves 
   And a bare installer item uses the canonical name, `installerVocabulary.packageName` overrides it per installer
   And casks and extensions are installer keys: `brew/cask` items install casks via brew, `vscode` items install extensions via the code CLI
 
+Scenario: a user installs a package via a supported installation method
+  Status: tested
+  When a user wants to install a package via an installation method: brew, brew/cask, vscode, apt, npm, go, gem, prebuiltBinariesArchive, script, pyenv, nvm
+  Then they have the ability to do so on any platform where the method is eligible (osInstallers: every platform carries prebuiltBinariesArchive, script, npm, go, gem, pyenv, nvm. linux-debian adds apt, darwin adds brew, brew/cask, vscode)
+  And a method outside the set is a hard error naming the valid set
+
 Scenario: a user steers method selection with preferred installation methods
   Status: tested
   When `packages.preferredInstallationMethods: [methods...]` is set in the user config, a spec's options, a profile's options, `--preferred-methods`, or CHE_PACKAGES_PREFERRED_METHODS
@@ -212,10 +218,31 @@ Scenario: a user spots duplicate installs with check-single-present
   When I invoke `che packages check-single-present`
   Then a canonical command present in more than one PATH dir warns `multiple-present` listing every location
 
+Scenario: packages.yml has a json schema with its structure
+  Status: tested
+  When `make render-docs` runs
+  Then it generates the packages file json schema at `assets/data/packages.schema.json` from the Go source, alongside che.schema.json, published with the docs
+  And a packages file opens with a `# yaml-language-server: $schema=<url-or-path>` modeline pointing at it, so yaml-aware editors validate and complete entries in place
+  And the builtin packages.yml carries that modeline referencing the published schema url
+
 Scenario: a dry run announces installs without touching the host
   Status: tested
   When I invoke an install under --dry-run
   Then each pending package announces `install <pkg> via <mgr> (dry run)`
   And no manager install command executes
+
+Scenario: a user restricts installs to chosen methods with --only-methods
+  Status: tested
+  When I invoke `che packages install --only-methods <mgr>[,<mgr>...]` (env `CHE_PACKAGES_ONLY_METHODS`)
+  Then only entry items using a listed manager are considered, nothing falls through to another installer
+  And a package with no listed manager applicable skips with `no applicable manager`
+  And an unknown manager name fails validation
+
+Scenario: a user caches binariesRemoteArchive downloads across runs
+  Status: tested
+  When I invoke an install with `--download-cache-dir <dir>` (env `CHE_PACKAGES_DOWNLOAD_CACHE_DIR`)
+  Then assets download to `<dir>/<sha256(url)>-<basename>` and later installs reuse the cached file without curl
+  And a checksum mismatch deletes the cached file before failing
+  And an empty value keeps the current per-install temp-dir behavior
 
 <!-- [<] 🤖🤖 -->

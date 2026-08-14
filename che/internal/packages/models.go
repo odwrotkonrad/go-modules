@@ -179,6 +179,10 @@ func (f *File) eligibleInstallersOrBuiltin() map[string]InstallerList {
 	return orBuiltin(f.OSInstallers, f.OSInstallers != nil, func(b *File) map[string]InstallerList { return b.OSInstallers })
 }
 
+func (f *File) EligibleInstallers(h Host) []string {
+	return f.eligibleInstallers(h)
+}
+
 func (f *File) eligibleInstallers(h Host) []string {
 	m := f.eligibleInstallersOrBuiltin()
 	for _, k := range h.eligibilityKeys() {
@@ -621,6 +625,7 @@ func (it *Item) unmarshalBinariesRemoteArchive(val *yaml.Node) error {
 		return fmt.Errorf("binariesRemoteArchive tokens {arch_x}/{arch_g} are gone: use {arch} with archScheme")
 	}
 	it.BinariesRemoteArchive = b
+	it.AliasBinary = b.AliasBinary
 	return nil
 }
 

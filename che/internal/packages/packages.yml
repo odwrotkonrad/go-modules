@@ -1,3 +1,4 @@
+# yaml-language-server: $schema=https://gitlab.com/konradodwrot/go-modules/-/raw/main/che/assets/data/packages.schema.json
 ##[>] 🤖🤖
 archSchemes:
     go: {amd64: amd64, arm64: arm64}
@@ -34,6 +35,10 @@ basePackages:
         - curl
         - git
         - unzip
+    brew:
+        - brew
+    brew/cask:
+        - brew
     apt:
         - apt-transport-https
         - ca-certificates
@@ -173,6 +178,14 @@ packages:
             - apt:
                 versionMap: {"8.14.1": "8.14.1-2+deb13u2~bpo13+1"}
                 fromRegistry: deb.debian.org/debian
+            - binariesRemoteArchive:
+                archScheme: uname
+                extractBinaries: [curl]
+                platformEligibility:
+                    - linux-amd64: sha256:e955f211202ded2536164588331acfc987dc4b7857efa3577717b1ffeab22029
+                    - linux-arm64: sha256:d3f10502a9c6ead9bc3763fde3d12467db03661a263e11fec2ef2edc70e98e9f
+                version: 8.21.0
+                url: https://github.com/stunnel/static-curl/releases/download/{version}/curl-linux-{arch}-musl-{version}.tar.xz
     docker:
         version: 29.7.2
         requires:
@@ -574,6 +587,33 @@ packages:
             - brew
             - npm:
                 version: 11.20.0
+    podman:
+        completions:
+            zsh:
+                cmd: podman completion zsh
+        installers:
+            - brew
+            - apt
+            - binariesRemoteArchive:
+                extractBinaries: ["podman-{version}/usr/bin/podman", "podman-{version}/usr/bin/podman-mac-helper"]
+                platformEligibility:
+                    - darwin-arm64: sha256:ff5e1fa29e9e4544118639791d9e483114a2279c0070963ecab480d25f345dcb
+                version: 6.1.0
+                url: https://github.com/podman-container-tools/podman/releases/download/v{version}/podman-remote-release-darwin_arm64.zip
+            - binariesRemoteArchive:
+                archScheme: go
+                aliasBinary:
+                    podman-remote-static-linux_amd64: podman
+                    podman-remote-static-linux_arm64: podman
+                extractBinaries: ["bin/podman-remote-static-linux_{arch}"]
+                platformEligibility:
+                    - linux-amd64: sha256:460b4cd2e1a7e5a2dddeb39f4fb427315a7de8a9fafc85483bd67667819fe032
+                    - linux-arm64: sha256:aa152311cda6f4254a2ebe08d750ab6fa8fd8fa95a0edb720bf3731c424ec7fd
+                version: 6.1.0
+                url: https://github.com/podman-container-tools/podman/releases/download/v{version}/podman-remote-static-linux_{arch}.tar.gz
+    podman-desktop:
+        installers:
+            - brew/cask
     procs:
         installers:
             - brew

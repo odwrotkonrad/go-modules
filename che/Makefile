@@ -6,16 +6,23 @@ GO ?= go
 GOCOVER_COBERTURA ?= github.com/t-yuki/gocover-cobertura@v0.0.0-20180217150009-aaee18c8195c
 CC ?= clang
 BIN := che
-#[why] CI builds the cover binary once (build-che-cover) and passes BUILD_DEP= so e2e jobs reuse the artifact
 BUILD_DEP ?= build-cover
 STATE_HOME := $(or $(CHE_STATE_HOME),$(if $(XDG_STATE_HOME),$(XDG_STATE_HOME)/che),$(HOME)/.local/state/che)
 DB := $(STATE_HOME)/ops.db
 BK_APPDB := $(HOME)/Library/Application Support/beekeeper-studio/app.db
 
 WRAPPERS :=
-COMMANDS := render-docs test test-cover cover-report e2e e2e-dryrun e2e-run e2e-registry build build-cover build-e2e-test vet lint install release-check release-darwin release-snapshot inspect-db dump-db open-db
+COMMANDS := render-docs test test-cover cover-report e2e e2e-dryrun e2e-run e2e-registry e2e-install-methods-vm-template build build-cover build-e2e-test build-linux vet lint install release-check release-darwin release-snapshot inspect-db dump-db open-db
 
 .PHONY: $(WRAPPERS) $(COMMANDS)
+
+E2E_GO_SRC := $(shell find . ../lib -name '*.go' -not -path './dist/*' -not -path './cover-*/*') go.mod go.sum ../go.work
+
+dist/$(BIN): $(E2E_GO_SRC)
+	CC=$(CC) $(GO) build -cover -coverpkg=./... -o dist/$(BIN) .
+
+dist/e2e.test: $(E2E_GO_SRC)
+	CC=$(CC) $(GO) test -c -o dist/e2e.test ./e2e
 
 ##[>] Docs [genai-include]
 #[what] generate docs/cli.md + assets/data/{che.schema.json,cli-usage.md} from the Go source
@@ -70,15 +77,19 @@ cover-report:
 	@sed -i.bak 's|filename="gitlab.com/konradodwrot/go-modules/|filename="|g' coverage.xml && rm coverage.xml.bak
 	@$(GO) tool cover -func=coverage.out | tail -1
 
-#[what] build the coverage-instrumented binary into ./dist (e2e prerequisite)
-build-cover:
-	CC=$(CC) $(GO) build -cover -coverpkg=./... -o dist/$(BIN) .
+#[what] build the coverage-instrumented binary into ./dist (e2e prerequisite, skipped when current)
+build-cover: dist/$(BIN)
 
-#[what] compile the e2e harness into ./dist/e2e.test (with the binary, the only artifacts CI e2e jobs need)
-build-e2e-test:
-	CC=$(CC) $(GO) test -c -o dist/e2e.test ./e2e
+#[what] compile the e2e harness into ./dist/e2e.test (skipped when current)
+build-e2e-test: dist/e2e.test
 
-#[why] E2E_USE_TEST_BIN=1 runs the prebuilt dist/e2e.test: no go toolchain or module/build caches in the job
+HOST_GOARCH := $(if $(filter arm64 aarch64,$(shell uname -m)),arm64,amd64)
+E2E_LINUX_ARCH := $(or $(patsubst linux-%,%,$(filter linux-%,$(PLATFORM))),$(HOST_GOARCH))
+ZIG_LINUX_TARGET := $(if $(filter arm64,$(E2E_LINUX_ARCH)),aarch64,x86_64)-linux-gnu
+#[what] cross-build the linux binary into ./dist/che-linux-<arch> (zig cc, arch from PLATFORM=linux-<arch>, default host arch), the linux-container binary
+build-linux:
+	GOOS=linux GOARCH=$(E2E_LINUX_ARCH) CGO_ENABLED=1 CC="zig cc -target $(ZIG_LINUX_TARGET)" CXX="zig c++ -target $(ZIG_LINUX_TARGET)" $(GO) build -o dist/che-linux-$(E2E_LINUX_ARCH) .
+
 ifeq ($(E2E_USE_TEST_BIN),1)
 E2E_RUN = sh -c 'cd e2e && exec ../dist/e2e.test -test.v -test.count=1 -test.timeout 45m -test.run "$$0"'
 else
@@ -105,11 +116,33 @@ e2e-packages: $(BUILD_DEP)
 	if [[ -e cover-e2e-packages ]] rm -rf cover-e2e-packages; mkdir -p cover-e2e-packages
 	E2E_BIN=$(CURDIR)/dist/$(BIN) E2E_GOCOVERDIR=$(CURDIR)/cover-e2e-packages $(E2E_RUN) TestE2EPackages
 
-#[what] real-install e2e per installation method family (METHOD=<method>, default all, prefix matches sub-groups, see e2e/install_methods.yml): installs live packages into a throwaway HOME, then runs each one, binary covdata into ./cover-e2e-install-methods
-#[vals] brew/formulae|brew/cask|vscode|apt|binariesRemoteArchive|script|pyenv|nvm|npm|go|all
-e2e-install-methods: $(BUILD_DEP)
+E2E_INSTALL_SELECT := E2E_INSTALL_METHOD=$(or $(METHOD),$(E2E_INSTALL_METHOD),all) E2E_INSTALL_PACKAGE=$(or $(PACKAGE),$(E2E_INSTALL_PACKAGE)) E2E_INSTALL_MODE=$(or $(MODE),$(E2E_INSTALL_MODE)) E2E_INSTALL_PLATFORM=$(or $(PLATFORM),$(E2E_INSTALL_PLATFORM))
+E2E_INSTALL_MODE_SEL := $(or $(MODE),$(E2E_INSTALL_MODE))
+E2E_INSTALL_PLATFORM_SEL := $(or $(PLATFORM),$(E2E_INSTALL_PLATFORM))
+E2E_TARGET_LINUX := $(or $(filter linux-%,$(E2E_INSTALL_PLATFORM_SEL)),$(if $(E2E_INSTALL_PLATFORM_SEL),,$(filter Linux,$(shell uname -s))))
+E2E_BM_DARWIN := $(if $(CI)$(E2E_ALLOW_HOST),,$(if $(filter Darwin,$(shell uname -s)),$(if $(filter 1,$(shell sysctl -n kern.hv_vmm_present 2>/dev/null)),,1)))
+E2E_WITH_DEPS := $(filter with_deps,$(E2E_INSTALL_MODE_SEL))
+ifneq ($(and $(E2E_BM_DARWIN),$(E2E_WITH_DEPS),$(if $(E2E_TARGET_LINUX),,1)),)
+E2E_INSTALL_METHODS_DEPS := build-e2e-test
+E2E_INSTALL_METHODS_RUN = $(E2E_INSTALL_SELECT) ../ci/e2e-install-methods-vm.zsh
+else
+ifneq ($(and $(if $(E2E_WITH_DEPS),,1),$(E2E_TARGET_LINUX)),)
+E2E_INSTALL_METHODS_DEPS := build-linux
+E2E_INSTALL_METHODS_ENV := E2E_BIN_LINUX=$(CURDIR)/dist/che-linux-$(E2E_LINUX_ARCH)
+endif
+ifneq ($(and $(E2E_BM_DARWIN),$(if $(E2E_WITH_DEPS),,1),$(if $(E2E_TARGET_LINUX),,1)),)
+E2E_INSTALL_METHODS_DEPS := e2e-install-methods-vm-template
+endif
+E2E_INSTALL_METHODS_RUN = E2E_BIN=$(CURDIR)/dist/$(BIN) E2E_GOCOVERDIR=$(CURDIR)/cover-e2e-install-methods $(E2E_INSTALL_SELECT) $(E2E_INSTALL_METHODS_ENV) $(E2E_RUN) TestE2EInstallMethods
+endif
+#[what] ensure the darwin no-deps tart VM template exists (clone vanilla base, bootstrap ssh key, stop)
+e2e-install-methods-vm-template:
+	../ci/e2e-install-methods-vm-template.zsh
+#[what] real-install e2e, see spec/vetted_title_only/e2e-install-methods.md: each selected package installs live once per eligible entry method, then runs; MODE=with_no_deps (default) gives each install a fresh debian container (linux) or tart VM (darwin), MODE=with_deps a throwaway HOME (bare-metal darwin delegates the run into a tart VM)
+#[vals] METHOD: <method>|<method>/ prefix|all; PACKAGE: <pkg>[,<pkg>...]|all; MODE: with_no_deps|with_deps; PLATFORM: darwin-arm64|linux-arm64|linux-amd64; E2E_ALLOW_HOST: 1; E2E_INSTALL_PACKAGES_PER_METHOD: <n>; CHE_LOG_LEVEL: info (default)|debug|trace
+e2e-install-methods: $(BUILD_DEP) $(E2E_INSTALL_METHODS_DEPS)
 	if [[ -e cover-e2e-install-methods ]] rm -rf cover-e2e-install-methods; mkdir -p cover-e2e-install-methods
-	E2E_BIN=$(CURDIR)/dist/$(BIN) E2E_GOCOVERDIR=$(CURDIR)/cover-e2e-install-methods E2E_INSTALL_METHOD=$(or $(METHOD),$(E2E_INSTALL_METHOD),all) $(E2E_RUN) TestE2EInstallMethods
+	$(E2E_INSTALL_METHODS_RUN)
 
 #[what] registry e2e: every brew formula and cask name in the builtin packages file resolves upstream
 e2e-registry:

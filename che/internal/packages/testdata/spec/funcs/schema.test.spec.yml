@@ -1,0 +1,69 @@
+# [>] 🤖🤖
+context:
+  function: packages.CompiledSchema.Validate
+cases:
+  - name: ShouldValidateBuiltinPackagesYml
+    input:
+      args: [path: packages.yml]
+    expected:
+      output: true
+  - name: ShouldValidateFixturePackagesYmls
+    input:
+      args:
+        - globs:
+            - ../cli/testdata/fixture/commands/packages/*/home/.config/packages/*.yml
+            - ../../e2e/home/.config/packages/*.yml
+    expected:
+      output: true
+  - name: ShouldRejectUnknownInstallerScalar
+    input:
+      args:
+        - doc: |
+            packages:
+              x: [frobnicate]
+    expected:
+      output: false
+  - name: ShouldRejectTwoKeyItemMap
+    input:
+      args:
+        - doc: |
+            packages:
+              x:
+                - brew: {packageName: a}
+                  apt: {packageName: b}
+    expected:
+      output: false
+  - name: ShouldRejectChecksumWithoutSha256Prefix
+    input:
+      args:
+        - doc: |
+            packages:
+              x:
+                - binariesRemoteArchive:
+                    url: https://example.com/a.tar.gz
+                    platformEligibility:
+                      - linux-amd64: deadbeef
+    expected:
+      output: false
+  - name: ShouldRejectEntryObjectUnknownKey
+    input:
+      args:
+        - doc: |
+            packages:
+              x:
+                installers: [brew]
+                bogus: true
+    expected:
+      output: false
+  - name: ShouldRejectNpmItemWithExtractBinaries
+    input:
+      args:
+        - doc: |
+            packages:
+              x:
+                - npm:
+                    packageName: a
+                    extractBinaries: [bin/a]
+    expected:
+      output: false
+# [<] 🤖🤖

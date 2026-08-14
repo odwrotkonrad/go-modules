@@ -35,8 +35,10 @@ func (in *Installer) ensureBasePackages(mgr string) error {
 func (in *Installer) installBasePackages(names []string) error {
 	sub := *in
 	sub.baseInstalling = true
+	sub.Opts.OnlyMethods = nil
 	err := sub.InstallRequests(Requests(names))
 	sub.baseInstalling = false
+	sub.Opts.OnlyMethods = in.Opts.OnlyMethods
 	*in = sub
 	return err
 }

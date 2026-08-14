@@ -108,7 +108,7 @@ func TestPick(t *testing.T) {
 		h := testHost(c.Input.Args.String(t, 0), "amd64", cmdMap(c.Input.Args.Strings(t, 1)))
 		var entry Entry
 		require.NoError(t, yaml.Unmarshal([]byte(c.Input.Args.String(t, 2)), &entry))
-		it, ok, err := h.pickPreferred("pkg", entry, c.Input.Args.Strings(t, 3), nil)
+		it, ok, err := h.pickPreferred("pkg", entry, c.Input.Args.Strings(t, 3), c.Input.Args.Strings(t, 4), nil, false)
 		if err != nil {
 			return pickGot{}, err
 		}

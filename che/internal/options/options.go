@@ -241,6 +241,13 @@ func (c *Options) Resolve(env LookupEnv, user, spec Layer) error {
 		c.PackagesPreferredMethods = packages.DefaultPreferredMethods
 		c.setValue("packages.preferredInstallationMethods", "["+strings.Join(packages.DefaultPreferredMethods, ", ")+"]")
 	}
+	c.PackagesOnlyMethods = c.resolveList("packages.onlyInstallationMethods",
+		layerList(c.PackagesOnlyMethods, "cliFlag"), envStr(env("CHE_PACKAGES_ONLY_METHODS")))
+	if err := packages.ValidateManagers(c.PackagesOnlyMethods); err != nil {
+		return err
+	}
+	c.PackagesDownloadCacheDir = c.resolveStr("packages.downloadCacheDir", "",
+		flagStr(c.PackagesDownloadCacheDir), envStr(env("CHE_PACKAGES_DOWNLOAD_CACHE_DIR")))
 	c.PackagesBinariesRemoteArchiveDestinationCandidates = c.resolveList("packages.binariesRemoteArchive.installDestinationCandidates",
 		layerList(c.PackagesBinariesRemoteArchiveDestinationCandidates, "cliFlag"), envStr(env("CHE_PACKAGES_BINARIES_REMOTE_ARCHIVE_INSTALL_DESTINATION_CANDIDATES")),
 		layerList(user.Packages.BinariesRemoteArchive.InstallDestinationCandidates, "config-file"), layerList(spec.Packages.BinariesRemoteArchive.InstallDestinationCandidates, "specFile"))

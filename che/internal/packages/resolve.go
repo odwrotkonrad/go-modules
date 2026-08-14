@@ -23,6 +23,7 @@ type Host struct {
 	PathDirs  func() []string
 	FpathDirs func() []string
 	Getenv    func(string) string
+	Stat      func(string) (os.FileInfo, error)
 }
 
 func NewHost() Host {
@@ -33,6 +34,7 @@ func NewHost() Host {
 		PathDirs:  func() []string { return filepath.SplitList(os.Getenv("PATH")) },
 		FpathDirs: fpathDirs,
 		Getenv:    os.Getenv,
+		Stat:      os.Stat,
 	}
 	if h.OS == "linux" {
 		h.Distro = linuxDistro()
@@ -98,14 +100,29 @@ func (h Host) HasCmd(name string) bool {
 	return err == nil
 }
 
+func (h Host) BrewBin() string {
+	if p, err := h.LookPath("brew"); err == nil {
+		return p
+	}
+	if h.Stat == nil {
+		return ""
+	}
+	for _, p := range []string{"/opt/homebrew/bin/brew", "/usr/local/bin/brew"} {
+		if fi, err := h.Stat(p); err == nil && !fi.IsDir() {
+			return p
+		}
+	}
+	return ""
+}
+
 func (h Host) expandAs(s, version, arch string) string {
 	return strings.NewReplacer("{version}", version, "{os}", h.OS, "{arch}", arch).Replace(s)
 }
 
-func (h Host) applicable(pkg string, it Item) (bool, error) {
+func (h Host) applicable(pkg string, it Item, strict bool) (bool, error) {
 	switch it.Mgr {
 	case "brew", "cask":
-		return h.OS == "darwin" && h.HasCmd("brew"), nil
+		return h.OS == "darwin" && (!strict || h.BrewBin() != ""), nil
 	case "apt":
 		return h.OS == "linux" && h.HasCmd("apt-get"), nil
 	case "npm":
@@ -147,17 +164,26 @@ func (h Host) applicable(pkg string, it Item) (bool, error) {
 	}
 }
 
-func (h Host) pickPreferred(pkg string, entry Entry, preferred, allowed []string) (Item, bool, error) {
-	for _, it := range orderByPreference(entry.Items, preferred) {
-		ok, err := h.applicable(pkg, it)
-		if err != nil {
-			return Item{}, false, err
-		}
-		if ok && len(allowed) > 0 && !slices.Contains(allowed, methodFamily(it.Mgr)) {
-			ok = false
-		}
-		if ok {
-			return it, true, nil
+func (h Host) pickPreferred(pkg string, entry Entry, preferred, only, allowed []string, strictOnly bool) (Item, bool, error) {
+	passes := []bool{true, false}
+	if strictOnly {
+		passes = []bool{true}
+	}
+	for _, strict := range passes {
+		for _, it := range orderByPreference(entry.Items, preferred) {
+			ok, err := h.applicable(pkg, it, strict)
+			if err != nil {
+				return Item{}, false, err
+			}
+			if ok && len(only) > 0 && !slices.Contains(only, it.Mgr) {
+				ok = false
+			}
+			if ok && len(allowed) > 0 && !slices.Contains(allowed, methodFamily(it.Mgr)) {
+				ok = false
+			}
+			if ok {
+				return it, true, nil
+			}
 		}
 	}
 	return Item{}, false, nil

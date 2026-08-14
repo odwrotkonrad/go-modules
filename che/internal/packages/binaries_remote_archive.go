@@ -3,6 +3,7 @@ package packages
 // [>] 🤖🤖🤖
 
 import (
+	"crypto/sha256"
 	"fmt"
 	"os"
 	"path"
@@ -36,17 +37,16 @@ func (in *Installer) installBinariesRemoteArchive(pkg string, b *BinariesRemoteA
 		return fmt.Errorf("%s: %w", pkg, err)
 	}
 	url := in.Host.expandAs(b.URL, version, arch)
-	tmp, err := os.MkdirTemp("", "che-packages-")
+	asset, cached, cleanup, err := in.fetchAsset(url)
 	if err != nil {
 		return err
 	}
-	defer func() { _ = os.RemoveAll(tmp) }()
-	asset := filepath.Join(tmp, path.Base(url))
-	if err := in.exec(curlArgv(url, asset)); err != nil {
-		return err
-	}
+	defer cleanup()
 	if want, ok := b.PlatformEligibility.Checksums[in.Host.PlatformKey()]; ok {
 		if err := in.verifyChecksum(pkg, asset, want); err != nil {
+			if cached {
+				_ = os.Remove(asset)
+			}
 			return err
 		}
 	} else {
@@ -57,6 +57,33 @@ func (in *Installer) installBinariesRemoteArchive(pkg string, b *BinariesRemoteA
 	}
 	in.emit(log.Levels.Info, "installed", labelWithVersion(pkg, version)+" via binariesRemoteArchive")
 	return nil
+}
+
+func (in *Installer) fetchAsset(url string) (string, bool, func(), error) {
+	if in.Opts.DownloadCacheDir != "" {
+		dir := in.expandPath(in.Opts.DownloadCacheDir)
+		if err := os.MkdirAll(dir, 0o755); err != nil {
+			return "", false, nil, err
+		}
+		asset := filepath.Join(dir, fmt.Sprintf("%x-%s", sha256.Sum256([]byte(url)), path.Base(url)))
+		if _, err := os.Stat(asset); err == nil {
+			return asset, true, func() {}, nil
+		}
+		if err := in.exec(curlArgv(url, asset)); err != nil {
+			return "", false, nil, err
+		}
+		return asset, true, func() {}, nil
+	}
+	tmp, err := os.MkdirTemp("", "che-packages-")
+	if err != nil {
+		return "", false, nil, err
+	}
+	asset := filepath.Join(tmp, path.Base(url))
+	if err := in.exec(curlArgv(url, asset)); err != nil {
+		_ = os.RemoveAll(tmp)
+		return "", false, nil, err
+	}
+	return asset, false, func() { _ = os.RemoveAll(tmp) }, nil
 }
 
 func (in *Installer) versionOutputHasPin(pkg, pin string) bool {

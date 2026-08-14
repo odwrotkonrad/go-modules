@@ -5,18 +5,25 @@ workflow:
     - if: $CI_PIPELINE_SOURCE == "merge_request_event"
     - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
 
+include:
+  - local: .gitlab/ci/test-install-packages.gitlab-ci.yml
+
 stages:
   - warm
   - verify
   - test-unit
   - test-e2e
   - test-e2e-installs
+  - test-e2e-installs-darwin-arm64
+  - test-e2e-installs-linux-amd64
+  - test-e2e-installs-linux-arm64
   - coverage
   - release
   - publish
 
 variables:
   CI_IMAGE: registry.gitlab.com/konradodwrot/infra/oci-images/ci-linux:latest
+  CI_IMAGE_ARM64: registry.gitlab.com/konradodwrot/infra/oci-images/ci-linux:latest-arm64
   GOMODCACHE: $CI_PROJECT_DIR/.cache/go-mod
   GOCACHE: $CI_PROJECT_DIR/.cache/go-build
   CC: clang
@@ -182,8 +189,14 @@ test-e2e-che-registry:
 .test-install-methods:
   stage: test-e2e-installs
   needs: []
+  #[why] the per-method package cap keeps MR pipelines fast; the manual per-package jobs and local PACKAGE=all cover the full set
+  variables:
+    E2E_INSTALL_PACKAGES_PER_METHOD: "3"
+  #[why] MR changes-triggered runs block the merge; main keeps allow_failure, manual stays optional
   rules:
-    - if: $CI_PIPELINE_SOURCE == "merge_request_event" || $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
+    - if: $CI_PIPELINE_SOURCE == "merge_request_event"
+      changes: [che/internal/packages/**/*, che/e2e/install_methods*]
+    - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
       changes: [che/internal/packages/**/*, che/e2e/install_methods*]
       allow_failure: true
     - if: $CI_PIPELINE_SOURCE == "merge_request_event" || $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
@@ -193,7 +206,7 @@ test-e2e-che-registry:
   #   rule runs on pipelines where the build job does not exist); darwin never fetches it
   #   and builds its own binary
   script:
-    - make -C che e2e-install-methods METHOD="$METHOD" $(test -x che/dist/e2e.test && echo "BUILD_DEP= E2E_USE_TEST_BIN=1")
+    - make -C che e2e-install-methods MODE=with_deps METHOD="$METHOD" $(test -x che/dist/e2e.test && echo "BUILD_DEP= E2E_USE_TEST_BIN=1")
   artifacts:
     paths:
       - che/cover-e2e-install-methods/
@@ -233,7 +246,9 @@ build-che-cover-darwin:
         - .cache/go-build
       policy: pull-push
   rules:
-    - if: $CI_PIPELINE_SOURCE == "merge_request_event" || $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
+    - if: $CI_PIPELINE_SOURCE == "merge_request_event"
+      changes: [che/internal/packages/**/*, che/e2e/install_methods*]
+    - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
       changes: [che/internal/packages/**/*, che/e2e/install_methods*]
       allow_failure: true
     - if: $CI_PIPELINE_SOURCE == "merge_request_event" || $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
@@ -264,6 +279,37 @@ test-install-methods-darwin:
     - curl -fsSL --connect-timeout 30 --retry 10 --retry-delay 30 --retry-all-errors -o /tmp/go.tar.gz "https://go.dev/dl/go1.26.4.darwin-arm64.tar.gz"
     - sudo tar -xzf /tmp/go.tar.gz -C /usr/local
     - export PATH=/usr/local/go/bin:$PATH
+
+#[what] manual no-deps install e2e: each install in a fresh debian container via dind, che cross-built in-job
+#[why] with_no_deps proves each package pulls its own dependencies: too slow for every MR, so manual only
+test-install-methods-no-deps:
+  stage: test-e2e-installs
+  image: $CI_IMAGE
+  services: [docker:dind]
+  needs:
+    - job: build-che-cover
+      optional: true
+  variables:
+    DOCKER_HOST: tcp://docker:2376
+    DOCKER_TLS_CERTDIR: "/certs"
+    DOCKER_TLS_VERIFY: "1"
+    DOCKER_CERT_PATH: "$DOCKER_TLS_CERTDIR/client"
+    #[why] docker run -v paths must live under /builds, the only volume the dind service shares with the job
+    E2E_INSTALL_CACHE_DIR: $CI_PROJECT_DIR/.cache/che-e2e-install
+  parallel:
+    matrix:
+      - METHOD: [apt, binariesRemoteArchive, script, pyenv, nvm, npm, go]
+  rules:
+    - if: $CI_PIPELINE_SOURCE == "merge_request_event" || $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
+      when: manual
+      allow_failure: true
+  before_script:
+    - apt-get update && apt-get install -y --no-install-recommends docker.io
+  script:
+    - make -C che e2e-install-methods MODE=with_no_deps METHOD="$METHOD" $(test -x che/dist/e2e.test && echo "BUILD_DEP= E2E_USE_TEST_BIN=1")
+  artifacts:
+    paths:
+      - che/cover-e2e-install-methods/
 ##[<] 🤖🤖
 
 coverage-che:

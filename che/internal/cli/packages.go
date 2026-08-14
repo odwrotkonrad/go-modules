@@ -28,6 +28,10 @@ func (a *app) packagesCmd() *cobra.Command {
 		"override packages file merged over the effective base (the packages file, or the builtin when none exists): same-name entries replace, new names append; default: $XDG_CONFIG_HOME/che/packages-override.yml if present; env: CHE_PACKAGES_OVERRIDE")
 	pf.StringSliceVar(&a.flags.PackagesPreferredMethods, "preferred-methods", nil,
 		"installation-method preference order (comma-separated or repeated): listed managers try first within each package entry, unlisted follow in entry order; values: brew | cask | apt | npm | go | gem | binariesRemoteArchive | script | vscode | pyenv | nvm; env: CHE_PACKAGES_PREFERRED_METHODS")
+	pf.StringSliceVar(&a.flags.PackagesOnlyMethods, "only-methods", nil,
+		"restrict installs to the listed managers (comma-separated or repeated): items using any other manager are skipped, a package with no listed manager applicable is not installed; values: brew | cask | apt | npm | go | gem | binariesRemoteArchive | script | vscode | pyenv | nvm; env: CHE_PACKAGES_ONLY_METHODS")
+	pf.StringVar(&a.flags.PackagesDownloadCacheDir, "download-cache-dir", "",
+		"binariesRemoteArchive download cache directory: assets download to <dir>/<sha256(url)>-<basename> and later installs reuse the file, a checksum mismatch evicts it; empty disables caching; env: CHE_PACKAGES_DOWNLOAD_CACHE_DIR")
 
 	install := &cobra.Command{
 		Use:   "install [pkg...]",

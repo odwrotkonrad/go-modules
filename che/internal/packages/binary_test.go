@@ -3,6 +3,7 @@ package packages
 // [>] 🤖🤖
 
 import (
+	"os"
 	"testing"
 
 	"github.com/stretchr/testify/require"
@@ -67,6 +68,44 @@ func TestInstallBinaryBareAsset(t *testing.T) {
 		"install -m 0755",
 		"/home/u/.local/bin/kind")
 	refuteCalls(t, m, "tar -x")
+}
+
+func curlWrites(t *testing.T) func(argv []string) ([]byte, error) {
+	return func(argv []string) ([]byte, error) {
+		if argv[0] != "curl" {
+			return nil, nil
+		}
+		for i, a := range argv {
+			if a == "-o" {
+				require.NoError(t, os.WriteFile(argv[i+1], []byte("asset"), 0o644))
+			}
+		}
+		return nil, nil
+	}
+}
+
+func TestInstallBinaryDownloadCacheReusesAsset(t *testing.T) {
+	opts := Options{DownloadCacheDir: t.TempDir()}
+	in, m := newInstaller(t, kubectxYaml, "linux", cmdMap([]string{"sha256sum"}), opts)
+	m.Stub = chainStubs(curlWrites(t), shaStub("goodsha"))
+	require.NoError(t, in.Install([]string{"kubectx"}))
+	requireCalls(t, m, "curl -fsSL")
+	in, m = newInstaller(t, kubectxYaml, "linux", cmdMap([]string{"sha256sum"}), opts)
+	m.Stub = shaStub("goodsha")
+	require.NoError(t, in.Install([]string{"kubectx"}))
+	refuteCalls(t, m, "curl")
+	requireCalls(t, m, "tar -x")
+}
+
+func TestInstallBinaryDownloadCacheEvictsOnShaMismatch(t *testing.T) {
+	cache := t.TempDir()
+	in, m := newInstaller(t, kubectxYaml, "linux", cmdMap([]string{"sha256sum"}), Options{DownloadCacheDir: cache})
+	m.Stub = chainStubs(curlWrites(t), shaStub("badsha"))
+	err := in.Install([]string{"kubectx"})
+	require.ErrorContains(t, err, "sha256 mismatch")
+	entries, err := os.ReadDir(cache)
+	require.NoError(t, err)
+	require.Empty(t, entries)
 }
 
 const zigYaml = `packages:

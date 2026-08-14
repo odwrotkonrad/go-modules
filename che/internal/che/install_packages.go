@@ -80,6 +80,8 @@ func NewPackagesInstaller(env map[string]string, home string, opts options.Optio
 			IfMissing:        opts.PackagesIfMissing,
 			DryRun:           opts.DryRun != options.DryRun.Off,
 			PreferredMethods: opts.PackagesPreferredMethods,
+			OnlyMethods:      opts.PackagesOnlyMethods,
+			DownloadCacheDir: opts.PackagesDownloadCacheDir,
 			BinariesRemoteArchiveDestinationCandidates: opts.PackagesBinariesRemoteArchiveDestinationCandidates,
 			BinariesRemoteArchiveCheckPresentOnPath:    opts.PackagesBinariesRemoteArchiveCheckPresentOnPath,
 			CompletionsEnabled:                         opts.PackagesCompletionsEnabled,

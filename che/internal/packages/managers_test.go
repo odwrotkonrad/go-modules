@@ -432,7 +432,7 @@ func TestInstallPythonPyenvPinFromBuiltin(t *testing.T) {
 	require.NoError(t, err)
 	m := &execx.Mock{}
 	execx.Swap(t, m)
-	in := &Installer{File: f, FilePath: BuiltinPath, Host: testHost("darwin", "arm64", cmdMap([]string{"python3", "pyenv"})), Opts: Options{}}
+	in := &Installer{File: f, FilePath: BuiltinPath, Host: testHost("darwin", "arm64", cmdMap([]string{"python3", "pyenv", "brew"})), Opts: Options{}}
 	m.Stub = func(argv []string) ([]byte, error) {
 		if strings.Join(argv, " ") == "pyenv versions --bare" {
 			return []byte("3.9.6\n"), nil
