@@ -30,7 +30,7 @@
 
 test-install-package-darwin-arm64:
   extends: .test-install-package
-  stage: test-e2e-installs-darwin-arm64
+  stage: test-e2e-package-installs-darwin-arm64
   tags:
     - saas-macos-medium-m1
   image: macos-26-xcode-26
@@ -49,7 +49,7 @@ test-install-package-darwin-arm64:
 
 test-install-package-linux-amd64:
   extends: .test-install-package-linux
-  stage: test-e2e-installs-linux-amd64
+  stage: test-e2e-package-installs-linux-amd64
   image: $CI_IMAGE
   needs:
     - job: build-che-cover
@@ -62,7 +62,7 @@ test-install-package-linux-amd64:
 
 test-install-package-linux-arm64:
   extends: .test-install-package-linux
-  stage: test-e2e-installs-linux-arm64
+  stage: test-e2e-package-installs-linux-arm64
   tags:
     - saas-linux-small-arm64
   image: $CI_IMAGE_ARM64
