@@ -105,6 +105,7 @@
   - sqlite3
   - stow
   - tamasfe.even-better-toml
+  - tar
   - tart
   - tcl
   - terraform

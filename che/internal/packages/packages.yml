@@ -36,6 +36,8 @@ basePackages:
     script:
         - curl
         - git
+        - tar
+        - unzip
     brew:
         - brew
     brew/cask:
@@ -762,6 +764,9 @@ packages:
     stow:
         installers:
             - brew
+            - apt
+    tar:
+        installers:
             - apt
     tamasfe.even-better-toml:
         version: 0.21.2
