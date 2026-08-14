@@ -16,7 +16,6 @@ import (
 	"slices"
 	"strconv"
 	"strings"
-	"sync"
 	"sync/atomic"
 	"testing"
 	"time"
@@ -474,7 +473,6 @@ func runJobNoDeps(t *testing.T, job installJob, cfg runCfg) (string, bool) {
 	}
 	require.FileExists(t, binLinux)
 	arch := cmp.Or(cfg.linuxArch, runtime.GOARCH)
-	image := noDepsImage(t, arch)
 	cache := devCacheDir(t)
 	argv := []string{
 		"run", "--rm", "--quiet", "--platform", "linux/" + arch,
@@ -484,7 +482,7 @@ func runJobNoDeps(t *testing.T, job installJob, cfg runCfg) (string, bool) {
 		"-v", filepath.Join(cache, "xdg") + ":/root/.cache",
 		"-v", filepath.Join(cache, "downloads") + ":/che-cache",
 		"-e", "CHE_PACKAGES_DOWNLOAD_CACHE_DIR=/che-cache",
-		image, "sh", "-ec", noDepsScript(job),
+		noDepsImage(), "sh", "-ec", noDepsScript(job),
 	}
 	run := exec.Command("docker", argv...)
 	out, err := runStreamed(t, run, "with_no_deps install "+strings.Join(job.packages, " "))
@@ -492,19 +490,8 @@ func runJobNoDeps(t *testing.T, job installJob, cfg runCfg) (string, bool) {
 	return out, strings.Contains(out, noDepsSkipMarker)
 }
 
-var noDepsImages sync.Map
-
-func noDepsImage(t *testing.T, arch string) string {
-	t.Helper()
-	tag := "che-e2e-install-methods:" + arch
-	once, _ := noDepsImages.LoadOrStore(arch, new(sync.Once))
-	once.(*sync.Once).Do(func() {
-		build := exec.Command("docker", "build", "--quiet", "--platform", "linux/"+arch,
-			"--file", "install-methods.Dockerfile", "--tag", tag, ".")
-		out, err := build.CombinedOutput()
-		require.NoError(t, err, "build %s: %s", tag, out)
-	})
-	return tag
+func noDepsImage() string {
+	return cmp.Or(os.Getenv("E2E_INSTALL_IMAGE"), "registry.gitlab.com/konradodwrot/infra/oci-images/e2e-debian:latest")
 }
 
 func runStreamed(t *testing.T, cmd *exec.Cmd, label string) (string, error) {
