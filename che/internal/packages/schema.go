@@ -191,13 +191,13 @@ func aptDef() *jsonschema.Schema {
 func verifyDef() *jsonschema.Schema {
 	o := obj("verify options: strategy keys plus presence-check tuning, multiple keys combine", nil)
 	o.Properties.Set(VerifyVersionCmd, &jsonschema.Schema{Description: "run the entry command with --version (fallback version), exit 0 and non-empty output required", Type: "boolean"})
-	o.Properties.Set(VerifyPkgVersionCmd, &jsonschema.Schema{Description: "ask the installing manager for the installed version, exit 0 and non-empty output required", Type: "boolean"})
+	o.Properties.Set(VerifyPkgMgrVersionCheck, &jsonschema.Schema{Description: "ask the installing manager for the installed version, exit 0 and non-empty output required", Type: "boolean"})
 	o.Properties.Set("cmd", str("command run after install, exit 0 = verified"))
 	o.Properties.Set("checkInPath", &jsonschema.Schema{Description: "probe PATH for the package command during presence checks (default true); false for command-less packages", Type: "boolean"})
 	return &jsonschema.Schema{
 		Description: "install verification: a named strategy shorthand or an options object",
 		OneOf: []*jsonschema.Schema{
-			{Description: "strategy: versionCmd runs the entry command with --version, pkgVersionCmd asks the installing manager for the installed version", Type: "string", Enum: []any{VerifyVersionCmd, VerifyPkgVersionCmd}},
+			{Description: "strategy: versionCmd runs the entry command with --version, pkgMgrVersionCheck asks the installing manager for the installed version", Type: "string", Enum: []any{VerifyVersionCmd, VerifyPkgMgrVersionCheck}},
 			o,
 		},
 	}

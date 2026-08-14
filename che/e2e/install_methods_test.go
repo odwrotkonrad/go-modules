@@ -248,8 +248,8 @@ func resolveVerify(t *testing.T, entry packages.Entry, pkg, mgr string) []verify
 		if spec.VersionCmd {
 			cmds = append(cmds, defaultVerify(entry, pkg))
 		}
-		if spec.PkgVersionCmd {
-			cmd, err := pkgVersionCmd(entry, pkg, mgr)
+		if spec.PkgMgrVersionCheck {
+			cmd, err := pkgMgrVersionCheck(entry, pkg, mgr)
 			require.NoError(t, err)
 			cmds = append(cmds, verifyCmd{cmd: cmd, wantOut: true})
 		}
@@ -274,7 +274,7 @@ func defaultVerify(entry packages.Entry, pkg string) verifyCmd {
 	return verifyCmd{cmd: fmt.Sprintf("%s --version 2>/dev/null || %s version", cmd, cmd), wantOut: true}
 }
 
-func pkgVersionCmd(entry packages.Entry, pkg, mgr string) (string, error) {
+func pkgMgrVersionCheck(entry packages.Entry, pkg, mgr string) (string, error) {
 	name := pkg
 	for _, it := range entry.Items {
 		if it.Mgr != mgr {
@@ -301,7 +301,7 @@ func pkgVersionCmd(entry packages.Entry, pkg, mgr string) (string, error) {
 	case "vscode":
 		return fmt.Sprintf("code --list-extensions --show-versions | grep -i '^%s@'", name), nil
 	}
-	return "", fmt.Errorf("verify pkgVersionCmd: no version query for method %s", mgr)
+	return "", fmt.Errorf("verify pkgMgrVersionCheck: no version query for method %s", mgr)
 }
 
 func runJob(t *testing.T, job installJob, cfg runCfg) {

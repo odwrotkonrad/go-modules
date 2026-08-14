@@ -26,7 +26,7 @@ func TestCheckPresentSkipsPathProbeWhenDisabled(t *testing.T) {
     installers:
       - apt:
           verify:
-            pkgVersionCmd: true
+            pkgMgrVersionCheck: true
             checkInPath: false
   nvm:
     verify:

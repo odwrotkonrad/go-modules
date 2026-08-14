@@ -73,7 +73,7 @@ packages:
         installers:
             - apt:
                 verify:
-                    pkgVersionCmd: true
+                    pkgMgrVersionCheck: true
                     checkInPath: false
     aws:
         installers:
@@ -104,7 +104,7 @@ packages:
             - apt
     beekeeper-studio:
         verify:
-            pkgVersionCmd: true
+            pkgMgrVersionCheck: true
             checkInPath: false
         installers:
             - brew/cask
@@ -116,7 +116,7 @@ packages:
                 NONINTERACTIVE: "1"
     ca-certificates:
         verify:
-            pkgVersionCmd: true
+            pkgMgrVersionCheck: true
             checkInPath: false
         installers:
             - apt
@@ -289,7 +289,7 @@ packages:
                 versionMap: {"5": "7:5.1.9-0+deb12u1"}
     font-jetbrains-mono:
         verify:
-            pkgVersionCmd: true
+            pkgMgrVersionCheck: true
             checkInPath: false
         installers:
             - brew/cask
@@ -487,20 +487,20 @@ packages:
                 version: 2.1.10
     libbz2:
         verify:
-            pkgVersionCmd: true
+            pkgMgrVersionCheck: true
             checkInPath: false
         installers:
             - apt:
                 packageName: libbz2-dev
     libc6-dev:
         verify:
-            pkgVersionCmd: true
+            pkgMgrVersionCheck: true
             checkInPath: false
         installers:
             - apt
     libffi:
         verify:
-            pkgVersionCmd: true
+            pkgMgrVersionCheck: true
             checkInPath: false
         installers:
             - apt:
@@ -508,7 +508,7 @@ packages:
     liblzma:
         version: 5.4.1
         verify:
-            pkgVersionCmd: true
+            pkgMgrVersionCheck: true
             checkInPath: false
         installers:
             - apt:
@@ -516,14 +516,14 @@ packages:
                 versionMap: {"5.4.1": "5.4.1-1+deb12u1"}
     libsqlite3:
         verify:
-            pkgVersionCmd: true
+            pkgMgrVersionCheck: true
             checkInPath: false
         installers:
             - apt:
                 packageName: libsqlite3-dev
     libtool:
         verify:
-            pkgVersionCmd: true
+            pkgMgrVersionCheck: true
             checkInPath: false
         installers:
             - brew
@@ -668,7 +668,7 @@ packages:
             - apt
     pcre2:
         verify:
-            pkgVersionCmd: true
+            pkgMgrVersionCheck: true
             checkInPath: false
         installers:
             - brew
@@ -713,7 +713,7 @@ packages:
                 url: https://github.com/podman-container-tools/podman/releases/download/v{version}/podman-remote-static-linux_{arch}.tar.gz
     podman-desktop:
         verify:
-            pkgVersionCmd: true
+            pkgMgrVersionCheck: true
             checkInPath: false
         installers:
             - brew/cask
@@ -733,7 +733,7 @@ packages:
                 url: https://github.com/prometheus/prometheus/releases/download/v{version}/prometheus-{version}.{os}-{arch}.tar.gz
     pstree:
         verify:
-            cmd: pstree -V
+            cmd: pstree
         installers:
             - brew
             - apt:
@@ -771,7 +771,7 @@ packages:
                 global: 3.14.6
     readline:
         verify:
-            pkgVersionCmd: true
+            pkgMgrVersionCheck: true
             checkInPath: false
         installers:
             - brew
@@ -806,7 +806,7 @@ packages:
                 versionMap: {"3.1": "1:3.1"}
     ruby-dev:
         verify:
-            pkgVersionCmd: true
+            pkgMgrVersionCheck: true
             checkInPath: false
         installers:
             - apt
@@ -825,7 +825,7 @@ packages:
             - apt
     showkey:
         verify:
-            pkgVersionCmd: true
+            pkgMgrVersionCheck: true
         installers:
             - brew
             - apt:
@@ -853,7 +853,7 @@ packages:
     tcl:
         version: "8"
         verify:
-            pkgVersionCmd: true
+            pkgMgrVersionCheck: true
             checkInPath: false
         installers:
             - brew:
@@ -942,7 +942,7 @@ packages:
                 url: https://ziglang.org/download/{version}/zig-{arch}-linux-{version}.tar.xz
     zlib:
         verify:
-            pkgVersionCmd: true
+            pkgMgrVersionCheck: true
             checkInPath: false
         installers:
             - brew

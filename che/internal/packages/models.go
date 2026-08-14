@@ -442,15 +442,15 @@ type Item struct {
 }
 
 const (
-	VerifyVersionCmd    = "versionCmd"
-	VerifyPkgVersionCmd = "pkgVersionCmd"
+	VerifyVersionCmd         = "versionCmd"
+	VerifyPkgMgrVersionCheck = "pkgMgrVersionCheck"
 )
 
 type VerifySpec struct {
-	VersionCmd    bool
-	PkgVersionCmd bool
-	Cmd           string
-	CheckInPath   *bool
+	VersionCmd         bool
+	PkgMgrVersionCheck bool
+	Cmd                string
+	CheckInPath        *bool
 }
 
 func (v *VerifySpec) ChecksPath() bool {
@@ -462,35 +462,35 @@ func (v *VerifySpec) UnmarshalYAML(node *yaml.Node) error {
 		switch node.Value {
 		case VerifyVersionCmd:
 			v.VersionCmd = true
-		case VerifyPkgVersionCmd:
-			v.PkgVersionCmd = true
+		case VerifyPkgMgrVersionCheck:
+			v.PkgMgrVersionCheck = true
 		default:
-			return fmt.Errorf("verify: want %s, %s or {%s|%s|cmd|checkInPath}, got %q", VerifyVersionCmd, VerifyPkgVersionCmd, VerifyVersionCmd, VerifyPkgVersionCmd, node.Value)
+			return fmt.Errorf("verify: want %s, %s or {%s|%s|cmd|checkInPath}, got %q", VerifyVersionCmd, VerifyPkgMgrVersionCheck, VerifyVersionCmd, VerifyPkgMgrVersionCheck, node.Value)
 		}
 		return nil
 	}
 	var obj struct {
-		VersionCmd    bool   `yaml:"versionCmd"`
-		PkgVersionCmd bool   `yaml:"pkgVersionCmd"`
-		Cmd           string `yaml:"cmd"`
-		CheckInPath   *bool  `yaml:"checkInPath"`
+		VersionCmd         bool   `yaml:"versionCmd"`
+		PkgMgrVersionCheck bool   `yaml:"pkgMgrVersionCheck"`
+		Cmd                string `yaml:"cmd"`
+		CheckInPath        *bool  `yaml:"checkInPath"`
 	}
 	if err := node.Decode(&obj); err != nil {
 		return err
 	}
-	if !obj.VersionCmd && !obj.PkgVersionCmd && obj.Cmd == "" && obj.CheckInPath == nil {
-		return fmt.Errorf("verify: object form requires %s, %s, cmd, or checkInPath", VerifyVersionCmd, VerifyPkgVersionCmd)
+	if !obj.VersionCmd && !obj.PkgMgrVersionCheck && obj.Cmd == "" && obj.CheckInPath == nil {
+		return fmt.Errorf("verify: object form requires %s, %s, cmd, or checkInPath", VerifyVersionCmd, VerifyPkgMgrVersionCheck)
 	}
-	v.VersionCmd, v.PkgVersionCmd, v.Cmd, v.CheckInPath = obj.VersionCmd, obj.PkgVersionCmd, obj.Cmd, obj.CheckInPath
+	v.VersionCmd, v.PkgMgrVersionCheck, v.Cmd, v.CheckInPath = obj.VersionCmd, obj.PkgMgrVersionCheck, obj.Cmd, obj.CheckInPath
 	return nil
 }
 
 func (v VerifySpec) MarshalYAML() (any, error) {
 	if v.CheckInPath == nil && v.Cmd == "" {
-		if v.PkgVersionCmd && !v.VersionCmd {
-			return VerifyPkgVersionCmd, nil
+		if v.PkgMgrVersionCheck && !v.VersionCmd {
+			return VerifyPkgMgrVersionCheck, nil
 		}
-		if v.VersionCmd && !v.PkgVersionCmd {
+		if v.VersionCmd && !v.PkgMgrVersionCheck {
 			return VerifyVersionCmd, nil
 		}
 	}
@@ -498,8 +498,8 @@ func (v VerifySpec) MarshalYAML() (any, error) {
 	if v.VersionCmd {
 		obj[VerifyVersionCmd] = true
 	}
-	if v.PkgVersionCmd {
-		obj[VerifyPkgVersionCmd] = true
+	if v.PkgMgrVersionCheck {
+		obj[VerifyPkgMgrVersionCheck] = true
 	}
 	if v.Cmd != "" {
 		obj["cmd"] = v.Cmd

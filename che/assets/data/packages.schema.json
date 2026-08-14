@@ -389,9 +389,9 @@
           "type": "string",
           "enum": [
             "versionCmd",
-            "pkgVersionCmd"
+            "pkgMgrVersionCheck"
           ],
-          "description": "strategy: versionCmd runs the entry command with --version, pkgVersionCmd asks the installing manager for the installed version"
+          "description": "strategy: versionCmd runs the entry command with --version, pkgMgrVersionCheck asks the installing manager for the installed version"
         },
         {
           "properties": {
@@ -399,7 +399,7 @@
               "type": "boolean",
               "description": "run the entry command with --version (fallback version), exit 0 and non-empty output required"
             },
-            "pkgVersionCmd": {
+            "pkgMgrVersionCheck": {
               "type": "boolean",
               "description": "ask the installing manager for the installed version, exit 0 and non-empty output required"
             },

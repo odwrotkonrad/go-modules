@@ -33,14 +33,14 @@ func TestResolveVerifyUsesEntryCommand(t *testing.T) {
 }
 
 func TestResolveVerifyEntryStrategyAppliesToEveryMethod(t *testing.T) {
-	e := parseEntry(t, `{verify: pkgVersionCmd, installers: [apt, brew]}`)
+	e := parseEntry(t, `{verify: pkgMgrVersionCheck, installers: [apt, brew]}`)
 	require.Equal(t, `dpkg-query -W -f '${Version}\n' foo`, resolveVerify(t, e, "foo", "apt")[0].cmd)
 	require.Equal(t, "brew list --versions foo", resolveVerify(t, e, "foo", "brew")[0].cmd)
 }
 
 func TestResolveVerifyItemOverridesEntry(t *testing.T) {
 	e := parseEntry(t, `
-verify: pkgVersionCmd
+verify: pkgMgrVersionCheck
 installers:
   - brew
   - apt:
@@ -58,9 +58,9 @@ func TestResolveVerifyCmdChecksExitCodeOnly(t *testing.T) {
 	require.False(t, vs[0].wantOut)
 }
 
-func TestResolveVerifyPkgVersionCmdUsesManagerPackageName(t *testing.T) {
+func TestResolveVerifyPkgMgrVersionCheckUsesManagerPackageName(t *testing.T) {
 	e := parseEntry(t, `
-verify: pkgVersionCmd
+verify: pkgMgrVersionCheck
 installers:
   - apt:
       packageName: libfoo-dev
@@ -79,7 +79,7 @@ func TestResolveVerifyLegacyVersionCommandStillWins(t *testing.T) {
 }
 
 func TestResolveVerifyCombinesMultipleStrategyKeys(t *testing.T) {
-	e := parseEntry(t, `{verify: {pkgVersionCmd: true, cmd: test -e /etc/foo}, installers: [apt]}`)
+	e := parseEntry(t, `{verify: {pkgMgrVersionCheck: true, cmd: test -e /etc/foo}, installers: [apt]}`)
 	vs := resolveVerify(t, e, "foo", "apt")
 	require.Len(t, vs, 2)
 	require.Equal(t, `dpkg-query -W -f '${Version}\n' foo`, vs[0].cmd)
@@ -88,9 +88,9 @@ func TestResolveVerifyCombinesMultipleStrategyKeys(t *testing.T) {
 	require.False(t, vs[1].wantOut)
 }
 
-func TestPkgVersionCmdRejectsUnsupportedManager(t *testing.T) {
+func TestPkgMgrVersionCheckRejectsUnsupportedManager(t *testing.T) {
 	e := parseEntry(t, `[go]`)
-	_, err := pkgVersionCmd(e, "foo", "go")
+	_, err := pkgMgrVersionCheck(e, "foo", "go")
 	require.ErrorContains(t, err, "no version query for method go")
 }
 

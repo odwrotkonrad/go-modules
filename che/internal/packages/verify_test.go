@@ -19,12 +19,12 @@ func parseFile(t *testing.T, yml string) *File {
 func TestVerifyParsesStrategyOnEntry(t *testing.T) {
 	f := parseFile(t, `packages:
   foo:
-    verify: pkgVersionCmd
+    verify: pkgMgrVersionCheck
     installers: [apt]
 `)
 	v := f.Packages["foo"].Verify
 	require.NotNil(t, v)
-	require.True(t, v.PkgVersionCmd)
+	require.True(t, v.PkgMgrVersionCheck)
 	require.Empty(t, v.Cmd)
 }
 
@@ -36,7 +36,7 @@ func TestVerifyParsesStrategyOnItem(t *testing.T) {
   bar:
     - brew:
         packageName: barx
-        verify: pkgVersionCmd
+        verify: pkgMgrVersionCheck
   baz:
     - binariesRemoteArchive:
         url: https://example.com/{version}.tar.gz
@@ -44,7 +44,7 @@ func TestVerifyParsesStrategyOnItem(t *testing.T) {
         verify: {cmd: baz doctor}
 `)
 	require.True(t, f.Packages["foo"].Items[0].Verify.VersionCmd)
-	require.True(t, f.Packages["bar"].Items[0].Verify.PkgVersionCmd)
+	require.True(t, f.Packages["bar"].Items[0].Verify.PkgMgrVersionCheck)
 	require.Equal(t, "baz doctor", f.Packages["baz"].Items[0].Verify.Cmd)
 }
 
@@ -58,7 +58,7 @@ func TestVerifyParsesCmdObject(t *testing.T) {
 	v := f.Packages["foo"].Verify
 	require.NotNil(t, v)
 	require.False(t, v.VersionCmd)
-	require.False(t, v.PkgVersionCmd)
+	require.False(t, v.PkgMgrVersionCheck)
 	require.Equal(t, "test -e /etc/foo.conf", v.Cmd)
 }
 
@@ -68,7 +68,7 @@ func TestVerifyRejectsUnknownStrategy(t *testing.T) {
     verify: nope
     installers: [apt]
 `), &File{})
-	require.ErrorContains(t, err, "verify: want versionCmd, pkgVersionCmd or {versionCmd|pkgVersionCmd|cmd|checkInPath}")
+	require.ErrorContains(t, err, "verify: want versionCmd, pkgMgrVersionCheck or {versionCmd|pkgMgrVersionCheck|cmd|checkInPath}")
 }
 
 func TestVerifyRejectsEmptyCmd(t *testing.T) {
@@ -77,7 +77,7 @@ func TestVerifyRejectsEmptyCmd(t *testing.T) {
     verify: {cmd: ""}
     installers: [apt]
 `), &File{})
-	require.ErrorContains(t, err, "verify: object form requires versionCmd, pkgVersionCmd, cmd, or checkInPath")
+	require.ErrorContains(t, err, "verify: object form requires versionCmd, pkgMgrVersionCheck, cmd, or checkInPath")
 }
 
 func TestVerifyRoundTrips(t *testing.T) {
@@ -87,7 +87,7 @@ func TestVerifyRoundTrips(t *testing.T) {
             verify:
                 cmd: test -x /usr/bin/bar
     foo:
-        verify: pkgVersionCmd
+        verify: pkgMgrVersionCheck
         installers:
             - apt
 `
