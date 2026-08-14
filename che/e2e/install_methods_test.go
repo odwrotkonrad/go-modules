@@ -310,7 +310,7 @@ func runJob(t *testing.T, job installJob, cfg runCfg) {
 	//   preinstalled package is an environment outcome, not a failure
 	stripped := ansiRe.ReplaceAllString(out, "")
 	for _, pkg := range job.packages {
-		if strings.Contains(stripped, "installed "+pkg+" ") {
+		if regexp.MustCompile(`(?m)installed ` + regexp.QuoteMeta(pkg) + `( \S+)? via `).MatchString(stripped) {
 			continue
 		}
 		if !strings.Contains(stripped, "will not install "+pkg+":") &&

@@ -167,7 +167,7 @@ test-e2e-che-registry:
 #[what] build the install-e2e container base image (debian + ca-certificates) once per pipeline, both arches, shared as docker-save tars
 warm-e2e-pkg-installs-image:
   stage: warm
-  image: $CI_IMAGE_DIND
+  image: docker:28
   services: [docker:dind]
   needs: []
   variables:
@@ -185,7 +185,8 @@ warm-e2e-pkg-installs-image:
       allow_failure: true
   script:
     - docker run --privileged --rm tonistiigi/binfmt --install arm64
-    - docker buildx create --use --name e2e-images
+    - docker context create dind --docker "host=$DOCKER_HOST,ca=$DOCKER_CERT_PATH/ca.pem,cert=$DOCKER_CERT_PATH/cert.pem,key=$DOCKER_CERT_PATH/key.pem"
+    - docker buildx create --use dind
     - mkdir -p e2e-images
     - docker buildx build --platform linux/amd64 --tag che-e2e-debian:amd64 --output type=docker,dest=e2e-images/che-e2e-debian-amd64.tar --file che/e2e/install-methods.Dockerfile che/e2e
     - docker buildx build --platform linux/arm64 --tag che-e2e-debian:arm64 --output type=docker,dest=e2e-images/che-e2e-debian-arm64.tar --file che/e2e/install-methods.Dockerfile che/e2e
@@ -264,7 +265,7 @@ test-e2e-install-methods:
         script) PACKAGE=pyenv,nvm;;
         pyenv) PACKAGE=python3;;
         nvm) PACKAGE=node;;
-        npm) PACKAGE=corepack,pnpm,tsc,pyright,typescript-language-server;;
+        npm) PACKAGE=ccstatusline,pnpm,tsc,pyright,typescript-language-server;;
         go) PACKAGE=gopls,get-os-open-files-with;;
       esac
     - test -f e2e-images/che-e2e-debian-amd64.tar && docker load --quiet -i e2e-images/che-e2e-debian-amd64.tar || true
