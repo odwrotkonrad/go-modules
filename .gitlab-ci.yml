@@ -102,7 +102,7 @@ verify-precommit-all:
         coverage_format: cobertura
         path: $MODULE/coverage.xml
 
-test-che:
+test-unit-che:
   extends: .test-module
   variables:
     MODULE: che
@@ -279,7 +279,7 @@ coverage-che:
   image: $CI_IMAGE
   stage: coverage
   needs:
-    - test-che
+    - test-unit-che
     - test-e2e-che-dryrun
     - test-e2e-che-run
     - test-e2e-che-backup
@@ -309,7 +309,7 @@ coverage-che:
     - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
       changes: [che/**/*, lib/**/*, go.work, .gitlab-ci.yml]
 
-test-get-os-open-files-with:
+test-unit-get-os-open-files-with:
   extends: .test-module
   variables:
     MODULE: get-os-open-files-with
@@ -319,7 +319,7 @@ test-get-os-open-files-with:
     - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
       changes: [get-os-open-files-with/**/*, lib/**/*, go.work, .gitlab-ci.yml]
 
-test-get-term-open-files-with:
+test-unit-get-term-open-files-with:
   extends: .test-module
   variables:
     MODULE: get-term-open-files-with
@@ -329,7 +329,7 @@ test-get-term-open-files-with:
     - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
       changes: [get-term-open-files-with/**/*, lib/**/*, go.work, .gitlab-ci.yml]
 
-test-lib:
+test-unit-lib:
   extends: .test-module
   variables:
     MODULE: lib
