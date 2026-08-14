@@ -164,7 +164,7 @@ config loaders and main-shape boilerplate.
 `e2e-backup`: `$(BUILD_DEP)` backup e2e flow (create/ls/restore selectors, CHE_LOG_LEVEL=info), binary covdata into ./cover-e2e-backup
 `e2e-packages`: `$(BUILD_DEP)` packages e2e flow (install + checks against fake PATH managers, CHE_LOG_LEVEL=info), binary covdata into ./cover-e2e-packages
 `e2e-install-methods-vm-template` ensure the darwin no-deps tart VM template exists (clone vanilla base, bootstrap ssh key, stop)
-`e2e-install-methods`: `$(BUILD_DEP) -> $(E2E_INSTALL_METHODS_DEPS)` real-install e2e, see spec/vetted_title_only/e2e-install-methods.md: each selected package installs live once per eligible entry method, then runs; MODE=with_no_deps (default) gives each install a fresh debian container (linux) or tart VM (darwin), MODE=with_deps a throwaway HOME (bare-metal darwin delegates the run into a tart VM)
+`e2e-install-methods`: `$(BUILD_DEP) -> $(E2E_INSTALL_METHODS_DEPS)` real-install e2e, see spec/vetted_title_only/che/e2e-install-methods.md: each selected package installs live once per eligible entry method, then runs; MODE=with_no_deps (default) gives each install a fresh debian container (linux) or tart VM (darwin), MODE=with_deps a throwaway HOME (bare-metal darwin delegates the run into a tart VM)
 `e2e-registry` registry e2e: every brew formula and cask name in the builtin packages file resolves upstream
 `e2e`: `e2e-dryrun -> e2e-run -> e2e-backup -> e2e-packages` run all e2e flows
 `build` build the binary into ./dist

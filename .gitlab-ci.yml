@@ -259,20 +259,7 @@ test-install-methods:
     E2E_INSTALL_CACHE_DIR: $CI_PROJECT_DIR/.cache/che-e2e-install
   parallel:
     matrix:
-      - METHOD: apt
-        PACKAGE: jq,bat,fd
-      - METHOD: binariesRemoteArchive
-        PACKAGE: yq,kubectl,cilium
-      - METHOD: script
-        PACKAGE: pyenv,nvm
-      - METHOD: pyenv
-        PACKAGE: python3
-      - METHOD: nvm
-        PACKAGE: node
-      - METHOD: npm
-        PACKAGE: corepack,pnpm,tsc
-      - METHOD: go
-        PACKAGE: gopls,get-os-open-files-with
+      - METHOD: [apt, binariesRemoteArchive, script, pyenv, nvm, npm, go]
   #[why] MR changes-triggered runs block the merge; main keeps allow_failure, manual stays optional
   rules:
     - if: $CI_PIPELINE_SOURCE == "merge_request_event"
@@ -285,7 +272,17 @@ test-install-methods:
       allow_failure: true
   before_script:
     - apt-get update && apt-get install -y --no-install-recommends docker.io
+  #[why] the chosen packages live here, not in the matrix: matrix variables all land in the job name, METHOD alone keeps it readable
   script:
+    - case "$METHOD" in
+        apt) PACKAGE=jq,bat,fd;;
+        binariesRemoteArchive) PACKAGE=yq,kubectl,cilium;;
+        script) PACKAGE=pyenv,nvm;;
+        pyenv) PACKAGE=python3;;
+        nvm) PACKAGE=node;;
+        npm) PACKAGE=corepack,pnpm,tsc;;
+        go) PACKAGE=gopls,get-os-open-files-with;;
+      esac
     - make -C che e2e-install-methods MODE=with_no_deps METHOD="$METHOD" PACKAGE="$PACKAGE" $(test -x che/dist/e2e.test && echo "BUILD_DEP= E2E_USE_TEST_BIN=1") $(test -x che/dist/che-linux-amd64 && echo "E2E_INSTALL_METHODS_DEPS=")
   artifacts:
     paths:

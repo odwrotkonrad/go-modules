@@ -138,7 +138,7 @@ endif
 #[what] ensure the darwin no-deps tart VM template exists (clone vanilla base, bootstrap ssh key, stop)
 e2e-install-methods-vm-template:
 	../ci/e2e-install-methods-vm-template.zsh
-#[what] real-install e2e, see spec/vetted_title_only/e2e-install-methods.md: each selected package installs live once per eligible entry method, then runs; MODE=with_no_deps (default) gives each install a fresh debian container (linux) or tart VM (darwin), MODE=with_deps a throwaway HOME (bare-metal darwin delegates the run into a tart VM)
+#[what] real-install e2e, see spec/vetted_title_only/che/e2e-install-methods.md: each selected package installs live once per eligible entry method, then runs; MODE=with_no_deps (default) gives each install a fresh debian container (linux) or tart VM (darwin), MODE=with_deps a throwaway HOME (bare-metal darwin delegates the run into a tart VM)
 #[vals] METHOD: <method>|<method>/ prefix|all; PACKAGE: <pkg>[,<pkg>...]|all; MODE: with_no_deps|with_deps; PLATFORM: darwin-arm64|linux-arm64|linux-amd64; E2E_ALLOW_HOST: 1; E2E_INSTALL_PACKAGES_PER_METHOD: <n>; CHE_LOG_LEVEL: info (default)|debug|trace
 e2e-install-methods: $(BUILD_DEP) $(E2E_INSTALL_METHODS_DEPS)
 	if [[ -e cover-e2e-install-methods ]] rm -rf cover-e2e-install-methods; mkdir -p cover-e2e-install-methods
