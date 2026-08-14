@@ -95,11 +95,12 @@ func (in *Installer) ensureAptRepo(name string, r *AptRepoSpec) error {
 	}
 	suites := r.Suites
 	if suites == "" {
-		out, ok := in.output([]string{"sh", "-ec", ". /etc/os-release && echo \"$VERSION_CODENAME\""})
-		if !ok || strings.TrimSpace(out) == "" {
+		b, err := in.Host.ReadFile("/etc/os-release")
+		codename := parseVersionCodename(b)
+		if err != nil || codename == "" {
 			return fmt.Errorf("%s: apt repo suites not set and VERSION_CODENAME unavailable", name)
 		}
-		suites = strings.TrimSpace(out)
+		suites = codename
 	}
 	arch, ok := in.output([]string{"dpkg", "--print-architecture"})
 	if !ok {
@@ -134,6 +135,15 @@ func (in *Installer) ensureAptRepo(name string, r *AptRepoSpec) error {
 	in.aptUpdated = false
 	in.emit(log.Levels.Info, "configured", name+" apt repo "+r.URL)
 	return nil
+}
+
+func parseVersionCodename(b []byte) string {
+	for line := range strings.Lines(string(b)) {
+		if v, ok := strings.CutPrefix(strings.TrimSpace(line), "VERSION_CODENAME="); ok {
+			return strings.Trim(v, `"`)
+		}
+	}
+	return ""
 }
 
 func fileExists(path string) bool {

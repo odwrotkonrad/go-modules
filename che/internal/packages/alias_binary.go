@@ -34,10 +34,10 @@ func (in *Installer) aliasBinaries(pkg string, it Item) error {
 			in.emitDryRun("alias", pkg+": "+to+" -> "+src)
 			continue
 		}
-		if err := in.exec([]string{"mkdir", "-p", binDir}); err != nil {
+		if err := os.MkdirAll(binDir, 0o755); err != nil {
 			return err
 		}
-		if err := in.exec([]string{"ln", "-sf", src, dest}); err != nil {
+		if err := makeSymlink(src, dest); err != nil {
 			return err
 		}
 		in.emit(log.Levels.Info, "aliased", pkg+": "+dest+" -> "+src)

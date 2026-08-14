@@ -3,6 +3,8 @@ package packages
 // [>] 🤖🤖
 
 import (
+	"fmt"
+	"path/filepath"
 	"testing"
 
 	"github.com/stretchr/testify/require"
@@ -33,8 +35,17 @@ func aptStub(t *testing.T) func(argv []string) ([]byte, error) {
 	t.Helper()
 	return chainStubs(
 		failOn("dpkg -s"),
-		stubOutputs("dpkg --print-architecture", "amd64\n", "sh -ec . /etc/os-release", "bookworm\n"),
+		stubOutputs("dpkg --print-architecture", "amd64\n"),
 	)
+}
+
+func stubOsRelease(in *Installer) {
+	in.Host.ReadFile = func(path string) ([]byte, error) {
+		if path == "/etc/os-release" {
+			return []byte("ID=debian\nVERSION_CODENAME=\"bookworm\"\n"), nil
+		}
+		return nil, fmt.Errorf("read %s: not stubbed", path)
+	}
 }
 
 var errNotInstalled = &notInstalledErr{}
@@ -46,6 +57,7 @@ func (*notInstalledErr) Error() string { return "not installed" }
 func TestInstallAptRepoConfiguresAndInstalls(t *testing.T) {
 	in, m := newInstaller(t, dockerAptYaml, "linux", cmdMap([]string{"apt-get"}), Options{})
 	m.Stub = aptStub(t)
+	stubOsRelease(in)
 	require.NoError(t, in.Install([]string{"docker"}))
 	require.Contains(t, testFetch.Calls(), "https://download.docker.com/linux/debian/gpg")
 	requireCalls(t, m,
@@ -58,7 +70,8 @@ func TestInstallAptRepoConfiguresAndInstalls(t *testing.T) {
 
 func TestInstallAptRepoSkipsWhenAllInstalled(t *testing.T) {
 	in, m := newInstaller(t, dockerAptYaml, "linux", cmdMap([]string{"apt-get"}), Options{})
-	m.Stub = stubOutputs("dpkg --print-architecture", "amd64\n", "sh -ec . /etc/os-release", "bookworm\n")
+	m.Stub = stubOutputs("dpkg --print-architecture", "amd64\n")
+	stubOsRelease(in)
 	require.NoError(t, in.Install([]string{"docker"}))
 	refuteCalls(t, m, "apt-get install")
 	requireCalls(t, m, "/etc/apt/sources.list.d/download.docker.com-linux-debian.sources")
@@ -215,9 +228,10 @@ func TestCommandOverrideRunsScriptWhenAbsent(t *testing.T) {
 
 func TestNoApplicableManagerStillInstallsCompletions(t *testing.T) {
 	in, m := newInstaller(t, dockerAptYaml, "darwin", cmdMap([]string{"docker"}), completionsOpts(Options{}))
+	home := tempHome(t, in)
 	m.Stub = stubOutputs("sh ", "#compdef docker\n")
 	require.NoError(t, in.Install([]string{"docker"}))
-	requireCalls(t, m, "/home/u/.local/share/zsh/site-functions/_docker")
+	require.FileExists(t, filepath.Join(home, ".local", "share", "zsh", "site-functions", "_docker"))
 }
 
 // [<] 🤖🤖

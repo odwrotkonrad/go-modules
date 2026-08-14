@@ -42,17 +42,25 @@ Scenario: managers list in preference order, the first applicable wins
   Status: tested
   When a package lists several managers
   Then brew/cask apply on macos with brew present, apt on linux with apt-get present
-  And npm/go/gem apply where their command is present
+  And go/gem apply where their command is present; npm applies even without the command when no other item is strictly applicable, bootstrapping node first
   And binariesRemoteArchive applies when its installerVocabulary.platformEligibility list carries this os-arch
   And the first applicable item in entry order installs the package
   And an unknown manager is a hard error
-  And a package with no applicable manager is a logged skip, not an error
+  And a requested package with no applicable installation method is a hard error (`--missing-method-warn` downgrades it to a warning)
+  And a dependency-pulled package with no applicable installation method is a logged skip
   And an unknown package name is a hard error naming the packages file
 
 Scenario: a manager installed earlier in the run serves later packages, no second invocation
   Status: tested
   When one install run installs npm via apt and another package needs npm
   Then resolution runs in rounds: the npm-managed package installs in a later round of the same run
+
+Scenario: an npm package on a bare host bootstraps node first
+  Status: implemented
+  When a package's npm item is selected on a host without npm (no item strictly applicable)
+  Then the npm `basePackages` group installs first: `node`, pulling `nvm` via requires, nvm's script pulling its own script base group (curl, git, tar, unzip): nested base groups are ensured, each once per run
+  And the npm invocation resolves through the nvm default node's bin dir when npm is not on PATH
+  And `--only-methods npm` does not filter the bootstrap (base installs bypass only-methods)
 
 Scenario: the install log tells spec-requested packages from dependencies
   Status: implemented
@@ -244,7 +252,7 @@ Scenario: a user restricts installs to chosen methods with --only-methods
   Status: tested
   When I invoke `che packages install --only-methods <mgr>[,<mgr>...]` (env `CHE_PACKAGES_ONLY_METHODS`)
   Then only entry items using a listed manager are considered, nothing falls through to another installer
-  And a package with no listed manager applicable skips with `no applicable manager`
+  And a package with no listed manager applicable skips with `no applicable installation method`
   And an unknown manager name fails validation
 
 Scenario: a package manager's index is refreshed before its first install of the run

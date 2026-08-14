@@ -24,6 +24,7 @@ type Host struct {
 	FpathDirs func() []string
 	Getenv    func(string) string
 	Stat      func(string) (os.FileInfo, error)
+	ReadFile  func(string) ([]byte, error)
 }
 
 func NewHost() Host {
@@ -35,6 +36,7 @@ func NewHost() Host {
 		FpathDirs: fpathDirs,
 		Getenv:    os.Getenv,
 		Stat:      os.Stat,
+		ReadFile:  os.ReadFile,
 	}
 	if h.OS == "linux" {
 		h.Distro = linuxDistro()
@@ -126,7 +128,7 @@ func (h Host) applicable(pkg string, it Item, strict bool) (bool, error) {
 	case "apt":
 		return h.OS == "linux" && h.HasCmd("apt-get"), nil
 	case "npm":
-		return h.HasCmd("npm"), nil
+		return !strict || h.HasCmd("npm"), nil
 	case "vscode":
 		return h.HasCmd("code"), nil
 	case "gem":

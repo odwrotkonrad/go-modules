@@ -37,6 +37,7 @@ func testHost(osname, arch string, cmds map[string]string) Host {
 			}
 			return ""
 		},
+		ReadFile: func(path string) ([]byte, error) { return nil, fmt.Errorf("read %s: not stubbed", path) },
 	}
 }
 

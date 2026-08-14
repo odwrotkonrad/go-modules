@@ -38,6 +38,7 @@ type installJob struct {
 	packages    []string
 	onlyMethods []string
 	verify      map[string]verifyCmd
+	warnMissing bool
 }
 
 type verifyCmd struct {
@@ -99,7 +100,7 @@ var ansiRe = regexp.MustCompile("\x1b\\[[0-9;]*m")
 func noApplicableManager(out string, pkgs []string) bool {
 	stripped := ansiRe.ReplaceAllString(out, "")
 	for _, pkg := range pkgs {
-		if !strings.Contains(stripped, "will not install "+pkg+": no applicable manager") {
+		if !strings.Contains(stripped, "will not install "+pkg+": no applicable installation method") {
 			return false
 		}
 	}
@@ -228,6 +229,7 @@ func runPackageMethods(t *testing.T, entry packages.Entry, pkg, method string, c
 				packages:    []string{pkg},
 				onlyMethods: []string{m},
 				verify:      map[string]verifyCmd{pkg: resolveVerify(t, entry, pkg, m)},
+				warnMissing: lenient || os.Getenv("E2E_INSTALL_MISSING_METHOD") == "warn",
 			}, cfg, lenient)
 		})
 	}
@@ -298,7 +300,7 @@ func runJob(t *testing.T, job installJob, cfg runCfg, lenient bool) {
 		out, skipped = runJobHost(t, job)
 	}
 	if skipped {
-		t.Skipf("no applicable manager for %s here", strings.Join(job.packages, ", "))
+		t.Skipf("no applicable installation method for %s here", strings.Join(job.packages, ", "))
 	}
 	// [why] a host copy already on PATH makes che skip: the run would then verify the system
 	//   binary and prove nothing about the method under test; in all-packages mode a
@@ -317,6 +319,9 @@ func runJob(t *testing.T, job installJob, cfg runCfg, lenient bool) {
 
 func installArgv(job installJob) []string {
 	argv := []string{"packages", "install", "--packages-file", packages.BuiltinSentinel}
+	if job.warnMissing {
+		argv = append(argv, "--missing-method-warn")
+	}
 	if len(job.onlyMethods) > 0 {
 		argv = append(argv, "--only-methods", strings.Join(job.onlyMethods, ","))
 	}
@@ -451,11 +456,12 @@ func appendRunVerify(b *strings.Builder, che string, job installJob) {
 	b.WriteString("out=$(cat \"$olog\")\n")
 	b.WriteString("skip=1\n")
 	for _, pkg := range job.packages {
-		fmt.Fprintf(b, "case \"$out\" in (*'%s: no applicable manager'*) ;; (*) skip=0;; esac\n", pkg)
+		fmt.Fprintf(b, "case \"$out\" in (*'%s: no applicable installation method'*) ;; (*) skip=0;; esac\n", pkg)
 	}
 	fmt.Fprintf(b, "if [ \"$skip\" = 1 ]; then echo %s; exit 0; fi\n", noDepsSkipMarker)
 	for pkg, v := range job.verify {
-		fmt.Fprintf(b, "vout=$(bash -ec %s 2>&1) || { printf '%%s\\n' \"$vout\"; exit 1; }\n", shq(v.cmd))
+		cmd := `if [ -s "$NVM_DIR/nvm.sh" ]; then . "$NVM_DIR/nvm.sh"; fi; ` + v.cmd
+		fmt.Fprintf(b, "vout=$(bash -c %s 2>&1) || { printf '%%s\\n' \"$vout\"; exit 1; }\n", shq(cmd))
 		fmt.Fprintf(b, "printf 'verify %s: %%s\\n' \"$vout\"\n", pkg)
 		if v.wantOut {
 			b.WriteString("test -n \"$vout\"\n")

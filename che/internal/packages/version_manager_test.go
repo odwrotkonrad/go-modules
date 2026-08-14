@@ -60,9 +60,8 @@ func TestVersionManagerPyenvSkipsWhenSatisfied(t *testing.T) {
 
 func TestVersionManagerPendsUntilToolPresent(t *testing.T) {
 	in, m := newInstaller(t, pythonVmYaml, "linux", cmdMap(nil), Options{})
-	out, err := captureStdout(t, func() error { return in.Install([]string{"python3"}) })
-	require.NoError(t, err)
-	wantLines(t, out, "will not install python3: no applicable manager")
+	_, err := captureStdout(t, func() error { return in.Install([]string{"python3"}) })
+	require.ErrorContains(t, err, "no applicable installation method for python3")
 	require.Empty(t, m.Calls())
 }
 

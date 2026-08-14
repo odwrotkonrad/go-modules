@@ -32,6 +32,7 @@ type Options struct {
 	PackagesOverride                                   string
 	PackagesUpdate                                     bool
 	PackagesIfMissing                                  bool
+	PackagesMissingMethodWarn                          bool
 	PackagesPreferredMethods                           []string
 	PackagesOnlyMethods                                []string
 	PackagesDownloadCacheDir                           string

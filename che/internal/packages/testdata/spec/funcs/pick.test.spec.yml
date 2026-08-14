@@ -18,14 +18,14 @@ cases:
         - entry: "[brew, apt]"
     expected:
       output: {mgr: apt, picked: true}
-  - name: ShouldSkipNpmWithoutNpmCommand
+  - name: ShouldPickNpmWithoutNpmCommand
     input:
       args:
         - os: linux
         - cmds: []
         - entry: "[{npm: {packageName: x}}]"
     expected:
-      output: {picked: false}
+      output: {mgr: npm, picked: true}
   - name: ShouldPickBinaryWhenShaMatchesHost
     input:
       args:

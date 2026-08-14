@@ -42,6 +42,8 @@ func (a *app) packagesCmd() *cobra.Command {
 		"refresh installed unpinned packages via their manager; pinned ones converge on the pin regardless")
 	install.Flags().BoolVar(&a.flags.PackagesIfMissing, "if-missing", false,
 		"skip packages whose canonical command exists anywhere on PATH, regardless of manager")
+	install.Flags().BoolVar(&a.flags.PackagesMissingMethodWarn, "missing-method-warn", false,
+		"warn instead of erroring when a requested package has no applicable installation method on this host")
 	install.Flags().StringVar(&a.flags.PackagesSilenceInstallStdout, "silence-install-stdout", "",
 		"silence the installation method's stdout/stderr (a failing method's captured output always prints); values: true (bare-flag default) | false (stream as it runs); default: true at error/warn/info log level, false at debug/trace; env: CHE_PACKAGES_SILENCE_INSTALL_STDOUT")
 	install.Flags().Lookup("silence-install-stdout").NoOptDefVal = "true"

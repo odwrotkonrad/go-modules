@@ -36,7 +36,7 @@ Scenario: running e2e installation tests for a given platform attempts only that
   Given a target platform (explicit or host-autodetected)
   When install tests run
   Then methods not applicable to that platform are filtered out up front, never attempted
-  And no per-package attempt ends in "no applicable manager" for a platform mismatch (e.g. `apt` on darwin)
+  And no per-package attempt ends in "no applicable installation method" for a platform mismatch (e.g. `apt` on darwin)
 
 Scenario: installation test runs in LOG_LEVEL=info, and can be configured when needed
   Status: tested
@@ -144,7 +144,7 @@ Scenario: each darwin e2e installation test runs in its own tart VM so packages 
 Scenario: an MR pipeline stays fast by testing only a chosen subset of packages per method
   Status: implemented
   When an MR pipeline runs the install-methods jobs
-  Then each method group installs only chosen packages (up to 3, curated in the job matrix)
+  Then each method group installs only chosen packages (up to 5, curated in the job matrix)
   And only the chosen packages appear in the test output, no skipped-package noise
   And the full set stays reachable via the manual per-package jobs and local `PACKAGE=all`
 

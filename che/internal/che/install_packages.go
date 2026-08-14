@@ -78,6 +78,7 @@ func NewPackagesInstaller(env map[string]string, home string, opts options.Optio
 		Opts: packages.Options{
 			Update:               opts.PackagesUpdate,
 			IfMissing:            opts.PackagesIfMissing,
+			MissingMethodWarn:    opts.PackagesMissingMethodWarn,
 			DryRun:               opts.DryRun != options.DryRun.Off,
 			PreferredMethods:     opts.PackagesPreferredMethods,
 			OnlyMethods:          opts.PackagesOnlyMethods,

@@ -31,21 +31,29 @@ installerRegistries:
           suites: stable
           components: main
 basePackages:
-    binariesRemoteArchive:
-        - xz
+    apt:
+        - apt-transport-https
+        - ca-certificates
+        - gpg
+    brew:
+        - brew
+    brew/cask:
+        - brew
+    gem:
+        - ruby
+    go:
+        - go
+    npm:
+        - node
+    nvm:
+        - nvm
+    pyenv:
+        - pyenv
     script:
         - curl
         - git
         - tar
         - unzip
-    brew:
-        - brew
-    brew/cask:
-        - brew
-    apt:
-        - apt-transport-https
-        - ca-certificates
-        - gpg
     vscode:
         - code
 packages:
@@ -125,6 +133,7 @@ packages:
             - script:
                 url: https://konradodwrot.gitlab.io/go-modules/install.sh
     cilium:
+        versionCommand: cilium version --client
         installers:
             - brew:
                 packageName: cilium-cli

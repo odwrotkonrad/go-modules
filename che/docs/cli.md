@@ -248,6 +248,7 @@ Usage: `che packages install [pkg...] [flags]`
 | Option | Env | Values | Default | Description |
 | --- | --- | --- | --- | --- |
 | `--if-missing` |  | `bool` | `false` | skip packages whose canonical command exists anywhere on PATH, regardless of manager |
+| `--missing-method-warn` |  | `bool` | `false` | warn instead of erroring when a requested package has no applicable installation method on this host |
 | `--silence-install-stdout` | `CHE_PACKAGES_SILENCE_INSTALL_STDOUT` | `true (bare-flag default)` \| `false (stream as it runs)` | `true at error/warn/info log level, false at debug/trace` | silence the installation method's stdout/stderr (a failing method's captured output always prints) |
 | `--update` |  | `bool` | `false` | refresh installed unpinned packages via their manager; pinned ones converge on the pin regardless |
 

@@ -24,6 +24,7 @@ const Scope = "install-packages"
 type Options struct {
 	Update                                     bool
 	IfMissing                                  bool
+	MissingMethodWarn                          bool
 	DryRun                                     bool
 	PreferredMethods                           []string
 	OnlyMethods                                []string
@@ -261,7 +262,7 @@ func (in *Installer) InstallRequests(reqs []Request) error {
 	}
 	for _, pkg := range pending {
 		if in.hasCmd(pkg) {
-			in.emitSkip(log.Levels.Info, in.pkgLabel(pkg), "no applicable manager, command present")
+			in.emitSkip(log.Levels.Info, in.pkgLabel(pkg), "no applicable installation method, command present")
 			entry, err := in.findEntry(pkg)
 			if err != nil {
 				return err
@@ -271,7 +272,14 @@ func (in *Installer) InstallRequests(reqs []Request) error {
 			}
 			continue
 		}
-		in.emitSkip(log.Levels.Info, in.pkgLabel(pkg), "no applicable manager")
+		if by, dep := in.requiredBy[pkg]; !dep || by == pkg {
+			if !in.Opts.MissingMethodWarn {
+				return fmt.Errorf("no applicable installation method for %s", pkg)
+			}
+			in.emitSkip(log.Levels.Warn, in.pkgLabel(pkg), "no applicable installation method")
+			continue
+		}
+		in.emitSkip(log.Levels.Info, in.pkgLabel(pkg), "no applicable installation method")
 	}
 	return nil
 }
@@ -330,10 +338,8 @@ func (in *Installer) installVia(pkg string, it Item) error {
 		in.emitSkip(log.Levels.Info, in.pkgLabel(pkg), "command present (--if-missing)")
 		return nil
 	}
-	if !in.baseInstalling {
-		if err := in.ensureBasePackages(it.Mgr, pkg); err != nil {
-			return err
-		}
+	if err := in.ensureBasePackages(it.Mgr, pkg); err != nil {
+		return err
 	}
 	switch {
 	case it.Mgr == "apt" && it.Apt != nil:
@@ -414,6 +420,22 @@ func (in *Installer) brewBin() string {
 	return "brew"
 }
 
+// [>] 🤖🤖
+func (in *Installer) npmBin() string {
+	if in.Host.HasCmd("npm") {
+		return "npm"
+	}
+	if v := vmTools["nvm"].global(in); v != "" {
+		p := filepath.Join(in.Host.nvmDir(), "versions", "node", "v"+v, "bin", "npm")
+		if fileExists(p) {
+			return p
+		}
+	}
+	return "npm"
+}
+
+// [<] 🤖🤖
+
 func (in *Installer) brewArgv(mgr, sub string, args ...string) []string {
 	argv := []string{in.brewBin(), sub}
 	if mgr == "cask" {
@@ -472,7 +494,7 @@ func (in *Installer) isInstalled(pkg, mgr, base string) bool {
 		if in.hasCmd(pkg) {
 			return true
 		}
-		_, ok := in.output([]string{"npm", "ls", "--global", "--depth=0", base})
+		_, ok := in.output([]string{in.npmBin(), "ls", "--global", "--depth=0", base})
 		return ok
 	case "vscode":
 		_, ok := in.codeExtensions()[strings.ToLower(base)]
@@ -520,7 +542,7 @@ func (in *Installer) installedVersion(mgr, base string) string {
 		}
 		return strings.TrimSpace(out)
 	case "npm":
-		out, ok := in.output([]string{"npm", "ls", "--global", "--depth=0", base})
+		out, ok := in.output([]string{in.npmBin(), "ls", "--global", "--depth=0", base})
 		if !ok {
 			return ""
 		}
@@ -563,9 +585,11 @@ var managerRoutines = map[string]managerRoutine{
 	},
 	"npm": {
 		install: func(in *Installer, _, name, _ string) error {
-			return in.exec(in.sudo("npm", "install", "--global", name))
+			return in.exec(in.sudo(in.npmBin(), "install", "--global", name))
 		},
-		update: func(in *Installer, _, base string) error { return in.exec(in.sudo("npm", "update", "--global", base)) },
+		update: func(in *Installer, _, base string) error {
+			return in.exec(in.sudo(in.npmBin(), "update", "--global", base))
+		},
 	},
 	"vscode": {
 		install: func(in *Installer, _, name, _ string) error {

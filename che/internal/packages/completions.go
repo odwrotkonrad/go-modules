@@ -53,10 +53,10 @@ func (in *Installer) installCompletions(pkg string, e Entry) error {
 			return err
 		}
 	}
-	if err := in.exec([]string{"mkdir", "-p", dir}); err != nil {
+	if err := os.MkdirAll(dir, 0o755); err != nil {
 		return err
 	}
-	if err := in.exec([]string{"install", "-m", "0644", asset, dest}); err != nil {
+	if err := installFile(asset, dest, 0o644); err != nil {
 		return err
 	}
 	in.emit(log.Levels.Info, "installed", pkg+" zsh completions -> "+dest)

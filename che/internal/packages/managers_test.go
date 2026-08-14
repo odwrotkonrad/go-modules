@@ -3,8 +3,11 @@ package packages
 // [>] 🤖🤖
 
 import (
+	"archive/tar"
 	"archive/zip"
 	"bytes"
+	"compress/gzip"
+	"crypto/sha256"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -12,6 +15,7 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/require"
+	"github.com/ulikunitz/xz"
 	"gopkg.in/yaml.v3"
 
 	"gitlab.com/konradodwrot/go-modules/che/internal/execx"
@@ -76,6 +80,44 @@ func tempHome(t *testing.T, in *Installer) string {
 		return ""
 	}
 	return home
+}
+
+func shaHex(b []byte) string { return fmt.Sprintf("%x", sha256.Sum256(b)) }
+
+func withSha(yml string, body []byte) string { return strings.ReplaceAll(yml, "goodsha", shaHex(body)) }
+
+func tarBytes(t *testing.T, names ...string) []byte {
+	t.Helper()
+	var buf bytes.Buffer
+	tw := tar.NewWriter(&buf)
+	for _, name := range names {
+		require.NoError(t, tw.WriteHeader(&tar.Header{Name: name, Mode: 0o755, Size: 3}))
+		_, err := tw.Write([]byte("bin"))
+		require.NoError(t, err)
+	}
+	require.NoError(t, tw.Close())
+	return buf.Bytes()
+}
+
+func tarGzBody(t *testing.T, names ...string) []byte {
+	t.Helper()
+	var buf bytes.Buffer
+	gz := gzip.NewWriter(&buf)
+	_, err := gz.Write(tarBytes(t, names...))
+	require.NoError(t, err)
+	require.NoError(t, gz.Close())
+	return buf.Bytes()
+}
+
+func tarXzBody(t *testing.T, names ...string) []byte {
+	t.Helper()
+	var buf bytes.Buffer
+	xw, err := xz.NewWriter(&buf)
+	require.NoError(t, err)
+	_, err = xw.Write(tarBytes(t, names...))
+	require.NoError(t, err)
+	require.NoError(t, xw.Close())
+	return buf.Bytes()
 }
 
 func zipBody(t *testing.T, names ...string) []byte {
@@ -165,9 +207,8 @@ func TestBrewTapQualifiedNameIsParseError(t *testing.T) {
 func TestAptIneligibleOnNonDebianLinux(t *testing.T) {
 	in, m := newInstaller(t, "packages:\n  jq: [apt]", "linux", cmdMap([]string{"apt-get"}), Options{})
 	in.Host.Distro = ""
-	out, err := captureStdout(t, func() error { return in.Install([]string{"jq"}) })
-	require.NoError(t, err)
-	wantLines(t, out, "will not install jq: no applicable manager")
+	_, err := captureStdout(t, func() error { return in.Install([]string{"jq"}) })
+	require.ErrorContains(t, err, "no applicable installation method for jq")
 	require.Empty(t, m.Calls())
 }
 
@@ -268,11 +309,18 @@ func TestInstallRoundsServeLaterPackages(t *testing.T) {
 	require.Contains(t, m.Calls(), "sudo npm install --global x")
 }
 
-func TestInstallSkipsNoApplicableManager(t *testing.T) {
-	in, m := newInstaller(t, "packages:\n  bat: [brew]", "linux", cmdMap(nil), Options{})
+func TestInstallMissingMethodWarnDowngrades(t *testing.T) {
+	in, m := newInstaller(t, "packages:\n  bat: [brew]", "linux", cmdMap(nil), Options{MissingMethodWarn: true})
 	out, err := captureStdout(t, func() error { return in.Install([]string{"bat"}) })
 	require.NoError(t, err)
-	wantLines(t, out, "will not install bat: no applicable manager")
+	wantLines(t, out, "will not install bat: no applicable installation method")
+	require.Empty(t, m.Calls())
+}
+
+func TestInstallSkipsNoApplicableManager(t *testing.T) {
+	in, m := newInstaller(t, "packages:\n  bat: [brew]", "linux", cmdMap(nil), Options{})
+	_, err := captureStdout(t, func() error { return in.Install([]string{"bat"}) })
+	require.ErrorContains(t, err, "no applicable installation method for bat")
 	require.Empty(t, m.Calls())
 }
 
@@ -301,9 +349,8 @@ func TestInstallScriptSkipsWhenCommandPresent(t *testing.T) {
 
 func TestInstallScriptSkipsOnForeignOs(t *testing.T) {
 	in, m := newInstaller(t, brewScriptYaml, "linux", cmdMap(nil), Options{})
-	out, err := captureStdout(t, func() error { return in.Install([]string{"brew"}) })
-	require.NoError(t, err)
-	wantLines(t, out, "will not install brew: no applicable manager")
+	_, err := captureStdout(t, func() error { return in.Install([]string{"brew"}) })
+	require.ErrorContains(t, err, "no applicable installation method for brew")
 	require.Empty(t, m.Calls())
 }
 
@@ -395,9 +442,8 @@ func TestInstallScriptPinSkipsWhenMatching(t *testing.T) {
 func TestInstallScriptShaGatesApplicability(t *testing.T) {
 	in, m := newInstaller(t, gcloudYaml, "darwin", cmdMap(nil), Options{})
 	in.Host.Arch = "amd64"
-	out, err := captureStdout(t, func() error { return in.Install([]string{"gcloud"}) })
-	require.NoError(t, err)
-	wantLines(t, out, "will not install gcloud: no applicable manager")
+	_, err := captureStdout(t, func() error { return in.Install([]string{"gcloud"}) })
+	require.ErrorContains(t, err, "no applicable installation method for gcloud")
 	require.Empty(t, m.Calls())
 }
 
@@ -521,8 +567,11 @@ func TestVersionCommandOverridesProbe(t *testing.T) {
 }
 
 func TestVersionCommandDriftReinstalls(t *testing.T) {
-	in, m := newInstaller(t, kubectlYaml, "linux", cmdMap([]string{"kubectl", "sha256sum"}), Options{})
-	m.Stub = chainStubs(stubOutputs("kubectl ", "Client Version: v1.36.0\n"), shaStub("goodsha"))
+	body := []byte("kubectl-bin")
+	in, m := newInstaller(t, withSha(kubectlYaml, body), "linux", cmdMap([]string{"kubectl"}), Options{})
+	tempHome(t, in)
+	m.Stub = stubOutputs("kubectl ", "Client Version: v1.36.0\n")
+	testFetch.Bodies["https://example.com/v1.36.3/kubectl"] = body
 	require.NoError(t, in.Install([]string{"kubectl"}))
 	require.NotEmpty(t, testFetch.Calls())
 }
@@ -554,9 +603,8 @@ func TestInstallCodeExtensionSkipsInstalledAndListsOnce(t *testing.T) {
 
 func TestInstallCodeExtensionSkipsWithoutCodeCommand(t *testing.T) {
 	in, m := newInstaller(t, codeExtYaml, "linux", cmdMap(nil), Options{})
-	out, err := captureStdout(t, func() error { return in.Install([]string{"golang.go"}) })
-	require.NoError(t, err)
-	wantLines(t, out, "will not install golang.go: no applicable manager")
+	_, err := captureStdout(t, func() error { return in.Install([]string{"golang.go"}) })
+	require.ErrorContains(t, err, "no applicable installation method for golang.go")
 	require.Empty(t, m.Calls())
 }
 

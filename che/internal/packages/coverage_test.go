@@ -208,14 +208,6 @@ func TestInstallBinaryZipAsset(t *testing.T) {
         version: 1.15.0
         url: https://example.com/terraform_{version}_{os}_{arch}.zip
 `
-	in, m := newInstaller(t, zipYaml, "linux", cmdMap([]string{"sha256sum"}), Options{})
-	home := t.TempDir()
-	in.Host.Getenv = func(k string) string {
-		if k == "HOME" {
-			return home
-		}
-		return ""
-	}
 	var zbuf bytes.Buffer
 	zw := zip.NewWriter(&zbuf)
 	zf, err := zw.CreateHeader(&zip.FileHeader{Name: "terraform"})
@@ -223,11 +215,12 @@ func TestInstallBinaryZipAsset(t *testing.T) {
 	_, err = zf.Write([]byte("#!/bin/sh\n"))
 	require.NoError(t, err)
 	require.NoError(t, zw.Close())
+	in, _ := newInstaller(t, withSha(zipYaml, zbuf.Bytes()), "linux", cmdMap(nil), Options{})
+	home := tempHome(t, in)
 	testFetch.Bodies["https://example.com/terraform_1.15.0_linux_amd64.zip"] = zbuf.Bytes()
-	m.Stub = shaStub("goodsha")
 	require.NoError(t, in.Install([]string{"terraform"}))
 	require.FileExists(t, filepath.Join(home, ".local", "opt", "terraform", "terraform"))
-	requireCalls(t, m, filepath.Join(home, ".local", "bin", "terraform"))
+	requireSymlink(t, filepath.Join(home, ".local", "bin", "terraform"), filepath.Join(home, ".local", "opt", "terraform", "terraform"))
 }
 
 func TestDefaultEmittersWriteStdout(t *testing.T) {

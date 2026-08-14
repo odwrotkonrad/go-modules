@@ -226,7 +226,7 @@ warm-go-darwin:
     paths:
       - che/dist/
 
-#[what] no-deps install e2e: 3 chosen packages per method, each install in a fresh debian container via dind
+#[what] no-deps install e2e: up to 5 chosen packages per method, each install in a fresh debian container via dind
 #[why] with_no_deps proves each package pulls its own dependencies; the curated per-method subset keeps MR pipelines fast and deterministic, the manual per-package jobs and local PACKAGE=all cover the full set
 test-e2e-install-methods:
   stage: test-e2e-method-installs
@@ -260,12 +260,12 @@ test-e2e-install-methods:
   #[why] the chosen packages live here, not in the matrix: matrix variables all land in the job name, METHOD alone keeps it readable
   script:
     - case "$METHOD" in
-        apt) PACKAGE=jq,bat,fd;;
-        binariesRemoteArchive) PACKAGE=yq,kubectl,cilium;;
+        apt) PACKAGE=jq,bat,fd,htop,tree;;
+        binariesRemoteArchive) PACKAGE=yq,kubectl,cilium,kind,lefthook;;
         script) PACKAGE=pyenv,nvm;;
         pyenv) PACKAGE=python3;;
         nvm) PACKAGE=node;;
-        npm) PACKAGE=corepack,pnpm,tsc;;
+        npm) PACKAGE=corepack,pnpm,tsc,pyright,typescript-language-server;;
         go) PACKAGE=gopls,get-os-open-files-with;;
       esac
     - test -f e2e-images/che-e2e-debian-amd64.tar && docker load --quiet -i e2e-images/che-e2e-debian-amd64.tar || true
