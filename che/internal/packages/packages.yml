@@ -6,9 +6,9 @@ archSchemes:
     odd: {amd64: x86_64, arm64: arm64}
     rust: {amd64: "x86_64-unknown-{os}-musl", arm64: "aarch64-unknown-{os}-gnu"}
 osInstallers:
-    linux: &base [binariesRemoteArchive, script, npm, go, gem, pyenv, nvm]
+    linux: &base [binariesRemoteArchive, script, npm, go, gem, pyenv, nvm, vscode]
     linux-debian: [apt, *base]
-    darwin: [brew, brew/cask, vscode, *base]
+    darwin: [brew, brew/cask, *base]
 installerRegistries:
     brew:
         - azure/azure-cli
@@ -28,6 +28,14 @@ installerRegistries:
           components: main
         - url: https://konradodwrot.gitlab.io/go-modules/apt
           verificationKey: https://konradodwrot.gitlab.io/go-modules/apt/gpg.key
+          suites: stable
+          components: main
+        - url: https://packages.microsoft.com/repos/code
+          verificationKey: https://packages.microsoft.com/keys/microsoft.asc
+          suites: stable
+          components: main
+        - url: https://apt.grafana.com
+          verificationKey: https://apt.grafana.com/gpg.key
           suites: stable
           components: main
 basePackages:
@@ -95,6 +103,9 @@ packages:
                 packageName: bats-core
             - apt
     beekeeper-studio:
+        verify:
+            strategy: pkgVersionCmd
+            checkInPath: false
         installers:
             - brew/cask
     brew:
@@ -160,6 +171,8 @@ packages:
         installers:
             - brew/cask:
                 packageName: visual-studio-code
+            - apt:
+                fromRegistry: packages.microsoft.com/repos/code
     codex:
         requires:
             - ruby
@@ -236,6 +249,8 @@ packages:
                 versionMap: {"29.7.2": "5:29.7.2-1~debian.12~bookworm"}
                 fromRegistry: download.docker.com/linux/debian
     duti:
+        verify:
+            cmd: duti -V
         installers:
             - brew
     editorconfig.editorconfig:
@@ -262,6 +277,9 @@ packages:
             - apt:
                 versionMap: {"5": "7:5.1.9-0+deb12u1"}
     font-jetbrains-mono:
+        verify:
+            strategy: pkgVersionCmd
+            checkInPath: false
         installers:
             - brew/cask
     gcc:
@@ -353,6 +371,8 @@ packages:
     grafana:
         installers:
             - brew
+            - apt:
+                fromRegistry: apt.grafana.com
     hoovercj.vscode-settings-cycler:
         version: 1.0.1
         installers:
@@ -365,10 +385,13 @@ packages:
         version: 2.20.0
         installers:
             - binariesRemoteArchive:
-                extractBinaries: ["jaeger-{version}-darwin-arm64/jaeger"]
+                archScheme: go
+                extractBinaries: ["jaeger-{version}-{os}-{arch}/jaeger"]
                 platformEligibility:
                     - darwin-arm64: sha256:b2d21051b27f06535c288dd63e15a42d5aae653d0113695014d7e6b502736e5d
-                url: https://github.com/jaegertracing/jaeger/releases/download/v{version}/jaeger-{version}-darwin-arm64.tar.gz
+                    - linux-amd64: sha256:c967368ba09be356089ef7e8aab2a76d170dc007ff6ccf7925c8167ede2900d7
+                    - linux-arm64: sha256:582261d2d8e46721246f5f8072dca7f6762355b248e0dc493bb85990e6226952
+                url: https://github.com/jaegertracing/jaeger/releases/download/v{version}/jaeger-{version}-{os}-{arch}.tar.gz
     jq:
         installers:
             - brew
@@ -489,11 +512,17 @@ packages:
             - brew
             - apt
     logcli:
+        verify:
+            cmd: logcli --version
         installers:
             - brew
+            - apt:
+                fromRegistry: apt.grafana.com
     loki:
         installers:
             - brew
+            - apt:
+                fromRegistry: apt.grafana.com
     make:
         installers:
             - brew
@@ -602,9 +631,17 @@ packages:
                     - linux-arm64: sha256:e2c72ed188d5e27edca43b32ba6e07d271737bcca04f2869f270ed60750e3f83
                 url: https://github.com/open-telemetry/opentelemetry-collector-releases/releases/download/v{version}/otelcol_{version}_{os}_{arch}.tar.gz
     packer:
+        version: 1.16.0
         installers:
             - brew:
                 fromRegistry: hashicorp/tap
+            - binariesRemoteArchive:
+                archScheme: go
+                platformEligibility:
+                    - darwin-arm64: sha256:6530042cf8f8a1f96b6607cb22b5be298be53b400cd4a2c81ab8b946964fccda
+                    - linux-amd64: sha256:5edcd14ab59b535040c512dbecd6ec9ef976a000b073c19d93e4c431c948581e
+                    - linux-arm64: sha256:cf18f03460d92265d49b56befff333e80641d845822799eab04357c39f75b5d7
+                url: https://releases.hashicorp.com/packer/{version}/packer_{version}_{os}_{arch}.zip
     pandoc:
         installers:
             - brew
@@ -658,6 +695,9 @@ packages:
                 version: 6.1.0
                 url: https://github.com/podman-container-tools/podman/releases/download/v{version}/podman-remote-static-linux_{arch}.tar.gz
     podman-desktop:
+        verify:
+            strategy: pkgVersionCmd
+            checkInPath: false
         installers:
             - brew/cask
     procs:
@@ -671,8 +711,12 @@ packages:
                 extractBinaries: ["prometheus-{version}.{os}-{arch}/prometheus", "prometheus-{version}.{os}-{arch}/promtool"]
                 platformEligibility:
                     - darwin-arm64: sha256:f68ca4f1dbedd6366bbfdd8ac5d2c0b7ba1f273474acc8d38eb33202fbeec7a4
+                    - linux-amd64: sha256:0e8c4d46101bd025ea8265e377d2caabc57f488fc1be1c367f37db69ea41be6f
+                    - linux-arm64: sha256:7cecb17a6f41d59814e1a0581a1f81f79051ad5973d1ecf39e23a9f747d6572a
                 url: https://github.com/prometheus/prometheus/releases/download/v{version}/prometheus-{version}.{os}-{arch}.tar.gz
     pstree:
+        verify:
+            cmd: pstree -V
         installers:
             - brew
             - apt:
@@ -761,6 +805,8 @@ packages:
             - brew
             - apt
     showkey:
+        verify:
+            cmd: showkey -V
         installers:
             - brew
             - apt:
@@ -830,11 +876,14 @@ packages:
             - npm:
                 version: 5.3.0
     unzip:
+        versionCommand: unzip -v
         installers:
             - apt
     uv:
         installers:
             - brew
+            - script:
+                url: https://astral.sh/uv/install.sh
     watch:
         installers:
             - brew

@@ -6,9 +6,12 @@ import (
 	"archive/tar"
 	"bytes"
 	"compress/bzip2"
+	"crypto/sha256"
 	"errors"
 	"fmt"
 	"io"
+	"net/http"
+	"net/http/httptest"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -120,6 +123,21 @@ func setup(t *testing.T, specEnv map[string]string) *world {
 	raw, err := os.ReadFile(cheYml)
 	require.NoError(t, err)
 	require.NoError(t, os.WriteFile(cheYml, bytes.ReplaceAll(raw, []byte("__REMOTE_DIR__"), []byte(w.remote)), 0o644))
+	payload := []byte("e2e-binary-payload\n")
+	srv := httptest.NewServer(http.HandlerFunc(func(rw http.ResponseWriter, r *http.Request) {
+		if strings.Contains(r.URL.Path, "/bad/") {
+			http.NotFound(rw, r)
+			return
+		}
+		_, _ = rw.Write(payload)
+	}))
+	t.Cleanup(srv.Close)
+	pkgYml := filepath.Join(w.local, "packages.yml")
+	if raw, err := os.ReadFile(pkgYml); err == nil {
+		raw = bytes.ReplaceAll(raw, []byte("__E2E_HTTP__"), []byte(srv.URL))
+		raw = bytes.ReplaceAll(raw, []byte("__E2E_SHA__"), fmt.Appendf(nil, "%x", sha256.Sum256(payload)))
+		require.NoError(t, os.WriteFile(pkgYml, raw, 0o644))
+	}
 	require.NoError(t, os.MkdirAll(w.home, 0o755))
 	if _, err := os.Stat("home"); err == nil {
 		require.NoError(t, os.CopyFS(w.home, os.DirFS("home")))

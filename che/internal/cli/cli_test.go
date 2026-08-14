@@ -3,7 +3,12 @@ package cli
 // [>] 🤖🤖
 
 import (
+	"archive/tar"
+	"bytes"
+	"compress/gzip"
+	"crypto/sha256"
 	"errors"
+	"fmt"
 	"os"
 	"path/filepath"
 	"strings"
@@ -14,6 +19,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"gitlab.com/konradodwrot/go-modules/che/internal/che"
+	"gitlab.com/konradodwrot/go-modules/che/internal/fetchx"
 	"gitlab.com/konradodwrot/go-modules/che/internal/options"
 	"gitlab.com/konradodwrot/go-modules/che/internal/packages"
 	"gitlab.com/konradodwrot/go-modules/che/internal/testutil"
@@ -52,8 +58,37 @@ func PackagesMockHost() packages.Host {
 			return "", errors.New(name + " not found")
 		},
 		PathDirs: func() []string { return nil },
-		Getenv:   func(string) string { return "" },
+		Getenv: func(k string) string {
+			if k == "HOME" {
+				return os.Getenv("HOME")
+			}
+			return ""
+		},
+		ReadFile: func(path string) ([]byte, error) { return nil, errors.New("read " + path + ": not stubbed") },
 	}
+}
+
+func mockPackagesFetch(t *testing.T, home string) {
+	t.Helper()
+	var tarBuf bytes.Buffer
+	tw := tar.NewWriter(&tarBuf)
+	require.NoError(t, tw.WriteHeader(&tar.Header{Name: "kubectx", Mode: 0o755, Size: 3}))
+	_, err := tw.Write([]byte("bin"))
+	require.NoError(t, err)
+	require.NoError(t, tw.Close())
+	var body bytes.Buffer
+	gz := gzip.NewWriter(&body)
+	_, err = gz.Write(tarBuf.Bytes())
+	require.NoError(t, err)
+	require.NoError(t, gz.Close())
+	yml := filepath.Join(home, ".config", "packages", "packages.yml")
+	if raw, err := os.ReadFile(yml); err == nil {
+		raw = bytes.ReplaceAll(raw, []byte("mocksha"), fmt.Appendf(nil, "%x", sha256.Sum256(body.Bytes())))
+		require.NoError(t, os.WriteFile(yml, raw, 0o644))
+	}
+	fetchx.Swap(t, &fetchx.Mock{Bodies: map[string][]byte{
+		"https://example.com/v0.11.0/kubectx_v0.11.0_linux_x86_64.tar.gz": body.Bytes(),
+	}})
 }
 
 func setupMock(t *testing.T, pwd, profile string, decl map[string]string, env map[string]string) (*app, *cobra.Command, string) {
@@ -69,6 +104,7 @@ func setupMock(t *testing.T, pwd, profile string, decl map[string]string, env ma
 	m := testutil.ApplyMocks(t, decl)
 	if _, ok := decl["packages.Host"]; ok {
 		testyml.Swap(t, &che.NewPackagesHost, PackagesMockHost)
+		mockPackagesFetch(t, home)
 	}
 	realSeams := che.NewSeams
 	testyml.Swap(t, &che.NewSeams, func(home string) che.Seams {

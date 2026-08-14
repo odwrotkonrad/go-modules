@@ -47,6 +47,9 @@ func get(url string) (*http.Response, error) {
 		if resp.StatusCode >= 400 {
 			_ = resp.Body.Close()
 			lastErr = fmt.Errorf("GET %s: %s", url, resp.Status)
+			if resp.StatusCode < 500 {
+				return nil, lastErr
+			}
 			continue
 		}
 		return resp, nil

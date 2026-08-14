@@ -658,14 +658,11 @@ func (in *Installer) brewInstall(mgr, name string) error {
 		return err
 	}
 	if parts := strings.Split(name, "/"); len(parts) >= 3 {
-		if err := in.exec([]string{in.brewBin(), "tap", parts[0] + "/" + parts[1]}); err != nil {
+		tap := parts[0] + "/" + parts[1]
+		if err := in.exec([]string{in.brewBin(), "tap", tap}); err != nil {
 			return err
 		}
-		kind := "--formula"
-		if mgr == "cask" {
-			kind = "--cask"
-		}
-		if err := in.exec([]string{in.brewBin(), "trust", kind, name}); err != nil {
+		if err := in.exec([]string{in.brewBin(), "trust", tap}); err != nil {
 			return err
 		}
 	}

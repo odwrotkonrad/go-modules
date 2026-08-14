@@ -230,7 +230,7 @@ func runPackageMethods(t *testing.T, entry packages.Entry, pkg, method string, c
 				onlyMethods: []string{m},
 				verify:      map[string]verifyCmd{pkg: resolveVerify(t, entry, pkg, m)},
 				warnMissing: lenient || os.Getenv("E2E_INSTALL_MISSING_METHOD") == "warn",
-			}, cfg, lenient)
+			}, cfg)
 		})
 	}
 }
@@ -276,6 +276,9 @@ func pkgVersionCmd(entry packages.Entry, pkg, mgr string) (string, error) {
 	case "apt":
 		return fmt.Sprintf("dpkg-query -W -f '${Version}\\n' %s", name), nil
 	case "brew":
+		if entry.Version != "" {
+			return fmt.Sprintf("brew list --versions %s@%s || brew list --versions %s", name, entry.Version, name), nil
+		}
 		return "brew list --versions " + name, nil
 	case "cask":
 		return "brew list --cask --versions " + name, nil
@@ -287,7 +290,7 @@ func pkgVersionCmd(entry packages.Entry, pkg, mgr string) (string, error) {
 	return "", fmt.Errorf("verify pkgVersionCmd: no version query for method %s", mgr)
 }
 
-func runJob(t *testing.T, job installJob, cfg runCfg, lenient bool) {
+func runJob(t *testing.T, job installJob, cfg runCfg) {
 	t.Helper()
 	var out string
 	var skipped bool
@@ -307,14 +310,14 @@ func runJob(t *testing.T, job installJob, cfg runCfg, lenient bool) {
 	//   preinstalled package is an environment outcome, not a failure
 	stripped := ansiRe.ReplaceAllString(out, "")
 	for _, pkg := range job.packages {
+		if strings.Contains(stripped, "installed "+pkg+" ") {
+			continue
+		}
 		if !strings.Contains(stripped, "will not install "+pkg+":") &&
 			!strings.Contains(stripped, pkg+": ✅ already") {
 			continue
 		}
-		if lenient {
-			t.Skipf("%s was already present here, the method never ran", pkg)
-		}
-		require.Fail(t, fmt.Sprintf("%s was already present, so the method never ran", pkg))
+		t.Skipf("%s was already present here, the method never ran", pkg)
 	}
 }
 
@@ -338,6 +341,7 @@ func hostInstallEnv(t *testing.T, home string) []string {
 	goBin := filepath.Join(home, "go", "bin")
 	dirs := []string{
 		bin, goBin,
+		filepath.Join(home, ".gem", "bin"),
 		filepath.Join(pyenvRoot, "bin"), filepath.Join(pyenvRoot, "shims"),
 	}
 	if runtime.GOOS == "darwin" {
@@ -356,6 +360,7 @@ func hostInstallEnv(t *testing.T, home string) []string {
 		"XDG_BIN_HOME=" + bin,
 		"XDG_STATE_HOME=" + filepath.Join(home, ".local", "state"),
 		"XDG_CACHE_HOME=" + filepath.Join(home, ".cache"),
+		"GEM_HOME=" + filepath.Join(home, ".gem"),
 		"CHE_E2E=1",
 		"CHE_LOG_LEVEL=" + logLevel(),
 		"CHE_PACKAGES_BINARIES_REMOTE_ARCHIVE_CHECK_PRESENT_ON_PATH=0",

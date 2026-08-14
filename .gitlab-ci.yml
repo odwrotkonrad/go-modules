@@ -185,11 +185,10 @@ warm-e2e-pkg-installs-image:
       allow_failure: true
   script:
     - docker run --privileged --rm tonistiigi/binfmt --install arm64
-    - docker build --quiet --platform linux/amd64 --tag che-e2e-debian:amd64 --file che/e2e/install-methods.Dockerfile che/e2e
-    - docker build --quiet --platform linux/arm64 --tag che-e2e-debian:arm64 --file che/e2e/install-methods.Dockerfile che/e2e
+    - docker buildx create --use --name e2e-images
     - mkdir -p e2e-images
-    - docker save che-e2e-debian:amd64 -o e2e-images/che-e2e-debian-amd64.tar
-    - docker save che-e2e-debian:arm64 -o e2e-images/che-e2e-debian-arm64.tar
+    - docker buildx build --platform linux/amd64 --tag che-e2e-debian:amd64 --output type=docker,dest=e2e-images/che-e2e-debian-amd64.tar --file che/e2e/install-methods.Dockerfile che/e2e
+    - docker buildx build --platform linux/arm64 --tag che-e2e-debian:arm64 --output type=docker,dest=e2e-images/che-e2e-debian-arm64.tar --file che/e2e/install-methods.Dockerfile che/e2e
   artifacts:
     paths:
       - e2e-images/

@@ -198,7 +198,7 @@ func TestInstallBrewTapQualified(t *testing.T) {
 		"brew list che",
 		"brew update --quiet",
 		"brew tap konradodwrot/tap",
-		"brew trust --formula konradodwrot/tap/che",
+		"brew trust konradodwrot/tap",
 		"brew install konradodwrot/tap/che",
 	}, m.Calls())
 }
@@ -613,11 +613,10 @@ func TestInstallCodeExtensionSkipsInstalledAndListsOnce(t *testing.T) {
 	require.Equal(t, []string{"code --list-extensions --show-versions"}, m.Calls())
 }
 
-func TestInstallCodeExtensionSkipsWithoutCodeCommand(t *testing.T) {
+func TestInstallCodeExtensionAttemptsWithoutCodeCommand(t *testing.T) {
 	in, m := newInstaller(t, codeExtYaml, "linux", cmdMap(nil), Options{})
-	_, err := captureStdout(t, func() error { return in.Install([]string{"golang.go"}) })
-	require.ErrorContains(t, err, "no applicable installation method for golang.go")
-	require.Empty(t, m.Calls())
+	require.NoError(t, in.Install([]string{"golang.go"}))
+	requireCalls(t, m, "code --install-extension golang.go")
 }
 
 func TestInstallCodeExtensionUpdateForces(t *testing.T) {

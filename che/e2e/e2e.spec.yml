@@ -563,7 +563,7 @@ testCases:
         expected:
           exitCode: 1
           stdOut:
-            - "curl"
+            - "404"
             - "e2e-bin-bad"
         notExpected:
           stdOut: ["installed e2e-bin-bad"]

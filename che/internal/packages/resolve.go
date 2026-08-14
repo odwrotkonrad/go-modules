@@ -130,7 +130,7 @@ func (h Host) applicable(pkg string, it Item, strict bool) (bool, error) {
 	case "npm":
 		return !strict || h.HasCmd("npm"), nil
 	case "vscode":
-		return h.HasCmd("code"), nil
+		return !strict || h.HasCmd("code"), nil
 	case "gem":
 		return !strict || h.HasCmd("gem"), nil
 	case "go":
