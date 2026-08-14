@@ -110,10 +110,10 @@ Scenario: developer have ability to run installation test for platform they're u
   Then only the host platform is testable
   And any other platform fails with a clear message
 
-Scenario: an MR pipeline tests install methods with `MODE=with_deps` and must pass before merging
+Scenario: an MR pipeline tests install methods with `MODE=with_no_deps` and must pass before merging
   Status: implemented
   When an MR pipeline runs the install-methods jobs
-  Then they run `MODE=with_deps` (throwaway HOME on the job host)
+  Then they run `MODE=with_no_deps` (each install in a fresh debian container)
   And their failure fails the pipeline
 
 Scenario: an MR pipeline contains an optional manual no-deps install-methods job
@@ -140,12 +140,12 @@ Scenario: each darwin e2e installation test runs in its own tart VM so packages 
   Then each install runs in its own fresh tart VM
   And nothing installed by one test is visible to another
 
-Scenario: an MR pipeline stays fast by testing only a configurable subset of packages per method
+Scenario: an MR pipeline stays fast by testing only a chosen subset of packages per method
   Status: implemented
   When an MR pipeline runs the install-methods jobs
-  Then each method group installs only a subset of its packages (currently 3)
-  And the subset size is a CI variable (e.g. `E2E_INSTALL_MR_PACKAGES_PER_METHOD`)
-  And the full set stays reachable via the manual jobs and local `PACKAGE=all`
+  Then each method group installs only chosen packages (up to 3, curated in the job matrix)
+  And only the chosen packages appear in the test output, no skipped-package noise
+  And the full set stays reachable via the manual per-package jobs and local `PACKAGE=all`
 
 Scenario: developer have ability to run installation test of a their chosen package for installation method of their choice in gitlab MR pipeline as optional job
   Status: implemented

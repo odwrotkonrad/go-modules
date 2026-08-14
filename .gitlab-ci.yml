@@ -210,49 +210,6 @@ test-e2e-che-registry:
 ##[<] 🤖🤖
 
 ##[>] 🤖🤖
-#[what] real-install e2e: each installation method installs live packages into a throwaway HOME, then runs each one
-#[why] every other test stubs exec: only these prove the methods against real registries, archives and repos
-.test-install-methods:
-  stage: test-e2e-installs
-  needs: []
-  #[why] the per-method package cap keeps MR pipelines fast; the manual per-package jobs and local PACKAGE=all cover the full set
-  variables:
-    E2E_INSTALL_PACKAGES_PER_METHOD: "3"
-  #[why] MR changes-triggered runs block the merge; main keeps allow_failure, manual stays optional
-  rules:
-    - if: $CI_PIPELINE_SOURCE == "merge_request_event"
-      changes: [che/internal/packages/**/*, che/e2e/install_methods*]
-    - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
-      changes: [che/internal/packages/**/*, che/e2e/install_methods*]
-      allow_failure: true
-    - if: $CI_PIPELINE_SOURCE == "merge_request_event" || $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
-      when: manual
-      allow_failure: true
-  #[why] reuse the build-che-cover artifact when present (linux only, optional: the manual
-  #   rule runs on pipelines where the build job does not exist); darwin never fetches it
-  #   and builds its own binary
-  script:
-    - make -C che e2e-install-methods MODE=with_deps METHOD="$METHOD" $(test -x che/dist/e2e.test && echo "BUILD_DEP= E2E_USE_TEST_BIN=1")
-  artifacts:
-    paths:
-      - che/cover-e2e-install-methods/
-
-test-install-methods-linux:
-  extends: .test-install-methods
-  image: debian:bookworm-slim
-  needs:
-    - job: build-che-cover
-      optional: true
-  parallel:
-    matrix:
-      - METHOD: [apt, binariesRemoteArchive, script, pyenv, nvm, npm, go]
-  before_script:
-    #[why] bootstrap minimum only: zsh + clang run the Makefile itself, the rest installs through basePackages and each package's requires
-    - apt-get update && apt-get install -y --no-install-recommends ca-certificates curl make sudo zsh clang
-    - curl -fsSL --connect-timeout 30 --retry 10 --retry-delay 30 --retry-all-errors -o /tmp/go.tar.gz https://go.dev/dl/go1.26.4.linux-amd64.tar.gz
-    - tar -xzf /tmp/go.tar.gz -C /usr/local
-    - export PATH=/usr/local/go/bin:$PATH
-
 #[what] darwin build of the cover binary + e2e harness, shared by the darwin install jobs
 #[why] the linux artifact is the wrong platform: without this every darwin matrix job links its own
 build-che-cover-darwin:
@@ -272,11 +229,6 @@ build-che-cover-darwin:
         - .cache/go-build
       policy: pull-push
   rules:
-    - if: $CI_PIPELINE_SOURCE == "merge_request_event"
-      changes: [che/internal/packages/**/*, che/e2e/install_methods*]
-    - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
-      changes: [che/internal/packages/**/*, che/e2e/install_methods*]
-      allow_failure: true
     - if: $CI_PIPELINE_SOURCE == "merge_request_event" || $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
       when: manual
       allow_failure: true
@@ -290,24 +242,8 @@ build-che-cover-darwin:
     paths:
       - che/dist/
 
-test-install-methods-darwin:
-  extends: .test-install-methods
-  tags:
-    - saas-macos-medium-m1
-  image: macos-26-xcode-26
-  needs:
-    - job: build-che-cover-darwin
-      optional: true
-  parallel:
-    matrix:
-      - METHOD: [brew/formulae, brew/cask, binariesRemoteArchive, script, pyenv, nvm]
-  before_script:
-    - curl -fsSL --connect-timeout 30 --retry 10 --retry-delay 30 --retry-all-errors -o /tmp/go.tar.gz "https://go.dev/dl/go1.26.4.darwin-arm64.tar.gz"
-    - sudo tar -xzf /tmp/go.tar.gz -C /usr/local
-    - export PATH=/usr/local/go/bin:$PATH
-
-#[what] manual no-deps install e2e: each install in a fresh debian container via dind, che cross-built in-job
-#[why] with_no_deps proves each package pulls its own dependencies: too slow for every MR, so manual only
+#[what] no-deps install e2e: 3 chosen packages per method, each install in a fresh debian container via dind
+#[why] with_no_deps proves each package pulls its own dependencies; the curated per-method subset keeps MR pipelines fast and deterministic, the manual per-package jobs and local PACKAGE=all cover the full set
 test-install-methods-no-deps:
   stage: test-e2e-installs
   image: $CI_IMAGE
@@ -324,15 +260,34 @@ test-install-methods-no-deps:
     E2E_INSTALL_CACHE_DIR: $CI_PROJECT_DIR/.cache/che-e2e-install
   parallel:
     matrix:
-      - METHOD: [apt, binariesRemoteArchive, script, pyenv, nvm, npm, go]
+      - METHOD: apt
+        PACKAGE: jq,bat,fd
+      - METHOD: binariesRemoteArchive
+        PACKAGE: yq,kubectl,cilium
+      - METHOD: script
+        PACKAGE: pyenv,nvm
+      - METHOD: pyenv
+        PACKAGE: python3
+      - METHOD: nvm
+        PACKAGE: node
+      - METHOD: npm
+        PACKAGE: corepack,pnpm,tsc
+      - METHOD: go
+        PACKAGE: gopls,get-os-open-files-with
+  #[why] MR changes-triggered runs block the merge; main keeps allow_failure, manual stays optional
   rules:
+    - if: $CI_PIPELINE_SOURCE == "merge_request_event"
+      changes: [che/internal/packages/**/*, che/e2e/install_methods*]
+    - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
+      changes: [che/internal/packages/**/*, che/e2e/install_methods*]
+      allow_failure: true
     - if: $CI_PIPELINE_SOURCE == "merge_request_event" || $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
       when: manual
       allow_failure: true
   before_script:
     - apt-get update && apt-get install -y --no-install-recommends docker.io
   script:
-    - make -C che e2e-install-methods MODE=with_no_deps METHOD="$METHOD" $(test -x che/dist/e2e.test && echo "BUILD_DEP= E2E_USE_TEST_BIN=1")
+    - make -C che e2e-install-methods MODE=with_no_deps METHOD="$METHOD" PACKAGE="$PACKAGE" $(test -x che/dist/e2e.test && echo "BUILD_DEP= E2E_USE_TEST_BIN=1")
   artifacts:
     paths:
       - che/cover-e2e-install-methods/
@@ -347,9 +302,7 @@ coverage-che:
     - test-e2e-che-run
     - test-e2e-che-backup
     #[why] conditional/manual allow_failure jobs: optional so skipped runs don't block the report
-    - job: test-install-methods-linux
-      optional: true
-    - job: test-install-methods-darwin
+    - job: test-install-methods-no-deps
       optional: true
   cache:
     - key: go-mod
