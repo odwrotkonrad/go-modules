@@ -8,6 +8,17 @@ workflow:
 include:
   - local: .gitlab/ci/test-install-packages.gitlab-ci.yml
 
+#[why] retry infrastructure flakes (image pulls, runner/network, stuck jobs) twice; script failures never retry, a real test failure stays red
+default:
+  retry:
+    max: 2
+    when:
+      - runner_system_failure
+      - api_failure
+      - stuck_or_timeout_failure
+      - scheduler_failure
+      - unknown_failure
+
 stages:
   - warm
   - verify
