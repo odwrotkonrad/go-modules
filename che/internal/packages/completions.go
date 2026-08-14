@@ -44,7 +44,7 @@ func (in *Installer) installCompletions(pkg string, e Entry) error {
 			return err
 		}
 	} else {
-		if err := in.exec(curlArgv(def.URL, asset)); err != nil {
+		if err := in.download(def.URL, asset); err != nil {
 			return err
 		}
 	}

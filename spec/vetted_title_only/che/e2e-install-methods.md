@@ -89,10 +89,11 @@ Scenario: developer have ability to run installation test in environment with ab
   Then each install runs in a fresh debian container: only che and its declared base prerequisites present
   And the package must pull in its own dependencies, so missing ones surface
 
-Scenario: when testing installs in MODE=with_no_deps download cache is leveraged to reduce test time
+Scenario: when testing installs download cache is leveraged to reduce test time
   Status: tested
-  When I rerun install tests in `MODE=with_no_deps`
-  Then apt archives, apt lists and che-downloaded assets come from a host cache shared across runs (the che cache dir's `dev` subdir, `~/.cache/che/dev`, override `E2E_INSTALL_CACHE_DIR`)
+  When I rerun install tests (any `MODE`)
+  Then che-downloaded assets come from che's download cache (`CHE_PACKAGES_DOWNLOAD_CACHE_DIR`) pointed at the `downloads` subdir of a host dev cache dir shared across runs (the che cache dir's `dev` subdir, `~/.cache/che/dev`, override `E2E_INSTALL_CACHE_DIR`)
+  And in `MODE=with_no_deps` apt archives and apt lists also come from that dev cache dir
   And the environment itself stays bare and isolated
 
 Scenario: developer have ability to run installation test for every supported platform on darwin-arm64

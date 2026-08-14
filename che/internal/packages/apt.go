@@ -21,11 +21,12 @@ func (in *Installer) installAptSpec(pkg string, a *AptSpec) error {
 	binPin, pkgPin := in.aptPins(pkg, a)
 	if in.skipInstalledOrEmitReinstall(pkg, "apt", pkgPin, binPin,
 		func() bool { return in.isInstalled(pkg, "apt", name) },
-		func() bool { return in.installedVersion("apt", name) == pkgPin }) {
+		func() bool { return in.installedVersion("apt", name) == pkgPin },
+		func() string { return in.installedVersion("apt", name) }) {
 		return nil
 	}
 	if in.Opts.DryRun {
-		in.emitDryRun("install", labelWithVersion(pkg, binPin)+" via apt")
+		in.emitDryRun("install", labelWithVersion(in.pkgLabel(pkg), binPin)+" via apt")
 		return nil
 	}
 	if err := in.aptUpdate(); err != nil {
@@ -43,7 +44,11 @@ func (in *Installer) installAptSpec(pkg string, a *AptSpec) error {
 	if err := in.exec(in.sudo(argv...)); err != nil {
 		return err
 	}
-	in.emit(log.Levels.Info, "installed", labelWithVersion(pkg, binPin)+" via apt")
+	ver := binPin
+	if ver == "" {
+		ver = in.installedVersion("apt", name)
+	}
+	in.emit(log.Levels.Info, "installed", labelWithVersion(in.pkgLabel(pkg), ver)+" via apt")
 	return nil
 }
 
@@ -107,7 +112,7 @@ func (in *Installer) ensureAptRepo(name string, r *AptRepoSpec) error {
 	defer func() { _ = os.RemoveAll(tmp) }()
 	if download {
 		asc := filepath.Join(tmp, name+".asc")
-		if err := in.exec(curlArgv(r.VerificationKey, asc)); err != nil {
+		if err := in.download(r.VerificationKey, asc); err != nil {
 			return err
 		}
 		if err := in.exec(in.sudo("install", "-m", "0755", "-d", "/etc/apt/keyrings")); err != nil {

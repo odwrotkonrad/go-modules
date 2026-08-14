@@ -42,9 +42,8 @@ func TestInstallBinaryTarFlow(t *testing.T) {
 	in, m := newInstaller(t, kubectxYaml, "linux", cmdMap([]string{"sha256sum"}), Options{})
 	m.Stub = shaStub("goodsha")
 	require.NoError(t, in.Install([]string{"kubectx"}))
+	require.Contains(t, testFetch.Calls(), "https://example.com/v0.11.0/kubectx_v0.11.0_linux_x86_64.tar.gz")
 	requireCalls(t, m,
-		"curl -fsSL",
-		"kubectx_v0.11.0_linux_x86_64.tar.gz https://example.com/v0.11.0/kubectx_v0.11.0_linux_x86_64.tar.gz",
 		"rm -rf /home/u/.local/opt/kubectx",
 		"tar -x -C /home/u/.local/opt/kubectx",
 		"ln -sf /home/u/.local/opt/kubectx/kubectx /home/u/.local/bin/kubectx")
@@ -63,44 +62,30 @@ func TestInstallBinaryBareAsset(t *testing.T) {
 	in, m := newInstaller(t, kindYaml, "linux", cmdMap([]string{"sha256sum"}), Options{})
 	m.Stub = shaStub("goodsha")
 	require.NoError(t, in.Install([]string{"kind"}))
+	require.Contains(t, testFetch.Calls(), "https://example.com/v0.32.0/kind-linux-amd64")
 	requireCalls(t, m,
-		"kind-linux-amd64 https://example.com/v0.32.0/kind-linux-amd64",
 		"install -m 0755",
 		"/home/u/.local/bin/kind")
 	refuteCalls(t, m, "tar -x")
 }
 
-func curlWrites(t *testing.T) func(argv []string) ([]byte, error) {
-	return func(argv []string) ([]byte, error) {
-		if argv[0] != "curl" {
-			return nil, nil
-		}
-		for i, a := range argv {
-			if a == "-o" {
-				require.NoError(t, os.WriteFile(argv[i+1], []byte("asset"), 0o644))
-			}
-		}
-		return nil, nil
-	}
-}
-
 func TestInstallBinaryDownloadCacheReusesAsset(t *testing.T) {
 	opts := Options{DownloadCacheDir: t.TempDir()}
 	in, m := newInstaller(t, kubectxYaml, "linux", cmdMap([]string{"sha256sum"}), opts)
-	m.Stub = chainStubs(curlWrites(t), shaStub("goodsha"))
+	m.Stub = shaStub("goodsha")
 	require.NoError(t, in.Install([]string{"kubectx"}))
-	requireCalls(t, m, "curl -fsSL")
+	require.Len(t, testFetch.Calls(), 1)
 	in, m = newInstaller(t, kubectxYaml, "linux", cmdMap([]string{"sha256sum"}), opts)
 	m.Stub = shaStub("goodsha")
 	require.NoError(t, in.Install([]string{"kubectx"}))
-	refuteCalls(t, m, "curl")
+	require.Empty(t, testFetch.Calls())
 	requireCalls(t, m, "tar -x")
 }
 
 func TestInstallBinaryDownloadCacheEvictsOnShaMismatch(t *testing.T) {
 	cache := t.TempDir()
 	in, m := newInstaller(t, kubectxYaml, "linux", cmdMap([]string{"sha256sum"}), Options{DownloadCacheDir: cache})
-	m.Stub = chainStubs(curlWrites(t), shaStub("badsha"))
+	m.Stub = shaStub("badsha")
 	err := in.Install([]string{"kubectx"})
 	require.ErrorContains(t, err, "sha256 mismatch")
 	entries, err := os.ReadDir(cache)
@@ -123,8 +108,8 @@ func TestInstallBinaryTreeFlow(t *testing.T) {
 	in, m := newInstaller(t, zigYaml, "linux", cmdMap([]string{"sha256sum"}), Options{})
 	m.Stub = shaStub("goodsha")
 	require.NoError(t, in.Install([]string{"zig"}))
+	require.Contains(t, testFetch.Calls(), "https://example.com/0.16.0/zig-x86_64-linux-0.16.0.tar.xz")
 	requireCalls(t, m,
-		"zig-x86_64-linux-0.16.0.tar.xz https://example.com/0.16.0/zig-x86_64-linux-0.16.0.tar.xz",
 		"mkdir -p /home/u/.local/opt/zig",
 		"tar -x -C /home/u/.local/opt/zig",
 		"ln -sf /home/u/.local/opt/zig/zig-x86_64-linux-0.16.0/zig /home/u/.local/bin/zig")
@@ -149,8 +134,8 @@ func TestInstallBinariesRemoteArchiveArchScheme(t *testing.T) {
 	in.Host.Arch = "arm64"
 	m.Stub = shaStub("goodsha")
 	require.NoError(t, in.Install([]string{"gcloud"}))
+	require.Contains(t, testFetch.Calls(), "https://example.com/cli-572.0.0-darwin-arm.tar.gz")
 	requireCalls(t, m,
-		"cli-572.0.0-darwin-arm.tar.gz https://example.com/cli-572.0.0-darwin-arm.tar.gz",
 		"ln -sf /home/u/.local/opt/gcloud/sdk/bin/gcloud /home/u/.local/bin/gcloud",
 		"ln -sf /home/u/.local/opt/gcloud/sdk/bin/gsutil /home/u/.local/bin/gsutil")
 }
@@ -166,7 +151,7 @@ func TestInstallBinaryReinstallsOnPinDrift(t *testing.T) {
 	in, m := newInstaller(t, kindYaml, "linux", cmdMap([]string{"sha256sum", "kind"}), Options{})
 	m.Stub = chainStubs(stubOutputs("kind ", "kind version 0.30.0\n"), shaStub("goodsha"))
 	require.NoError(t, in.Install([]string{"kind"}))
-	requireCalls(t, m, "curl -fsSL")
+	require.NotEmpty(t, testFetch.Calls())
 }
 
 const awsYaml = `packages:
@@ -183,9 +168,9 @@ const awsYaml = `packages:
 
 func TestInstallAwsScriptOnDarwin(t *testing.T) {
 	in, m := newInstaller(t, awsYaml, "darwin", cmdMap(nil), Options{})
-	m.Stub = stubOutputs("curl ", "echo install-aws")
 	require.NoError(t, in.Install([]string{"aws"}))
-	requireCalls(t, m, "https://awscli.amazonaws.com/v2/install.sh", "che-script-")
+	require.Contains(t, testFetch.Calls(), "https://awscli.amazonaws.com/v2/install.sh")
+	requireCalls(t, m, "che-script-")
 }
 
 func TestInstallAwsSkipsWhenPresent(t *testing.T) {
@@ -196,12 +181,13 @@ func TestInstallAwsSkipsWhenPresent(t *testing.T) {
 
 func TestInstallAwsLinuxArchive(t *testing.T) {
 	in, m := newInstaller(t, awsYaml, "linux", cmdMap(nil), Options{})
+	home := tempHome(t, in)
+	testFetch.Bodies["https://awscli.amazonaws.com/awscli-exe-linux-x86_64.zip"] = zipBody(t, "aws/dist/aws", "aws/dist/aws_completer")
 	require.NoError(t, in.Install([]string{"aws"}))
+	require.Contains(t, testFetch.Calls(), "https://awscli.amazonaws.com/awscli-exe-linux-x86_64.zip")
 	requireCalls(t, m,
-		"awscli-exe-linux-x86_64.zip",
-		"unzip -oq",
-		"ln -sf /home/u/.local/opt/aws/aws/dist/aws /home/u/.local/bin/aws",
-		"ln -sf /home/u/.local/opt/aws/aws/dist/aws_completer /home/u/.local/bin/aws_completer")
+		"ln -sf "+home+"/.local/opt/aws/aws/dist/aws "+home+"/.local/bin/aws",
+		"ln -sf "+home+"/.local/opt/aws/aws/dist/aws_completer "+home+"/.local/bin/aws_completer")
 	refuteCalls(t, m, "install --update")
 }
 

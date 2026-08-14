@@ -358,6 +358,7 @@ func hostInstallEnv(t *testing.T, home string) []string {
 		//[why] GOPATH defaults into the throwaway HOME: without this the module cache's
 		//  read-only dirs make t.TempDir cleanup fail the passing test
 		"GOFLAGS=-modcacherw",
+		"CHE_PACKAGES_DOWNLOAD_CACHE_DIR=" + filepath.Join(devCacheDir(t), "downloads"),
 	}
 	if v := os.Getenv("SSL_CERT_FILE"); v != "" {
 		env = append(env, "SSL_CERT_FILE="+v)
@@ -408,11 +409,11 @@ func shq(s string) string {
 	return "'" + strings.ReplaceAll(s, "'", `'\''`) + "'"
 }
 
-// [why] apt/download caches persist across runs while the environment stays dependency-free:
+// [why] apt/download caches persist across runs while each environment stays isolated:
 //
-//	only /var/cache/apt, /var/lib/apt/lists, /root/.cache and the che download cache
-//	are mounted from the host
-func noDepsCacheDir(t *testing.T) string {
+//	with_no_deps mounts /var/cache/apt, /var/lib/apt/lists, /root/.cache and the che
+//	download cache from here; with_deps points CHE_PACKAGES_DOWNLOAD_CACHE_DIR at downloads/
+func devCacheDir(t *testing.T) string {
 	t.Helper()
 	base := os.Getenv("E2E_INSTALL_CACHE_DIR")
 	if base == "" {
@@ -474,7 +475,7 @@ func runJobNoDeps(t *testing.T, job installJob, cfg runCfg) (string, bool) {
 	require.FileExists(t, binLinux)
 	arch := cmp.Or(cfg.linuxArch, runtime.GOARCH)
 	image := noDepsImage(t, arch)
-	cache := noDepsCacheDir(t)
+	cache := devCacheDir(t)
 	argv := []string{
 		"run", "--rm", "--quiet", "--platform", "linux/" + arch,
 		"-v", binLinux + ":/usr/local/bin/che:ro",
@@ -572,7 +573,8 @@ export XDG_STATE_HOME=$HOME/.local/state XDG_CACHE_HOME=$HOME/.cache
 export PYENV_ROOT=$HOME/.pyenv NVM_DIR=$HOME/.config/nvm GOBIN=$HOME/go/bin GOFLAGS=-modcacherw
 `)
 	fmt.Fprintf(&b, "export CHE_E2E=1 CHE_LOG_LEVEL=%s CHE_PACKAGES_BINARIES_REMOTE_ARCHIVE_CHECK_PRESENT_ON_PATH=0\n", logLevel())
-	b.WriteString(`export GOCOVERDIR=$HOME/cover
+	b.WriteString(`if [ -d '/Volumes/My Shared Files/che-cache' ]; then export CHE_PACKAGES_DOWNLOAD_CACHE_DIR='/Volumes/My Shared Files/che-cache'; fi
+export GOCOVERDIR=$HOME/cover
 mkdir -p $HOME/.local/bin $HOME/.config $HOME/.local/state $HOME/cover $HOME/work
 cd $HOME/work
 printf 'e2e:\n  options: {autoDiscover: true}\n' > che.yml
@@ -624,7 +626,8 @@ func runJobVM(t *testing.T, job installJob) (string, bool) {
 	t.Logf("tart clone %s -> %s", vmTemplate, vm)
 	cloneOut, err := exec.Command("tart", "clone", vmTemplate, vm).CombinedOutput()
 	require.NoError(t, err, "tart clone %s %s: %s", vmTemplate, vm, cloneOut)
-	boot := exec.Command("tart", "run", "--no-graphics", vm)
+	boot := exec.Command("tart", "run", "--no-graphics",
+		"--dir=che-cache:"+filepath.Join(devCacheDir(t), "downloads"), vm)
 	require.NoError(t, boot.Start())
 	t.Cleanup(func() {
 		t.Logf("stop + delete %s", vm)

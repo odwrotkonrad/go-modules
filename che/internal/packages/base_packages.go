@@ -25,6 +25,14 @@ func (in *Installer) ensureBasePackages(mgr, forPkg string) error {
 		if len(pkgs) == 0 {
 			continue
 		}
+		if in.requiredBy == nil {
+			in.requiredBy = map[string]string{}
+		}
+		for _, p := range pkgs {
+			if _, ok := in.requiredBy[p]; !ok {
+				in.requiredBy[p] = forPkg
+			}
+		}
 		in.emit(log.Levels.Debug, "base-packages", group+": ensuring "+strings.Join(pkgs, ", "))
 		if err := in.installBasePackages(pkgs); err != nil {
 			return err

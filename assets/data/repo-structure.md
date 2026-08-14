@@ -70,6 +70,7 @@ che
         spec
           funcs
     execx
+    fetchx
     fsutil
       testdata
         spec

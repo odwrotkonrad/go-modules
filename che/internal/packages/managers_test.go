@@ -3,6 +3,8 @@ package packages
 // [>] 🤖🤖
 
 import (
+	"archive/zip"
+	"bytes"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -13,7 +15,10 @@ import (
 	"gopkg.in/yaml.v3"
 
 	"gitlab.com/konradodwrot/go-modules/che/internal/execx"
+	"gitlab.com/konradodwrot/go-modules/che/internal/fetchx"
 )
+
+var testFetch *fetchx.Mock
 
 func newInstaller(t *testing.T, filesYaml, osname string, cmds map[string]string, opts Options) (*Installer, *execx.Mock) {
 	t.Helper()
@@ -21,6 +26,8 @@ func newInstaller(t *testing.T, filesYaml, osname string, cmds map[string]string
 	require.NoError(t, yaml.Unmarshal([]byte(filesYaml), &f))
 	m := &execx.Mock{}
 	execx.Swap(t, m)
+	testFetch = &fetchx.Mock{Bodies: map[string][]byte{}}
+	fetchx.Swap(t, testFetch)
 	return &Installer{File: &f, FilePath: "packages.yml", Host: testHost(osname, "amd64", cmds), Opts: opts}, m
 }
 
@@ -59,6 +66,32 @@ func chainStubs(stubs ...func(argv []string) ([]byte, error)) func(argv []string
 	}
 }
 
+func tempHome(t *testing.T, in *Installer) string {
+	t.Helper()
+	home := t.TempDir()
+	in.Host.Getenv = func(k string) string {
+		if k == "HOME" {
+			return home
+		}
+		return ""
+	}
+	return home
+}
+
+func zipBody(t *testing.T, names ...string) []byte {
+	t.Helper()
+	var buf bytes.Buffer
+	zw := zip.NewWriter(&buf)
+	for _, name := range names {
+		f, err := zw.CreateHeader(&zip.FileHeader{Name: name})
+		require.NoError(t, err)
+		_, err = f.Write([]byte("bin"))
+		require.NoError(t, err)
+	}
+	require.NoError(t, zw.Close())
+	return buf.Bytes()
+}
+
 func requireCalls(t *testing.T, m *execx.Mock, fragments ...string) {
 	t.Helper()
 	joined := strings.Join(m.Calls(), "\n")
@@ -95,12 +128,21 @@ packages:
   che: [{brew: {fromRegistry: konradodwrot/tap}}]
 `
 
+func TestInstallBrewUpdatesIndexOncePerRun(t *testing.T) {
+	in, m := newInstaller(t, "packages:\n  bat: [brew]\n  fd: [brew]", "darwin", cmdMap([]string{"brew"}), Options{})
+	m.Stub = failOn("brew list")
+	require.NoError(t, in.Install([]string{"bat", "fd"}))
+	requireCalls(t, m, "brew update --quiet", "brew install bat", "brew install fd")
+	require.Equal(t, 1, strings.Count(strings.Join(m.Calls(), "\n"), "brew update --quiet"))
+}
+
 func TestInstallBrewTapQualified(t *testing.T) {
 	in, m := newInstaller(t, tapYaml, "darwin", cmdMap([]string{"brew"}), Options{})
 	m.Stub = failOn("brew list")
 	require.NoError(t, in.Install([]string{"che"}))
 	require.Equal(t, []string{
 		"brew list che",
+		"brew update --quiet",
 		"brew tap konradodwrot/tap",
 		"brew trust --formula konradodwrot/tap/che",
 		"brew install konradodwrot/tap/che",
@@ -298,21 +340,19 @@ func TestInstallScriptRemoteUrlFetchesAndRuns(t *testing.T) {
         env: {NONINTERACTIVE: "1"}
 `
 	in, m := newInstaller(t, yml, "darwin", cmdMap(nil), Options{})
-	m.Stub = stubOutputs("curl ", "echo installing\n")
+	testFetch.Bodies["https://example.com/install.sh"] = []byte("echo installing\n")
 	require.NoError(t, in.Install([]string{"brew"}))
-	calls := m.Calls()
-	require.Contains(t, calls[0], "curl -fsSL")
-	require.Contains(t, calls[0], "https://example.com/install.sh")
-	require.Contains(t, calls[1], "che-script-")
-	require.Contains(t, m.Envs()[1], "NONINTERACTIVE=1")
+	require.Contains(t, testFetch.Calls(), "https://example.com/install.sh")
+	require.Contains(t, m.Calls()[0], "che-script-")
+	require.Contains(t, m.Envs()[0], "NONINTERACTIVE=1")
 }
 
 func TestInstallScriptRemoteUrlFetchFailureErrors(t *testing.T) {
 	const yml = `packages:
   x: [{script: {url: https://example.com/install.sh}}]
 `
-	in, m := newInstaller(t, yml, "darwin", cmdMap(nil), Options{})
-	m.Stub = failOn("curl")
+	in, _ := newInstaller(t, yml, "darwin", cmdMap(nil), Options{})
+	testFetch.Err = fmt.Errorf("boom")
 	require.ErrorContains(t, in.Install([]string{"x"}), "install script fetch failed")
 }
 
@@ -366,8 +406,8 @@ func TestInstallGcloudPicksLinuxAptRepo(t *testing.T) {
 	in.FilePath = BuiltinPath
 	m.Stub = aptStub(t)
 	require.NoError(t, in.Install([]string{"gcloud"}))
+	require.Contains(t, testFetch.Calls(), "https://packages.cloud.google.com/apt/doc/apt-key.gpg")
 	requireCalls(t, m,
-		"packages.cloud.google.com/apt/doc/apt-key.gpg",
 		"/etc/apt/sources.list.d/packages.cloud.google.com-apt-cloud-sdk-main.sources",
 		"--no-install-recommends -t cloud-sdk google-cloud-cli")
 }
@@ -484,7 +524,7 @@ func TestVersionCommandDriftReinstalls(t *testing.T) {
 	in, m := newInstaller(t, kubectlYaml, "linux", cmdMap([]string{"kubectl", "sha256sum"}), Options{})
 	m.Stub = chainStubs(stubOutputs("kubectl ", "Client Version: v1.36.0\n"), shaStub("goodsha"))
 	require.NoError(t, in.Install([]string{"kubectl"}))
-	requireCalls(t, m, "curl -fsSL")
+	require.NotEmpty(t, testFetch.Calls())
 }
 
 const codeExtYaml = "packages:\n  golang.go: [vscode]\n  redhat.vscode-yaml: [vscode]\n  code: [{brew/cask: {packageName: visual-studio-code}}]"

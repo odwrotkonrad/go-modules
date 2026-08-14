@@ -15,6 +15,7 @@ import (
 	"strings"
 
 	"gitlab.com/konradodwrot/go-modules/che/internal/execx"
+	"gitlab.com/konradodwrot/go-modules/che/internal/fetchx"
 	"gitlab.com/konradodwrot/go-modules/che/internal/log"
 )
 
@@ -46,21 +47,26 @@ type Installer struct {
 	EmitDryRun func(action, msg string)
 
 	aptUpdated     bool
+	brewUpdated    bool
 	codeExts       map[string]string
 	outdated       map[string]map[string]bool
 	binDir         string
 	compDir        string
 	requested      map[string]Request
+	requiredBy     map[string]string
 	baseDone       map[string]bool
 	baseInstalling bool
 }
 
-func curlArgv(url string, dest ...string) []string {
-	argv := []string{"curl", "-fsSL", "--connect-timeout", "30", "--retry", "10", "--retry-delay", "30", "--retry-all-errors"}
-	for _, d := range dest {
-		argv = append(argv, "-o", d)
-	}
-	return append(argv, url)
+func (in *Installer) download(url, dest string) error {
+	in.emit(log.Levels.Debug, "download", url)
+	return fetchx.Default.Download(url, dest)
+}
+
+func (in *Installer) fetch(url string) ([]byte, bool) {
+	in.emit(log.Levels.Debug, "download", url)
+	body, err := fetchx.Default.Fetch(url)
+	return body, err == nil
 }
 
 type Request struct {
@@ -149,6 +155,23 @@ func labelWithVersion(pkg, version string) string {
 	return pkg + " " + version
 }
 
+// [>] 🤖🤖
+func (in *Installer) pkgLabel(pkg string) string {
+	if by, ok := in.requiredBy[pkg]; ok && by != pkg {
+		return by + " dependency " + pkg
+	}
+	return pkg
+}
+
+func reinstallMsg(label, current, to string) string {
+	if current == "" {
+		return label + ": -> " + to
+	}
+	return label + ": " + current + " -> " + to
+}
+
+// [<] 🤖🤖
+
 func (in *Installer) cmdFor(pkg string) string {
 	if e, ok := in.File.Packages[pkg]; ok && e.Command != "" {
 		return e.Command
@@ -198,7 +221,7 @@ func (in *Installer) InstallRequests(reqs []Request) error {
 			if len(entry.Items) == 0 {
 				progress = true
 				if !in.hasCmd(pkg) {
-					in.emitSkip(log.Levels.Info, pkg, "no install manager, command absent")
+					in.emitSkip(log.Levels.Info, in.pkgLabel(pkg), "no install manager, command absent")
 					continue
 				}
 				if err := in.installCompletions(pkg, entry); err != nil {
@@ -238,7 +261,7 @@ func (in *Installer) InstallRequests(reqs []Request) error {
 	}
 	for _, pkg := range pending {
 		if in.hasCmd(pkg) {
-			in.emitSkip(log.Levels.Info, pkg, "no applicable manager, command present")
+			in.emitSkip(log.Levels.Info, in.pkgLabel(pkg), "no applicable manager, command present")
 			entry, err := in.findEntry(pkg)
 			if err != nil {
 				return err
@@ -248,7 +271,7 @@ func (in *Installer) InstallRequests(reqs []Request) error {
 			}
 			continue
 		}
-		in.emitSkip(log.Levels.Info, pkg, "no applicable manager")
+		in.emitSkip(log.Levels.Info, in.pkgLabel(pkg), "no applicable manager")
 	}
 	return nil
 }
@@ -256,6 +279,9 @@ func (in *Installer) InstallRequests(reqs []Request) error {
 func (in *Installer) plan(reqs []Request) ([]string, error) {
 	if in.requested == nil {
 		in.requested = map[string]Request{}
+	}
+	if in.requiredBy == nil {
+		in.requiredBy = map[string]string{}
 	}
 	var out []string
 	seen := map[string]bool{}
@@ -273,6 +299,9 @@ func (in *Installer) plan(reqs []Request) ([]string, error) {
 			return err
 		}
 		for _, dep := range entry.Requires {
+			if _, ok := in.requiredBy[dep]; !ok {
+				in.requiredBy[dep] = name
+			}
 			if err := walk(dep, append(chain, name)); err != nil {
 				return err
 			}
@@ -288,12 +317,17 @@ func (in *Installer) plan(reqs []Request) ([]string, error) {
 			return nil, err
 		}
 	}
+	if !in.baseInstalling {
+		for _, r := range reqs {
+			delete(in.requiredBy, r.Name)
+		}
+	}
 	return out, nil
 }
 
 func (in *Installer) installVia(pkg string, it Item) error {
 	if in.Opts.IfMissing && in.hasCmd(pkg) {
-		in.emitSkip(log.Levels.Info, pkg, "command present (--if-missing)")
+		in.emitSkip(log.Levels.Info, in.pkgLabel(pkg), "command present (--if-missing)")
 		return nil
 	}
 	if !in.baseInstalling {
@@ -313,7 +347,7 @@ func (in *Installer) installVia(pkg string, it Item) error {
 	}
 	pin := in.pinFor(pkg, it.Version)
 	if it.Mgr == "cask" && pin != "" {
-		in.emit(log.Levels.Warn, "unpinnable", pkg+": version "+pin+" cannot be enforced via brew/cask, installing the current release")
+		in.emit(log.Levels.Warn, "unpinnable", in.pkgLabel(pkg)+": version "+pin+" cannot be enforced via brew/cask, installing the current release")
 		pin = ""
 	}
 	base, err := in.managerPkgName(pkg, it, pin)
@@ -324,27 +358,31 @@ func (in *Installer) installVia(pkg string, it Item) error {
 	switch {
 	case installed && pin != "" && !in.pinSatisfied(pkg, it.Mgr, base, pin):
 		if !installAcceptsPin(it.Mgr) && !in.managerHasNewer(it.Mgr, base) {
-			in.emitSkip(log.Levels.Warn, pkg, fmt.Sprintf("pin %s unsatisfiable via %s: installed %s is the manager's latest", pin, it.Mgr, in.installedVersion(it.Mgr, base)))
+			in.emitSkip(log.Levels.Warn, in.pkgLabel(pkg), fmt.Sprintf("pin %s unsatisfiable via %s: installed %s is the manager's latest", pin, it.Mgr, in.installedVersion(it.Mgr, base)))
 			return nil
 		}
-		in.emit(log.Levels.Info, "reinstall", pkg+": -> "+pin)
+		in.emit(log.Levels.Info, "reinstall", reinstallMsg(in.pkgLabel(pkg), in.installedVersion(it.Mgr, base), pin))
 		if !installAcceptsPin(it.Mgr) {
 			return in.update(pkg, it.Mgr, base)
 		}
 	case installed && in.Opts.Update && pin == "":
 		return in.update(pkg, it.Mgr, base)
 	case installed:
-		in.emitSkip(log.Levels.Info, pkg, "already installed via "+it.Mgr)
+		in.emitSkip(log.Levels.Info, in.pkgLabel(pkg), "already installed via "+it.Mgr)
 		return nil
 	}
 	if in.Opts.DryRun {
-		in.emitDryRun("install", labelWithVersion(pkg, pin)+" via "+it.Mgr)
+		in.emitDryRun("install", labelWithVersion(in.pkgLabel(pkg), pin)+" via "+it.Mgr)
 		return nil
 	}
 	if err := in.managerInstall(it.Mgr, pinnedName(it.Mgr, base, pin), pin); err != nil {
 		return err
 	}
-	in.emit(log.Levels.Info, "installed", labelWithVersion(pkg, pin)+" via "+it.Mgr)
+	ver := pin
+	if ver == "" && it.Mgr == "apt" {
+		ver = in.installedVersion("apt", base)
+	}
+	in.emit(log.Levels.Info, "installed", labelWithVersion(in.pkgLabel(pkg), ver)+" via "+it.Mgr)
 	return nil
 }
 
@@ -558,7 +596,7 @@ var managerRoutines = map[string]managerRoutine{
 
 func (in *Installer) update(pkg, mgr, base string) error {
 	if in.Opts.DryRun {
-		in.emitDryRun("update", pkg+" via "+mgr)
+		in.emitDryRun("update", in.pkgLabel(pkg)+" via "+mgr)
 		return nil
 	}
 	if mgr == "go" {
@@ -571,7 +609,7 @@ func (in *Installer) update(pkg, mgr, base string) error {
 	if err := r.update(in, mgr, base); err != nil {
 		return err
 	}
-	in.emit(log.Levels.Info, "updated", pkg+" via "+mgr)
+	in.emit(log.Levels.Info, "updated", labelWithVersion(in.pkgLabel(pkg), in.installedVersion(mgr, base))+" via "+mgr)
 	return nil
 }
 
@@ -584,6 +622,9 @@ func (in *Installer) managerInstall(mgr, name, pin string) error {
 }
 
 func (in *Installer) brewInstall(mgr, name string) error {
+	if err := in.brewUpdate(); err != nil {
+		return err
+	}
 	if parts := strings.Split(name, "/"); len(parts) >= 3 {
 		if err := in.exec([]string{in.brewBin(), "tap", parts[0] + "/" + parts[1]}); err != nil {
 			return err
@@ -607,15 +648,27 @@ func (in *Installer) aptUpdate() error {
 	return in.exec(in.sudo("apt-get", "update"))
 }
 
-func (in *Installer) skipInstalledOrEmitReinstall(pkg, method, pin, to string, checkInstalled, checkPin func() bool) bool {
+func (in *Installer) brewUpdate() error {
+	if in.brewUpdated {
+		return nil
+	}
+	in.brewUpdated = true
+	return in.exec([]string{in.brewBin(), "update", "--quiet"})
+}
+
+func (in *Installer) skipInstalledOrEmitReinstall(pkg, method, pin, to string, checkInstalled, checkPin func() bool, current func() string) bool {
 	if !checkInstalled() {
 		return false
 	}
 	if pin == "" || checkPin() {
-		in.emitSkip(log.Levels.Info, pkg, "already installed via "+method)
+		in.emitSkip(log.Levels.Info, in.pkgLabel(pkg), "already installed via "+method)
 		return true
 	}
-	in.emit(log.Levels.Info, "reinstall", pkg+": -> "+to)
+	cur := ""
+	if current != nil {
+		cur = current()
+	}
+	in.emit(log.Levels.Info, "reinstall", reinstallMsg(in.pkgLabel(pkg), cur, to))
 	return false
 }
 
@@ -637,22 +690,22 @@ func (in *Installer) installScript(pkg string, s *ScriptSpec) error {
 	pin := in.pinFor(pkg, s.Version)
 	if s.ValidateArtifact != "" {
 		if fileExists(in.expandPath(s.ValidateArtifact)) {
-			in.emitSkip(log.Levels.Info, pkg, "already installed via script ("+s.ValidateArtifact+" present)")
+			in.emitSkip(log.Levels.Info, in.pkgLabel(pkg), "already installed via script ("+s.ValidateArtifact+" present)")
 			return nil
 		}
 	} else if in.skipInstalledOrEmitReinstall(pkg, "script", pin, s.Version,
 		func() bool { return in.hasCmd(pkg) },
-		func() bool { return in.versionOutputHasPin(pkg, pin) }) {
+		func() bool { return in.versionOutputHasPin(pkg, pin) }, nil) {
 		return nil
 	}
 	if in.Opts.DryRun {
-		in.emitDryRun("install", labelWithVersion(pkg, pin)+" via script")
+		in.emitDryRun("install", labelWithVersion(in.pkgLabel(pkg), pin)+" via script")
 		return nil
 	}
 	if err := in.runScript(pkg, s, "install script"); err != nil {
 		return err
 	}
-	in.emit(log.Levels.Info, "installed", labelWithVersion(pkg, pin)+" via script")
+	in.emit(log.Levels.Info, "installed", labelWithVersion(in.pkgLabel(pkg), pin)+" via script")
 	return nil
 }
 
@@ -689,15 +742,15 @@ func (in *Installer) scriptArgv(pkg string, s *ScriptSpec) ([]string, func(), er
 		return withScriptArgs([]string{"/bin/sh", "-ec", s.Run}, s), nil, nil
 	}
 	if s.URL != "" {
-		content, ok := in.output(curlArgv(s.URL))
-		if !ok || content == "" {
+		content, ok := in.fetch(s.URL)
+		if !ok || len(content) == 0 {
 			return nil, nil, fmt.Errorf("%s: install script fetch failed: %s", pkg, s.URL)
 		}
 		f, err := os.CreateTemp("", "che-script-*")
 		if err != nil {
 			return nil, nil, err
 		}
-		if _, err := f.WriteString(content); err != nil {
+		if _, err := f.Write(content); err != nil {
 			return nil, nil, err
 		}
 		if err := f.Chmod(0o755); err != nil {
@@ -737,7 +790,7 @@ func (in *Installer) goInstall(pkg, module string) error {
 	if err := in.runCmd(c); err != nil {
 		return fmt.Errorf("go install %s: %w", module, err)
 	}
-	in.emit(log.Levels.Info, "installed", pkg+" via go")
+	in.emit(log.Levels.Info, "installed", in.pkgLabel(pkg)+" via go")
 	return nil
 }
 

@@ -76,7 +76,7 @@ func TestEntryVersionPinsArchiveVersion(t *testing.T) {
 	in, m := newInstaller(t, y, "linux", cmdMap([]string{"sha256sum"}), Options{})
 	m.Stub = shaStub("goodsha")
 	require.NoError(t, in.Install([]string{"kind"}))
-	requireCalls(t, m, "https://example.com/kind-0.32.0")
+	require.Contains(t, testFetch.Calls(), "https://example.com/kind-0.32.0")
 }
 
 func TestArchiveWithoutVersionNeedsNoPin(t *testing.T) {
@@ -87,9 +87,11 @@ func TestArchiveWithoutVersionNeedsNoPin(t *testing.T) {
         extractBinaries: [aws/dist/aws]
         url: https://example.com/aws-latest.zip
 `
-	in, m := newInstaller(t, y, "linux", cmdMap(nil), Options{})
+	in, _ := newInstaller(t, y, "linux", cmdMap(nil), Options{})
+	tempHome(t, in)
+	testFetch.Bodies["https://example.com/aws-latest.zip"] = zipBody(t, "aws/dist/aws")
 	require.NoError(t, in.Install([]string{"aws"}))
-	requireCalls(t, m, "aws-latest.zip")
+	require.Contains(t, testFetch.Calls(), "https://example.com/aws-latest.zip")
 }
 
 // [<] 🤖🤖

@@ -90,8 +90,8 @@ func TestInstallCompletionsFetchesVerifiesInstalls(t *testing.T) {
 	in, m := newInstaller(t, goCompYaml, "linux", cmdMap([]string{"sha256sum"}), completionsOpts(Options{}))
 	m.Stub = shaStub("goodsha")
 	require.NoError(t, in.Install([]string{"go"}))
+	require.Contains(t, testFetch.Calls(), "https://example.com/_golang")
 	requireCalls(t, m,
-		"_golang https://example.com/_golang",
 		"mkdir -p /home/u/.local/share/zsh/site-functions",
 		"install -m 0644",
 		"/home/u/.local/share/zsh/site-functions/_golang")
@@ -104,7 +104,7 @@ func TestInstallCompletionsSkipsWhenPresent(t *testing.T) {
 		completionsOpts(Options{CompletionsDestinationCandidates: []string{dir}}))
 	m.Stub = shaStub("goodsha")
 	require.NoError(t, in.Install([]string{"go"}))
-	refuteCalls(t, m, "_golang https://example.com/_golang")
+	require.NotContains(t, testFetch.Calls(), "https://example.com/_golang")
 }
 
 func TestInstallCompletionsDryRunAnnounces(t *testing.T) {

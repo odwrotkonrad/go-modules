@@ -3,6 +3,8 @@ package packages
 // [>] 🤖🤖
 
 import (
+	"archive/zip"
+	"bytes"
 	"os"
 	"path/filepath"
 	"strings"
@@ -207,9 +209,25 @@ func TestInstallBinaryZipAsset(t *testing.T) {
         url: https://example.com/terraform_{version}_{os}_{arch}.zip
 `
 	in, m := newInstaller(t, zipYaml, "linux", cmdMap([]string{"sha256sum"}), Options{})
+	home := t.TempDir()
+	in.Host.Getenv = func(k string) string {
+		if k == "HOME" {
+			return home
+		}
+		return ""
+	}
+	var zbuf bytes.Buffer
+	zw := zip.NewWriter(&zbuf)
+	zf, err := zw.CreateHeader(&zip.FileHeader{Name: "terraform"})
+	require.NoError(t, err)
+	_, err = zf.Write([]byte("#!/bin/sh\n"))
+	require.NoError(t, err)
+	require.NoError(t, zw.Close())
+	testFetch.Bodies["https://example.com/terraform_1.15.0_linux_amd64.zip"] = zbuf.Bytes()
 	m.Stub = shaStub("goodsha")
 	require.NoError(t, in.Install([]string{"terraform"}))
-	requireCalls(t, m, "unzip -oq", "/home/u/.local/bin/terraform")
+	require.FileExists(t, filepath.Join(home, ".local", "opt", "terraform", "terraform"))
+	requireCalls(t, m, filepath.Join(home, ".local", "bin", "terraform"))
 }
 
 func TestDefaultEmittersWriteStdout(t *testing.T) {

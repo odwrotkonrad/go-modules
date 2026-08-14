@@ -78,11 +78,11 @@ func (in *Installer) installVersionManager(pkg string, s *VersionManagerSpec) er
 	}
 	globalOK := tool.global(in) == global
 	if len(missing) == 0 && globalOK {
-		in.emitSkip(log.Levels.Debug, pkg, "versions present via "+s.Tool)
+		in.emitSkip(log.Levels.Debug, in.pkgLabel(pkg), "versions present via "+s.Tool)
 		return nil
 	}
 	if in.Opts.DryRun {
-		in.emitDryRun("install", fmt.Sprintf("%s via %s (versions: %s, global: %s)", pkg, s.Tool, strings.Join(versions, " "), global))
+		in.emitDryRun("install", fmt.Sprintf("%s via %s (versions: %s, global: %s)", in.pkgLabel(pkg), s.Tool, strings.Join(versions, " "), global))
 		return nil
 	}
 	for _, v := range missing {
@@ -93,7 +93,7 @@ func (in *Installer) installVersionManager(pkg string, s *VersionManagerSpec) er
 	if err := tool.setGlobal(in, global); err != nil {
 		return err
 	}
-	in.emit(log.Levels.Info, "installed", fmt.Sprintf("%s via %s (versions: %s, global: %s)", pkg, s.Tool, strings.Join(versions, " "), global))
+	in.emit(log.Levels.Info, "installed", fmt.Sprintf("%s via %s (versions: %s, global: %s)", in.pkgLabel(pkg), s.Tool, strings.Join(versions, " "), global))
 	return nil
 }
 

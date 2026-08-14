@@ -54,6 +54,15 @@ Scenario: a manager installed earlier in the run serves later packages, no secon
   When one install run installs npm via apt and another package needs npm
   Then resolution runs in rounds: the npm-managed package installs in a later round of the same run
 
+Scenario: the install log tells spec-requested packages from dependencies
+  Status: implemented
+  When an install run installs or skips a package pulled in by `requires` or a manager's `basePackages` group
+  Then its log lines label it `<requirer> dependency <pkg>` (`will not install curl dependency git: already installed via apt`)
+  And spec-requested packages keep their bare name, even when another entry also requires them
+  And a reinstall line shows the currently installed version when known (`reinstall curl: 8.5.0-2 -> 8.14.1`), keeping `-> <pin>` alone otherwise
+  And an unpinned apt installed line reports the installed version (`installed apt-transport-https 2.6.1 via apt`); pinned installs keep the pin
+  And an updated line reports the manager's post-update version when known
+
 Scenario: a profile installs its packages before its scripts
   Status: tested
   When a profile declares `include.installPackages: [names...]`
@@ -237,6 +246,14 @@ Scenario: a user restricts installs to chosen methods with --only-methods
   Then only entry items using a listed manager are considered, nothing falls through to another installer
   And a package with no listed manager applicable skips with `no applicable manager`
   And an unknown manager name fails validation
+
+Scenario: a package manager's index is refreshed before its first install of the run
+  Status: tested
+  Given a run about to install via a manager with a repo index (apt, brew, brew/cask)
+  When the manager's first install of the run starts
+  Then the manager's repo-update command runs first (apt: `apt-get update`, brew: `brew update`)
+  And it runs at most once per run, re-armed when a new apt registry is configured
+  And managers querying live registries (npm, gem, go, vscode) run no update command
 
 Scenario: a user caches binariesRemoteArchive downloads across runs
   Status: tested

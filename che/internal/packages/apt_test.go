@@ -47,8 +47,8 @@ func TestInstallAptRepoConfiguresAndInstalls(t *testing.T) {
 	in, m := newInstaller(t, dockerAptYaml, "linux", cmdMap([]string{"apt-get"}), Options{})
 	m.Stub = aptStub(t)
 	require.NoError(t, in.Install([]string{"docker"}))
+	require.Contains(t, testFetch.Calls(), "https://download.docker.com/linux/debian/gpg")
 	requireCalls(t, m,
-		"https://download.docker.com/linux/debian/gpg",
 		"sudo install -m 0755 -d /etc/apt/keyrings",
 		"/etc/apt/keyrings/download.docker.com-linux-debian.asc",
 		"/etc/apt/sources.list.d/download.docker.com-linux-debian.sources",
