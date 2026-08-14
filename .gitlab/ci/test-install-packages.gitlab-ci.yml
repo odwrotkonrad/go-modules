@@ -169,7 +169,7 @@ test-e2e-install-package-linux-amd64:
   needs:
     - job: warm-go
       optional: true
-    - job: warm-e2e-image
+    - job: warm-e2e-pkg-installs-image
       optional: true
   script:
     - test -f e2e-images/che-e2e-debian-amd64.tar && docker load --quiet -i e2e-images/che-e2e-debian-amd64.tar || true
@@ -187,7 +187,7 @@ test-e2e-install-package-linux-arm64:
   needs:
     - job: warm-go
       optional: true
-    - job: warm-e2e-image
+    - job: warm-e2e-pkg-installs-image
       optional: true
   #[why] the shared warm-go artifact's dist/che and dist/e2e.test are amd64: swap in the zig-cross arm64 builds before reuse
   script:

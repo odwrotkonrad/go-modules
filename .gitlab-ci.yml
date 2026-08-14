@@ -165,7 +165,7 @@ test-e2e-che-registry:
 
 ##[>] 🤖🤖
 #[what] build the install-e2e container base image (debian + ca-certificates) once per pipeline, both arches, shared as docker-save tars
-warm-e2e-image:
+warm-e2e-pkg-installs-image:
   stage: warm
   image: $CI_IMAGE_DIND
   services: [docker:dind]
@@ -235,7 +235,7 @@ test-e2e-install-methods:
   needs:
     - job: warm-go
       optional: true
-    - job: warm-e2e-image
+    - job: warm-e2e-pkg-installs-image
       optional: true
   variables:
     DOCKER_HOST: tcp://docker:2376
