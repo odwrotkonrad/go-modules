@@ -631,12 +631,12 @@ packages:
                     - linux-arm64: sha256:e2c72ed188d5e27edca43b32ba6e07d271737bcca04f2869f270ed60750e3f83
                 url: https://github.com/open-telemetry/opentelemetry-collector-releases/releases/download/v{version}/otelcol_{version}_{os}_{arch}.tar.gz
     packer:
-        version: 1.16.0
         installers:
             - brew:
                 fromRegistry: hashicorp/tap
             - binariesRemoteArchive:
                 archScheme: go
+                version: 1.16.0
                 platformEligibility:
                     - darwin-arm64: sha256:6530042cf8f8a1f96b6607cb22b5be298be53b400cd4a2c81ab8b946964fccda
                     - linux-amd64: sha256:5edcd14ab59b535040c512dbecd6ec9ef976a000b073c19d93e4c431c948581e

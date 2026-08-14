@@ -25,7 +25,7 @@ Four sibling repos duplicated toolchain, CI, conventions, release flow. One repo
 - `conventions/templates/convention.md`: generating repo docs with che templates: `templates/1-env|2-data|3-audience`, `che.yml` wiring, `make render-templates`.
 - `conventions/ci/convention.md`: lefthook pre-commit hooks (minimal: docs generation check), re-run in a minimal CI validate job.
 - `conventions/license/convention.md`: every public repo carries `LICENSE` (unmodified MIT, creation-year copyright).
-- `conventions/spec-scenarios/convention.md`: behavior specs as markdown feature files: Gherkin-style scenarios, each with a `Status:` line (`todo | implemented | tested`), statuses kept accurate, each scenario title a value statement for its audience.
+- `conventions/spec-scenarios/convention.md`: behavior specs as markdown feature files: Gherkin-style scenarios, each with a `Status:` line (`todo | implemented | tested`), statuses kept accurate, each scenario title a value statement for its audience. Vetting dirs under `spec/`: `vetted/` (AI never touches), `vetted_title_only/` (titles frozen, rest editable), `unvetted_ai/` (AI free rein, new AI scenarios land here); moving files and scenarios between dirs must come from human will. `technical-requirements.md` same dirs, prefer `vetted/`: on add/change AI urges vetting first.
 - `conventions/claude-agents/convention.md`: per-repo `RO-<Repo>`/`RW-<Repo>` claude agents, che-rendered into `.claude/` on virt only: shared snippets in `configs`, fetched as remote renderTemplates sources (`@<repo>//<path>` + `ctx`), rendered outputs never committed.
 
 Each convention dir carries a runnable `example/`. This repo itself follows all of these conventions.
