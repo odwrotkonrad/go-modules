@@ -47,6 +47,13 @@ Scenario: pkgVersionCmd resolves per manager
   When the install e2e runs
   Then each method verifies via its own manager's version query
 
+Scenario: a command-less package opts out of the PATH presence probe (verify.checkInPath)
+  Status: tested
+  Given a `verify:` object with `checkInPath: false` (default true; combinable with `strategy` or `cmd`)
+  When presence checks run (`che packages check`, the post-install check)
+  Then the package is not probed for a command on PATH and no "missing" warning fires
+  And the install is still proven by the entry's verify strategy (e.g. apt-transport-https via `pkgVersionCmd`, nvm via its sourcing `cmd`)
+
 Scenario: a custom verify cmd succeeds on exit 0 alone
   Status: tested
   Given a `verify: {cmd: <command>}`

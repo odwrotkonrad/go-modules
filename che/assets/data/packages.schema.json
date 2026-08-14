@@ -395,20 +395,29 @@
         },
         {
           "properties": {
+            "strategy": {
+              "type": "string",
+              "enum": [
+                "versionCmd",
+                "pkgVersionCmd"
+              ],
+              "description": "versionCmd runs the entry command with --version, pkgVersionCmd asks the installing manager for the installed version"
+            },
             "cmd": {
               "type": "string",
-              "description": "command run after install, exit 0 = verified"
+              "description": "command run after install, exit 0 = verified (mutually exclusive with strategy)"
+            },
+            "checkInPath": {
+              "type": "boolean",
+              "description": "probe PATH for the package command during presence checks (default true); false for command-less packages"
             }
           },
           "additionalProperties": false,
           "type": "object",
-          "required": [
-            "cmd"
-          ],
-          "description": "custom verify command, exit 0 proves the install"
+          "description": "verify options: a strategy or custom command plus presence-check tuning"
         }
       ],
-      "description": "install verification: a named strategy or a custom command"
+      "description": "install verification: a named strategy or an options object"
     },
     "VersionManager": {
       "properties": {

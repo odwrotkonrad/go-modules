@@ -53,7 +53,9 @@ packages:
     apt-transport-https:
         installers:
             - apt:
-                verify: pkgVersionCmd
+                verify:
+                    strategy: pkgVersionCmd
+                    checkInPath: false
     aws:
         installers:
             - brew:
@@ -512,7 +514,9 @@ packages:
                     - 22.23.2
                 global: 24.19.0
     nvm:
-        versionCommand: . "$NVM_DIR/nvm.sh" && nvm --version
+        verify:
+            cmd: . "$NVM_DIR/nvm.sh" && nvm --version
+            checkInPath: false
         installers:
             - script:
                 url: https://raw.githubusercontent.com/nvm-sh/nvm/v0.40.6/install.sh

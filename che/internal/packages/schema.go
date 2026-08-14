@@ -189,10 +189,12 @@ func aptDef() *jsonschema.Schema {
 }
 
 func verifyDef() *jsonschema.Schema {
-	o := obj("custom verify command, exit 0 proves the install", []string{"cmd"})
-	o.Properties.Set("cmd", str("command run after install, exit 0 = verified"))
+	o := obj("verify options: a strategy or custom command plus presence-check tuning", nil)
+	o.Properties.Set("strategy", &jsonschema.Schema{Description: "versionCmd runs the entry command with --version, pkgVersionCmd asks the installing manager for the installed version", Type: "string", Enum: []any{VerifyVersionCmd, VerifyPkgVersionCmd}})
+	o.Properties.Set("cmd", str("command run after install, exit 0 = verified (mutually exclusive with strategy)"))
+	o.Properties.Set("checkInPath", &jsonschema.Schema{Description: "probe PATH for the package command during presence checks (default true); false for command-less packages", Type: "boolean"})
 	return &jsonschema.Schema{
-		Description: "install verification: a named strategy or a custom command",
+		Description: "install verification: a named strategy or an options object",
 		OneOf: []*jsonschema.Schema{
 			{Description: "strategy: versionCmd runs the entry command with --version, pkgVersionCmd asks the installing manager for the installed version", Type: "string", Enum: []any{VerifyVersionCmd, VerifyPkgVersionCmd}},
 			o,

@@ -20,6 +20,33 @@ func TestCheckPresentReportsMissing(t *testing.T) {
 	wantLines(t, out, "missing fd")
 }
 
+func TestCheckPresentSkipsPathProbeWhenDisabled(t *testing.T) {
+	yml := `packages:
+  apt-transport-https:
+    installers:
+      - apt:
+          verify:
+            strategy: pkgVersionCmd
+            checkInPath: false
+  nvm:
+    verify:
+      cmd: true
+      checkInPath: false
+    installers:
+      - script:
+          url: https://example.com/install.sh
+  fd: [apt]`
+	in, _ := newInstaller(t, yml, "linux", cmdMap([]string{"apt-get"}), Options{})
+	out, err := captureStdout(t, func() error {
+		require.Equal(t, []string{"fd"}, in.CheckPresent([]string{"apt-transport-https", "nvm", "fd"}))
+		return nil
+	})
+	require.NoError(t, err)
+	wantLines(t, out, "missing fd")
+	notLine(t, out, "missing apt-transport-https")
+	notLine(t, out, "missing nvm")
+}
+
 func TestCheckUpgradableBrewOutdated(t *testing.T) {
 	in, m := newInstaller(t, "packages:\n  bat: [brew]\n  fd: [brew]", "darwin", cmdMap([]string{"brew"}), Options{})
 	m.Stub = stubOutputs("brew outdated", "bat\n")

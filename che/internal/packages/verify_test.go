@@ -67,7 +67,7 @@ func TestVerifyRejectsUnknownStrategy(t *testing.T) {
     verify: nope
     installers: [apt]
 `), &File{})
-	require.ErrorContains(t, err, "verify: want versionCmd, pkgVersionCmd or {cmd: <command>}")
+	require.ErrorContains(t, err, "verify: want versionCmd, pkgVersionCmd or {strategy|cmd|checkInPath}")
 }
 
 func TestVerifyRejectsEmptyCmd(t *testing.T) {
@@ -76,7 +76,7 @@ func TestVerifyRejectsEmptyCmd(t *testing.T) {
     verify: {cmd: ""}
     installers: [apt]
 `), &File{})
-	require.ErrorContains(t, err, "verify: object form requires a non-empty cmd")
+	require.ErrorContains(t, err, "verify: object form requires strategy, cmd, or checkInPath")
 }
 
 func TestVerifyRoundTrips(t *testing.T) {

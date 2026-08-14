@@ -447,36 +447,59 @@ const (
 )
 
 type VerifySpec struct {
-	Strategy string
-	Cmd      string
+	Strategy    string
+	Cmd         string
+	CheckInPath *bool
+}
+
+func (v *VerifySpec) ChecksPath() bool {
+	return v == nil || v.CheckInPath == nil || *v.CheckInPath
 }
 
 func (v *VerifySpec) UnmarshalYAML(node *yaml.Node) error {
 	if node.Kind == yaml.ScalarNode {
 		if node.Value != VerifyVersionCmd && node.Value != VerifyPkgVersionCmd {
-			return fmt.Errorf("verify: want %s, %s or {cmd: <command>}, got %q", VerifyVersionCmd, VerifyPkgVersionCmd, node.Value)
+			return fmt.Errorf("verify: want %s, %s or {strategy|cmd|checkInPath}, got %q", VerifyVersionCmd, VerifyPkgVersionCmd, node.Value)
 		}
 		v.Strategy = node.Value
 		return nil
 	}
 	var obj struct {
-		Cmd string `yaml:"cmd"`
+		Strategy    string `yaml:"strategy"`
+		Cmd         string `yaml:"cmd"`
+		CheckInPath *bool  `yaml:"checkInPath"`
 	}
 	if err := node.Decode(&obj); err != nil {
 		return err
 	}
-	if obj.Cmd == "" {
-		return fmt.Errorf("verify: object form requires a non-empty cmd")
+	if obj.Strategy != "" && obj.Strategy != VerifyVersionCmd && obj.Strategy != VerifyPkgVersionCmd {
+		return fmt.Errorf("verify.strategy: want %s or %s, got %q", VerifyVersionCmd, VerifyPkgVersionCmd, obj.Strategy)
 	}
-	v.Cmd = obj.Cmd
+	if obj.Strategy != "" && obj.Cmd != "" {
+		return fmt.Errorf("verify: strategy and cmd are mutually exclusive")
+	}
+	if obj.Strategy == "" && obj.Cmd == "" && obj.CheckInPath == nil {
+		return fmt.Errorf("verify: object form requires strategy, cmd, or checkInPath")
+	}
+	v.Strategy, v.Cmd, v.CheckInPath = obj.Strategy, obj.Cmd, obj.CheckInPath
 	return nil
 }
 
 func (v VerifySpec) MarshalYAML() (any, error) {
-	if v.Cmd != "" {
-		return map[string]string{"cmd": v.Cmd}, nil
+	if v.CheckInPath == nil {
+		if v.Cmd != "" {
+			return map[string]string{"cmd": v.Cmd}, nil
+		}
+		return v.Strategy, nil
 	}
-	return v.Strategy, nil
+	obj := map[string]any{"checkInPath": *v.CheckInPath}
+	if v.Cmd != "" {
+		obj["cmd"] = v.Cmd
+	}
+	if v.Strategy != "" {
+		obj["strategy"] = v.Strategy
+	}
+	return obj, nil
 }
 
 type VersionManagerSpec struct {
