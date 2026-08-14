@@ -37,7 +37,7 @@ import (
 type installJob struct {
 	packages    []string
 	onlyMethods []string
-	verify      map[string]verifyCmd
+	verify      map[string][]verifyCmd
 	warnMissing bool
 }
 
@@ -228,14 +228,14 @@ func runPackageMethods(t *testing.T, entry packages.Entry, pkg, method string, c
 			runJob(t, installJob{
 				packages:    []string{pkg},
 				onlyMethods: []string{m},
-				verify:      map[string]verifyCmd{pkg: resolveVerify(t, entry, pkg, m)},
+				verify:      map[string][]verifyCmd{pkg: resolveVerify(t, entry, pkg, m)},
 				warnMissing: lenient || os.Getenv("E2E_INSTALL_MISSING_METHOD") == "warn",
 			}, cfg)
 		})
 	}
 }
 
-func resolveVerify(t *testing.T, entry packages.Entry, pkg, mgr string) verifyCmd {
+func resolveVerify(t *testing.T, entry packages.Entry, pkg, mgr string) []verifyCmd {
 	t.Helper()
 	spec := entry.Verify
 	for _, it := range entry.Items {
@@ -243,16 +243,30 @@ func resolveVerify(t *testing.T, entry packages.Entry, pkg, mgr string) verifyCm
 			spec = it.Verify
 		}
 	}
-	switch {
-	case spec != nil && spec.Cmd != "":
-		return verifyCmd{cmd: spec.Cmd}
-	case spec != nil && spec.Strategy == packages.VerifyPkgVersionCmd:
-		cmd, err := pkgVersionCmd(entry, pkg, mgr)
-		require.NoError(t, err)
-		return verifyCmd{cmd: cmd, wantOut: true}
-	case spec == nil && entry.VersionCommand != "":
-		return verifyCmd{cmd: entry.VersionCommand, wantOut: true}
+	var cmds []verifyCmd
+	if spec != nil {
+		if spec.VersionCmd {
+			cmds = append(cmds, defaultVerify(entry, pkg))
+		}
+		if spec.PkgVersionCmd {
+			cmd, err := pkgVersionCmd(entry, pkg, mgr)
+			require.NoError(t, err)
+			cmds = append(cmds, verifyCmd{cmd: cmd, wantOut: true})
+		}
+		if spec.Cmd != "" {
+			cmds = append(cmds, verifyCmd{cmd: spec.Cmd})
+		}
+		if len(cmds) > 0 {
+			return cmds
+		}
 	}
+	if spec == nil && entry.VersionCommand != "" {
+		return []verifyCmd{{cmd: entry.VersionCommand, wantOut: true}}
+	}
+	return []verifyCmd{defaultVerify(entry, pkg)}
+}
+
+func defaultVerify(entry packages.Entry, pkg string) verifyCmd {
 	cmd := pkg
 	if entry.Command != "" {
 		cmd = entry.Command
@@ -285,7 +299,7 @@ func pkgVersionCmd(entry packages.Entry, pkg, mgr string) (string, error) {
 	case "npm":
 		return "npm ls --global " + name, nil
 	case "vscode":
-		return fmt.Sprintf(`code $([ "$(id -u)" = 0 ] && echo "--no-sandbox --user-data-dir $HOME/.vscode-root") --list-extensions --show-versions | grep -i '^%s@'`, name), nil
+		return fmt.Sprintf("code --list-extensions --show-versions | grep -i '^%s@'", name), nil
 	}
 	return "", fmt.Errorf("verify pkgVersionCmd: no version query for method %s", mgr)
 }
@@ -402,15 +416,17 @@ func runJobHost(t *testing.T, job installJob) (string, bool) {
 		return out, true
 	}
 
-	for pkg, v := range job.verify {
-		verify := exec.Command("/bin/bash", "-ec", v.cmd)
-		verify.Env = env
-		verify.Dir = home
-		vout, verr := verify.CombinedOutput()
-		t.Logf("verify %s: %s\n%s", pkg, v.cmd, vout)
-		require.NoError(t, verr, "verify %s via %q", pkg, v.cmd)
-		if v.wantOut {
-			require.NotEmpty(t, strings.TrimSpace(string(vout)), "verify %s produced no output", pkg)
+	for pkg, vs := range job.verify {
+		for _, v := range vs {
+			verify := exec.Command("/bin/bash", "-ec", verifyShell(v.cmd))
+			verify.Env = env
+			verify.Dir = home
+			vout, verr := verify.CombinedOutput()
+			t.Logf("verify %s: %s\n%s", pkg, v.cmd, vout)
+			require.NoError(t, verr, "verify %s via %q", pkg, v.cmd)
+			if v.wantOut {
+				require.NotEmpty(t, strings.TrimSpace(string(vout)), "verify %s produced no output", pkg)
+			}
 		}
 	}
 	return out, false
@@ -418,6 +434,11 @@ func runJobHost(t *testing.T, job installJob) (string, bool) {
 
 func shq(s string) string {
 	return "'" + strings.ReplaceAll(s, "'", `'\''`) + "'"
+}
+
+func verifyShell(cmd string) string {
+	return `if [ -s "$NVM_DIR/nvm.sh" ]; then . "$NVM_DIR/nvm.sh"; fi; ` +
+		`if [ "$(id -u)" = 0 ]; then code() { command code --no-sandbox --user-data-dir "$HOME/.vscode-root" "$@"; }; fi; ` + cmd
 }
 
 // [why] apt/download caches persist across runs while each environment stays isolated:
@@ -465,12 +486,13 @@ func appendRunVerify(b *strings.Builder, che string, job installJob) {
 		fmt.Fprintf(b, "case \"$out\" in (*'%s: no applicable installation method'*) ;; (*) skip=0;; esac\n", pkg)
 	}
 	fmt.Fprintf(b, "if [ \"$skip\" = 1 ]; then echo %s; exit 0; fi\n", noDepsSkipMarker)
-	for pkg, v := range job.verify {
-		cmd := `if [ -s "$NVM_DIR/nvm.sh" ]; then . "$NVM_DIR/nvm.sh"; fi; ` + v.cmd
-		fmt.Fprintf(b, "vout=$(bash -c %s 2>&1) || { printf '%%s\\n' \"$vout\"; exit 1; }\n", shq(cmd))
-		fmt.Fprintf(b, "printf 'verify %s: %%s\\n' \"$vout\"\n", pkg)
-		if v.wantOut {
-			b.WriteString("test -n \"$vout\"\n")
+	for pkg, vs := range job.verify {
+		for _, v := range vs {
+			fmt.Fprintf(b, "vout=$(bash -c %s 2>&1) || { printf '%%s\\n' \"$vout\"; exit 1; }\n", shq(verifyShell(v.cmd)))
+			fmt.Fprintf(b, "printf 'verify %s: %%s\\n' \"$vout\"\n", pkg)
+			if v.wantOut {
+				b.WriteString("test -n \"$vout\"\n")
+			}
 		}
 	}
 }

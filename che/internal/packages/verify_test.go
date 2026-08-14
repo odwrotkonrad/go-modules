@@ -24,7 +24,7 @@ func TestVerifyParsesStrategyOnEntry(t *testing.T) {
 `)
 	v := f.Packages["foo"].Verify
 	require.NotNil(t, v)
-	require.Equal(t, VerifyPkgVersionCmd, v.Strategy)
+	require.True(t, v.PkgVersionCmd)
 	require.Empty(t, v.Cmd)
 }
 
@@ -43,8 +43,8 @@ func TestVerifyParsesStrategyOnItem(t *testing.T) {
         version: "1.0"
         verify: {cmd: baz doctor}
 `)
-	require.Equal(t, VerifyVersionCmd, f.Packages["foo"].Items[0].Verify.Strategy)
-	require.Equal(t, VerifyPkgVersionCmd, f.Packages["bar"].Items[0].Verify.Strategy)
+	require.True(t, f.Packages["foo"].Items[0].Verify.VersionCmd)
+	require.True(t, f.Packages["bar"].Items[0].Verify.PkgVersionCmd)
 	require.Equal(t, "baz doctor", f.Packages["baz"].Items[0].Verify.Cmd)
 }
 
@@ -57,7 +57,8 @@ func TestVerifyParsesCmdObject(t *testing.T) {
 `)
 	v := f.Packages["foo"].Verify
 	require.NotNil(t, v)
-	require.Empty(t, v.Strategy)
+	require.False(t, v.VersionCmd)
+	require.False(t, v.PkgVersionCmd)
 	require.Equal(t, "test -e /etc/foo.conf", v.Cmd)
 }
 
@@ -67,7 +68,7 @@ func TestVerifyRejectsUnknownStrategy(t *testing.T) {
     verify: nope
     installers: [apt]
 `), &File{})
-	require.ErrorContains(t, err, "verify: want versionCmd, pkgVersionCmd or {strategy|cmd|checkInPath}")
+	require.ErrorContains(t, err, "verify: want versionCmd, pkgVersionCmd or {versionCmd|pkgVersionCmd|cmd|checkInPath}")
 }
 
 func TestVerifyRejectsEmptyCmd(t *testing.T) {
@@ -76,7 +77,7 @@ func TestVerifyRejectsEmptyCmd(t *testing.T) {
     verify: {cmd: ""}
     installers: [apt]
 `), &File{})
-	require.ErrorContains(t, err, "verify: object form requires strategy, cmd, or checkInPath")
+	require.ErrorContains(t, err, "verify: object form requires versionCmd, pkgVersionCmd, cmd, or checkInPath")
 }
 
 func TestVerifyRoundTrips(t *testing.T) {

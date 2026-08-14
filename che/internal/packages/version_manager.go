@@ -64,9 +64,9 @@ func (in *Installer) linkNvmGlobalBin(global string) {
 		return
 	}
 	dest := in.userBinDir()
-	_ = in.exec([]string{"mkdir", "-p", dest})
+	_ = os.MkdirAll(dest, 0o755)
 	for _, e := range entries {
-		_ = in.exec([]string{"ln", "-sf", filepath.Join(bin, e.Name()), filepath.Join(dest, e.Name())})
+		_ = makeSymlink(filepath.Join(bin, e.Name()), filepath.Join(dest, e.Name()))
 	}
 }
 

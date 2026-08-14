@@ -447,9 +447,10 @@ const (
 )
 
 type VerifySpec struct {
-	Strategy    string
-	Cmd         string
-	CheckInPath *bool
+	VersionCmd    bool
+	PkgVersionCmd bool
+	Cmd           string
+	CheckInPath   *bool
 }
 
 func (v *VerifySpec) ChecksPath() bool {
@@ -458,46 +459,53 @@ func (v *VerifySpec) ChecksPath() bool {
 
 func (v *VerifySpec) UnmarshalYAML(node *yaml.Node) error {
 	if node.Kind == yaml.ScalarNode {
-		if node.Value != VerifyVersionCmd && node.Value != VerifyPkgVersionCmd {
-			return fmt.Errorf("verify: want %s, %s or {strategy|cmd|checkInPath}, got %q", VerifyVersionCmd, VerifyPkgVersionCmd, node.Value)
+		switch node.Value {
+		case VerifyVersionCmd:
+			v.VersionCmd = true
+		case VerifyPkgVersionCmd:
+			v.PkgVersionCmd = true
+		default:
+			return fmt.Errorf("verify: want %s, %s or {%s|%s|cmd|checkInPath}, got %q", VerifyVersionCmd, VerifyPkgVersionCmd, VerifyVersionCmd, VerifyPkgVersionCmd, node.Value)
 		}
-		v.Strategy = node.Value
 		return nil
 	}
 	var obj struct {
-		Strategy    string `yaml:"strategy"`
-		Cmd         string `yaml:"cmd"`
-		CheckInPath *bool  `yaml:"checkInPath"`
+		VersionCmd    bool   `yaml:"versionCmd"`
+		PkgVersionCmd bool   `yaml:"pkgVersionCmd"`
+		Cmd           string `yaml:"cmd"`
+		CheckInPath   *bool  `yaml:"checkInPath"`
 	}
 	if err := node.Decode(&obj); err != nil {
 		return err
 	}
-	if obj.Strategy != "" && obj.Strategy != VerifyVersionCmd && obj.Strategy != VerifyPkgVersionCmd {
-		return fmt.Errorf("verify.strategy: want %s or %s, got %q", VerifyVersionCmd, VerifyPkgVersionCmd, obj.Strategy)
+	if !obj.VersionCmd && !obj.PkgVersionCmd && obj.Cmd == "" && obj.CheckInPath == nil {
+		return fmt.Errorf("verify: object form requires %s, %s, cmd, or checkInPath", VerifyVersionCmd, VerifyPkgVersionCmd)
 	}
-	if obj.Strategy != "" && obj.Cmd != "" {
-		return fmt.Errorf("verify: strategy and cmd are mutually exclusive")
-	}
-	if obj.Strategy == "" && obj.Cmd == "" && obj.CheckInPath == nil {
-		return fmt.Errorf("verify: object form requires strategy, cmd, or checkInPath")
-	}
-	v.Strategy, v.Cmd, v.CheckInPath = obj.Strategy, obj.Cmd, obj.CheckInPath
+	v.VersionCmd, v.PkgVersionCmd, v.Cmd, v.CheckInPath = obj.VersionCmd, obj.PkgVersionCmd, obj.Cmd, obj.CheckInPath
 	return nil
 }
 
 func (v VerifySpec) MarshalYAML() (any, error) {
-	if v.CheckInPath == nil {
-		if v.Cmd != "" {
-			return map[string]string{"cmd": v.Cmd}, nil
+	if v.CheckInPath == nil && v.Cmd == "" {
+		if v.PkgVersionCmd && !v.VersionCmd {
+			return VerifyPkgVersionCmd, nil
 		}
-		return v.Strategy, nil
+		if v.VersionCmd && !v.PkgVersionCmd {
+			return VerifyVersionCmd, nil
+		}
 	}
-	obj := map[string]any{"checkInPath": *v.CheckInPath}
+	obj := map[string]any{}
+	if v.VersionCmd {
+		obj[VerifyVersionCmd] = true
+	}
+	if v.PkgVersionCmd {
+		obj[VerifyPkgVersionCmd] = true
+	}
 	if v.Cmd != "" {
 		obj["cmd"] = v.Cmd
 	}
-	if v.Strategy != "" {
-		obj["strategy"] = v.Strategy
+	if v.CheckInPath != nil {
+		obj["checkInPath"] = *v.CheckInPath
 	}
 	return obj, nil
 }

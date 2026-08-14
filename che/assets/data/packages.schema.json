@@ -395,17 +395,17 @@
         },
         {
           "properties": {
-            "strategy": {
-              "type": "string",
-              "enum": [
-                "versionCmd",
-                "pkgVersionCmd"
-              ],
-              "description": "versionCmd runs the entry command with --version, pkgVersionCmd asks the installing manager for the installed version"
+            "versionCmd": {
+              "type": "boolean",
+              "description": "run the entry command with --version (fallback version), exit 0 and non-empty output required"
+            },
+            "pkgVersionCmd": {
+              "type": "boolean",
+              "description": "ask the installing manager for the installed version, exit 0 and non-empty output required"
             },
             "cmd": {
               "type": "string",
-              "description": "command run after install, exit 0 = verified (mutually exclusive with strategy)"
+              "description": "command run after install, exit 0 = verified"
             },
             "checkInPath": {
               "type": "boolean",
@@ -414,10 +414,10 @@
           },
           "additionalProperties": false,
           "type": "object",
-          "description": "verify options: a strategy or custom command plus presence-check tuning"
+          "description": "verify options: strategy keys plus presence-check tuning, multiple keys combine"
         }
       ],
-      "description": "install verification: a named strategy or an options object"
+      "description": "install verification: a named strategy shorthand or an options object"
     },
     "VersionManager": {
       "properties": {
