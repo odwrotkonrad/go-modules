@@ -4,7 +4,7 @@
 
 `che packages` declaratively installs packages from a packages file
 (`$XDG_CONFIG_HOME/packages/packages.yml`): each canonical name lists managers
-in preference order (brew, brew/cask, vscode, apt, npm, go, gem, prebuiltBinariesArchive, script, pyenv, nvm), the first applicable on
+in preference order (brew, brew/cask, vscode, apt, npm, go, gem, binariesRemoteArchive, script, pyenv, nvm), the first applicable on
 this host wins. Profiles declare `include.installPackages` and the run
 sequence installs them before `runScripts`. Four check subcommands report
 presence, upgradability, shadowing, and duplicates.
@@ -18,8 +18,8 @@ Scenario: a package named once, by its CLI name, resolves on every host
 
 Scenario: a user installs a package via a supported installation method
   Status: tested
-  When a user wants to install a package via an installation method: brew, brew/cask, vscode, apt, npm, go, gem, prebuiltBinariesArchive, script, pyenv, nvm
-  Then they have the ability to do so on any platform where the method is eligible (osInstallers: every platform carries prebuiltBinariesArchive, script, npm, go, gem, pyenv, nvm. linux-debian adds apt, darwin adds brew, brew/cask, vscode)
+  When a user wants to install a package via an installation method: brew, brew/cask, vscode, apt, npm, go, gem, binariesRemoteArchive, script, pyenv, nvm
+  Then they have the ability to do so on any platform where the method is eligible (osInstallers: every platform carries binariesRemoteArchive, script, npm, go, gem, pyenv, nvm. linux-debian adds apt, darwin adds brew, brew/cask, vscode)
   And a method outside the set is a hard error naming the valid set
 
 Scenario: a user steers method selection with preferred installation methods
@@ -31,9 +31,9 @@ Scenario: a user steers method selection with preferred installation methods
   And the cascade is flag/env > profile > spec > user config
   And an unknown method name is a hard error naming the valid set
 
-Scenario: a user relocates prebuiltBinariesArchive installs and knows when the target is off PATH
+Scenario: a user relocates binariesRemoteArchive installs and knows when the target is off PATH
   Status: tested
-  When `packages.prebuiltBinariesArchive.installDestinationCandidates` is set (user config, spec options, profile options, or CHE_PACKAGES_PREBUILT_BINARIES_ARCHIVE_INSTALL_DESTINATION_CANDIDATES; scalar or list, ~/ and $VARs expand; default ~/.local/bin)
+  When `packages.binariesRemoteArchive.installDestinationCandidates` is set (user config, spec options, profile options, or CHE_PACKAGES_BINARIES_REMOTE_ARCHIVE_INSTALL_DESTINATION_CANDIDATES; scalar or list, ~/ and $VARs expand; default ~/.local/bin)
   Then with `checkPresentOnPath` (default true) the first candidate found on PATH becomes the install destination
   And when no candidate is on PATH a warning lists them once per run and the first entry is used
   And `checkPresentOnPath: false` skips the PATH probe and always uses the first entry
@@ -43,7 +43,7 @@ Scenario: managers list in preference order, the first applicable wins
   When a package lists several managers
   Then brew/cask apply on macos with brew present, apt on linux with apt-get present
   And npm/go/gem apply where their command is present
-  And prebuiltBinariesArchive applies when its installerVocabulary.platformEligibility list carries this os-arch
+  And binariesRemoteArchive applies when its installerVocabulary.platformEligibility list carries this os-arch
   And the first applicable item in entry order installs the package
   And an unknown manager is a hard error
   And a package with no applicable manager is a logged skip, not an error
@@ -72,7 +72,7 @@ Scenario: a version pin converges the host on exactly that version, downgrades i
   When a version is specified (entry-level or item-level `version:`) and the installed version differs
   Then install reinstalls to match the pin: npm installs `name@<pin>`, apt installs `name=<pin>`, go installs `module@v<pin>`, gem installs `-v <pin>`; unpinnable managers run their update path
   And embedded pins in item names (npm `name@ver`, apt `name=ver`, brew `name@ver`) are parse errors naming the version field
-  And install and dry-run messages label the package with its pinned version (`installed aws 2.36.18 via prebuiltBinariesArchive`)
+  And install and dry-run messages label the package with its pinned version (`installed aws 2.36.18 via binariesRemoteArchive`)
 
 Scenario: an absent version means rolling, a stated version is a promise checked per installer
   Status: tested
@@ -118,7 +118,7 @@ Scenario: an entry-level version guards any package's installed version
   Status: tested
   When an entry sets an exact `version:`
   Then it overrides the item-level pin for the drift check, matched against whole version tokens of the probe output
-  And a prebuiltBinariesArchive item whose url or installerVocabulary.extractBinaries uses `{version}` requires a pinned version: entry or item `version:`, or a requested one; none is a hard error
+  And a binariesRemoteArchive item whose url or installerVocabulary.extractBinaries uses `{version}` requires a pinned version: entry or item `version:`, or a requested one; none is a hard error
   And a manager-installed package drifting from the pin runs the manager's update path; check-upgradable warns while drifted
   And entries whose manager ships one recent version stay unpinned by convention; the builtin pins every version-distributing entry (archives, scripts, pyenv/nvm, npm/gem/go tools)
 
@@ -157,15 +157,15 @@ Scenario: top-level archLabelSchemes and osInstallers blocks standardize arch la
   Then the most specific key matching the host wins (`<os>-<distro>-<arch>` > `<os>-<distro>` > `<os>-<arch>` > `<os>`) and only its listed installers are applicable; a host matching no key falls back to the built-in applicability rules
   And apt is eligible only under `linux-debian` (the linux distro read from /etc/os-release ID): apt is not common to every distro, plain `linux` hosts skip apt items
   And item `installerVocabulary.platformEligibility:` ids are `<os>-<arch>`, validated against the block's os prefixes and archLabelSchemes' arches; an unknown value is a hard error naming both
-  And on a host whose platform id is a key, only its listed methods are applicable, named explicitly: `brew`, `brew/cask`, `vscode`, apt, npm, go, gem, prebuiltBinariesArchive, script, pyenv, nvm; an unlisted host platform falls back to the built-in applicability rules
+  And on a host whose platform id is a key, only its listed methods are applicable, named explicitly: `brew`, `brew/cask`, `vscode`, apt, npm, go, gem, binariesRemoteArchive, script, pyenv, nvm; an unlisted host platform falls back to the built-in applicability rules
   And a key extends another with a yaml anchor/alias, no installer repetition (`linux: &common [script, npm]`, `linux-debian: [apt, *common]`): alias lists flatten
   And a file without the blocks inherits the builtin's
   And an item's `installerVocabulary.archLabelScheme: <set>` picks the spelling `{arch}` expands to; every item using `{arch}` must declare it (the builtin ships `go`, `uname`, `odd`)
   And the old `{arch_x}`/`{arch_g}` tokens and per-item `archNames:` maps are parse errors
 
-Scenario: a prebuiltBinariesArchive entry downloads, verifies, and lands on the destination candidate
+Scenario: a binariesRemoteArchive entry downloads, verifies, and lands on the destination candidate
   Status: tested
-  When a prebuiltBinariesArchive item applies (installerVocabulary.platformEligibility carries this os-arch)
+  When a binariesRemoteArchive item applies (installerVocabulary.platformEligibility carries this os-arch)
   Then url and installerVocabulary.extractBinaries members expand {version} {os} {arch} ({arch} spelled per archLabelScheme)
   And the download verifies against the platform's checksum, declared algorithm-prefixed (`sha256:<hex>`, an unprefixed value is a parse error); a bare platform name skips verification with a warning, a mismatch aborts the install
   And .tar.* extract the listed members, .zip unzips, bare assets install as-is
@@ -174,7 +174,7 @@ Scenario: a prebuiltBinariesArchive entry downloads, verifies, and lands on the 
 
 Scenario: a vscode extension is a package like any other
   Status: tested
-  When a package named by its extension id lists the `vscode` method via the brew object form (`golang.go: [{brew: {vscode: golang.go}}]`; bare `code`/`vscode` and `{code: id}`/`{vscode: id}` are illegal)
+  When a package named by its extension id lists the `vscode` installer key (bare `golang.go: [vscode]`, packageName defaulting to the entry key)
   Then it applies where the `code` command is present and installs via `code --install-extension <id>`
   And presence (install skip and check-present) reads `code --list-extensions`, queried once per run, case-insensitive
   And `--update` reruns the install with `--force`
@@ -206,7 +206,7 @@ Scenario: a user sees what drifted with check-upgradable
   Status: tested
   When I invoke `che packages check-upgradable`
   Then manager-reported outdated packages warn (brew outdated, apt list --upgradable, npm outdated -g)
-  And prebuiltBinariesArchive entries whose installed --version output lacks the yaml pin warn
+  And binariesRemoteArchive entries whose installed --version output lacks the yaml pin warn
 
 Scenario: a user spots PATH shadowing with check-not-shadowed
   Status: tested
