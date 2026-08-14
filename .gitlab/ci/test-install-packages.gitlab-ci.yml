@@ -141,8 +141,6 @@
     DOCKER_TLS_VERIFY: "1"
     DOCKER_CERT_PATH: "$DOCKER_TLS_CERTDIR/client"
     E2E_INSTALL_CACHE_DIR: $CI_PROJECT_DIR/.cache/che-e2e-install
-  before_script:
-    - apt-get update && apt-get install -y --no-install-recommends docker.io
 
 test-e2e-install-package-darwin-arm64:
   extends: .test-install-package
@@ -166,7 +164,7 @@ test-e2e-install-package-darwin-arm64:
 test-e2e-install-package-linux-amd64:
   extends: .test-install-package-linux
   stage: test-e2e-package-installs-linux-amd64
-  image: $CI_IMAGE
+  image: $CI_IMAGE_DIND
   needs:
     - job: warm-go
       optional: true
@@ -181,7 +179,7 @@ test-e2e-install-package-linux-arm64:
   stage: test-e2e-package-installs-linux-arm64
   tags:
     - saas-linux-small-arm64
-  image: $CI_IMAGE_ARM64
+  image: $CI_IMAGE_DIND_ARM64
   needs:
     - job: warm-go
       optional: true

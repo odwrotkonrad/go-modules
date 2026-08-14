@@ -24,6 +24,8 @@ stages:
 variables:
   CI_IMAGE: registry.gitlab.com/konradodwrot/infra/oci-images/ci-linux:latest
   CI_IMAGE_ARM64: registry.gitlab.com/konradodwrot/infra/oci-images/ci-linux:latest-arm64
+  CI_IMAGE_DIND: registry.gitlab.com/konradodwrot/infra/oci-images/ci-linux-dind:latest
+  CI_IMAGE_DIND_ARM64: registry.gitlab.com/konradodwrot/infra/oci-images/ci-linux-dind:latest-arm64
   GOMODCACHE: $CI_PROJECT_DIR/.cache/go-mod
   GOCACHE: $CI_PROJECT_DIR/.cache/go-build
   CC: clang
@@ -198,7 +200,7 @@ warm-go-darwin:
 #[why] with_no_deps proves each package pulls its own dependencies; the curated per-method subset keeps MR pipelines fast and deterministic, the manual per-package jobs and local PACKAGE=all cover the full set
 test-e2e-install-methods:
   stage: test-e2e-method-installs
-  image: $CI_IMAGE
+  image: $CI_IMAGE_DIND
   services: [docker:dind]
   needs:
     - job: warm-go
@@ -223,8 +225,6 @@ test-e2e-install-methods:
     - if: $CI_PIPELINE_SOURCE == "merge_request_event" || $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
       when: manual
       allow_failure: true
-  before_script:
-    - apt-get update && apt-get install -y --no-install-recommends docker.io
   #[why] the chosen packages live here, not in the matrix: matrix variables all land in the job name, METHOD alone keeps it readable
   script:
     - case "$METHOD" in
