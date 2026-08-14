@@ -512,12 +512,20 @@ func (in *Installer) isInstalled(pkg, mgr, base string) bool {
 	}
 }
 
+func (in *Installer) codeArgv(args ...string) []string {
+	argv := append([]string{"code"}, args...)
+	if in.Host.Euid == 0 {
+		argv = append(argv, "--no-sandbox", "--user-data-dir", filepath.Join(in.Host.Getenv("HOME"), ".vscode-root"))
+	}
+	return argv
+}
+
 func (in *Installer) codeExtensions() map[string]string {
 	if in.codeExts != nil {
 		return in.codeExts
 	}
 	in.codeExts = map[string]string{}
-	if out, ok := in.output([]string{"code", "--list-extensions", "--show-versions"}); ok {
+	if out, ok := in.output(in.codeArgv("--list-extensions", "--show-versions")); ok {
 		for line := range strings.Lines(out) {
 			ext := strings.ToLower(strings.TrimSpace(line))
 			if ext == "" {
@@ -601,7 +609,7 @@ var managerRoutines = map[string]managerRoutine{
 	},
 	"vscode": {
 		install: func(in *Installer, _, name, _ string) error {
-			if err := in.exec([]string{"code", "--install-extension", name}); err != nil {
+			if err := in.exec(in.codeArgv("--install-extension", name)); err != nil {
 				return err
 			}
 			base, version, _ := strings.Cut(strings.ToLower(name), "@")
@@ -609,7 +617,7 @@ var managerRoutines = map[string]managerRoutine{
 			return nil
 		},
 		update: func(in *Installer, _, base string) error {
-			return in.exec([]string{"code", "--install-extension", base, "--force"})
+			return in.exec(in.codeArgv("--install-extension", base, "--force"))
 		},
 	},
 	"gem": {

@@ -879,7 +879,7 @@ func (f *File) ValidatePlatforms() error {
 func (f *File) Find(pkg, path string) (Entry, error) {
 	e, ok := f.Packages[pkg]
 	if !ok {
-		return Entry{}, fmt.Errorf("unknown package: %s (add it to %s)", pkg, path)
+		return Entry{}, fmt.Errorf("unknown package: %s (required entry in %s)", pkg, path)
 	}
 	return e, nil
 }

@@ -658,7 +658,7 @@ func TestCheckPresentUsesExtensionListForCodePackages(t *testing.T) {
 func TestInstallUnknownPackageErrors(t *testing.T) {
 	in, _ := newInstaller(t, "packages: {}", "darwin", cmdMap([]string{"brew"}), Options{})
 	err := in.Install([]string{"nope"})
-	require.ErrorContains(t, err, "unknown package: nope (add it to packages.yml)")
+	require.ErrorContains(t, err, "unknown package: nope (required entry in packages.yml)")
 }
 
 // [<] 🤖🤖

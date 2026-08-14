@@ -115,6 +115,9 @@ packages:
             env:
                 NONINTERACTIVE: "1"
     ca-certificates:
+        verify:
+            strategy: pkgVersionCmd
+            checkInPath: false
         installers:
             - apt
     ccstatusline:
@@ -168,6 +171,8 @@ packages:
                 packageName: '@anthropic-ai/claude-code'
                 version: 2.1.224
     code:
+        verify:
+            cmd: code --no-sandbox --user-data-dir "$HOME/.vscode-root" --version
         installers:
             - brew/cask:
                 packageName: visual-studio-code
@@ -231,12 +236,18 @@ packages:
                 fromRegistry: download.docker.com/linux/debian
     docker-buildx-plugin:
         version: 0.36.1
+        verify:
+            cmd: /usr/libexec/docker/cli-plugins/docker-buildx version
+            checkInPath: false
         installers:
             - apt:
                 versionMap: {"0.36.1": "0.36.1-1~debian.12~bookworm"}
                 fromRegistry: download.docker.com/linux/debian
     docker-compose-plugin:
         version: 5.4.0
+        verify:
+            cmd: /usr/libexec/docker/cli-plugins/docker-compose version
+            checkInPath: false
         installers:
             - apt:
                 versionMap: {"5.4.0": "5.4.0-1~debian.12~bookworm"}
@@ -481,6 +492,12 @@ packages:
         installers:
             - apt:
                 packageName: libbz2-dev
+    libc6-dev:
+        verify:
+            strategy: pkgVersionCmd
+            checkInPath: false
+        installers:
+            - apt
     libffi:
         verify:
             strategy: pkgVersionCmd
@@ -798,6 +815,8 @@ packages:
         requires:
             - gcc
             - make
+            - libc6-dev
+            - ruby-dev
         installers:
             - gem
     shellcheck:

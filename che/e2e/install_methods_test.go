@@ -285,7 +285,7 @@ func pkgVersionCmd(entry packages.Entry, pkg, mgr string) (string, error) {
 	case "npm":
 		return "npm ls --global " + name, nil
 	case "vscode":
-		return fmt.Sprintf("code --list-extensions --show-versions | grep -i '^%s@'", name), nil
+		return fmt.Sprintf(`code $([ "$(id -u)" = 0 ] && echo "--no-sandbox --user-data-dir $HOME/.vscode-root") --list-extensions --show-versions | grep -i '^%s@'`, name), nil
 	}
 	return "", fmt.Errorf("verify pkgVersionCmd: no version query for method %s", mgr)
 }
