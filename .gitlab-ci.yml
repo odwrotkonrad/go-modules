@@ -164,6 +164,36 @@ test-e2e-che-registry:
 ##[<] 🤖🤖
 
 ##[>] 🤖🤖
+#[what] build the install-e2e container base image (debian + ca-certificates) once per pipeline, both arches, shared as docker-save tars
+warm-e2e-image:
+  stage: warm
+  image: $CI_IMAGE_DIND
+  services: [docker:dind]
+  needs: []
+  variables:
+    DOCKER_HOST: tcp://docker:2376
+    DOCKER_TLS_CERTDIR: "/certs"
+    DOCKER_TLS_VERIFY: "1"
+    DOCKER_CERT_PATH: "$DOCKER_TLS_CERTDIR/client"
+  rules:
+    - if: $CI_PIPELINE_SOURCE == "merge_request_event"
+      changes: [che/**/*, lib/**/*, go.work, .gitlab-ci.yml]
+    - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
+      changes: [che/**/*, lib/**/*, go.work, .gitlab-ci.yml]
+    - if: $CI_PIPELINE_SOURCE == "merge_request_event" || $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
+      when: manual
+      allow_failure: true
+  script:
+    - docker run --privileged --rm tonistiigi/binfmt --install arm64
+    - docker build --quiet --platform linux/amd64 --tag che-e2e-debian:amd64 --file che/e2e/install-methods.Dockerfile che/e2e
+    - docker build --quiet --platform linux/arm64 --tag che-e2e-debian:arm64 --file che/e2e/install-methods.Dockerfile che/e2e
+    - mkdir -p e2e-images
+    - docker save che-e2e-debian:amd64 -o e2e-images/che-e2e-debian-amd64.tar
+    - docker save che-e2e-debian:arm64 -o e2e-images/che-e2e-debian-arm64.tar
+  artifacts:
+    paths:
+      - e2e-images/
+
 #[what] darwin warm build: cover binary + e2e harness, shared by the darwin install jobs via artifact
 #[why] the linux artifact is the wrong platform: without this every darwin matrix job links its own
 warm-go-darwin:
@@ -205,6 +235,8 @@ test-e2e-install-methods:
   needs:
     - job: warm-go
       optional: true
+    - job: warm-e2e-image
+      optional: true
   variables:
     DOCKER_HOST: tcp://docker:2376
     DOCKER_TLS_CERTDIR: "/certs"
@@ -236,6 +268,7 @@ test-e2e-install-methods:
         npm) PACKAGE=corepack,pnpm,tsc;;
         go) PACKAGE=gopls,get-os-open-files-with;;
       esac
+    - test -f e2e-images/che-e2e-debian-amd64.tar && docker load --quiet -i e2e-images/che-e2e-debian-amd64.tar || true
     - make -C che e2e-install-methods MODE=with_no_deps METHOD="$METHOD" PACKAGE="$PACKAGE" $(test -x che/dist/e2e.test && echo "BUILD_DEP= E2E_USE_TEST_BIN=1") $(test -x che/dist/che-linux-amd64 && echo "E2E_INSTALL_METHODS_DEPS=")
   artifacts:
     paths:
