@@ -252,6 +252,13 @@ packages:
                 packageName: containerd.io
                 versionMap: {"2.3.3": "2.3.3-1~debian.12~bookworm"}
                 fromRegistry: download.docker.com/linux/debian
+            - binariesRemoteArchive:
+                archScheme: go
+                extractBinaries: [bin/containerd, bin/containerd-shim-runc-v2, bin/ctr]
+                platformEligibility:
+                    - linux-amd64: sha256:ebf6e710056312628eaf6fb4a1c32f0a4ae5f812568321be4029389d66fc7c7c
+                    - linux-arm64: sha256:9cc708f13c31588a2fbdbd13553d963356e990d50e9b95a2d6120f4ff2067910
+                url: https://github.com/containerd/containerd/releases/download/v{version}/containerd-{version}-linux-{arch}.tar.gz
     curl:
         installers:
             - brew
@@ -305,6 +312,18 @@ packages:
             - apt:
                 versionMap: {"0.36.1": "0.36.1-1~debian.12~bookworm"}
                 fromRegistry: download.docker.com/linux/debian
+            - binariesRemoteArchive:
+                archScheme: go
+                aliasBinary:
+                    docker-buildx-plugin: ~/.docker/cli-plugins/docker-buildx
+                platformEligibility:
+                    - darwin-arm64: sha256:214cdc36788602862dbc82b523d58648b4585c7b0ff95218b0817c44db5573d7
+                    - linux-amd64: sha256:48af8a397ebd60178778bf63611dbcebe5f5e7a9be90eb9147b24b9587455778
+                    - linux-arm64: sha256:5d0cafd9d16afe1a0f0d9529885344ace2cc99efdd531b6c783c5455a6001569
+                url: https://github.com/docker/buildx/releases/download/v{version}/buildx-v{version}.{os}-{arch}
+                verify:
+                    cmd: $HOME/.docker/cli-plugins/docker-buildx version
+                    checkInPath: false
     docker-compose-plugin:
         version: 5.4.0
         verify:
@@ -314,6 +333,18 @@ packages:
             - apt:
                 versionMap: {"5.4.0": "5.4.0-1~debian.12~bookworm"}
                 fromRegistry: download.docker.com/linux/debian
+            - binariesRemoteArchive:
+                archScheme: uname
+                aliasBinary:
+                    docker-compose-plugin: ~/.docker/cli-plugins/docker-compose
+                platformEligibility:
+                    - darwin-arm64: sha256:bc3d1fd4c01e3af9b481fc5ea153ea7c006c77eb39be78e9af3e2e8ebecc0d61
+                    - linux-amd64: sha256:837fd1d35bf6a494f41b5b5988269a7be79de337cf1a1a6ff0e45ab51bb4e9be
+                    - linux-arm64: sha256:fc5d1371f1ec7987e703da94ede49af3fbfb240b83f22991a98511de7bc4b93b
+                url: https://github.com/docker/compose/releases/download/v{version}/docker-compose-{os}-{arch}
+                verify:
+                    cmd: $HOME/.docker/cli-plugins/docker-compose version
+                    checkInPath: false
     dockerd:
         version: 29.7.2
         installers:
@@ -321,6 +352,13 @@ packages:
                 packageName: docker-ce
                 versionMap: {"29.7.2": "5:29.7.2-1~debian.12~bookworm"}
                 fromRegistry: download.docker.com/linux/debian
+            - binariesRemoteArchive:
+                archScheme: uname
+                extractBinaries: [docker/dockerd, docker/docker-init, docker/docker-proxy, docker/runc]
+                platformEligibility:
+                    - linux-amd64: sha256:803d433f226db4776e1768fd319fc6c6e4935a456acf84fcc0080818b854bc8f
+                    - linux-arm64: sha256:43d143448adf2c2787704e7d7704fd6d62d367a54c5edaef0a3f75509cb0938d
+                url: https://download.docker.com/linux/static/stable/{arch}/docker-{version}.tgz
     duti:
         verify:
             cmd: duti -V

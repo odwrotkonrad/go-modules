@@ -195,6 +195,10 @@
         "completions": {
           "$ref": "#/$defs/CompletionsInstall",
           "description": "zsh completions installation options"
+        },
+        "updateCheck": {
+          "$ref": "#/$defs/UpdateCheck",
+          "description": "check the package registry for newer published package definitions before installs"
         }
       },
       "additionalProperties": false,
@@ -472,6 +476,20 @@
           ]
         }
       ]
+    },
+    "UpdateCheck": {
+      "properties": {
+        "enabled": {
+          "type": "boolean",
+          "description": "before installs, fetch the latest published che-packages definitions into the cache (failures warn and installs fall through to the cached or builtin set); default false; overridden by CHE_PACKAGES_UPDATE_CHECK"
+        },
+        "cooldown": {
+          "type": "string",
+          "description": "minimum interval between update checks (Go duration, e.g. 15m, 1h); default 15m; overridden by CHE_PACKAGES_UPDATE_CHECK_COOLDOWN"
+        }
+      },
+      "additionalProperties": false,
+      "type": "object"
     },
     "dirGroup": {
       "properties": {

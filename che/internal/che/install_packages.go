@@ -8,6 +8,7 @@ import (
 	"os"
 	"path/filepath"
 	"slices"
+	"time"
 
 	"gitlab.com/konradodwrot/go-modules/che/internal/log"
 	"gitlab.com/konradodwrot/go-modules/che/internal/options"
@@ -47,6 +48,12 @@ func loadPackagesFile(env map[string]string, home string, opts options.Options) 
 	path := resolvePackagesFile(env, home, opts)
 	if opts.PackagesFile == "" {
 		if _, err := os.Stat(path); err != nil {
+			if dir, _, ok := packages.ResolveCurrentDefinitions(packages.ResolveDefinitionsCacheDir(env, home)); ok {
+				cached := filepath.Join(dir, "packages.yml")
+				if f, err := packages.Load(cached); err == nil {
+					return f, cached, nil
+				}
+			}
 			f, err := packages.LoadBuiltin()
 			return f, packages.BuiltinPath, err
 		}
@@ -55,7 +62,26 @@ func loadPackagesFile(env map[string]string, home string, opts options.Options) 
 	return f, path, err
 }
 
+func checkDefinitionsUpdate(env map[string]string, home string, opts options.Options) {
+	if !opts.PackagesUpdateCheckEnabled {
+		return
+	}
+	cooldown, err := time.ParseDuration(opts.PackagesUpdateCheckCooldown)
+	if err != nil {
+		cooldown = packages.DefaultUpdateCooldown
+	}
+	cacheDir := packages.ResolveDefinitionsCacheDir(env, home)
+	res, err := packages.UpdateDefinitions(cacheDir, packages.ResolveUpdateBaseURL(env), cooldown, false)
+	switch {
+	case err != nil:
+		log.Emit(log.Event{Level: log.Levels.Warn, Scope: packages.Scope, Action: "update-check", Msg: "definitions update failed, using current set: " + err.Error()})
+	case res.Updated:
+		log.Emit(log.Event{Level: log.Levels.Info, Scope: packages.Scope, Action: "update-check", Msg: "definitions updated to " + res.Version})
+	}
+}
+
 func NewPackagesInstaller(env map[string]string, home string, opts options.Options) (*packages.Installer, error) {
+	checkDefinitionsUpdate(env, home, opts)
 	f, path, err := loadPackagesFile(env, home, opts)
 	if err != nil {
 		return nil, err
@@ -92,6 +118,19 @@ func NewPackagesInstaller(env map[string]string, home string, opts options.Optio
 			CompletionsCheckPresentOnFpath:             opts.PackagesCompletionsCheckPresentOnFpath,
 		},
 	}, nil
+}
+
+func UpdatePackagesDefinitions(ctx Context, opts options.Options, force bool) (packages.UpdateResult, error) {
+	home, err := resolveInvokingHome(ctx)
+	if err != nil {
+		return packages.UpdateResult{}, err
+	}
+	cooldown, err := time.ParseDuration(opts.PackagesUpdateCheckCooldown)
+	if err != nil {
+		cooldown = packages.DefaultUpdateCooldown
+	}
+	cacheDir := packages.ResolveDefinitionsCacheDir(ctx.Env, home)
+	return packages.UpdateDefinitions(cacheDir, packages.ResolveUpdateBaseURL(ctx.Env), cooldown, force)
 }
 
 func NewPackagesInstallerFromContext(ctx Context, opts options.Options) (*packages.Installer, error) {

@@ -7,6 +7,7 @@ import (
 	"os"
 	"path/filepath"
 	"slices"
+	"strings"
 
 	"gitlab.com/konradodwrot/go-modules/che/internal/log"
 )
@@ -22,19 +23,25 @@ func (in *Installer) aliasBinaries(pkg string, it Item) error {
 		if err != nil {
 			continue
 		}
+		pathDest := strings.ContainsRune(to, '/')
 		dest := filepath.Join(binDir, to)
+		if pathDest {
+			dest = in.expandPath(to)
+		}
 		if resolved, err := os.Readlink(dest); err == nil && resolved == src {
 			continue
 		}
-		if _, err := in.Host.LookPath(to); err == nil && !fileExists(dest) {
-			in.emitPresent(log.Levels.Debug, pkg, to+" already resolves without an alias")
-			continue
+		if !pathDest {
+			if _, err := in.Host.LookPath(to); err == nil && !fileExists(dest) {
+				in.emitPresent(log.Levels.Debug, pkg, to+" already resolves without an alias")
+				continue
+			}
 		}
 		if in.Opts.DryRun {
 			in.emitDryRun("alias", pkg+": "+to+" -> "+src)
 			continue
 		}
-		if err := os.MkdirAll(binDir, 0o755); err != nil {
+		if err := os.MkdirAll(filepath.Dir(dest), 0o755); err != nil {
 			return err
 		}
 		if err := makeSymlink(src, dest); err != nil {

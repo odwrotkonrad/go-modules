@@ -14,6 +14,7 @@ import (
 	"slices"
 	"strings"
 
+	chepackages "gitlab.com/konradodwrot/go-modules/che-packages"
 	"gitlab.com/konradodwrot/go-modules/che/internal/execx"
 	"gitlab.com/konradodwrot/go-modules/che/internal/fetchx"
 	"gitlab.com/konradodwrot/go-modules/che/internal/log"
@@ -792,7 +793,7 @@ func (in *Installer) makeScriptArgv(pkg string, s *ScriptSpec) ([]string, func()
 		}
 	}
 	if in.FilePath == BuiltinPath && !filepath.IsAbs(s.Path) {
-		if b, err := builtinScripts.ReadFile("scripts/" + path.Base(s.Path)); err == nil {
+		if b, err := chepackages.Scripts.ReadFile("scripts/" + path.Base(s.Path)); err == nil {
 			return withScriptArgs([]string{"/bin/sh", "-ec", string(b)}, s), nil, nil
 		}
 	}

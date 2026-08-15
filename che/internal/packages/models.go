@@ -3,7 +3,6 @@ package packages
 // [>] 🤖🤖🤖
 
 import (
-	"embed"
 	"fmt"
 	"maps"
 	"os"
@@ -14,14 +13,9 @@ import (
 
 	"gopkg.in/yaml.v3"
 
+	chepackages "gitlab.com/konradodwrot/go-modules/che-packages"
 	"gitlab.com/konradodwrot/go-modules/che/internal/fsutil"
 )
-
-//go:embed packages.yml
-var builtinPackages []byte
-
-//go:embed all:scripts
-var builtinScripts embed.FS
 
 const BuiltinPath = "builtin packages.yml"
 
@@ -29,7 +23,7 @@ const BuiltinSentinel = "__builtin__.packages.yml"
 
 func LoadBuiltin() (*File, error) {
 	f := &File{}
-	if err := yaml.Unmarshal(builtinPackages, f); err != nil {
+	if err := yaml.Unmarshal(chepackages.Builtin, f); err != nil {
 		return nil, fmt.Errorf("parse %s: %w", BuiltinPath, err)
 	}
 	return f, nil

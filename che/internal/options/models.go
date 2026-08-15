@@ -42,6 +42,8 @@ type Options struct {
 	PackagesCompletionsDestinationCandidates           []string
 	PackagesCompletionsCheckPresentOnFpath             bool
 	PackagesSilenceInstallStdout                       string
+	PackagesUpdateCheckEnabled                         bool
+	PackagesUpdateCheckCooldown                        string
 	AutoDiscover                                       bool
 	Otel                                               Otel
 	Settings                                           []Setting

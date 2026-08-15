@@ -162,7 +162,7 @@ func itemDef() *jsonschema.Schema {
 func itemBodyDef() *jsonschema.Schema {
 	o := obj("manager item spec", nil)
 	o.Properties.Set("packageName", str("manager-side package name when it differs from the entry key"))
-	o.Properties.Set("aliasBinary", stringMap("alias name to target binary"))
+	o.Properties.Set("aliasBinary", stringMap("alias name in the bin dir, or dest path (~ and $VARS expand, parent dirs created), to target binary"))
 	o.Properties.Set("version", str("pinned version, absent means rolling"))
 	o.Properties.Set("fromRegistry", str("installerRegistries ref (brew tap, apt url), brew/brew-cask/apt only"))
 	o.Properties.Set("verify", ref("Verify"))
@@ -174,7 +174,7 @@ func binariesRemoteArchiveDef() *jsonschema.Schema {
 	o.Properties.Set("packageName", str(""))
 	o.Properties.Set("versionMap", stringMap("binary version to archive version"))
 	o.Properties.Set("archScheme", str("archSchemes set substituted for {arch}"))
-	o.Properties.Set("aliasBinary", stringMap("alias name to target binary"))
+	o.Properties.Set("aliasBinary", stringMap("alias name in the bin dir, or dest path (~ and $VARS expand, parent dirs created), to target binary"))
 	o.Properties.Set("platformEligibility", ref("PlatformEligibility"))
 	o.Properties.Set("extractBinaries", ref("ExtractBinaries"))
 	o.Properties.Set("version", str("pinned version, absent means rolling"))
@@ -219,7 +219,7 @@ func aptDef() *jsonschema.Schema {
 	o := obj("apt item spec", nil)
 	o.Properties.Set("packageName", str("apt package name when it differs from the entry key"))
 	o.Properties.Set("versionMap", vm)
-	o.Properties.Set("aliasBinary", stringMap("alias name to target binary"))
+	o.Properties.Set("aliasBinary", stringMap("alias name in the bin dir, or dest path (~ and $VARS expand, parent dirs created), to target binary"))
 	o.Properties.Set("fromRegistry", str("installerRegistries.apt ref: scheme-less url[::suites[::components]]"))
 	o.Properties.Set("verify", ref("Verify"))
 	return o
@@ -240,7 +240,7 @@ func nixDef() *jsonschema.Schema {
 	o := obj("nix item spec", nil)
 	o.Properties.Set("packageName", str("flake attribute when it differs from the entry key"))
 	o.Properties.Set("versionMap", vm)
-	o.Properties.Set("aliasBinary", stringMap("alias name to target binary"))
+	o.Properties.Set("aliasBinary", stringMap("alias name in the bin dir, or dest path (~ and $VARS expand, parent dirs created), to target binary"))
 	o.Properties.Set("fromRegistry", str("installerRegistries.nix ref by name; default nixpkgs"))
 	o.Properties.Set("verify", ref("Verify"))
 	return o

@@ -7,9 +7,8 @@ upstream:
   - configs/llm/claude
   - infra/oci-images/ci-linux
   - infra/oci-images/ci-linux-dind
-  - {consumes: go-modules/lib, into: che}
-  - {consumes: go-modules/lib, into: get-os-open-files-with}
-  - {consumes: go-modules/lib, into: get-term-open-files-with}
+edges:
+  go-modules/lib: [che, get-os-open-files-with, get-term-open-files-with]
 downstream:
   - {name: che, type: binary}
   - {name: get-os-open-files-with, type: binary}

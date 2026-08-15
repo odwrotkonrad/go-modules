@@ -20,6 +20,7 @@ require (
 	github.com/tree-sitter-grammars/tree-sitter-make v1.1.1
 	github.com/tree-sitter/go-tree-sitter v0.24.0
 	github.com/ulikunitz/xz v0.5.16
+	gitlab.com/konradodwrot/go-modules/che-packages v0.0.1
 	gitlab.com/konradodwrot/go-modules/lib v0.0.1
 	go.opentelemetry.io/otel v1.42.0
 	go.opentelemetry.io/otel/exporters/otlp/otlplog/otlploggrpc v0.13.0
@@ -215,3 +216,5 @@ require (
 	modernc.org/memory v1.5.0 // indirect
 	modernc.org/sqlite v1.23.1 // indirect
 )
+
+replace gitlab.com/konradodwrot/go-modules/che-packages => ../che-packages

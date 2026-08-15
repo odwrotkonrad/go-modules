@@ -257,6 +257,14 @@ Usage: `che packages install [pkg...] [flags]`
 | `--silence-install-stdout` | `CHE_PACKAGES_SILENCE_INSTALL_STDOUT` | `true (bare-flag default)` \| `false (stream as it runs)` | `true at error/warn/info log level, false at debug/trace` | silence the installation method's stdout/stderr (a failing method's captured output always prints) |
 | `--update` |  | `bool` | `false` | refresh installed unpinned packages via their manager; pinned ones converge on the pin regardless |
 
+### `$ che packages update`
+
+fetch the latest published package definitions into the cache ($XDG_CACHE_HOME/che/packages); cached definitions supersede the builtin set when no packages file exists.
+
+| Option | Env | Values | Default | Description |
+| --- | --- | --- | --- | --- |
+| `--force` |  | `bool` | `false` | skip the cooldown short-circuit and re-check the registry now |
+
 ### `$ che prune-broken-links`
 
 delete broken symlinks.

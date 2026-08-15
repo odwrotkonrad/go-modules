@@ -633,6 +633,12 @@ func overlayPackages(hi, lo Packages) Packages {
 	if hi.Completions.Zsh.CheckPresentOnFpath == nil {
 		hi.Completions.Zsh.CheckPresentOnFpath = lo.Completions.Zsh.CheckPresentOnFpath
 	}
+	if hi.UpdateCheck.Enabled == nil {
+		hi.UpdateCheck.Enabled = lo.UpdateCheck.Enabled
+	}
+	if hi.UpdateCheck.Cooldown == "" {
+		hi.UpdateCheck.Cooldown = lo.UpdateCheck.Cooldown
+	}
 	return hi
 }
 

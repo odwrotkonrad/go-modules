@@ -21,7 +21,7 @@
             "type": "string"
           },
           "type": "object",
-          "description": "alias name to target binary"
+          "description": "alias name in the bin dir, or dest path (~ and $VARS expand, parent dirs created), to target binary"
         },
         "fromRegistry": {
           "type": "string",
@@ -80,7 +80,7 @@
             "type": "string"
           },
           "type": "object",
-          "description": "alias name to target binary"
+          "description": "alias name in the bin dir, or dest path (~ and $VARS expand, parent dirs created), to target binary"
         },
         "platformEligibility": {
           "$ref": "#/$defs/PlatformEligibility"
@@ -334,7 +334,7 @@
             "type": "string"
           },
           "type": "object",
-          "description": "alias name to target binary"
+          "description": "alias name in the bin dir, or dest path (~ and $VARS expand, parent dirs created), to target binary"
         },
         "version": {
           "type": "string",
@@ -371,7 +371,7 @@
             "type": "string"
           },
           "type": "object",
-          "description": "alias name to target binary"
+          "description": "alias name in the bin dir, or dest path (~ and $VARS expand, parent dirs created), to target binary"
         },
         "fromRegistry": {
           "type": "string",

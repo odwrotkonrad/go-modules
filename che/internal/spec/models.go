@@ -90,6 +90,12 @@ type Packages struct {
 	PreferredInstallationMethods []string                     `yaml:"preferredInstallationMethods" jsonschema:"enum=brew,enum=cask,enum=apt,enum=npm,enum=go,enum=gem,enum=binariesRemoteArchive,enum=script,enum=pyenv,enum=nvm,enum=nix" jsonschema_description:"manager preference order: listed managers are tried first (in this order) within each package entry, unlisted ones follow in entry order; cascades profile > spec > user config; overridden by CHE_PACKAGES_PREFERRED_METHODS"`
 	BinariesRemoteArchive        BinariesRemoteArchiveInstall `yaml:"binariesRemoteArchive" jsonschema_description:"binariesRemoteArchive installation method options"`
 	Completions                  CompletionsInstall           `yaml:"completions" jsonschema_description:"zsh completions installation options"`
+	UpdateCheck                  UpdateCheck                  `yaml:"updateCheck" jsonschema_description:"check the package registry for newer published package definitions before installs"`
+}
+
+type UpdateCheck struct {
+	Enabled  *bool  `yaml:"enabled" jsonschema_description:"before installs, fetch the latest published che-packages definitions into the cache (failures warn and installs fall through to the cached or builtin set); default false; overridden by CHE_PACKAGES_UPDATE_CHECK"`
+	Cooldown string `yaml:"cooldown" jsonschema_description:"minimum interval between update checks (Go duration, e.g. 15m, 1h); default 15m; overridden by CHE_PACKAGES_UPDATE_CHECK_COOLDOWN"`
 }
 
 type CompletionsInstall struct {

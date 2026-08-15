@@ -50,6 +50,7 @@ func (a *app) makePackagesCmd() *cobra.Command {
 	addPackagesKindFlag(install, &a.packagesKind)
 
 	cmd.AddCommand(install,
+		a.makePackagesUpdateCmd(),
 		a.makeCheckPresentCmd(),
 		a.makeCheckCmd("check-upgradable", "warn on manager-reported outdated packages and binary pins drifted from --version output",
 			func(in *packages.Installer, pkgs []string) error { return in.CheckUpgradable(pkgs) }),
@@ -90,6 +91,34 @@ func (a *app) installPackagesRunE(cmd *cobra.Command, args []string) error {
 	return a.specs.ExecEach(a.runCtx, "install-packages", func(ctx context.Context, p *che.ProfileReady) error {
 		return p.ExecOperationNamed(ctx, "install-packages")
 	})
+}
+
+func (a *app) makePackagesUpdateCmd() *cobra.Command {
+	var force bool
+	cmd := &cobra.Command{
+		Use:   "update",
+		Short: "fetch the latest published package definitions into the cache ($XDG_CACHE_HOME/che/packages); cached definitions supersede the builtin set when no packages file exists",
+		RunE: func(cmd *cobra.Command, args []string) error {
+			res, err := che.UpdatePackagesDefinitions(a.ctx, a.opts, force)
+			if err != nil {
+				return err
+			}
+			switch {
+			case res.Updated:
+				fmt.Printf("definitions updated to %s\n", res.Version)
+			case res.Skipped == "cooldown" && res.Version == "":
+				fmt.Println("update check on cooldown, no cached definitions yet (--force to fetch now)")
+			case res.Skipped == "cooldown":
+				fmt.Printf("definitions %s (checked within cooldown, --force to re-check)\n", res.Version)
+			default:
+				fmt.Printf("definitions %s up to date\n", res.Version)
+			}
+			return nil
+		},
+	}
+	cmd.Flags().BoolVar(&force, "force", false,
+		"skip the cooldown short-circuit and re-check the registry now")
+	return cmd
 }
 
 func (a *app) makeCheckPresentCmd() *cobra.Command {

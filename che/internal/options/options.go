@@ -8,6 +8,7 @@ import (
 	"slices"
 	"strconv"
 	"strings"
+	"time"
 
 	"gitlab.com/konradodwrot/go-modules/che/internal/log"
 	"gitlab.com/konradodwrot/go-modules/che/internal/packages"
@@ -257,6 +258,13 @@ func (o *Options) Resolve(env LookupEnv, user, spec Layer) error {
 		layerList(o.PackagesOnlyMethods, "cliFlag"), envStr(env("CHE_PACKAGES_ONLY_METHODS")))
 	if err := packages.ValidateManagers(o.PackagesOnlyMethods); err != nil {
 		return err
+	}
+	o.PackagesUpdateCheckEnabled = o.resolveBool("packages.updateCheck.enabled", false, env("CHE_PACKAGES_UPDATE_CHECK"), false,
+		boolLayer{user.Packages.UpdateCheck.Enabled, "config-file"}, boolLayer{spec.Packages.UpdateCheck.Enabled, "specFile"})
+	o.PackagesUpdateCheckCooldown = o.resolveStr("packages.updateCheck.cooldown", "15m",
+		envStr(env("CHE_PACKAGES_UPDATE_CHECK_COOLDOWN")), layer(user.Packages.UpdateCheck.Cooldown, "config-file"), layer(spec.Packages.UpdateCheck.Cooldown, "specFile"))
+	if _, err := time.ParseDuration(o.PackagesUpdateCheckCooldown); err != nil {
+		return fmt.Errorf("invalid packages.updateCheck.cooldown %q: want a Go duration (15m, 1h)", o.PackagesUpdateCheckCooldown)
 	}
 	o.PackagesDownloadCacheDir = o.resolveStr("packages.downloadCacheDir", "",
 		flagStr(o.PackagesDownloadCacheDir), envStr(env("CHE_PACKAGES_DOWNLOAD_CACHE_DIR")))
