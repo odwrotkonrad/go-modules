@@ -138,9 +138,10 @@ packages:
             - brew
             - apt:
                 #[why] debian renames the binary (bat is taken by bacula-console-qt): alias it back
-                #[why] only the binary is renamed: the page stays bat.1
+                #[why] debian ships no man page under either name
                 aliasBinary:
                     batcat: bat
+                manpages: []
             - nix:
                 fromRegistry: nixpkgs-26.05
                 versionMap: {"0.26.1": "02e08985a27c65ffd33d434eeb2e660a2e4dc84d"}
