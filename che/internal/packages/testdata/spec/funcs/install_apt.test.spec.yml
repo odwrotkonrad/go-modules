@@ -1,0 +1,430 @@
+# [>] 🤖🤖
+context:
+  function: packages.Installer.installApt
+cases:
+  - name: ShouldConfigureRepoAndInstall
+    input:
+      args:
+        - files: |
+            installerRegistries:
+              apt:
+                - url: https://download.docker.com/linux/debian
+                  verificationKey: https://download.docker.com/linux/debian/gpg
+            packages:
+              docker:
+                installers:
+                  - apt:
+                      packageName: docker-ce
+                      fromRegistry: download.docker.com/linux/debian
+        - cfg:
+            cmds: [apt-get]
+            failOn: [dpkg -s]
+            stubs:
+              - {prefix: dpkg --print-architecture, output: "amd64\n"}
+            osRelease: "ID=debian\nVERSION_CODENAME=\"bookworm\"\n"
+            packages: [docker]
+    expected:
+      output:
+        fetches: ["https://download.docker.com/linux/debian/gpg"]
+        calls:
+          - sudo install -m 0755 -d /etc/apt/keyrings
+          - /etc/apt/keyrings/download.docker.com-linux-debian.asc
+          - /etc/apt/sources.list.d/download.docker.com-linux-debian.sources
+          - sudo apt-get update
+          - sudo apt-get install --yes --no-install-recommends docker-ce
+  - name: ShouldKeepRepoConfiguredWhenAllInstalled
+    input:
+      args:
+        - files: |
+            installerRegistries:
+              apt:
+                - url: https://download.docker.com/linux/debian
+                  verificationKey: https://download.docker.com/linux/debian/gpg
+            packages:
+              docker:
+                installers:
+                  - apt:
+                      packageName: docker-ce
+                      fromRegistry: download.docker.com/linux/debian
+        - cfg:
+            cmds: [apt-get]
+            stubs:
+              - {prefix: dpkg --print-architecture, output: "amd64\n"}
+            osRelease: "ID=debian\nVERSION_CODENAME=\"bookworm\"\n"
+            packages: [docker]
+    expected:
+      output:
+        calls: [/etc/apt/sources.list.d/download.docker.com-linux-debian.sources]
+    notExpected:
+      output:
+        calls: [apt-get install]
+  - name: ShouldAnnounceRepoInstallOnDryRun
+    input:
+      args:
+        - files: |
+            installerRegistries:
+              apt:
+                - url: https://download.docker.com/linux/debian
+                  verificationKey: https://download.docker.com/linux/debian/gpg
+            packages:
+              docker:
+                installers:
+                  - apt:
+                      packageName: docker-ce
+                      fromRegistry: download.docker.com/linux/debian
+        - cfg:
+            cmds: [apt-get]
+            dryRun: true
+            failOn: [dpkg -s]
+            stubs:
+              - {prefix: dpkg --print-architecture, output: "amd64\n"}
+            packages: [docker]
+    expected:
+      stdOut: ["install docker via apt (dry run)"]
+    notExpected:
+      output:
+        calls: [curl]
+  - name: ShouldSkipInstalledPrerequisites
+    input:
+      args:
+        - files: |
+            packages:
+              x:
+                installers:
+                  - apt:
+                      packageName: x-cli
+                      prerequisitePackages: [gnupg]
+        - cfg:
+            cmds: [apt-get]
+            failOn: [dpkg -s x-cli]
+            packages: [x]
+    expected:
+      output:
+        calls: [--no-install-recommends x-cli]
+    notExpected:
+      output:
+        calls: [--no-install-recommends gnupg]
+  - name: ShouldRequireRegistryUrlAndVerificationKey
+    input:
+      args:
+        - files: |
+            installerRegistries:
+              apt:
+                - url: https://example.com
+            packages:
+              x:
+                installers:
+                  - apt: {fromRegistry: example.com}
+        - cfg:
+            cmds: [apt-get]
+            failOn: [dpkg -s]
+            stubs:
+              - {prefix: dpkg --print-architecture, output: "amd64\n"}
+            packages: [x]
+    expected:
+      errorOutput: apt registry "example.com" requires url and verificationKey
+  - name: ShouldPinMappedPackageVersion
+    input:
+      args:
+        - files: |
+            installerRegistries:
+              apt:
+                - url: https://deb.debian.org/debian
+                  verificationKey: /usr/share/keyrings/debian-archive-keyring.gpg
+                  suites: bookworm-backports
+                  components: main
+            packages:
+              curl:
+                version: 8.21.0
+                installers:
+                  - apt:
+                      versionMap: {"8.14.1": "8.14.1-2+deb13u2~bpo13+1"}
+                      fromRegistry: deb.debian.org/debian
+        - cfg:
+            cmds: [apt-get]
+            failOn: [dpkg -s]
+            stubs:
+              - {prefix: dpkg --print-architecture, output: "amd64\n"}
+            packages: [curl]
+    expected:
+      output:
+        calls: ["sudo apt-get install --yes --no-install-recommends -t bookworm-backports --allow-downgrades curl=8.14.1-2+deb13u2~bpo13+1"]
+  - name: ShouldReinstallOnPinMismatch
+    input:
+      args:
+        - files: |
+            installerRegistries:
+              apt:
+                - url: https://deb.debian.org/debian
+                  verificationKey: /usr/share/keyrings/debian-archive-keyring.gpg
+                  suites: bookworm-backports
+                  components: main
+            packages:
+              curl:
+                version: 8.21.0
+                installers:
+                  - apt:
+                      versionMap: {"8.14.1": "8.14.1-2+deb13u2~bpo13+1"}
+                      fromRegistry: deb.debian.org/debian
+        - cfg:
+            cmds: [apt-get]
+            stubs:
+              - {prefix: dpkg-query, output: 7.88.1-10+deb12u15}
+            packages: [curl]
+    expected:
+      output:
+        calls: ["--allow-downgrades curl=8.14.1-2+deb13u2~bpo13+1"]
+  - name: ShouldSkipWhenPinInstalled
+    input:
+      args:
+        - files: |
+            installerRegistries:
+              apt:
+                - url: https://deb.debian.org/debian
+                  verificationKey: /usr/share/keyrings/debian-archive-keyring.gpg
+                  suites: bookworm-backports
+                  components: main
+            packages:
+              curl:
+                version: 8.21.0
+                installers:
+                  - apt:
+                      versionMap: {"8.14.1": "8.14.1-2+deb13u2~bpo13+1"}
+                      fromRegistry: deb.debian.org/debian
+        - cfg:
+            cmds: [apt-get]
+            stubs:
+              - {prefix: dpkg-query, output: 8.14.1-2+deb13u2~bpo13+1}
+            packages: [curl]
+    expected: {}
+    notExpected:
+      output:
+        calls: [apt-get install]
+  - name: ShouldSkipKeyDownloadForPathKey
+    input:
+      args:
+        - files: |
+            installerRegistries:
+              apt:
+                - url: https://deb.debian.org/debian
+                  verificationKey: /usr/share/keyrings/debian-archive-keyring.gpg
+                  suites: bookworm-backports
+                  components: main
+            packages:
+              curl:
+                version: 8.21.0
+                installers:
+                  - apt:
+                      versionMap: {"8.14.1": "8.14.1-2+deb13u2~bpo13+1"}
+                      fromRegistry: deb.debian.org/debian
+        - cfg:
+            cmds: [apt-get]
+            stubs:
+              - {prefix: dpkg-query, output: 8.14.1-2+deb13u2~bpo13+1}
+            packages: [curl]
+    expected:
+      output:
+        calls: [/etc/apt/sources.list.d/deb.debian.org-debian-bookworm-backports-main.sources]
+    notExpected:
+      output:
+        calls: [curl -fsSL, /etc/apt/keyrings, apt-get install]
+  - name: ShouldErrorOnUnknownRegistry
+    input:
+      args:
+        - files: |
+            packages:
+              x:
+                installers:
+                  - apt: {fromRegistry: nowhere.example.com}
+        - cfg:
+            cmds: [apt-get]
+            failOn: [dpkg -s]
+            stubs:
+              - {prefix: dpkg --print-architecture, output: "amd64\n"}
+            packages: [x]
+    expected:
+      errorOutput: unknown apt registry "nowhere.example.com"
+  - name: ShouldRejectAmbiguousRegistry
+    input:
+      args:
+        - files: |
+            installerRegistries:
+              apt:
+                - url: https://deb.debian.org/debian
+                  verificationKey: /usr/share/keyrings/debian-archive-keyring.gpg
+                  suites: bookworm-backports
+                  components: main
+                - url: https://deb.debian.org/debian
+                  verificationKey: /usr/share/keyrings/debian-archive-keyring.gpg
+                  suites: bookworm
+                  components: main
+            packages:
+              x:
+                installers:
+                  - apt: {fromRegistry: deb.debian.org/debian}
+        - cfg:
+            cmds: [apt-get]
+            failOn: [dpkg -s]
+            stubs:
+              - {prefix: dpkg --print-architecture, output: "amd64\n"}
+            packages: [x]
+    expected:
+      errorOutput: ambiguous apt registry
+  - name: ShouldNarrowAmbiguousRegistryWithSuites
+    input:
+      args:
+        - files: |
+            installerRegistries:
+              apt:
+                - url: https://deb.debian.org/debian
+                  verificationKey: /usr/share/keyrings/debian-archive-keyring.gpg
+                  suites: bookworm-backports
+                  components: main
+                - url: https://deb.debian.org/debian
+                  verificationKey: /usr/share/keyrings/debian-archive-keyring.gpg
+                  suites: bookworm
+                  components: main
+            packages:
+              y:
+                installers:
+                  - apt: {fromRegistry: deb.debian.org/debian::bookworm-backports}
+        - cfg:
+            cmds: [apt-get]
+            failOn: [dpkg -s]
+            stubs:
+              - {prefix: dpkg --print-architecture, output: "amd64\n"}
+            packages: [y]
+    expected:
+      output:
+        calls: [-t bookworm-backports]
+  - name: ShouldSkipScriptWhenCommandOverridePresent
+    input:
+      args:
+        - files: |
+            packages:
+              docker-desktop:
+                command: docker
+                installers:
+                  - script:
+                      os: darwin
+                      run: echo install-desktop
+        - cfg:
+            os: darwin
+            cmds: [docker]
+            packages: [docker-desktop]
+    expected: {}
+    notExpected:
+      output:
+        calls: [install-desktop]
+  - name: ShouldRunScriptWhenCommandOverrideAbsent
+    input:
+      args:
+        - files: |
+            packages:
+              docker-desktop:
+                command: docker
+                installers:
+                  - script:
+                      os: darwin
+                      run: echo install-desktop
+        - cfg:
+            os: darwin
+            packages: [docker-desktop]
+    expected:
+      output:
+        calls: [install-desktop]
+  - name: ShouldReinstallEntryPinOnDrift
+    input:
+      args:
+        - files: |
+            packages:
+              jq:
+                version: 1.7-1
+                installers: [apt]
+        - cfg:
+            cmds: [apt-get]
+            stubs:
+              - {prefix: dpkg-query, output: 1.6-2}
+            packages: [jq]
+    expected:
+      output:
+        calls: ["sudo apt-get install --yes --no-install-recommends jq=1.7-1"]
+  - name: ShouldBeIneligibleOnNonDebianLinux
+    input:
+      args:
+        - files: "packages:\n  jq: [apt]"
+        - cfg:
+            cmds: [apt-get]
+            distro: ""
+            packages: [jq]
+    expected:
+      errorOutput: no applicable installation method for jq
+      output:
+        exactCalls: []
+  - name: ShouldPickMostSpecificOsInstallersKey
+    input:
+      args:
+        - files: |
+            osInstallers:
+              linux: [npm]
+              linux-debian: [apt]
+            packages:
+              jq: [apt]
+        - cfg:
+            cmds: [apt-get]
+            failOn: [dpkg -s]
+            packages: [jq]
+    expected:
+      output:
+        calls: [sudo apt-get install --yes --no-install-recommends jq]
+  - name: ShouldSudoAndUpdateIndexOncePerRun
+    input:
+      args:
+        - files: "packages:\n  fd: [brew, {apt: {packageName: fd-find}}]\n  jq: [apt]"
+        - cfg:
+            cmds: [apt-get]
+            failOn: [dpkg -s]
+            packages: [fd, jq]
+    expected:
+      output:
+        calls:
+          - sudo apt-get update
+          - sudo apt-get install --yes --no-install-recommends fd-find
+          - sudo apt-get install --yes --no-install-recommends jq
+        callCounts:
+          apt-get update: 1
+  - name: ShouldPickGcloudLinuxAptRepo
+    input:
+      args:
+        - files: |
+            installerRegistries:
+              apt:
+                - url: https://packages.cloud.google.com/apt
+                  verificationKey: https://packages.cloud.google.com/apt/doc/apt-key.gpg
+                  suites: cloud-sdk
+                  components: main
+            packages:
+              gcloud:
+                - apt:
+                    packageName: google-cloud-cli
+                    fromRegistry: packages.cloud.google.com/apt
+                - script:
+                    platformEligibility:
+                      - darwin-arm64: sha256:gsha
+                    os: darwin
+                    version: 572.0.0
+                    run: echo install-gcloud
+        - cfg:
+            cmds: [apt-get]
+            builtinFilePath: true
+            failOn: [dpkg -s]
+            stubs:
+              - {prefix: dpkg --print-architecture, output: "amd64\n"}
+            packages: [gcloud]
+    expected:
+      output:
+        fetches: ["https://packages.cloud.google.com/apt/doc/apt-key.gpg"]
+        calls:
+          - /etc/apt/sources.list.d/packages.cloud.google.com-apt-cloud-sdk-main.sources
+          - --no-install-recommends -t cloud-sdk google-cloud-cli
+# [<] 🤖🤖

@@ -514,4 +514,105 @@ cases:
         profiles: [main]
         linkDests:
           main: ['/Library/LaunchDaemons/x.plist', '/etc/zshenv']
+  - name: ShouldRejectAutoDiscoveryWhenDisabled
+    input:
+      args:
+        - refFiles: {}
+        - hostFiles:
+            che.yml: |
+              marked:
+                options: {autoDiscover: true}
+        - flags: {autoDiscover: false}
+    expected:
+      errorOutput: auto-discovery is disabled
+  - name: ShouldDiscoverMarkedProfilesWhenEnabled
+    input:
+      args:
+        - refFiles: {}
+        - hostFiles:
+            che.yml: |
+              marked:
+                options: {autoDiscover: true}
+        - flags: {}
+    expected:
+      output:
+        profiles: [marked]
+  - name: ShouldForceProfilesPastDisabledDiscovery
+    input:
+      args:
+        - refFiles: {}
+        - hostFiles:
+            che.yml: |
+              marked:
+                options: {autoDiscover: true}
+        - flags: {autoDiscover: false, profiles: [marked]}
+    expected:
+      output:
+        profiles: [marked]
+  - name: ShouldCascadeSpecAndProfileWorkingDirectories
+    input:
+      args:
+        - refFiles: {}
+        - hostFiles:
+            che.yml: |
+              options:
+                profileWorkingDirectory: spectree
+              p:
+                options: {autoDiscover: true}
+                include:
+                  makeLinks: [{source: _home/**, dest: 's:^_home:$HOME:'}]
+              q:
+                options: {autoDiscover: true, profileWorkingDirectory: proftree}
+                include:
+                  makeLinks: [{source: _home/**, dest: 's:^_home:$HOME:'}]
+            spectree/_home/.config/a: "a\n"
+            proftree/_home/.config/b: "b\n"
+        - flags: {}
+    expected:
+      output:
+        workingDirs:
+          p: "${HOST_REPO}/spectree"
+          q: "${HOST_REPO}/proftree"
+        linkDests:
+          p: ["${HOME}/.config/a"]
+          q: ["${HOME}/.config/b"]
+  - name: ShouldDefaultToCheLevelWorkingDirectoryFlag
+    input:
+      args:
+        - refFiles: {}
+        - hostFiles:
+            che.yml: |
+              r:
+                options: {autoDiscover: true}
+                include:
+                  makeLinks: [_home/**]
+            chetree/_home/.config/c: "c\n"
+        - flags: {profileWorkingDirectory: chetree}
+    expected:
+      output:
+        workingDirs:
+          r: "${HOST_REPO}/chetree"
+  - name: ShouldKeepSourcedSpecAnchoredAtItsOwnCheckout
+    input:
+      args:
+        - refFiles:
+            che.yml: |
+              s:
+                options: {autoDiscover: true}
+                include:
+                  makeLinks: [_home/**]
+            _home/.config/x: "x\n"
+        - hostFiles:
+            che.yml: |
+              main:
+                options: {autoDiscover: true}
+                include:
+                  profiles:
+                    - source: "${REF_DIR}/che.yml::s"
+            roottree/_home/.config/c: "c\n"
+        - flags: {profileWorkingDirectory: roottree}
+    expected:
+      output:
+        workingDirs:
+          s: "${REF_DIR}"
 # [<] 🤖🤖

@@ -66,21 +66,6 @@ func TestBasePackagesInstallOncePerRun(t *testing.T) {
 	require.Equal(t, 1, strings.Count(calls, "--no-install-recommends curl"))
 }
 
-func TestBasePackagesCommonOnlyForOtherMethods(t *testing.T) {
-	in, m := newInstaller(t, basePackagesYaml, "darwin", cmdMap([]string{"brew"}), Options{})
-	m.Stub = failOn("brew list")
-	require.NoError(t, in.Install([]string{"jq"}))
-	requireCalls(t, m, "brew install curl")
-	refuteCalls(t, m, "brew install ca-certificates")
-}
-
-func TestBasePackagesSkippedOnDryRun(t *testing.T) {
-	in, m := newInstaller(t, basePackagesYaml, "linux", cmdMap([]string{"apt-get"}), Options{DryRun: true})
-	m.Stub = failOn("dpkg -s")
-	require.NoError(t, in.Install([]string{"jq"}))
-	refuteCalls(t, m, "--no-install-recommends curl")
-}
-
 func TestBasePackagesBrewBootstrapsWhenAbsent(t *testing.T) {
 	const y = `basePackages:
   brew: [brew]
@@ -124,28 +109,6 @@ packages:
 	require.Less(t, scriptAt, jqAt)
 	require.Less(t, scriptAt, batAt)
 	require.Equal(t, 1, strings.Count(calls, "che-script-"))
-}
-
-func TestBasePackagesBrewPresentSkipsBootstrap(t *testing.T) {
-	const y = `basePackages:
-  brew: [brew]
-packages:
-  brew:
-    installers: [{script: {os: darwin, url: https://example.com/install.sh}}]
-  jq: [brew]
-`
-	in, m := newInstaller(t, y, "darwin", cmdMap([]string{"brew"}), Options{})
-	m.Stub = failOn("brew list")
-	require.NoError(t, in.Install([]string{"jq"}))
-	requireCalls(t, m, "brew install jq")
-	refuteCalls(t, m, "che-script-")
-}
-
-func TestBasePackagesAbsentIsNoop(t *testing.T) {
-	in, m := newInstaller(t, "packages:\n  jq: [apt]\n", "linux", cmdMap([]string{"apt-get"}), Options{})
-	m.Stub = failOn("dpkg -s")
-	require.NoError(t, in.Install([]string{"jq"}))
-	requireCalls(t, m, "--no-install-recommends jq")
 }
 
 // [<] 🤖🤖

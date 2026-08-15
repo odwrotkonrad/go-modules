@@ -1,0 +1,251 @@
+# [>] 🤖🤖
+context:
+  function: packages.Installer.Install
+cases:
+  - name: ShouldSkipWhenEntryVersionMatches
+    input:
+      args:
+        - files: |
+            packages:
+              bat:
+                version: "0.25.0"
+                installers: [brew, apt]
+        - cfg:
+            os: darwin
+            cmds: [brew, bat]
+            stubs:
+              - {prefix: "bat ", output: "bat 0.25.0 (871abd2)\n"}
+            packages: [bat]
+    expected: {}
+    notExpected:
+      output:
+        calls: [brew install, brew upgrade]
+  - name: ShouldRunManagerUpdateOnVersionDrift
+    input:
+      args:
+        - files: |
+            packages:
+              bat:
+                version: "0.25.0"
+                installers: [brew, apt]
+        - cfg:
+            os: darwin
+            cmds: [brew, bat]
+            stubs:
+              - {prefix: "bat ", output: "bat 0.24.0\n"}
+              - {prefix: brew outdated, output: "bat\n"}
+            packages: [bat]
+    expected:
+      output:
+        calls: [brew upgrade bat@0.25.0]
+  - name: ShouldSkipDriftWhenManagerHasNoNewer
+    input:
+      args:
+        - files: |
+            packages:
+              bat:
+                version: "0.25.0"
+                installers: [brew, apt]
+        - cfg:
+            os: darwin
+            cmds: [brew, bat]
+            stubs:
+              - {prefix: "bat ", output: "bat 0.24.0\n"}
+            packages: [bat]
+    expected: {}
+    notExpected:
+      output:
+        calls: [brew upgrade, brew install bat]
+  - name: ShouldAppendVersionedBrewFormula
+    input:
+      args:
+        - files: |
+            packages:
+              node:
+                version: "24"
+                installers: [brew]
+        - cfg:
+            os: darwin
+            cmds: [brew]
+            failOn: [brew list]
+            packages: [node]
+    expected:
+      output:
+        calls: [brew install node@24]
+    notExpected:
+      output:
+        calls: ["node@24@24"]
+  - name: ShouldWarnOnCaskPinAndInstallCurrent
+    input:
+      args:
+        - files: |
+            packages:
+              claude:
+                version: "2.1.224"
+                installers: [{brew/cask: {packageName: claude-code}}]
+        - cfg:
+            os: darwin
+            cmds: [brew]
+            failOn: [brew list]
+            packages: [claude]
+    expected:
+      stdOut: [cannot be enforced via brew/cask]
+      output:
+        calls: [brew install --cask claude-code]
+  - name: ShouldSkipPinningForUnversionedEntry
+    input:
+      args:
+        - files: |
+            packages:
+              jq:
+                installers: [brew, apt]
+        - cfg:
+            os: darwin
+            cmds: [brew, jq]
+            stubs:
+              - {prefix: "jq ", output: "jq-1.7.1\n"}
+            packages: [jq]
+    expected: {}
+    notExpected:
+      output:
+        calls: [__rolling__, brew install, brew upgrade]
+  - name: ShouldNotUseLatestSentinelAsArchiveVersion
+    input:
+      args:
+        - files: |
+            packages:
+              kind:
+                installers:
+                  - binariesRemoteArchive:
+                      platformEligibility: [{linux-amd64: sha256:goodsha}]
+                      url: https://example.com/kind-{version}
+        - cfg:
+            cmds: [sha256sum]
+            packages: [kind]
+    expected:
+      errorOutput: no version pinned
+  - name: ShouldResolveExplicitLatestSentinelAsArchiveVersion
+    input:
+      args:
+        - files: |
+            packages:
+              kind:
+                version: latest
+                installers:
+                  - binariesRemoteArchive:
+                      platformEligibility: [linux-amd64]
+                      url: https://example.com/kind-{version}
+        - cfg:
+            tempHome: true
+            packages: [kind]
+    expected:
+      output:
+        fetches: ["https://example.com/kind-latest"]
+  - name: ShouldPinGoModuleFromEntryVersion
+    input:
+      args:
+        - files: |
+            packages:
+              gopls:
+                version: 0.23.0
+                installers:
+                  - go:
+                      packageName: golang.org/x/tools/gopls
+        - cfg:
+            os: darwin
+            cmds: [go]
+            packages: [gopls]
+    expected:
+      output:
+        calls: [go install golang.org/x/tools/gopls@v0.23.0]
+  - name: ShouldTrackModuleHeadOnLatestVersion
+    input:
+      args:
+        - files: |
+            packages:
+              mytool:
+                version: latest
+                installers:
+                  - go:
+                      packageName: example.com/mytool
+        - cfg:
+            os: darwin
+            cmds: [go]
+            packages: [mytool]
+    expected:
+      output:
+        calls: [go install example.com/mytool@latest]
+    notExpected:
+      output:
+        calls: ["@vlatest"]
+  - name: ShouldSkipDriftChecksOnLatestVersion
+    input:
+      args:
+        - files: |
+            packages:
+              mytool:
+                version: latest
+                installers: [brew]
+        - cfg:
+            os: darwin
+            cmds: [brew, mytool]
+            packages: [mytool]
+    expected: {}
+    notExpected:
+      output:
+        calls: [brew install, brew upgrade]
+  - name: ShouldNeverFallBackFromUserFileScriptToBuiltin
+    input:
+      args:
+        - files: "packages:\n  kitty:\n    installers: [{script: {path: scripts/post-install-kitty.sh}}]"
+        - cfg:
+            os: darwin
+            tempFilePath: true
+            packages: [kitty]
+    expected:
+      errorOutput: install script not found
+    notExpected:
+      output:
+        calls: [kitty.app]
+  - name: ShouldRunPostInstallOnFreshInstall
+    input:
+      args:
+        - files: |
+            packages:
+              kitty:
+                installers:
+                  - script:
+                      url: https://example.com/installer.sh
+                      args: [launch=n]
+                postInstall: ln -fs /Applications/kitty.app/Contents/MacOS/kitty "$HOME/.local/bin/kitty"
+        - cfg:
+            os: darwin
+            stubs:
+              - {prefix: "curl ", output: "echo installing\n"}
+            packages: [kitty]
+    expected:
+      output:
+        calls:
+          - che-script-
+          - " launch=n"
+          - ln -fs /Applications/kitty.app/Contents/MacOS/kitty "$HOME/.local/bin/kitty"
+  - name: ShouldSkipPostInstallWhenAlreadyPresent
+    input:
+      args:
+        - files: |
+            packages:
+              kitty:
+                installers:
+                  - script:
+                      url: https://example.com/installer.sh
+                      args: [launch=n]
+                postInstall: ln -fs /Applications/kitty.app/Contents/MacOS/kitty "$HOME/.local/bin/kitty"
+        - cfg:
+            os: darwin
+            cmds: [kitty]
+            packages: [kitty]
+    expected: {}
+    notExpected:
+      output:
+        calls: [ln -fs]
+# [<] 🤖🤖

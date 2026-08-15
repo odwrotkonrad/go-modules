@@ -1,0 +1,38 @@
+# [>] 🤖🤖
+context:
+  function: che.ProfileReady.runScripts
+cases:
+  - name: ShouldStopAtFirstFailureWithErrexit
+    input:
+      args:
+        - each: false
+        - errexit: true
+        - failCmds: [install/first]
+    expected:
+      errorOutput: ["scripts failed:", install/first, errexit]
+      stdOut: ["failed ${SCRIPT_FIRST}"]
+    notExpected:
+      stdOut: ["${SCRIPT_SECOND}"]
+  - name: ShouldContinueAfterFailureByDefault
+    input:
+      args:
+        - each: false
+        - errexit: false
+        - failCmds: [install/first]
+    expected:
+      errorOutput: ["scripts failed:", install/first]
+      stdOut: ["failed ${SCRIPT_FIRST}", "ran ${SCRIPT_SECOND}"]
+    notExpected:
+      errorOutput: [errexit]
+  - name: ShouldStopRemainingProfilesOnErrexitInExecEach
+    input:
+      args:
+        - each: true
+        - errexit: true
+        - failCmds: [scripts/fail]
+    expected:
+      errorOutput: [errexit]
+      stdOut: [scripts/fail]
+    notExpected:
+      stdOut: ["ran ${REPO}/scripts/ok"]
+# [<] 🤖🤖

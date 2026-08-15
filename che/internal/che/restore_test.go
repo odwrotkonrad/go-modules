@@ -12,6 +12,7 @@ import (
 	"gitlab.com/konradodwrot/go-modules/che/internal/fsutil"
 	"gitlab.com/konradodwrot/go-modules/che/internal/options"
 	"gitlab.com/konradodwrot/go-modules/che/internal/testutil"
+	"gitlab.com/konradodwrot/go-modules/lib/testyml"
 )
 
 func restorerOver(t *testing.T, p *ProfileReady, opts options.Options) *Restorer {
@@ -53,56 +54,54 @@ func readFile(t *testing.T, path string) string {
 	return string(body)
 }
 
-func TestRestoreByRunIDRestoresThatRunsArchives(t *testing.T) {
-	p := realProfile(t)
-	dest := filepath.Join(p.home, "f.txt")
-	require.NoError(t, os.WriteFile(dest, []byte("original"), 0o644))
-	mutateCopy(t, p, dest, "installed")
-
-	require.NoError(t, restorerOver(t, p, options.Options{}).Restore(RestoreSelector{RunID: testRunID}))
-	require.Equal(t, "original", readFile(t, dest))
+type restoreRun struct {
+	RunID   string `yaml:"runId"`
+	Ts      string `yaml:"ts"`
+	Content string `yaml:"content"`
 }
 
-func TestRestoreByBackupIDRestoresOneArchive(t *testing.T) {
-	p := realProfile(t)
-	dest := filepath.Join(p.home, "f.txt")
-	require.NoError(t, os.WriteFile(dest, []byte("original"), 0o644))
-	mutateCopy(t, p, dest, "installed")
-	backups, err := p.Ledger.Backups()
-	require.NoError(t, err)
-	require.Len(t, backups, 1)
-	_, backupID := fsutil.ParseBackupArchiveName(backups[0].Path)
-	require.NotEmpty(t, backupID)
-
-	require.NoError(t, restorerOver(t, p, options.Options{}).Restore(RestoreSelector{BackupID: backupID}))
-	require.Equal(t, "original", readFile(t, dest))
+type restoreSelectorSpec struct {
+	RunID            string `yaml:"runId"`
+	BackupID         string `yaml:"backupId"`
+	Timestamp        string `yaml:"timestamp"`
+	UseCurrentRunID  bool   `yaml:"useCurrentRunId"`
+	UseFirstBackupID bool   `yaml:"useFirstBackupId"`
 }
 
-func TestRestoreByTimestampPicksLatestAtOrBefore(t *testing.T) {
-	p := realProfile(t)
-	dest := filepath.Join(p.home, "f.txt")
-	require.NoError(t, os.WriteFile(dest, []byte("v0"), 0o644))
-	run1 := nextRun(t, p, "run1aaaaaaaa", "20240101T000000")
-	mutateCopy(t, run1, dest, "v1")
-	run2 := nextRun(t, p, "run2bbbbbbbb", "20240201T000000")
-	mutateCopy(t, run2, dest, "v2")
-
-	// [why] latest backup <= T: between the runs only run1's archive qualifies,
-	require.NoError(t, restorerOver(t, p, options.Options{}).Restore(RestoreSelector{Timestamp: "20240115T000000"}))
-	require.Equal(t, "v0", readFile(t, dest))
-
-	mutateCopy(t, nextRun(t, p, "run3cccccccc", "20240301T000000"), dest, "v3")
-	require.NoError(t, restorerOver(t, p, options.Options{}).Restore(RestoreSelector{Timestamp: "20240215T000000"}))
-	require.Equal(t, "v1", readFile(t, dest))
-}
-
-func TestRestoreByTimestampBeforeEveryBackupErrors(t *testing.T) {
-	p := realProfile(t)
-	dest := filepath.Join(p.home, "f.txt")
-	mutateCopy(t, nextRun(t, p, "run1aaaaaaaa", "20240101T000000"), dest, "v1")
-
-	err := restorerOver(t, p, options.Options{}).Restore(RestoreSelector{Timestamp: "20230101T000000"})
-	require.ErrorContains(t, err, "no backup matches")
+func TestRestore(t *testing.T) {
+	testyml.Eq(t, td, "testdata/spec/funcs/restore.test.spec.yml", func(t *testing.T, c testyml.Case[string]) (string, error) {
+		p := realProfile(t)
+		dest := filepath.Join(p.home, "f.txt")
+		if initial := c.Input.Args.String(t, 0); initial != "" {
+			require.NoError(t, os.WriteFile(dest, []byte(initial), 0o644))
+		}
+		var runs []restoreRun
+		c.Input.Args.To(t, 1, &runs)
+		if c.Input.Args.Bool(t, 2) {
+			mutateCopy(t, p, dest, "installed")
+		}
+		for _, r := range runs {
+			mutateCopy(t, nextRun(t, p, r.RunID, r.Ts), dest, r.Content)
+		}
+		var sel restoreSelectorSpec
+		c.Input.Args.To(t, 3, &sel)
+		selector := RestoreSelector{RunID: sel.RunID, BackupID: sel.BackupID, Timestamp: sel.Timestamp}
+		if sel.UseCurrentRunID {
+			selector.RunID = p.runID
+		}
+		if sel.UseFirstBackupID {
+			backups, err := p.Ledger.Backups()
+			require.NoError(t, err)
+			require.Len(t, backups, 1)
+			_, backupID := fsutil.ParseBackupArchiveName(backups[0].Path)
+			require.NotEmpty(t, backupID)
+			selector.BackupID = backupID
+		}
+		if err := restorerOver(t, p, options.Options{}).Restore(selector); err != nil {
+			return "", err
+		}
+		return readFile(t, dest), nil
+	})
 }
 
 func TestRestoreSkipsDriftedDest(t *testing.T) {
@@ -129,18 +128,6 @@ func TestRestoreDryRunWritesNothing(t *testing.T) {
 	require.NoError(t, err)
 	require.Contains(t, testutil.StripANSI(out), "restore "+dest+" (dry run)")
 	require.Equal(t, "installed", readFile(t, dest))
-}
-
-func TestRestoreSelectorErrors(t *testing.T) {
-	p := realProfile(t)
-	dest := filepath.Join(p.home, "f.txt")
-	mutateCopy(t, p, dest, "installed")
-	r := restorerOver(t, p, options.Options{})
-
-	require.ErrorContains(t, r.Restore(RestoreSelector{}), "--run-id")
-	require.ErrorContains(t, r.Restore(RestoreSelector{RunID: "nope"}), "no backup matches")
-	require.ErrorContains(t, r.Restore(RestoreSelector{BackupID: "nope"}), "no backup matches")
-	require.ErrorContains(t, r.Restore(RestoreSelector{Timestamp: "bogus"}), "invalid --timestamp")
 }
 
 func TestRestoreUnreadableArchiveErrors(t *testing.T) {

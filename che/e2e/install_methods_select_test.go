@@ -6,37 +6,22 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/require"
+	"gopkg.in/yaml.v3"
 
 	"gitlab.com/konradodwrot/go-modules/che/internal/packages"
+	"gitlab.com/konradodwrot/go-modules/lib/testyml"
 )
 
 func TestMethodKey(t *testing.T) {
-	require.Equal(t, "brew/formulae", methodKey("brew"))
-	require.Equal(t, "brew/cask", methodKey("cask"))
-	require.Equal(t, "apt", methodKey("apt"))
-	require.Equal(t, "binariesRemoteArchive", methodKey("binariesRemoteArchive"))
+	testyml.Eq(t, td, "testdata/spec/funcs/method_key.test.spec.yml", func(t *testing.T, c testyml.Case[string]) (string, error) {
+		return methodKey(c.Input.Args.String(t, 0)), nil
+	})
 }
 
 func TestMethodMatches(t *testing.T) {
-	cases := []struct {
-		name, key, selected string
-		want                bool
-	}{
-		{name: "empty selects everything", key: "apt", selected: "", want: true},
-		{name: "all selects everything", key: "brew/cask", selected: "all", want: true},
-		{name: "exact", key: "apt", selected: "apt", want: true},
-		{name: "exact slashed", key: "brew/cask", selected: "brew/cask", want: true},
-		{name: "prefix", key: "brew/formulae", selected: "brew", want: true},
-		{name: "prefix other sub", key: "brew/cask", selected: "brew", want: true},
-		{name: "no partial word", key: "brewx", selected: "brew", want: false},
-		{name: "mismatch", key: "apt", selected: "brew", want: false},
-		{name: "selected deeper", key: "brew", selected: "brew/cask", want: false},
-	}
-	for _, c := range cases {
-		t.Run(c.name, func(t *testing.T) {
-			require.Equal(t, c.want, methodMatches(c.key, c.selected))
-		})
-	}
+	testyml.Eq(t, td, "testdata/spec/funcs/method_matches.test.spec.yml", func(t *testing.T, c testyml.Case[bool]) (bool, error) {
+		return methodMatches(c.Input.Args.String(t, 0), c.Input.Args.String(t, 1)), nil
+	})
 }
 
 func TestTargetHost(t *testing.T) {
@@ -45,34 +30,25 @@ func TestTargetHost(t *testing.T) {
 }
 
 func TestEligibleMethods(t *testing.T) {
-	entry := packages.Entry{Items: []packages.Item{
-		{Mgr: "brew"}, {Mgr: "cask"}, {Mgr: "apt"}, {Mgr: "binariesRemoteArchive"}, {Mgr: "binariesRemoteArchive"},
-	}}
-	darwin := []string{"brew", "brew/cask", "binariesRemoteArchive", "script", "npm", "go", "gem", "pyenv", "nvm"}
-	linux := []string{"apt", "binariesRemoteArchive", "script", "npm", "go", "gem", "pyenv", "nvm"}
-	cases := []struct {
-		name, method string
-		eligible     []string
-		want         []string
-	}{
-		{name: "darwin drops apt", eligible: darwin, want: []string{"brew", "cask", "binariesRemoteArchive"}},
-		{name: "linux drops brew and cask", eligible: linux, want: []string{"apt", "binariesRemoteArchive"}},
-		{name: "method narrows further", method: "brew", eligible: darwin, want: []string{"brew", "cask"}},
-		{name: "method x platform mismatch", method: "apt", eligible: darwin, want: nil},
-		{name: "dedupes repeated managers", method: "binariesRemoteArchive", eligible: linux, want: []string{"binariesRemoteArchive"}},
-	}
-	for _, c := range cases {
-		t.Run(c.name, func(t *testing.T) {
-			require.Equal(t, c.want, eligibleMethods(entry, c.method, c.eligible))
-		})
-	}
+	testyml.Eq(t, td, "testdata/spec/funcs/eligible_methods.test.spec.yml", func(t *testing.T, c testyml.Case[[]string]) ([]string, error) {
+		var entry packages.Entry
+		require.NoError(t, yaml.Unmarshal([]byte(c.Input.Args.String(t, 0)), &entry))
+		got := eligibleMethods(entry, c.Input.Args.String(t, 1), c.Input.Args.Strings(t, 2))
+		if got == nil {
+			got = []string{}
+		}
+		return got, nil
+	})
 }
 
 func TestSplitPackages(t *testing.T) {
-	require.Equal(t, []string{"jq"}, splitPackages("jq"))
-	require.Equal(t, []string{"jq", "podman"}, splitPackages("jq,podman"))
-	require.Equal(t, []string{"jq", "podman"}, splitPackages(" jq , podman ,"))
-	require.Empty(t, splitPackages(",,"))
+	testyml.Eq(t, td, "testdata/spec/funcs/split_packages.test.spec.yml", func(t *testing.T, c testyml.Case[[]string]) ([]string, error) {
+		got := splitPackages(c.Input.Args.String(t, 0))
+		if got == nil {
+			got = []string{}
+		}
+		return got, nil
+	})
 }
 
 // [<] 🤖🤖

@@ -257,6 +257,9 @@ che
       root
         remote
       scripts
+    testdata
+      spec
+        funcs
   internal
     che
       testdata

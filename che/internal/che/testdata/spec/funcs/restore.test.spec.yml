@@ -1,0 +1,92 @@
+# [>] 🤖🤖
+context:
+  function: che.Restorer.Restore
+cases:
+  - name: ShouldRestoreCurrentRunsArchivesByRunID
+    input:
+      args:
+        - initial: original
+        - runs: []
+        - seedDefaultRun: true
+        - selector: {useCurrentRunId: true}
+    expected:
+      output: original
+  - name: ShouldRestoreSingleArchiveByBackupID
+    input:
+      args:
+        - initial: original
+        - runs: []
+        - seedDefaultRun: true
+        - selector: {useFirstBackupId: true}
+    expected:
+      output: original
+  - name: ShouldPickLatestBackupAtOrBeforeTimestamp
+    input:
+      args:
+        - initial: v0
+        - runs:
+            - {runId: run1aaaaaaaa, ts: 20240101T000000, content: v1}
+            - {runId: run2bbbbbbbb, ts: 20240201T000000, content: v2}
+        - seedDefaultRun: false
+        - selector: {timestamp: 20240115T000000}
+    expected:
+      output: v0
+  - name: ShouldPickBetweenRunsBackupAtLaterTimestamp
+    input:
+      args:
+        - initial: v0
+        - runs:
+            - {runId: run1aaaaaaaa, ts: 20240101T000000, content: v1}
+            - {runId: run2bbbbbbbb, ts: 20240201T000000, content: v2}
+            - {runId: run3cccccccc, ts: 20240301T000000, content: v3}
+        - seedDefaultRun: false
+        - selector: {timestamp: 20240215T000000}
+    expected:
+      output: v1
+  - name: ShouldErrorOnTimestampBeforeEveryBackup
+    input:
+      args:
+        - initial: ""
+        - runs:
+            - {runId: run1aaaaaaaa, ts: 20240101T000000, content: v1}
+        - seedDefaultRun: false
+        - selector: {timestamp: 20230101T000000}
+    expected:
+      errorOutput: no backup matches
+  - name: ShouldRequireASelector
+    input:
+      args:
+        - initial: ""
+        - runs: []
+        - seedDefaultRun: true
+        - selector: {}
+    expected:
+      errorOutput: --run-id
+  - name: ShouldErrorOnUnknownRunID
+    input:
+      args:
+        - initial: ""
+        - runs: []
+        - seedDefaultRun: true
+        - selector: {runId: nope}
+    expected:
+      errorOutput: no backup matches
+  - name: ShouldErrorOnUnknownBackupID
+    input:
+      args:
+        - initial: ""
+        - runs: []
+        - seedDefaultRun: true
+        - selector: {backupId: nope}
+    expected:
+      errorOutput: no backup matches
+  - name: ShouldErrorOnMalformedTimestamp
+    input:
+      args:
+        - initial: ""
+        - runs: []
+        - seedDefaultRun: true
+        - selector: {timestamp: bogus}
+    expected:
+      errorOutput: invalid --timestamp
+# [<] 🤖🤖

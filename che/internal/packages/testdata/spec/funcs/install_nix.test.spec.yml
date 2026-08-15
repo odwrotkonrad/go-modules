@@ -1,0 +1,195 @@
+# [>] 🤖🤖
+context:
+  function: packages.Installer.installNix
+cases:
+  - name: ShouldInstallUnpinnedFromNixpkgsUnstable
+    input:
+      args:
+        - files: "packages:\n  jq: [nix]"
+        - cfg:
+            cmds: [nix]
+            failOn: ["nix --extra-experimental-features nix-command flakes profile list"]
+            packages: [jq]
+    expected:
+      output:
+        calls: ["nix --extra-experimental-features nix-command flakes profile install github:NixOS/nixpkgs/nixpkgs-unstable#jq"]
+  - name: ShouldInstallFromRegistryRef
+    input:
+      args:
+        - files: |
+            installerRegistries:
+              nix:
+                - name: stable
+                  url: github:NixOS/nixpkgs
+                  ref: nixos-26.05
+            packages:
+              bat:
+                installers:
+                  - nix: {fromRegistry: stable}
+        - cfg:
+            cmds: [nix]
+            failOn: ["nix --extra-experimental-features nix-command flakes profile list"]
+            packages: [bat]
+    expected:
+      output:
+        calls: ["profile install github:NixOS/nixpkgs/nixos-26.05#bat"]
+  - name: ShouldErrorOnUnknownRegistry
+    input:
+      args:
+        - files: |
+            installerRegistries:
+              nix:
+                - name: stable
+                  url: github:NixOS/nixpkgs
+            packages:
+              bat:
+                installers:
+                  - nix: {fromRegistry: nowhere}
+        - cfg:
+            cmds: [nix]
+            failOn: ["nix --extra-experimental-features nix-command flakes profile list"]
+            packages: [bat]
+    expected:
+      errorOutput: unknown nix registry "nowhere"
+    notExpected:
+      output:
+        calls: [profile install]
+  - name: ShouldInstallPinnedRevisionRef
+    input:
+      args:
+        - files: |
+            packages:
+              jq:
+                installers:
+                  - nix:
+                      versionMap: {"1.8.2": "6b5e5b7a6631f065bf6908986990b37d845f847f"}
+        - cfg:
+            cmds: [nix]
+            failOn: ["nix --extra-experimental-features nix-command flakes profile list"]
+            packages: [jq]
+    expected:
+      output:
+        calls: ["profile install github:NixOS/nixpkgs/6b5e5b7a6631f065bf6908986990b37d845f847f#jq"]
+  - name: ShouldReinstallOnPinDrift
+    input:
+      args:
+        - files: |
+            packages:
+              jq:
+                installers:
+                  - nix:
+                      versionMap: {"1.8.2": "6b5e5b7a6631f065bf6908986990b37d845f847f"}
+        - cfg:
+            cmds: [nix, jq]
+            stubs:
+              - {prefix: "nix --extra-experimental-features nix-command flakes profile list", output: "Name: jq\nStore paths: /nix/store/abcd1234-jq-1.7.1-bin\n"}
+            packages: [jq]
+    expected:
+      output:
+        calls:
+          - profile remove jq
+          - "profile install github:NixOS/nixpkgs/6b5e5b7a6631f065bf6908986990b37d845f847f#jq"
+  - name: ShouldSkipWhenPinInstalled
+    input:
+      args:
+        - files: |
+            packages:
+              jq:
+                installers:
+                  - nix:
+                      versionMap: {"1.8.2": "6b5e5b7a6631f065bf6908986990b37d845f847f"}
+        - cfg:
+            cmds: [nix, jq]
+            stubs:
+              - {prefix: "nix --extra-experimental-features nix-command flakes profile list", output: "Name: jq\nStore paths: /nix/store/abcd1234-jq-1.8.2\n"}
+            packages: [jq]
+    expected: {}
+    notExpected:
+      output:
+        calls: [profile install, profile remove]
+  - name: ShouldSkipWhenInstalledUnpinned
+    input:
+      args:
+        - files: "packages:\n  jq: [nix]"
+        - cfg:
+            cmds: [nix, jq]
+            stubs:
+              - {prefix: "nix --extra-experimental-features nix-command flakes profile list", output: "Name: jq\nStore paths: /nix/store/abcd1234-jq-1.8.2\n"}
+            packages: [jq]
+    expected: {}
+    notExpected:
+      output:
+        calls: [profile install]
+  - name: ShouldUpgradeUnpinnedOnUpdate
+    input:
+      args:
+        - files: "packages:\n  jq: [nix]"
+        - cfg:
+            cmds: [nix, jq]
+            update: true
+            stubs:
+              - {prefix: "nix --extra-experimental-features nix-command flakes profile list", output: "Name: jq\nStore paths: /nix/store/abcd1234-jq-1.8.2\n"}
+            packages: [jq]
+    expected:
+      output:
+        calls: [profile upgrade jq]
+    notExpected:
+      output:
+        calls: [profile install]
+  - name: ShouldErrorOnRequestedVersionWithoutRevision
+    input:
+      args:
+        - files: |
+            packages:
+              jq:
+                installers:
+                  - nix:
+                      versionMap: {"1.8.2": "6b5e5b7a6631f065bf6908986990b37d845f847f"}
+        - cfg:
+            cmds: [nix]
+            failOn: ["nix --extra-experimental-features nix-command flakes profile list"]
+            method: installRequests
+            requests:
+              - {name: jq, versions: ["9.9"]}
+    expected:
+      errorOutput: versionMap
+    notExpected:
+      output:
+        calls: [profile install]
+  - name: ShouldErrorOnEntryPinWithoutRevision
+    input:
+      args:
+        - files: |
+            packages:
+              jq:
+                version: 1.8.2
+                installers: [nix]
+        - cfg:
+            cmds: [nix]
+            failOn: ["nix --extra-experimental-features nix-command flakes profile list"]
+            packages: [jq]
+    expected:
+      errorOutput: versionMap
+    notExpected:
+      output:
+        calls: [profile install]
+  - name: ShouldAnnounceOnDryRun
+    input:
+      args:
+        - files: |
+            packages:
+              jq:
+                installers:
+                  - nix:
+                      versionMap: {"1.8.2": "6b5e5b7a6631f065bf6908986990b37d845f847f"}
+        - cfg:
+            cmds: [nix]
+            dryRun: true
+            failOn: ["nix --extra-experimental-features nix-command flakes profile list"]
+            packages: [jq]
+    expected:
+      stdOut: ["install jq 1.8.2 via nix (nixpkgs) (dry run)"]
+    notExpected:
+      output:
+        calls: [profile install]
+# [<] 🤖🤖
