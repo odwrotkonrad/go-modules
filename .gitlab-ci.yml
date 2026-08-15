@@ -253,6 +253,8 @@ warm-go-darwin:
         - .cache/go-build
       policy: pull-push
   rules:
+    - if: $ENABLE_DARWIN_CI != "true"
+      when: never
     - if: $CI_PIPELINE_SOURCE == "merge_request_event"
       changes: [che/**/*, che-packages/**/*, lib/**/*, go.work, .gitlab-ci.yml]
     - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
@@ -505,6 +507,8 @@ goreleaser-darwin-che:
   image: macos-26-xcode-26
   needs: []
   rules:
+    - if: $ENABLE_DARWIN_CI != "true"
+      when: never
     - if: $CI_COMMIT_TAG =~ /^che\/v/
   variables:
     GOPATH: $CI_PROJECT_DIR/.cache/go-path
@@ -576,6 +580,8 @@ prerelease-darwin-che:
   image: macos-26-xcode-26
   needs: []
   rules:
+    - if: $ENABLE_DARWIN_CI != "true"
+      when: never
     - if: $CI_PIPELINE_SOURCE == "merge_request_event"
       changes: [che/**/*, che-packages/**/*, lib/**/*]
   variables:
@@ -646,7 +652,10 @@ publish-che:
   stage: publish
   image: $CI_IMAGE
   needs:
-    - goreleaser-darwin-che
+    #[why] optional: darwin builds are gated by ENABLE_DARWIN_CI. a needs on a rules-excluded job
+    #   would stop the tag pipeline being created at all, so with darwin CI off this publishes linux-only
+    - job: goreleaser-darwin-che
+      optional: true
     - goreleaser-linux-che
     - docs-che
   rules:
@@ -689,7 +698,8 @@ publish-brew-che:
   image: $CI_IMAGE
   needs:
     - publish-che
-    - goreleaser-darwin-che
+    - job: goreleaser-darwin-che
+      optional: true
     - goreleaser-linux-che
   rules:
     - if: $CI_COMMIT_TAG =~ /^che\/v/

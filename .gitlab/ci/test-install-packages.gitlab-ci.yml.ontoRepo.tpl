@@ -27,6 +27,13 @@
 #[why] hard needs on the darwin warm build: play warm-go-darwin first, its artifacts are the only binaries these jobs run (no in-job go toolchain or self-build)
 test-e2e-install-package-darwin-arm64:
   extends: .test-install-package
+  #[why] darwin jobs are gated by the group-level ENABLE_DARWIN_CI toggle; the inherited rules follow
+  rules:
+    - if: $ENABLE_DARWIN_CI != "true"
+      when: never
+    - if: $CI_PIPELINE_SOURCE == "merge_request_event" || $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
+      when: manual
+      allow_failure: true
   stage: test-e2e-package-installs-darwin-arm64
   tags:
     - saas-macos-medium-m1
