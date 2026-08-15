@@ -19,15 +19,6 @@ func (in *Installer) CheckPresent(pkgs []string) []string {
 			in.emit(log.Levels.Debug, "present", pkg+" (checkInPath disabled)")
 			continue
 		}
-		if in.isCodeManaged(pkg) {
-			if _, ok := in.codeExtensions()[strings.ToLower(pkg)]; ok {
-				in.emit(log.Levels.Debug, "present", pkg+" (code extension)")
-				continue
-			}
-			in.emit(log.Levels.Warn, "missing", pkg)
-			missing = append(missing, pkg)
-			continue
-		}
 		if path, err := in.Host.LookPath(pkg); err == nil {
 			in.emit(log.Levels.Debug, "present", pkg+" at "+path)
 			continue
@@ -50,18 +41,6 @@ func (in *Installer) verifySpec(pkg string) *VerifySpec {
 		return it.Verify
 	}
 	return entry.Verify
-}
-
-func (in *Installer) isCodeManaged(pkg string) bool {
-	if in.File == nil {
-		return false
-	}
-	entry, ok := in.File.Packages[pkg]
-	if !ok {
-		return false
-	}
-	it, picked, err := in.pickItem(pkg, entry)
-	return err == nil && picked && it.Mgr == "vscode"
 }
 
 func (in *Installer) CheckUpgradable(pkgs []string) error {

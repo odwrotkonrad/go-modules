@@ -1,0 +1,23 @@
+# [>] 🤖🤖
+context:
+  function: fsutil.SlugRef
+cases:
+  - name: ShouldSlugSlashSeparatedRef
+    input:
+      args:
+        - ref: cli/macos
+    expected:
+      output: cli-macos
+  - name: ShouldSlugColonSeparatedRemoteRef
+    input:
+      args:
+        - ref: "remote:remote:ops-remote"
+    expected:
+      output: remote-remote-ops-remote
+  - name: ShouldKeepPlainRefUnchanged
+    input:
+      args:
+        - ref: plain
+    expected:
+      output: plain
+# [<] 🤖🤖

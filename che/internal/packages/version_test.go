@@ -81,35 +81,6 @@ func TestArchiveWithoutVersionNeedsNoPin(t *testing.T) {
 
 // [<] 🤖🤖
 
-func TestVscodeExtensionPinInstallsVersionedAndSkips(t *testing.T) {
-	const y = `packages:
-  golang.go:
-    version: "0.50.0"
-    installers: [vscode]
-`
-	in, m := newInstaller(t, y, "darwin", cmdMap([]string{"code"}), Options{})
-	m.Stub = codeListStub("")
-	require.NoError(t, in.Install([]string{"golang.go"}))
-	requireCalls(t, m, "code --install-extension golang.go@0.50.0")
-
-	in2, m2 := newInstaller(t, y, "darwin", cmdMap([]string{"code"}), Options{})
-	m2.Stub = codeListStub("golang.go@0.50.0\n")
-	require.NoError(t, in2.Install([]string{"golang.go"}))
-	refuteCalls(t, m2, "--install-extension")
-}
-
-func TestVscodeExtensionPinDriftReinstalls(t *testing.T) {
-	const y = `packages:
-  golang.go:
-    version: "0.50.0"
-    installers: [vscode]
-`
-	in, m := newInstaller(t, y, "darwin", cmdMap([]string{"code"}), Options{})
-	m.Stub = codeListStub("golang.go@0.49.0\n")
-	require.NoError(t, in.Install([]string{"golang.go"}))
-	requireCalls(t, m, "code --install-extension golang.go@0.50.0")
-}
-
 func TestBrewPinAppendsVersionedFormula(t *testing.T) {
 	const y = `packages:
   node:

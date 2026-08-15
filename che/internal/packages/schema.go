@@ -64,6 +64,22 @@ func Schema() *jsonschema.Schema {
 		Type:                 "object",
 		AdditionalProperties: arr(str("")),
 	})
+	toolPkgs := &jsonschema.Schema{
+		Description:          "tool-scoped packages per host tool: package name to version pin, null or empty value means rolling",
+		Type:                 "object",
+		AdditionalProperties: jsonschema.FalseSchema,
+		Properties:           jsonschema.NewProperties(),
+	}
+	for _, tool := range KnownTools() {
+		toolPkgs.Properties.Set(tool, &jsonschema.Schema{
+			Type: "object",
+			AdditionalProperties: &jsonschema.Schema{OneOf: []*jsonschema.Schema{
+				{Description: "version pin", Type: "string"},
+				{Description: "rolling", Type: "null"},
+			}},
+		})
+	}
+	root.Properties.Set("toolPackages", toolPkgs)
 	root.Properties.Set("packages", &jsonschema.Schema{
 		Description:          "package entries by canonical command name",
 		Type:                 "object",
@@ -131,7 +147,7 @@ func itemDef() *jsonschema.Schema {
 	m.Properties.Set("nix", ref("Nix"))
 	m.Properties.Set("pyenv", ref("VersionManager"))
 	m.Properties.Set("nvm", ref("VersionManager"))
-	for _, mgr := range []string{"brew", "brew/cask", "vscode", "npm", "go", "gem"} {
+	for _, mgr := range []string{"brew", "brew/cask", "npm", "go", "gem"} {
 		m.Properties.Set(mgr, ref("ItemBody"))
 	}
 	return &jsonschema.Schema{

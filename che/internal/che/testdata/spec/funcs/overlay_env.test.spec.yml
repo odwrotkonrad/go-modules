@@ -1,0 +1,19 @@
+# [>] 🤖🤖
+context:
+  function: che.overlayEnv
+cases:
+  - name: ShouldShadowBaseAndAddOverlayKeys
+    input:
+      args:
+        - base: {SHADOWED: host, KEPT: base}
+        - overlay: {SHADOWED: ref, ADDED: x}
+    expected:
+      output: {SHADOWED: ref, KEPT: base, ADDED: x}
+  - name: ShouldReturnBaseOnNilOverlay
+    input:
+      args:
+        - base: {SHADOWED: host, KEPT: base}
+        - overlay: null
+    expected:
+      output: {SHADOWED: host, KEPT: base}
+# [<] 🤖🤖

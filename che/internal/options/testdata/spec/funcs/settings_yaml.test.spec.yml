@@ -1,0 +1,41 @@
+# [>] 🤖🤖
+context:
+  function: options.SettingsYAML
+cases:
+  - name: ShouldNestDottedKeysAndKeepTypes
+    input:
+      args:
+        - default: false
+        - settings:
+            - {key: logLevel, value: info}
+            - {key: packages.binary.checkPresentOnPath, value: "true", kind: bool}
+            - {key: packages.preferredInstallationMethods, value: "binary,brew", kind: list}
+            - {key: otel.enabled, value: "false", kind: bool}
+    expected:
+      output:
+        logLevel: info
+        packages:
+          binary: {checkPresentOnPath: true}
+          preferredInstallationMethods: [binary, brew]
+        otel: {enabled: false}
+  - name: ShouldSeedDefaultsWithoutRunOnlyKeys
+    input:
+      args:
+        - default: true
+    expected:
+      stdOut:
+        - "logLevel: info"
+        - "dryRun: false"
+        - "file: __builtin__.packages.yml"
+        - "checkPresentOnPath: true"
+        - "installDestinationCandidates: [~/.local/bin, ~/bin]"
+        - "installDestinationCandidates: [~/.local/share/zsh/site-functions, ~/.zfunc]"
+        - "skipOps: []"
+    notExpected:
+      stdOut:
+        - cheWorkingDirectory
+        - skipRunIf
+        - errexit
+        - override
+        - 'dryRun: "false"'
+# [<] 🤖🤖

@@ -21,13 +21,14 @@ import (
 var version = "dev"
 
 type app struct {
-	flags   options.Options
-	opts    options.Options
-	ctx     che.Context
-	root    *che.SpecReady
-	tel     *telemetry.Telemetry
-	runCtx  context.Context
-	runSpan trace.Span
+	flags        options.Options
+	opts         options.Options
+	packagesKind string
+	ctx          che.Context
+	root         *che.SpecReady
+	tel          *telemetry.Telemetry
+	runCtx       context.Context
+	runSpan      trace.Span
 }
 
 func New() *app { return &app{} }

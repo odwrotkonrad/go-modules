@@ -1,0 +1,24 @@
+# [>] 🤖🤖
+context:
+  function: spec.ProfileRecipe.MakeProfile
+cases:
+  - name: ShouldMergeIncludedProfilesAndDropExcludedPackages
+    input:
+      args:
+        - doc: |
+            base:
+              include:
+                installPackages: [git, jq]
+            main:
+              include:
+                profiles: [base]
+                installPackages: [{name: jq, versions: "1.7.*"}, tmux, kind]
+              exclude:
+                installPackages: [kind]
+        - profile: main
+    expected:
+      output:
+        - {name: git}
+        - {name: jq, versions: ["1.7.*"]}
+        - {name: tmux}
+# [<] 🤖🤖

@@ -40,7 +40,65 @@ type File struct {
 	OSInstallers        map[string]InstallerList     `yaml:"osInstallers,omitempty"`
 	InstallerRegistries *InstallerRegistriesSpec     `yaml:"installerRegistries,omitempty"`
 	BasePackages        map[string][]string          `yaml:"basePackages,omitempty"`
+	ToolPackages        ToolPackagesMap              `yaml:"toolPackages,omitempty"`
 	Packages            map[string]Entry             `yaml:"packages,omitempty"`
+}
+
+type ToolPackagesMap map[string]ToolPackageSet
+
+func (m *ToolPackagesMap) UnmarshalYAML(node *yaml.Node) error {
+	if node.Kind != yaml.MappingNode {
+		return fmt.Errorf("toolPackages must map tool names to package maps")
+	}
+	*m = ToolPackagesMap{}
+	for i := 0; i+1 < len(node.Content); i += 2 {
+		tool := node.Content[i].Value
+		if _, ok := toolRoutines[tool]; !ok {
+			return fmt.Errorf("toolPackages.%s: unknown tool: want one of %s", tool, strings.Join(KnownTools(), ", "))
+		}
+		var set ToolPackageSet
+		if err := node.Content[i+1].Decode(&set); err != nil {
+			return fmt.Errorf("toolPackages.%s: %w", tool, err)
+		}
+		(*m)[tool] = set
+	}
+	return nil
+}
+
+type ToolPackageSet map[string]string
+
+func (s *ToolPackageSet) UnmarshalYAML(node *yaml.Node) error {
+	if node.Kind != yaml.MappingNode {
+		return fmt.Errorf("want a package name to version pin map")
+	}
+	*s = ToolPackageSet{}
+	for i := 0; i+1 < len(node.Content); i += 2 {
+		name, val := node.Content[i].Value, node.Content[i+1]
+		if val.Kind != yaml.ScalarNode {
+			return fmt.Errorf("%s: version must be a scalar pin or empty (rolling)", name)
+		}
+		if val.Tag == "!!null" {
+			(*s)[name] = ""
+			continue
+		}
+		(*s)[name] = val.Value
+	}
+	return nil
+}
+
+func (s ToolPackageSet) MarshalYAML() (any, error) {
+	node := &yaml.Node{Kind: yaml.MappingNode}
+	for _, name := range slices.Sorted(maps.Keys(s)) {
+		key := &yaml.Node{}
+		key.SetString(name)
+		val := &yaml.Node{Kind: yaml.ScalarNode, Tag: "!!null", Value: "null"}
+		if s[name] != "" {
+			val = &yaml.Node{}
+			val.SetString(s[name])
+		}
+		node.Content = append(node.Content, key, val)
+	}
+	return node, nil
 }
 
 type InstallerList []string
@@ -361,6 +419,7 @@ func (f *File) YAML() (string, error) {
 		{"archSchemes", len(f.ArchSchemes) == 0, f.ArchSchemes},
 		{"osInstallers", len(f.OSInstallers) == 0, f.OSInstallers},
 		{"installerRegistries", f.InstallerRegistries == nil, f.InstallerRegistries},
+		{"toolPackages", len(f.ToolPackages) == 0, f.ToolPackages},
 	} {
 		if top.empty {
 			continue
@@ -387,6 +446,22 @@ func (f *File) Delta(base *File) *File {
 			continue
 		}
 		out.Packages[name] = entry
+	}
+	for tool, set := range f.ToolPackages {
+		diff := ToolPackageSet{}
+		for name, version := range set {
+			if baseVersion, ok := base.ToolPackages[tool][name]; ok && baseVersion == version {
+				continue
+			}
+			diff[name] = version
+		}
+		if len(diff) == 0 {
+			continue
+		}
+		if out.ToolPackages == nil {
+			out.ToolPackages = ToolPackagesMap{}
+		}
+		out.ToolPackages[tool] = diff
 	}
 	return out
 }
@@ -681,7 +756,6 @@ var legacyItemKeys = map[string][]string{
 	"nix":                   {"installerVocabulary"},
 	"brew":                  {"installerVocabulary", "formula", "cask", "vscode", "package"},
 	"brew/cask":             {"installerVocabulary", "formula", "cask", "vscode", "package"},
-	"vscode":                {"installerVocabulary", "formula", "cask", "vscode", "package"},
 	"npm":                   {"installerVocabulary", "package"},
 	"gem":                   {"installerVocabulary", "package"},
 	"go":                    {"installerVocabulary", "package"},
@@ -700,8 +774,15 @@ func rejectLegacyKeys(key string, val *yaml.Node) error {
 }
 
 func rejectBareBrewKind(v string) error {
-	if v == "code" || v == "cask" {
-		return fmt.Errorf("casks and extensions are installer keys: brew/cask or vscode")
+	if v == "cask" {
+		return fmt.Errorf("casks are installer keys: brew/cask")
+	}
+	return nil
+}
+
+func rejectVscodeInstaller(v string) error {
+	if v == "vscode" {
+		return fmt.Errorf("vscode installer is gone: extensions live in toolPackages.vscode")
 	}
 	return nil
 }
@@ -749,6 +830,9 @@ func (it *Item) UnmarshalYAML(node *yaml.Node) error {
 }
 
 func (it *Item) unmarshalScalar(v string) error {
+	if err := rejectVscodeInstaller(v); err != nil {
+		return err
+	}
 	if err := rejectBareBrewKind(v); err != nil {
 		return err
 	}
@@ -840,6 +924,9 @@ func (it *Item) unmarshalNix(val *yaml.Node) error {
 }
 
 func (it *Item) unmarshalManager(key string, val *yaml.Node) error {
+	if err := rejectVscodeInstaller(key); err != nil {
+		return err
+	}
 	if err := rejectBareBrewKind(key); err != nil {
 		return err
 	}
@@ -865,8 +952,6 @@ func (it *Item) unmarshalManager(key string, val *yaml.Node) error {
 	it.Name, it.Version, it.Registry, it.AliasBinary, it.Verify = body.PackageName, body.Version, body.FromRegistry, body.AliasBinary, body.Verify
 	isBrew := it.Mgr == "brew" || it.Mgr == "cask"
 	switch {
-	case it.Mgr == "vscode" && it.Registry != "":
-		return fmt.Errorf("vscode item %s: extensions have no registry", it.Name)
 	case it.Registry != "" && !isBrew:
 		return fmt.Errorf("%s item %s: fromRegistry applies to brew, brew/cask, and apt items", key, it.Name)
 	case it.Mgr == "npm" && strings.LastIndex(it.Name, "@") > 0:
@@ -911,6 +996,12 @@ func (f *File) Merge(override *File) {
 		f.OSInstallers = override.OSInstallers
 	}
 	f.BasePackages = fsutil.MergeMap(f.BasePackages, override.BasePackages)
+	for tool, set := range override.ToolPackages {
+		if f.ToolPackages == nil {
+			f.ToolPackages = ToolPackagesMap{}
+		}
+		f.ToolPackages[tool] = fsutil.MergeMap(f.ToolPackages[tool], set)
+	}
 	f.Packages = fsutil.MergeMap(f.Packages, override.Packages)
 	f.mergeRegistries(override.InstallerRegistries)
 }

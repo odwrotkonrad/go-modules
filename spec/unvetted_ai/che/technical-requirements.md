@@ -10,7 +10,6 @@
 - `binariesRemoteArchive`
 - `script`
 - `buildFromSource`
-- `vscode`
 - `pyenv`
 - `nvm`
 - `nix`

@@ -48,7 +48,7 @@ func TestEligibleMethods(t *testing.T) {
 	entry := packages.Entry{Items: []packages.Item{
 		{Mgr: "brew"}, {Mgr: "cask"}, {Mgr: "apt"}, {Mgr: "binariesRemoteArchive"}, {Mgr: "binariesRemoteArchive"},
 	}}
-	darwin := []string{"brew", "brew/cask", "vscode", "binariesRemoteArchive", "script", "npm", "go", "gem", "pyenv", "nvm"}
+	darwin := []string{"brew", "brew/cask", "binariesRemoteArchive", "script", "npm", "go", "gem", "pyenv", "nvm"}
 	linux := []string{"apt", "binariesRemoteArchive", "script", "npm", "go", "gem", "pyenv", "nvm"}
 	cases := []struct {
 		name, method string

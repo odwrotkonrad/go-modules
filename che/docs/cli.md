@@ -195,10 +195,10 @@ install packages from packages.yml and check their state.
 | Option | Env | Values | Default | Description |
 | --- | --- | --- | --- | --- |
 | `--download-cache-dir` | `CHE_PACKAGES_DOWNLOAD_CACHE_DIR` | `string` |  | binariesRemoteArchive download cache directory: assets download to <dir>/<sha256(url)>-<basename> and later installs reuse the file, a checksum mismatch evicts it; empty disables caching |
-| `--only-methods` | `CHE_PACKAGES_ONLY_METHODS` | `brew` \| `cask` \| `apt` \| `npm` \| `go` \| `gem` \| `binariesRemoteArchive` \| `script` \| `vscode` \| `pyenv` \| `nvm` | `[]` | restrict installs to the listed managers (comma-separated or repeated): items using any other manager are skipped, a package with no listed manager applicable is not installed |
+| `--only-methods` | `CHE_PACKAGES_ONLY_METHODS` | `brew` \| `cask` \| `apt` \| `npm` \| `go` \| `gem` \| `binariesRemoteArchive` \| `script` \| `pyenv` \| `nvm` | `[]` | restrict installs to the listed managers (comma-separated or repeated): items using any other manager are skipped, a package with no listed manager applicable is not installed |
 | `--packages-file` | `CHE_PACKAGES_FILE` | `string` | `$XDG_CONFIG_HOME/packages/packages.yml` | packages.yml path, fully superseding the builtin packages.yml shipped in che (a set file must exist; the builtin serves only when no file exists at the default path) |
 | `--packages-override` | `CHE_PACKAGES_OVERRIDE` | `string` | `$XDG_CONFIG_HOME/che/packages-override.yml if present` | override packages file merged over the effective base (the packages file, or the builtin when none exists): same-name entries replace, new names append |
-| `--preferred-methods` | `CHE_PACKAGES_PREFERRED_METHODS` | `brew` \| `cask` \| `apt` \| `npm` \| `go` \| `gem` \| `binariesRemoteArchive` \| `script` \| `vscode` \| `pyenv` \| `nvm` | `[]` | installation-method preference order (comma-separated or repeated): listed managers try first within each package entry, unlisted follow in entry order |
+| `--preferred-methods` | `CHE_PACKAGES_PREFERRED_METHODS` | `brew` \| `cask` \| `apt` \| `npm` \| `go` \| `gem` \| `binariesRemoteArchive` \| `script` \| `pyenv` \| `nvm` | `[]` | installation-method preference order (comma-separated or repeated): listed managers try first within each package entry, unlisted follow in entry order |
 
 ### `$ che packages check-not-shadowed`
 
@@ -208,9 +208,13 @@ Usage: `che packages check-not-shadowed [pkg...]`
 
 ### `$ che packages check-present`
 
-check the canonical commands resolve on PATH (errors on any missing).
+check the canonical commands resolve on PATH (errors on any missing); --kind=<tool> checks the tool's installed packages instead.
 
-Usage: `che packages check-present [pkg...]`
+Usage: `che packages check-present [pkg...] [flags]`
+
+| Option | Env | Values | Default | Description |
+| --- | --- | --- | --- | --- |
+| `--kind` |  | `packages` \| `vscode` | `packages` | package kind: packages (canonical entries) or a tool name whose toolPackages entries install via that tool |
 
 ### `$ che packages check-single-present`
 
@@ -248,6 +252,7 @@ Usage: `che packages install [pkg...] [flags]`
 | Option | Env | Values | Default | Description |
 | --- | --- | --- | --- | --- |
 | `--if-missing` |  | `bool` | `false` | skip packages whose canonical command exists anywhere on PATH, regardless of manager |
+| `--kind` |  | `packages` \| `vscode` | `packages` | package kind: packages (canonical entries) or a tool name whose toolPackages entries install via that tool |
 | `--missing-method-warn` |  | `bool` | `false` | warn instead of erroring when a requested package has no applicable installation method on this host |
 | `--silence-install-stdout` | `CHE_PACKAGES_SILENCE_INSTALL_STDOUT` | `true (bare-flag default)` \| `false (stream as it runs)` | `true at error/warn/info log level, false at debug/trace` | silence the installation method's stdout/stderr (a failing method's captured output always prints) |
 | `--update` |  | `bool` | `false` | refresh installed unpinned packages via their manager; pinned ones converge on the pin regardless |

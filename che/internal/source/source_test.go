@@ -29,20 +29,9 @@ func TestSlug(t *testing.T) {
 }
 
 func TestDir(t *testing.T) {
-	const url = "https://example.com/x.git"
-	for _, tc := range []struct {
-		name, che, xdg, want string
-	}{
-		{"default", "", "", "/h/.cache/che/remote-sources/example.com-x"},
-		{"cheOverride", "/o", "/x", "/o/remote-sources/example.com-x"},
-		{"xdgBase", "", "/x", "/x/che/remote-sources/example.com-x"},
-	} {
-		t.Run(tc.name, func(t *testing.T) {
-			t.Setenv("CHE_CACHE_HOME", tc.che)
-			t.Setenv("XDG_CACHE_HOME", tc.xdg)
-			assert.Equal(t, tc.want, Dir("/h", url))
-		})
-	}
+	testyml.Eq(t, td, "testdata/spec/funcs/resolve_dir.test.spec.yml", func(t *testing.T, c testyml.Case[string]) (string, error) {
+		return Dir(c.Input.Args.String(t, 0), c.Input.Args.String(t, 1)), nil
+	})
 }
 
 type ensureWant struct {

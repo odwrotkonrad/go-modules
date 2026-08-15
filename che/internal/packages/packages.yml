@@ -6,7 +6,7 @@ archSchemes:
     odd: {amd64: x86_64, arm64: arm64}
     rust: {amd64: "x86_64-unknown-{os}-musl", arm64: "aarch64-unknown-{os}-gnu"}
 osInstallers:
-    linux: &base [binariesRemoteArchive, script, buildFromSource, npm, go, gem, pyenv, nvm, vscode, nix]
+    linux: &base [binariesRemoteArchive, script, buildFromSource, npm, go, gem, pyenv, nvm, nix]
     linux-debian: [apt, *base]
     darwin: [brew, brew/cask, *base]
 installerRegistries:
@@ -82,11 +82,26 @@ basePackages:
         - unzip
     vscode:
         - code
+toolPackages:
+    vscode:
+        anthropic.claude-code: 2.1.224
+        charliermarsh.ruff: 2026.72.0
+        editorconfig.editorconfig: 0.18.2
+        esbenp.prettier-vscode: 12.4.0
+        golang.go: 0.56.0
+        hoovercj.vscode-settings-cycler: 1.0.1
+        mindaro-dev.file-downloader: 1.0.13
+        ms-azuretools.vscode-containers: 2.4.5
+        ms-kubernetes-tools.vscode-kubernetes-tools: 1.4.1
+        ms-python.debugpy: 2026.6.0
+        ms-python.python: 2026.4.0
+        ms-python.vscode-python-envs: 1.36.0
+        ms-vscode-remote.remote-containers: 0.466.0
+        openai.chatgpt: 26.623.31921
+        redhat.vscode-yaml: 1.24.0
+        tamasfe.even-better-toml: 0.21.2
+        yzhang.markdown-all-in-one: 3.6.3
 packages:
-    anthropic.claude-code:
-        version: 2.1.224
-        installers:
-            - vscode
     apt-transport-https:
         installers:
             - apt:
@@ -156,10 +171,6 @@ packages:
         version: 2.2.27
         installers:
             - npm
-    charliermarsh.ruff:
-        version: 2026.72.0
-        installers:
-            - vscode
     che:
         #[why] our own module
         version: latest
@@ -308,14 +319,6 @@ packages:
             cmd: duti -V
         installers:
             - brew
-    editorconfig.editorconfig:
-        version: 0.18.2
-        installers:
-            - vscode
-    esbenp.prettier-vscode:
-        version: 12.4.0
-        installers:
-            - vscode
     fd:
         installers:
             - brew
@@ -425,10 +428,6 @@ packages:
                 extractBinaries: [go/bin/go, go/bin/gofmt]
                 platformEligibility: [darwin-arm64, linux-amd64, linux-arm64]
                 url: https://go.dev/dl/go{version}.{os}-{arch}.tar.gz
-    golang.go:
-        version: 0.56.0
-        installers:
-            - vscode
     gopls:
         version: 0.23.0
         installers:
@@ -452,10 +451,6 @@ packages:
             - brew
             - apt:
                 fromRegistry: apt.grafana.com
-    hoovercj.vscode-settings-cycler:
-        version: 1.0.1
-        installers:
-            - vscode
     htop:
         installers:
             - brew
@@ -634,34 +629,6 @@ packages:
         installers:
             - brew
             - apt
-    mindaro-dev.file-downloader:
-        version: 1.0.13
-        installers:
-            - vscode
-    ms-azuretools.vscode-containers:
-        version: 2.4.5
-        installers:
-            - vscode
-    ms-kubernetes-tools.vscode-kubernetes-tools:
-        version: 1.4.1
-        installers:
-            - vscode
-    ms-python.debugpy:
-        version: 2026.6.0
-        installers:
-            - vscode
-    ms-python.python:
-        version: 2026.4.0
-        installers:
-            - vscode
-    ms-python.vscode-python-envs:
-        version: 1.36.0
-        installers:
-            - vscode
-    ms-vscode-remote.remote-containers:
-        version: 0.466.0
-        installers:
-            - vscode
     nix:
         verify:
             checkInPath: false
@@ -720,10 +687,6 @@ packages:
         installers:
             - brew/cask:
                 packageName: 1password-cli
-    openai.chatgpt:
-        version: 26.623.31921
-        installers:
-            - vscode
     openssh:
         command: ssh
         verify:
@@ -909,10 +872,6 @@ packages:
             - brew
             - apt:
                 packageName: libreadline-dev
-    redhat.vscode-yaml:
-        version: 1.24.0
-        installers:
-            - vscode
     rg:
         completions:
             zsh:
@@ -991,10 +950,6 @@ packages:
             - nix:
                 packageName: gnutar
                 versionMap: {"1.35": "6b5e5b7a6631f065bf6908986990b37d845f847f"}
-    tamasfe.even-better-toml:
-        version: 0.21.2
-        installers:
-            - vscode
     tart:
         installers:
             - brew:
@@ -1093,10 +1048,6 @@ packages:
             - nix:
                 packageName: yq-go
                 versionMap: {"4.53.3": "6b5e5b7a6631f065bf6908986990b37d845f847f"}
-    yzhang.markdown-all-in-one:
-        version: 3.6.3
-        installers:
-            - vscode
     zig:
         installers:
             - brew

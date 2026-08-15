@@ -12,7 +12,7 @@ its method). Values:
 - `pkgMgrVersionCheck` (scalar shorthand or `pkgMgrVersionCheck: true`): ask the
   installing manager for the installed version (apt: `dpkg-query -W`, brew:
   `brew list --versions`, brew/cask: `brew list --cask --versions`, npm:
-  `npm ls --global`, vscode: `code --list-extensions --show-versions`),
+  `npm ls --global`),
   exit 0 and non-empty output required
 - `cmd: <command>`: run the command, exit 0 alone means verified
 - object form combines: each strategy is its own key, several keys run all of
@@ -54,7 +54,7 @@ Scenario: a binary-less apt package verifies via the manager's version query
 
 Scenario: pkgMgrVersionCheck resolves per manager
   Status: implemented
-  Given an entry with `verify: pkgMgrVersionCheck` and brew, brew/cask, npm or vscode methods
+  Given an entry with `verify: pkgMgrVersionCheck` and brew, brew/cask or npm methods
   When the install e2e runs
   Then each method verifies via its own manager's version query
 

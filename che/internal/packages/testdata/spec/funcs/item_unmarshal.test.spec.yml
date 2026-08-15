@@ -87,24 +87,24 @@ cases:
         - yaml: "{script: {url: https://example.com/install.sh}}"
     expected:
       output: {mgr: script, name: "", scriptUrl: https://example.com/install.sh}
-  - name: ShouldDecodeBrewCodeExtensionForm
+  - name: ShouldRejectGoneVscodeScalar
+    input:
+      args:
+        - yaml: "vscode"
+    expected:
+      errorOutput: "vscode installer is gone: extensions live in toolPackages.vscode"
+  - name: ShouldRejectGoneVscodeMap
     input:
       args:
         - yaml: "{vscode: {packageName: golang.go}}"
     expected:
-      output: {mgr: vscode, name: golang.go}
-  - name: ShouldRejectBareCodeItem
+      errorOutput: "vscode installer is gone: extensions live in toolPackages.vscode"
+  - name: ShouldRejectBareCaskItem
     input:
       args:
-        - yaml: "code"
+        - yaml: "cask"
     expected:
-      errorOutput: "casks and extensions are installer keys: brew/cask or vscode"
-  - name: ShouldRejectDirectCodeMap
-    input:
-      args:
-        - yaml: "{code: golang.go}"
-    expected:
-      errorOutput: "casks and extensions are installer keys: brew/cask or vscode"
+      errorOutput: "casks are installer keys: brew/cask"
   - name: ShouldErrorOnMultiKeyMap
     input:
       args:

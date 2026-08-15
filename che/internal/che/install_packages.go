@@ -4,6 +4,7 @@ package che
 
 import (
 	"cmp"
+	"maps"
 	"os"
 	"path/filepath"
 	"slices"
@@ -173,6 +174,54 @@ func (p *ProfileReady) installPackages(refs []spec.PackageRef) error {
 		in.CheckPresent(packages.RequestNames(reqs))
 	}
 	return nil
+}
+
+func (p *ProfileReady) installToolPackages(tools map[string][]spec.ToolPackageRef) error {
+	if len(tools) == 0 {
+		return nil
+	}
+	in, err := p.newInstaller()
+	if err != nil {
+		return err
+	}
+	for _, tool := range slices.Sorted(maps.Keys(tools)) {
+		refs := tools[tool]
+		if len(refs) == 0 {
+			continue
+		}
+		reqs := make([]packages.Request, len(refs))
+		for i, r := range refs {
+			reqs[i] = packages.Request{Name: r.Name}
+			if r.Version != "" {
+				reqs[i].Versions = []string{r.Version}
+			}
+		}
+		if err := in.InstallToolPackages(tool, reqs); err != nil {
+			return err
+		}
+		if !p.isDryRun() {
+			in.CheckToolPackagesPresent(tool, packages.RequestNames(reqs))
+		}
+	}
+	return nil
+}
+
+func InstallToolPackageNames(profiles []*ProfileReady, tool string) []string {
+	var out []string
+	for _, p := range profiles {
+		for _, op := range p.OperationsReady {
+			ip, ok := op.(*InstallPackagesOperationReady)
+			if !ok {
+				continue
+			}
+			for _, ref := range ip.ToolPackages[tool] {
+				if !slices.Contains(out, ref.Name) {
+					out = append(out, ref.Name)
+				}
+			}
+		}
+	}
+	return out
 }
 
 // [<] 🤖🤖🤖

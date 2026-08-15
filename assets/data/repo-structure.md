@@ -65,6 +65,9 @@ che
           cmds
           funcs
     database
+      testdata
+        spec
+          funcs
     docgen
       testdata
         spec
@@ -158,6 +161,9 @@ che
         spec
           funcs
     telemetry
+      testdata
+        spec
+          funcs
     testutil
       specs
       testdata

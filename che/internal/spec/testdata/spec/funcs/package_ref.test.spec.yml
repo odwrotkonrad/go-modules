@@ -1,0 +1,29 @@
+# [>] 🤖🤖
+context:
+  function: spec.PackageRef.UnmarshalYAML
+cases:
+  - name: ShouldRequireName
+    input:
+      args:
+        - yaml: "{versions: 1.2.3}"
+    expected:
+      errorOutput: requires name
+  - name: ShouldParseVersionListAndGlobalVersion
+    input:
+      args:
+        - yaml: "{name: node, versions: [24.16.0, 22.14.0], globalVersion: 22.14.0}"
+    expected:
+      output: {name: node, versions: [24.16.0, 22.14.0], globalVersion: 22.14.0}
+  - name: ShouldParseScalarVersionsAsSingletonList
+    input:
+      args:
+        - yaml: "{name: go, versions: 1.26.4}"
+    expected:
+      output: {name: go, versions: [1.26.4]}
+  - name: ShouldRejectGlobalVersionNotAmongVersions
+    input:
+      args:
+        - yaml: "{name: node, versions: [24.16.0], globalVersion: 22.14.0}"
+    expected:
+      errorOutput: globalVersion 22.14.0 is not among versions
+# [<] 🤖🤖

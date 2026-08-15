@@ -39,16 +39,16 @@ func TestBasePackagesInstallBeforeMethod(t *testing.T) {
 func TestBasePackagesVscodeInstallsCodeFirst(t *testing.T) {
 	const y = `basePackages:
   vscode: [code]
+toolPackages:
+  vscode:
+    golang.go: 0.50.0
 packages:
   code:
     installers: [{brew/cask: {packageName: visual-studio-code}}]
-  golang.go:
-    version: "0.50.0"
-    installers: [vscode]
 `
 	in, m := newInstaller(t, y, "darwin", cmdMap([]string{"brew", "code"}), Options{})
 	m.Stub = failOn("brew list")
-	require.NoError(t, in.Install([]string{"golang.go"}))
+	require.NoError(t, in.InstallToolPackages("vscode", Requests([]string{"golang.go"})))
 	calls := strings.Join(m.Calls(), "\n")
 	caskAt := strings.Index(calls, "brew install --cask visual-studio-code")
 	extAt := strings.Index(calls, "--install-extension golang.go@0.50.0")

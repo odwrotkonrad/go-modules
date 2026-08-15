@@ -1,4 +1,7 @@
 ##[>] 🤖🤖
+toolPackages:
+  vscode:
+    e2e.fake-ext: 1.2.3
 packages:
   e2e-plain: [{npm: {packageName: e2e-plain}}]
   e2e-conditional: [{npm: {packageName: e2e-conditional}}]

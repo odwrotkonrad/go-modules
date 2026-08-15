@@ -146,8 +146,6 @@ func (h Host) applicable(pkg string, it Item, strict bool) (bool, error) {
 		return !strict || h.HasCmd("npm"), nil
 	case "nix":
 		return !strict || h.NixBin() != "", nil
-	case "vscode":
-		return !strict || h.HasCmd("code"), nil
 	case "gem":
 		return !strict || h.HasCmd("gem"), nil
 	case "go":
@@ -224,11 +222,11 @@ func methodFamily(mgr string) string {
 	return mgr
 }
 
-var KnownManagers = []string{"brew", "cask", "apt", "npm", "go", "gem", "binariesRemoteArchive", "script", "buildFromSource", "vscode", "pyenv", "nvm", "nix"}
+var KnownManagers = []string{"brew", "cask", "apt", "npm", "go", "gem", "binariesRemoteArchive", "script", "buildFromSource", "pyenv", "nvm", "nix"}
 
-var PlatformMethods = []string{"brew", "brew/cask", "vscode", "apt", "npm", "go", "gem", "binariesRemoteArchive", "script", "buildFromSource", "pyenv", "nvm", "nix"}
+var PlatformMethods = []string{"brew", "brew/cask", "apt", "npm", "go", "gem", "binariesRemoteArchive", "script", "buildFromSource", "pyenv", "nvm", "nix"}
 
-var DefaultPreferredMethods = []string{"brew", "cask", "apt", "binariesRemoteArchive", "script", "buildFromSource", "npm", "go", "gem", "vscode", "nix"}
+var DefaultPreferredMethods = []string{"brew", "cask", "apt", "binariesRemoteArchive", "script", "buildFromSource", "npm", "go", "gem", "nix"}
 
 var DefaultBinariesRemoteArchiveDestinationCandidates = []string{"~/.local/bin", "~/bin"}
 

@@ -262,7 +262,6 @@
           "enum": [
             "brew",
             "brew/cask",
-            "vscode",
             "apt",
             "npm",
             "go",
@@ -303,9 +302,6 @@
               "$ref": "#/$defs/ItemBody"
             },
             "brew/cask": {
-              "$ref": "#/$defs/ItemBody"
-            },
-            "vscode": {
               "$ref": "#/$defs/ItemBody"
             },
             "npm": {
@@ -595,6 +591,28 @@
       },
       "type": "object",
       "description": "prerequisite package names per group: common always, an installer name when that installer is eligible"
+    },
+    "toolPackages": {
+      "properties": {
+        "vscode": {
+          "additionalProperties": {
+            "oneOf": [
+              {
+                "type": "string",
+                "description": "version pin"
+              },
+              {
+                "type": "null",
+                "description": "rolling"
+              }
+            ]
+          },
+          "type": "object"
+        }
+      },
+      "additionalProperties": false,
+      "type": "object",
+      "description": "tool-scoped packages per host tool: package name to version pin, null or empty value means rolling"
     },
     "packages": {
       "additionalProperties": {

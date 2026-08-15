@@ -27,9 +27,9 @@ func (a *app) packagesCmd() *cobra.Command {
 	pf.StringVar(&a.flags.PackagesOverride, "packages-override", "",
 		"override packages file merged over the effective base (the packages file, or the builtin when none exists): same-name entries replace, new names append; default: $XDG_CONFIG_HOME/che/packages-override.yml if present; env: CHE_PACKAGES_OVERRIDE")
 	pf.StringSliceVar(&a.flags.PackagesPreferredMethods, "preferred-methods", nil,
-		"installation-method preference order (comma-separated or repeated): listed managers try first within each package entry, unlisted follow in entry order; values: brew | cask | apt | npm | go | gem | binariesRemoteArchive | script | vscode | pyenv | nvm; env: CHE_PACKAGES_PREFERRED_METHODS")
+		"installation-method preference order (comma-separated or repeated): listed managers try first within each package entry, unlisted follow in entry order; values: brew | cask | apt | npm | go | gem | binariesRemoteArchive | script | pyenv | nvm; env: CHE_PACKAGES_PREFERRED_METHODS")
 	pf.StringSliceVar(&a.flags.PackagesOnlyMethods, "only-methods", nil,
-		"restrict installs to the listed managers (comma-separated or repeated): items using any other manager are skipped, a package with no listed manager applicable is not installed; values: brew | cask | apt | npm | go | gem | binariesRemoteArchive | script | vscode | pyenv | nvm; env: CHE_PACKAGES_ONLY_METHODS")
+		"restrict installs to the listed managers (comma-separated or repeated): items using any other manager are skipped, a package with no listed manager applicable is not installed; values: brew | cask | apt | npm | go | gem | binariesRemoteArchive | script | pyenv | nvm; env: CHE_PACKAGES_ONLY_METHODS")
 	pf.StringVar(&a.flags.PackagesDownloadCacheDir, "download-cache-dir", "",
 		"binariesRemoteArchive download cache directory: assets download to <dir>/<sha256(url)>-<basename> and later installs reuse the file, a checksum mismatch evicts it; empty disables caching; env: CHE_PACKAGES_DOWNLOAD_CACHE_DIR")
 
@@ -47,15 +47,10 @@ func (a *app) packagesCmd() *cobra.Command {
 	install.Flags().StringVar(&a.flags.PackagesSilenceInstallStdout, "silence-install-stdout", "",
 		"silence the installation method's stdout/stderr (a failing method's captured output always prints); values: true (bare-flag default) | false (stream as it runs); default: true at error/warn/info log level, false at debug/trace; env: CHE_PACKAGES_SILENCE_INSTALL_STDOUT")
 	install.Flags().Lookup("silence-install-stdout").NoOptDefVal = "true"
+	addPackagesKindFlag(install, &a.packagesKind)
 
 	cmd.AddCommand(install,
-		a.packagesCheckCmd("check-present", "check the canonical commands resolve on PATH (errors on any missing)",
-			func(in *packages.Installer, pkgs []string) error {
-				if missing := in.CheckPresent(pkgs); len(missing) > 0 {
-					return fmt.Errorf("missing commands: %s", strings.Join(missing, ", "))
-				}
-				return nil
-			}),
+		a.packagesCheckPresentCmd(),
 		a.packagesCheckCmd("check-upgradable", "warn on manager-reported outdated packages and binary pins drifted from --version output",
 			func(in *packages.Installer, pkgs []string) error { return in.CheckUpgradable(pkgs) }),
 		a.packagesCheckCmd("check-not-shadowed", "warn when a package's manager-expected binary is not the first PATH hit",
@@ -101,15 +96,49 @@ func (a *app) packagesConfigCmd() *cobra.Command {
 					}
 					fmt.Printf("%s = %s\n", name, strings.Join(mgrs, ", "))
 				}
+				for _, tool := range slices.Sorted(maps.Keys(file.ToolPackages)) {
+					set := file.ToolPackages[tool]
+					for _, name := range slices.Sorted(maps.Keys(set)) {
+						version := set[name]
+						if version == "" {
+							version = "rolling"
+						}
+						fmt.Printf("%s/%s = %s\n", tool, name, version)
+					}
+				}
 			}, file.YAML)
 		})
 }
 
+func addPackagesKindFlag(cmd *cobra.Command, dest *string) {
+	cmd.Flags().StringVar(dest, "kind", "packages",
+		"package kind: packages (canonical entries) or a tool name whose toolPackages entries install via that tool; values: packages | "+strings.Join(packages.KnownTools(), " | "))
+}
+
+func validatePackagesKind(kind string) error {
+	if kind == "packages" || slices.Contains(packages.KnownTools(), kind) {
+		return nil
+	}
+	return fmt.Errorf("unknown kind %q: want packages or one of %s", kind, strings.Join(packages.KnownTools(), ", "))
+}
+
 func (a *app) packagesInstallRunE(cmd *cobra.Command, args []string) error {
+	if err := validatePackagesKind(a.packagesKind); err != nil {
+		return err
+	}
 	if len(args) > 0 {
 		in, err := che.NewPackagesInstallerFromContext(a.ctx, a.opts)
 		if err != nil {
 			return err
+		}
+		if a.packagesKind != "packages" {
+			if err := in.InstallToolPackages(a.packagesKind, packages.Requests(args)); err != nil {
+				return err
+			}
+			if a.opts.DryRun == options.DryRun.Off {
+				in.CheckToolPackagesPresent(a.packagesKind, args)
+			}
+			return nil
 		}
 		if err := in.Install(args); err != nil {
 			return err
@@ -122,6 +151,48 @@ func (a *app) packagesInstallRunE(cmd *cobra.Command, args []string) error {
 	return a.root.ExecEach(a.runCtx, "install-packages", func(ctx context.Context, p *che.ProfileReady) error {
 		return p.ExecOperationNamed(ctx, "install-packages")
 	})
+}
+
+func (a *app) packagesCheckPresentCmd() *cobra.Command {
+	cmd := &cobra.Command{
+		Use:   "check-present [pkg...]",
+		Short: "check the canonical commands resolve on PATH (errors on any missing); --kind=<tool> checks the tool's installed packages instead",
+		RunE: func(cmd *cobra.Command, args []string) error {
+			if err := validatePackagesKind(a.packagesKind); err != nil {
+				return err
+			}
+			in, err := che.NewPackagesInstallerFromContext(a.ctx, a.opts)
+			if err != nil {
+				return err
+			}
+			if a.packagesKind != "packages" {
+				names := args
+				if len(names) == 0 {
+					names = che.InstallToolPackageNames(a.root.AllProfiles(), a.packagesKind)
+				}
+				if len(names) == 0 {
+					names = slices.Sorted(maps.Keys(in.File.ToolPackages[a.packagesKind]))
+				}
+				if missing := in.CheckToolPackagesPresent(a.packagesKind, names); len(missing) > 0 {
+					return fmt.Errorf("missing %s packages: %s", a.packagesKind, strings.Join(missing, ", "))
+				}
+				return nil
+			}
+			pkgs := args
+			if len(pkgs) == 0 {
+				pkgs = che.InstallPackageNames(a.root.AllProfiles())
+			}
+			if len(pkgs) == 0 {
+				pkgs = slices.Sorted(maps.Keys(in.File.Packages))
+			}
+			if missing := in.CheckPresent(pkgs); len(missing) > 0 {
+				return fmt.Errorf("missing commands: %s", strings.Join(missing, ", "))
+			}
+			return nil
+		},
+	}
+	addPackagesKindFlag(cmd, &a.packagesKind)
+	return cmd
 }
 
 func (a *app) packagesCheckCmd(name, short string, run func(*packages.Installer, []string) error) *cobra.Command {

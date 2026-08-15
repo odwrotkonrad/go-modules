@@ -1,0 +1,125 @@
+# [>] 🤖🤖
+context:
+  function: database.DB.Installed
+cases:
+  - name: ShouldKeepLatestOpPerDest
+    input:
+      args:
+        - seed:
+            - runId: 20240101T000000
+              command: all
+              profiles: [cli]
+              ops:
+                - {profile: cli, opType: create, kind: link, dest: /a}
+                - {profile: cli, opType: noop, kind: link, dest: /a}
+                - {profile: cli, opType: create, kind: copy, dest: /b}
+        - query: installed
+    expected:
+      output:
+        ops:
+          - {dest: /b, opType: create, kind: copy, profileRef: cli}
+          - {dest: /a, opType: noop, kind: link, profileRef: cli}
+  - name: ShouldExcludeRemovedDests
+    input:
+      args:
+        - seed:
+            - runId: 20240101T000000
+              command: all
+              profiles: [cli]
+              ops:
+                - {profile: cli, opType: create, kind: link, dest: /a}
+                - {profile: cli, opType: remove, kind: link, dest: /a}
+        - query: installed
+    expected:
+      output: {ops: []}
+  - name: ShouldScopeInstalledToProfile
+    input:
+      args:
+        - seed:
+            - runId: 20240101T000000
+              command: all
+              profiles: [profA, profB]
+              ops:
+                - {profile: profA, opType: create, kind: link, dest: /a}
+                - {profile: profB, opType: create, kind: link, dest: /b}
+        - query: installedForProfile profA
+    expected:
+      output:
+        ops:
+          - {dest: /a, opType: create, kind: link, profileRef: profA}
+  - name: ShouldDedupEnsureBackupByPath
+    input:
+      args:
+        - seed:
+            - runId: 20240101T000000
+              command: all
+        - query: ensureBackupDedup /state/backups/che-make-links-ts.tar.bz2 make-links
+    expected:
+      output:
+        dedup: {same: true, specLinked: true}
+  - name: ShouldRoundTripKindColumns
+    input:
+      args:
+        - seed:
+            - runId: 20240101T000000
+              command: all
+              profiles: [cli]
+              ops:
+                - {profile: cli, opType: create, kind: render, dest: /d, srcRel: x.tpl, mode: "0644", prevKind: absent, nextKind: file, nextPresent: true, nextMode: "0644"}
+        - query: installed
+    expected:
+      output:
+        ops:
+          - {dest: /d, opType: create, kind: render, srcRel: x.tpl, mode: "0644", prevKind: absent, nextPresent: true, profileRef: cli}
+  - name: ShouldPreloadBackupOnInstalled
+    input:
+      args:
+        - seed:
+            - runId: 20240101T000000
+              command: all
+              profiles: [cli]
+              backups:
+                - {path: /state/backups/a.tar.bz2, op: make-links}
+              ops:
+                - {profile: cli, opType: create, kind: link, dest: /a, backupPath: /state/backups/a.tar.bz2}
+        - query: installed
+    expected:
+      output:
+        ops:
+          - {dest: /a, opType: create, kind: link, profileRef: cli, backupPath: /state/backups/a.tar.bz2}
+  - name: ShouldProjectRunIDOnBackupsNewestFirst
+    input:
+      args:
+        - seed:
+            - runId: runaaaaaaaaa
+              command: run
+              backups:
+                - {path: /b/cli/backup/t1-ida.tar.bz2, op: backup}
+            - runId: runbbbbbbbbb
+              command: run
+              backups:
+                - {path: /b/cli/backup/t2-idb.tar.bz2, op: backup}
+        - query: backups
+    expected:
+      output:
+        backups:
+          - {path: /b/cli/backup/t2-idb.tar.bz2, runId: runbbbbbbbbb}
+          - {path: /b/cli/backup/t1-ida.tar.bz2, runId: runaaaaaaaaa}
+  - name: ShouldIncludeRemovesInLatestOps
+    input:
+      args:
+        - seed:
+            - runId: 20240101T000000
+              command: all
+              profiles: [cli]
+              ops:
+                - {profile: cli, opType: create, kind: copy, dest: /a}
+                - {profile: cli, opType: remove, kind: copy, dest: /a, nextKind: absent}
+                - {profile: cli, opType: create, kind: copy, dest: /b}
+        - query: latestOps
+    expected:
+      output:
+        ops:
+          - {dest: /b, opType: create, kind: copy, profileRef: cli}
+          - {dest: /a, opType: remove, kind: copy, profileRef: cli}
+# [<] 🤖🤖

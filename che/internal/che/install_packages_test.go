@@ -8,6 +8,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"gitlab.com/konradodwrot/go-modules/che/internal/options"
+	"gitlab.com/konradodwrot/go-modules/lib/testyml"
 )
 
 func TestOperationsOrderInstallPackagesBeforeRunScripts(t *testing.T) {
@@ -25,11 +26,13 @@ func TestOperationsOrderInstallPackagesBeforeRunScripts(t *testing.T) {
 	}, names)
 }
 
-func TestResolvePackagesFilePrecedence(t *testing.T) {
-	env := map[string]string{"XDG_CONFIG_HOME": "/xdg"}
-	require.Equal(t, "/xdg/packages/packages.yml", resolvePackagesFile(env, "/home/u", options.Options{}))
-	require.Equal(t, "/home/u/.config/packages/packages.yml", resolvePackagesFile(map[string]string{}, "/home/u", options.Options{}))
-	require.Equal(t, "/x.yml", resolvePackagesFile(env, "/home/u", options.Options{PackagesFile: "/x.yml"}))
+func TestResolvePackagesFile(t *testing.T) {
+	testyml.Eq(t, td, "testdata/spec/funcs/resolve_packages_file.test.spec.yml", func(t *testing.T, c testyml.Case[string]) (string, error) {
+		var env map[string]string
+		c.Input.Args.To(t, 0, &env)
+		opts := options.Options{PackagesFile: c.Input.Args.String(t, 2)}
+		return resolvePackagesFile(env, c.Input.Args.String(t, 1), opts), nil
+	})
 }
 
 // [<] 🤖🤖

@@ -581,8 +581,6 @@ func TestVersionCommandDriftReinstalls(t *testing.T) {
 	require.NotEmpty(t, testFetch.Calls())
 }
 
-const codeExtYaml = "packages:\n  golang.go: [vscode]\n  redhat.vscode-yaml: [vscode]\n  code: [{brew/cask: {packageName: visual-studio-code}}]"
-
 func codeListStub(installed string) func(argv []string) ([]byte, error) {
 	return func(argv []string) ([]byte, error) {
 		if argv[0] == "code" && argv[1] == "--list-extensions" {
@@ -590,62 +588,6 @@ func codeListStub(installed string) func(argv []string) ([]byte, error) {
 		}
 		return nil, nil
 	}
-}
-
-func TestInstallCodeExtensionWhenMissing(t *testing.T) {
-	in, m := newInstaller(t, codeExtYaml, "darwin", cmdMap([]string{"code"}), Options{})
-	m.Stub = codeListStub("redhat.vscode-yaml\n")
-	require.NoError(t, in.Install([]string{"golang.go"}))
-	require.Contains(t, m.Calls(), "code --install-extension golang.go")
-}
-
-func TestInstallCodeExtensionSkipsInstalledAndListsOnce(t *testing.T) {
-	in, m := newInstaller(t, codeExtYaml, "darwin", cmdMap([]string{"code"}), Options{})
-	m.Stub = codeListStub("Golang.Go\nredhat.vscode-yaml\n")
-	require.NoError(t, in.Install([]string{"golang.go", "redhat.vscode-yaml"}))
-	require.Equal(t, []string{"code --list-extensions --show-versions"}, m.Calls())
-}
-
-func TestInstallCodeExtensionAttemptsWithoutCodeCommand(t *testing.T) {
-	in, m := newInstaller(t, codeExtYaml, "linux", cmdMap(nil), Options{})
-	require.NoError(t, in.Install([]string{"golang.go"}))
-	requireCalls(t, m, "code --install-extension golang.go")
-}
-
-func TestInstallCodeExtensionUpdateForces(t *testing.T) {
-	in, m := newInstaller(t, codeExtYaml, "darwin", cmdMap([]string{"code"}), Options{Update: true})
-	m.Stub = codeListStub("golang.go\n")
-	require.NoError(t, in.Install([]string{"golang.go"}))
-	require.Contains(t, m.Calls(), "code --install-extension golang.go --force")
-}
-
-func TestInstallCodeExtensionRoundsAfterCask(t *testing.T) {
-	cmds := cmdMap([]string{"brew"})
-	in, m := newInstaller(t, codeExtYaml, "darwin", cmds, Options{})
-	m.Stub = func(argv []string) ([]byte, error) {
-		joined := strings.Join(argv, " ")
-		if strings.HasPrefix(joined, "brew list") {
-			return nil, fmt.Errorf("not installed")
-		}
-		if joined == "brew install --cask visual-studio-code" {
-			cmds["code"] = "/usr/local/bin/code"
-		}
-		return nil, nil
-	}
-	require.NoError(t, in.Install([]string{"golang.go", "code"}))
-	require.Contains(t, m.Calls(), "code --install-extension golang.go")
-}
-
-func TestCheckPresentUsesExtensionListForCodePackages(t *testing.T) {
-	in, m := newInstaller(t, codeExtYaml, "darwin", cmdMap([]string{"code"}), Options{})
-	m.Stub = codeListStub("golang.go\n")
-	out, err := captureStdout(t, func() error {
-		require.Equal(t, []string{"redhat.vscode-yaml"}, in.CheckPresent([]string{"golang.go", "redhat.vscode-yaml"}))
-		return nil
-	})
-	require.NoError(t, err)
-	wantLines(t, out, "missing redhat.vscode-yaml")
-	notLine(t, out, "missing golang.go")
 }
 
 func TestInstallUnknownPackageErrors(t *testing.T) {

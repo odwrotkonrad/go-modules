@@ -405,7 +405,7 @@ func (in *Installer) installVia(pkg string, it Item) error {
 }
 
 func installAcceptsPin(mgr string) bool {
-	return slices.Contains([]string{"npm", "apt", "gem", "go", "vscode"}, mgr)
+	return slices.Contains([]string{"npm", "apt", "gem", "go"}, mgr)
 }
 
 func (in *Installer) managerPkgName(pkg string, it Item, pin string) (string, error) {
@@ -469,7 +469,7 @@ func pinnedName(mgr, base, pin string) string {
 		return base
 	}
 	switch mgr {
-	case "npm", "vscode":
+	case "npm":
 		return base + "@" + pin
 	case "apt":
 		return base + "=" + pin
@@ -508,9 +508,6 @@ func (in *Installer) isInstalled(pkg, mgr, base string) bool {
 		}
 		_, ok := in.output([]string{in.npmBin(), "ls", "--global", "--depth=0", base})
 		return ok
-	case "vscode":
-		_, ok := in.codeExtensions()[strings.ToLower(base)]
-		return ok
 	case "nix":
 		out, ok := in.nixProfileList()
 		if !ok {
@@ -521,32 +518,6 @@ func (in *Installer) isInstalled(pkg, mgr, base string) bool {
 	default:
 		return in.hasCmd(pkg)
 	}
-}
-
-func (in *Installer) codeArgv(args ...string) []string {
-	argv := append([]string{"code"}, args...)
-	if in.Host.Euid == 0 {
-		argv = append(argv, "--no-sandbox", "--user-data-dir", filepath.Join(in.Host.Getenv("HOME"), ".vscode-root"))
-	}
-	return argv
-}
-
-func (in *Installer) codeExtensions() map[string]string {
-	if in.codeExts != nil {
-		return in.codeExts
-	}
-	in.codeExts = map[string]string{}
-	if out, ok := in.output(in.codeArgv("--list-extensions", "--show-versions")); ok {
-		for line := range strings.Lines(out) {
-			ext := strings.ToLower(strings.TrimSpace(line))
-			if ext == "" {
-				continue
-			}
-			name, version, _ := strings.Cut(ext, "@")
-			in.codeExts[name] = version
-		}
-	}
-	return in.codeExts
 }
 
 func (in *Installer) installedVersion(mgr, base string) string {
@@ -560,8 +531,6 @@ func (in *Installer) installedVersion(mgr, base string) string {
 			return fields[len(fields)-1]
 		}
 		return ""
-	case "vscode":
-		return in.codeExtensions()[strings.ToLower(base)]
 	case "apt":
 		out, ok := in.output([]string{"dpkg-query", "-W", "-f=${Version}", base})
 		if !ok {
@@ -631,19 +600,6 @@ var managerRoutines = map[string]managerRoutine{
 			}
 			in.linkNvmNpmBins()
 			return nil
-		},
-	},
-	"vscode": {
-		install: func(in *Installer, _, name, _ string) error {
-			if err := in.exec(in.codeArgv("--install-extension", name)); err != nil {
-				return err
-			}
-			base, version, _ := strings.Cut(strings.ToLower(name), "@")
-			in.codeExtensions()[base] = version
-			return nil
-		},
-		update: func(in *Installer, _, base string) error {
-			return in.exec(in.codeArgv("--install-extension", base, "--force"))
 		},
 	},
 	"gem": {

@@ -7,6 +7,8 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/require"
+
+	"gitlab.com/konradodwrot/go-modules/lib/testyml"
 )
 
 func TestResolveBackupArchivePathLayout(t *testing.T) {
@@ -18,19 +20,21 @@ func TestResolveBackupArchivePathLayout(t *testing.T) {
 }
 
 func TestSlugRef(t *testing.T) {
-	require.Equal(t, "cli-macos", SlugRef("cli/macos"))
-	require.Equal(t, "remote-remote-ops-remote", SlugRef("remote:remote:ops-remote"))
-	require.Equal(t, "plain", SlugRef("plain"))
+	testyml.Eq(t, td, "testdata/spec/funcs/slug_ref.test.spec.yml", func(t *testing.T, c testyml.Case[string]) (string, error) {
+		return SlugRef(c.Input.Args.String(t, 0)), nil
+	})
+}
+
+type archiveNameGot struct {
+	Ts string `yaml:"ts"`
+	ID string `yaml:"id,omitempty"`
 }
 
 func TestParseBackupArchiveName(t *testing.T) {
-	ts, id := ParseBackupArchiveName("/x/backups/cli-macos/backup/20260721T114639-a1b2c3d4e5f6.tar.bz2")
-	require.Equal(t, "20260721T114639", ts)
-	require.Equal(t, "a1b2c3d4e5f6", id)
-
-	ts, id = ParseBackupArchiveName("/x/backups/legacy.tar.bz2")
-	require.Equal(t, "legacy", ts)
-	require.Empty(t, id)
+	testyml.Eq(t, td, "testdata/spec/funcs/parse_backup_archive_name.test.spec.yml", func(t *testing.T, c testyml.Case[archiveNameGot]) (archiveNameGot, error) {
+		ts, id := ParseBackupArchiveName(c.Input.Args.String(t, 0))
+		return archiveNameGot{Ts: ts, ID: id}, nil
+	})
 }
 
 // [<] 🤖🤖

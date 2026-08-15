@@ -22,6 +22,7 @@ import (
 	"time"
 
 	"github.com/stretchr/testify/require"
+	"gopkg.in/yaml.v3"
 
 	"gitlab.com/konradodwrot/go-modules/che/internal/fsutil"
 	"gitlab.com/konradodwrot/go-modules/che/internal/packages"
@@ -35,10 +36,13 @@ import (
 //	subtest per entry method; E2E_INSTALL_METHOD narrows methods (exact or
 //	<method>/ prefix); E2E_INSTALL_PACKAGES_PER_METHOD caps packages per method
 type installJob struct {
-	packages    []string
-	onlyMethods []string
-	verify      map[string]pkgVerify
-	warnMissing bool
+	packages     []string
+	onlyMethods  []string
+	kind         string
+	packagesYAML string
+	setupShell   string
+	verify       map[string]pkgVerify
+	warnMissing  bool
 }
 
 type verifyCmd struct {
@@ -216,6 +220,56 @@ func runPackageMode(t *testing.T, sel, method string, cfg runCfg) {
 			runPackageMethods(t, file.Packages[name], name, method, cfg, eligible, lenient, limit, used)
 		})
 	}
+	if lenient {
+		runToolPackages(t, file, method, cfg)
+	}
+}
+
+const fakeCodeShim = `mkdir -p "$HOME/.local/bin"
+cat > "$HOME/.local/bin/code" <<'FAKECODE'
+#!/bin/sh
+state="$HOME/.fake-code-extensions"
+touch "$state"
+case "$1" in
+--install-extension)
+    name=$2
+    case "$name" in (*@*) ;; (*) name="$name@0.0.1";; esac
+    printf '%s\n' "$name" >> "$state"
+    ;;
+--list-extensions)
+    cat "$state"
+    ;;
+esac
+exit 0
+FAKECODE
+chmod +x "$HOME/.local/bin/code"`
+
+func runToolPackages(t *testing.T, file *packages.File, method string, cfg runCfg) {
+	for _, tool := range slices.Sorted(maps.Keys(file.ToolPackages)) {
+		key := "toolPackages/" + tool
+		if !methodMatches(key, method) {
+			continue
+		}
+		names := slices.Sorted(maps.Keys(file.ToolPackages[tool]))
+		t.Run(key, func(t *testing.T) {
+			src, err := yaml.Marshal(map[string]packages.ToolPackagesMap{"toolPackages": file.ToolPackages})
+			require.NoError(t, err)
+			verify := map[string]pkgVerify{}
+			for _, name := range names {
+				verify[name] = pkgVerify{cmds: []verifyCmd{{
+					cmd:     fmt.Sprintf("code --list-extensions --show-versions | grep -i '^%s@'", name),
+					wantOut: true,
+				}}}
+			}
+			runJob(t, installJob{
+				packages:     names,
+				kind:         tool,
+				packagesYAML: string(src),
+				setupShell:   fakeCodeShim,
+				verify:       verify,
+			}, cfg)
+		})
+	}
 }
 
 func runPackageMethods(t *testing.T, entry packages.Entry, pkg, method string, cfg runCfg, eligible []string, lenient bool, limit int, used map[string]int) {
@@ -253,7 +307,7 @@ func resolveVerify(t *testing.T, entry packages.Entry, pkg, mgr string) pkgVerif
 	if entry.Command != "" {
 		name = entry.Command
 	}
-	pv := pkgVerify{cmd: name, checkPath: spec.ChecksPath() && mgr != "vscode"}
+	pv := pkgVerify{cmd: name, checkPath: spec.ChecksPath()}
 	if spec != nil {
 		if spec.VersionCmd {
 			pv.cmds = append(pv.cmds, defaultVerify(entry, pkg))
@@ -288,12 +342,6 @@ func resolveVerify(t *testing.T, entry packages.Entry, pkg, mgr string) pkgVerif
 			}
 		}
 		pv.cmds = append(pv.cmds, defaultVerify(entry, pkg))
-		return pv
-	}
-	if mgr == "vscode" {
-		cmd, err := pkgMgrVersionCheck(entry, pkg, mgr)
-		require.NoError(t, err)
-		pv.cmds = []verifyCmd{{cmd: cmd, wantOut: true}}
 		return pv
 	}
 	pv.cmds = []verifyCmd{defaultVerify(entry, pkg)}
@@ -337,8 +385,6 @@ func pkgMgrVersionCheck(entry packages.Entry, pkg, mgr string) (string, error) {
 		return "npm ls --global " + name, nil
 	case "nix":
 		return fmt.Sprintf("nix profile list | grep -i %s", name), nil
-	case "vscode":
-		return fmt.Sprintf("code --list-extensions --show-versions | grep -i '^%s@'", name), nil
 	}
 	return "", fmt.Errorf("verify pkgMgrVersionCheck: no version query for method %s", mgr)
 }
@@ -375,7 +421,14 @@ func runJob(t *testing.T, job installJob, cfg runCfg) {
 }
 
 func installArgv(job installJob) []string {
-	argv := []string{"packages", "install", "--packages-file", packages.BuiltinSentinel}
+	file := packages.BuiltinSentinel
+	if job.packagesYAML != "" {
+		file = "packages.e2e.yml"
+	}
+	argv := []string{"packages", "install", "--packages-file", file}
+	if job.kind != "" {
+		argv = append(argv, "--kind", job.kind)
+	}
 	if job.warnMissing {
 		argv = append(argv, "--missing-method-warn")
 	}
@@ -441,6 +494,16 @@ func runJobHost(t *testing.T, job installJob) (string, bool) {
 	work := t.TempDir()
 	require.NoError(t, os.WriteFile(filepath.Join(work, "che.yml"),
 		[]byte("e2e:\n  options: {autoDiscover: true}\n"), 0o644))
+	if job.packagesYAML != "" {
+		require.NoError(t, os.WriteFile(filepath.Join(work, "packages.e2e.yml"), []byte(job.packagesYAML), 0o644))
+	}
+	if job.setupShell != "" {
+		setup := exec.Command("/bin/bash", "-ec", job.setupShell)
+		setup.Env = env
+		setup.Dir = work
+		sout, serr := setup.CombinedOutput()
+		require.NoError(t, serr, "job setup: %s", sout)
+	}
 	install := exec.Command(binPath(t), installArgv(job)...)
 	install.Env = env
 	install.Dir = work
@@ -493,8 +556,7 @@ func shq(s string) string {
 
 func verifyShell(cmd string) string {
 	return `if [ -s "$NVM_DIR/nvm.sh" ]; then . "$NVM_DIR/nvm.sh"; fi; ` +
-		`if [ -s /nix/var/nix/profiles/default/etc/profile.d/nix-daemon.sh ]; then . /nix/var/nix/profiles/default/etc/profile.d/nix-daemon.sh; fi; ` +
-		`if [ "$(id -u)" = 0 ]; then code() { command code --no-sandbox --user-data-dir "$HOME/.vscode-root" "$@"; }; fi; ` + cmd
+		`if [ -s /nix/var/nix/profiles/default/etc/profile.d/nix-daemon.sh ]; then . /nix/var/nix/profiles/default/etc/profile.d/nix-daemon.sh; fi; ` + cmd
 }
 
 // [why] apt/download caches persist across runs while each environment stays isolated:
@@ -528,8 +590,19 @@ export PYENV_ROOT=/root/.pyenv NVM_DIR=/root/.config/nvm GOBIN=/root/go/bin GOFL
 cd /tmp/work
 printf 'e2e:\n  options: {autoDiscover: true}\n' > che.yml
 `)
+	appendJobSetup(&b, job)
 	appendRunVerify(&b, "che", job)
 	return b.String()
+}
+
+func appendJobSetup(b *strings.Builder, job installJob) {
+	if job.packagesYAML != "" {
+		fmt.Fprintf(b, "printf '%%s' %s > packages.e2e.yml\n", shq(job.packagesYAML))
+	}
+	if job.setupShell != "" {
+		b.WriteString(job.setupShell)
+		b.WriteString("\n")
+	}
 }
 
 func appendRunVerify(b *strings.Builder, che string, job installJob) {
@@ -538,8 +611,9 @@ func appendRunVerify(b *strings.Builder, che string, job installJob) {
 	b.WriteString("[ \"$(cat \"$rcf\")\" = 0 ] || exit 1\n")
 	b.WriteString("out=$(cat \"$olog\")\n")
 	b.WriteString("skip=1\n")
+	b.WriteString("m='no applicable installation'' method'\n")
 	for _, pkg := range job.packages {
-		fmt.Fprintf(b, "case \"$out\" in (*'%s: no applicable installation method'*) ;; (*) skip=0;; esac\n", pkg)
+		fmt.Fprintf(b, "case \"$out\" in (*\"%s: $m\"*) ;; (*) skip=0;; esac\n", pkg)
 	}
 	fmt.Fprintf(b, "if [ \"$skip\" = 1 ]; then echo %s; exit 0; fi\n", noDepsSkipMarker)
 	for pkg, pv := range job.verify {
@@ -678,6 +752,7 @@ mkdir -p $HOME/.local/bin $HOME/.config $HOME/.local/state $HOME/cover $HOME/wor
 cd $HOME/work
 printf 'e2e:\n  options: {autoDiscover: true}\n' > che.yml
 `)
+	appendJobSetup(&b, job)
 	appendRunVerify(&b, "$HOME/che-e2e/che", job)
 	return b.String()
 }

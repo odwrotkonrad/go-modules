@@ -263,82 +263,54 @@ func TestPrepareSpecs(t *testing.T) {
 		})
 }
 
-func TestPrepareOptionsPrecedence(t *testing.T) {
-	repo := testutil.Repo(t, map[string]string{
-		"che.yml": "options:\n  validateSpec: error\n  logLevel: debug\np:\n  options: {autoDiscover: true}\n",
-	})
-	_, baseEnv := prepEnv(t)
-	ctx := func(extra map[string]string) Context {
-		env := map[string]string{}
-		maps.Copy(env, baseEnv)
-		maps.Copy(env, extra)
-		return newContext(env, repo)
-	}
-
-	_, opts, err := PrepareApplicationOptions(ctx(nil), options.Options{})
-	require.NoError(t, err)
-	assert.Equal(t, options.ValidateSpec.Error, opts.ValidateSpec, "yaml layer over default")
-	assert.Equal(t, "debug", opts.LogLevel, "yaml logLevel over default")
-
-	_, opts, err = PrepareApplicationOptions(ctx(map[string]string{"CHE_VALIDATE_SPEC": "warn"}), options.Options{})
-	require.NoError(t, err)
-	assert.Equal(t, options.ValidateSpec.Warn, opts.ValidateSpec, "env var over yaml")
-
-	_, opts, err = PrepareApplicationOptions(ctx(map[string]string{"CHE_VALIDATE_SPEC": "warn"}), options.Options{ValidateSpec: options.ValidateSpec.Error})
-	require.NoError(t, err)
-	assert.Equal(t, options.ValidateSpec.Error, opts.ValidateSpec, "flag over env var")
+type prepareOptsGot struct {
+	ValidateSpec      string   `yaml:"validateSpec,omitempty"`
+	LogLevel          string   `yaml:"logLevel,omitempty"`
+	DryRun            string   `yaml:"dryRun,omitempty"`
+	SkipRemoteRefs    bool     `yaml:"skipRemoteRefs,omitempty"`
+	RenderSkipSecrets bool     `yaml:"renderSkipSecrets,omitempty"`
+	AutoDiscover      bool     `yaml:"autoDiscover,omitempty"`
+	Profiles          []string `yaml:"profiles,omitempty"`
 }
 
-func TestPrepareOptionsUserConfig(t *testing.T) {
-	repo := testutil.Repo(t, map[string]string{
-		"che.yml": "options:\n  validateSpec: warn\n  profiles: [spec/only]\np:\n  options: {autoDiscover: true}\n",
-	})
-	_, baseEnv := prepEnv(t)
-
-	// [why] XDG_CONFIG_HOME steers UserConfigPath, which resolves the config
-	cfgHome := t.TempDir()
-	t.Setenv("XDG_CONFIG_HOME", cfgHome)
-	t.Setenv("CHE_CONFIG_HOME", "")
-	cfgDir := filepath.Join(cfgHome, "che")
-	require.NoError(t, os.MkdirAll(cfgDir, 0o755))
-	config := "validateSpec: error\n" +
-		"logLevel: debug\n" +
-		"dryRun: delta\n" +
-		"skipRemoteRefs: true\n" +
-		"autoDiscover: true\n" +
-		"profiles: [cfg/a, cfg/b]\n" +
-		"renderTemplates:\n  skipSecrets: true\n"
-	require.NoError(t, os.WriteFile(filepath.Join(cfgDir, "config.yml"), []byte(config), 0o644))
-
-	ctx := func(extra map[string]string) Context {
+func TestPrepareOptions(t *testing.T) {
+	testyml.Eq(t, td, "testdata/spec/funcs/prepare_options.test.spec.yml", func(t *testing.T, c testyml.Case[prepareOptsGot]) (prepareOptsGot, error) {
+		repo := testutil.Repo(t, map[string]string{"che.yml": c.Input.Args.String(t, 0)})
+		_, baseEnv := prepEnv(t)
+		if configYml := c.Input.Args.String(t, 1); configYml != "" {
+			// [why] XDG_CONFIG_HOME steers UserConfigPath, which resolves the config
+			cfgHome := t.TempDir()
+			t.Setenv("XDG_CONFIG_HOME", cfgHome)
+			t.Setenv("CHE_CONFIG_HOME", "")
+			cfgDir := filepath.Join(cfgHome, "che")
+			require.NoError(t, os.MkdirAll(cfgDir, 0o755))
+			require.NoError(t, os.WriteFile(filepath.Join(cfgDir, "config.yml"), []byte(configYml), 0o644))
+		}
+		var extraEnv map[string]string
+		c.Input.Args.To(t, 2, &extraEnv)
 		env := map[string]string{}
 		maps.Copy(env, baseEnv)
-		maps.Copy(env, extra)
-		return newContext(env, repo)
-	}
-
-	_, opts, err := PrepareApplicationOptions(ctx(nil), options.Options{})
-	require.NoError(t, err)
-	assert.Equal(t, options.ValidateSpec.Error, opts.ValidateSpec, "user-config validateSpec over spec")
-	assert.Equal(t, "debug", opts.LogLevel, "user-config logLevel")
-	assert.Equal(t, options.DryRun.Delta, opts.DryRun, "user-config dryRun")
-	assert.True(t, opts.SkipRemoteRefs, "user-config skipRemoteRefs")
-	assert.True(t, opts.RenderSkipSecrets, "user-config renderTemplates.skipSecrets")
-	assert.True(t, opts.AutoDiscover, "user-config autoDiscover")
-	assert.Equal(t, []string{"cfg/a", "cfg/b"}, opts.Profiles, "user-config profiles over spec")
-
-	_, opts, err = PrepareApplicationOptions(ctx(map[string]string{"CHE_VALIDATE_SPEC": "warn", "CHE_PROFILE": "env/a,env/b"}), options.Options{})
-	require.NoError(t, err)
-	assert.Equal(t, options.ValidateSpec.Warn, opts.ValidateSpec, "env over user-config")
-	assert.Equal(t, []string{"env/a", "env/b"}, opts.Profiles, "CHE_PROFILE over user-config")
-
-	_, opts, err = PrepareApplicationOptions(ctx(map[string]string{"CHE_VALIDATE_SPEC": "warn", "CHE_PROFILE": "env/a,env/b"}), options.Options{Profiles: []string{"flag/a"}})
-	require.NoError(t, err)
-	assert.Equal(t, []string{"flag/a"}, opts.Profiles, "flag over env + user-config")
-
-	_, opts, err = PrepareApplicationOptions(ctx(map[string]string{"CHE_DRY_RUN": "true"}), options.Options{})
-	require.NoError(t, err)
-	assert.Equal(t, options.DryRun.Delta, opts.DryRun, "dry-run true aliases delta")
+		maps.Copy(env, extraEnv)
+		var flags struct {
+			ValidateSpec string   `yaml:"validateSpec"`
+			Profiles     []string `yaml:"profiles"`
+		}
+		c.Input.Args.To(t, 3, &flags)
+		cliOpts := options.Options{ValidateSpec: options.ValidateSpecMode(flags.ValidateSpec), Profiles: flags.Profiles}
+		_, opts, err := PrepareApplicationOptions(newContext(env, repo), cliOpts)
+		if err != nil {
+			return prepareOptsGot{}, err
+		}
+		return prepareOptsGot{
+			ValidateSpec:      string(opts.ValidateSpec),
+			LogLevel:          opts.LogLevel,
+			DryRun:            string(opts.DryRun),
+			SkipRemoteRefs:    opts.SkipRemoteRefs,
+			RenderSkipSecrets: opts.RenderSkipSecrets,
+			AutoDiscover:      opts.AutoDiscover,
+			Profiles:          opts.Profiles,
+		}, nil
+	})
 }
 
 func TestWorkingDirectoryCascade(t *testing.T) {
@@ -425,12 +397,15 @@ func TestAutoDiscoverSwitch(t *testing.T) {
 }
 
 func TestOverlayEnv(t *testing.T) {
-	base := map[string]string{"SHADOWED": "host", "KEPT": "base"}
-	got := overlayEnv(base, map[string]string{"SHADOWED": "ref", "ADDED": "x"})
-	assert.Equal(t, map[string]string{"SHADOWED": "ref", "KEPT": "base", "ADDED": "x"}, got)
-	assert.Equal(t, map[string]string{"SHADOWED": "host", "KEPT": "base"}, base, "base map unchanged")
-
-	assert.Equal(t, base, overlayEnv(base, nil))
+	testyml.Eq(t, td, "testdata/spec/funcs/overlay_env.test.spec.yml", func(t *testing.T, c testyml.Case[map[string]string]) (map[string]string, error) {
+		var base, overlay map[string]string
+		c.Input.Args.To(t, 0, &base)
+		c.Input.Args.To(t, 1, &overlay)
+		snapshot := maps.Clone(base)
+		got := overlayEnv(base, overlay)
+		assert.Equal(t, snapshot, base, "base map unchanged")
+		return got, nil
+	})
 }
 
 type stubOperation struct {

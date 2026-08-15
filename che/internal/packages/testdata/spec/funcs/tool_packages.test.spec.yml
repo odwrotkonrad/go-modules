@@ -1,0 +1,93 @@
+# [>] 🤖🤖
+context:
+  function: packages.ToolPackagesMap.UnmarshalYAML + packages.File.Merge + packages.File.Delta
+cases:
+  - name: ShouldDecodePinAndNullAsRolling
+    input:
+      args:
+        - op: unmarshal
+        - file: |
+            toolPackages:
+              vscode:
+                golang.go: 0.50.0
+                anthropic.claude-code:
+    expected:
+      output:
+        vscode:
+          golang.go: 0.50.0
+          anthropic.claude-code: rolling
+  - name: ShouldRejectUnknownTool
+    input:
+      args:
+        - op: unmarshal
+        - file: |
+            toolPackages:
+              pip:
+                requests: 2.0.0
+    expected:
+      errorOutput: "toolPackages.pip: unknown tool: want one of vscode"
+  - name: ShouldRejectNonScalarVersion
+    input:
+      args:
+        - op: unmarshal
+        - file: |
+            toolPackages:
+              vscode:
+                golang.go: {version: 0.50.0}
+    expected:
+      errorOutput: "toolPackages.vscode: golang.go: version must be a scalar pin or empty (rolling)"
+  - name: ShouldMergeOverridePinsPerTool
+    input:
+      args:
+        - op: merge
+        - file: |
+            toolPackages:
+              vscode:
+                golang.go: 0.50.0
+                redhat.vscode-yaml: 1.24.0
+        - override: |
+            toolPackages:
+              vscode:
+                golang.go: 0.51.0
+                tamasfe.even-better-toml:
+    expected:
+      output:
+        vscode:
+          golang.go: 0.51.0
+          redhat.vscode-yaml: 1.24.0
+          tamasfe.even-better-toml: rolling
+  - name: ShouldDeltaOnlyChangedAndNewEntries
+    input:
+      args:
+        - op: delta
+        - file: |
+            toolPackages:
+              vscode:
+                golang.go: 0.51.0
+                redhat.vscode-yaml: 1.24.0
+                tamasfe.even-better-toml:
+        - base: |
+            toolPackages:
+              vscode:
+                golang.go: 0.50.0
+                redhat.vscode-yaml: 1.24.0
+    expected:
+      output:
+        vscode:
+          golang.go: 0.51.0
+          tamasfe.even-better-toml: rolling
+  - name: ShouldDeltaNothingWhenEqual
+    input:
+      args:
+        - op: delta
+        - file: |
+            toolPackages:
+              vscode:
+                golang.go: 0.50.0
+        - base: |
+            toolPackages:
+              vscode:
+                golang.go: 0.50.0
+    expected:
+      output: {}
+# [<] 🤖🤖
