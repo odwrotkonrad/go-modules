@@ -24,20 +24,20 @@ var toolRoutines = map[string]toolRoutine{
 	"vscode": {
 		baseGroup: "vscode",
 		command:   "code",
-		list:      func(in *Installer) map[string]string { return in.codeExtensions() },
+		list:      func(in *Installer) map[string]string { return in.listCodeExtensions() },
 		install: func(in *Installer, name, pin string) error {
 			target := name
 			if pin != "" {
 				target += "@" + pin
 			}
-			if err := in.exec(in.codeArgv("--install-extension", target)); err != nil {
+			if err := in.exec(in.makeCodeArgv("--install-extension", target)); err != nil {
 				return err
 			}
-			in.codeExtensions()[strings.ToLower(name)] = pin
+			in.listCodeExtensions()[strings.ToLower(name)] = pin
 			return nil
 		},
 		update: func(in *Installer, name string) error {
-			return in.exec(in.codeArgv("--install-extension", name, "--force"))
+			return in.exec(in.makeCodeArgv("--install-extension", name, "--force"))
 		},
 	},
 }
@@ -60,7 +60,7 @@ func lookupToolPackage(installed map[string]string, name string) (string, bool) 
 	return v, ok
 }
 
-func (in *Installer) codeArgv(args ...string) []string {
+func (in *Installer) makeCodeArgv(args ...string) []string {
 	argv := append([]string{"code"}, args...)
 	if in.Host.Euid == 0 {
 		argv = append(argv, "--no-sandbox", "--user-data-dir", filepath.Join(in.Host.Getenv("HOME"), ".vscode-root"))
@@ -68,12 +68,12 @@ func (in *Installer) codeArgv(args ...string) []string {
 	return argv
 }
 
-func (in *Installer) codeExtensions() map[string]string {
+func (in *Installer) listCodeExtensions() map[string]string {
 	if in.codeExts != nil {
 		return in.codeExts
 	}
 	in.codeExts = map[string]string{}
-	if out, ok := in.output(in.codeArgv("--list-extensions", "--show-versions")); ok {
+	if out, ok := in.output(in.makeCodeArgv("--list-extensions", "--show-versions")); ok {
 		for line := range strings.Lines(out) {
 			ext := strings.ToLower(strings.TrimSpace(line))
 			if ext == "" {
@@ -132,7 +132,7 @@ func (in *Installer) InstallToolPackages(tool string, reqs []Request) error {
 			in.emit(log.Levels.Info, "updated", label+" via "+tool)
 			continue
 		case present:
-			in.emit(log.Levels.Info, "reinstall", reinstallMsg(label, current, pin))
+			in.emit(log.Levels.Info, "reinstall", formatReinstall(label, current, pin))
 		}
 		if in.Opts.DryRun {
 			in.emitDryRun("install", labelWithVersion(label, pin)+" via "+tool)

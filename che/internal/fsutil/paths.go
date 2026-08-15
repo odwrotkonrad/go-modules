@@ -6,7 +6,26 @@ import (
 	"cmp"
 	"os"
 	"path/filepath"
+	"strings"
 )
+
+func IsUnder(path, root string) bool {
+	return path == root || strings.HasPrefix(path, root+"/")
+}
+
+func ExpandHome(p, home string) string {
+	if rest, ok := strings.CutPrefix(p, "~/"); ok {
+		return filepath.Join(home, rest)
+	}
+	return p
+}
+
+func AbbreviateHome(path, home string) string {
+	if home != "" && strings.HasPrefix(path, home+string(filepath.Separator)) {
+		return "~" + strings.TrimPrefix(path, home)
+	}
+	return path
+}
 
 func ResolveCacheHome(home string) string {
 	return resolveBaseDir("CHE_CACHE_HOME", "XDG_CACHE_HOME", home, ".cache")

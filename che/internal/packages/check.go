@@ -15,7 +15,7 @@ import (
 func (in *Installer) CheckPresent(pkgs []string) []string {
 	var missing []string
 	for _, pkg := range pkgs {
-		if !in.verifySpec(pkg).ChecksPath() {
+		if !in.findVerifySpec(pkg).ChecksPath() {
 			in.emit(log.Levels.Debug, "present", pkg+" (checkInPath disabled)")
 			continue
 		}
@@ -29,7 +29,7 @@ func (in *Installer) CheckPresent(pkgs []string) []string {
 	return missing
 }
 
-func (in *Installer) verifySpec(pkg string) *VerifySpec {
+func (in *Installer) findVerifySpec(pkg string) *VerifySpec {
 	if in.File == nil {
 		return nil
 	}
@@ -53,7 +53,7 @@ func (in *Installer) CheckUpgradable(pkgs []string) error {
 		if err != nil || !ok {
 			continue
 		}
-		if pin := in.pinFor(pkg, pinnedVersion(it)); pin != "" {
+		if pin := in.resolvePin(pkg, findItemPin(it)); pin != "" {
 			if in.hasCmd(pkg) && !in.versionOutputHasPin(pkg, pin) {
 				in.emit(log.Levels.Warn, "upgradable", pkg+" via "+it.Mgr+": yaml pins "+pin)
 			}
@@ -66,14 +66,14 @@ func (in *Installer) CheckUpgradable(pkgs []string) error {
 		if name == "" {
 			name = pkg
 		}
-		if in.managerOutdated(it.Mgr)[path.Base(name)] {
+		if in.listOutdated(it.Mgr)[path.Base(name)] {
 			in.emit(log.Levels.Warn, "upgradable", pkg+" via "+it.Mgr)
 		}
 	}
 	return nil
 }
 
-func pinnedVersion(it Item) string {
+func findItemPin(it Item) string {
 	switch {
 	case it.BinariesRemoteArchive != nil:
 		return it.BinariesRemoteArchive.Version
@@ -91,7 +91,7 @@ func pinnedVersion(it Item) string {
 	return it.Version
 }
 
-func (in *Installer) managerOutdated(mgr string) map[string]bool {
+func (in *Installer) listOutdated(mgr string) map[string]bool {
 	if names, ok := in.outdated[mgr]; ok {
 		return names
 	}
@@ -189,7 +189,7 @@ func (in *Installer) managerBinDir(mgr string) string {
 		}
 		return filepath.Join(in.Host.Getenv("HOME"), "go", "bin")
 	case "binariesRemoteArchive":
-		return in.userBinDir()
+		return in.resolveBinDir()
 	}
 	return ""
 }

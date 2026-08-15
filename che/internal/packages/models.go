@@ -35,6 +35,18 @@ func LoadBuiltin() (*File, error) {
 	return f, nil
 }
 
+func Load(path string) (*File, error) {
+	b, err := os.ReadFile(path)
+	if err != nil {
+		return nil, fmt.Errorf("packages file not found: %s", path)
+	}
+	f := &File{}
+	if err := yaml.Unmarshal(b, f); err != nil {
+		return nil, fmt.Errorf("parse %s: %w", path, err)
+	}
+	return f, nil
+}
+
 type File struct {
 	ArchSchemes         map[string]map[string]string `yaml:"archSchemes,omitempty"`
 	OSInstallers        map[string]InstallerList     `yaml:"osInstallers,omitempty"`
@@ -161,7 +173,7 @@ func stripURLScheme(url string) string {
 	return url
 }
 
-func splitAptRegistryRef(ref string) (url, suites, components string) {
+func parseAptRef(ref string) (url, suites, components string) {
 	parts := strings.SplitN(ref, "::", 3)
 	url = parts[0]
 	if len(parts) > 1 {
@@ -174,7 +186,7 @@ func splitAptRegistryRef(ref string) (url, suites, components string) {
 }
 
 func matchAptRegistries(registries []*AptRepoSpec, ref string) []*AptRepoSpec {
-	url, suites, components := splitAptRegistryRef(ref)
+	url, suites, components := parseAptRef(ref)
 	var out []*AptRepoSpec
 	for _, r := range registries {
 		if stripURLScheme(r.URL) != url {
@@ -240,7 +252,7 @@ func (f *File) hasBrewTap(tap string) bool {
 		slices.Contains(orBuiltin(nil, false, func(b *File) []string { return b.InstallerRegistries.brew() }), tap)
 }
 
-func aptRegistrySlug(r *AptRepoSpec) string {
+func makeAptSlug(r *AptRepoSpec) string {
 	parts := []string{stripURLScheme(r.URL)}
 	if r.Suites != "" {
 		parts = append(parts, r.Suites)
@@ -262,10 +274,6 @@ func (f *File) eligibleInstallersOrBuiltin() map[string]InstallerList {
 }
 
 func (f *File) EligibleInstallers(h Host) []string {
-	return f.eligibleInstallers(h)
-}
-
-func (f *File) eligibleInstallers(h Host) []string {
 	m := f.eligibleInstallersOrBuiltin()
 	for _, k := range h.eligibilityKeys() {
 		if v, ok := m[k]; ok {
@@ -320,14 +328,14 @@ type itemBody struct {
 	Verify              *VerifySpec `yaml:"verify,omitempty"`
 }
 
-func installerKey(mgr string) string {
+func makeInstallerKey(mgr string) string {
 	if mgr == "cask" {
 		return "brew/cask"
 	}
 	return mgr
 }
 
-func mgrForInstallerKey(key string) (string, bool) {
+func parseInstallerKey(key string) (string, bool) {
 	switch key {
 	case "brew":
 		return "brew", true
@@ -367,9 +375,9 @@ func (it Item) MarshalYAML() (any, error) {
 		Verify:              it.Verify,
 	}
 	if body.isZero() && body.Version == "" && body.FromRegistry == "" && body.Verify == nil {
-		return installerKey(it.Mgr), nil
+		return makeInstallerKey(it.Mgr), nil
 	}
-	return map[string]itemBody{installerKey(it.Mgr): body}, nil
+	return map[string]itemBody{makeInstallerKey(it.Mgr): body}, nil
 }
 
 func (e Entry) MarshalYAML() (any, error) {
@@ -836,7 +844,7 @@ func (it *Item) unmarshalScalar(v string) error {
 	if err := rejectBareBrewKind(v); err != nil {
 		return err
 	}
-	if mgr, ok := mgrForInstallerKey(v); ok {
+	if mgr, ok := parseInstallerKey(v); ok {
 		it.Mgr = mgr
 		return nil
 	}
@@ -931,7 +939,7 @@ func (it *Item) unmarshalManager(key string, val *yaml.Node) error {
 		return err
 	}
 	it.Mgr = key
-	if mgr, ok := mgrForInstallerKey(key); ok {
+	if mgr, ok := parseInstallerKey(key); ok {
 		it.Mgr = mgr
 	}
 	if val.Kind != yaml.MappingNode {
@@ -973,18 +981,6 @@ func mappingHasKey(node *yaml.Node, key string) bool {
 	return false
 }
 
-func Load(path string) (*File, error) {
-	b, err := os.ReadFile(path)
-	if err != nil {
-		return nil, fmt.Errorf("packages file not found: %s", path)
-	}
-	f := &File{}
-	if err := yaml.Unmarshal(b, f); err != nil {
-		return nil, fmt.Errorf("parse %s: %w", path, err)
-	}
-	return f, nil
-}
-
 func (f *File) Merge(override *File) {
 	if override == nil {
 		return
@@ -1015,7 +1011,7 @@ func (f *File) mergeRegistries(override *InstallerRegistriesSpec) {
 	}
 	regs := f.InstallerRegistries
 	for _, r := range override.Apt {
-		if len(matchAptRegistries(regs.Apt, aptRegistryRef(r))) == 0 {
+		if len(matchAptRegistries(regs.Apt, formatAptRef(r))) == 0 {
 			regs.Apt = append(regs.Apt, r)
 		}
 	}
@@ -1031,7 +1027,7 @@ func (f *File) mergeRegistries(override *InstallerRegistriesSpec) {
 	}
 }
 
-func aptRegistryRef(r *AptRepoSpec) string {
+func formatAptRef(r *AptRepoSpec) string {
 	ref := stripURLScheme(r.URL)
 	if r.Suites != "" || r.Components != "" {
 		ref += "::" + r.Suites

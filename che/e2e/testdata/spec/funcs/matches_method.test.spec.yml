@@ -1,6 +1,6 @@
 # [>] 🤖🤖
 context:
-  function: e2e.methodMatches
+  function: e2e.matchesMethod
 cases:
   - name: ShouldSelectEverythingOnEmptySelector
     input:

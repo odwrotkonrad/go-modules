@@ -7,7 +7,7 @@ type OpenerRule struct {
 	Types  []string `yaml:"types"`
 }
 
-type Sections map[string][]OpenerRule
+type TerminalRules map[string][]OpenerRule
 
 type language struct {
 	Type       string   `yaml:"type"`

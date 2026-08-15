@@ -18,7 +18,7 @@ import (
 func TestDryRunAnnounce(t *testing.T) {
 	testyml.Run(t, td, "testdata/spec/cmds/dry_run_announce.test.spec.yml",
 		func(t *testing.T, c testyml.Case[string]) {
-			a, root, _ := repoEnv(t, c.Context.Pwd)
+			a, root, _ := setupRepoEnv(t, c.Context.Pwd)
 			for k, v := range c.Context.Env {
 				t.Setenv(k, v)
 			}

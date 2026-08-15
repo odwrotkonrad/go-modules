@@ -34,7 +34,7 @@ func prepEnv(t *testing.T) (string, map[string]string) {
 		t.Skip("non-root path only; build resolves home from $HOME")
 	}
 	home := t.TempDir()
-	// [why] clear XDG/CHE base-dir vars so spec-side cache-home resolution
+	// [why] clear XDG/CHE base-dir vars so spec-side cache-home resolution falls back to $HOME
 	for _, k := range []string{
 		"CHE_CACHE_HOME", "CHE_STATE_HOME", "CHE_DATA_HOME", "CHE_CONFIG_HOME",
 		"XDG_CACHE_HOME", "XDG_STATE_HOME", "XDG_DATA_HOME", "XDG_CONFIG_HOME",
@@ -130,7 +130,7 @@ func TestPrepareSpecs(t *testing.T) {
 			vars["HOME"] = home
 			vars["CACHE"] = filepath.Join(home, ".cache/che/remote-sources")
 
-			// [why] the launch env is built at the top edge exactly like
+			// [why] the launch env is built at the top edge exactly like the CLI does
 			env := map[string]string{}
 			maps.Copy(env, baseEnv)
 			if d, ok := vars["REF_DIR"]; ok {
@@ -142,7 +142,7 @@ func TestPrepareSpecs(t *testing.T) {
 			for _, k := range flags.UnsetEnv {
 				delete(env, k)
 			}
-			// [why] spec-side source resolution (URI $VAR expand, XDG cache home)
+			// [why] spec-side source resolution (URI $VAR expand, XDG cache home) reads the process env
 			t.Chdir(hostRepo)
 			for _, k := range flags.UnsetEnv {
 				t.Setenv(k, "")
@@ -273,7 +273,7 @@ func TestPrepareSpecs(t *testing.T) {
 				}
 			}
 			if w.SampleEnv != "" {
-				// [why] the profile captured the launch env overlaid with its
+				// [why] the profile captured the launch env overlaid with its spec env
 				assert.Equal(t, w.EnvInOverlay, sp.env[w.SampleEnv], w.SampleEnv+" in the captured env")
 			}
 		})
@@ -294,7 +294,7 @@ func TestPrepareOptions(t *testing.T) {
 		repo := testutil.Repo(t, map[string]string{"che.yml": c.Input.Args.String(t, 0)})
 		_, baseEnv := prepEnv(t)
 		if configYml := c.Input.Args.String(t, 1); configYml != "" {
-			// [why] XDG_CONFIG_HOME steers UserConfigPath, which resolves the config
+			// [why] XDG_CONFIG_HOME steers UserConfigPath, which resolves the user config layer
 			cfgHome := t.TempDir()
 			t.Setenv("XDG_CONFIG_HOME", cfgHome)
 			t.Setenv("CHE_CONFIG_HOME", "")

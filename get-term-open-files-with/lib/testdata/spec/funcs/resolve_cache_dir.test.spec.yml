@@ -1,6 +1,6 @@
 # [>] 🤖🤖
 context:
-  function: lib.CacheDir
+  function: lib.ResolveCacheDir
 cases:
   - name: ShouldFallBackToXdgCacheHome
     context:

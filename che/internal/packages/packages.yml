@@ -290,6 +290,12 @@ packages:
                     - linux-amd64: sha256:803d433f226db4776e1768fd319fc6c6e4935a456acf84fcc0080818b854bc8f
                     - linux-arm64: sha256:43d143448adf2c2787704e7d7704fd6d62d367a54c5edaef0a3f75509cb0938d
                 url: https://download.docker.com/linux/static/stable/{arch}/docker-{version}.tgz
+            - binariesRemoteArchive:
+                archScheme: uname
+                extractBinaries: [docker/docker]
+                platformEligibility:
+                    - darwin-arm64: sha256:b8683ed19d1f06048a496f9b8429e2c71d0b088d475b7487c054ea3666c02a3c
+                url: https://download.docker.com/mac/static/stable/{arch}/docker-{version}.tgz
     docker-buildx-plugin:
         version: 0.36.1
         verify:

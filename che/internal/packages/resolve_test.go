@@ -205,7 +205,7 @@ func TestPick(t *testing.T) {
 func TestExpand(t *testing.T) {
 	testyml.Eq(t, td, "testdata/spec/funcs/expand.test.spec.yml", func(t *testing.T, c testyml.Case[string]) (string, error) {
 		h := testHost(c.Input.Args.String(t, 0), "amd64", nil)
-		return h.expandAs(c.Input.Args.String(t, 2), c.Input.Args.String(t, 3), c.Input.Args.String(t, 1)), nil
+		return h.expandTokens(c.Input.Args.String(t, 2), c.Input.Args.String(t, 3), c.Input.Args.String(t, 1)), nil
 	})
 }
 

@@ -47,8 +47,8 @@ func TestCommands(t *testing.T) {
 		}
 		args, profile := splitProfileArg(c.Context.CommandArgs())
 		a, root, home := setupMock(t, c.Context.Pwd, profile, c.Context.MockedInterfaces, c.Context.Env)
-		require.NotEmpty(t, a.root.AllProfiles())
-		repo := a.root.AllProfiles()[0].Source.DirectoryPath
+		require.NotEmpty(t, a.specs.AllProfiles())
+		repo := a.specs.AllProfiles()[0].Source.DirectoryPath
 		vars := map[string]string{
 			"HOME": home,
 			"REPO": repo,

@@ -15,7 +15,7 @@ import (
 //go:embed all:testdata
 var td embed.FS
 
-func TestRenderDocumentNode(t *testing.T) {
+func TestRenderDutiLines(t *testing.T) {
 	testyml.Eq(t, td, "testdata/spec/funcs/render_duti_lines.test.spec.yml", func(t *testing.T, c testyml.Case[string]) (string, error) {
 		var node *yaml.Node
 		switch raw := c.Input.Args.String(t, 0); raw {

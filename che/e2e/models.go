@@ -30,7 +30,7 @@ type step struct {
 	Command     string            `yaml:"command"`
 	Write       *writeSpec        `yaml:"write"`
 	Remove      *removeSpec       `yaml:"remove"`
-	GitRestore  *gitSpec          `yaml:"gitRestore"`
+	GitRestore  *gitRestoreSpec   `yaml:"gitRestore"`
 	Extract     *extractSpec      `yaml:"extract"`
 	Capture     map[string]string `yaml:"capture"`
 	Expected    want              `yaml:"expected"`
@@ -56,7 +56,7 @@ type removeSpec struct {
 	Paths []string `yaml:"paths"`
 }
 
-type gitSpec struct {
+type gitRestoreSpec struct {
 	Repo string `yaml:"repo"`
 	Path string `yaml:"path"`
 }

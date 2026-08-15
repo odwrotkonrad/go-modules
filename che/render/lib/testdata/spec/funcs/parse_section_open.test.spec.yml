@@ -1,6 +1,6 @@
 # [>] 🤖🤖
 context:
-  function: lib.sectionOpen
+  function: lib.parseSectionOpen
 cases:
   - name: ShouldParseGenaiIncludeLabel
     input:

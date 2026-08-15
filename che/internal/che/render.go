@@ -148,7 +148,7 @@ func (p *ProfileReady) resolveTemplateDests(item spec.FileItem) []tmplDest {
 			out[i] = tmplDest{path: filepath.Join(p.expandEnv("${invokingSpecGitRoot}"), rest), opts: d.Options, header: rest}
 			continue
 		}
-		// [why] expand env / ~ before the host-vs-repo decision so $HOME/... and
+		// [why] expand env / ~ before the host-vs-repo decision so $HOME/... and ~/... land on the host
 		path := p.expandHome(d.Path)
 		if strings.HasPrefix(path, "/") {
 			out[i] = tmplDest{path: path, host: true, opts: d.Options, header: path}

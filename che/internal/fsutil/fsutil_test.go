@@ -93,6 +93,17 @@ func TestTrackedFiles(t *testing.T) {
 	})
 }
 
+func TestTrackedFilesNoRepo(t *testing.T) {
+	dir := t.TempDir()
+	require.NoError(t, os.MkdirAll(filepath.Join(dir, "sub"), 0o755))
+	require.NoError(t, os.WriteFile(filepath.Join(dir, "che.yml"), []byte("x"), 0o644))
+	require.NoError(t, os.WriteFile(filepath.Join(dir, "sub", "f"), []byte("x"), 0o644))
+	got, err := ListTrackedFiles(dir)
+	require.NoError(t, err)
+	slices.Sort(got)
+	require.Equal(t, []string{"che.yml", filepath.Join("sub", "f")}, got)
+}
+
 func TestMkdirArgv(t *testing.T) {
 	f := FS{Home: "/Users/x"}
 	testyml.Eq(t, td, "testdata/spec/funcs/mkdir_argv.test.spec.yml", func(t *testing.T, c testyml.Case[[]string]) ([]string, error) {
@@ -116,19 +127,19 @@ func TestFSOps(t *testing.T) {
 		a := c.Input.Args
 		var err error
 		switch c.Context.Function {
-		case "fsutil.FS.Mkdir":
+		case "fsutil.FS.MakeDir":
 			err = f.MakeDir(a.String(t, 0), octal(t, a.String(t, 1)), a.Bool(t, 2))
-		case "fsutil.FS.Symlink":
+		case "fsutil.FS.MakeSymlink":
 			err = f.MakeSymlink(a.String(t, 0), a.String(t, 1))
-		case "fsutil.FS.Copy":
+		case "fsutil.FS.CopyFile":
 			err = f.CopyFile(a.String(t, 0), a.String(t, 1), octal(t, a.String(t, 2)))
-		case "fsutil.FS.Remove":
+		case "fsutil.FS.RemoveFile":
 			err = f.RemoveFile(a.String(t, 0))
-		case "fsutil.FS.Chown":
+		case "fsutil.FS.ChangeOwner":
 			err = f.ChangeOwner(a.String(t, 0), a.String(t, 1))
-		case "fsutil.FS.Chmod":
+		case "fsutil.FS.ChangeMode":
 			err = f.ChangeMode(a.String(t, 0), a.String(t, 1))
-		case "fsutil.FS.Install":
+		case "fsutil.FS.InstallFile":
 			err = f.InstallFile(a.String(t, 0), []byte(a.String(t, 3)), octal(t, a.String(t, 1)), a.String(t, 2))
 		default:
 			t.Fatalf("unknown function %q", c.Context.Function)
@@ -149,14 +160,3 @@ func TestFSOps(t *testing.T) {
 }
 
 // [<] 🤖🤖
-
-func TestTrackedFilesNoRepo(t *testing.T) {
-	dir := t.TempDir()
-	require.NoError(t, os.MkdirAll(filepath.Join(dir, "sub"), 0o755))
-	require.NoError(t, os.WriteFile(filepath.Join(dir, "che.yml"), []byte("x"), 0o644))
-	require.NoError(t, os.WriteFile(filepath.Join(dir, "sub", "f"), []byte("x"), 0o644))
-	got, err := ListTrackedFiles(dir)
-	require.NoError(t, err)
-	slices.Sort(got)
-	require.Equal(t, []string{"che.yml", filepath.Join("sub", "f")}, got)
-}

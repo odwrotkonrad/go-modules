@@ -20,7 +20,7 @@ import (
 //go:embed all:testdata
 var td embed.FS
 
-func languagesFixture(t *testing.T) string {
+func readLanguagesFixture(t *testing.T) string {
 	t.Helper()
 	return testyml.ReadFile(t, td, "testdata/fixture/common/languages.yml")
 }
@@ -46,11 +46,11 @@ func TestRun(t *testing.T) {
 		url := lib.LanguagesURL
 		switch c.Input.Args.String(t, 1) {
 		case "languages":
-			url = serveStatus(t, http.StatusOK, languagesFixture(t))
+			url = serveStatus(t, http.StatusOK, readLanguagesFixture(t))
 		case "error500":
 			url = serveStatus(t, http.StatusInternalServerError, "")
 		default:
-			require.NoError(t, os.WriteFile(filepath.Join(cache, "languages.yml"), []byte(languagesFixture(t)), 0o644))
+			require.NoError(t, os.WriteFile(filepath.Join(cache, "languages.yml"), []byte(readLanguagesFixture(t)), 0o644))
 		}
 		raw := ""
 		if cfg := c.Input.Args.String(t, 0); cfg != "" {

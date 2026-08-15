@@ -1,6 +1,6 @@
 # [>] 🤖🤖
 context:
-  function: e2e.methodKey
+  function: e2e.resolveMethodKey
 cases:
   - name: ShouldGroupBrewUnderFormulae
     input:

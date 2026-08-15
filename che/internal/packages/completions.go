@@ -15,7 +15,7 @@ func (in *Installer) installCompletions(pkg string, e Entry) error {
 	if def == nil || !in.Opts.CompletionsEnabled {
 		return nil
 	}
-	dir := in.completionsDir()
+	dir := in.resolveCompletionsDir()
 	name := def.Name
 	if name == "" {
 		name = "_" + pkg
@@ -63,13 +63,13 @@ func (in *Installer) installCompletions(pkg string, e Entry) error {
 	return nil
 }
 
-func (in *Installer) completionsDir() string {
+func (in *Installer) resolveCompletionsDir() string {
 	return in.resolveDestDir(&in.compDir, in.Opts.CompletionsDestinationCandidates, DefaultCompletionsDestinationCandidates,
-		in.Opts.CompletionsCheckPresentOnFpath, in.fpath,
+		in.Opts.CompletionsCheckPresentOnFpath, in.resolveFpath,
 		"packages.completions.zsh.installDestinationCandidates", "fpath")
 }
 
-func (in *Installer) fpath() []string {
+func (in *Installer) resolveFpath() []string {
 	if in.Host.FpathDirs == nil {
 		return nil
 	}

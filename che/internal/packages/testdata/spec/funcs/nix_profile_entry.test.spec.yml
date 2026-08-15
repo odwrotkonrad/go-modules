@@ -1,6 +1,6 @@
 # [>] 🤖🤖
 context:
-  function: packages.nixProfileEntry
+  function: packages.findNixEntry
 cases:
   - name: ShouldParseNameAndStorePathFormat
     input:

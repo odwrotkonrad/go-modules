@@ -1,6 +1,6 @@
 # [>] 🤖🤖
 context:
-  function: yamlcfg.customPaths
+  function: yamlcfg.resolveCustomPaths
 cases:
   - name: ShouldUseXdgConfigHomeForUserPath
     context:

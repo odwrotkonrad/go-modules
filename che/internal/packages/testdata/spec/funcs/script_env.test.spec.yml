@@ -1,6 +1,6 @@
 # [>] 🤖🤖
 context:
-  function: packages.Installer.scriptEnv
+  function: packages.Installer.makeScriptEnv
 cases:
   - name: ShouldCarryPinShaAndHostArchVars
     input:

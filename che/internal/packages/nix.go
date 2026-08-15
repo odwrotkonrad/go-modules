@@ -12,7 +12,7 @@ import (
 	"gitlab.com/konradodwrot/go-modules/che/internal/log"
 )
 
-func (in *Installer) nixBin() string {
+func (in *Installer) resolveNixBin() string {
 	if in.Host.HasCmd("nix") {
 		return "nix"
 	}
@@ -22,11 +22,11 @@ func (in *Installer) nixBin() string {
 	return "nix"
 }
 
-func (in *Installer) nixArgv(args ...string) []string {
-	return append([]string{in.nixBin(), "--extra-experimental-features", "nix-command flakes", "profile"}, args...)
+func (in *Installer) makeNixArgv(args ...string) []string {
+	return append([]string{in.resolveNixBin(), "--extra-experimental-features", "nix-command flakes", "profile"}, args...)
 }
 
-func (in *Installer) nixRegistryFor(pkg string, n *NixSpec) (*NixRegistrySpec, error) {
+func (in *Installer) resolveNixRegistry(pkg string, n *NixSpec) (*NixRegistrySpec, error) {
 	name := cmp.Or(n.FromRegistry, DefaultNixRegistry)
 	reg, err := in.File.nixRegistry(name)
 	if err != nil {
@@ -38,7 +38,7 @@ func (in *Installer) nixRegistryFor(pkg string, n *NixSpec) (*NixRegistrySpec, e
 	return reg, nil
 }
 
-func nixRef(reg *NixRegistrySpec, attr, rev string) string {
+func formatNixRef(reg *NixRegistrySpec, attr, rev string) string {
 	switch {
 	case rev != "":
 		return reg.URL + "/" + rev + "#" + attr
@@ -48,7 +48,7 @@ func nixRef(reg *NixRegistrySpec, attr, rev string) string {
 	return reg.URL + "#" + attr
 }
 
-func (in *Installer) nixPins(pkg string, n *NixSpec) (binPin, rev string, err error) {
+func (in *Installer) resolveNixPins(pkg string, n *NixSpec) (binPin, rev string, err error) {
 	if r, ok := in.requested[pkg]; ok && len(r.Versions) > 0 {
 		v := r.globalVersion()
 		if rv, ok := n.VersionMap[v]; ok {
@@ -59,7 +59,7 @@ func (in *Installer) nixPins(pkg string, n *NixSpec) (binPin, rev string, err er
 	for bin, rv := range n.VersionMap {
 		return bin, rv, nil
 	}
-	if pin := in.pinFor(pkg, ""); pin != "" {
+	if pin := in.resolvePin(pkg, ""); pin != "" {
 		return "", "", fmt.Errorf("%s: version %s pinned but the nix item's versionMap has no nixpkgs revision for it", pkg, pin)
 	}
 	return "", "", nil
@@ -70,11 +70,11 @@ func (in *Installer) installNixSpec(pkg string, n *NixSpec) error {
 		n = &NixSpec{}
 	}
 	attr := n.packageName(pkg)
-	reg, err := in.nixRegistryFor(pkg, n)
+	reg, err := in.resolveNixRegistry(pkg, n)
 	if err != nil {
 		return err
 	}
-	binPin, rev, err := in.nixPins(pkg, n)
+	binPin, rev, err := in.resolveNixPins(pkg, n)
 	if err != nil {
 		return err
 	}
@@ -89,28 +89,28 @@ func (in *Installer) installNixSpec(pkg string, n *NixSpec) error {
 		return nil
 	}
 	if in.Opts.DryRun {
-		in.emitDryRun("install", labelWithVersion(in.pkgLabel(pkg), binPin)+" via nix ("+reg.Name+")")
+		in.emitDryRun("install", labelWithVersion(in.labelPkg(pkg), binPin)+" via nix ("+reg.Name+")")
 		return nil
 	}
 	if installed {
-		if err := in.exec(in.nixArgv("remove", attr)); err != nil {
+		if err := in.exec(in.makeNixArgv("remove", attr)); err != nil {
 			return err
 		}
 	}
-	if err := in.exec(in.nixArgv("install", nixRef(reg, attr, rev))); err != nil {
+	if err := in.exec(in.makeNixArgv("install", formatNixRef(reg, attr, rev))); err != nil {
 		return err
 	}
 	ver := binPin
 	if ver == "" {
 		ver = in.installedVersion("nix", attr)
 	}
-	in.emit(log.Levels.Info, "installed", labelWithVersion(in.pkgLabel(pkg), ver)+" via nix ("+reg.Name+")")
+	in.emit(log.Levels.Info, "installed", labelWithVersion(in.labelPkg(pkg), ver)+" via nix ("+reg.Name+")")
 	return nil
 }
 
 var nixStoreVersionRe = regexp.MustCompile(`^[0-9][0-9A-Za-z.+_]*`)
 
-func nixProfileEntry(out, attr string) (found bool, version string) {
+func findNixEntry(out, attr string) (found bool, version string) {
 	for field := range strings.FieldsSeq(out) {
 		if !strings.HasPrefix(field, "/nix/store/") {
 			continue
@@ -132,20 +132,20 @@ func nixProfileEntry(out, attr string) (found bool, version string) {
 	return found, version
 }
 
-func (in *Installer) nixProfileList() (string, bool) {
-	return in.output(in.nixArgv("list"))
+func (in *Installer) listNixProfile() (string, bool) {
+	return in.output(in.makeNixArgv("list"))
 }
 
 var nixInstallRoutine = managerRoutine{
 	install: func(in *Installer, _, name, _ string) error {
-		reg, err := in.nixRegistryFor(name, &NixSpec{})
+		reg, err := in.resolveNixRegistry(name, &NixSpec{})
 		if err != nil {
 			return err
 		}
-		return in.exec(in.nixArgv("install", nixRef(reg, name, "")))
+		return in.exec(in.makeNixArgv("install", formatNixRef(reg, name, "")))
 	},
 	update: func(in *Installer, _, base string) error {
-		return in.exec(in.nixArgv("upgrade", base))
+		return in.exec(in.makeNixArgv("upgrade", base))
 	},
 }
 

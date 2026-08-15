@@ -132,7 +132,7 @@ func (h Host) NixBin() string {
 	return ""
 }
 
-func (h Host) expandAs(s, version, arch string) string {
+func (h Host) expandTokens(s, version, arch string) string {
 	return strings.NewReplacer("{version}", version, "{os}", h.OS, "{arch}", arch).Replace(s)
 }
 
@@ -204,7 +204,7 @@ func (h Host) pickPreferred(pkg string, entry Entry, preferred, only, allowed []
 			if ok && len(only) > 0 && !slices.Contains(only, it.Mgr) {
 				ok = false
 			}
-			if ok && len(allowed) > 0 && !slices.Contains(allowed, methodFamily(it.Mgr)) {
+			if ok && len(allowed) > 0 && !slices.Contains(allowed, makeInstallerKey(it.Mgr)) {
 				ok = false
 			}
 			if ok {
@@ -213,13 +213,6 @@ func (h Host) pickPreferred(pkg string, entry Entry, preferred, only, allowed []
 		}
 	}
 	return Item{}, false, nil
-}
-
-func methodFamily(mgr string) string {
-	if mgr == "cask" {
-		return "brew/cask"
-	}
-	return mgr
 }
 
 var KnownManagers = []string{"brew", "cask", "apt", "npm", "go", "gem", "binariesRemoteArchive", "script", "buildFromSource", "pyenv", "nvm", "nix"}

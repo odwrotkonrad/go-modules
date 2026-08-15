@@ -1,6 +1,6 @@
 # [>] 🤖🤖
 context:
-  function: lib.tagComment
+  function: lib.parseTagComment
 cases:
   - name: ShouldParseValsLabel
     input:

@@ -7,7 +7,7 @@ import (
 )
 
 // [>] 🤖🤖🤖
-func ruleTarget(node *sitter.Node, src []byte, what string) (target, bool) {
+func parseRuleTarget(node *sitter.Node, src []byte, what string) (target, bool) {
 	var name string
 	for i := range node.NamedChildCount() {
 		child := node.NamedChild(i)
@@ -19,15 +19,15 @@ func ruleTarget(node *sitter.Node, src []byte, what string) (target, bool) {
 	if name == "" || strings.HasPrefix(name, ".") {
 		return target{}, false
 	}
-	var chain []string
+	var deps []string
 	if normal := node.ChildByFieldName("normal"); normal != nil {
-		chain = words(normal.Utf8Text(src))
+		deps = strings.Fields(normal.Utf8Text(src))
 	}
-	return target{name: name, what: what, chain: chain}, true
+	return target{name: name, what: what, deps: deps}, true
 }
 
-func paramTarget(node *sitter.Node, src []byte, what, vals string) (target, bool) {
-	word := firstWord(node)
+func parseParamTarget(node *sitter.Node, src []byte, what, vals string) (target, bool) {
+	word := findWord(node)
 	if word == nil {
 		return target{}, false
 	}
@@ -38,21 +38,17 @@ func paramTarget(node *sitter.Node, src []byte, what, vals string) (target, bool
 	return target{name: name, what: what, vals: vals}, true
 }
 
-func firstWord(node *sitter.Node) *sitter.Node {
+func findWord(node *sitter.Node) *sitter.Node {
 	for i := range node.NamedChildCount() {
 		child := node.NamedChild(i)
 		if child.Kind() == "word" {
 			return child
 		}
-		if w := firstWord(child); w != nil {
+		if w := findWord(child); w != nil {
 			return w
 		}
 	}
 	return nil
-}
-
-func words(s string) []string {
-	return strings.Fields(strings.TrimSpace(s))
 }
 
 //[<] 🤖🤖🤖

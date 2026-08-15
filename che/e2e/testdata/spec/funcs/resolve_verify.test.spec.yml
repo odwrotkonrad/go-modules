@@ -130,7 +130,7 @@ cases:
         - entry: "[go]"
         - pkg: foo
         - method: go
-        - rawPkgMgrQuery: true
+        - pkgMgrVersionCheck: true
     expected:
       errorOutput: no version query for method go
 # [<] 🤖🤖

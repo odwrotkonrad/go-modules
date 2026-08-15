@@ -48,17 +48,17 @@ func parse(src []byte) ([]section, error) {
 		return &stack[len(stack)-1]
 	}
 
-	var pending pendingCmt
+	var pending pendingComment
 
 	for i := range root.NamedChildCount() {
 		node := root.NamedChild(i)
 		text := strings.TrimSpace(node.Utf8Text(src))
 		prev := pending
-		pending = pendingCmt{}
+		pending = pendingComment{}
 
 		switch node.Kind() {
 		case "comment":
-			if label, depth, ok := sectionOpen(text); ok {
+			if label, depth, ok := parseSectionOpen(text); ok {
 				if c := cur(); c != nil {
 					emit(*c)
 					c.targets = nil
@@ -70,25 +70,25 @@ func parse(src []byte) ([]section, error) {
 					level:   3 + depth,
 					kept:    kept,
 				})
-			} else if depth, ok := sectionClose(text); ok {
+			} else if depth, ok := parseSectionClose(text); ok {
 				for len(stack) > 0 && stack[len(stack)-1].depth >= depth {
 					emit(stack[len(stack)-1])
 					stack = stack[:len(stack)-1]
 				}
-			} else if what, ok := tagComment(text, "what"); ok {
-				pending = pendingCmt{what: what, vals: prev.vals}
-			} else if vals, ok := tagComment(text, "vals"); ok {
-				pending = pendingCmt{what: prev.what, vals: vals}
+			} else if what, ok := parseTagComment(text, "what"); ok {
+				pending = pendingComment{what: what, vals: prev.vals}
+			} else if vals, ok := parseTagComment(text, "vals"); ok {
+				pending = pendingComment{what: prev.what, vals: vals}
 			}
 		case "rule":
 			if c := cur(); c != nil && c.kept {
-				if t, ok := ruleTarget(node, src, prev.what); ok {
+				if t, ok := parseRuleTarget(node, src, prev.what); ok {
 					c.targets = append(c.targets, t)
 				}
 			}
 		case "variable_assignment", "export_directive":
 			if c := cur(); c != nil && c.kept && prev.what != "" {
-				if t, ok := paramTarget(node, src, prev.what, prev.vals); ok {
+				if t, ok := parseParamTarget(node, src, prev.what, prev.vals); ok {
 					c.targets = append(c.targets, t)
 				}
 			}

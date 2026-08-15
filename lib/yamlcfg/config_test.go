@@ -112,9 +112,9 @@ func TestUnwrap(t *testing.T) {
 	})
 }
 
-func TestCustomPaths(t *testing.T) {
-	testyml.Eq(t, td, "testdata/spec/funcs/custom_paths.test.spec.yml", func(t *testing.T, c testyml.Case[string]) (string, error) {
-		paths := yamlcfg.CustomPaths(c.Input.Args.String(t, 0), c.Input.Args.String(t, 1))
+func TestResolveCustomPaths(t *testing.T) {
+	testyml.Eq(t, td, "testdata/spec/funcs/resolve_custom_paths.test.spec.yml", func(t *testing.T, c testyml.Case[string]) (string, error) {
+		paths := yamlcfg.ResolveCustomPaths(c.Input.Args.String(t, 0), c.Input.Args.String(t, 1))
 		return paths[c.Input.Args.Int(t, 2)], nil
 	})
 }

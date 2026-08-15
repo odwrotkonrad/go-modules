@@ -10,10 +10,6 @@ import (
 	"gitlab.com/konradodwrot/go-modules/lib/yamlcfg"
 )
 
-func cfgErr(msg string) *yamlcfg.CodedError {
-	return &yamlcfg.CodedError{Code: yamlcfg.CodeConfig, Msg: "invalid config: " + msg}
-}
-
 func RenderDutiLines(cfg *yaml.Node) (string, error) {
 	if cfg == nil {
 		return "", nil
@@ -26,18 +22,18 @@ func RenderDutiLines(cfg *yaml.Node) (string, error) {
 		return "", nil
 	}
 	if root.Kind != yaml.MappingNode {
-		return "", cfgErr("top level must be a mapping")
+		return "", newConfigErr("top level must be a mapping")
 	}
 	var lines []string
 	for bundleKey, roles := range yamlcfg.MapPairs(root) {
 		bundle := bundleKey.Value
 		if roles.Kind != yaml.MappingNode {
-			return "", cfgErr(bundle + " must be a mapping")
+			return "", newConfigErr(bundle + " must be a mapping")
 		}
 		for roleKey, utis := range yamlcfg.MapPairs(roles) {
 			role := roleKey.Value
 			if utis.Kind != yaml.SequenceNode {
-				return "", cfgErr(bundle + "." + role + " must be a list")
+				return "", newConfigErr(bundle + "." + role + " must be a list")
 			}
 			for _, uti := range utis.Content {
 				lines = append(lines, bundle+" "+uti.Value+" "+role)
@@ -45,6 +41,10 @@ func RenderDutiLines(cfg *yaml.Node) (string, error) {
 		}
 	}
 	return strings.Join(lines, "\n"), nil
+}
+
+func newConfigErr(msg string) *yamlcfg.CodedError {
+	return &yamlcfg.CodedError{Code: yamlcfg.CodeConfig, Msg: "invalid config: " + msg}
 }
 
 //[<] 🤖🤖

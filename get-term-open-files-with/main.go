@@ -32,15 +32,15 @@ func run(args []string, customDir, url string) (string, error) {
 		return "", yamlcfg.ArgsError(args)
 	}
 	terminal := args[0]
-	var sections lib.Sections
-	if err := yamlcfg.LoadConfig(configName, customDir, &sections); err != nil {
+	var rules lib.TerminalRules
+	if err := yamlcfg.LoadConfig(configName, customDir, &rules); err != nil {
 		return "", err
 	}
-	byType, err := lib.TypeExtensions(url)
+	extsByType, err := lib.LoadTypeExtensions(url)
 	if err != nil {
 		return "", err
 	}
-	return lib.RenderSuffixAliases(terminal, sections, byType), nil
+	return lib.RenderSuffixAliases(terminal, rules, extsByType), nil
 }
 
 func main() {

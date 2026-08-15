@@ -13,7 +13,7 @@ import (
 	"gitlab.com/konradodwrot/go-modules/che/internal/log"
 )
 
-func Dir(home, url string) string {
+func ResolveDir(home, url string) string {
 	return filepath.Join(fsutil.ResolveCacheHome(home), "remote-sources", slug(url))
 }
 
@@ -28,7 +28,6 @@ func slug(url string) string {
 	return strings.Trim(s, "-")
 }
 
-// [why] a shallow --ff-only pull fails once the fetched history is truncated;
 var checkouts = map[string]string{}
 
 func ResetCache() { checkouts = map[string]string{} }
@@ -37,15 +36,15 @@ func EnsureCheckout(home, url string) (string, error) {
 	if dir, ok := checkouts[url]; ok {
 		return dir, nil
 	}
-	dir, err := ensureCheckout(home, url)
+	dir, err := cloneOrUpdate(home, url)
 	if err == nil {
 		checkouts[url] = dir
 	}
 	return dir, err
 }
 
-func ensureCheckout(home, url string) (string, error) {
-	dir := Dir(home, url)
+func cloneOrUpdate(home, url string) (string, error) {
+	dir := ResolveDir(home, url)
 	line := "remote " + url + " into " + fsutil.AbbreviateHome(dir, home)
 	emit := func(action string) {
 		log.Emit(log.Event{
@@ -61,7 +60,7 @@ func ensureCheckout(home, url string) (string, error) {
 		return dir, nil
 	}
 	before, _ := gitOut("-C", dir, "rev-parse", "HEAD")
-	// [why] a failing update with a cached checkout is survivable: warn and use
+	// [why] a shallow --ff-only pull fails once the fetched history is truncated
 	if err := git("-C", dir, "fetch", "--quiet", "--depth", "1"); err != nil {
 		log.EmitWarn("init-remote-sources", "warning", fmt.Sprintf("fetch failed, using cached checkout %s: %v", dir, err))
 		return dir, nil

@@ -47,7 +47,7 @@ func requireSecretResolverMock(t *testing.T, decl map[string]string) {
 	}
 }
 
-func TestSecretFunc(t *testing.T) {
+func TestNewSecretFunc(t *testing.T) {
 	testyml.Run(t, td, "testdata/spec/funcs/secret_resolver.test.spec.yml", func(t *testing.T, c testyml.Case[secretWant]) {
 		requireSecretResolverMock(t, c.Context.MockedInterfaces)
 		for k, v := range c.Context.Env {
@@ -77,7 +77,7 @@ func TestSecretFunc(t *testing.T) {
 		})
 		testyml.Swap(t, &secretSleep, testutil.SleepMock)
 
-		secret := secretFunc(context.Background())
+		secret := newSecretFunc(context.Background())
 		ref := a.String(t, 0)
 		got, err := secret(ref)
 		if a.Bool(t, 5) {

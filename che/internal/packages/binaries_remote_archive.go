@@ -22,17 +22,17 @@ import (
 )
 
 func (in *Installer) installBinariesRemoteArchive(pkg string, b *BinariesRemoteArchiveSpec) error {
-	pin := in.pinFor(pkg, b.Version)
+	pin := in.resolvePin(pkg, b.Version)
 	if in.skipInstalledOrEmitReinstall(pkg, "binariesRemoteArchive", pin, pin,
 		func() bool { return in.hasCmd(pkg) },
 		func() bool { return in.versionOutputHasPin(pkg, pin) }, nil) {
 		return nil
 	}
-	if err := in.requestedOverridesPin(pkg, b.Version); err != nil {
+	if err := in.checkRequestedPin(pkg, b.Version); err != nil {
 		return err
 	}
 	if in.Opts.DryRun {
-		in.emitDryRun("install", labelWithVersion(in.pkgLabel(pkg), pin)+" via binariesRemoteArchive")
+		in.emitDryRun("install", labelWithVersion(in.labelPkg(pkg), pin)+" via binariesRemoteArchive")
 		return nil
 	}
 	version, err := in.resolveArchiveVersion(pkg, b)
@@ -43,15 +43,15 @@ func (in *Installer) installBinariesRemoteArchive(pkg string, b *BinariesRemoteA
 	if err != nil {
 		return fmt.Errorf("%s: %w", pkg, err)
 	}
-	url := in.Host.expandAs(b.URL, version, arch)
-	asset, cached, cleanup, err := in.fetchAsset(url)
+	url := in.Host.expandTokens(b.URL, version, arch)
+	asset, inCache, cleanup, err := in.fetchAsset(url)
 	if err != nil {
 		return err
 	}
 	defer cleanup()
 	if want, ok := b.PlatformEligibility.Checksums[in.Host.PlatformKey()]; ok {
 		if err := in.verifyChecksum(pkg, asset, want); err != nil {
-			if cached {
+			if inCache {
 				_ = os.Remove(asset)
 			}
 			return err
@@ -62,7 +62,7 @@ func (in *Installer) installBinariesRemoteArchive(pkg string, b *BinariesRemoteA
 	if err := in.installMembers(pkg, asset, version, arch, b); err != nil {
 		return err
 	}
-	in.emit(log.Levels.Info, "installed", labelWithVersion(in.pkgLabel(pkg), version)+" via binariesRemoteArchive")
+	in.emit(log.Levels.Info, "installed", labelWithVersion(in.labelPkg(pkg), version)+" via binariesRemoteArchive")
 	return nil
 }
 
@@ -98,7 +98,7 @@ func (in *Installer) versionOutputHasPin(pkg, pin string) bool {
 		out, ok := in.output(strings.Fields(e.VersionCommand))
 		return ok && PinMatches(out, pin)
 	}
-	cmd := in.cmdFor(pkg)
+	cmd := in.resolveCmd(pkg)
 	if out, ok := in.output([]string{cmd, "--version"}); ok && PinMatches(out, pin) {
 		return true
 	}
@@ -143,20 +143,20 @@ func (in *Installer) expandMembers(pkg, version, arch string, b *BinariesRemoteA
 	}
 	out := make([]string, len(names))
 	for i, m := range names {
-		out[i] = in.Host.expandAs(m, version, arch)
+		out[i] = in.Host.expandTokens(m, version, arch)
 	}
 	return out
 }
 
 func (in *Installer) installMembers(pkg, asset, version, arch string, b *BinariesRemoteArchiveSpec) error {
-	binDir := in.userBinDir()
+	binDir := in.resolveBinDir()
 	if err := os.MkdirAll(binDir, 0o755); err != nil {
 		return err
 	}
 	if !isArchive(asset) {
 		return installFile(asset, filepath.Join(binDir, pkg), 0o755)
 	}
-	opt := in.userOptDir(pkg)
+	opt := in.resolveOptDir(pkg)
 	if err := os.RemoveAll(opt); err != nil {
 		return err
 	}
@@ -318,7 +318,7 @@ func sanitizeArchivePath(dest, name string) (string, error) {
 	return target, nil
 }
 
-func (in *Installer) userBinDir() string {
+func (in *Installer) resolveBinDir() string {
 	return in.resolveDestDir(&in.binDir, in.Opts.BinariesRemoteArchiveDestinationCandidates, DefaultBinariesRemoteArchiveDestinationCandidates,
 		in.Opts.BinariesRemoteArchiveCheckPresentOnPath, in.Host.PathDirs,
 		"packages.binariesRemoteArchive.installDestinationCandidates", "PATH")
@@ -355,7 +355,7 @@ func (in *Installer) expandPath(p string) string {
 	return os.Expand(p, in.Host.Getenv)
 }
 
-func (in *Installer) userOptDir(pkg string) string {
+func (in *Installer) resolveOptDir(pkg string) string {
 	return filepath.Join(in.Host.Getenv("HOME"), ".local", "opt", pkg)
 }
 

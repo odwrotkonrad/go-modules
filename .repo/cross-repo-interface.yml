@@ -1,0 +1,18 @@
+##[>] 🤖🤖
+upstream:
+  - prose/repo-prose
+  - prose/conventions-doc
+  - prose/doc-templates
+  - prose/license
+  - configs/llm/claude
+  - infra/oci-images/ci-linux
+  - infra/oci-images/ci-linux-dind
+  - {consumes: go-modules/lib, into: che}
+  - {consumes: go-modules/lib, into: get-os-open-files-with}
+  - {consumes: go-modules/lib, into: get-term-open-files-with}
+downstream:
+  - {name: che, type: binary}
+  - {name: get-os-open-files-with, type: binary}
+  - {name: get-term-open-files-with, type: binary}
+  - {name: lib, type: go-module}
+##[<] 🤖🤖

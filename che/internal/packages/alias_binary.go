@@ -15,7 +15,7 @@ func (in *Installer) aliasBinaries(pkg string, it Item) error {
 	if len(it.AliasBinary) == 0 {
 		return nil
 	}
-	binDir := in.userBinDir()
+	binDir := in.resolveBinDir()
 	for _, from := range slices.Sorted(maps.Keys(it.AliasBinary)) {
 		to := it.AliasBinary[from]
 		src, err := in.Host.LookPath(from)
@@ -45,8 +45,6 @@ func (in *Installer) aliasBinaries(pkg string, it Item) error {
 	return nil
 }
 
-// [<] 🤖🤖
-
 func (in *Installer) runEntryPostInstall(pkg string, e Entry) error {
 	if e.PostInstall == nil {
 		return nil
@@ -61,3 +59,5 @@ func (in *Installer) runEntryPostInstall(pkg string, e Entry) error {
 	in.emit(log.Levels.Info, "post-installed", pkg)
 	return nil
 }
+
+// [<] 🤖🤖

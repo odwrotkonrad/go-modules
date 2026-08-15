@@ -1,6 +1,6 @@
 # [>] 🤖🤖
 context:
-  function: fsutil.FS.MkdirArgv
+  function: fsutil.FS.BuildMkdirArgv
 cases:
   - name: ShouldIncludeParentsFlagWhenRequested
     input:

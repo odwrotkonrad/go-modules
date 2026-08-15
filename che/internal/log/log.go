@@ -9,7 +9,7 @@ import (
 	"github.com/fatih/color"
 )
 
-var boldC = func() *color.Color {
+var boldColor = func() *color.Color {
 	c := color.New(color.Bold)
 	c.EnableColor()
 	return c
@@ -173,7 +173,7 @@ func PrintItem(l Level, indent int, text string) {
 	}
 }
 
-func bold(s string) string { return boldC.Sprint(s) }
+func bold(s string) string { return boldColor.Sprint(s) }
 
 // [<] 🤖🤖 structural
 

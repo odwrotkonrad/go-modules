@@ -1,6 +1,6 @@
 # [>] 🤖🤖
 context:
-  function: e2e.eligibleMethods
+  function: e2e.resolveEligibleMethods
 cases:
   - name: ShouldDropAptOnDarwinEligibility
     input:

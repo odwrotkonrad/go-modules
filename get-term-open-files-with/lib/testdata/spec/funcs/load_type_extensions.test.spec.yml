@@ -1,6 +1,6 @@
 # [>] 🤖🤖
 context:
-  function: lib.TypeExtensions
+  function: lib.LoadTypeExtensions
 cases:
   - name: ShouldExit12OnInvalidCachedYaml
     input:

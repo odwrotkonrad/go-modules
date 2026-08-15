@@ -57,11 +57,11 @@ func SleepMock(time.Duration) {}
 
 func NewCmdMockExecutor() *CmdMockExecutor {
 	m := &CmdMockExecutor{clones: map[string]string{}}
-	m.Stub = m.model
+	m.Stub = m.respond
 	return m
 }
 
-func (m *CmdMockExecutor) model(argv []string) ([]byte, error) {
+func (m *CmdMockExecutor) respond(argv []string) ([]byte, error) {
 	cmd := strings.Join(argv, " ")
 	for _, f := range m.FailCmds {
 		if strings.Contains(cmd, f) {
@@ -75,13 +75,13 @@ func (m *CmdMockExecutor) model(argv []string) ([]byte, error) {
 	if argv[0] == "git" {
 		return m.git(argv[1:])
 	}
-	if out, ok, err := m.packagesModel(cmd, argv); ok {
+	if out, ok, err := m.respondPackages(cmd, argv); ok {
 		return out, err
 	}
 	return []byte(m.Out), nil
 }
 
-func (m *CmdMockExecutor) packagesModel(cmd string, argv []string) ([]byte, bool, error) {
+func (m *CmdMockExecutor) respondPackages(cmd string, argv []string) ([]byte, bool, error) {
 	switch {
 	case strings.HasPrefix(cmd, "dpkg -s"), strings.HasPrefix(cmd, "brew list"), strings.HasPrefix(cmd, "npm ls"):
 		return nil, true, errors.New("stub: not installed")
@@ -120,7 +120,7 @@ func (m *CmdMockExecutor) git(args []string) ([]byte, error) {
 		dir := args[1]
 		switch args[2] {
 		case "rev-parse":
-			return gitHead(dir)
+			return readGitHead(dir)
 		case "fetch":
 			return nil, nil
 		case "reset":
@@ -137,7 +137,7 @@ func (m *CmdMockExecutor) git(args []string) ([]byte, error) {
 	return nil, fmt.Errorf("CmdMockExecutor: unmodeled git argv %v", args)
 }
 
-func gitHead(dir string) ([]byte, error) {
+func readGitHead(dir string) ([]byte, error) {
 	b, err := os.ReadFile(filepath.Join(dir, ".git/HEAD"))
 	if err != nil {
 		return nil, err
@@ -188,7 +188,7 @@ func (m *FileSystemMockWriter) record(parts ...string) error {
 	return nil
 }
 
-func mode(m os.FileMode) string { return fmt.Sprintf("%04o", m) }
+func formatMode(m os.FileMode) string { return fmt.Sprintf("%04o", m) }
 
 func (m *FileSystemMockWriter) MakeDir(dest string, md os.FileMode, parents bool) error {
 	parts := []string{"mkdir"}
@@ -196,7 +196,7 @@ func (m *FileSystemMockWriter) MakeDir(dest string, md os.FileMode, parents bool
 		parts = append(parts, "-p")
 	}
 	if md != 0 {
-		parts = append(parts, "-m", mode(md))
+		parts = append(parts, "-m", formatMode(md))
 	}
 	return m.record(append(parts, dest)...)
 }
@@ -210,7 +210,7 @@ func (m *FileSystemMockWriter) MakeSymlink(target, dest string) error {
 }
 
 func (m *FileSystemMockWriter) CopyFile(src, dest string, md os.FileMode) error {
-	return m.record("copy", src, dest, mode(md))
+	return m.record("copy", src, dest, formatMode(md))
 }
 
 func (m *FileSystemMockWriter) RemoveFile(dest string) error {
@@ -226,7 +226,7 @@ func (m *FileSystemMockWriter) ChangeOwner(owner, dest string) error {
 }
 
 func (m *FileSystemMockWriter) InstallFile(dest string, body []byte, md os.FileMode, owner string) error {
-	parts := []string{"install", dest, mode(md)}
+	parts := []string{"install", dest, formatMode(md)}
 	if owner != "" {
 		parts = append(parts, owner)
 	}

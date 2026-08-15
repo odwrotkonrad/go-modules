@@ -5,7 +5,7 @@ import (
 )
 
 // [>] 🤖🤖🤖
-func leaderDepth(text string) (leaders int, rest string, ok bool) {
+func cutHashes(text string) (count int, rest string, ok bool) {
 	i := 0
 	for i < len(text) && text[i] == '#' {
 		i++
@@ -16,8 +16,8 @@ func leaderDepth(text string) (leaders int, rest string, ok bool) {
 	return i, text[i:], true
 }
 
-func sectionOpen(text string) (label string, depth int, ok bool) {
-	leaders, rest, ok := leaderDepth(text)
+func parseSectionOpen(text string) (label string, depth int, ok bool) {
+	hashes, rest, ok := cutHashes(text)
 	if !ok || !strings.HasPrefix(rest, "[>]") {
 		return "", 0, false
 	}
@@ -30,18 +30,18 @@ func sectionOpen(text string) (label string, depth int, ok bool) {
 	if label == "" {
 		return "", 0, false
 	}
-	return label, leaders - 2, true
+	return label, hashes - 2, true
 }
 
-func sectionClose(text string) (depth int, ok bool) {
-	leaders, rest, ok := leaderDepth(text)
+func parseSectionClose(text string) (depth int, ok bool) {
+	hashes, rest, ok := cutHashes(text)
 	if !ok || !strings.HasPrefix(rest, "[<]") {
 		return 0, false
 	}
-	return leaders - 2, true
+	return hashes - 2, true
 }
 
-func tagComment(text, tag string) (string, bool) {
+func parseTagComment(text, tag string) (string, bool) {
 	p := "#[" + tag + "]"
 	if !strings.HasPrefix(text, p) {
 		return "", false
