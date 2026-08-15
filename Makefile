@@ -10,10 +10,11 @@ COMMANDS := render-templates render-docs repo-ci-prepare-hooks repo-ci-precommit
 .PHONY: $(WRAPPERS) $(COMMANDS)
 
 ##[>] Docs [genai-include]
+#[why] ontoRepo only: claude-agents renders untracked .claude/ from prose-generated snippets absent in a clone
 #[what] render *.ontoRepo.tpl onto the repo with this checkout's che build
 render-templates:
 	@$(MAKE) -C che build
-	@che/dist/che render-templates
+	@che/dist/che render-templates --profiles ontoRepo
 
 #[what] generate che docs (docs/cli.md, che.schema.json, cli-usage.md) from the Go source
 render-docs:
