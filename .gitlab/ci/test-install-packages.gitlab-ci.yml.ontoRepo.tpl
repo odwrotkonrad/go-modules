@@ -24,21 +24,17 @@
     DOCKER_CERT_PATH: "$DOCKER_TLS_CERTDIR/client"
     E2E_INSTALL_CACHE_DIR: $CI_PROJECT_DIR/.cache/che-e2e-install
 
+#[why] hard needs on the darwin warm build: play warm-go-darwin first, its artifacts are the only binaries these jobs run (no in-job go toolchain or self-build)
 test-e2e-install-package-darwin-arm64:
   extends: .test-install-package
   stage: test-e2e-package-installs-darwin-arm64
   tags:
     - saas-macos-medium-m1
   image: macos-26-xcode-26
-  needs: []
-  dependencies:
+  needs:
     - warm-go-darwin
-  before_script:
-    - curl -fsSL --connect-timeout 30 --retry 10 --retry-delay 30 --retry-all-errors -o /tmp/go.tar.gz "https://go.dev/dl/go1.26.4.darwin-arm64.tar.gz"
-    - sudo tar -xzf /tmp/go.tar.gz -C /usr/local
-    - export PATH=/usr/local/go/bin:$PATH
   script:
-    - make -C che e2e-install-methods PACKAGE="$PACKAGE" METHOD="$METHOD" PLATFORM=darwin-arm64 MODE=with_deps $(test -x che/dist/e2e.test && echo "BUILD_DEP= E2E_USE_TEST_BIN=1")
+    - make -C che e2e-install-methods PACKAGE="$PACKAGE" METHOD="$METHOD" PLATFORM=darwin-arm64 MODE=with_deps BUILD_DEP= E2E_USE_TEST_BIN=1
   parallel:
     matrix:
       - PACKAGE: *packages
