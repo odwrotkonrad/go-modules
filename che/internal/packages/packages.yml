@@ -218,7 +218,8 @@ packages:
                 version: 2.1.224
     code:
         verify:
-            cmd: code --version
+            # [why] bare `code --version` fails as root: "You are trying to start Visual Studio Code as a super user which isn't recommended. If this was intended, please add the argument `--no-sandbox` and specify an alternate user data directory using the `--user-data-dir` argument."
+            cmd: code --no-sandbox --user-data-dir /tmp/che-verify-code --version
         installers:
             - brew/cask:
                 packageName: visual-studio-code
