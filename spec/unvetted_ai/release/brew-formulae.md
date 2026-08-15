@@ -8,7 +8,7 @@ Scenario: a user installs the latest che with a plain tap and install
   Status: implemented
   When a `che/vX.Y.Z` tag pipeline runs `publish-brew`
   Then `Formula/che.rb` (class `Che`) commits to the tap at that version
-  And `brew tap konradodwrot/tap && brew install che` installs it from the GitHub mirror
+  And `brew tap odwrotkonrad/tap && brew install che` installs it from the GitHub mirror
 
 Scenario: a user pins an exact che version at install time
   Status: implemented

@@ -14,7 +14,7 @@ installerRegistries:
         - azure/azure-cli
         - cirruslabs/cli
         - hashicorp/tap
-        - konradodwrot/tap
+        - odwrotkonrad/tap
     apt:
         - url: https://deb.debian.org/debian
           verificationKey: /usr/share/keyrings/debian-archive-keyring.gpg
@@ -136,7 +136,7 @@ packages:
                 cmd: che completion zsh
         installers:
             - brew:
-                fromRegistry: konradodwrot/tap
+                fromRegistry: odwrotkonrad/tap
             - apt:
                 fromRegistry: konradodwrot.gitlab.io/go-modules/apt
             - binariesRemoteArchive:
@@ -744,6 +744,7 @@ packages:
         - brew
         - script:
             url: https://pyenv.run
+            validateArtifact: ~/.pyenv/bin/pyenv
     pyright:
         installers:
             - brew
@@ -841,6 +842,8 @@ packages:
             - apt
     tar:
         installers:
+            - brew:
+                packageName: gnu-tar
             - apt
     tamasfe.even-better-toml:
         version: 0.21.2
@@ -897,6 +900,7 @@ packages:
     unzip:
         versionCommand: unzip -v
         installers:
+            - brew
             - apt
     uv:
         installers:

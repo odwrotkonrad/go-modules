@@ -31,7 +31,7 @@ Four sibling repos duplicated toolchain, CI, conventions, release flow. One repo
 ### che via brew (Homebrew on macOS, Linuxbrew)
 
 ```sh
-brew tap konradodwrot/tap
+brew tap odwrotkonrad/tap
 brew install che
 ```
 
@@ -43,7 +43,7 @@ brew install che@0.0.67
 
 Binary formula for `{darwin,linux}_{amd64,arm64}`: installs `che` and the render
 CLIs from the prebuilt release archives, updated by each che tag pipeline. The
-tap is mirrored to [GitHub](https://github.com/konradodwrot/homebrew-tap), which
+tap is mirrored to [GitHub](https://github.com/odwrotkonrad/homebrew-tap), which
 `brew tap` resolves by default.
 
 ### che via apt (Debian, Ubuntu)

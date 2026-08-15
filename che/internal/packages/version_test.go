@@ -202,6 +202,21 @@ func TestUnversionedLatestSentinelNotUsedAsArchiveVersion(t *testing.T) {
 	require.ErrorContains(t, in.Install([]string{"kind"}), "no version pinned")
 }
 
+func TestExplicitLatestSentinelResolvesLatestArchiveVersion(t *testing.T) {
+	const y = `packages:
+  kind:
+    version: latest
+    installers:
+      - binariesRemoteArchive:
+          platformEligibility: [linux-amd64]
+          url: https://example.com/kind-{version}
+`
+	in, _ := newInstaller(t, y, "linux", cmdMap(nil), Options{})
+	tempHome(t, in)
+	require.NoError(t, in.Install([]string{"kind"}))
+	require.Contains(t, testFetch.Calls(), "https://example.com/kind-latest")
+}
+
 func TestAliasBinaryLinksRenamedBinary(t *testing.T) {
 	const y = `packages:
   bat:
