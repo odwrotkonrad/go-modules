@@ -128,15 +128,16 @@ Scenario: a nix item installs from nixpkgs via nix profile
   When a package lists a `- nix` item (bare, or `{nix: {packageName: <attr>, versionMap: ..., aliasBinary: ..., verify: ...}}`)
   Then it is eligible on linux and darwin, last in the default preference order, so it never preempts another applicable manager
   And on a host without nix the `nix` basePackages group bootstraps nix first via the Determinate Systems installer script (daemon install on hosts, `--init none` in containers; `/nix/receipt.json` marks it installed), and che falls back to `/nix/var/nix/profiles/default/bin/nix` or `~/.nix-profile/bin/nix` while nix is off PATH
-  And an unpinned item installs `nix profile install nixpkgs#<attr>` (attr defaults to the entry key, `packageName` overrides), `--update` runs `nix profile upgrade <attr>`
+  And flake sources are declared once under `installerRegistries.nix` (`name`, `url` flake base, optional `ref` branch); an item picks one via `fromRegistry: <name>`, defaulting to `nixpkgs`; the builtin ships `nixpkgs` (nixpkgs-unstable) and a version-named stable registry (`nixpkgs-26.05`: the nixos-26.05 branch); a reference to an undeclared registry is a hard error
+  And an unpinned item installs `nix profile install <url>/<ref>#<attr>` (attr defaults to the entry key, `packageName` overrides), install lines name the registry (`installed bat via nix (nixpkgs-26.05)`), `--update` runs `nix profile upgrade <attr>`
   And presence and installed-version read `nix profile list` (store-path parse, defensive across nix output formats; an unparseable version falls back to the `--version` probe)
   And a packageName carrying `#`, `@`, or `=` is a parse error: names stay bare nixpkgs attributes
-  And `fromRegistry`, `platformEligibility`, `extractBinaries`, and `archScheme` on a nix item are parse errors
+  And `platformEligibility`, `extractBinaries`, and `archScheme` on a nix item are parse errors
 
-Scenario: a nix pin is a nixpkgs revision
+Scenario: a nix pin is a registry-repo revision
   Status: implemented
-  When a nix item pins via `versionMap: {"<binary-version>": "<nixpkgs-revision>"}` (exactly one pair)
-  Then install resolves the ref `github:NixOS/nixpkgs/<revision>#<attr>` and the drift check compares the profile's store-path version to the binary version
+  When a nix item pins via `versionMap: {"<binary-version>": "<revision>"}` (exactly one pair, revision of the item's registry repo)
+  Then install resolves the ref `<registry-url>/<revision>#<attr>` and the drift check compares the profile's store-path version to the binary version
   And a drifted install reinstalls: `nix profile remove <attr>`, then the pinned ref installs
   And a requested or entry-pinned version with no revision in the versionMap is a hard error naming versionMap
 

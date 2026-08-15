@@ -10,6 +10,13 @@ osInstallers:
     linux-debian: [apt, *base]
     darwin: [brew, brew/cask, *base]
 installerRegistries:
+    nix:
+        - name: nixpkgs
+          url: github:NixOS/nixpkgs
+          ref: nixpkgs-unstable
+        - name: nixpkgs-26.05
+          url: github:NixOS/nixpkgs
+          ref: nixos-26.05
     brew:
         - azure/azure-cli
         - cirruslabs/cli
@@ -111,7 +118,8 @@ packages:
                 #[why] debian renames the binary (bat is taken by bacula-console-qt): alias it back
                 aliasBinary:
                     batcat: bat
-            - nix
+            - nix:
+                fromRegistry: nixpkgs-26.05
     bats:
         installers:
             - brew:

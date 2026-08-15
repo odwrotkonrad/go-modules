@@ -3,6 +3,7 @@ package packages
 // [>] 🤖🤖
 
 import (
+	"cmp"
 	"fmt"
 	"path"
 	"regexp"
@@ -25,11 +26,26 @@ func (in *Installer) nixArgv(args ...string) []string {
 	return append([]string{in.nixBin(), "--extra-experimental-features", "nix-command flakes", "profile"}, args...)
 }
 
-func nixRef(attr, rev string) string {
-	if rev == "" {
-		return "nixpkgs#" + attr
+func (in *Installer) nixRegistryFor(pkg string, n *NixSpec) (*NixRegistrySpec, error) {
+	name := cmp.Or(n.FromRegistry, DefaultNixRegistry)
+	reg, err := in.File.nixRegistry(name)
+	if err != nil {
+		return nil, fmt.Errorf("%s: %w", pkg, err)
 	}
-	return "github:NixOS/nixpkgs/" + rev + "#" + attr
+	if reg.URL == "" {
+		return nil, fmt.Errorf("%s: nix registry %q requires name and url", pkg, name)
+	}
+	return reg, nil
+}
+
+func nixRef(reg *NixRegistrySpec, attr, rev string) string {
+	switch {
+	case rev != "":
+		return reg.URL + "/" + rev + "#" + attr
+	case reg.Ref != "":
+		return reg.URL + "/" + reg.Ref + "#" + attr
+	}
+	return reg.URL + "#" + attr
 }
 
 func (in *Installer) nixPins(pkg string, n *NixSpec) (binPin, rev string, err error) {
@@ -54,6 +70,10 @@ func (in *Installer) installNixSpec(pkg string, n *NixSpec) error {
 		n = &NixSpec{}
 	}
 	attr := n.packageName(pkg)
+	reg, err := in.nixRegistryFor(pkg, n)
+	if err != nil {
+		return err
+	}
 	binPin, rev, err := in.nixPins(pkg, n)
 	if err != nil {
 		return err
@@ -69,7 +89,7 @@ func (in *Installer) installNixSpec(pkg string, n *NixSpec) error {
 		return nil
 	}
 	if in.Opts.DryRun {
-		in.emitDryRun("install", labelWithVersion(in.pkgLabel(pkg), binPin)+" via nix")
+		in.emitDryRun("install", labelWithVersion(in.pkgLabel(pkg), binPin)+" via nix ("+reg.Name+")")
 		return nil
 	}
 	if installed {
@@ -77,14 +97,14 @@ func (in *Installer) installNixSpec(pkg string, n *NixSpec) error {
 			return err
 		}
 	}
-	if err := in.exec(in.nixArgv("install", nixRef(attr, rev))); err != nil {
+	if err := in.exec(in.nixArgv("install", nixRef(reg, attr, rev))); err != nil {
 		return err
 	}
 	ver := binPin
 	if ver == "" {
 		ver = in.installedVersion("nix", attr)
 	}
-	in.emit(log.Levels.Info, "installed", labelWithVersion(in.pkgLabel(pkg), ver)+" via nix")
+	in.emit(log.Levels.Info, "installed", labelWithVersion(in.pkgLabel(pkg), ver)+" via nix ("+reg.Name+")")
 	return nil
 }
 
@@ -118,7 +138,11 @@ func (in *Installer) nixProfileList() (string, bool) {
 
 var nixInstallRoutine = managerRoutine{
 	install: func(in *Installer, _, name, _ string) error {
-		return in.exec(in.nixArgv("install", nixRef(name, "")))
+		reg, err := in.nixRegistryFor(name, &NixSpec{})
+		if err != nil {
+			return err
+		}
+		return in.exec(in.nixArgv("install", nixRef(reg, name, "")))
 	},
 	update: func(in *Installer, _, base string) error {
 		return in.exec(in.nixArgv("upgrade", base))

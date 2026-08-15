@@ -19,6 +19,7 @@ func Schema() *jsonschema.Schema {
 	defs := jsonschema.Definitions{
 		"InstallerList":         installerListDef(),
 		"AptRegistry":           aptRegistryDef(),
+		"NixRegistry":           nixRegistryDef(),
 		"Entry":                 entryDef(),
 		"Item":                  itemDef(),
 		"ItemBody":              itemBodyDef(),
@@ -56,6 +57,7 @@ func Schema() *jsonschema.Schema {
 	registries := obj("installer package sources referenced by fromRegistry", nil)
 	registries.Properties.Set("apt", arr(ref("AptRegistry")))
 	registries.Properties.Set("brew", arr(str("brew tap name (<user>/<repo>)")))
+	registries.Properties.Set("nix", arr(ref("NixRegistry")))
 	root.Properties.Set("installerRegistries", registries)
 	root.Properties.Set("basePackages", &jsonschema.Schema{
 		Description:          "prerequisite package names per group: common always, an installer name when that installer is eligible",
@@ -207,14 +209,23 @@ func aptDef() *jsonschema.Schema {
 	return o
 }
 
+func nixRegistryDef() *jsonschema.Schema {
+	o := obj("one nix flake source, referenced by name", []string{"name", "url"})
+	o.Properties.Set("name", str("registry name referenced by fromRegistry"))
+	o.Properties.Set("url", str("flake base url without a branch (github:NixOS/nixpkgs)"))
+	o.Properties.Set("ref", str("branch or tag installs track when no revision pins"))
+	return o
+}
+
 func nixDef() *jsonschema.Schema {
 	one := uint64(1)
-	vm := stringMap("exactly one binary version to nixpkgs revision pin")
+	vm := stringMap("exactly one binary version to registry-repo revision pin")
 	vm.MaxProperties = &one
 	o := obj("nix item spec", nil)
-	o.Properties.Set("packageName", str("nixpkgs attribute when it differs from the entry key"))
+	o.Properties.Set("packageName", str("flake attribute when it differs from the entry key"))
 	o.Properties.Set("versionMap", vm)
 	o.Properties.Set("aliasBinary", stringMap("alias name to target binary"))
+	o.Properties.Set("fromRegistry", str("installerRegistries.nix ref by name; default nixpkgs"))
 	o.Properties.Set("verify", ref("Verify"))
 	return o
 }

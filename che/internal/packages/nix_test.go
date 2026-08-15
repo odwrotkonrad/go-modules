@@ -22,7 +22,40 @@ func TestInstallNixUnpinnedInstallsFromNixpkgs(t *testing.T) {
 	in, m := newInstaller(t, "packages:\n  jq: [nix]", "linux", cmdMap([]string{"nix"}), Options{})
 	m.Stub = failOn(nixListPrefix)
 	require.NoError(t, in.Install([]string{"jq"}))
-	requireCalls(t, m, "nix --extra-experimental-features nix-command flakes profile install nixpkgs#jq")
+	requireCalls(t, m, "nix --extra-experimental-features nix-command flakes profile install github:NixOS/nixpkgs/nixpkgs-unstable#jq")
+}
+
+func TestInstallNixFromRegistryUsesItsRef(t *testing.T) {
+	const yml = `installerRegistries:
+  nix:
+    - name: stable
+      url: github:NixOS/nixpkgs
+      ref: nixos-26.05
+packages:
+  bat:
+    installers:
+      - nix: {fromRegistry: stable}
+`
+	in, m := newInstaller(t, yml, "linux", cmdMap([]string{"nix"}), Options{})
+	m.Stub = failOn(nixListPrefix)
+	require.NoError(t, in.Install([]string{"bat"}))
+	requireCalls(t, m, "profile install github:NixOS/nixpkgs/nixos-26.05#bat")
+}
+
+func TestInstallNixUnknownRegistryErrors(t *testing.T) {
+	const yml = `installerRegistries:
+  nix:
+    - name: stable
+      url: github:NixOS/nixpkgs
+packages:
+  bat:
+    installers:
+      - nix: {fromRegistry: nowhere}
+`
+	in, m := newInstaller(t, yml, "linux", cmdMap([]string{"nix"}), Options{})
+	m.Stub = failOn(nixListPrefix)
+	require.ErrorContains(t, in.Install([]string{"bat"}), `unknown nix registry "nowhere"`)
+	refuteCalls(t, m, "profile install")
 }
 
 func TestInstallNixPinnedInstallsRevisionRef(t *testing.T) {
@@ -88,7 +121,7 @@ func TestInstallNixDryRunAnnounces(t *testing.T) {
 	m.Stub = failOn(nixListPrefix)
 	out, err := captureStdout(t, func() error { return in.Install([]string{"jq"}) })
 	require.NoError(t, err)
-	wantLines(t, out, "install jq 1.8.2 via nix (dry run)")
+	wantLines(t, out, "install jq 1.8.2 via nix (nixpkgs) (dry run)")
 	refuteCalls(t, m, "profile install")
 }
 
@@ -100,12 +133,6 @@ func TestNixItemValidation(t *testing.T) {
           versionMap: {"1.0": "aaa", "2.0": "bbb"}
 `), &File{})
 	require.ErrorContains(t, err, "exactly one binary version")
-	err = yaml.Unmarshal([]byte(`packages:
-  x:
-    installers:
-      - nix: {fromRegistry: nixpkgs}
-`), &File{})
-	require.ErrorContains(t, err, "fromRegistry")
 	err = yaml.Unmarshal([]byte(`packages:
   x:
     installers:

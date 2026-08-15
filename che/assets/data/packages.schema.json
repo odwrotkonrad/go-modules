@@ -360,7 +360,7 @@
       "properties": {
         "packageName": {
           "type": "string",
-          "description": "nixpkgs attribute when it differs from the entry key"
+          "description": "flake attribute when it differs from the entry key"
         },
         "versionMap": {
           "additionalProperties": {
@@ -368,7 +368,7 @@
           },
           "type": "object",
           "maxProperties": 1,
-          "description": "exactly one binary version to nixpkgs revision pin"
+          "description": "exactly one binary version to registry-repo revision pin"
         },
         "aliasBinary": {
           "additionalProperties": {
@@ -377,6 +377,10 @@
           "type": "object",
           "description": "alias name to target binary"
         },
+        "fromRegistry": {
+          "type": "string",
+          "description": "installerRegistries.nix ref by name; default nixpkgs"
+        },
         "verify": {
           "$ref": "#/$defs/Verify"
         }
@@ -384,6 +388,29 @@
       "additionalProperties": false,
       "type": "object",
       "description": "nix item spec"
+    },
+    "NixRegistry": {
+      "properties": {
+        "name": {
+          "type": "string",
+          "description": "registry name referenced by fromRegistry"
+        },
+        "url": {
+          "type": "string",
+          "description": "flake base url without a branch (github:NixOS/nixpkgs)"
+        },
+        "ref": {
+          "type": "string",
+          "description": "branch or tag installs track when no revision pins"
+        }
+      },
+      "additionalProperties": false,
+      "type": "object",
+      "required": [
+        "name",
+        "url"
+      ],
+      "description": "one nix flake source, referenced by name"
     },
     "PlatformEligibility": {
       "items": {
@@ -545,6 +572,12 @@
           "items": {
             "type": "string",
             "description": "brew tap name (\u003cuser\u003e/\u003crepo\u003e)"
+          },
+          "type": "array"
+        },
+        "nix": {
+          "items": {
+            "$ref": "#/$defs/NixRegistry"
           },
           "type": "array"
         }

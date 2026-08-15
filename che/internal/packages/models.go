@@ -68,8 +68,9 @@ func (l *InstallerList) UnmarshalYAML(node *yaml.Node) error {
 }
 
 type InstallerRegistriesSpec struct {
-	Apt  []*AptRepoSpec `yaml:"apt,omitempty"`
-	Brew []string       `yaml:"brew,omitempty"`
+	Apt  []*AptRepoSpec     `yaml:"apt,omitempty"`
+	Brew []string           `yaml:"brew,omitempty"`
+	Nix  []*NixRegistrySpec `yaml:"nix,omitempty"`
 }
 
 func (r *InstallerRegistriesSpec) apt() []*AptRepoSpec {
@@ -84,6 +85,13 @@ func (r *InstallerRegistriesSpec) brew() []string {
 		return nil
 	}
 	return r.Brew
+}
+
+func (r *InstallerRegistriesSpec) nix() []*NixRegistrySpec {
+	if r == nil {
+		return nil
+	}
+	return r.Nix
 }
 
 func stripURLScheme(url string) string {
@@ -151,6 +159,22 @@ func orBuiltin[T any](own T, present bool, pick func(*File) T) T {
 func (f *File) aptRegistriesOrBuiltin() []*AptRepoSpec {
 	regs := f.InstallerRegistries.apt()
 	return orBuiltin(regs, len(regs) > 0, func(b *File) []*AptRepoSpec { return b.InstallerRegistries.apt() })
+}
+
+const DefaultNixRegistry = "nixpkgs"
+
+func (f *File) nixRegistriesOrBuiltin() []*NixRegistrySpec {
+	regs := f.InstallerRegistries.nix()
+	return orBuiltin(regs, len(regs) > 0, func(b *File) []*NixRegistrySpec { return b.InstallerRegistries.nix() })
+}
+
+func (f *File) nixRegistry(name string) (*NixRegistrySpec, error) {
+	for _, r := range f.nixRegistriesOrBuiltin() {
+		if r.Name == name {
+			return r, nil
+		}
+	}
+	return nil, fmt.Errorf("unknown nix registry %q (installerRegistries.nix)", name)
 }
 
 func (f *File) hasBrewTap(tap string) bool {
@@ -537,6 +561,7 @@ func (a *AptSpec) packageName(pkg string) string {
 
 type NixSpec struct {
 	InstallerVocabulary `yaml:",inline"`
+	FromRegistry        string      `yaml:"fromRegistry,omitempty"`
 	Verify              *VerifySpec `yaml:"verify,omitempty"`
 }
 
@@ -545,6 +570,12 @@ func (n *NixSpec) packageName(pkg string) string {
 		return n.PackageName
 	}
 	return pkg
+}
+
+type NixRegistrySpec struct {
+	Name string `yaml:"name,omitempty"`
+	URL  string `yaml:"url,omitempty"`
+	Ref  string `yaml:"ref,omitempty"`
 }
 
 type AptRepoSpec struct {
@@ -789,9 +820,6 @@ func (it *Item) unmarshalApt(val *yaml.Node) error {
 
 func (it *Item) unmarshalNix(val *yaml.Node) error {
 	it.Mgr = "nix"
-	if mappingHasKey(val, "fromRegistry") {
-		return fmt.Errorf("nix item: fromRegistry applies to brew, brew/cask, and apt items")
-	}
 	n := &NixSpec{}
 	if err := val.Decode(n); err != nil {
 		return err
@@ -903,6 +931,11 @@ func (f *File) mergeRegistries(override *InstallerRegistriesSpec) {
 	for _, tap := range override.Brew {
 		if !slices.Contains(regs.Brew, tap) {
 			regs.Brew = append(regs.Brew, tap)
+		}
+	}
+	for _, r := range override.Nix {
+		if !slices.ContainsFunc(regs.Nix, func(have *NixRegistrySpec) bool { return have.Name == r.Name }) {
+			regs.Nix = append(regs.Nix, r)
 		}
 	}
 }
