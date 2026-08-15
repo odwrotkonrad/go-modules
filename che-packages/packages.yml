@@ -138,9 +138,9 @@ packages:
             - brew
             - apt:
                 #[why] debian renames the binary (bat is taken by bacula-console-qt): alias it back
+                #[why] only the binary is renamed: the page stays bat.1
                 aliasBinary:
                     batcat: bat
-                manpages: [batcat.1]
             - nix:
                 fromRegistry: nixpkgs-26.05
                 versionMap: {"0.26.1": "02e08985a27c65ffd33d434eeb2e660a2e4dc84d"}
@@ -1035,7 +1035,9 @@ packages:
             - brew:
                 packageName: gnu-tar
                 manpages: [gtar.1]
-            - apt
+            #[why] debian splits the man page into the separate tar-doc package
+            - apt:
+                manpages: []
             - nix:
                 packageName: gnutar
                 versionMap: {"1.35": "6b5e5b7a6631f065bf6908986990b37d845f847f"}
