@@ -133,16 +133,20 @@ packages:
                 packageName: azure-cli
                 versionMap: {"2.89.0": "6b5e5b7a6631f065bf6908986990b37d845f847f"}
     bat:
+        manpages: [bat.1]
         installers:
             - brew
             - apt:
                 #[why] debian renames the binary (bat is taken by bacula-console-qt): alias it back
+                #[why] debian ships no man page under either name
                 aliasBinary:
                     batcat: bat
+                manpages: []
             - nix:
                 fromRegistry: nixpkgs-26.05
                 versionMap: {"0.26.1": "02e08985a27c65ffd33d434eeb2e660a2e4dc84d"}
     bats:
+        manpages: [bats.1]
         installers:
             - brew:
                 packageName: bats-core
@@ -260,12 +264,15 @@ packages:
                     - linux-arm64: sha256:9cc708f13c31588a2fbdbd13553d963356e990d50e9b95a2d6120f4ff2067910
                 url: https://github.com/containerd/containerd/releases/download/v{version}/containerd-{version}-linux-{arch}.tar.gz
     curl:
+        manpages: [curl.1]
         installers:
             - brew
             - apt:
                 versionMap: {"8.14.1": "8.14.1-2+deb13u2~bpo13+1"}
                 fromRegistry: deb.debian.org/debian
+            #[why] the static build ships the binary alone, no man page
             - binariesRemoteArchive:
+                manpages: []
                 archScheme: uname
                 extractBinaries: [curl]
                 platformEligibility:
@@ -362,21 +369,25 @@ packages:
     duti:
         verify:
             cmd: duti -V
+        manpages: [duti.1]
         installers:
             - brew
     fd:
+        manpages: [fd.1]
         installers:
             - brew
             - apt:
                 packageName: fd-find
                 aliasBinary:
                     fdfind: fd
+                manpages: [fdfind.1]
             - nix:
                 versionMap: {"10.4.2": "6b5e5b7a6631f065bf6908986990b37d845f847f"}
     ffmpeg:
         version: "5"
         verify:
             cmd: ffmpeg -version
+        manpages: [ffmpeg.1]
         installers:
             - brew
             - apt:
@@ -407,12 +418,14 @@ packages:
             - go:
                 packageName: gitlab.com/konradodwrot/go-modules/get-os-open-files-with
     gh:
+        manpages: [gh.1]
         installers:
             - brew
             - apt
             - nix:
                 versionMap: {"2.97.0": "6b5e5b7a6631f065bf6908986990b37d845f847f"}
     git:
+        manpages: [git.1]
         installers:
             - brew
             - apt:
@@ -451,6 +464,7 @@ packages:
             - nix:
                 versionMap: {"1.111.0": "6b5e5b7a6631f065bf6908986990b37d845f847f"}
     gpg:
+        manpages: [gpg.1]
         installers:
             - brew:
                 packageName: gnupg
@@ -497,6 +511,7 @@ packages:
             - apt:
                 fromRegistry: apt.grafana.com
     htop:
+        manpages: [htop.1]
         installers:
             - brew
             - apt
@@ -514,6 +529,7 @@ packages:
                     - linux-arm64: sha256:582261d2d8e46721246f5f8072dca7f6762355b248e0dc493bb85990e6226952
                 url: https://github.com/jaegertracing/jaeger/releases/download/v{version}/jaeger-{version}-{os}-{arch}.tar.gz
     jq:
+        manpages: [jq.1]
         installers:
             - brew
             - apt
@@ -547,9 +563,12 @@ packages:
         completions:
             zsh:
                 cmd: kubectl completion zsh
+        manpages: [kubectl.1]
         installers:
             - brew
+            #[why] the release is the bare binary, no man page
             - binariesRemoteArchive:
+                manpages: []
                 archScheme: go
                 platformEligibility:
                     - linux-amd64: sha256:ebbd080e7c2e275093b55915722043257eb24004363e20acb3c4d71919f88336
@@ -673,7 +692,8 @@ packages:
     make:
         installers:
             - brew
-            - apt
+            - apt:
+                manpages: [make.1]
     nix:
         verify:
             checkInPath: false
@@ -688,6 +708,7 @@ packages:
                     fi
                 validateArtifact: /nix/receipt.json
     nmap:
+        manpages: [nmap.1]
         installers:
             - brew
             - apt:
@@ -710,8 +731,11 @@ packages:
             cmd: . "$NVM_DIR/nvm.sh" && nvm --version
             checkInPath: false
         installers:
+            #[why] since v0.40.6 the upstream installer aborts when $NVM_DIR does not exist (it stopped creating it) and refuses to run under sh, so mkdir first and pipe it to bash
             - script:
-                url: https://raw.githubusercontent.com/nvm-sh/nvm/v0.40.6/install.sh
+                run: |
+                    mkdir -p "$NVM_DIR"
+                    curl -fsSL https://raw.githubusercontent.com/nvm-sh/nvm/v0.40.6/install.sh | bash
                 env:
                     NVM_DIR: $XDG_CONFIG_HOME/nvm
                     #[why] the installer otherwise appends its bootstrap lines to ~/.zshrc, a che-managed
@@ -736,6 +760,7 @@ packages:
         command: ssh
         verify:
             cmd: ssh -V
+        manpages: [ssh.1]
         installers:
             - brew
             - apt:
@@ -775,12 +800,14 @@ packages:
                     - linux-arm64: sha256:cf18f03460d92265d49b56befff333e80641d845822799eab04357c39f75b5d7
                 url: https://releases.hashicorp.com/packer/{version}/packer_{version}_{os}_{arch}.zip
     pandoc:
+        manpages: [pandoc.1]
         installers:
             - brew
             - apt
             - nix:
                 versionMap: {"3.7.0.2": "6b5e5b7a6631f065bf6908986990b37d845f847f"}
     patch:
+        manpages: [patch.1]
         installers:
             - apt
     pcre2:
@@ -792,12 +819,16 @@ packages:
             - apt:
                 packageName: libpcre2-dev
     pipx:
+        manpages: [pipx.1]
         installers:
-            - brew
+            #[why] the brew formula ships no man page
+            - brew:
+                manpages: []
             - apt
             - nix:
                 versionMap: {"1.16.6": "6b5e5b7a6631f065bf6908986990b37d845f847f"}
     pkgconf:
+        manpages: [pkgconf.1]
         installers:
             - brew
             - apt
@@ -869,6 +900,7 @@ packages:
     pstree:
         verify:
             cmd: pstree
+        manpages: [pstree.1]
         installers:
             - brew
             - apt:
@@ -878,7 +910,8 @@ packages:
             - nix:
                 versionMap: {"2.39": "6b5e5b7a6631f065bf6908986990b37d845f847f"}
     pyenv:
-        - brew
+        - brew:
+            manpages: [pyenv.1]
         - script:
             run: git clone --depth 1 https://github.com/pyenv/pyenv.git "${PYENV_ROOT:-$HOME/.pyenv}"
             validateArtifact: ~/.pyenv/bin/pyenv
@@ -921,6 +954,7 @@ packages:
         completions:
             zsh:
                 cmd: rg --generate=complete-zsh
+        manpages: [rg.1]
         installers:
             - brew:
                 packageName: ripgrep
@@ -928,6 +962,7 @@ packages:
             - binariesRemoteArchive:
                 archScheme: rust
                 extractBinaries: ["ripgrep-{version}-{arch}/rg"]
+                extractManpages: ["ripgrep-{version}-{arch}/doc/rg.1"]
                 platformEligibility:
                     - linux-arm64: sha256:c827481c4ff4ea10c9dc7a4022c8de5db34a5737cb74484d62eb94a95841ab2f
                     - linux-amd64: sha256:4cf9f2741e6c465ffdb7c26f38056a59e2a2544b51f7cc128ef28337eeae4d8e
@@ -947,10 +982,12 @@ packages:
             - apt:
                 packageName: ruby-full
                 versionMap: {"3.1": "1:3.1"}
+                manpages: [ruby.1]
             - buildFromSource:
                 version: 3.4.10
                 checksum: sha256:ecee2d072a14f2d14347dd56dfd8fe5c3130abf5117bfaacbda0f4ef9cc429ec
                 url: https://cache.ruby-lang.org/pub/ruby/3.4/ruby-{version}.tar.gz
+                manpages: [ruby.1]
     ruby-lsp:
         version: 0.26.10
         requires:
@@ -961,6 +998,7 @@ packages:
         installers:
             - gem
     shellcheck:
+        manpages: [shellcheck.1]
         installers:
             - brew
             - apt
@@ -974,24 +1012,33 @@ packages:
             - apt:
                 packageName: kbd
     sqlite3:
+        manpages: [sqlite3.1]
         installers:
+            #[why] keg-only formula: its man page never links into the brew prefix
             - brew:
                 packageName: sqlite
+                manpages: []
             - apt
             - nix:
                 packageName: sqlite
                 versionMap: {"3.53.3": "6b5e5b7a6631f065bf6908986990b37d845f847f"}
     stow:
+        manpages: [stow.8]
         installers:
             - brew
             - apt
             - nix:
                 versionMap: {"2.4.1": "6b5e5b7a6631f065bf6908986990b37d845f847f"}
     tar:
+        manpages: [tar.1]
         installers:
+            #[why] the formula prefixes its binary and page: gtar
             - brew:
                 packageName: gnu-tar
-            - apt
+                manpages: [gtar.1]
+            #[why] debian splits the man page into the separate tar-doc package
+            - apt:
+                manpages: []
             - nix:
                 packageName: gnutar
                 versionMap: {"1.35": "6b5e5b7a6631f065bf6908986990b37d845f847f"}
@@ -1022,6 +1069,7 @@ packages:
     tmux:
         verify:
             cmd: tmux -V
+        manpages: [tmux.1]
         installers:
             - brew
             - apt:
@@ -1030,6 +1078,7 @@ packages:
             - nix:
                 versionMap: {"3.7b": "6b5e5b7a6631f065bf6908986990b37d845f847f"}
     tree:
+        manpages: [tree.1]
         installers:
             - brew
             - apt
@@ -1054,8 +1103,11 @@ packages:
                 versionMap: {"5.3.0": "6b5e5b7a6631f065bf6908986990b37d845f847f"}
     unzip:
         versionCommand: unzip -v
+        manpages: [unzip.1]
         installers:
-            - brew
+            #[why] keg-only formula: its man page never links into the brew prefix
+            - brew:
+                manpages: []
             - apt
             - nix:
                 versionMap: {"6.0": "6b5e5b7a6631f065bf6908986990b37d845f847f"}
@@ -1067,11 +1119,13 @@ packages:
             - nix:
                 versionMap: {"0.12.3": "6b5e5b7a6631f065bf6908986990b37d845f847f"}
     watch:
+        manpages: [watch.1]
         installers:
             - brew
             - apt:
                 packageName: procps
     xz:
+        manpages: [xz.1]
         installers:
             - brew
             - apt:
@@ -1121,12 +1175,14 @@ packages:
         installers:
             - apt
     zsh:
+        manpages: [zsh.1]
         installers:
             - brew
             - apt
             - nix:
                 versionMap: {"5.9.2": "6b5e5b7a6631f065bf6908986990b37d845f847f"}
     zstd:
+        manpages: [zstd.1]
         installers:
             - brew
             - apt

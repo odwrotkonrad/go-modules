@@ -8,8 +8,8 @@ import (
 )
 
 func IsDirSettled(reader FileSystemReader, dest string) bool {
-	fi, err := reader.StatPath(dest)
-	return err == nil && fi.IsDir()
+	info, err := reader.StatPath(dest)
+	return err == nil && info.IsDir()
 }
 
 func IsLinkSettled(reader FileSystemReader, src, dest string) bool {
@@ -21,16 +21,16 @@ func IsLinkSettled(reader FileSystemReader, src, dest string) bool {
 	return err == nil && destResolved == srcResolved
 }
 
-func IsSameContent(reader FileSystemReader, a, b string) bool {
-	x, err := reader.ReadFileBytes(a)
+func IsSameContent(reader FileSystemReader, src, dest string) bool {
+	srcData, err := reader.ReadFileBytes(src)
 	if err != nil {
 		return false
 	}
-	y, err := reader.ReadFileBytes(b)
+	destData, err := reader.ReadFileBytes(dest)
 	if err != nil {
 		return false
 	}
-	return bytes.Equal(x, y)
+	return bytes.Equal(srcData, destData)
 }
 
 func PrependEnvVar(env []string, key, value string) []string {

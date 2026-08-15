@@ -46,11 +46,11 @@ func (e *Evaluator) resolve(src string) (string, bool, error) {
 		if !ok {
 			return "", false, fmt.Errorf("unknown builtin %q (defined: isOs, isVirt)", src)
 		}
-		v := fn()
-		return v, v == "true", nil
+		value := fn()
+		return value, value == "true", nil
 	case strings.HasPrefix(src, "env:"):
-		v := e.lookupEnv(strings.TrimPrefix(src, "env:"))
-		return v, v != "", nil
+		value := e.lookupEnv(strings.TrimPrefix(src, "env:"))
+		return value, value != "", nil
 	default:
 		return "", false, fmt.Errorf("unknown source %q: want builtin:<name> or env:<NAME>", src)
 	}

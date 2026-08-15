@@ -40,9 +40,9 @@ func isVirtualized(goos string, exec execx.CmdExecutor, read FileSystemReader) b
 		if _, err := read.StatPath("/.dockerenv"); err == nil {
 			return true
 		}
-		if b, err := read.ReadFileBytes("/proc/1/cgroup"); err == nil {
-			s := string(b)
-			return strings.Contains(s, "docker") || strings.Contains(s, "containerd") || strings.Contains(s, "lxc")
+		if data, err := read.ReadFileBytes("/proc/1/cgroup"); err == nil {
+			cgroup := string(data)
+			return strings.Contains(cgroup, "docker") || strings.Contains(cgroup, "containerd") || strings.Contains(cgroup, "lxc")
 		}
 		return false
 	default:
@@ -51,11 +51,11 @@ func isVirtualized(goos string, exec execx.CmdExecutor, read FileSystemReader) b
 }
 
 func ResolveUserHome(name string) (string, error) {
-	u, err := UserLookup(name)
+	record, err := UserLookup(name)
 	if err != nil {
 		return "", err
 	}
-	return u.HomeDir, nil
+	return record.HomeDir, nil
 }
 
 // [<] 🤖🤖

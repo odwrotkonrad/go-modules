@@ -22,18 +22,18 @@ type versionManagerRoutine struct {
 var versionManagerRoutines = map[string]versionManagerRoutine{
 	"pyenv": {
 		installed: func(in *Installer, v string) bool {
-			out, ok := in.output([]string{"pyenv", "versions", "--bare"})
+			out, ok := in.output([]string{in.Host.pyenvBin(), "versions", "--bare"})
 			return ok && slices.Contains(strings.Fields(out), v)
 		},
 		global: func(in *Installer) string {
-			out, _ := in.output([]string{"pyenv", "global"})
+			out, _ := in.output([]string{in.Host.pyenvBin(), "global"})
 			return strings.TrimSpace(out)
 		},
 		install: func(in *Installer, v string) error {
-			return in.exec([]string{"pyenv", "install", "--skip-existing", v})
+			return in.exec([]string{in.Host.pyenvBin(), "install", "--skip-existing", v})
 		},
 		setGlobal: func(in *Installer, v string) error {
-			return in.exec([]string{"pyenv", "global", v})
+			return in.exec([]string{in.Host.pyenvBin(), "global", v})
 		},
 	},
 	"nvm": {

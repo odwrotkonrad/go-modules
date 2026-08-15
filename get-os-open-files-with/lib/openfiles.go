@@ -14,7 +14,7 @@ func RenderDutiLines(cfg *yaml.Node) (string, error) {
 	if cfg == nil {
 		return "", nil
 	}
-	root := yamlcfg.Unwrap(cfg)
+	root := yamlcfg.DocumentRoot(cfg)
 	if root.Kind == yaml.DocumentNode && len(root.Content) == 0 {
 		return "", nil
 	}

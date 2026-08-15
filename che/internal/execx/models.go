@@ -16,6 +16,6 @@ type Cmd struct {
 	Stderr io.Writer
 }
 
-type Real struct{}
+type OS struct{}
 
 // [<] 🤖🤖🤖

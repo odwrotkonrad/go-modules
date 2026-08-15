@@ -18,7 +18,7 @@ const (
 	codeDrift   = 22
 )
 
-func (t Tool) Main() { climain.RunNamed(t.Name, t.Version, t.Usage, t.Run) }
+func (t Tool) Main() { climain.Run(t.Name, t.Version, t.Usage, t.Run) }
 
 func (t Tool) Run(args []string) (string, error) {
 	switch {

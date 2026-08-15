@@ -14,24 +14,24 @@ func ParseMode(s string) (os.FileMode, bool) {
 	if s == "" {
 		return 0, false
 	}
-	n, err := strconv.ParseUint(s, 8, 32)
+	parsed, err := strconv.ParseUint(s, 8, 32)
 	if err != nil {
 		return 0, false
 	}
-	return os.FileMode(n), true
+	return os.FileMode(parsed), true
 }
 
 func DetectPermsDrift(reader FileSystemReader, dest, chmod, owner string) (needChmod, needChown bool) {
-	fi, err := reader.LstatPath(dest)
+	info, err := reader.LstatPath(dest)
 	if err != nil {
 		return false, false
 	}
 	if mode, ok := ParseMode(chmod); ok {
 		mask := maskMode(mode)
-		needChmod = mode&mask != toUnixMode(fi.Mode())&mask
+		needChmod = mode&mask != toUnixMode(info.Mode())&mask
 	}
 	if owner != "" {
-		needChown = IsOwnerDrifted(fi, owner)
+		needChown = IsOwnerDrifted(info, owner)
 	}
 	return needChmod, needChown
 }
@@ -43,40 +43,40 @@ func maskMode(mode os.FileMode) os.FileMode {
 	return 0o777
 }
 
-func toUnixMode(m os.FileMode) os.FileMode {
-	u := m.Perm()
-	if m&os.ModeSetuid != 0 {
-		u |= 0o4000
+func toUnixMode(mode os.FileMode) os.FileMode {
+	unix := mode.Perm()
+	if mode&os.ModeSetuid != 0 {
+		unix |= 0o4000
 	}
-	if m&os.ModeSetgid != 0 {
-		u |= 0o2000
+	if mode&os.ModeSetgid != 0 {
+		unix |= 0o2000
 	}
-	if m&os.ModeSticky != 0 {
-		u |= 0o1000
+	if mode&os.ModeSticky != 0 {
+		unix |= 0o1000
 	}
-	return u
+	return unix
 }
 
-func IsOwnerDrifted(fi os.FileInfo, owner string) bool {
-	st, ok := fi.Sys().(*syscall.Stat_t)
+func IsOwnerDrifted(info os.FileInfo, owner string) bool {
+	stat, ok := info.Sys().(*syscall.Stat_t)
 	if !ok {
 		return false
 	}
 	name, group, _ := strings.Cut(owner, ":")
 	uid, uidOK := lookupID(name, UserLookup, func(u *user.User) string { return u.Uid })
 	gid, gidOK := lookupID(group, GroupLookup, func(g *user.Group) string { return g.Gid })
-	return (uidOK && uid != st.Uid) || (gidOK && gid != st.Gid)
+	return (uidOK && uid != stat.Uid) || (gidOK && gid != stat.Gid)
 }
 
 func lookupID[T any](name string, lookup func(string) (T, error), idOf func(T) string) (uint32, bool) {
 	if name == "" {
 		return 0, false
 	}
-	rec, err := lookup(name)
+	record, err := lookup(name)
 	if err != nil {
 		return 0, false
 	}
-	id, err := strconv.ParseUint(idOf(rec), 10, 32)
+	id, err := strconv.ParseUint(idOf(record), 10, 32)
 	if err != nil {
 		return 0, false
 	}

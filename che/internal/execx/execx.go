@@ -12,7 +12,7 @@ type CmdExecutor interface {
 	Output(c Cmd) ([]byte, error)
 }
 
-var Default CmdExecutor = Real{}
+var Default CmdExecutor = OS{}
 
 func (c Cmd) command() *exec.Cmd {
 	ctx := c.Ctx
@@ -24,13 +24,13 @@ func (c Cmd) command() *exec.Cmd {
 	return cmd
 }
 
-func (Real) Exec(c Cmd) error {
+func (OS) Exec(c Cmd) error {
 	cmd := c.command()
 	cmd.Stdout = c.Stdout
 	return cmd.Run()
 }
 
-func (Real) Output(c Cmd) ([]byte, error) {
+func (OS) Output(c Cmd) ([]byte, error) {
 	return c.command().Output()
 }
 

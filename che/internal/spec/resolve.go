@@ -138,7 +138,7 @@ func (r ProfileRecipe) MakeProfile(recipes []ProfileRecipe, workingDir string) (
 		Scripts:      scripts,
 		Links:        merged.explicitLinks,
 		Copies:       merged.explicitCopies,
-		Templates:    merged.explicitTmpls,
+		Templates:    merged.explicitTemplates,
 	}
 	if err := classify(workingDir, merged, &res); err != nil {
 		return OperationRecipes{}, nil, err
@@ -176,8 +176,8 @@ func expandScripts(repoRoot string, entries []string) ([]string, error) {
 				return nil, fmt.Errorf("run-scripts entry matched no script: %s", entry)
 			}
 			slices.Sort(hits)
-			for _, h := range hits {
-				rel, err := filepath.Rel(repoRoot, h)
+			for _, hit := range hits {
+				rel, err := filepath.Rel(repoRoot, hit)
 				if err != nil {
 					return nil, err
 				}
@@ -201,81 +201,81 @@ func mergeRecipe(recipes []ProfileRecipe, merged *mergedInclude, rec ProfileReci
 	child := append(slices.Clone(seen), name)
 	for _, ref := range rec.Include.Profiles {
 		if ref.URI != "" {
-			dup := slices.ContainsFunc(merged.refs, func(q ProfileSourceRecipe) bool {
-				return q.URI == ref.URI && q.ProfileName == ref.ProfileName
+			dup := slices.ContainsFunc(merged.refs, func(seen ProfileSourceRecipe) bool {
+				return seen.URI == ref.URI && seen.ProfileName == ref.ProfileName
 			})
 			if !dup {
 				merged.refs = append(merged.refs, ref)
 			}
 			continue
 		}
-		m, ok := findRecipe(recipes, ref.ProfileName)
+		included, ok := findRecipe(recipes, ref.ProfileName)
 		if !ok {
 			return fmt.Errorf("include.profiles names undefined profile %q (from %v)", ref.ProfileName, child)
 		}
-		if err := mergeRecipe(recipes, merged, m, child); err != nil {
+		if err := mergeRecipe(recipes, merged, included, child); err != nil {
 			return err
 		}
 	}
-	in := rec.Include
-	for _, e := range in.MakeLinks {
+	include := rec.Include
+	for _, entry := range include.MakeLinks {
 		switch {
-		case e.glob != "":
-			merged.linkGlobs.add(e.glob, Perms{})
-		case e.Source == "":
+		case entry.glob != "":
+			merged.linkGlobs.add(entry.glob, Perms{})
+		case entry.Source == "":
 			return fmt.Errorf("profile %q: link entry missing source", name)
-		case e.DestRule != "":
-			rule, err := ruleFromDest(e.Source, e.DestRule)
+		case entry.DestRule != "":
+			rule, err := ruleFromDest(entry.Source, entry.DestRule)
 			if err != nil {
 				return fmt.Errorf("profile %q: %w", name, err)
 			}
-			merged.linkGlobs.addRule(e.Source, Perms{}, rule)
-		case len(e.Dest) == 0:
-			return fmt.Errorf("profile %q: link entry %q missing dest", name, e.Source)
+			merged.linkGlobs.addRule(entry.Source, Perms{}, rule)
+		case len(entry.Dest) == 0:
+			return fmt.Errorf("profile %q: link entry %q missing dest", name, entry.Source)
 		default:
-			merged.explicitLinks = append(merged.explicitLinks, FileItem{Rel: e.Source, Dests: e.Dest})
+			merged.explicitLinks = append(merged.explicitLinks, FileItem{Rel: entry.Source, Dests: entry.Dest})
 		}
 	}
-	if err := splitEntries(in.MakeCopies, &merged.copyGlobs, &merged.explicitCopies); err != nil {
+	if err := splitEntries(include.MakeCopies, &merged.copyGlobs, &merged.explicitCopies); err != nil {
 		return fmt.Errorf("profile %q: %w", name, err)
 	}
-	if err := splitTemplates(in.RenderTemplates, &merged.tmplGlobs, &merged.explicitTmpls); err != nil {
+	if err := splitTemplates(include.RenderTemplates, &merged.templateGlobs, &merged.explicitTemplates); err != nil {
 		return fmt.Errorf("profile %q: %w", name, err)
 	}
-	for _, e := range in.MakeDirs {
-		merged.dirs = append(merged.dirs, expandDirGroup(e)...)
+	for _, entry := range include.MakeDirs {
+		merged.dirs = append(merged.dirs, expandDirGroup(entry)...)
 	}
-	merged.packages = append(merged.packages, in.InstallPackages...)
-	for tool, refs := range in.InstallToolPackages {
+	merged.packages = append(merged.packages, include.InstallPackages...)
+	for tool, refs := range include.InstallToolPackages {
 		if merged.toolPackages == nil {
 			merged.toolPackages = map[string][]ToolPackageRef{}
 		}
 		merged.toolPackages[tool] = append(merged.toolPackages[tool], refs...)
 	}
-	merged.scripts = append(merged.scripts, in.Scripts...)
+	merged.scripts = append(merged.scripts, include.Scripts...)
 	merged.exclude.append(rec.Exclude)
 	return nil
 }
 
-func (ex *excludeSet) append(o excludeSet) {
-	ex.MakeLinks = append(ex.MakeLinks, o.MakeLinks...)
-	ex.MakeCopies = append(ex.MakeCopies, o.MakeCopies...)
-	ex.RenderTemplates = append(ex.RenderTemplates, o.RenderTemplates...)
-	ex.MakeDirs = append(ex.MakeDirs, o.MakeDirs...)
-	ex.InstallPackages = append(ex.InstallPackages, o.InstallPackages...)
-	for tool, globs := range o.InstallToolPackages {
+func (ex *excludeSet) append(other excludeSet) {
+	ex.MakeLinks = append(ex.MakeLinks, other.MakeLinks...)
+	ex.MakeCopies = append(ex.MakeCopies, other.MakeCopies...)
+	ex.RenderTemplates = append(ex.RenderTemplates, other.RenderTemplates...)
+	ex.MakeDirs = append(ex.MakeDirs, other.MakeDirs...)
+	ex.InstallPackages = append(ex.InstallPackages, other.InstallPackages...)
+	for tool, globs := range other.InstallToolPackages {
 		if ex.InstallToolPackages == nil {
 			ex.InstallToolPackages = map[string][]string{}
 		}
 		ex.InstallToolPackages[tool] = append(ex.InstallToolPackages[tool], globs...)
 	}
-	ex.Scripts = append(ex.Scripts, o.Scripts...)
+	ex.Scripts = append(ex.Scripts, other.Scripts...)
 }
 
 func splitEntries(entries []entry, globs *globSet, explicit *[]FileItem) error {
-	for _, e := range entries {
-		if err := splitGroupFiles(e.Files, e.Perms, globs, explicit, nil, func(f fileSpec) FileItem {
-			return FileItem{Rel: f.Source, Dests: f.Dest, Perms: e.Perms}
+	for _, group := range entries {
+		if err := splitGroupFiles(group.Files, group.Perms, globs, explicit, nil, func(file fileSpec) FileItem {
+			return FileItem{Rel: file.Source, Dests: file.Dest, Perms: group.Perms}
 		}); err != nil {
 			return err
 		}
@@ -284,9 +284,9 @@ func splitEntries(entries []entry, globs *globSet, explicit *[]FileItem) error {
 }
 
 func splitTemplates(entries []templateGroup, globs *globSet, explicit *[]FileItem) error {
-	for _, e := range entries {
-		if err := splitGroupFiles(e.Files, e.Perms, globs, explicit, checkTemplateSpec, func(f fileSpec) FileItem {
-			return FileItem{Rel: f.Source, Dests: mergeDestOptions(e.Options, f.Dest), Ctx: fsutil.MergeMap(e.Ctx, f.Ctx), Perms: e.Perms}
+	for _, group := range entries {
+		if err := splitGroupFiles(group.Files, group.Perms, globs, explicit, checkTemplateSpec, func(file fileSpec) FileItem {
+			return FileItem{Rel: file.Source, Dests: mergeDestOptions(group.Options, file.Dest), Ctx: fsutil.MergeMap(group.Ctx, file.Ctx), Perms: group.Perms}
 		}); err != nil {
 			return err
 		}
@@ -295,44 +295,44 @@ func splitTemplates(entries []templateGroup, globs *globSet, explicit *[]FileIte
 }
 
 func splitGroupFiles(files []fileSpec, perms Perms, globs *globSet, explicit *[]FileItem, check func(fileSpec) error, makeItem func(fileSpec) FileItem) error {
-	for _, f := range files {
+	for _, file := range files {
 		if check != nil {
-			if err := check(f); err != nil {
+			if err := check(file); err != nil {
 				return err
 			}
 		}
 		switch {
-		case f.glob != "":
-			globs.add(f.glob, perms)
-		case f.DestRule != "":
-			rule, err := ruleFromDest(f.Source, f.DestRule)
+		case file.glob != "":
+			globs.add(file.glob, perms)
+		case file.DestRule != "":
+			rule, err := ruleFromDest(file.Source, file.DestRule)
 			if err != nil {
 				return err
 			}
-			globs.addRule(f.Source, perms, rule)
+			globs.addRule(file.Source, perms, rule)
 		default:
-			*explicit = append(*explicit, makeItem(f))
+			*explicit = append(*explicit, makeItem(file))
 		}
 	}
 	return nil
 }
 
-func checkTemplateSpec(f fileSpec) error {
+func checkTemplateSpec(file fileSpec) error {
 	switch {
-	case f.glob != "":
-		if IsRemoteSrc(f.glob) {
-			return fmt.Errorf("renderTemplates glob cannot be remote: %q", f.glob)
+	case file.glob != "":
+		if IsRemoteSrc(file.glob) {
+			return fmt.Errorf("renderTemplates glob cannot be remote: %q", file.glob)
 		}
-	case f.DestRule != "":
-		if IsRemoteSrc(f.Source) {
-			return fmt.Errorf("renderTemplates dest rewrite cannot be remote: %q", f.Source)
+	case file.DestRule != "":
+		if IsRemoteSrc(file.Source) {
+			return fmt.Errorf("renderTemplates dest rewrite cannot be remote: %q", file.Source)
 		}
-	case IsRemoteSrc(f.Source):
-		if !render.IsRemoteRef(RemoteSrcRef(f.Source)) {
-			return fmt.Errorf("renderTemplates remote source malformed, want @<repo>//<path>[?ref=<ref>]: %q", f.Source)
+	case IsRemoteSrc(file.Source):
+		if !render.IsRemoteRef(RemoteSrcRef(file.Source)) {
+			return fmt.Errorf("renderTemplates remote source malformed, want @<repo>//<path>[?ref=<ref>]: %q", file.Source)
 		}
-		if len(f.Dest) == 0 {
-			return fmt.Errorf("renderTemplates remote source requires explicit dest: %q", f.Source)
+		if len(file.Dest) == 0 {
+			return fmt.Errorf("renderTemplates remote source requires explicit dest: %q", file.Source)
 		}
 	}
 	return nil
@@ -349,16 +349,16 @@ func mergeDestOptions(group render.Options, dests []DestSpec) []DestSpec {
 	return out
 }
 
-func expandDirGroup(g dirGroup) []FileItem {
+func expandDirGroup(group dirGroup) []FileItem {
 	var out []FileItem
-	for _, f := range g.Files {
-		paths := f.Dest
-		if f.glob != "" {
-			paths = []DestSpec{{Path: f.glob}}
+	for _, file := range group.Files {
+		dests := file.Dest
+		if file.glob != "" {
+			dests = []DestSpec{{Path: file.glob}}
 		}
-		for _, d := range paths {
-			for _, p := range fsutil.ExpandBraces(d.Path) {
-				out = append(out, FileItem{Dests: []DestSpec{{Path: p}}, Perms: g.Perms})
+		for _, dest := range dests {
+			for _, path := range fsutil.ExpandBraces(dest.Path) {
+				out = append(out, FileItem{Dests: []DestSpec{{Path: path}}, Perms: group.Perms})
 			}
 		}
 	}
@@ -379,7 +379,7 @@ func classify(workingDir string, merged mergedInclude, res *resolved) error {
 			continue
 		}
 		switch {
-		case IsTmplSrc(rel) && appendMatch(merged.tmplGlobs, rel, TrimTmplExt, &res.Templates):
+		case IsTemplateSrc(rel) && appendMatch(merged.templateGlobs, rel, TrimTemplateExt, &res.Templates):
 		case strings.HasSuffix(rel, CpExt) && appendMatch(merged.copyGlobs, rel, trimCpExt, &res.Copies):
 		case filepath.Base(rel) == ".gitkeep":
 		case appendMatch(merged.linkGlobs, rel, identity, &res.Links):
@@ -393,48 +393,48 @@ func identity(rel string) string  { return rel }
 func trimCpExt(rel string) string { return strings.TrimSuffix(rel, CpExt) }
 
 func appendMatch(gs globSet, rel string, destBase func(string) string, items *[]FileItem) bool {
-	gp, ok := gs.match(rel)
+	matched, ok := gs.match(rel)
 	if !ok {
 		return false
 	}
-	it := FileItem{Rel: rel, Perms: gp.perms}
-	if gp.rule != nil {
+	item := FileItem{Rel: rel, Perms: matched.perms}
+	if matched.rule != nil {
 		base := destBase(rel)
-		if dest := gp.rule.apply(base); dest != base {
-			it.Dests = []DestSpec{{Path: dest}}
-			it.Derived = true
+		if dest := matched.rule.apply(base); dest != base {
+			item.Dests = []DestSpec{{Path: dest}}
+			item.Derived = true
 		}
 	}
-	*items = append(*items, it)
+	*items = append(*items, item)
 	return true
 }
 
 func collectExplicitRels(merged mergedInclude) map[string]bool {
-	m := map[string]bool{}
-	for _, it := range merged.explicitLinks {
-		m[it.Rel] = true
+	rels := map[string]bool{}
+	for _, item := range merged.explicitLinks {
+		rels[item.Rel] = true
 	}
-	for _, it := range merged.explicitCopies {
-		m[it.Rel] = true
+	for _, item := range merged.explicitCopies {
+		rels[item.Rel] = true
 	}
-	for _, it := range merged.explicitTmpls {
-		m[it.Rel] = true
+	for _, item := range merged.explicitTemplates {
+		rels[item.Rel] = true
 	}
-	return m
+	return rels
 }
 
 func (gs *globSet) add(glob string, perms Perms) { gs.addRule(glob, perms, nil) }
 
 func (gs *globSet) addRule(glob string, perms Perms, rule *destRule) {
-	for _, g := range fsutil.ExpandBraces(glob) {
-		*gs = append(*gs, globPerm{glob: g, perms: perms, rule: rule})
+	for _, expanded := range fsutil.ExpandBraces(glob) {
+		*gs = append(*gs, globPerm{glob: expanded, perms: perms, rule: rule})
 	}
 }
 
 func (gs globSet) match(rel string) (globPerm, bool) {
-	for _, g := range slices.Backward(gs) {
-		if isGlobMatch(g.glob, rel) {
-			return g, true
+	for _, candidate := range slices.Backward(gs) {
+		if isGlobMatch(candidate.glob, rel) {
+			return candidate, true
 		}
 	}
 	return globPerm{}, false
@@ -447,22 +447,22 @@ func isGlobMatch(glob, rel string) bool {
 func collectDirs(res *resolved) {
 	dirSeen := map[string]bool{}
 	addRel := func(rel string) {
-		for d := filepath.Dir(rel); d != "." && d != "/" && !dirSeen[d]; d = filepath.Dir(d) {
-			dirSeen[d] = true
-			res.Dirs = append(res.Dirs, d)
+		for dir := filepath.Dir(rel); dir != "." && dir != "/" && !dirSeen[dir]; dir = filepath.Dir(dir) {
+			dirSeen[dir] = true
+			res.Dirs = append(res.Dirs, dir)
 		}
 	}
-	for _, it := range res.Links {
-		addRel(DestRel(it))
+	for _, item := range res.Links {
+		addRel(DestRel(item))
 	}
-	for _, it := range res.Copies {
-		addRel(DestRel(it))
+	for _, item := range res.Copies {
+		addRel(DestRel(item))
 	}
-	for _, it := range res.Templates {
-		if len(it.Dests) == 0 {
-			addRel(it.Rel)
-		} else if it.Derived {
-			addRel(it.Dests[0].Path)
+	for _, item := range res.Templates {
+		if len(item.Dests) == 0 {
+			addRel(item.Rel)
+		} else if item.Derived {
+			addRel(item.Dests[0].Path)
 		}
 	}
 	slices.SortFunc(res.Links, byRel)
@@ -474,43 +474,43 @@ func collectDirs(res *resolved) {
 func byRel(a, b FileItem) int { return cmp.Compare(a.Rel, b.Rel) }
 
 // [why] later entries win, so a profile ref can re-pin a package version
-func dedupePackages(xs []PackageRef) []PackageRef {
-	at := map[string]int{}
+func dedupePackages(refs []PackageRef) []PackageRef {
+	indexByName := map[string]int{}
 	var out []PackageRef
-	for _, x := range xs {
-		if i, ok := at[x.Name]; ok {
-			if len(x.Versions) > 0 {
-				out[i].Versions = x.Versions
+	for _, ref := range refs {
+		if i, ok := indexByName[ref.Name]; ok {
+			if len(ref.Versions) > 0 {
+				out[i].Versions = ref.Versions
 			}
-			if x.GlobalVersion != "" {
-				out[i].GlobalVersion = x.GlobalVersion
+			if ref.GlobalVersion != "" {
+				out[i].GlobalVersion = ref.GlobalVersion
 			}
 			continue
 		}
-		at[x.Name] = len(out)
-		out = append(out, x)
+		indexByName[ref.Name] = len(out)
+		out = append(out, ref)
 	}
 	return out
 }
 
 // [why] later entries win, so a profile ref can re-pin a tool package version
-func dedupeToolPackages(m map[string][]ToolPackageRef) map[string][]ToolPackageRef {
-	if len(m) == 0 {
+func dedupeToolPackages(byTool map[string][]ToolPackageRef) map[string][]ToolPackageRef {
+	if len(byTool) == 0 {
 		return nil
 	}
-	out := make(map[string][]ToolPackageRef, len(m))
-	for tool, refs := range m {
-		at := map[string]int{}
+	out := make(map[string][]ToolPackageRef, len(byTool))
+	for tool, refs := range byTool {
+		indexByName := map[string]int{}
 		var kept []ToolPackageRef
-		for _, r := range refs {
-			if i, ok := at[r.Name]; ok {
-				if r.Version != "" {
-					kept[i].Version = r.Version
+		for _, ref := range refs {
+			if i, ok := indexByName[ref.Name]; ok {
+				if ref.Version != "" {
+					kept[i].Version = ref.Version
 				}
 				continue
 			}
-			at[r.Name] = len(kept)
-			kept = append(kept, r)
+			indexByName[ref.Name] = len(kept)
+			kept = append(kept, ref)
 		}
 		out[tool] = kept
 	}
@@ -520,14 +520,14 @@ func dedupeToolPackages(m map[string][]ToolPackageRef) map[string][]ToolPackageR
 func applyExcludes(ex excludeSet, res *resolved) {
 	linkGlobs := fsutil.ExpandAll(ex.MakeLinks)
 	copyGlobs := fsutil.ExpandAll(ex.MakeCopies)
-	tmplGlobs := fsutil.ExpandAll(ex.RenderTemplates)
+	templateGlobs := fsutil.ExpandAll(ex.RenderTemplates)
 	dirGlobs := fsutil.ExpandAll(ex.MakeDirs)
 	pkgGlobs := fsutil.ExpandAll(ex.InstallPackages)
 	scriptGlobs := fsutil.ExpandAll(ex.Scripts)
 
 	res.Links = dropFiles(res.Links, linkGlobs)
 	res.Copies = dropFiles(res.Copies, copyGlobs)
-	res.Templates = dropFiles(res.Templates, tmplGlobs)
+	res.Templates = dropFiles(res.Templates, templateGlobs)
 	res.ExtraDirs = dropFiles(res.ExtraDirs, dirGlobs)
 	res.Packages = dropPackages(res.Packages, pkgGlobs)
 	for tool, globs := range ex.InstallToolPackages {
@@ -535,8 +535,8 @@ func applyExcludes(ex excludeSet, res *resolved) {
 			continue
 		}
 		expanded := fsutil.ExpandAll(globs)
-		res.ToolPackages[tool] = slices.DeleteFunc(res.ToolPackages[tool], func(r ToolPackageRef) bool {
-			return isAnyGlobMatch(expanded, r.Name)
+		res.ToolPackages[tool] = slices.DeleteFunc(res.ToolPackages[tool], func(ref ToolPackageRef) bool {
+			return isAnyGlobMatch(expanded, ref.Name)
 		})
 	}
 	res.Scripts = dropStrings(res.Scripts, scriptGlobs)
@@ -550,12 +550,12 @@ func dropFiles(items []FileItem, globs []string) []FileItem {
 	if len(globs) == 0 {
 		return items
 	}
-	return slices.DeleteFunc(items, func(it FileItem) bool {
-		if isAnyGlobMatch(globs, it.Rel) {
+	return slices.DeleteFunc(items, func(item FileItem) bool {
+		if isAnyGlobMatch(globs, item.Rel) {
 			return true
 		}
-		for _, d := range it.Dests {
-			if isAnyGlobMatch(globs, d.Path) {
+		for _, dest := range item.Dests {
+			if isAnyGlobMatch(globs, dest.Path) {
 				return true
 			}
 		}
@@ -563,22 +563,22 @@ func dropFiles(items []FileItem, globs []string) []FileItem {
 	})
 }
 
-func dropPackages(xs []PackageRef, globs []string) []PackageRef {
+func dropPackages(refs []PackageRef, globs []string) []PackageRef {
 	if len(globs) == 0 {
-		return xs
+		return refs
 	}
-	return slices.DeleteFunc(xs, func(x PackageRef) bool { return isAnyGlobMatch(globs, x.Name) })
+	return slices.DeleteFunc(refs, func(ref PackageRef) bool { return isAnyGlobMatch(globs, ref.Name) })
 }
 
-func dropStrings(xs, globs []string) []string {
+func dropStrings(values, globs []string) []string {
 	if len(globs) == 0 {
-		return xs
+		return values
 	}
-	return slices.DeleteFunc(xs, func(x string) bool { return isAnyGlobMatch(globs, x) })
+	return slices.DeleteFunc(values, func(value string) bool { return isAnyGlobMatch(globs, value) })
 }
 
 func isAnyGlobMatch(globs []string, rel string) bool {
-	return slices.ContainsFunc(globs, func(g string) bool { return isGlobMatch(g, rel) })
+	return slices.ContainsFunc(globs, func(glob string) bool { return isGlobMatch(glob, rel) })
 }
 
 func (o ProfileOptions) Over(spec Options) ProfileOptions {
@@ -597,55 +597,55 @@ func (o ProfileOptions) OverRef(entry ProfileOptions) ProfileOptions {
 	return overlayProfileOptions(entry, o)
 }
 
-func overlayProfileOptions(hi, lo ProfileOptions) ProfileOptions {
-	if hi.AutoDiscover == nil {
-		hi.AutoDiscover = lo.AutoDiscover
+func overlayProfileOptions(override, base ProfileOptions) ProfileOptions {
+	if override.AutoDiscover == nil {
+		override.AutoDiscover = base.AutoDiscover
 	}
-	if hi.LogLevel == "" {
-		hi.LogLevel = lo.LogLevel
+	if override.LogLevel == "" {
+		override.LogLevel = base.LogLevel
 	}
-	if hi.ProfileWorkingDirectory == "" {
-		hi.ProfileWorkingDirectory = lo.ProfileWorkingDirectory
+	if override.ProfileWorkingDirectory == "" {
+		override.ProfileWorkingDirectory = base.ProfileWorkingDirectory
 	}
-	hi.Packages = overlayPackages(hi.Packages, lo.Packages)
-	return hi
+	override.Packages = overlayPackages(override.Packages, base.Packages)
+	return override
 }
 
-func overlayPackages(hi, lo Packages) Packages {
-	if hi.File == "" {
-		hi.File = lo.File
+func overlayPackages(override, base Packages) Packages {
+	if override.File == "" {
+		override.File = base.File
 	}
-	if len(hi.PreferredInstallationMethods) == 0 {
-		hi.PreferredInstallationMethods = lo.PreferredInstallationMethods
+	if len(override.PreferredInstallationMethods) == 0 {
+		override.PreferredInstallationMethods = base.PreferredInstallationMethods
 	}
-	if len(hi.BinariesRemoteArchive.InstallDestinationCandidates) == 0 {
-		hi.BinariesRemoteArchive.InstallDestinationCandidates = lo.BinariesRemoteArchive.InstallDestinationCandidates
+	if len(override.BinariesRemoteArchive.InstallDestinationCandidates) == 0 {
+		override.BinariesRemoteArchive.InstallDestinationCandidates = base.BinariesRemoteArchive.InstallDestinationCandidates
 	}
-	if hi.BinariesRemoteArchive.CheckPresentOnPath == nil {
-		hi.BinariesRemoteArchive.CheckPresentOnPath = lo.BinariesRemoteArchive.CheckPresentOnPath
+	if override.BinariesRemoteArchive.CheckPresentOnPath == nil {
+		override.BinariesRemoteArchive.CheckPresentOnPath = base.BinariesRemoteArchive.CheckPresentOnPath
 	}
-	if hi.Completions.Zsh.Enabled == nil {
-		hi.Completions.Zsh.Enabled = lo.Completions.Zsh.Enabled
+	if override.Completions.Zsh.Enabled == nil {
+		override.Completions.Zsh.Enabled = base.Completions.Zsh.Enabled
 	}
-	if len(hi.Completions.Zsh.InstallDestinationCandidates) == 0 {
-		hi.Completions.Zsh.InstallDestinationCandidates = lo.Completions.Zsh.InstallDestinationCandidates
+	if len(override.Completions.Zsh.InstallDestinationCandidates) == 0 {
+		override.Completions.Zsh.InstallDestinationCandidates = base.Completions.Zsh.InstallDestinationCandidates
 	}
-	if hi.Completions.Zsh.CheckPresentOnFpath == nil {
-		hi.Completions.Zsh.CheckPresentOnFpath = lo.Completions.Zsh.CheckPresentOnFpath
+	if override.Completions.Zsh.CheckPresentOnFpath == nil {
+		override.Completions.Zsh.CheckPresentOnFpath = base.Completions.Zsh.CheckPresentOnFpath
 	}
-	if len(hi.Manpages.InstallDestinationCandidates) == 0 {
-		hi.Manpages.InstallDestinationCandidates = lo.Manpages.InstallDestinationCandidates
+	if len(override.Manpages.InstallDestinationCandidates) == 0 {
+		override.Manpages.InstallDestinationCandidates = base.Manpages.InstallDestinationCandidates
 	}
-	if hi.Manpages.CheckPresentOnManpath == nil {
-		hi.Manpages.CheckPresentOnManpath = lo.Manpages.CheckPresentOnManpath
+	if override.Manpages.CheckPresentOnManpath == nil {
+		override.Manpages.CheckPresentOnManpath = base.Manpages.CheckPresentOnManpath
 	}
-	if hi.UpdateCheck.Enabled == nil {
-		hi.UpdateCheck.Enabled = lo.UpdateCheck.Enabled
+	if override.UpdateCheck.Enabled == nil {
+		override.UpdateCheck.Enabled = base.UpdateCheck.Enabled
 	}
-	if hi.UpdateCheck.Cooldown == "" {
-		hi.UpdateCheck.Cooldown = lo.UpdateCheck.Cooldown
+	if override.UpdateCheck.Cooldown == "" {
+		override.UpdateCheck.Cooldown = base.UpdateCheck.Cooldown
 	}
-	return hi
+	return override
 }
 
 // [<] 🤖🤖

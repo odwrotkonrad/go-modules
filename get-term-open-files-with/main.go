@@ -27,13 +27,13 @@ var terminals = map[string]bool{"any": true, "vscode": true, "kitty": true}
 
 var version = "dev"
 
-func run(args []string, customDir, url string) (string, error) {
+func run(args []string, userDir, url string) (string, error) {
 	if len(args) != 1 || !terminals[args[0]] {
 		return "", yamlcfg.ArgsError(args)
 	}
 	terminal := args[0]
 	var rules lib.TerminalRules
-	if err := yamlcfg.LoadConfig(configName, customDir, &rules); err != nil {
+	if err := yamlcfg.LoadConfig(configName, userDir, &rules); err != nil {
 		return "", err
 	}
 	extsByType, err := lib.LoadTypeExtensions(url)
@@ -44,7 +44,7 @@ func run(args []string, customDir, url string) (string, error) {
 }
 
 func main() {
-	climain.Run("get-term-open-files-with", version, usage, func(args []string) (string, error) {
+	climain.RunLine("get-term-open-files-with", version, usage, func(args []string) (string, error) {
 		return run(args, "", lib.LanguagesURL)
 	})
 }

@@ -14,14 +14,14 @@ import (
 )
 
 const (
-	TmplExt           = ".tpl"
+	TemplateExt       = ".tpl"
 	CpExt             = ".ontoHost.cp"
 	DefaultWorkingDir = "."
 )
 
-var tmplExts = []string{".ontoHost.tpl", ".ontoRepo.tpl", ".tpl"}
+var templateExts = []string{".ontoHost.tpl", ".ontoRepo.tpl", ".tpl"}
 
-func IsTmplSrc(rel string) bool { return strings.HasSuffix(rel, TmplExt) }
+func IsTemplateSrc(rel string) bool { return strings.HasSuffix(rel, TemplateExt) }
 
 const RemoteSrcPrefix = "@"
 
@@ -47,8 +47,8 @@ func (r ProfileRecipe) SourcedRefs() []ProfileSourceRecipe {
 
 func RemoteSrcRef(source string) string { return strings.TrimPrefix(source, RemoteSrcPrefix) }
 
-func TrimTmplExt(rel string) string {
-	for _, ext := range tmplExts {
+func TrimTemplateExt(rel string) string {
+	for _, ext := range templateExts {
 		if trimmed, ok := strings.CutSuffix(rel, ext); ok {
 			return trimmed
 		}

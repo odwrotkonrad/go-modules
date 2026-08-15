@@ -30,7 +30,7 @@ func realProfile(t *testing.T) *ProfileReady {
 	require.NoError(t, err)
 	return &ProfileReady{
 		ref: "cli", home: home, runID: testRunID, runTs: testRunID, specDone: spec, profileDone: prof,
-		Seams: Seams{FS: fsutil.FS{Home: home}, Reader: fsutil.OSReader{}, Ledger: db},
+		Deps: Deps{FS: fsutil.FS{Home: home}, Reader: fsutil.OSReader{}, Ledger: db},
 	}
 }
 

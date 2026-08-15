@@ -35,10 +35,10 @@ func Run[C any](t *testing.T, fsys fs.FS, path string, fn func(t *testing.T, c C
 	seen := map[string]bool{}
 	for i := range file.Cases {
 		node := &file.Cases[i]
-		name := readCaseName(t, path, i, node)
+		name := decodeCaseName(t, path, i, node)
 		require.Falsef(t, seen[name], "%s: duplicate case name %q", path, name)
 		seen[name] = true
-		requireWantKey(t, path, name, node)
+		requireAssertionKey(t, path, name, node)
 		mergeCaseContext(t, path, name, &file.Context, node)
 		var c C
 		require.NoErrorf(t, StrictDecodeNode(node, &c), "%s: case %q", path, name)
@@ -60,7 +60,7 @@ func Eq[W any](t *testing.T, fsys fs.FS, path string, fn func(t *testing.T, c Ca
 	})
 }
 
-func readCaseName(t *testing.T, path string, i int, node *yaml.Node) string {
+func decodeCaseName(t *testing.T, path string, i int, node *yaml.Node) string {
 	t.Helper()
 	var head struct {
 		Name string `yaml:"name"`
@@ -70,20 +70,20 @@ func readCaseName(t *testing.T, path string, i int, node *yaml.Node) string {
 	return head.Name
 }
 
-func requireWantKey(t *testing.T, path, name string, node *yaml.Node) {
+func requireAssertionKey(t *testing.T, path, name string, node *yaml.Node) {
 	t.Helper()
-	for k := range yamlcfg.MapPairs(node) {
-		switch k.Value {
+	for key := range yamlcfg.MapPairs(node) {
+		switch key.Value {
 		case "expected", "notExpected", "contains":
 			return
 		}
 	}
-	t.Fatalf("%s: case %q: missing expected/notExpected", path, name)
+	t.Fatalf("%s: case %q: missing expected/notExpected/contains", path, name)
 }
 
 func mergeCaseContext(t *testing.T, path, name string, fileCtx, node *yaml.Node) {
 	t.Helper()
-	merged := yamlcfg.MergeNodes(cloneNode(t, fileCtx), getMapValue(node, "context"))
+	merged := yamlcfg.MergeNodes(cloneNode(t, fileCtx), mapValue(node, "context"))
 	var ctx Context
 	if merged != nil {
 		require.NoErrorf(t, StrictDecodeNode(merged, &ctx), "%s: case %q: context", path, name)
@@ -97,41 +97,41 @@ func mergeCaseContext(t *testing.T, path, name string, fileCtx, node *yaml.Node)
 	setMapValue(node, "context", merged)
 }
 
-func cloneNode(t *testing.T, n *yaml.Node) *yaml.Node {
+func cloneNode(t *testing.T, node *yaml.Node) *yaml.Node {
 	t.Helper()
-	if n == nil || n.Kind == 0 {
+	if node == nil || node.Kind == 0 {
 		return nil
 	}
-	enc, err := yaml.Marshal(n)
+	encoded, err := yaml.Marshal(node)
 	require.NoError(t, err)
 	var doc yaml.Node
-	require.NoError(t, yaml.Unmarshal(enc, &doc))
+	require.NoError(t, yaml.Unmarshal(encoded, &doc))
 	if len(doc.Content) == 0 {
 		return nil
 	}
 	return doc.Content[0]
 }
 
-func getMapValue(m *yaml.Node, key string) *yaml.Node {
-	for k, v := range yamlcfg.MapPairs(m) {
+func mapValue(mapping *yaml.Node, key string) *yaml.Node {
+	for k, val := range yamlcfg.MapPairs(mapping) {
 		if k.Value == key {
-			return v
+			return val
 		}
 	}
 	return nil
 }
 
-func setMapValue(m *yaml.Node, key string, val *yaml.Node) {
+func setMapValue(mapping *yaml.Node, key string, val *yaml.Node) {
 	if val == nil {
 		return
 	}
-	for i := 0; i+1 < len(m.Content); i += 2 {
-		if m.Content[i].Value == key {
-			m.Content[i+1] = val
+	for i := 0; i+1 < len(mapping.Content); i += 2 {
+		if mapping.Content[i].Value == key {
+			mapping.Content[i+1] = val
 			return
 		}
 	}
-	m.Content = append(m.Content,
+	mapping.Content = append(mapping.Content,
 		&yaml.Node{Kind: yaml.ScalarNode, Value: key}, val)
 }
 
@@ -150,11 +150,11 @@ func StrictDecodeNode(node *yaml.Node, out any) error {
 }
 
 func (c Context) CommandArgs() []string {
-	f := strings.Fields(c.Command)
-	if len(f) <= 1 {
+	fields := strings.Fields(c.Command)
+	if len(fields) <= 1 {
 		return nil
 	}
-	return f[1:]
+	return fields[1:]
 }
 
 func (c Context) CommandArgsExpanded(vars map[string]string) []string {
@@ -170,15 +170,15 @@ func (a *Args) UnmarshalYAML(node *yaml.Node) error {
 	if err := node.Decode(&items); err != nil {
 		return err
 	}
-	out := make(Args, 0, len(items))
+	args := make(Args, 0, len(items))
 	for i := range items {
 		if items[i].Kind == yaml.MappingNode && len(items[i].Content) == 2 {
-			out = append(out, arg{name: items[i].Content[0].Value, node: *items[i].Content[1]})
+			args = append(args, arg{name: items[i].Content[0].Value, node: *items[i].Content[1]})
 			continue
 		}
-		out = append(out, arg{node: items[i]})
+		args = append(args, arg{node: items[i]})
 	}
-	*a = out
+	*a = args
 	return nil
 }
 
@@ -236,9 +236,9 @@ func (e Expected[W]) Check(t *testing.T, err error) bool {
 		return false
 	}
 	require.Error(t, err)
-	for _, m := range append(append(Matchers{}, e.ErrorOutput...), e.StdErr...) {
-		if !IsMatch(err.Error(), m) {
-			t.Errorf("error %q missing %q", err.Error(), m)
+	for _, matcher := range append(append(Matchers{}, e.ErrorOutput...), e.StdErr...) {
+		if !IsMatch(err.Error(), matcher) {
+			t.Errorf("error %q missing %q", err.Error(), matcher)
 		}
 	}
 	if e.ExitCode != 0 {
@@ -249,11 +249,11 @@ func (e Expected[W]) Check(t *testing.T, err error) bool {
 
 func (m *Matchers) UnmarshalYAML(node *yaml.Node) error {
 	if node.Kind == yaml.ScalarNode {
-		var s string
-		if err := node.Decode(&s); err != nil {
+		var single string
+		if err := node.Decode(&single); err != nil {
 			return err
 		}
-		*m = Matchers{s}
+		*m = Matchers{single}
 		return nil
 	}
 	var list []string
@@ -264,30 +264,26 @@ func (m *Matchers) UnmarshalYAML(node *yaml.Node) error {
 	return nil
 }
 
-var matcherHoleRe = regexp.MustCompile(`\{\{/(.*?)/\}\}`)
+var matcherRegexpEscape = regexp.MustCompile(`\{\{/(.*?)/\}\}`)
 
-func buildMatcherPattern(matcher string) string {
-	var b strings.Builder
-	last := 0
-	for _, loc := range matcherHoleRe.FindAllStringSubmatchIndex(matcher, -1) {
-		b.WriteString(regexp.QuoteMeta(matcher[last:loc[0]]))
-		b.WriteString(matcher[loc[2]:loc[3]])
-		last = loc[1]
+func matcherPattern(matcher string) string {
+	var pattern strings.Builder
+	literalStart := 0
+	for _, loc := range matcherRegexpEscape.FindAllStringSubmatchIndex(matcher, -1) {
+		pattern.WriteString(regexp.QuoteMeta(matcher[literalStart:loc[0]]))
+		pattern.WriteString(matcher[loc[2]:loc[3]])
+		literalStart = loc[1]
 	}
-	b.WriteString(regexp.QuoteMeta(matcher[last:]))
-	return b.String()
-}
-
-func compileMatcher(matcher string) *regexp.Regexp {
-	return regexp.MustCompile(buildMatcherPattern(matcher))
+	pattern.WriteString(regexp.QuoteMeta(matcher[literalStart:]))
+	return pattern.String()
 }
 
 func IsMatch(s, matcher string) bool {
-	return compileMatcher(matcher).MatchString(s)
+	return regexp.MustCompile(matcherPattern(matcher)).MatchString(s)
 }
 
 func IsMatchFull(s, matcher string) bool {
-	return regexp.MustCompile(`\A` + buildMatcherPattern(matcher) + `\z`).MatchString(s)
+	return regexp.MustCompile(`\A` + matcherPattern(matcher) + `\z`).MatchString(s)
 }
 
 func MustMatch(t *testing.T, s, matcher string) {
@@ -304,16 +300,16 @@ func MustNotMatch(t *testing.T, s, matcher string) {
 	}
 }
 
-func MustCount(t *testing.T, s, substr string, n int) {
+func MustCount(t *testing.T, s, substr string, want int) {
 	t.Helper()
-	if got := strings.Count(s, substr); got != n {
-		t.Errorf("output contains %q %d times, want %d:\n--- got ---\n%s", substr, got, n, s)
+	if got := strings.Count(s, substr); got != want {
+		t.Errorf("output contains %q %d times, want %d:\n--- got ---\n%s", substr, got, want, s)
 	}
 }
 
 func Expand(s string, vars map[string]string) string {
-	for k, v := range vars {
-		s = strings.ReplaceAll(s, "${"+k+"}", v)
+	for name, val := range vars {
+		s = strings.ReplaceAll(s, "${"+name+"}", val)
 	}
 	return s
 }
@@ -327,9 +323,9 @@ func Swap[T any](t testing.TB, ptr *T, v T) {
 
 func ReadFile(t *testing.T, fsys fs.FS, path string) string {
 	t.Helper()
-	b, err := fs.ReadFile(fsys, path)
+	data, err := fs.ReadFile(fsys, path)
 	require.NoErrorf(t, err, "read fixture %s", path)
-	return string(b)
+	return string(data)
 }
 
 func EqualExpected(t *testing.T, fsys fs.FS, path, got string) {
@@ -339,27 +335,27 @@ func EqualExpected(t *testing.T, fsys fs.FS, path, got string) {
 
 func CopyDir(t *testing.T, fsys fs.FS, src, dest string) {
 	t.Helper()
-	err := fs.WalkDir(fsys, src, func(p string, d fs.DirEntry, err error) error {
+	err := fs.WalkDir(fsys, src, func(path string, entry fs.DirEntry, err error) error {
 		if err != nil {
 			return err
 		}
-		rel := strings.TrimPrefix(strings.TrimPrefix(p, src), "/")
+		rel := strings.TrimPrefix(strings.TrimPrefix(path, src), "/")
 		target := filepath.Join(dest, filepath.FromSlash(rel))
-		if d.IsDir() {
+		if entry.IsDir() {
 			return os.MkdirAll(target, 0o755)
 		}
-		b, err := fs.ReadFile(fsys, p)
+		data, err := fs.ReadFile(fsys, path)
 		if err != nil {
 			return err
 		}
-		return os.WriteFile(target, b, 0o644)
+		return os.WriteFile(target, data, 0o644)
 	})
 	require.NoErrorf(t, err, "copy fixture dir %s -> %s", src, dest)
 }
 
 func ConfigDir(t *testing.T, configName, raw string) string {
 	t.Helper()
-	Swap(t, &yamlcfg.SystemDir, filepath.Join(t.TempDir(), "no-system"))
+	Swap(t, &yamlcfg.SystemConfigDir, filepath.Join(t.TempDir(), "no-system"))
 	dir := t.TempDir()
 	if raw != "" {
 		require.NoError(t, os.WriteFile(filepath.Join(dir, configName), []byte(raw), 0o644))

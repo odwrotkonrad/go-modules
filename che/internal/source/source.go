@@ -18,14 +18,14 @@ func ResolveDir(home, url string) string {
 }
 
 func slug(url string) string {
-	s := url
-	for _, p := range []string{"ssh://", "https://", "http://", "git://", "file://"} {
-		s = strings.TrimPrefix(s, p)
+	slug := url
+	for _, scheme := range []string{"ssh://", "https://", "http://", "git://", "file://"} {
+		slug = strings.TrimPrefix(slug, scheme)
 	}
-	s = strings.TrimPrefix(s, "git@")
-	s = strings.TrimSuffix(s, ".git")
-	s = strings.NewReplacer("/", "-", ":", "-").Replace(s)
-	return strings.Trim(s, "-")
+	slug = strings.TrimPrefix(slug, "git@")
+	slug = strings.TrimSuffix(slug, ".git")
+	slug = strings.NewReplacer("/", "-", ":", "-").Replace(slug)
+	return strings.Trim(slug, "-")
 }
 
 var checkouts = map[string]string{}
@@ -45,21 +45,21 @@ func EnsureCheckout(home, url string) (string, error) {
 
 func cloneOrUpdate(home, url string) (string, error) {
 	dir := ResolveDir(home, url)
-	line := "remote " + url + " into " + fsutil.AbbreviateHome(dir, home)
-	emit := func(action string) {
+	msg := "remote " + url + " into " + fsutil.AbbreviateHome(dir, home)
+	emitAction := func(action string) {
 		log.Emit(log.Event{
 			Level: log.Levels.Info, Scope: "init-remote-sources", Action: action,
-			Msg: line, Attrs: map[string]string{"url": url, "checkout": dir},
+			Msg: msg, Attrs: map[string]string{"url": url, "checkout": dir},
 		})
 	}
 	if _, err := os.Stat(filepath.Join(dir, ".git")); err != nil {
 		if err := git("clone", "--quiet", "--depth", "1", "--single-branch", url, dir); err != nil {
 			return "", fmt.Errorf("source clone %s: %w", url, err)
 		}
-		emit("cloned")
+		emitAction("cloned")
 		return dir, nil
 	}
-	before, _ := gitOut("-C", dir, "rev-parse", "HEAD")
+	headBefore, _ := gitOutput("-C", dir, "rev-parse", "HEAD")
 	// [why] a shallow --ff-only pull fails once the fetched history is truncated
 	if err := git("-C", dir, "fetch", "--quiet", "--depth", "1"); err != nil {
 		log.EmitWarn("init-remote-sources", "warning", fmt.Sprintf("fetch failed, using cached checkout %s: %v", dir, err))
@@ -69,10 +69,10 @@ func cloneOrUpdate(home, url string) (string, error) {
 		log.EmitWarn("init-remote-sources", "warning", fmt.Sprintf("update failed, using cached checkout %s: %v", dir, err))
 		return dir, nil
 	}
-	if after, _ := gitOut("-C", dir, "rev-parse", "HEAD"); after != before {
-		emit("updated")
+	if headAfter, _ := gitOutput("-C", dir, "rev-parse", "HEAD"); headAfter != headBefore {
+		emitAction("updated")
 	} else {
-		emit("up-to-date")
+		emitAction("up-to-date")
 	}
 	return dir, nil
 }
@@ -81,7 +81,7 @@ func git(args ...string) error {
 	return execx.Default.Exec(execx.Cmd{Argv: append([]string{"git"}, args...), Stderr: os.Stderr})
 }
 
-func gitOut(args ...string) (string, error) {
+func gitOutput(args ...string) (string, error) {
 	out, err := execx.Default.Output(execx.Cmd{Argv: append([]string{"git"}, args...), Stderr: os.Stderr})
 	return strings.TrimSpace(string(out)), err
 }

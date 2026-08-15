@@ -28,7 +28,7 @@ func configDirs(t *testing.T, user, system string) string {
 	} else {
 		writeCfg(t, sysDir, system)
 	}
-	testyml.Swap(t, &yamlcfg.SystemDir, sysDir)
+	testyml.Swap(t, &yamlcfg.SystemConfigDir, sysDir)
 	userDir := t.TempDir()
 	if user != "" {
 		writeCfg(t, userDir, user)
@@ -61,7 +61,7 @@ func TestLoadConfig(t *testing.T) {
 			if os.Geteuid() == 0 {
 				t.Skip("root reads 0o000 files")
 			}
-			testyml.Swap(t, &yamlcfg.SystemDir, filepath.Join(t.TempDir(), "no-system"))
+			testyml.Swap(t, &yamlcfg.SystemConfigDir, filepath.Join(t.TempDir(), "no-system"))
 			userDir := t.TempDir()
 			require.NoError(t, os.WriteFile(filepath.Join(userDir, "cfg.yml"), []byte("a: 1"), 0o000))
 			_, err := yamlcfg.LoadConfigNode("cfg.yml", userDir)
@@ -102,19 +102,19 @@ func TestLoadConfigDecode(t *testing.T) {
 	})
 }
 
-func TestUnwrap(t *testing.T) {
-	testyml.Eq(t, td, "testdata/spec/funcs/unwrap.test.spec.yml", func(t *testing.T, c testyml.Case[bool]) (bool, error) {
+func TestDocumentRoot(t *testing.T) {
+	testyml.Eq(t, td, "testdata/spec/funcs/document_root.test.spec.yml", func(t *testing.T, c testyml.Case[bool]) (bool, error) {
 		if c.Input.Args.Bool(t, 0) {
-			return yamlcfg.Unwrap(nil) == nil, nil
+			return yamlcfg.DocumentRoot(nil) == nil, nil
 		}
-		n := &yaml.Node{Kind: yaml.ScalarNode}
-		return yamlcfg.Unwrap(n) == n, nil
+		scalar := &yaml.Node{Kind: yaml.ScalarNode}
+		return yamlcfg.DocumentRoot(scalar) == scalar, nil
 	})
 }
 
-func TestResolveCustomPaths(t *testing.T) {
-	testyml.Eq(t, td, "testdata/spec/funcs/resolve_custom_paths.test.spec.yml", func(t *testing.T, c testyml.Case[string]) (string, error) {
-		paths := yamlcfg.ResolveCustomPaths(c.Input.Args.String(t, 0), c.Input.Args.String(t, 1))
+func TestResolveConfigPaths(t *testing.T) {
+	testyml.Eq(t, td, "testdata/spec/funcs/resolve_config_paths.test.spec.yml", func(t *testing.T, c testyml.Case[string]) (string, error) {
+		paths := yamlcfg.ResolveConfigPaths(c.Input.Args.String(t, 0), c.Input.Args.String(t, 1))
 		return paths[c.Input.Args.Int(t, 2)], nil
 	})
 }

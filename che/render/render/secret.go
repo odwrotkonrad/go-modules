@@ -120,15 +120,15 @@ func parseGCPRef(ref string) (project, secret, version string, err error) {
 }
 
 func retry[T any](delays []time.Duration, sleep func(time.Duration), shouldRetry func(error) bool, op func() (T, error)) (T, error) {
-	v, err := op()
-	for _, d := range delays {
+	out, err := op()
+	for _, delay := range delays {
 		if !shouldRetry(err) {
 			break
 		}
-		sleep(d)
-		v, err = op()
+		sleep(delay)
+		out, err = op()
 	}
-	return v, err
+	return out, err
 }
 
 func isRateLimitErr(err error) bool {
@@ -136,8 +136,8 @@ func isRateLimitErr(err error) bool {
 }
 
 func IsSecretRefPresent(body []byte) bool {
-	for _, s := range secretSchemes {
-		if bytes.Contains(body, []byte(s)) {
+	for _, scheme := range secretSchemes {
+		if bytes.Contains(body, []byte(scheme)) {
 			return true
 		}
 	}

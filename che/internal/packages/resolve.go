@@ -117,6 +117,19 @@ func (h Host) nvmDir() string {
 	return filepath.Join(h.Getenv("HOME"), ".nvm")
 }
 
+// [why] pyenv installs into $PYENV_ROOT/bin, which the che process env never picks up: resolve the binary by absolute path, falling back to bare "pyenv" when the root has no binary (PATH-installed pyenv still works)
+func (h Host) pyenvBin() string {
+	root := h.Getenv("PYENV_ROOT")
+	if root == "" {
+		root = filepath.Join(h.Getenv("HOME"), ".pyenv")
+	}
+	bin := filepath.Join(root, "bin", "pyenv")
+	if fileExists(bin) {
+		return bin
+	}
+	return "pyenv"
+}
+
 func (h Host) PlatformKey() string { return h.OS + "-" + h.Arch }
 
 func (h Host) HasCmd(name string) bool {
@@ -195,7 +208,7 @@ func (h Host) applicable(pkg string, it Item, strict bool) (bool, error) {
 			return true, nil
 		}
 		if it.Mgr == "pyenv" {
-			return h.HasCmd("pyenv"), nil
+			return h.pyenvBin() != "pyenv" || h.HasCmd("pyenv"), nil
 		}
 		_, err := os.Stat(filepath.Join(h.nvmDir(), "nvm.sh"))
 		return err == nil, nil

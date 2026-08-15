@@ -25,20 +25,20 @@ import (
 	"gitlab.com/konradodwrot/go-modules/che/render/render"
 )
 
-type Seams struct {
+type Deps struct {
 	FS      fsutil.FileSystemWriter
 	Reader  fsutil.FileSystemReader
 	Fetcher RemoteFetcher
 	Ledger  *database.DB
 }
 
-var NewSeams = func(home string) Seams {
+var NewDeps = func(home string) Deps {
 	db, err := database.Open(filepath.Join(fsutil.ResolveStateHome(home), "ops.db"))
 	if err != nil {
 		log.EmitTrace("ledger", "error", "open failed: "+err.Error())
 		db = nil
 	}
-	return Seams{
+	return Deps{
 		FS:      fsutil.FS{Home: home},
 		Reader:  fsutil.OSReader{},
 		Fetcher: gitFetcher{fetch: render.NewRemoteFetcher()},
@@ -154,7 +154,7 @@ func PrepareSpecs(ctx Context, opts options.Options, src spec.SpecSourceRecipe) 
 		ctx:       ctx,
 		opts:      opts,
 		home:      home,
-		gitRoot:   repoRoot,
+		repoRoot:  repoRoot,
 		tel:       ctx.Tel,
 		seenSpecs: map[string]bool{},
 		seenRefs:  map[string]bool{},
@@ -170,7 +170,7 @@ type specPreparer struct {
 	ctx       Context
 	opts      options.Options
 	home      string
-	gitRoot   string
+	repoRoot  string
 	tel       *telemetry.Telemetry
 	seenSpecs map[string]bool
 	seenRefs  map[string]bool
@@ -230,30 +230,30 @@ func findRepoRoot(ctx Context) (string, error) {
 }
 
 func findSpecRoot(dir string) (string, error) {
-	d, err := filepath.Abs(dir)
+	current, err := filepath.Abs(dir)
 	if err != nil {
 		return "", err
 	}
 	for {
-		if _, err := os.Stat(filepath.Join(d, "che.yml")); err == nil {
-			return d, nil
+		if _, err := os.Stat(filepath.Join(current, "che.yml")); err == nil {
+			return current, nil
 		}
-		parent := filepath.Dir(d)
-		if parent == d {
+		parent := filepath.Dir(current)
+		if parent == current {
 			return "", fmt.Errorf("che.yml not found walking up from %s (no git repo)", dir)
 		}
-		d = parent
+		current = parent
 	}
 }
 
 func resolveInvokingHome(ctx Context) (string, error) {
 	if ctx.Euid == 0 {
 		if name := ctx.Env["SUDO_USER"]; name != "" {
-			h, err := fsutil.ResolveUserHome(name)
+			home, err := fsutil.ResolveUserHome(name)
 			if err != nil {
 				return "", fmt.Errorf("lookup SUDO_USER %q: %w", name, err)
 			}
-			return h, nil
+			return home, nil
 		}
 	}
 	home := ctx.Env["HOME"]
@@ -334,42 +334,42 @@ func resolveWorkingDir(env map[string]string, anchor, directory string) (string,
 }
 
 func (r *SpecRecipe) validateSchema(cli options.ValidateSpecMode) error {
-	b, err := os.ReadFile(r.sourceReady.DefinitionURI)
+	data, err := os.ReadFile(r.sourceReady.DefinitionURI)
 	if err != nil {
 		return fmt.Errorf("spec not found: %s", r.sourceReady.DefinitionURI)
 	}
-	finds := spec.ValidateSchema(b)
-	if len(finds) == 0 {
+	violations := spec.ValidateSchema(data)
+	if len(violations) == 0 {
 		return nil
 	}
 	// [why] flag/env wins over this spec's own options.validateSpec, then warn.
-	mode := options.ValidateSpecMode(cmp.Or(string(cli), peekSpecValidateMode(b), string(options.ValidateSpec.Warn)))
+	mode := options.ValidateSpecMode(cmp.Or(string(cli), peekSpecValidateMode(data), string(options.ValidateSpec.Warn)))
 	if mode == options.ValidateSpec.Error {
-		return fmt.Errorf("schema violations in %s:\n%s", r.sourceReady.DefinitionURI, strings.Join(finds, "\n"))
+		return fmt.Errorf("schema violations in %s:\n%s", r.sourceReady.DefinitionURI, strings.Join(violations, "\n"))
 	}
-	for _, f := range finds {
-		log.EmitWarn("validate-spec", "warning", f)
+	for _, violation := range violations {
+		log.EmitWarn("validate-spec", "warning", violation)
 	}
 	return nil
 }
 
-func peekSpecValidateMode(b []byte) string {
-	return decodeYAMLQuiet[specOptionsDoc](b).Options.ValidateSpec
+func peekSpecValidateMode(data []byte) string {
+	return decodeYAMLQuiet[specOptionsDoc](data).Options.ValidateSpec
 }
 
 func (r *SpecRecipe) candidateSummary() (all, autoDiscoverable string) {
-	var profs, auto []string
+	var names, autoNames []string
 	for _, rec := range r.ProfileRecipes {
 		name := rec.Source.GetProfileName()
-		if incs := rec.IncludedProfileRefs(); len(incs) > 0 {
-			name += "[" + strings.Join(incs, ",") + "]"
+		if included := rec.IncludedProfileRefs(); len(included) > 0 {
+			name += "[" + strings.Join(included, ",") + "]"
 		}
-		profs = append(profs, name)
+		names = append(names, name)
 		if rec.Options.AutoDiscover != nil && *rec.Options.AutoDiscover {
-			auto = append(auto, rec.Source.GetProfileName())
+			autoNames = append(autoNames, rec.Source.GetProfileName())
 		}
 	}
-	return "[" + strings.Join(profs, ",") + "]", "[" + strings.Join(auto, ",") + "]"
+	return "[" + strings.Join(names, ",") + "]", "[" + strings.Join(autoNames, ",") + "]"
 }
 
 func (r *SpecRecipe) PrepareProfiles(p *specPreparer, forced *spec.ProfileSourceRecipe, root bool) (*SpecReady, error) {
@@ -410,10 +410,10 @@ func (p *specPreparer) evalWith(overlay map[string]string) func(string) (bool, e
 
 func (r *SpecRecipe) composeIncludes(p *specPreparer, ready *SpecReady) ([]spec.ProfileRecipe, error) {
 	lookup := slices.Clone(r.ProfileRecipes)
-	for _, inc := range r.Include {
-		child, err := p.prepare(inc, r.sourceReady.DirectoryPath, nil, false)
+	for _, included := range r.Include {
+		child, err := p.prepare(included, r.sourceReady.DirectoryPath, nil, false)
 		if err != nil {
-			return nil, fmt.Errorf("include.sources %q: %w", inc.URI, err)
+			return nil, fmt.Errorf("include.sources %q: %w", included.URI, err)
 		}
 		if child == nil {
 			continue
@@ -422,7 +422,7 @@ func (r *SpecRecipe) composeIncludes(p *specPreparer, ready *SpecReady) ([]spec.
 		for _, rec := range child.recipes {
 			name := rec.Source.GetProfileName()
 			if _, err := spec.FindRecipe(lookup, name); err == nil {
-				return nil, fmt.Errorf("include.sources %q: profile %q collides with an already-composed profile of the same name", inc.URI, name)
+				return nil, fmt.Errorf("include.sources %q: profile %q collides with an already-composed profile of the same name", included.URI, name)
 			}
 			lookup = append(lookup, rec)
 		}
@@ -484,14 +484,12 @@ func (r *SpecRecipe) assembleProfiles(p *specPreparer, ready *SpecReady, lookup 
 			env = fsutil.MergeMap(r.Env, forced.Env)
 			refCtx = forced.Ctx
 		}
-		pr, refs, err := r.makeProfileReady(p, rec, lookup, env)
-		if err == nil {
-			pr.refCtx = refCtx
-		}
+		profile, refs, err := r.makeProfileReady(p, rec, lookup, env)
 		if err != nil {
 			return err
 		}
-		ready.Profiles = append(ready.Profiles, pr)
+		profile.refCtx = refCtx
+		ready.Profiles = append(ready.Profiles, profile)
 		if p.opts.SkipRemoteRefs {
 			continue
 		}
@@ -512,22 +510,22 @@ func (r *SpecRecipe) makeProfileReady(p *specPreparer, rec spec.ProfileRecipe, l
 	name := rec.Source.GetProfileName()
 	effectiveEnv := overlayEnv(p.ctx.Env, env)
 	// [why] ${invokingSpecGitRoot} anchors dests at the top-level spec's checkout, letting a sourced spec render into the invoking repo
-	effectiveEnv = overlayEnv(effectiveEnv, map[string]string{"invokingSpecGitRoot": p.gitRoot})
-	wd, err := resolveWorkingDir(effectiveEnv, rec.Source.DirectoryPath, rec.Options.ProfileWorkingDirectory)
+	effectiveEnv = overlayEnv(effectiveEnv, map[string]string{"invokingSpecGitRoot": p.repoRoot})
+	workingDir, err := resolveWorkingDir(effectiveEnv, rec.Source.DirectoryPath, rec.Options.ProfileWorkingDirectory)
 	if err != nil {
 		return nil, nil, fmt.Errorf("profile %q: %w", name, err)
 	}
-	ops, sourced, err := rec.MakeProfile(lookup, wd)
+	ops, sourced, err := rec.MakeProfile(lookup, workingDir)
 	if err != nil {
 		return nil, nil, fmt.Errorf("profile %q: %w", name, err)
 	}
-	seams := NewSeams(p.home)
-	specDone := p.startSpec(seams.Ledger, r.sourceReady.DefinitionURI)
-	profileDone, err := seams.Ledger.StartProfile(specDone, rec.Source.String(), name, r.sourceReady.DefinitionURI, rec.Source.DirectoryPath)
+	deps := NewDeps(p.home)
+	specDone := p.startSpec(deps.Ledger, r.sourceReady.DefinitionURI)
+	profileDone, err := deps.Ledger.StartProfile(specDone, rec.Source.String(), name, r.sourceReady.DefinitionURI, rec.Source.DirectoryPath)
 	if err != nil {
 		log.EmitTrace("ledger", "error", "start profile: "+err.Error())
 	}
-	pr := &ProfileReady{
+	profile := &ProfileReady{
 		Source: spec.ProfileSourceReady{
 			SourceReady: spec.SourceReady{DefinitionURI: r.sourceReady.DefinitionURI, DirectoryPath: rec.Source.DirectoryPath},
 			ProfileName: name,
@@ -537,7 +535,7 @@ func (r *SpecRecipe) makeProfileReady(p *specPreparer, rec spec.ProfileRecipe, l
 		env:         effectiveEnv,
 		Profiles:    sourced,
 		ref:         rec.Source.DisplayRef(),
-		workingDir:  wd,
+		workingDir:  workingDir,
 		opts:        p.opts,
 		home:        p.home,
 		runID:       p.ctx.RunID,
@@ -546,13 +544,13 @@ func (r *SpecRecipe) makeProfileReady(p *specPreparer, rec spec.ProfileRecipe, l
 		command:     p.ctx.Command,
 		specDone:    specDone,
 		profileDone: profileDone,
-		Seams:       seams,
+		Deps:        deps,
 	}
-	pr.OperationsReady, err = pr.prepareOperations(ops)
+	profile.OperationsReady, err = profile.prepareOperations(ops)
 	if err != nil {
 		return nil, nil, fmt.Errorf("profile %q: %w", name, err)
 	}
-	return pr, sourced, nil
+	return profile, sourced, nil
 }
 
 // [<] 🤖🤖
@@ -571,11 +569,11 @@ type SpecReady struct {
 }
 
 func (s *SpecReady) LogRejected() {
-	for _, r := range s.Rejected {
+	for _, rejection := range s.Rejected {
 		log.Emit(log.Event{
 			Level: log.Levels.Debug, Scope: "discover-profiles", Action: "run",
-			Msg: "profile " + r.Ref, Reasons: []string{"runIf failed: " + r.Cond},
-			Attrs: map[string]string{"profile": r.Ref, "condition": r.Cond},
+			Msg: "profile " + rejection.Ref, Reasons: []string{"runIf failed: " + rejection.Cond},
+			Attrs: map[string]string{"profile": rejection.Ref, "condition": rejection.Cond},
 		})
 	}
 }
@@ -589,8 +587,8 @@ func (s *SpecReady) LogDiscovered() {
 
 func (s *SpecReady) AllProfiles() []*ProfileReady {
 	out := slices.Clone(s.Profiles)
-	for _, c := range s.Include {
-		out = append(out, c.AllProfiles()...)
+	for _, included := range s.Include {
+		out = append(out, included.AllProfiles()...)
 	}
 	return out
 }
@@ -599,7 +597,7 @@ func (s *SpecReady) ExecEach(ctx context.Context, opName string, fn func(context
 	ctx, span := s.tel.Span(ctx, opName, attribute.String("op", opName))
 	defer span.End()
 	s.LogDiscovered()
-	var fails []error
+	var errs []error
 	for _, p := range s.AllProfiles() {
 		// [why] a profile whose command ops carry no delta at all is skipped
 		if ops := p.commandOps(opName); len(ops) == 0 {
@@ -607,8 +605,8 @@ func (s *SpecReady) ExecEach(ctx context.Context, opName string, fn func(context
 			if scoped := p.commandScopedOps(opName); len(scoped) > 0 {
 				reasons = nil
 				for _, op := range scoped {
-					if r := p.skipOpsReason(op.Name()); !slices.Contains(reasons, r) {
-						reasons = append(reasons, r)
+					if reason := p.skipOpsReason(op.Name()); !slices.Contains(reasons, reason) {
+						reasons = append(reasons, reason)
 					}
 				}
 			}
@@ -627,17 +625,17 @@ func (s *SpecReady) ExecEach(ctx context.Context, opName string, fn func(context
 		err := fn(pctx, p)
 		if err != nil {
 			pspan.RecordError(err)
-			fails = append(fails, fmt.Errorf("%s: %w", p.Ref(), err))
+			errs = append(errs, fmt.Errorf("%s: %w", p.Ref(), err))
 		}
 		pspan.End()
 		if errors.Is(err, ErrErrexit) {
 			break
 		}
 	}
-	for _, err := range fails {
+	for _, err := range errs {
 		log.EmitError(opName, "fail", err.Error())
 	}
-	return errors.Join(fails...)
+	return errors.Join(errs...)
 }
 
 // [<] 🤖🤖
@@ -668,7 +666,7 @@ type ProfileReady struct {
 	backupArchive   string
 	currentArchive  string
 	currentSub      string
-	Seams
+	Deps
 }
 
 type opInfo struct {
@@ -745,16 +743,16 @@ func (p *ProfileReady) classifyDest(dest string) database.Object {
 	if dest == "" {
 		return database.Object{Kind: "absent"}
 	}
-	fi, err := p.Reader.LstatPath(dest)
+	info, err := p.Reader.LstatPath(dest)
 	if err != nil {
 		return database.Object{Kind: "absent"}
 	}
-	obj := database.Object{Present: true, Mode: fsutil.FormatModeArg(fi.Mode().Perm())}
+	obj := database.Object{Present: true, Mode: fsutil.FormatModeArg(info.Mode().Perm())}
 	switch {
-	case fi.Mode()&os.ModeSymlink != 0:
+	case info.Mode()&os.ModeSymlink != 0:
 		obj.Kind = "link"
 		obj.Target, _ = p.Reader.ReadLink(dest)
-	case fi.IsDir():
+	case info.IsDir():
 		obj.Kind = "dir"
 	default:
 		obj.Kind = "file"
@@ -810,8 +808,8 @@ func (p *ProfileReady) LogDiscovered() {
 	heading := fmt.Sprintf("Profile %s  (profile workdir: %s)",
 		p.Ref(), fsutil.AbbreviateHome(p.workingDir, p.home))
 	log.Emit(log.Event{Level: log.Levels.Info, Scope: "discover-profiles", Action: "discovered", Msg: heading, Attrs: attrs, Heading: 2})
-	for _, l := range lines {
-		log.Emit(log.Event{Level: log.Levels.Info, Scope: "discover-profiles", Msg: l, Depth: 1})
+	for _, line := range lines {
+		log.Emit(log.Event{Level: log.Levels.Info, Scope: "discover-profiles", Msg: line, Depth: 1})
 	}
 }
 
@@ -1077,9 +1075,9 @@ func filterScriptsByName(scripts, names []string) []string {
 		return scripts
 	}
 	var out []string
-	for _, s := range scripts {
-		if slices.ContainsFunc(names, func(n string) bool { return strings.Contains(s, n) }) {
-			out = append(out, s)
+	for _, script := range scripts {
+		if slices.ContainsFunc(names, func(name string) bool { return strings.Contains(script, name) }) {
+			out = append(out, script)
 		}
 	}
 	return out

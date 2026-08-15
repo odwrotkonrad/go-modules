@@ -24,11 +24,11 @@ func openRepo(dir string) (*git.Repository, string, error) {
 	if err != nil {
 		return nil, "", fmt.Errorf("open git repo from %s: %w", dir, err)
 	}
-	wt, err := repo.Worktree()
+	worktree, err := repo.Worktree()
 	if err != nil {
 		return nil, "", fmt.Errorf("worktree from %s: %w", dir, err)
 	}
-	root, err := filepath.EvalSymlinks(wt.Filesystem.Root())
+	root, err := filepath.EvalSymlinks(worktree.Filesystem.Root())
 	if err != nil {
 		return nil, "", err
 	}
@@ -43,20 +43,21 @@ func ListTrackedFiles(root string) ([]string, error) {
 		}
 		return nil, err
 	}
-	idx, err := repo.Storer.Index()
+	index, err := repo.Storer.Index()
 	if err != nil {
 		return nil, fmt.Errorf("read git index under %s: %w", root, err)
 	}
-	if root, err = filepath.Abs(root); err != nil {
+	base, err := filepath.Abs(root)
+	if err != nil {
 		return nil, err
 	}
-	if root, err = filepath.EvalSymlinks(root); err != nil {
+	if base, err = filepath.EvalSymlinks(base); err != nil {
 		return nil, err
 	}
 	var files []string
-	for _, e := range idx.Entries {
-		abs := filepath.Join(repoRoot, e.Name)
-		rel, err := filepath.Rel(root, abs)
+	for _, entry := range index.Entries {
+		abs := filepath.Join(repoRoot, entry.Name)
+		rel, err := filepath.Rel(base, abs)
 		if err != nil || rel == ".." || strings.HasPrefix(rel, "../") {
 			continue
 		}
@@ -74,20 +75,20 @@ func walkFiles(root string) ([]string, error) {
 		return nil, err
 	}
 	var files []string
-	err = filepath.WalkDir(abs, func(p string, d fs.DirEntry, walkErr error) error {
+	err = filepath.WalkDir(abs, func(path string, entry fs.DirEntry, walkErr error) error {
 		if walkErr != nil {
 			return walkErr
 		}
-		if d.IsDir() {
-			if d.Name() == git.GitDirName {
+		if entry.IsDir() {
+			if entry.Name() == git.GitDirName {
 				return filepath.SkipDir
 			}
 			return nil
 		}
-		if !d.Type().IsRegular() && d.Type()&fs.ModeSymlink == 0 {
+		if !entry.Type().IsRegular() && entry.Type()&fs.ModeSymlink == 0 {
 			return nil
 		}
-		rel, err := filepath.Rel(abs, p)
+		rel, err := filepath.Rel(abs, path)
 		if err != nil {
 			return err
 		}

@@ -12,15 +12,15 @@ func ruleFromDest(source, dest string) (*destRule, error) {
 	if len(dest) >= 2 && dest[0] == 's' && dest[1] != '\\' && !isWord(dest[1]) {
 		return parseDestRule(dest)
 	}
-	const sfx = "/**"
-	if strings.HasSuffix(source, sfx) && strings.HasSuffix(dest, sfx) {
-		srcPrefix := strings.TrimSuffix(source, sfx)
-		dstPrefix := strings.TrimSuffix(dest, sfx)
+	const recursiveSuffix = "/**"
+	if strings.HasSuffix(source, recursiveSuffix) && strings.HasSuffix(dest, recursiveSuffix) {
+		srcPrefix := strings.TrimSuffix(source, recursiveSuffix)
+		destPrefix := strings.TrimSuffix(dest, recursiveSuffix)
 		re, err := regexp.Compile("^" + regexp.QuoteMeta(srcPrefix))
 		if err != nil {
 			return nil, fmt.Errorf("dest sugar %q: %w", dest, err)
 		}
-		return &destRule{re: re, repl: dstPrefix, global: false}, nil
+		return &destRule{re: re, repl: destPrefix, global: false}, nil
 	}
 	return nil, fmt.Errorf("dest %q: want s<delim><pattern><delim><replacement><delim>[g] or <prefix>/** with source <prefix>/**", dest)
 }
@@ -51,20 +51,20 @@ func parseDestRule(s string) (*destRule, error) {
 
 func splitRule(s string, delim byte) []string {
 	var parts []string
-	var b strings.Builder
+	var part strings.Builder
 	for i := 0; i < len(s); i++ {
 		switch {
 		case s[i] == '\\' && i+1 < len(s) && s[i+1] == delim:
-			b.WriteByte(delim)
+			part.WriteByte(delim)
 			i++
 		case s[i] == delim:
-			parts = append(parts, b.String())
-			b.Reset()
+			parts = append(parts, part.String())
+			part.Reset()
 		default:
-			b.WriteByte(s[i])
+			part.WriteByte(s[i])
 		}
 	}
-	return append(parts, b.String())
+	return append(parts, part.String())
 }
 
 func (r *destRule) apply(rel string) string {

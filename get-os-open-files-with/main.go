@@ -23,11 +23,11 @@ const configName = "os-open-files-with.yml"
 
 var version = "dev"
 
-func run(args []string, customDir string) (string, error) {
+func run(args []string, userDir string) (string, error) {
 	if len(args) != 0 {
 		return "", yamlcfg.ArgsError(args)
 	}
-	node, err := yamlcfg.LoadConfigNode(configName, customDir)
+	node, err := yamlcfg.LoadConfigNode(configName, userDir)
 	if err != nil {
 		return "", err
 	}
@@ -35,7 +35,7 @@ func run(args []string, customDir string) (string, error) {
 }
 
 func main() {
-	climain.Run("get-os-open-files-with", version, usage, func(args []string) (string, error) {
+	climain.RunLine("get-os-open-files-with", version, usage, func(args []string) (string, error) {
 		return run(args, "")
 	})
 }

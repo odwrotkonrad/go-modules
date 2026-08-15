@@ -38,9 +38,9 @@ func ListBackups(ctx Context) error {
 	if err != nil {
 		return err
 	}
-	seams := NewSeams(home)
-	defer func() { _ = seams.Ledger.Close() }()
-	backups, err := seams.Ledger.Backups()
+	deps := NewDeps(home)
+	defer func() { _ = deps.Ledger.Close() }()
+	backups, err := deps.Ledger.Backups()
 	if err != nil {
 		return err
 	}
@@ -48,13 +48,13 @@ func ListBackups(ctx Context) error {
 		return nil
 	}
 	log.EmitHeading(log.Levels.Info, 1, "backup-ls", "listing", "backups")
-	for _, b := range backups {
-		ts, backupID := fsutil.ParseBackupArchiveName(b.Path)
+	for _, backup := range backups {
+		ts, backupID := fsutil.ParseBackupArchiveName(backup.Path)
 		line := fmt.Sprintf("run %s, backup %s, %s, %s, %s",
-			b.RunID, backupID, ts, humanSize(archiveSize(b.Path)), fsutil.AbbreviateHome(b.Path, home))
+			backup.RunID, backupID, ts, humanSize(archiveSize(backup.Path)), fsutil.AbbreviateHome(backup.Path, home))
 		log.Emit(log.Event{
 			Level: log.Levels.Info, Scope: "backup-ls", Msg: line, Depth: 1,
-			Attrs: map[string]string{"runId": b.RunID, "backupId": backupID, "path": b.Path},
+			Attrs: map[string]string{"runId": backup.RunID, "backupId": backupID, "path": backup.Path},
 		})
 	}
 	return nil
@@ -84,12 +84,12 @@ func newLedgerProfile(ctx Context, opts options.Options, specLabel, ref string) 
 	if err != nil {
 		return nil, err
 	}
-	seams := NewSeams(home)
-	spec, err := seams.Ledger.StartSpec(ctx.RunID, "", specLabel)
+	deps := NewDeps(home)
+	spec, err := deps.Ledger.StartSpec(ctx.RunID, "", specLabel)
 	if err != nil {
 		log.EmitTrace("ledger", "error", ref+" start spec: "+err.Error())
 	}
-	prof, err := seams.Ledger.StartProfile(spec, ref, ref, "", home)
+	prof, err := deps.Ledger.StartProfile(spec, ref, ref, "", home)
 	if err != nil {
 		log.EmitTrace("ledger", "error", ref+" start profile: "+err.Error())
 	}
@@ -102,7 +102,7 @@ func newLedgerProfile(ctx Context, opts options.Options, specLabel, ref string) 
 		specDone:    spec,
 		profileDone: prof,
 		logDepth:    1, // [why] restores/removals nest under their per-profile `## profile` heading
-		Seams:       seams,
+		Deps:        deps,
 	}, nil
 }
 

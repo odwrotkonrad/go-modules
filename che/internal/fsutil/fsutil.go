@@ -111,8 +111,8 @@ func (f FS) InstallFile(dest string, body []byte, mode os.FileMode, owner string
 func buildInstallArgv(mode os.FileMode, owner, src, dest string) []string {
 	argv := append([]string{"install"}, buildModeFlag(mode)...)
 	if owner != "" {
-		o, g, _ := strings.Cut(owner, ":")
-		argv = append(argv, "-o", o, "-g", g)
+		user, group, _ := strings.Cut(owner, ":")
+		argv = append(argv, "-o", user, "-g", group)
 	}
 	return append(argv, src, dest)
 }
@@ -125,18 +125,18 @@ func run(argv []string) error {
 	return execx.Default.Exec(execx.Cmd{Argv: argv, Stdout: os.Stdout, Stderr: os.Stderr})
 }
 
-func FormatModeArg(m os.FileMode) string { return fmt.Sprintf("%04o", m) }
+func FormatModeArg(mode os.FileMode) string { return fmt.Sprintf("%04o", mode) }
 
-func buildModeFlag(m os.FileMode) []string {
-	if m == 0 {
+func buildModeFlag(mode os.FileMode) []string {
+	if mode == 0 {
 		return nil
 	}
-	return []string{"-m", FormatModeArg(m)}
+	return []string{"-m", FormatModeArg(mode)}
 }
 
-func IsDir(p string) bool {
-	fi, err := os.Stat(p)
-	return err == nil && fi.IsDir()
+func IsDir(path string) bool {
+	info, err := os.Stat(path)
+	return err == nil && info.IsDir()
 }
 
 func MergeMap[K comparable, V any](base, overlay map[K]V) map[K]V {

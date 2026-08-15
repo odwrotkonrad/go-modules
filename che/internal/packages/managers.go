@@ -329,17 +329,17 @@ func (in *Installer) plan(reqs []Request) ([]string, error) {
 		out = append(out, name)
 		return nil
 	}
-	for _, r := range reqs {
-		if len(r.Versions) > 0 {
-			in.requested[r.Name] = r
+	for _, req := range reqs {
+		if len(req.Versions) > 0 {
+			in.requested[req.Name] = req
 		}
-		if err := walk(r.Name, nil); err != nil {
+		if err := walk(req.Name, nil); err != nil {
 			return nil, err
 		}
 	}
 	if !in.baseInstalling {
-		for _, r := range reqs {
-			delete(in.requiredBy, r.Name)
+		for _, req := range reqs {
+			delete(in.requiredBy, req.Name)
 		}
 	}
 	return out, nil
