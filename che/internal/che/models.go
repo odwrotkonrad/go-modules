@@ -1109,7 +1109,7 @@ func (p *ProfileReady) prepareOperations(ops spec.OperationRecipes) ([]operation
 		&MakeLinksOperationReady{Links: ops.MakeLinks.Links, Dirs: ops.MakeLinks.Dirs},
 		&MakeCopiesOperationReady{Copies: ops.MakeCopies.Copies, Dirs: ops.MakeCopies.Dirs},
 		&RenderTemplatesOperationReady{Templates: ops.RenderTemplates.Templates, SkipSecrets: p.opts.RenderSkipSecrets},
-		&InstallPackagesOperationReady{Packages: ops.InstallPackages.Packages},
+		&InstallPackagesOperationReady{Packages: ops.InstallPackages.Packages, ToolPackages: ops.InstallPackages.ToolPackages},
 		&RunScriptsOperationReady{Scripts: scripts},
 	}, nil
 }
@@ -1272,17 +1272,35 @@ func (o *RenderTemplatesOperationReady) unsettledDests(p *ProfileReady) (int, in
 
 type InstallPackagesOperationReady struct {
 	OperationReady
-	Packages []spec.PackageRef
+	Packages     []spec.PackageRef
+	ToolPackages map[string][]spec.ToolPackageRef
 }
 
-func (o *InstallPackagesOperationReady) Name() string   { return "install-packages" }
-func (o *InstallPackagesOperationReady) Selected() bool { return len(o.Packages) > 0 }
+func (o *InstallPackagesOperationReady) Name() string { return "install-packages" }
+func (o *InstallPackagesOperationReady) Selected() bool {
+	return len(o.Packages)+o.toolPackageCount() > 0
+}
+
+func (o *InstallPackagesOperationReady) toolPackageCount() int {
+	n := 0
+	for _, refs := range o.ToolPackages {
+		n += len(refs)
+	}
+	return n
+}
+
 func (o *InstallPackagesOperationReady) execOperation(p *ProfileReady) error {
-	return p.installPackages(o.Packages)
+	if len(o.Packages) > 0 {
+		if err := p.installPackages(o.Packages); err != nil {
+			return err
+		}
+	}
+	return p.installToolPackages(o.ToolPackages)
 }
 
 func (o *InstallPackagesOperationReady) counts(_ *ProfileReady) (int, int) {
-	return len(o.Packages), len(o.Packages)
+	n := len(o.Packages) + o.toolPackageCount()
+	return n, n
 }
 
 type RunScriptsOperationReady struct {

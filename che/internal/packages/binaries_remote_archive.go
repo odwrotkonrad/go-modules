@@ -253,6 +253,11 @@ func extractTar(asset, dest string) error {
 			if err != nil {
 				return err
 			}
+			if !hdr.ModTime.IsZero() {
+				if err := os.Chtimes(target, hdr.ModTime, hdr.ModTime); err != nil {
+					return err
+				}
+			}
 		case tar.TypeSymlink:
 			if err := os.MkdirAll(filepath.Dir(target), 0o755); err != nil {
 				return err

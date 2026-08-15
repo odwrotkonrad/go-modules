@@ -118,6 +118,22 @@ cases:
         - only: [cask]
     expected:
       output: {picked: false}
+  - name: ShouldPickGemWhenApplicable
+    input:
+      args:
+        - os: darwin
+        - cmds: [gem, brew]
+        - entry: "[gem]"
+    expected:
+      output: {mgr: gem, picked: true}
+  - name: ShouldPickCaskViaBrewCaskKey
+    input:
+      args:
+        - os: darwin
+        - cmds: [gem, brew]
+        - entry: "[{brew/cask: {packageName: x}}]"
+    expected:
+      output: {mgr: cask, picked: true}
   - name: ShouldErrorOnUnknownManager
     input:
       args:

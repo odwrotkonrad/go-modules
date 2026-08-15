@@ -3,9 +3,13 @@ package packages
 // [>] 🤖🤖
 
 import (
+	"archive/tar"
+	"bytes"
+	"compress/gzip"
 	"os"
 	"path/filepath"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/require"
 )
@@ -249,6 +253,38 @@ func TestInstallBinariesRemoteArchiveCheckPresentOnPathOffUsesFirstCandidate(t *
 	require.NoError(t, err)
 	notLine(t, out, "not on path")
 	require.FileExists(t, filepath.Join(dirA, "kind"))
+}
+
+// [<] 🤖🤖
+
+// [>] 🤖🤖
+func TestExtractTarPreservesModTimes(t *testing.T) {
+	old := time.Date(2020, 1, 2, 3, 4, 5, 0, time.UTC)
+	newer := time.Date(2024, 6, 7, 8, 9, 10, 0, time.UTC)
+	var buf bytes.Buffer
+	gz := gzip.NewWriter(&buf)
+	tw := tar.NewWriter(gz)
+	for _, f := range []struct {
+		name string
+		mod  time.Time
+	}{{"src/configure.ac", old}, {"src/configure", newer}} {
+		require.NoError(t, tw.WriteHeader(&tar.Header{Name: f.name, Mode: 0o755, Size: 3, ModTime: f.mod}))
+		_, err := tw.Write([]byte("bin"))
+		require.NoError(t, err)
+	}
+	require.NoError(t, tw.Close())
+	require.NoError(t, gz.Close())
+	asset := filepath.Join(t.TempDir(), "src.tar.gz")
+	require.NoError(t, os.WriteFile(asset, buf.Bytes(), 0o644))
+	dest := t.TempDir()
+	require.NoError(t, extractTar(asset, dest))
+	fiAc, err := os.Stat(filepath.Join(dest, "src", "configure.ac"))
+	require.NoError(t, err)
+	fiCfg, err := os.Stat(filepath.Join(dest, "src", "configure"))
+	require.NoError(t, err)
+	require.Equal(t, old, fiAc.ModTime().UTC())
+	require.Equal(t, newer, fiCfg.ModTime().UTC())
+	require.True(t, fiCfg.ModTime().After(fiAc.ModTime()))
 }
 
 // [<] 🤖🤖

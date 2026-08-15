@@ -19,12 +19,15 @@ func Schema() *jsonschema.Schema {
 	defs := jsonschema.Definitions{
 		"InstallerList":         installerListDef(),
 		"AptRegistry":           aptRegistryDef(),
+		"NixRegistry":           nixRegistryDef(),
 		"Entry":                 entryDef(),
 		"Item":                  itemDef(),
 		"ItemBody":              itemBodyDef(),
 		"BinariesRemoteArchive": binariesRemoteArchiveDef(),
+		"BuildFromSource":       buildFromSourceDef(),
 		"Script":                scriptDef(),
 		"Apt":                   aptDef(),
+		"Nix":                   nixDef(),
 		"VersionManager":        versionManagerDef(),
 		"PlatformEligibility":   platformEligibilityDef(),
 		"Verify":                verifyDef(),
@@ -54,12 +57,29 @@ func Schema() *jsonschema.Schema {
 	registries := obj("installer package sources referenced by fromRegistry", nil)
 	registries.Properties.Set("apt", arr(ref("AptRegistry")))
 	registries.Properties.Set("brew", arr(str("brew tap name (<user>/<repo>)")))
+	registries.Properties.Set("nix", arr(ref("NixRegistry")))
 	root.Properties.Set("installerRegistries", registries)
 	root.Properties.Set("basePackages", &jsonschema.Schema{
 		Description:          "prerequisite package names per group: common always, an installer name when that installer is eligible",
 		Type:                 "object",
 		AdditionalProperties: arr(str("")),
 	})
+	toolPkgs := &jsonschema.Schema{
+		Description:          "tool-scoped packages per host tool: package name to version pin, null or empty value means rolling",
+		Type:                 "object",
+		AdditionalProperties: jsonschema.FalseSchema,
+		Properties:           jsonschema.NewProperties(),
+	}
+	for _, tool := range KnownTools() {
+		toolPkgs.Properties.Set(tool, &jsonschema.Schema{
+			Type: "object",
+			AdditionalProperties: &jsonschema.Schema{OneOf: []*jsonschema.Schema{
+				{Description: "version pin", Type: "string"},
+				{Description: "rolling", Type: "null"},
+			}},
+		})
+	}
+	root.Properties.Set("toolPackages", toolPkgs)
 	root.Properties.Set("packages", &jsonschema.Schema{
 		Description:          "package entries by canonical command name",
 		Type:                 "object",
@@ -121,11 +141,13 @@ func itemDef() *jsonschema.Schema {
 		Properties:           jsonschema.NewProperties(),
 	}
 	m.Properties.Set("binariesRemoteArchive", ref("BinariesRemoteArchive"))
+	m.Properties.Set("buildFromSource", ref("BuildFromSource"))
 	m.Properties.Set("script", ref("Script"))
 	m.Properties.Set("apt", ref("Apt"))
+	m.Properties.Set("nix", ref("Nix"))
 	m.Properties.Set("pyenv", ref("VersionManager"))
 	m.Properties.Set("nvm", ref("VersionManager"))
-	for _, mgr := range []string{"brew", "brew/cask", "vscode", "npm", "go", "gem"} {
+	for _, mgr := range []string{"brew", "brew/cask", "npm", "go", "gem"} {
 		m.Properties.Set(mgr, ref("ItemBody"))
 	}
 	return &jsonschema.Schema{
@@ -161,6 +183,21 @@ func binariesRemoteArchiveDef() *jsonschema.Schema {
 	return o
 }
 
+func buildFromSourceDef() *jsonschema.Schema {
+	o := obj("download a source tarball, then ./configure && make && make install", []string{"url"})
+	o.Properties.Set("version", str("pinned version, absent means rolling"))
+	o.Properties.Set("url", str("source tarball url with a {version} token"))
+	o.Properties.Set("checksum", &jsonschema.Schema{Description: "sha256:<hex> of the source tarball", Type: "string", Pattern: checksumPattern})
+	o.Properties.Set("configureArgs", arr(str("extra ./configure arguments")))
+	o.Properties.Set("platformEligibility", &jsonschema.Schema{
+		Description: "eligible <os>-<arch> platforms, names only; empty means all",
+		Type:        "array",
+		Items:       str("platform name <os>-<arch>"),
+	})
+	o.Properties.Set("verify", ref("Verify"))
+	return o
+}
+
 func scriptDef() *jsonschema.Schema {
 	o := obj("script spec: run inline, path on disk, or url", nil)
 	o.Properties.Set("run", str("inline command"))
@@ -184,6 +221,27 @@ func aptDef() *jsonschema.Schema {
 	o.Properties.Set("versionMap", vm)
 	o.Properties.Set("aliasBinary", stringMap("alias name to target binary"))
 	o.Properties.Set("fromRegistry", str("installerRegistries.apt ref: scheme-less url[::suites[::components]]"))
+	o.Properties.Set("verify", ref("Verify"))
+	return o
+}
+
+func nixRegistryDef() *jsonschema.Schema {
+	o := obj("one nix flake source, referenced by name", []string{"name", "url"})
+	o.Properties.Set("name", str("registry name referenced by fromRegistry"))
+	o.Properties.Set("url", str("flake base url without a branch (github:NixOS/nixpkgs)"))
+	o.Properties.Set("ref", str("branch or tag installs track when no revision pins"))
+	return o
+}
+
+func nixDef() *jsonschema.Schema {
+	one := uint64(1)
+	vm := stringMap("exactly one binary version to registry-repo revision pin")
+	vm.MaxProperties = &one
+	o := obj("nix item spec", nil)
+	o.Properties.Set("packageName", str("flake attribute when it differs from the entry key"))
+	o.Properties.Set("versionMap", vm)
+	o.Properties.Set("aliasBinary", stringMap("alias name to target binary"))
+	o.Properties.Set("fromRegistry", str("installerRegistries.nix ref by name; default nixpkgs"))
 	o.Properties.Set("verify", ref("Verify"))
 	return o
 }

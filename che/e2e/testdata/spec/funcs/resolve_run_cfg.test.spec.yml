@@ -1,0 +1,192 @@
+# [>] 🤖🤖
+context:
+  function: e2e.resolveRunCfg
+cases:
+  - name: ShouldDefaultDarwinHostToNoDepsVM
+    input:
+      args:
+        - platform: ""
+        - mode: ""
+        - hostOs: darwin
+        - arch: arm64
+    expected:
+      output: {mode: with_no_deps, darwinVM: true}
+  - name: ShouldDefaultLinuxHostToNoDeps
+    input:
+      args:
+        - platform: ""
+        - mode: ""
+        - hostOs: linux
+        - arch: arm64
+    expected:
+      output: {mode: with_no_deps}
+  - name: ShouldAllowWithDepsOnVirtHost
+    input:
+      args:
+        - platform: ""
+        - mode: with_deps
+        - hostOs: darwin
+        - arch: arm64
+        - virt: true
+    expected:
+      output: {mode: with_deps}
+  - name: ShouldRejectWithDepsOnBareMetal
+    input:
+      args:
+        - platform: ""
+        - mode: with_deps
+        - hostOs: darwin
+        - arch: arm64
+    expected:
+      errorOutput: installs never run on the bare-metal host
+  - name: ShouldAllowWithDepsOnBareMetalWhenForced
+    input:
+      args:
+        - platform: ""
+        - mode: with_deps
+        - hostOs: darwin
+        - arch: arm64
+        - virt: false
+        - allowHost: true
+    expected:
+      output: {mode: with_deps}
+  - name: ShouldAcceptExplicitNoDepsMode
+    input:
+      args:
+        - platform: ""
+        - mode: with_no_deps
+        - hostOs: linux
+        - arch: arm64
+    expected:
+      output: {mode: with_no_deps}
+  - name: ShouldRejectUnknownMode
+    input:
+      args:
+        - platform: ""
+        - mode: bogus
+        - hostOs: darwin
+        - arch: arm64
+    expected:
+      errorOutput: with_deps or with_no_deps
+  - name: ShouldDefaultDarwinPlatformToVMPerInstall
+    input:
+      args:
+        - platform: darwin-arm64
+        - mode: ""
+        - hostOs: darwin
+        - arch: arm64
+    expected:
+      output: {mode: with_no_deps, darwinVM: true}
+  - name: ShouldKeepVMForExplicitNoDepsOnDarwin
+    input:
+      args:
+        - platform: darwin-arm64
+        - mode: with_no_deps
+        - hostOs: darwin
+        - arch: arm64
+        - virt: true
+    expected:
+      output: {mode: with_no_deps, darwinVM: true}
+  - name: ShouldAllowDarwinWithDepsOnVirt
+    input:
+      args:
+        - platform: darwin-arm64
+        - mode: with_deps
+        - hostOs: darwin
+        - arch: arm64
+        - virt: true
+    expected:
+      output: {mode: with_deps}
+  - name: ShouldRejectDarwinWithDepsOnBareMetal
+    input:
+      args:
+        - platform: darwin-arm64
+        - mode: with_deps
+        - hostOs: darwin
+        - arch: arm64
+    expected:
+      errorOutput: installs never run on the bare-metal host
+  - name: ShouldAllowDarwinWithDepsOnBareMetalWhenForced
+    input:
+      args:
+        - platform: darwin-arm64
+        - mode: with_deps
+        - hostOs: darwin
+        - arch: arm64
+        - virt: false
+        - allowHost: true
+    expected:
+      output: {mode: with_deps}
+  - name: ShouldRejectDarwinPlatformOnLinuxHost
+    input:
+      args:
+        - platform: darwin-arm64
+        - mode: ""
+        - hostOs: linux
+        - arch: arm64
+    expected:
+      errorOutput: needs a darwin-arm64 host
+  - name: ShouldRejectUnknownModeForDarwinPlatform
+    input:
+      args:
+        - platform: darwin-arm64
+        - mode: bogus
+        - hostOs: darwin
+        - arch: arm64
+    expected:
+      errorOutput: with_deps or with_no_deps
+  - name: ShouldCrossBuildLinuxAmd64OnDarwin
+    input:
+      args:
+        - platform: linux-amd64
+        - mode: ""
+        - hostOs: darwin
+        - arch: arm64
+    expected:
+      output: {mode: with_no_deps, linuxArch: amd64}
+  - name: ShouldRunLinuxArm64OnDarwin
+    input:
+      args:
+        - platform: linux-arm64
+        - mode: ""
+        - hostOs: darwin
+        - arch: arm64
+    expected:
+      output: {mode: with_no_deps, linuxArch: arm64}
+  - name: ShouldRunHostArchLinuxOnLinux
+    input:
+      args:
+        - platform: linux-arm64
+        - mode: ""
+        - hostOs: linux
+        - arch: arm64
+    expected:
+      output: {mode: with_no_deps, linuxArch: arm64}
+  - name: ShouldRejectCrossArchOnLinuxHost
+    input:
+      args:
+        - platform: linux-amd64
+        - mode: ""
+        - hostOs: linux
+        - arch: arm64
+    expected:
+      errorOutput: only the host platform (linux-arm64) is testable on linux hosts
+  - name: ShouldRejectModeConflictingWithLinuxPlatform
+    input:
+      args:
+        - platform: linux-amd64
+        - mode: with_deps
+        - hostOs: darwin
+        - arch: arm64
+    expected:
+      errorOutput: conflicts with platform linux-amd64
+  - name: ShouldRejectUnsupportedPlatform
+    input:
+      args:
+        - platform: darwin-amd64
+        - mode: ""
+        - hostOs: darwin
+        - arch: arm64
+    expected:
+      errorOutput: want darwin-arm64, linux-arm64 or linux-amd64
+# [<] 🤖🤖

@@ -1,5 +1,7 @@
 # Technical Requirements: che packages
 
+<!-- [>] 🤖🤖 -->
+
 ## Supported Installation Methods
 
 - `npm`
@@ -7,9 +9,10 @@
 - `gem`
 - `binariesRemoteArchive`
 - `script`
-- `vscode`
+- `buildFromSource`
 - `pyenv`
 - `nvm`
+- `nix`
 
 ### Linux
 
@@ -32,3 +35,5 @@ Local installs never touch the bare-metal host: each run virtualizes per platfor
 
 - `darwin-arm64`: tart macOS VM
 - `linux-arm64`, `linux-amd64`: docker container
+
+<!-- [<] 🤖🤖 -->

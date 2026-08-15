@@ -60,6 +60,7 @@ type prepWant struct {
 	SampleEnv     string              `yaml:"sampleEnv"`
 	EnvInOverlay  string              `yaml:"envInOverlay"`
 	LinkDests     map[string][]string `yaml:"linkDests"`
+	WorkingDirs   map[string]string   `yaml:"workingDirs"`
 }
 
 func profileByName(ps []*ProfileReady) map[string]*ProfileReady {
@@ -96,10 +97,13 @@ func sourcedProfile(ps []*ProfileReady) *ProfileReady {
 }
 
 type prepFlags struct {
-	SkipRemoteRefs bool     `yaml:"skipRemoteRefs"`
-	ValidateSpec   string   `yaml:"validateSpec"`
-	LogLevel       string   `yaml:"logLevel"`
-	UnsetEnv       []string `yaml:"unsetEnv"`
+	SkipRemoteRefs          bool     `yaml:"skipRemoteRefs"`
+	ValidateSpec            string   `yaml:"validateSpec"`
+	LogLevel                string   `yaml:"logLevel"`
+	UnsetEnv                []string `yaml:"unsetEnv"`
+	AutoDiscover            *bool    `yaml:"autoDiscover"`
+	Profiles                []string `yaml:"profiles"`
+	ProfileWorkingDirectory string   `yaml:"profileWorkingDirectory"`
 }
 
 func TestPrepareSpecs(t *testing.T) {
@@ -152,11 +156,13 @@ func TestPrepareSpecs(t *testing.T) {
 			vs := options.ValidateSpecMode(testyml.Expand(flags.ValidateSpec, vars))
 			logLevel := cmp.Or(flags.LogLevel, "info")
 			opts := options.Options{
-				AutoDiscover:    true,
-				SkipRemoteRefs:  flags.SkipRemoteRefs,
-				ValidateSpec:    vs,
-				ValidateSpecCLI: vs,
-				LogLevel:        logLevel,
+				AutoDiscover:            flags.AutoDiscover == nil || *flags.AutoDiscover,
+				Profiles:                flags.Profiles,
+				ProfileWorkingDirectory: flags.ProfileWorkingDirectory,
+				SkipRemoteRefs:          flags.SkipRemoteRefs,
+				ValidateSpec:            vs,
+				ValidateSpecCLI:         vs,
+				LogLevel:                logLevel,
 			}
 			level, err := log.ParseLevel(logLevel)
 			require.NoError(t, err)
@@ -256,6 +262,16 @@ func TestPrepareSpecs(t *testing.T) {
 					assert.Equalf(t, want, linkDests(t, pr), "profile %q link dests\n%s", name, out)
 				}
 			}
+			if w.WorkingDirs != nil {
+				by := profileByName(profiles)
+				for name, wantDir := range w.WorkingDirs {
+					pr := by[name]
+					require.NotNilf(t, pr, "profile %q not prepared\n%s", name, out)
+					wantEval, _ := filepath.EvalSymlinks(testyml.Expand(wantDir, vars))
+					gotEval, _ := filepath.EvalSymlinks(pr.workingDir)
+					assert.Equalf(t, wantEval, gotEval, "profile %q working dir", name)
+				}
+			}
 			if w.SampleEnv != "" {
 				// [why] the profile captured the launch env overlaid with its
 				assert.Equal(t, w.EnvInOverlay, sp.env[w.SampleEnv], w.SampleEnv+" in the captured env")
@@ -263,174 +279,66 @@ func TestPrepareSpecs(t *testing.T) {
 		})
 }
 
-func TestPrepareOptionsPrecedence(t *testing.T) {
-	repo := testutil.Repo(t, map[string]string{
-		"che.yml": "options:\n  validateSpec: error\n  logLevel: debug\np:\n  options: {autoDiscover: true}\n",
-	})
-	_, baseEnv := prepEnv(t)
-	ctx := func(extra map[string]string) Context {
-		env := map[string]string{}
-		maps.Copy(env, baseEnv)
-		maps.Copy(env, extra)
-		return newContext(env, repo)
-	}
-
-	_, opts, err := PrepareApplicationOptions(ctx(nil), options.Options{})
-	require.NoError(t, err)
-	assert.Equal(t, options.ValidateSpec.Error, opts.ValidateSpec, "yaml layer over default")
-	assert.Equal(t, "debug", opts.LogLevel, "yaml logLevel over default")
-
-	_, opts, err = PrepareApplicationOptions(ctx(map[string]string{"CHE_VALIDATE_SPEC": "warn"}), options.Options{})
-	require.NoError(t, err)
-	assert.Equal(t, options.ValidateSpec.Warn, opts.ValidateSpec, "env var over yaml")
-
-	_, opts, err = PrepareApplicationOptions(ctx(map[string]string{"CHE_VALIDATE_SPEC": "warn"}), options.Options{ValidateSpec: options.ValidateSpec.Error})
-	require.NoError(t, err)
-	assert.Equal(t, options.ValidateSpec.Error, opts.ValidateSpec, "flag over env var")
+type prepareOptsGot struct {
+	ValidateSpec      string   `yaml:"validateSpec,omitempty"`
+	LogLevel          string   `yaml:"logLevel,omitempty"`
+	DryRun            string   `yaml:"dryRun,omitempty"`
+	SkipRemoteRefs    bool     `yaml:"skipRemoteRefs,omitempty"`
+	RenderSkipSecrets bool     `yaml:"renderSkipSecrets,omitempty"`
+	AutoDiscover      bool     `yaml:"autoDiscover,omitempty"`
+	Profiles          []string `yaml:"profiles,omitempty"`
 }
 
-func TestPrepareOptionsUserConfig(t *testing.T) {
-	repo := testutil.Repo(t, map[string]string{
-		"che.yml": "options:\n  validateSpec: warn\n  profiles: [spec/only]\np:\n  options: {autoDiscover: true}\n",
-	})
-	_, baseEnv := prepEnv(t)
-
-	// [why] XDG_CONFIG_HOME steers UserConfigPath, which resolves the config
-	cfgHome := t.TempDir()
-	t.Setenv("XDG_CONFIG_HOME", cfgHome)
-	t.Setenv("CHE_CONFIG_HOME", "")
-	cfgDir := filepath.Join(cfgHome, "che")
-	require.NoError(t, os.MkdirAll(cfgDir, 0o755))
-	config := "validateSpec: error\n" +
-		"logLevel: debug\n" +
-		"dryRun: delta\n" +
-		"skipRemoteRefs: true\n" +
-		"autoDiscover: true\n" +
-		"profiles: [cfg/a, cfg/b]\n" +
-		"renderTemplates:\n  skipSecrets: true\n"
-	require.NoError(t, os.WriteFile(filepath.Join(cfgDir, "config.yml"), []byte(config), 0o644))
-
-	ctx := func(extra map[string]string) Context {
-		env := map[string]string{}
-		maps.Copy(env, baseEnv)
-		maps.Copy(env, extra)
-		return newContext(env, repo)
-	}
-
-	_, opts, err := PrepareApplicationOptions(ctx(nil), options.Options{})
-	require.NoError(t, err)
-	assert.Equal(t, options.ValidateSpec.Error, opts.ValidateSpec, "user-config validateSpec over spec")
-	assert.Equal(t, "debug", opts.LogLevel, "user-config logLevel")
-	assert.Equal(t, options.DryRun.Delta, opts.DryRun, "user-config dryRun")
-	assert.True(t, opts.SkipRemoteRefs, "user-config skipRemoteRefs")
-	assert.True(t, opts.RenderSkipSecrets, "user-config renderTemplates.skipSecrets")
-	assert.True(t, opts.AutoDiscover, "user-config autoDiscover")
-	assert.Equal(t, []string{"cfg/a", "cfg/b"}, opts.Profiles, "user-config profiles over spec")
-
-	_, opts, err = PrepareApplicationOptions(ctx(map[string]string{"CHE_VALIDATE_SPEC": "warn", "CHE_PROFILE": "env/a,env/b"}), options.Options{})
-	require.NoError(t, err)
-	assert.Equal(t, options.ValidateSpec.Warn, opts.ValidateSpec, "env over user-config")
-	assert.Equal(t, []string{"env/a", "env/b"}, opts.Profiles, "CHE_PROFILE over user-config")
-
-	_, opts, err = PrepareApplicationOptions(ctx(map[string]string{"CHE_VALIDATE_SPEC": "warn", "CHE_PROFILE": "env/a,env/b"}), options.Options{Profiles: []string{"flag/a"}})
-	require.NoError(t, err)
-	assert.Equal(t, []string{"flag/a"}, opts.Profiles, "flag over env + user-config")
-
-	_, opts, err = PrepareApplicationOptions(ctx(map[string]string{"CHE_DRY_RUN": "true"}), options.Options{})
-	require.NoError(t, err)
-	assert.Equal(t, options.DryRun.Delta, opts.DryRun, "dry-run true aliases delta")
-}
-
-func TestWorkingDirectoryCascade(t *testing.T) {
-	repo := testutil.Repo(t, map[string]string{
-		"che.yml": "options:\n  profileWorkingDirectory: spectree\n" +
-			"p:\n  options: {autoDiscover: true}\n  include:\n    makeLinks: [{source: _home/**, dest: 's:^_home:$HOME:'}]\n" +
-			"q:\n  options: {autoDiscover: true, profileWorkingDirectory: proftree}\n  include:\n    makeLinks: [{source: _home/**, dest: 's:^_home:$HOME:'}]\n",
-		"spectree/_home/.config/a": "a\n",
-		"proftree/_home/.config/b": "b\n",
-	})
-	home, baseEnv := prepEnv(t)
-
-	root, err := PrepareSpecs(newContext(baseEnv, repo), options.Options{SkipRunIf: true, AutoDiscover: true}, spec.SpecSourceRecipe{})
-	require.NoError(t, err)
-	byName := map[string]*ProfileReady{}
-	for _, pr := range root.AllProfiles() {
-		byName[pr.Source.GetProfileName()] = pr
-	}
-
-	eval := func(p string) string { r, _ := filepath.EvalSymlinks(p); return r }
-	assert.Equal(t, eval(filepath.Join(repo, "spectree")), eval(byName["p"].workingDir))
-	assert.Equal(t, eval(filepath.Join(repo, "proftree")), eval(byName["q"].workingDir))
-
-	linkDest := func(pr *ProfileReady) string {
-		for _, op := range pr.OperationsReady {
-			if lo, ok := op.(*MakeLinksOperationReady); ok && len(lo.Links) > 0 {
-				return pr.toDest(spec.DestRel(lo.Links[0]))
-			}
+func TestPrepareOptions(t *testing.T) {
+	testyml.Eq(t, td, "testdata/spec/funcs/prepare_options.test.spec.yml", func(t *testing.T, c testyml.Case[prepareOptsGot]) (prepareOptsGot, error) {
+		repo := testutil.Repo(t, map[string]string{"che.yml": c.Input.Args.String(t, 0)})
+		_, baseEnv := prepEnv(t)
+		if configYml := c.Input.Args.String(t, 1); configYml != "" {
+			// [why] XDG_CONFIG_HOME steers UserConfigPath, which resolves the config
+			cfgHome := t.TempDir()
+			t.Setenv("XDG_CONFIG_HOME", cfgHome)
+			t.Setenv("CHE_CONFIG_HOME", "")
+			cfgDir := filepath.Join(cfgHome, "che")
+			require.NoError(t, os.MkdirAll(cfgDir, 0o755))
+			require.NoError(t, os.WriteFile(filepath.Join(cfgDir, "config.yml"), []byte(configYml), 0o644))
 		}
-		return ""
-	}
-	assert.Equal(t, filepath.Join(home, ".config/a"), linkDest(byName["p"]), "p links from spectree")
-	assert.Equal(t, filepath.Join(home, ".config/b"), linkDest(byName["q"]), "q links from proftree")
-
-	repo2 := testutil.Repo(t, map[string]string{
-		"che.yml":                 "r:\n  options: {autoDiscover: true}\n  include:\n    makeLinks: [_home/**]\n",
-		"chetree/_home/.config/c": "c\n",
+		var extraEnv map[string]string
+		c.Input.Args.To(t, 2, &extraEnv)
+		env := map[string]string{}
+		maps.Copy(env, baseEnv)
+		maps.Copy(env, extraEnv)
+		var flags struct {
+			ValidateSpec string   `yaml:"validateSpec"`
+			Profiles     []string `yaml:"profiles"`
+		}
+		c.Input.Args.To(t, 3, &flags)
+		cliOpts := options.Options{ValidateSpec: options.ValidateSpecMode(flags.ValidateSpec), Profiles: flags.Profiles}
+		_, opts, err := PrepareApplicationOptions(newContext(env, repo), cliOpts)
+		if err != nil {
+			return prepareOptsGot{}, err
+		}
+		return prepareOptsGot{
+			ValidateSpec:      string(opts.ValidateSpec),
+			LogLevel:          opts.LogLevel,
+			DryRun:            string(opts.DryRun),
+			SkipRemoteRefs:    opts.SkipRemoteRefs,
+			RenderSkipSecrets: opts.RenderSkipSecrets,
+			AutoDiscover:      opts.AutoDiscover,
+			Profiles:          opts.Profiles,
+		}, nil
 	})
-	_, baseEnv2 := prepEnv(t)
-	root2, err := PrepareSpecs(newContext(baseEnv2, repo2), options.Options{SkipRunIf: true, AutoDiscover: true, ProfileWorkingDirectory: "chetree"}, spec.SpecSourceRecipe{})
-	require.NoError(t, err)
-	wantWD, _ := filepath.EvalSymlinks(filepath.Join(repo2, "chetree"))
-	gotWD, _ := filepath.EvalSymlinks(root2.AllProfiles()[0].workingDir)
-	assert.Equal(t, wantWD, gotWD, "che-level flag default")
-}
-
-func TestCheLevelWorkingDirectoryDoesNotLeakIntoSourcedSpec(t *testing.T) {
-	ref := testutil.Repo(t, map[string]string{
-		"che.yml":         "s:\n  options: {autoDiscover: true}\n  include:\n    makeLinks: [_home/**]\n",
-		"_home/.config/x": "x\n",
-	})
-	host := testutil.Repo(t, map[string]string{
-		"che.yml": "main:\n  options: {autoDiscover: true}\n  include:\n    profiles:\n" +
-			"      - source: \"" + ref + "/che.yml::s\"\n",
-		"roottree/_home/.config/c": "c\n",
-	})
-	_, baseEnv := prepEnv(t)
-
-	root, err := PrepareSpecs(newContext(baseEnv, host), options.Options{SkipRunIf: true, AutoDiscover: true, ProfileWorkingDirectory: "roottree"}, spec.SpecSourceRecipe{})
-	require.NoError(t, err)
-
-	byName := profileByName(root.AllProfiles())
-	wantRefWD, _ := filepath.EvalSymlinks(ref)
-	gotRefWD, _ := filepath.EvalSymlinks(byName["s"].workingDir)
-	assert.Equal(t, wantRefWD, gotRefWD, "sourced spec anchors at its own checkout, not che-level roottree")
-}
-
-func TestAutoDiscoverSwitch(t *testing.T) {
-	repo := testutil.Repo(t, map[string]string{
-		"che.yml": "marked:\n  options: {autoDiscover: true}\n",
-	})
-	_, baseEnv := prepEnv(t)
-
-	_, err := PrepareSpecs(newContext(baseEnv, repo), options.Options{SkipRunIf: true}, spec.SpecSourceRecipe{})
-	require.ErrorContains(t, err, "auto-discovery is disabled", "default-false zero value models autoDiscover=false")
-
-	root, err := PrepareSpecs(newContext(baseEnv, repo), options.Options{SkipRunIf: true, AutoDiscover: true}, spec.SpecSourceRecipe{})
-	require.NoError(t, err)
-	require.Len(t, root.AllProfiles(), 1, "autoDiscover=true discovers marked profiles")
-
-	root, err = PrepareSpecs(newContext(baseEnv, repo), options.Options{SkipRunIf: true, Profiles: []string{"marked"}}, spec.SpecSourceRecipe{})
-	require.NoError(t, err)
-	require.Len(t, root.AllProfiles(), 1, "forced profiles bypass the disabled discovery")
 }
 
 func TestOverlayEnv(t *testing.T) {
-	base := map[string]string{"SHADOWED": "host", "KEPT": "base"}
-	got := overlayEnv(base, map[string]string{"SHADOWED": "ref", "ADDED": "x"})
-	assert.Equal(t, map[string]string{"SHADOWED": "ref", "KEPT": "base", "ADDED": "x"}, got)
-	assert.Equal(t, map[string]string{"SHADOWED": "host", "KEPT": "base"}, base, "base map unchanged")
-
-	assert.Equal(t, base, overlayEnv(base, nil))
+	testyml.Eq(t, td, "testdata/spec/funcs/overlay_env.test.spec.yml", func(t *testing.T, c testyml.Case[map[string]string]) (map[string]string, error) {
+		var base, overlay map[string]string
+		c.Input.Args.To(t, 0, &base)
+		c.Input.Args.To(t, 1, &overlay)
+		snapshot := maps.Clone(base)
+		got := overlayEnv(base, overlay)
+		assert.Equal(t, snapshot, base, "base map unchanged")
+		return got, nil
+	})
 }
 
 type stubOperation struct {
@@ -450,65 +358,69 @@ func (o *stubOperation) execOperation(_ *ProfileReady) error {
 	return o.fail
 }
 
+type stubOpSpec struct {
+	Name     string `yaml:"name"`
+	Selected bool   `yaml:"selected"`
+	Delta    int    `yaml:"delta"`
+	Fail     string `yaml:"fail"`
+}
+
+type stubProfileSpec struct {
+	Ref     string       `yaml:"ref"`
+	SkipOps []string     `yaml:"skipOps"`
+	Ops     []stubOpSpec `yaml:"ops"`
+}
+
+type execGot struct {
+	Ran      []string `yaml:"ran,omitempty"`
+	Executed []string `yaml:"executed,omitempty"`
+}
+
 func TestExecOperations(t *testing.T) {
-	var ran []string
-	boom := errors.New("boom")
-	p := &ProfileReady{
-		ref: "p",
-		OperationsReady: []operationReady{
-			&stubOperation{name: "one", selected: true, delta: 1, ran: &ran},
-			&stubOperation{name: "skipped", selected: false, ran: &ran},
-			&stubOperation{name: "failing", selected: true, delta: 1, fail: boom, ran: &ran},
-			&stubOperation{name: "last", selected: true, delta: 1, ran: &ran},
-		},
-	}
-	t.Cleanup(log.SwapLevel(log.Levels.Debug))
-	out, err := testutil.CaptureStdout(t, func() error { return p.ExecOperations(context.Background()) })
-	require.ErrorIs(t, err, boom)
-	assert.Equal(t, []string{"one", "failing", "last"}, ran, "run order, failure does not stop")
-	assert.Contains(t, testutil.StripANSI(out), "# one")
-	assert.NotContains(t, testutil.StripANSI(out), "# skipped")
-}
-
-func TestExecOperationsSkipOpsNoSweep(t *testing.T) {
-	var ran []string
-	p := &ProfileReady{
-		ref:  "p",
-		opts: options.Options{SkipOps: []string{"render-templates"}},
-		OperationsReady: []operationReady{
-			&stubOperation{name: "render-templates", selected: false, ran: &ran},
-		},
-	}
-	t.Cleanup(log.SwapLevel(log.Levels.Debug))
-	out, err := testutil.CaptureStdout(t, func() error { return p.ExecOperations(context.Background()) })
-	require.NoError(t, err)
-	assert.Empty(t, ran)
-	stripped := testutil.StripANSI(out)
-	assert.Contains(t, stripped, "will not run op render-templates: options.skipOps")
-	assert.NotContains(t, stripped, "(nothing selected)", "skip wins over the deselected sweep branch")
-}
-
-func TestExecEachSkipsZeroDeltaProfile(t *testing.T) {
-	var ran []string
-	mk := func(ref string, delta int) *ProfileReady {
-		return &ProfileReady{ref: ref, OperationsReady: []operationReady{
-			&stubOperation{name: "make-links", selected: true, delta: delta, ran: &ran},
-		}}
-	}
-	s := &SpecReady{Profiles: []*ProfileReady{mk("settled", 0), mk("drifted", 1)}}
-	t.Cleanup(log.SwapLevel(log.Levels.Debug))
-	var executed []string
-	out, err := testutil.CaptureStdout(t, func() error {
-		return s.ExecEach(context.Background(), "run", func(_ context.Context, p *ProfileReady) error {
-			executed = append(executed, p.Ref())
+	testyml.Run(t, td, "testdata/spec/funcs/exec_operations.test.spec.yml", func(t *testing.T, c testyml.Case[execGot]) {
+		var specs []stubProfileSpec
+		c.Input.Args.To(t, 0, &specs)
+		var ran []string
+		profiles := make([]*ProfileReady, 0, len(specs))
+		for _, ps := range specs {
+			p := &ProfileReady{ref: ps.Ref, opts: options.Options{SkipOps: ps.SkipOps}}
+			for _, op := range ps.Ops {
+				var fail error
+				if op.Fail != "" {
+					fail = errors.New(op.Fail)
+				}
+				p.OperationsReady = append(p.OperationsReady,
+					&stubOperation{name: op.Name, selected: op.Selected, delta: op.Delta, fail: fail, ran: &ran})
+			}
+			profiles = append(profiles, p)
+		}
+		t.Cleanup(log.SwapLevel(log.Levels.Debug))
+		var executed []string
+		var err error
+		out, capErr := testutil.CaptureStdout(t, func() error {
+			if c.Input.Args.Bool(t, 1) {
+				s := &SpecReady{Profiles: profiles}
+				err = s.ExecEach(context.Background(), "run", func(_ context.Context, p *ProfileReady) error {
+					executed = append(executed, p.Ref())
+					return nil
+				})
+				return nil
+			}
+			err = profiles[0].ExecOperations(context.Background())
 			return nil
 		})
+		require.NoError(t, capErr)
+		c.Expected.Check(t, err)
+		assert.Equal(t, c.Expected.Output.Ran, ran, "op run order")
+		assert.Equal(t, c.Expected.Output.Executed, executed, "executed profiles")
+		stripped := testutil.StripANSI(out)
+		for _, m := range c.Expected.StdOut {
+			testyml.MustMatch(t, stripped, m)
+		}
+		for _, m := range c.NotExpected.StdOut {
+			testyml.MustNotMatch(t, stripped, m)
+		}
 	})
-	require.NoError(t, err)
-	assert.Equal(t, []string{"drifted"}, executed, "zero-delta profile not executed")
-	stripped := testutil.StripANSI(out)
-	assert.Contains(t, stripped, "will not run profile settled: no changes")
-	assert.Contains(t, stripped, "will run profile drifted: make-links (1 change)")
 }
 
 // [<] 🤖🤖

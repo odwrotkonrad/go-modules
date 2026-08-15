@@ -1,0 +1,89 @@
+# [>] 🤖🤖
+context:
+  function: packages.PinMatches
+cases:
+  - name: ShouldMatchPlainVersionWord
+    input:
+      args:
+        - out: kind version 0.32.0
+        - pin: 0.32.0
+    expected:
+      output: true
+  - name: ShouldRejectVersionMismatch
+    input:
+      args:
+        - out: kind version 0.32.0
+        - pin: 0.31.0
+    expected:
+      output: false
+  - name: ShouldMatchVPrefixedToken
+    input:
+      args:
+        - out: Terraform v1.15.8
+        - pin: 1.15.8
+    expected:
+      output: true
+  - name: ShouldMatchEmbeddedGoVersion
+    input:
+      args:
+        - out: go version go1.26.4 darwin/arm64
+        - pin: 1.26.4
+    expected:
+      output: true
+  - name: ShouldMatchUppercaseToolVersion
+    input:
+      args:
+        - out: Python 3.14.5
+        - pin: 3.14.5
+    expected:
+      output: true
+  - name: ShouldRejectPatchMismatch
+    input:
+      args:
+        - out: Python 3.14.5
+        - pin: 3.14.4
+    expected:
+      output: false
+  - name: ShouldMatchVersionAmongMetadata
+    input:
+      args:
+        - out: "prometheus, version 3.5.5 (branch: HEAD, revision: dcd3d551ced8)"
+        - pin: 3.5.5
+    expected:
+      output: true
+  - name: ShouldRejectDriftedMinor
+    input:
+      args:
+        - out: glab 1.108.0 (5de20850)
+        - pin: 1.107.0
+    expected:
+      output: false
+  - name: ShouldMatchHyphenatedDebianRevision
+    input:
+      args:
+        - out: jq-1.7.1-3
+        - pin: 1.7.1-3
+    expected:
+      output: true
+  - name: ShouldMatchEpochPrefixedVersion
+    input:
+      args:
+        - out: "1:1.7.1-3"
+        - pin: 1.7.1-3
+    expected:
+      output: true
+  - name: ShouldMatchAnythingOnEmptyPin
+    input:
+      args:
+        - out: anything
+        - pin: ""
+    expected:
+      output: true
+  - name: ShouldRejectOutputWithoutVersion
+    input:
+      args:
+        - out: no version here
+        - pin: 1.0.0
+    expected:
+      output: false
+# [<] 🤖🤖

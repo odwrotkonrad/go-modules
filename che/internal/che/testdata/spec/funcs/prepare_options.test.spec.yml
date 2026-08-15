@@ -1,0 +1,113 @@
+# [>] 🤖🤖
+context:
+  function: che.PrepareApplicationOptions
+cases:
+  - name: ShouldLayerSpecYamlOverDefaults
+    input:
+      args:
+        - cheYml: |
+            options:
+              validateSpec: error
+              logLevel: debug
+            p:
+              options: {autoDiscover: true}
+    expected:
+      output: {validateSpec: error, logLevel: debug, autoDiscover: true}
+  - name: ShouldLayerEnvVarOverSpecYaml
+    input:
+      args:
+        - cheYml: |
+            options:
+              validateSpec: error
+              logLevel: debug
+            p:
+              options: {autoDiscover: true}
+        - configYml: ""
+        - env: {CHE_VALIDATE_SPEC: warn}
+    expected:
+      output: {validateSpec: warn, logLevel: debug, autoDiscover: true}
+  - name: ShouldLayerFlagOverEnvVar
+    input:
+      args:
+        - cheYml: |
+            options:
+              validateSpec: error
+              logLevel: debug
+            p:
+              options: {autoDiscover: true}
+        - configYml: ""
+        - env: {CHE_VALIDATE_SPEC: warn}
+        - flags: {validateSpec: error}
+    expected:
+      output: {validateSpec: error, logLevel: debug, autoDiscover: true}
+  - name: ShouldLayerUserConfigOverSpecYaml
+    input:
+      args:
+        - cheYml: |
+            options:
+              validateSpec: warn
+              profiles: [spec/only]
+            p:
+              options: {autoDiscover: true}
+        - configYml: |
+            validateSpec: error
+            logLevel: debug
+            dryRun: delta
+            skipRemoteRefs: true
+            autoDiscover: true
+            profiles: [cfg/a, cfg/b]
+            renderTemplates:
+              skipSecrets: true
+    expected:
+      output:
+        validateSpec: error
+        logLevel: debug
+        dryRun: delta
+        skipRemoteRefs: true
+        renderSkipSecrets: true
+        autoDiscover: true
+        profiles: [cfg/a, cfg/b]
+  - name: ShouldLayerEnvOverUserConfig
+    input:
+      args:
+        - cheYml: |
+            options:
+              validateSpec: warn
+              profiles: [spec/only]
+            p:
+              options: {autoDiscover: true}
+        - configYml: |
+            validateSpec: error
+            logLevel: debug
+            profiles: [cfg/a, cfg/b]
+        - env: {CHE_VALIDATE_SPEC: warn, CHE_PROFILE: "env/a,env/b"}
+    expected:
+      output: {validateSpec: warn, logLevel: debug, profiles: [env/a, env/b], autoDiscover: true}
+  - name: ShouldLayerFlagProfilesOverEnvAndUserConfig
+    input:
+      args:
+        - cheYml: |
+            options:
+              validateSpec: warn
+              profiles: [spec/only]
+            p:
+              options: {autoDiscover: true}
+        - configYml: |
+            profiles: [cfg/a, cfg/b]
+        - env: {CHE_VALIDATE_SPEC: warn, CHE_PROFILE: "env/a,env/b"}
+        - flags: {profiles: [flag/a]}
+    expected:
+      output: {validateSpec: warn, profiles: [flag/a], logLevel: info, autoDiscover: true}
+  - name: ShouldAliasDryRunTrueToDelta
+    input:
+      args:
+        - cheYml: |
+            options:
+              validateSpec: warn
+            p:
+              options: {autoDiscover: true}
+        - configYml: ""
+        - env: {CHE_DRY_RUN: "true"}
+    expected:
+      output: {validateSpec: warn, dryRun: delta, logLevel: info, autoDiscover: true}
+# [<] 🤖🤖

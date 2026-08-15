@@ -103,7 +103,7 @@ testCases:
 
       - name: InstallPackagesDryRun
         command: che packages install --dry-run=all
-        expected: {stdOut: ["install e2e-plain via npm (dry run)"]}
+        expected: {stdOut: ["install e2e-plain via npm (dry run)", "install vscode/e2e.fake-ext 1.2.3 via vscode (dry run)"]}
         notExpected: {files: *allProfilesAllFilesExists}
 
       - name: RunScriptsDryRun
@@ -164,7 +164,7 @@ testCases:
               make-links: 3 changes
               make-copies: 1 change
               render-templates: 1 change
-              install-packages: 1 change
+              install-packages: 2 changes
               run-scripts: 1 change
             ## Profile conditional  (profile workdir: ${LOCAL}/root)
               make-dirs: 2 changes
@@ -197,6 +197,7 @@ testCases:
             - "${HOME}/plain/script-output"
             - "${HOME}/conditional/script-output"
             - "${HOME}/remote/script-output"
+            - "${HOME}/.e2e-code-extensions"
 
       - name: Uninstall
         command: che uninstall
@@ -274,6 +275,7 @@ testCases:
           stdOut:
             - "installed e2e-plain via npm"
             - "installed e2e-remote via npm"
+            - "installed vscode/e2e.fake-ext 1.2.3 via vscode"
         notExpected:
           stdOut: ["will run ", "will not run "]
 
@@ -336,7 +338,7 @@ testCases:
       - name: AccumulateInstallPackages
         command: che packages install
         expected:
-          stdOut: ["installed e2e-plain via npm"]
+          stdOut: ["installed e2e-plain via npm", "vscode/e2e.fake-ext: ✅ already installed via vscode"]
         notExpected:
           stdOut: ["will run ", "will not run "]
 
@@ -604,4 +606,37 @@ testCases:
             - "multiple present e2e-dup: ${FAKEBIN}/e2e-dup, ${FAKEBIN2}/e2e-dup"
         notExpected:
           stdOut: ["multiple present e2e-present"]
+
+      - name: InstallToolPackagesInstallsPinnedAndRolling
+        command: che packages install --packages-file ${LOCAL}/packages.yml --kind=vscode e2e.pinned-ext e2e.rolling-ext
+        expected:
+          exitCode: 0
+          stdOut:
+            - "installed vscode/e2e.pinned-ext 1.2.3 via vscode"
+            - "installed vscode/e2e.rolling-ext via vscode"
+
+      - name: InstallToolPackagesSecondRunSkipsPresent
+        command: che packages install --packages-file ${LOCAL}/packages.yml --kind=vscode e2e.pinned-ext
+        expected:
+          exitCode: 0
+          stdOut:
+            - "vscode/e2e.pinned-ext: ✅ already installed via vscode"
+        notExpected:
+          stdOut: ["installed vscode/e2e.pinned-ext"]
+
+      - name: InstallToolPackagesFailsOnUnknownName
+        command: che packages install --packages-file ${LOCAL}/packages.yml --kind=vscode nosuch.ext
+        expected:
+          exitCode: 1
+          stdOut:
+            - "unknown vscode package: nosuch.ext (required entry in toolPackages.vscode of ${LOCAL}/packages.yml)"
+
+      - name: CheckToolPackagesPresentFailsOnMissing
+        command: che packages check-present --packages-file ${LOCAL}/packages.yml --kind=vscode e2e.pinned-ext e2e.absent-ext
+        expected:
+          exitCode: 1
+          stdOut:
+            - "missing vscode/e2e.absent-ext"
+        notExpected:
+          stdOut: ["missing vscode/e2e.pinned-ext"]
 ##[<] 🤖🤖

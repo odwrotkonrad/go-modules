@@ -1,0 +1,17 @@
+# [>] 🤖🤖
+context:
+  function: fsutil.ParseBackupArchiveName
+cases:
+  - name: ShouldSplitTimestampAndBackupID
+    input:
+      args:
+        - path: /x/backups/cli-macos/backup/20260721T114639-a1b2c3d4e5f6.tar.bz2
+    expected:
+      output: {ts: 20260721T114639, id: a1b2c3d4e5f6}
+  - name: ShouldTreatLegacyNameAsTimestampOnly
+    input:
+      args:
+        - path: /x/backups/legacy.tar.bz2
+    expected:
+      output: {ts: legacy}
+# [<] 🤖🤖

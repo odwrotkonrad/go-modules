@@ -7,6 +7,8 @@ import (
 
 	"github.com/stretchr/testify/require"
 	"gopkg.in/yaml.v3"
+
+	"gitlab.com/konradodwrot/go-modules/lib/testyml"
 )
 
 func loadDoc(t *testing.T, src string) []ProfileRecipe {
@@ -21,45 +23,65 @@ func loadDoc(t *testing.T, src string) []ProfileRecipe {
 	return d.ProfileRecipes
 }
 
+type packageRefGot struct {
+	Name          string   `yaml:"name"`
+	Versions      []string `yaml:"versions,omitempty"`
+	GlobalVersion string   `yaml:"globalVersion,omitempty"`
+}
+
+func summarizeRef(r PackageRef) packageRefGot {
+	return packageRefGot{Name: r.Name, Versions: r.Versions, GlobalVersion: r.GlobalVersion}
+}
+
+func TestPackageRefUnmarshal(t *testing.T) {
+	testyml.Eq(t, td, "testdata/spec/funcs/package_ref.test.spec.yml", func(t *testing.T, c testyml.Case[packageRefGot]) (packageRefGot, error) {
+		var ref PackageRef
+		if err := yaml.Unmarshal([]byte(c.Input.Args.String(t, 0)), &ref); err != nil {
+			return packageRefGot{}, err
+		}
+		return summarizeRef(ref), nil
+	})
+}
+
 func TestMakeProfileInstallPackages(t *testing.T) {
-	recipes := loadDoc(t, `
-base:
-  include:
-    installPackages: [git, jq]
-main:
-  include:
-    profiles: [base]
-    installPackages: [{name: jq, versions: "1.7.*"}, tmux, kind]
-  exclude:
-    installPackages: [kind]
-`)
-	rec, err := FindRecipe(recipes, "main")
-	require.NoError(t, err)
-	ops, _, err := rec.MakeProfile(recipes, t.TempDir())
-	require.NoError(t, err)
-	require.Equal(t, []PackageRef{{Name: "git"}, {Name: "jq", Versions: StringOrList{"1.7.*"}}, {Name: "tmux"}}, ops.InstallPackages.Packages)
+	testyml.Eq(t, td, "testdata/spec/funcs/make_profile_packages.test.spec.yml", func(t *testing.T, c testyml.Case[[]packageRefGot]) ([]packageRefGot, error) {
+		recipes := loadDoc(t, c.Input.Args.String(t, 0))
+		rec, err := FindRecipe(recipes, c.Input.Args.String(t, 1))
+		require.NoError(t, err)
+		ops, _, err := rec.MakeProfile(recipes, t.TempDir())
+		if err != nil {
+			return nil, err
+		}
+		got := make([]packageRefGot, 0, len(ops.InstallPackages.Packages))
+		for _, r := range ops.InstallPackages.Packages {
+			got = append(got, summarizeRef(r))
+		}
+		return got, nil
+	})
 }
 
-func TestPackageRefRequiresName(t *testing.T) {
-	var ref PackageRef
-	require.ErrorContains(t, yaml.Unmarshal([]byte("{versions: 1.2.3}"), &ref), "requires name")
+type toolPackageRefGot struct {
+	Name    string `yaml:"name"`
+	Version string `yaml:"version,omitempty"`
 }
 
-func TestPackageRefVersionListAndGlobal(t *testing.T) {
-	var ref PackageRef
-	require.NoError(t, yaml.Unmarshal([]byte(`{name: node, versions: [24.16.0, 22.14.0], globalVersion: 22.14.0}`), &ref))
-	require.Equal(t, StringOrList{"24.16.0", "22.14.0"}, ref.Versions)
-	require.Equal(t, "22.14.0", ref.GlobalVersion)
-
-	var scalar PackageRef
-	require.NoError(t, yaml.Unmarshal([]byte(`{name: go, versions: 1.26.4}`), &scalar))
-	require.Equal(t, StringOrList{"1.26.4"}, scalar.Versions)
-}
-
-func TestPackageRefGlobalVersionMustBeListed(t *testing.T) {
-	var ref PackageRef
-	err := yaml.Unmarshal([]byte(`{name: node, versions: [24.16.0], globalVersion: 22.14.0}`), &ref)
-	require.ErrorContains(t, err, "globalVersion 22.14.0 is not among versions")
+func TestMakeProfileInstallToolPackages(t *testing.T) {
+	testyml.Eq(t, td, "testdata/spec/funcs/make_profile_tool_packages.test.spec.yml", func(t *testing.T, c testyml.Case[map[string][]toolPackageRefGot]) (map[string][]toolPackageRefGot, error) {
+		recipes := loadDoc(t, c.Input.Args.String(t, 0))
+		rec, err := FindRecipe(recipes, c.Input.Args.String(t, 1))
+		require.NoError(t, err)
+		ops, _, err := rec.MakeProfile(recipes, t.TempDir())
+		if err != nil {
+			return nil, err
+		}
+		got := map[string][]toolPackageRefGot{}
+		for tool, refs := range ops.InstallPackages.ToolPackages {
+			for _, r := range refs {
+				got[tool] = append(got[tool], toolPackageRefGot(r))
+			}
+		}
+		return got, nil
+	})
 }
 
 // [<] 🤖🤖

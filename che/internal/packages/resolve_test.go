@@ -75,6 +75,9 @@ func TestItemUnmarshal(t *testing.T) {
 		if it.BinariesRemoteArchive != nil {
 			got.Version, got.URL, got.Platforms, got.Checksums = it.BinariesRemoteArchive.Version, it.BinariesRemoteArchive.URL, it.BinariesRemoteArchive.PlatformEligibility.Names, it.BinariesRemoteArchive.PlatformEligibility.Checksums
 		}
+		if it.BuildFromSource != nil {
+			got.Version, got.URL, got.Platforms = it.BuildFromSource.Version, it.BuildFromSource.URL, it.BuildFromSource.PlatformEligibility.Names
+		}
 		if it.Script != nil {
 			got.Run, got.ScriptOs = strings.TrimSpace(it.Script.Run), it.Script.OS
 			got.ScriptPath, got.ScriptURL = it.Script.Path, it.Script.URL
@@ -96,6 +99,88 @@ func TestMerge(t *testing.T) {
 			}
 		}
 		return got, nil
+	})
+}
+
+type zshCompGot struct {
+	Name string `yaml:"name,omitempty"`
+	URL  string `yaml:"url,omitempty"`
+	Cmd  string `yaml:"cmd,omitempty"`
+}
+
+type entryGot struct {
+	Mgrs         []string          `yaml:"mgrs,omitempty"`
+	Verify       string            `yaml:"verify,omitempty"`
+	ItemVerifies []string          `yaml:"itemVerifies,omitempty"`
+	Name         string            `yaml:"name,omitempty"`
+	Aliases      map[string]string `yaml:"aliases,omitempty"`
+	Completions  *zshCompGot       `yaml:"completionsZsh,omitempty"`
+}
+
+func formatVerify(v *VerifySpec) string {
+	switch {
+	case v == nil:
+		return ""
+	case v.VersionCmd:
+		return "versionCmd"
+	case v.PkgMgrVersionCheck:
+		return "pkgMgrVersionCheck"
+	case v.Cmd != "":
+		return "cmd: " + v.Cmd
+	}
+	return "set"
+}
+
+func summarizeEntries(f *File) map[string]entryGot {
+	got := map[string]entryGot{}
+	for name, e := range f.Packages {
+		g := entryGot{Verify: formatVerify(e.Verify)}
+		anyItemVerify := false
+		for _, it := range e.Items {
+			g.Mgrs = append(g.Mgrs, it.Mgr)
+			v := formatVerify(it.Verify)
+			g.ItemVerifies = append(g.ItemVerifies, v)
+			anyItemVerify = anyItemVerify || v != ""
+			if it.Apt != nil && it.Apt.PackageName != "" {
+				g.Name = it.Apt.PackageName
+			}
+			if len(it.AliasBinary) > 0 {
+				g.Aliases = it.AliasBinary
+			}
+		}
+		if !anyItemVerify {
+			g.ItemVerifies = nil
+		}
+		if z := e.Completions.Zsh; z != nil {
+			g.Completions = &zshCompGot{Name: z.Name, URL: z.URL, Cmd: z.Cmd}
+		}
+		got[name] = g
+	}
+	return got
+}
+
+func TestEntryUnmarshal(t *testing.T) {
+	testyml.Eq(t, td, "testdata/spec/funcs/entry_unmarshal.test.spec.yml", func(t *testing.T, c testyml.Case[map[string]entryGot]) (map[string]entryGot, error) {
+		var f File
+		if err := yaml.Unmarshal([]byte(c.Input.Args.String(t, 0)), &f); err != nil {
+			return nil, err
+		}
+		if c.Input.Args.Bool(t, 1) {
+			if err := f.ValidatePlatforms(); err != nil {
+				return nil, err
+			}
+		}
+		if c.Input.Args.Bool(t, 2) {
+			out, err := f.YAML()
+			require.NoError(t, err)
+			var reparsed File
+			require.NoError(t, yaml.Unmarshal([]byte(out), &reparsed))
+			out2, err := reparsed.YAML()
+			require.NoError(t, err)
+			require.Equal(t, out, out2)
+			f = reparsed
+		}
+		return summarizeEntries(&f), nil
 	})
 }
 

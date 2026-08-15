@@ -1,0 +1,29 @@
+# [>] 🤖🤖
+context:
+  function: che.resolvePackagesFile
+cases:
+  - name: ShouldNestUnderXdgConfigHome
+    input:
+      args:
+        - env: {XDG_CONFIG_HOME: /xdg}
+        - home: /home/u
+        - packagesFile: ""
+    expected:
+      output: /xdg/packages/packages.yml
+  - name: ShouldDefaultToHomeConfigPackages
+    input:
+      args:
+        - env: {}
+        - home: /home/u
+        - packagesFile: ""
+    expected:
+      output: /home/u/.config/packages/packages.yml
+  - name: ShouldPreferExplicitPackagesFileOption
+    input:
+      args:
+        - env: {XDG_CONFIG_HOME: /xdg}
+        - home: /home/u
+        - packagesFile: /x.yml
+    expected:
+      output: /x.yml
+# [<] 🤖🤖

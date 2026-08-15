@@ -1,0 +1,26 @@
+# [>] 🤖🤖
+context:
+  function: telemetry.Telemetry.registerCounters
+cases:
+  - name: ShouldSumEveryCounterByItsLabels
+    input:
+      args:
+        - calls:
+            - {count: command, args: [all]}
+            - {count: spec}
+            - {count: profile, args: [cli]}
+            - {count: operation, args: [make-links]}
+            - {count: unit, args: [link, create, all]}
+            - {count: unit, args: [link, create, all]}
+            - {count: unit, args: [link, noop, all]}
+            - {count: error, args: [make-links]}
+    expected:
+      output:
+        "che.command.runs.total|command=all": 1
+        "che.spec.runs.total|": 1
+        "che.profile.runs.total|profile=cli": 1
+        "che.operation.runs.total|op=make-links": 1
+        "che.unit.total|command=all,kind=link,op_type=create": 2
+        "che.unit.total|command=all,kind=link,op_type=noop": 1
+        "che.errors.total|op=make-links": 1
+# [<] 🤖🤖

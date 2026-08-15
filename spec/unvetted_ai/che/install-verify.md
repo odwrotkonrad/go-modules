@@ -2,9 +2,9 @@
 
 <!-- [>] 🤖🤖 -->
 
-The `verify:` key in packages.yml declares how an install is proven. It lives
-on a package entry (applies to every method) and on an installer item
-(overrides the entry for that method). Values:
+The `verify:` key in packages.yml declares how an install is proven: on a
+package entry (every method) or on an installer item (overrides the entry for
+its method). Values:
 
 - `versionCmd` (default when absent, scalar shorthand or `versionCmd: true`):
   run the entry's command with `--version` (fallback `version`), exit 0 and
@@ -12,11 +12,11 @@ on a package entry (applies to every method) and on an installer item
 - `pkgMgrVersionCheck` (scalar shorthand or `pkgMgrVersionCheck: true`): ask the
   installing manager for the installed version (apt: `dpkg-query -W`, brew:
   `brew list --versions`, brew/cask: `brew list --cask --versions`, npm:
-  `npm ls --global`, vscode: `code --list-extensions --show-versions`),
+  `npm ls --global`),
   exit 0 and non-empty output required
 - `cmd: <command>`: run the command, exit 0 alone means verified
 - object form combines: each strategy is its own key, several keys run all of
-  them; `checkInPath: false` (default true) additionally disables the PATH
+  them. `checkInPath: false` (default true) additionally disables the PATH
   presence probe
 
 Scenario: an installed package verifies by running its command by default
@@ -54,7 +54,7 @@ Scenario: a binary-less apt package verifies via the manager's version query
 
 Scenario: pkgMgrVersionCheck resolves per manager
   Status: implemented
-  Given an entry with `verify: pkgMgrVersionCheck` and brew, brew/cask, npm or vscode methods
+  Given an entry with `verify: pkgMgrVersionCheck` and brew, brew/cask or npm methods
   When the install e2e runs
   Then each method verifies via its own manager's version query
 

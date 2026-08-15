@@ -19,7 +19,7 @@ Available Commands:
   make-links              symlink op (configs into system root)
   packages                install packages from packages.yml and check their state
     check-not-shadowed    warn when a package's manager-expected binary is not the first PATH hit
-    check-present         check the canonical commands resolve on PATH (errors on any missing)
+    check-present         check the canonical commands resolve on PATH (errors on any missing); --kind=<tool> checks the tool's installed packages instead
     check-single-present  warn when a canonical command resolves in more than one PATH dir, listing every location
     check-upgradable      warn on manager-reported outdated packages and binary pins drifted from --version output
     config                inspect the resolved packages database

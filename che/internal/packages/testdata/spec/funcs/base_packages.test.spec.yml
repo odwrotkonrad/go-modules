@@ -1,0 +1,83 @@
+# [>] 🤖🤖
+context:
+  function: packages.Installer.installBasePackages
+cases:
+  - name: ShouldInstallOnlyCommonBaseForOtherMethods
+    input:
+      args:
+        - files: |
+            basePackages:
+              common: [curl]
+              apt: [ca-certificates, gnupg]
+            packages:
+              curl: [brew, apt]
+              ca-certificates: [apt]
+              gnupg: [brew, apt]
+              jq: [brew, apt]
+              bat: [brew, apt]
+        - cfg:
+            os: darwin
+            cmds: [brew]
+            failOn: [brew list]
+            packages: [jq]
+    expected:
+      output:
+        calls: [brew install curl]
+    notExpected:
+      output:
+        calls: [brew install ca-certificates]
+  - name: ShouldSkipBasePackagesOnDryRun
+    input:
+      args:
+        - files: |
+            basePackages:
+              common: [curl]
+              apt: [ca-certificates, gnupg]
+            packages:
+              curl: [brew, apt]
+              ca-certificates: [apt]
+              gnupg: [brew, apt]
+              jq: [brew, apt]
+              bat: [brew, apt]
+        - cfg:
+            cmds: [apt-get]
+            dryRun: true
+            failOn: [dpkg -s]
+            packages: [jq]
+    expected: {}
+    notExpected:
+      output:
+        calls: [--no-install-recommends curl]
+  - name: ShouldSkipBrewBootstrapWhenPresent
+    input:
+      args:
+        - files: |
+            basePackages:
+              brew: [brew]
+            packages:
+              brew:
+                installers: [{script: {os: darwin, url: https://example.com/install.sh}}]
+              jq: [brew]
+        - cfg:
+            os: darwin
+            cmds: [brew]
+            failOn: [brew list]
+            packages: [jq]
+    expected:
+      output:
+        calls: [brew install jq]
+    notExpected:
+      output:
+        calls: [che-script-]
+  - name: ShouldTreatAbsentBasePackagesAsNoop
+    input:
+      args:
+        - files: "packages:\n  jq: [apt]"
+        - cfg:
+            cmds: [apt-get]
+            failOn: [dpkg -s]
+            packages: [jq]
+    expected:
+      output:
+        calls: [--no-install-recommends jq]
+# [<] 🤖🤖

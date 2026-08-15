@@ -1,0 +1,14 @@
+#!/bin/sh
+##[>] 🤖🤖
+state="${E2E_CODE_STATE:-$HOME/.e2e-code-extensions}"
+touch "$state"
+case "$1" in
+  --install-extension)
+    name=$2
+    case "$name" in (*@*) ;; (*) name="$name@0.0.1";; esac
+    printf '%s\n' "$name" >> "$state" ;;
+  --list-extensions)
+    cat "$state" ;;
+esac
+exit 0
+##[<] 🤖🤖

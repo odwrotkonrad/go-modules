@@ -87,7 +87,7 @@ type Run struct {
 
 type Packages struct {
 	File                         string                       `yaml:"file" jsonschema_description:"packages.yml path; default $XDG_CONFIG_HOME/packages/packages.yml; overridden by --packages-file and CHE_PACKAGES_FILE"`
-	PreferredInstallationMethods []string                     `yaml:"preferredInstallationMethods" jsonschema:"enum=brew,enum=cask,enum=apt,enum=npm,enum=go,enum=gem,enum=binariesRemoteArchive,enum=script,enum=vscode,enum=pyenv,enum=nvm" jsonschema_description:"manager preference order: listed managers are tried first (in this order) within each package entry, unlisted ones follow in entry order; cascades profile > spec > user config; overridden by CHE_PACKAGES_PREFERRED_METHODS"`
+	PreferredInstallationMethods []string                     `yaml:"preferredInstallationMethods" jsonschema:"enum=brew,enum=cask,enum=apt,enum=npm,enum=go,enum=gem,enum=binariesRemoteArchive,enum=script,enum=pyenv,enum=nvm,enum=nix" jsonschema_description:"manager preference order: listed managers are tried first (in this order) within each package entry, unlisted ones follow in entry order; cascades profile > spec > user config; overridden by CHE_PACKAGES_PREFERRED_METHODS"`
 	BinariesRemoteArchive        BinariesRemoteArchiveInstall `yaml:"binariesRemoteArchive" jsonschema_description:"binariesRemoteArchive installation method options"`
 	Completions                  CompletionsInstall           `yaml:"completions" jsonschema_description:"zsh completions installation options"`
 }
@@ -153,6 +153,42 @@ func (p PackageRef) JSONSchema() *jsonschema.Schema {
 	return &jsonschema.Schema{OneOf: []*jsonschema.Schema{{Type: "string"}, obj}}
 }
 
+type ToolPackageRef struct {
+	Name    string `yaml:"name" jsonschema_description:"package name in the tool's toolPackages map"`
+	Version string `yaml:"version,omitempty" jsonschema_description:"version pin overriding the toolPackages entry's value"`
+}
+
+func (p *ToolPackageRef) UnmarshalYAML(node *yaml.Node) error {
+	if node.Kind == yaml.ScalarNode {
+		p.Name = node.Value
+		return nil
+	}
+	var obj struct {
+		Name    string `yaml:"name"`
+		Version string `yaml:"version"`
+	}
+	if err := node.Decode(&obj); err != nil {
+		return err
+	}
+	if obj.Name == "" {
+		return fmt.Errorf("installToolPackages object form requires name")
+	}
+	p.Name, p.Version = obj.Name, obj.Version
+	return nil
+}
+
+func (p ToolPackageRef) JSONSchema() *jsonschema.Schema {
+	obj := &jsonschema.Schema{
+		Type:                 "object",
+		Properties:           jsonschema.NewProperties(),
+		Required:             []string{"name"},
+		AdditionalProperties: jsonschema.FalseSchema,
+	}
+	obj.Properties.Set("name", &jsonschema.Schema{Type: "string", Description: "package name in the tool's toolPackages map"})
+	obj.Properties.Set("version", &jsonschema.Schema{Type: "string", Description: "version pin overriding the toolPackages entry's value"})
+	return &jsonschema.Schema{OneOf: []*jsonschema.Schema{{Type: "string"}, obj}}
+}
+
 type StringOrList []string
 
 type Scalar string
@@ -195,22 +231,24 @@ type ProfileOptions struct {
 }
 
 type includeSet struct {
-	Profiles        []ProfileSourceRecipe `yaml:"profiles" jsonschema_description:"profile refs composed depth-first before this profile's own payload: local profile name scalar, or {source, options, env} where source is <source>/<spec-file>.yml::<profile> locating a profile in another spec (its own checkout anchor)"`
-	MakeLinks       []linkEntry           `yaml:"makeLinks" jsonschema_description:"symlink-op entries, workingDirectory-relative: glob string (dest derived 1:1), {source, dest: [paths]} explicit per-file dests, or {source, dest} dest rewrite (sed-style s:^_home:$HOME: or prefix-swap sugar {source: _home/**, dest: $HOME/**} to target home)"`
-	MakeCopies      []entry               `yaml:"makeCopies" jsonschema_description:"*.ontoHost.cp copy-op perm-groups, workingDirectory-relative sources; a glob source may carry a {source, dest} dest rewrite (sed-style s:^_home:$HOME: or prefix-swap sugar _home/** -> $HOME/**)"`
-	RenderTemplates []templateGroup       `yaml:"renderTemplates" jsonschema_description:"*.tpl render-op perm-groups; local host sources workingDirectory-relative, repo-doc sources (repo dest) workingDirectory-relative, or remote (@<repo>//<path>[?ref=<ref>], explicit dest required); glob and derived-dest forms are host sources; a glob source may carry a {source, dest} dest rewrite (sed-style s:^_home:$HOME: or prefix-swap sugar _home/** -> $HOME/**); dests expand env vars incl ${invokingSpecGitRoot}, the top-level spec's checkout"`
-	MakeDirs        []dirGroup            `yaml:"makeDirs" jsonschema_description:"extra-dir perm-groups; each item one dir path (brace-expanded)"`
-	InstallPackages []PackageRef          `yaml:"installPackages" jsonschema_description:"packages installed from the packages file (default $XDG_CONFIG_HOME/packages/packages.yml): canonical name scalar, or {name, version} to install a specific version (exact or wildcard), overriding the entry's default version; runs before runScripts"`
-	Scripts         []string              `yaml:"runScripts" jsonschema_description:"script paths or globs, repo-relative, run in spec order"`
+	Profiles            []ProfileSourceRecipe       `yaml:"profiles" jsonschema_description:"profile refs composed depth-first before this profile's own payload: local profile name scalar, or {source, options, env} where source is <source>/<spec-file>.yml::<profile> locating a profile in another spec (its own checkout anchor)"`
+	MakeLinks           []linkEntry                 `yaml:"makeLinks" jsonschema_description:"symlink-op entries, workingDirectory-relative: glob string (dest derived 1:1), {source, dest: [paths]} explicit per-file dests, or {source, dest} dest rewrite (sed-style s:^_home:$HOME: or prefix-swap sugar {source: _home/**, dest: $HOME/**} to target home)"`
+	MakeCopies          []entry                     `yaml:"makeCopies" jsonschema_description:"*.ontoHost.cp copy-op perm-groups, workingDirectory-relative sources; a glob source may carry a {source, dest} dest rewrite (sed-style s:^_home:$HOME: or prefix-swap sugar _home/** -> $HOME/**)"`
+	RenderTemplates     []templateGroup             `yaml:"renderTemplates" jsonschema_description:"*.tpl render-op perm-groups; local host sources workingDirectory-relative, repo-doc sources (repo dest) workingDirectory-relative, or remote (@<repo>//<path>[?ref=<ref>], explicit dest required); glob and derived-dest forms are host sources; a glob source may carry a {source, dest} dest rewrite (sed-style s:^_home:$HOME: or prefix-swap sugar _home/** -> $HOME/**); dests expand env vars incl ${invokingSpecGitRoot}, the top-level spec's checkout"`
+	MakeDirs            []dirGroup                  `yaml:"makeDirs" jsonschema_description:"extra-dir perm-groups; each item one dir path (brace-expanded)"`
+	InstallPackages     []PackageRef                `yaml:"installPackages" jsonschema_description:"packages installed from the packages file (default $XDG_CONFIG_HOME/packages/packages.yml): canonical name scalar, or {name, version} to install a specific version (exact or wildcard), overriding the entry's default version; runs before runScripts"`
+	InstallToolPackages map[string][]ToolPackageRef `yaml:"installToolPackages" jsonschema_description:"tool-scoped packages installed from the packages file's toolPackages section, per host tool: name scalar, or {name, version} overriding the entry's pin; runs with installPackages"`
+	Scripts             []string                    `yaml:"runScripts" jsonschema_description:"script paths or globs, repo-relative, run in spec order"`
 }
 
 type excludeSet struct {
-	MakeLinks       []string `yaml:"makeLinks" jsonschema_description:"drop matching link items"`
-	MakeCopies      []string `yaml:"makeCopies" jsonschema_description:"drop matching copy items (source or dest)"`
-	RenderTemplates []string `yaml:"renderTemplates" jsonschema_description:"drop matching template items (source or dest)"`
-	MakeDirs        []string `yaml:"makeDirs" jsonschema_description:"drop matching dirs"`
-	InstallPackages []string `yaml:"installPackages" jsonschema_description:"drop matching canonical package names"`
-	Scripts         []string `yaml:"runScripts" jsonschema_description:"drop matching scripts (resolved file paths)"`
+	MakeLinks           []string            `yaml:"makeLinks" jsonschema_description:"drop matching link items"`
+	MakeCopies          []string            `yaml:"makeCopies" jsonschema_description:"drop matching copy items (source or dest)"`
+	RenderTemplates     []string            `yaml:"renderTemplates" jsonschema_description:"drop matching template items (source or dest)"`
+	MakeDirs            []string            `yaml:"makeDirs" jsonschema_description:"drop matching dirs"`
+	InstallPackages     []string            `yaml:"installPackages" jsonschema_description:"drop matching canonical package names"`
+	InstallToolPackages map[string][]string `yaml:"installToolPackages" jsonschema_description:"drop matching package names per host tool"`
+	Scripts             []string            `yaml:"runScripts" jsonschema_description:"drop matching scripts (resolved file paths)"`
 }
 
 type linkEntry struct {
@@ -313,7 +351,8 @@ type (
 	}
 	InstallPackagesOperationRecipe struct {
 		OperationRecipe
-		Packages []PackageRef
+		Packages     []PackageRef
+		ToolPackages map[string][]ToolPackageRef
 	}
 	RunScriptsOperationRecipe struct {
 		OperationRecipe
@@ -336,13 +375,14 @@ type OperationRecipes struct {
 // [>] 🤖🤖 internals
 
 type resolved struct {
-	Links     []FileItem
-	Copies    []FileItem
-	Templates []FileItem
-	Dirs      []string
-	ExtraDirs []FileItem
-	Packages  []PackageRef
-	Scripts   []string
+	Links        []FileItem
+	Copies       []FileItem
+	Templates    []FileItem
+	Dirs         []string
+	ExtraDirs    []FileItem
+	Packages     []PackageRef
+	ToolPackages map[string][]ToolPackageRef
+	Scripts      []string
 }
 
 type destRule struct {
@@ -365,17 +405,18 @@ type globPerm struct {
 }
 
 type effective struct {
-	linkGlobs globSet
-	copyGlobs globSet
-	tmplGlobs globSet
-	richLink  []FileItem
-	richCopy  []FileItem
-	richTmpl  []FileItem
-	dirs      []FileItem
-	packages  []PackageRef
-	scripts   []string
-	refs      []ProfileSourceRecipe
-	exclude   excludeSet
+	linkGlobs    globSet
+	copyGlobs    globSet
+	tmplGlobs    globSet
+	richLink     []FileItem
+	richCopy     []FileItem
+	richTmpl     []FileItem
+	dirs         []FileItem
+	packages     []PackageRef
+	toolPackages map[string][]ToolPackageRef
+	scripts      []string
+	refs         []ProfileSourceRecipe
+	exclude      excludeSet
 }
 
 // [<] 🤖🤖

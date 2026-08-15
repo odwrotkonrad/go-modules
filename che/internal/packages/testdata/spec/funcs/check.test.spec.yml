@@ -1,0 +1,118 @@
+# [>] 🤖🤖
+context:
+  function: packages.Installer.CheckPresent
+cases:
+  - name: ShouldReportMissingPackages
+    input:
+      args:
+        - files: "packages:\n  bat: [brew]\n  fd: [brew]"
+        - cfg:
+            os: darwin
+            cmds: [bat]
+            method: checkPresent
+            packages: [bat, fd]
+    expected:
+      stdOut: [missing fd]
+      output:
+        missing: [fd]
+  - name: ShouldSkipPathProbeWhenCheckInPathDisabled
+    input:
+      args:
+        - files: |
+            packages:
+              apt-transport-https:
+                installers:
+                  - apt:
+                      verify:
+                        pkgMgrVersionCheck: true
+                        checkInPath: false
+              nvm:
+                verify:
+                  cmd: "true"
+                  checkInPath: false
+                installers:
+                  - script:
+                      url: https://example.com/install.sh
+              fd: [apt]
+        - cfg:
+            cmds: [apt-get]
+            method: checkPresent
+            packages: [apt-transport-https, nvm, fd]
+    expected:
+      stdOut: [missing fd]
+      output:
+        missing: [fd]
+    notExpected:
+      stdOut: [missing apt-transport-https, missing nvm]
+  - name: ShouldReportBrewOutdatedAsUpgradable
+    input:
+      args:
+        - files: "packages:\n  bat: [brew]\n  fd: [brew]"
+        - cfg:
+            os: darwin
+            cmds: [brew]
+            method: checkUpgradable
+            stubs:
+              - {prefix: brew outdated, output: "bat\n"}
+            packages: [bat, fd]
+    expected:
+      stdOut: [upgradable bat via brew]
+    notExpected:
+      stdOut: [upgradable fd via brew]
+  - name: ShouldReportBinaryPinDriftAsUpgradable
+    input:
+      args:
+        - files: |
+            packages:
+              kind:
+                - binariesRemoteArchive:
+                    platformEligibility:
+                      - linux-amd64: sha256:goodsha
+                    version: 0.32.0
+                    url: https://example.com/v{version}/kind-{os}-{arch}
+        - cfg:
+            cmds: [kind]
+            method: checkUpgradable
+            stubs:
+              - {prefix: "kind ", output: "kind version 0.30.0\n"}
+            packages: [kind]
+    expected:
+      stdOut: ["upgradable kind via binariesRemoteArchive: yaml pins 0.32.0"]
+  - name: ShouldReportScriptPinDriftAsUpgradable
+    input:
+      args:
+        - files: |
+            packages:
+              gcloud:
+                - script:
+                    platformEligibility:
+                      - darwin-arm64: sha256:gsha
+                    os: darwin
+                    version: 572.0.0
+                    run: echo install-gcloud
+        - cfg:
+            os: darwin
+            arch: arm64
+            cmds: [gcloud]
+            method: checkUpgradable
+            stubs:
+              - {prefix: "gcloud ", output: "Google Cloud SDK 570.0.0\n"}
+            packages: [gcloud]
+    expected:
+      stdOut: ["upgradable gcloud via script: yaml pins 572.0.0"]
+  - name: ShouldReportAptAndNpmOutdatedAsUpgradable
+    input:
+      args:
+        - files: "packages:\n  jq: [apt]\n  corepack: [npm]\n  fd: [apt]"
+        - cfg:
+            cmds: [apt-get, npm, corepack, jq, fd]
+            method: checkUpgradable
+            stubs:
+              - {prefix: apt list, output: "Listing...\njq/stable 1.7 amd64 [upgradable from: 1.6]\n"}
+              - {prefix: npm outdated, output: "/g:corepack@0.30.0:corepack@0.29.0:\n"}
+            packages: [jq, corepack, fd]
+    expected:
+      stdOut: [upgradable jq via apt, upgradable corepack via npm]
+    notExpected:
+      stdOut: [upgradable fd]
+# [<] 🤖🤖

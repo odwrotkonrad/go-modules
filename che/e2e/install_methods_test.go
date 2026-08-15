@@ -22,6 +22,7 @@ import (
 	"time"
 
 	"github.com/stretchr/testify/require"
+	"gopkg.in/yaml.v3"
 
 	"gitlab.com/konradodwrot/go-modules/che/internal/fsutil"
 	"gitlab.com/konradodwrot/go-modules/che/internal/packages"
@@ -35,10 +36,13 @@ import (
 //	subtest per entry method; E2E_INSTALL_METHOD narrows methods (exact or
 //	<method>/ prefix); E2E_INSTALL_PACKAGES_PER_METHOD caps packages per method
 type installJob struct {
-	packages    []string
-	onlyMethods []string
-	verify      map[string]pkgVerify
-	warnMissing bool
+	packages     []string
+	onlyMethods  []string
+	kind         string
+	packagesYAML string
+	setupShell   string
+	verify       map[string]pkgVerify
+	warnMissing  bool
 }
 
 type verifyCmd struct {
@@ -216,6 +220,56 @@ func runPackageMode(t *testing.T, sel, method string, cfg runCfg) {
 			runPackageMethods(t, file.Packages[name], name, method, cfg, eligible, lenient, limit, used)
 		})
 	}
+	if lenient {
+		runToolPackages(t, file, method, cfg)
+	}
+}
+
+const fakeCodeShim = `mkdir -p "$HOME/.local/bin"
+cat > "$HOME/.local/bin/code" <<'FAKECODE'
+#!/bin/sh
+state="$HOME/.fake-code-extensions"
+touch "$state"
+case "$1" in
+--install-extension)
+    name=$2
+    case "$name" in (*@*) ;; (*) name="$name@0.0.1";; esac
+    printf '%s\n' "$name" >> "$state"
+    ;;
+--list-extensions)
+    cat "$state"
+    ;;
+esac
+exit 0
+FAKECODE
+chmod +x "$HOME/.local/bin/code"`
+
+func runToolPackages(t *testing.T, file *packages.File, method string, cfg runCfg) {
+	for _, tool := range slices.Sorted(maps.Keys(file.ToolPackages)) {
+		key := "toolPackages/" + tool
+		if !methodMatches(key, method) {
+			continue
+		}
+		names := slices.Sorted(maps.Keys(file.ToolPackages[tool]))
+		t.Run(key, func(t *testing.T) {
+			src, err := yaml.Marshal(map[string]packages.ToolPackagesMap{"toolPackages": file.ToolPackages})
+			require.NoError(t, err)
+			verify := map[string]pkgVerify{}
+			for _, name := range names {
+				verify[name] = pkgVerify{cmds: []verifyCmd{{
+					cmd:     fmt.Sprintf("code --list-extensions --show-versions | grep -i '^%s@'", name),
+					wantOut: true,
+				}}}
+			}
+			runJob(t, installJob{
+				packages:     names,
+				kind:         tool,
+				packagesYAML: string(src),
+				setupShell:   fakeCodeShim,
+				verify:       verify,
+			}, cfg)
+		})
+	}
 }
 
 func runPackageMethods(t *testing.T, entry packages.Entry, pkg, method string, cfg runCfg, eligible []string, lenient bool, limit int, used map[string]int) {
@@ -253,7 +307,7 @@ func resolveVerify(t *testing.T, entry packages.Entry, pkg, mgr string) pkgVerif
 	if entry.Command != "" {
 		name = entry.Command
 	}
-	pv := pkgVerify{cmd: name, checkPath: spec.ChecksPath() && mgr != "vscode"}
+	pv := pkgVerify{cmd: name, checkPath: spec.ChecksPath()}
 	if spec != nil {
 		if spec.VersionCmd {
 			pv.cmds = append(pv.cmds, defaultVerify(entry, pkg))
@@ -290,12 +344,6 @@ func resolveVerify(t *testing.T, entry packages.Entry, pkg, mgr string) pkgVerif
 		pv.cmds = append(pv.cmds, defaultVerify(entry, pkg))
 		return pv
 	}
-	if mgr == "vscode" {
-		cmd, err := pkgMgrVersionCheck(entry, pkg, mgr)
-		require.NoError(t, err)
-		pv.cmds = []verifyCmd{{cmd: cmd, wantOut: true}}
-		return pv
-	}
 	pv.cmds = []verifyCmd{defaultVerify(entry, pkg)}
 	return pv
 }
@@ -314,9 +362,12 @@ func pkgMgrVersionCheck(entry packages.Entry, pkg, mgr string) (string, error) {
 		if it.Mgr != mgr {
 			continue
 		}
-		if it.Apt != nil && it.Apt.PackageName != "" {
+		switch {
+		case it.Apt != nil && it.Apt.PackageName != "":
 			name = it.Apt.PackageName
-		} else if it.Name != "" {
+		case it.Nix != nil && it.Nix.PackageName != "":
+			name = it.Nix.PackageName
+		case it.Name != "":
 			name = it.Name
 		}
 	}
@@ -332,8 +383,8 @@ func pkgMgrVersionCheck(entry packages.Entry, pkg, mgr string) (string, error) {
 		return "brew list --cask --versions " + name, nil
 	case "npm":
 		return "npm ls --global " + name, nil
-	case "vscode":
-		return fmt.Sprintf("code --list-extensions --show-versions | grep -i '^%s@'", name), nil
+	case "nix":
+		return fmt.Sprintf("nix profile list | grep -i %s", name), nil
 	}
 	return "", fmt.Errorf("verify pkgMgrVersionCheck: no version query for method %s", mgr)
 }
@@ -370,7 +421,14 @@ func runJob(t *testing.T, job installJob, cfg runCfg) {
 }
 
 func installArgv(job installJob) []string {
-	argv := []string{"packages", "install", "--packages-file", packages.BuiltinSentinel}
+	file := packages.BuiltinSentinel
+	if job.packagesYAML != "" {
+		file = "packages.e2e.yml"
+	}
+	argv := []string{"packages", "install", "--packages-file", file}
+	if job.kind != "" {
+		argv = append(argv, "--kind", job.kind)
+	}
 	if job.warnMissing {
 		argv = append(argv, "--missing-method-warn")
 	}
@@ -436,6 +494,16 @@ func runJobHost(t *testing.T, job installJob) (string, bool) {
 	work := t.TempDir()
 	require.NoError(t, os.WriteFile(filepath.Join(work, "che.yml"),
 		[]byte("e2e:\n  options: {autoDiscover: true}\n"), 0o644))
+	if job.packagesYAML != "" {
+		require.NoError(t, os.WriteFile(filepath.Join(work, "packages.e2e.yml"), []byte(job.packagesYAML), 0o644))
+	}
+	if job.setupShell != "" {
+		setup := exec.Command("/bin/bash", "-ec", job.setupShell)
+		setup.Env = env
+		setup.Dir = work
+		sout, serr := setup.CombinedOutput()
+		require.NoError(t, serr, "job setup: %s", sout)
+	}
 	install := exec.Command(binPath(t), installArgv(job)...)
 	install.Env = env
 	install.Dir = work
@@ -488,7 +556,7 @@ func shq(s string) string {
 
 func verifyShell(cmd string) string {
 	return `if [ -s "$NVM_DIR/nvm.sh" ]; then . "$NVM_DIR/nvm.sh"; fi; ` +
-		`if [ "$(id -u)" = 0 ]; then code() { command code --no-sandbox --user-data-dir "$HOME/.vscode-root" "$@"; }; fi; ` + cmd
+		`if [ -s /nix/var/nix/profiles/default/etc/profile.d/nix-daemon.sh ]; then . /nix/var/nix/profiles/default/etc/profile.d/nix-daemon.sh; fi; ` + cmd
 }
 
 // [why] apt/download caches persist across runs while each environment stays isolated:
@@ -512,7 +580,7 @@ func devCacheDir(t *testing.T) string {
 func noDepsScript(job installJob) string {
 	var b strings.Builder
 	b.WriteString(`export HOME=/root
-export PATH=/root/.local/bin:/root/go/bin:/root/.pyenv/bin:/root/.pyenv/shims:$PATH
+export PATH=/root/.local/bin:/root/go/bin:/root/.pyenv/bin:/root/.pyenv/shims:/nix/var/nix/profiles/default/bin:/root/.nix-profile/bin:$PATH
 export XDG_CONFIG_HOME=/root/.config XDG_DATA_HOME=/root/.local/share XDG_BIN_HOME=/root/.local/bin
 export XDG_STATE_HOME=/root/.local/state XDG_CACHE_HOME=/root/.cache
 export PYENV_ROOT=/root/.pyenv NVM_DIR=/root/.config/nvm GOBIN=/root/go/bin GOFLAGS=-modcacherw
@@ -522,8 +590,19 @@ export PYENV_ROOT=/root/.pyenv NVM_DIR=/root/.config/nvm GOBIN=/root/go/bin GOFL
 cd /tmp/work
 printf 'e2e:\n  options: {autoDiscover: true}\n' > che.yml
 `)
+	appendJobSetup(&b, job)
 	appendRunVerify(&b, "che", job)
 	return b.String()
+}
+
+func appendJobSetup(b *strings.Builder, job installJob) {
+	if job.packagesYAML != "" {
+		fmt.Fprintf(b, "printf '%%s' %s > packages.e2e.yml\n", shq(job.packagesYAML))
+	}
+	if job.setupShell != "" {
+		b.WriteString(job.setupShell)
+		b.WriteString("\n")
+	}
 }
 
 func appendRunVerify(b *strings.Builder, che string, job installJob) {
@@ -532,8 +611,9 @@ func appendRunVerify(b *strings.Builder, che string, job installJob) {
 	b.WriteString("[ \"$(cat \"$rcf\")\" = 0 ] || exit 1\n")
 	b.WriteString("out=$(cat \"$olog\")\n")
 	b.WriteString("skip=1\n")
+	b.WriteString("m='no applicable installation'' method'\n")
 	for _, pkg := range job.packages {
-		fmt.Fprintf(b, "case \"$out\" in (*'%s: no applicable installation method'*) ;; (*) skip=0;; esac\n", pkg)
+		fmt.Fprintf(b, "case \"$out\" in (*\"%s: $m\"*) ;; (*) skip=0;; esac\n", pkg)
 	}
 	fmt.Fprintf(b, "if [ \"$skip\" = 1 ]; then echo %s; exit 0; fi\n", noDepsSkipMarker)
 	for pkg, pv := range job.verify {
@@ -660,7 +740,7 @@ func waitVMSSH(t *testing.T, vm string) string {
 
 func vmScript(job installJob) string {
 	var b strings.Builder
-	b.WriteString(`export PATH=$HOME/.local/bin:$HOME/go/bin:$HOME/.pyenv/bin:$HOME/.pyenv/shims:/opt/homebrew/bin:/opt/homebrew/sbin:$PATH
+	b.WriteString(`export PATH=$HOME/.local/bin:$HOME/go/bin:$HOME/.pyenv/bin:$HOME/.pyenv/shims:/opt/homebrew/bin:/opt/homebrew/sbin:/nix/var/nix/profiles/default/bin:$HOME/.nix-profile/bin:$PATH
 export XDG_CONFIG_HOME=$HOME/.config XDG_DATA_HOME=$HOME/.local/share XDG_BIN_HOME=$HOME/.local/bin
 export XDG_STATE_HOME=$HOME/.local/state XDG_CACHE_HOME=$HOME/.cache
 export PYENV_ROOT=$HOME/.pyenv NVM_DIR=$HOME/.config/nvm GOBIN=$HOME/go/bin GOFLAGS=-modcacherw
@@ -672,6 +752,7 @@ mkdir -p $HOME/.local/bin $HOME/.config $HOME/.local/state $HOME/cover $HOME/wor
 cd $HOME/work
 printf 'e2e:\n  options: {autoDiscover: true}\n' > che.yml
 `)
+	appendJobSetup(&b, job)
 	appendRunVerify(&b, "$HOME/che-e2e/che", job)
 	return b.String()
 }

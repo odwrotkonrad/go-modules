@@ -4,7 +4,7 @@
 
 `che packages` declaratively installs packages from a packages file
 (`$XDG_CONFIG_HOME/packages/packages.yml`): each canonical name lists managers
-in preference order (brew, brew/cask, vscode, apt, npm, go, gem, binariesRemoteArchive, script, pyenv, nvm), the first applicable on
+in preference order (brew, brew/cask, apt, npm, go, gem, binariesRemoteArchive, script, pyenv, nvm, nix), the first applicable on
 this host wins. Profiles declare `include.installPackages` and the run
 sequence installs them before `runScripts`. Four check subcommands report
 presence, upgradability, shadowing, and duplicates.
@@ -14,12 +14,12 @@ Scenario: a package named once, by its CLI name, resolves on every host
   When I declare a package in packages.yml under its canonical name (the CLI program name when the package ships one)
   Then `che packages install <name>` installs it on any supported host
   And a bare installer item uses the canonical name, `installerVocabulary.packageName` overrides it per installer
-  And casks and extensions are installer keys: `brew/cask` items install casks via brew, `vscode` items install extensions via the code CLI
+  And casks are installer keys: `brew/cask` items install casks via brew; the `vscode` installer key is gone, extensions live in `toolPackages.vscode`
 
 Scenario: a user installs a package via a supported installation method
   Status: tested
-  When a user wants to install a package via an installation method: brew, brew/cask, vscode, apt, npm, go, gem, binariesRemoteArchive, script, pyenv, nvm
-  Then they have the ability to do so on any platform where the method is eligible (osInstallers: every platform carries binariesRemoteArchive, script, npm, go, gem, pyenv, nvm. linux-debian adds apt, darwin adds brew, brew/cask, vscode)
+  When a user wants to install a package via an installation method: brew, brew/cask, apt, npm, go, gem, binariesRemoteArchive, script, pyenv, nvm, nix
+  Then they have the ability to do so on any platform where the method is eligible (osInstallers: every platform carries binariesRemoteArchive, script, npm, go, gem, pyenv, nvm, nix. linux-debian adds apt, darwin adds brew, brew/cask)
   And a method outside the set is a hard error naming the valid set
 
 Scenario: a user steers method selection with preferred installation methods
@@ -123,6 +123,25 @@ Scenario: apt repositories are declared once as registries, entries reference th
   And a registry with explicit `suites:` installs with `-t <suites>` so exact-version dependencies (curl -> libcurl4) resolve from that suite too
   And a reference to an undeclared registry, or a registry missing url or verificationKey, is a hard error
 
+Scenario: a nix item installs from nixpkgs via nix profile
+  Status: implemented
+  When a package lists a `- nix` item (bare, or `{nix: {packageName: <attr>, versionMap: ..., aliasBinary: ..., verify: ...}}`)
+  Then it is eligible on linux and darwin, last in the default preference order, so it never preempts another applicable manager
+  And on a host without nix the `nix` basePackages group bootstraps nix first via the Determinate Systems installer script (daemon install on hosts, `--init none` in containers; `/nix/receipt.json` marks it installed), and che falls back to `/nix/var/nix/profiles/default/bin/nix` or `~/.nix-profile/bin/nix` while nix is off PATH
+  And flake sources are declared once under `installerRegistries.nix` (`name`, `url` flake base, optional `ref` branch); an item picks one via `fromRegistry: <name>`, defaulting to `nixpkgs`; the builtin ships `nixpkgs` (nixpkgs-unstable) and a version-named stable registry (`nixpkgs-26.05`: the nixos-26.05 branch); a reference to an undeclared registry is a hard error
+  And an unpinned item installs `nix profile install <url>/<ref>#<attr>` (attr defaults to the entry key, `packageName` overrides), install lines name the registry (`installed bat via nix (nixpkgs-26.05)`), `--update` runs `nix profile upgrade <attr>`
+  And presence and installed-version read `nix profile list` (store-path parse, defensive across nix output formats; an unparseable version falls back to the `--version` probe)
+  And a packageName carrying `#`, `@`, or `=` is a parse error: names stay bare nixpkgs attributes
+  And `platformEligibility`, `extractBinaries`, and `archScheme` on a nix item are parse errors
+
+Scenario: a nix pin is a registry-repo revision
+  Status: implemented
+  When a nix item pins via `versionMap: {"<binary-version>": "<revision>"}` (exactly one pair, revision of the item's registry repo)
+  Then install resolves the ref `<registry-url>/<revision>#<attr>` and the drift check compares the profile's store-path version to the binary version
+  And a drifted install reinstalls: `nix profile remove <attr>`, then the pinned ref installs
+  And a requested or entry-pinned version with no revision in the versionMap is a hard error naming versionMap
+  And every builtin nix item pins: version and revision from the registry's channel head (nixpkgs-unstable, nixos-26.05), one rev shared per registry
+
 Scenario: brew taps are declared once as registries, entries reference them by tap name
   Status: tested
   When a formula or cask lives in a third-party tap
@@ -174,7 +193,7 @@ Scenario: top-level archLabelSchemes and osInstallers blocks standardize arch la
   Then the most specific key matching the host wins (`<os>-<distro>-<arch>` > `<os>-<distro>` > `<os>-<arch>` > `<os>`) and only its listed installers are applicable; a host matching no key falls back to the built-in applicability rules
   And apt is eligible only under `linux-debian` (the linux distro read from /etc/os-release ID): apt is not common to every distro, plain `linux` hosts skip apt items
   And item `installerVocabulary.platformEligibility:` ids are `<os>-<arch>`, validated against the block's os prefixes and archLabelSchemes' arches; an unknown value is a hard error naming both
-  And on a host whose platform id is a key, only its listed methods are applicable, named explicitly: `brew`, `brew/cask`, `vscode`, apt, npm, go, gem, binariesRemoteArchive, script, pyenv, nvm; an unlisted host platform falls back to the built-in applicability rules
+  And on a host whose platform id is a key, only its listed methods are applicable, named explicitly: `brew`, `brew/cask`, apt, npm, go, gem, binariesRemoteArchive, script, pyenv, nvm, nix; an unlisted host platform falls back to the built-in applicability rules
   And a key extends another with a yaml anchor/alias, no installer repetition (`linux: &common [script, npm]`, `linux-debian: [apt, *common]`): alias lists flatten
   And a file without the blocks inherits the builtin's
   And an item's `installerVocabulary.archLabelScheme: <set>` picks the spelling `{arch}` expands to; every item using `{arch}` must declare it (the builtin ships `go`, `uname`, `odd`)
@@ -189,13 +208,11 @@ Scenario: a binariesRemoteArchive entry downloads, verifies, and lands on the de
   And a pinned version absent from the version probe output triggers reinstall
   And the probe runs `<canonical> --version`, falling back to `<canonical> version`, unless the entry sets `versionCommand:` (odd tools, e.g. kubectl -> `kubectl version --client`)
 
-Scenario: a vscode extension is a package like any other
+Scenario: a vscode extension lives in toolPackages, not the manager pipeline
   Status: tested
-  When a package named by its extension id lists the `vscode` installer key (bare `golang.go: [vscode]`, packageName defaulting to the entry key)
-  Then it applies where the `code` command is present and installs via `code --install-extension <id>`
-  And presence (install skip and check-present) reads `code --list-extensions`, queried once per run, case-insensitive
-  And `--update` reruns the install with `--force`
-  And installing vscode (cask) and its extensions in one run works: extensions resolve in a later round once `code` exists
+  When a packages file names extensions under `toolPackages.vscode` (extension id to version pin, null/empty value meaning rolling)
+  Then `che packages install --kind=vscode <id>` installs it via `code --install-extension <id>[@pin]`
+  And a `vscode` installer key inside `packages:` is a parse error pointing at `toolPackages.vscode`
 
 Scenario: a vendor installer becomes a declarative script entry
   Status: tested
@@ -261,7 +278,7 @@ Scenario: a package manager's index is refreshed before its first install of the
   When the manager's first install of the run starts
   Then the manager's repo-update command runs first (apt: `apt-get update`, brew: `brew update`)
   And it runs at most once per run, re-armed when a new apt registry is configured
-  And managers querying live registries (npm, gem, go, vscode) run no update command
+  And managers querying live registries (npm, gem, go) run no update command
 
 Scenario: a user caches binariesRemoteArchive downloads across runs
   Status: tested

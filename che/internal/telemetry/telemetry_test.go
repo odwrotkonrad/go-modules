@@ -4,6 +4,7 @@ package telemetry
 
 import (
 	"context"
+	"embed"
 	"strings"
 	"testing"
 
@@ -13,7 +14,11 @@ import (
 	"go.opentelemetry.io/otel/sdk/metric/metricdata"
 
 	"gitlab.com/konradodwrot/go-modules/che/internal/log"
+	"gitlab.com/konradodwrot/go-modules/lib/testyml"
 )
+
+//go:embed all:testdata
+var td embed.FS
 
 func TestNilTelemetryIsNoOp(t *testing.T) {
 	var tel *Telemetry
@@ -56,32 +61,43 @@ func TestStartUnreachableDegrades(t *testing.T) {
 	})
 }
 
+type counterCall struct {
+	Count string   `yaml:"count"`
+	Args  []string `yaml:"args"`
+}
+
 func TestCountersWiring(t *testing.T) {
-	reader := sdkmetric.NewManualReader()
-	tel := &Telemetry{meterProvider: sdkmetric.NewMeterProvider(sdkmetric.WithReader(reader))}
-	require.NoError(t, tel.registerCounters())
+	testyml.Eq(t, td, "testdata/spec/funcs/counters.test.spec.yml", func(t *testing.T, c testyml.Case[map[string]int64]) (map[string]int64, error) {
+		reader := sdkmetric.NewManualReader()
+		tel := &Telemetry{meterProvider: sdkmetric.NewMeterProvider(sdkmetric.WithReader(reader))}
+		require.NoError(t, tel.registerCounters())
 
-	ctx := context.Background()
-	tel.CountCommand(ctx, "all")
-	tel.CountSpec(ctx)
-	tel.CountProfile(ctx, "cli")
-	tel.CountOperation(ctx, "make-links")
-	tel.CountUnit(ctx, "link", "create", "all")
-	tel.CountUnit(ctx, "link", "create", "all")
-	tel.CountUnit(ctx, "link", "noop", "all")
-	tel.CountError(ctx, "make-links")
+		ctx := context.Background()
+		var calls []counterCall
+		c.Input.Args.To(t, 0, &calls)
+		for _, call := range calls {
+			switch call.Count {
+			case "command":
+				tel.CountCommand(ctx, call.Args[0])
+			case "spec":
+				tel.CountSpec(ctx)
+			case "profile":
+				tel.CountProfile(ctx, call.Args[0])
+			case "operation":
+				tel.CountOperation(ctx, call.Args[0])
+			case "unit":
+				tel.CountUnit(ctx, call.Args[0], call.Args[1], call.Args[2])
+			case "error":
+				tel.CountError(ctx, call.Args[0])
+			default:
+				t.Fatalf("unknown counter %q", call.Count)
+			}
+		}
 
-	var rm metricdata.ResourceMetrics
-	require.NoError(t, reader.Collect(context.Background(), &rm))
-
-	sums := collectSums(t, &rm)
-	assert.Equal(t, int64(1), sums["che.command.runs.total|command=all"])
-	assert.Equal(t, int64(1), sums["che.spec.runs.total|"])
-	assert.Equal(t, int64(1), sums["che.profile.runs.total|profile=cli"])
-	assert.Equal(t, int64(1), sums["che.operation.runs.total|op=make-links"])
-	assert.Equal(t, int64(2), sums["che.unit.total|command=all,kind=link,op_type=create"])
-	assert.Equal(t, int64(1), sums["che.unit.total|command=all,kind=link,op_type=noop"])
-	assert.Equal(t, int64(1), sums["che.errors.total|op=make-links"])
+		var rm metricdata.ResourceMetrics
+		require.NoError(t, reader.Collect(ctx, &rm))
+		return collectSums(t, &rm), nil
+	})
 }
 
 func collectSums(t *testing.T, rm *metricdata.ResourceMetrics) map[string]int64 {

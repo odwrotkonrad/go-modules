@@ -37,6 +37,29 @@ cases:
               url: https://example.com/kind-{os}-{arch}
     expected:
       output: {mgr: binariesRemoteArchive, name: "", version: 0.32.0, url: "https://example.com/kind-{os}-{arch}", platformNames: [linux-amd64], checksums: {linux-amd64: "sha256:abc"}}
+  - name: ShouldDecodeBuildFromSourceProps
+    input:
+      args:
+        - yaml: |
+            buildFromSource:
+              version: 3.4.10
+              checksum: sha256:abc
+              url: https://example.com/ruby-{version}.tar.gz
+              platformEligibility: [linux-amd64]
+    expected:
+      output: {mgr: buildFromSource, name: "", version: 3.4.10, url: "https://example.com/ruby-{version}.tar.gz", platformNames: [linux-amd64]}
+  - name: ShouldRejectBuildFromSourceWithoutUrl
+    input:
+      args:
+        - yaml: "{buildFromSource: {version: 3.4.10}}"
+    expected:
+      errorOutput: "buildFromSource item: url required"
+  - name: ShouldRejectBuildFromSourcePlatformChecksums
+    input:
+      args:
+        - yaml: "{buildFromSource: {url: 'https://x/y.tar.gz', platformEligibility: [{linux-amd64: 'sha256:abc'}]}}"
+    expected:
+      errorOutput: "buildFromSource item: platformEligibility takes names only, the sum goes in checksum"
   - name: ShouldDecodeScriptScalarForm
     input:
       args:
@@ -64,24 +87,24 @@ cases:
         - yaml: "{script: {url: https://example.com/install.sh}}"
     expected:
       output: {mgr: script, name: "", scriptUrl: https://example.com/install.sh}
-  - name: ShouldDecodeBrewCodeExtensionForm
+  - name: ShouldRejectGoneVscodeScalar
+    input:
+      args:
+        - yaml: "vscode"
+    expected:
+      errorOutput: "vscode installer is gone: extensions live in toolPackages.vscode"
+  - name: ShouldRejectGoneVscodeMap
     input:
       args:
         - yaml: "{vscode: {packageName: golang.go}}"
     expected:
-      output: {mgr: vscode, name: golang.go}
-  - name: ShouldRejectBareCodeItem
+      errorOutput: "vscode installer is gone: extensions live in toolPackages.vscode"
+  - name: ShouldRejectBareCaskItem
     input:
       args:
-        - yaml: "code"
+        - yaml: "cask"
     expected:
-      errorOutput: "casks and extensions are installer keys: brew/cask or vscode"
-  - name: ShouldRejectDirectCodeMap
-    input:
-      args:
-        - yaml: "{code: golang.go}"
-    expected:
-      errorOutput: "casks and extensions are installer keys: brew/cask or vscode"
+      errorOutput: "casks are installer keys: brew/cask"
   - name: ShouldErrorOnMultiKeyMap
     input:
       args:

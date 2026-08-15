@@ -1,0 +1,40 @@
+# [>] 🤖🤖
+context:
+  function: spec.ProfileRecipe.MakeProfile
+cases:
+  - name: ShouldMergeIncludedProfilesRepinAndDropExcludedToolPackages
+    input:
+      args:
+        - doc: |
+            base:
+              include:
+                installToolPackages:
+                  vscode: [golang.go, redhat.vscode-yaml]
+            main:
+              include:
+                profiles: [base]
+                installToolPackages:
+                  vscode: [{name: golang.go, version: 0.44.0}, tamasfe.even-better-toml]
+              exclude:
+                installToolPackages:
+                  vscode: [tamasfe.even-better-toml]
+        - profile: main
+    expected:
+      output:
+        vscode:
+          - {name: golang.go, version: 0.44.0}
+          - {name: redhat.vscode-yaml}
+  - name: ShouldKeepToolsSeparate
+    input:
+      args:
+        - doc: |
+            main:
+              include:
+                installToolPackages:
+                  vscode: [golang.go]
+        - profile: main
+    expected:
+      output:
+        vscode:
+          - {name: golang.go}
+# [<] 🤖🤖

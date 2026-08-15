@@ -6,10 +6,17 @@ archSchemes:
     odd: {amd64: x86_64, arm64: arm64}
     rust: {amd64: "x86_64-unknown-{os}-musl", arm64: "aarch64-unknown-{os}-gnu"}
 osInstallers:
-    linux: &base [binariesRemoteArchive, script, npm, go, gem, pyenv, nvm, vscode]
+    linux: &base [binariesRemoteArchive, script, buildFromSource, npm, go, gem, pyenv, nvm, nix]
     linux-debian: [apt, *base]
     darwin: [brew, brew/cask, *base]
 installerRegistries:
+    nix:
+        - name: nixpkgs
+          url: github:NixOS/nixpkgs
+          ref: nixpkgs-unstable
+        - name: nixpkgs-26.05
+          url: github:NixOS/nixpkgs
+          ref: nixos-26.05
     brew:
         - azure/azure-cli
         - cirruslabs/cli
@@ -30,6 +37,12 @@ installerRegistries:
           verificationKey: https://konradodwrot.gitlab.io/go-modules/apt/gpg.key
           suites: stable
           components: main
+        - url: https://packages.gitlab.com/runner/gitlab-runner/debian
+          verificationKey: https://packages.gitlab.com/runner/gitlab-runner/gpgkey
+          components: main
+        - url: https://packages.microsoft.com/repos/azure-cli
+          verificationKey: https://packages.microsoft.com/keys/microsoft.asc
+          components: main
         - url: https://packages.microsoft.com/repos/code
           verificationKey: https://packages.microsoft.com/keys/microsoft.asc
           suites: stable
@@ -47,10 +60,15 @@ basePackages:
         - brew
     brew/cask:
         - brew
+    buildFromSource:
+        - gcc
+        - make
     gem:
         - ruby
     go:
         - go
+    nix:
+        - nix
     npm:
         - node
     nvm:
@@ -64,11 +82,26 @@ basePackages:
         - unzip
     vscode:
         - code
+toolPackages:
+    vscode:
+        anthropic.claude-code: 2.1.224
+        charliermarsh.ruff: 2026.72.0
+        editorconfig.editorconfig: 0.18.2
+        esbenp.prettier-vscode: 12.4.0
+        golang.go: 0.56.0
+        hoovercj.vscode-settings-cycler: 1.0.1
+        mindaro-dev.file-downloader: 1.0.13
+        ms-azuretools.vscode-containers: 2.4.5
+        ms-kubernetes-tools.vscode-kubernetes-tools: 1.4.1
+        ms-python.debugpy: 2026.6.0
+        ms-python.python: 2026.4.0
+        ms-python.vscode-python-envs: 1.36.0
+        ms-vscode-remote.remote-containers: 0.466.0
+        openai.chatgpt: 26.623.31921
+        redhat.vscode-yaml: 1.24.0
+        tamasfe.even-better-toml: 0.21.2
+        yzhang.markdown-all-in-one: 3.6.3
 packages:
-    anthropic.claude-code:
-        version: 2.1.224
-        installers:
-            - vscode
     apt-transport-https:
         installers:
             - apt:
@@ -85,11 +118,20 @@ packages:
                 extractBinaries: [aws/dist/aws, aws/dist/aws_completer]
                 version: 2.36.18
                 url: https://awscli.amazonaws.com/awscli-exe-linux-{arch}-{version}.zip
+            - nix:
+                packageName: awscli2
+                versionMap: {"2.35.11": "6b5e5b7a6631f065bf6908986990b37d845f847f"}
     az:
         installers:
             - brew/cask:
                 packageName: azure-cli-preview
                 fromRegistry: azure/azure-cli
+            - apt:
+                packageName: azure-cli
+                fromRegistry: packages.microsoft.com/repos/azure-cli
+            - nix:
+                packageName: azure-cli
+                versionMap: {"2.89.0": "6b5e5b7a6631f065bf6908986990b37d845f847f"}
     bat:
         installers:
             - brew
@@ -97,11 +139,16 @@ packages:
                 #[why] debian renames the binary (bat is taken by bacula-console-qt): alias it back
                 aliasBinary:
                     batcat: bat
+            - nix:
+                fromRegistry: nixpkgs-26.05
+                versionMap: {"0.26.1": "02e08985a27c65ffd33d434eeb2e660a2e4dc84d"}
     bats:
         installers:
             - brew:
                 packageName: bats-core
             - apt
+            - nix:
+                versionMap: {"1.14.0": "6b5e5b7a6631f065bf6908986990b37d845f847f"}
     beekeeper-studio:
         verify:
             pkgMgrVersionCheck: true
@@ -124,10 +171,6 @@ packages:
         version: 2.2.27
         installers:
             - npm
-    charliermarsh.ruff:
-        version: 2026.72.0
-        installers:
-            - vscode
     che:
         #[why] our own module
         version: latest
@@ -159,6 +202,9 @@ packages:
                     - linux-arm64: sha256:9482937f14061fb239f2dbb2f97f4103de1b101f5d5defbff319f294f9bd540f
                 version: 0.19.7
                 url: https://github.com/cilium/cilium-cli/releases/download/v{version}/cilium-{os}-{arch}.tar.gz
+            - nix:
+                packageName: cilium-cli
+                versionMap: {"0.19.7": "6b5e5b7a6631f065bf6908986990b37d845f847f"}
     claude:
         completions:
             zsh:
@@ -172,7 +218,8 @@ packages:
                 version: 2.1.224
     code:
         verify:
-            cmd: code --version
+            # [why] bare `code --version` fails as root: "You are trying to start Visual Studio Code as a super user which isn't recommended. If this was intended, please add the argument `--no-sandbox` and specify an alternate user data directory using the `--user-data-dir` argument."
+            cmd: code --no-sandbox --user-data-dir /tmp/che-verify-code --version
         installers:
             - brew/cask:
                 packageName: visual-studio-code
@@ -219,6 +266,8 @@ packages:
                     - linux-arm64: sha256:d3f10502a9c6ead9bc3763fde3d12467db03661a263e11fec2ef2edc70e98e9f
                 version: 8.21.0
                 url: https://github.com/stunnel/static-curl/releases/download/{version}/curl-linux-{arch}-musl-{version}.tar.xz
+            - nix:
+                versionMap: {"8.21.0": "6b5e5b7a6631f065bf6908986990b37d845f847f"}
     docker:
         version: 29.7.2
         requires:
@@ -234,6 +283,13 @@ packages:
                 packageName: docker-ce-cli
                 versionMap: {"29.7.2": "5:29.7.2-1~debian.12~bookworm"}
                 fromRegistry: download.docker.com/linux/debian
+            - binariesRemoteArchive:
+                archScheme: uname
+                extractBinaries: [docker/docker]
+                platformEligibility:
+                    - linux-amd64: sha256:803d433f226db4776e1768fd319fc6c6e4935a456acf84fcc0080818b854bc8f
+                    - linux-arm64: sha256:43d143448adf2c2787704e7d7704fd6d62d367a54c5edaef0a3f75509cb0938d
+                url: https://download.docker.com/linux/static/stable/{arch}/docker-{version}.tgz
     docker-buildx-plugin:
         version: 0.36.1
         verify:
@@ -264,14 +320,6 @@ packages:
             cmd: duti -V
         installers:
             - brew
-    editorconfig.editorconfig:
-        version: 0.18.2
-        installers:
-            - vscode
-    esbenp.prettier-vscode:
-        version: 12.4.0
-        installers:
-            - vscode
     fd:
         installers:
             - brew
@@ -279,6 +327,8 @@ packages:
                 packageName: fd-find
                 aliasBinary:
                     fdfind: fd
+            - nix:
+                versionMap: {"10.4.2": "6b5e5b7a6631f065bf6908986990b37d845f847f"}
     ffmpeg:
         version: "5"
         verify:
@@ -316,14 +366,29 @@ packages:
         installers:
             - brew
             - apt
+            - nix:
+                versionMap: {"2.97.0": "6b5e5b7a6631f065bf6908986990b37d845f847f"}
     git:
         installers:
             - brew
             - apt:
                 versionMap: {"2.39.5": "1:2.39.5-0+deb12u3"}
+            - nix:
+                versionMap: {"2.55.0": "6b5e5b7a6631f065bf6908986990b37d845f847f"}
     gitlab-runner:
         installers:
             - brew
+            - apt:
+                fromRegistry: packages.gitlab.com/runner/gitlab-runner/debian
+            - binariesRemoteArchive:
+                archScheme: go
+                platformEligibility:
+                    - linux-amd64: sha256:e59b67160f0f80528317d51fa3fc80981eb8de36f195c1726ec1af112ef7c1f8
+                    - linux-arm64: sha256:7f83c7ee3c0cb2aafc1b9996433426867986421708dbfe355a6ff7bc36bfad4b
+                version: 19.2.2
+                url: https://s3.dualstack.us-east-1.amazonaws.com/gitlab-runner-downloads/v{version}/binaries/gitlab-runner-linux-{arch}
+            - nix:
+                versionMap: {"19.1.1": "6b5e5b7a6631f065bf6908986990b37d845f847f"}
     gitlab-tart-executor:
         installers:
             - brew:
@@ -339,6 +404,8 @@ packages:
                     - linux-arm64: sha256:54a5fe7de0db23e34151c55e561c28e59e6ef6a7731f7d0ce8a00fa58cd8d8f8
                 version: 1.112.0
                 url: https://gitlab.com/gitlab-org/cli/-/releases/v{version}/downloads/glab_{version}_linux_{arch}.tar.gz
+            - nix:
+                versionMap: {"1.111.0": "6b5e5b7a6631f065bf6908986990b37d845f847f"}
     gpg:
         installers:
             - brew:
@@ -346,6 +413,9 @@ packages:
             - apt:
                 packageName: gnupg
                 versionMap: {"2": "2.2.40-1.1+deb12u2"}
+            - nix:
+                packageName: gnupg
+                versionMap: {"2.4.9": "6b5e5b7a6631f065bf6908986990b37d845f847f"}
     go:
         version: 1.26.5
         completions:
@@ -359,10 +429,6 @@ packages:
                 extractBinaries: [go/bin/go, go/bin/gofmt]
                 platformEligibility: [darwin-arm64, linux-amd64, linux-arm64]
                 url: https://go.dev/dl/go{version}.{os}-{arch}.tar.gz
-    golang.go:
-        version: 0.56.0
-        installers:
-            - vscode
     gopls:
         version: 0.23.0
         installers:
@@ -379,19 +445,19 @@ packages:
                     - linux-arm64: sha256:702f03769ac8bcb0e47839c82243cc614ae995633599a98c63062e13ea85f829
                 version: 2.17.1
                 url: https://github.com/goreleaser/goreleaser/releases/download/v{version}/goreleaser_Linux_{arch}.tar.gz
+            - nix:
+                versionMap: {"2.17.1": "6b5e5b7a6631f065bf6908986990b37d845f847f"}
     grafana:
         installers:
             - brew
             - apt:
                 fromRegistry: apt.grafana.com
-    hoovercj.vscode-settings-cycler:
-        version: 1.0.1
-        installers:
-            - vscode
     htop:
         installers:
             - brew
             - apt
+            - nix:
+                versionMap: {"3.5.2": "6b5e5b7a6631f065bf6908986990b37d845f847f"}
     jaeger:
         version: 2.20.0
         installers:
@@ -407,6 +473,8 @@ packages:
         installers:
             - brew
             - apt
+            - nix:
+                versionMap: {"1.8.2": "6b5e5b7a6631f065bf6908986990b37d845f847f"}
     kind:
         completions:
             zsh:
@@ -420,6 +488,8 @@ packages:
                     - linux-arm64: sha256:b92cd615e97585de8ddade28ed5cd7feb4248d717c233eea5b03c37298900f5d
                 version: 0.32.0
                 url: https://github.com/kubernetes-sigs/kind/releases/download/v{version}/kind-{os}-{arch}
+            - nix:
+                versionMap: {"0.32.0": "6b5e5b7a6631f065bf6908986990b37d845f847f"}
     kitty:
         installers:
             - script:
@@ -442,6 +512,8 @@ packages:
                     - linux-arm64: sha256:3d86f24401c41ae5a46ac50eef8865fe891d3647d324a0836f6c63757a126e62
                 version: 1.36.3
                 url: https://dl.k8s.io/release/v{version}/bin/{os}/{arch}/kubectl
+            - nix:
+                versionMap: {"1.36.3": "6b5e5b7a6631f065bf6908986990b37d845f847f"}
         versionCommand: kubectl version --client
     kubectx:
         version: 0.11.0
@@ -485,6 +557,8 @@ packages:
                 url: https://github.com/evilmartians/lefthook/releases/download/v{version}/lefthook_{version}_MacOS_{arch}
             - npm:
                 version: 2.1.10
+            - nix:
+                versionMap: {"2.1.10": "6b5e5b7a6631f065bf6908986990b37d845f847f"}
     libbz2:
         verify:
             pkgMgrVersionCheck: true
@@ -521,12 +595,24 @@ packages:
         installers:
             - apt:
                 packageName: libsqlite3-dev
+    libssl-dev:
+        verify:
+            pkgMgrVersionCheck: true
+            checkInPath: false
+        installers:
+            - apt
     libtool:
         verify:
             pkgMgrVersionCheck: true
             checkInPath: false
         installers:
             - brew
+            - apt
+    libyaml-dev:
+        verify:
+            pkgMgrVersionCheck: true
+            checkInPath: false
+        installers:
             - apt
     logcli:
         verify:
@@ -544,40 +630,27 @@ packages:
         installers:
             - brew
             - apt
-    mindaro-dev.file-downloader:
-        version: 1.0.13
+    nix:
+        verify:
+            checkInPath: false
+            cmd: /nix/var/nix/profiles/default/bin/nix --version
         installers:
-            - vscode
-    ms-azuretools.vscode-containers:
-        version: 2.4.5
-        installers:
-            - vscode
-    ms-kubernetes-tools.vscode-kubernetes-tools:
-        version: 1.4.1
-        installers:
-            - vscode
-    ms-python.debugpy:
-        version: 2026.6.0
-        installers:
-            - vscode
-    ms-python.python:
-        version: 2026.4.0
-        installers:
-            - vscode
-    ms-python.vscode-python-envs:
-        version: 1.36.0
-        installers:
-            - vscode
-    ms-vscode-remote.remote-containers:
-        version: 0.466.0
-        installers:
-            - vscode
+            - script:
+                run: |
+                    if [ "$(uname -s)" = Linux ] && [ ! -d /run/systemd/system ]; then
+                        curl --proto '=https' --tlsv1.2 -fsSL https://install.determinate.systems/nix | sh -s -- install linux --init none --no-confirm
+                    else
+                        curl --proto '=https' --tlsv1.2 -fsSL https://install.determinate.systems/nix | sh -s -- install --no-confirm
+                    fi
+                validateArtifact: /nix/receipt.json
     nmap:
         installers:
             - brew
             - apt:
                 versionMap: {"7.94": "7.94+git20230807.3be01efb1+dfsg-4~bpo12+1"}
                 fromRegistry: deb.debian.org/debian
+            - nix:
+                versionMap: {"7.99": "6b5e5b7a6631f065bf6908986990b37d845f847f"}
     node:
         version: 24.19.0
         requires:
@@ -615,10 +688,6 @@ packages:
         installers:
             - brew/cask:
                 packageName: 1password-cli
-    openai.chatgpt:
-        version: 26.623.31921
-        installers:
-            - vscode
     openssh:
         command: ssh
         verify:
@@ -629,6 +698,8 @@ packages:
                 packageName: openssh-client
                 versionMap: {"10.0p1": "1:10.0p1-7~bpo12+1"}
                 fromRegistry: deb.debian.org/debian
+            - nix:
+                versionMap: {"10.4p1": "6b5e5b7a6631f065bf6908986990b37d845f847f"}
     openssl:
         version: "3.0"
         installers:
@@ -663,6 +734,8 @@ packages:
         installers:
             - brew
             - apt
+            - nix:
+                versionMap: {"3.7.0.2": "6b5e5b7a6631f065bf6908986990b37d845f847f"}
     patch:
         installers:
             - apt
@@ -678,6 +751,8 @@ packages:
         installers:
             - brew
             - apt
+            - nix:
+                versionMap: {"1.16.6": "6b5e5b7a6631f065bf6908986990b37d845f847f"}
     pkgconf:
         installers:
             - brew
@@ -687,6 +762,8 @@ packages:
             - brew
             - npm:
                 version: 11.20.0
+            - nix:
+                versionMap: {"11.20.0": "6b5e5b7a6631f065bf6908986990b37d845f847f"}
     podman:
         completions:
             zsh:
@@ -711,6 +788,8 @@ packages:
                     - linux-arm64: sha256:aa152311cda6f4254a2ebe08d750ab6fa8fd8fa95a0edb720bf3731c424ec7fd
                 version: 6.1.0
                 url: https://github.com/podman-container-tools/podman/releases/download/v{version}/podman-remote-static-linux_{arch}.tar.gz
+            - nix:
+                versionMap: {"5.8.4": "6b5e5b7a6631f065bf6908986990b37d845f847f"}
     podman-desktop:
         verify:
             pkgMgrVersionCheck: true
@@ -720,6 +799,18 @@ packages:
     procs:
         installers:
             - brew
+            - binariesRemoteArchive:
+                version: 0.14.12
+                platformEligibility:
+                    - darwin-arm64: sha256:20c7a33426ed7a43c3e13a48f2d1866ecc979a8ad46733f86ddc78ab7f12d49c
+                url: https://github.com/dalance/procs/releases/download/v{version}/procs-v{version}-aarch64-mac.zip
+            - binariesRemoteArchive:
+                version: 0.14.12
+                archScheme: uname
+                platformEligibility:
+                    - linux-amd64: sha256:81964faf9d5cd0e9f399d5d0954fb6fe4d4d9f7d3cbec4507633df5a45b11713
+                    - linux-arm64: sha256:74b4f82acc6fe553cbd5af20ba0baac420b42bef9bb0cbb38fef14b8317d9f91
+                url: https://github.com/dalance/procs/releases/download/v{version}/procs-v{version}-{arch}-linux.zip
     prometheus:
         version: 3.13.2
         installers:
@@ -740,6 +831,8 @@ packages:
                 packageName: psmisc
                 verify:
                     cmd: pstree --version
+            - nix:
+                versionMap: {"2.39": "6b5e5b7a6631f065bf6908986990b37d845f847f"}
     pyenv:
         - brew
         - script:
@@ -750,6 +843,8 @@ packages:
             - brew
             - npm:
                 version: 1.1.411
+            - nix:
+                versionMap: {"1.1.411": "6b5e5b7a6631f065bf6908986990b37d845f847f"}
     python3:
         version: 3.14.6
         requires:
@@ -778,10 +873,6 @@ packages:
             - brew
             - apt:
                 packageName: libreadline-dev
-    redhat.vscode-yaml:
-        version: 1.24.0
-        installers:
-            - vscode
     rg:
         completions:
             zsh:
@@ -798,32 +889,39 @@ packages:
                     - linux-amd64: sha256:4cf9f2741e6c465ffdb7c26f38056a59e2a2544b51f7cc128ef28337eeae4d8e
                 version: 14.1.1
                 url: https://github.com/BurntSushi/ripgrep/releases/download/{version}/ripgrep-{version}-{arch}.tar.gz
+            - nix:
+                packageName: ripgrep
+                versionMap: {"15.2.0": "6b5e5b7a6631f065bf6908986990b37d845f847f"}
     ruby:
         version: "3.1"
+        requires:
+            - libssl-dev
+            - libyaml-dev
+            - zlib1g-dev
         installers:
             - brew
             - apt:
                 packageName: ruby-full
                 versionMap: {"3.1": "1:3.1"}
-    ruby-dev:
-        verify:
-            pkgMgrVersionCheck: true
-            checkInPath: false
-        installers:
-            - apt
+            - buildFromSource:
+                version: 3.4.10
+                checksum: sha256:ecee2d072a14f2d14347dd56dfd8fe5c3130abf5117bfaacbda0f4ef9cc429ec
+                url: https://cache.ruby-lang.org/pub/ruby/3.4/ruby-{version}.tar.gz
     ruby-lsp:
         version: 0.26.10
         requires:
             - gcc
             - make
             - libc6-dev
-            - ruby-dev
+            - ruby
         installers:
             - gem
     shellcheck:
         installers:
             - brew
             - apt
+            - nix:
+                versionMap: {"0.11.0": "6b5e5b7a6631f065bf6908986990b37d845f847f"}
     showkey:
         verify:
             pkgMgrVersionCheck: true
@@ -836,19 +934,23 @@ packages:
             - brew:
                 packageName: sqlite
             - apt
+            - nix:
+                packageName: sqlite
+                versionMap: {"3.53.3": "6b5e5b7a6631f065bf6908986990b37d845f847f"}
     stow:
         installers:
             - brew
             - apt
+            - nix:
+                versionMap: {"2.4.1": "6b5e5b7a6631f065bf6908986990b37d845f847f"}
     tar:
         installers:
             - brew:
                 packageName: gnu-tar
             - apt
-    tamasfe.even-better-toml:
-        version: 0.21.2
-        installers:
-            - vscode
+            - nix:
+                packageName: gnutar
+                versionMap: {"1.35": "6b5e5b7a6631f065bf6908986990b37d845f847f"}
     tart:
         installers:
             - brew:
@@ -881,10 +983,14 @@ packages:
             - apt:
                 versionMap: {"3.5a": "3.5a-2~bpo12+1"}
                 fromRegistry: deb.debian.org/debian
+            - nix:
+                versionMap: {"3.7b": "6b5e5b7a6631f065bf6908986990b37d845f847f"}
     tree:
         installers:
             - brew
             - apt
+            - nix:
+                versionMap: {"2.3.2": "6b5e5b7a6631f065bf6908986990b37d845f847f"}
     tsc:
         installers:
             - brew:
@@ -892,21 +998,30 @@ packages:
             - npm:
                 packageName: typescript
                 version: 7.0.2
+            - nix:
+                packageName: typescript
+                versionMap: {"5.9.3": "6b5e5b7a6631f065bf6908986990b37d845f847f"}
     typescript-language-server:
         installers:
             - brew
             - npm:
                 version: 5.3.0
+            - nix:
+                versionMap: {"5.3.0": "6b5e5b7a6631f065bf6908986990b37d845f847f"}
     unzip:
         versionCommand: unzip -v
         installers:
             - brew
             - apt
+            - nix:
+                versionMap: {"6.0": "6b5e5b7a6631f065bf6908986990b37d845f847f"}
     uv:
         installers:
             - brew
             - script:
                 url: https://astral.sh/uv/install.sh
+            - nix:
+                versionMap: {"0.12.3": "6b5e5b7a6631f065bf6908986990b37d845f847f"}
     watch:
         installers:
             - brew
@@ -918,6 +1033,8 @@ packages:
             - apt:
                 packageName: xz-utils
                 versionMap: {"5.4.1": "5.4.1-1+deb12u1"}
+            - nix:
+                versionMap: {"5.8.3": "6b5e5b7a6631f065bf6908986990b37d845f847f"}
     yq:
         installers:
             - brew
@@ -929,10 +1046,9 @@ packages:
                     - linux-arm64: sha256:578648e463a11c1b6db6010cbf41eafed6bee79466fcffa1bb446672cf7945ea
                 version: 4.53.3
                 url: https://github.com/mikefarah/yq/releases/download/v{version}/yq_{os}_{arch}
-    yzhang.markdown-all-in-one:
-        version: 3.6.3
-        installers:
-            - vscode
+            - nix:
+                packageName: yq-go
+                versionMap: {"4.53.3": "6b5e5b7a6631f065bf6908986990b37d845f847f"}
     zig:
         installers:
             - brew
@@ -944,6 +1060,8 @@ packages:
                     - linux-arm64: sha256:ea4b09bfb22ec6f6c6ceac57ab63efb6b46e17ab08d21f69f3a48b38e1534f17
                 version: 0.16.0
                 url: https://ziglang.org/download/{version}/zig-{arch}-linux-{version}.tar.xz
+            - nix:
+                versionMap: {"0.16.0": "6b5e5b7a6631f065bf6908986990b37d845f847f"}
     zlib:
         verify:
             pkgMgrVersionCheck: true
@@ -952,12 +1070,22 @@ packages:
             - brew
             - apt:
                 packageName: zlib1g-dev
+    zlib1g-dev:
+        verify:
+            pkgMgrVersionCheck: true
+            checkInPath: false
+        installers:
+            - apt
     zsh:
         installers:
             - brew
             - apt
+            - nix:
+                versionMap: {"5.9.2": "6b5e5b7a6631f065bf6908986990b37d845f847f"}
     zstd:
         installers:
             - brew
             - apt
+            - nix:
+                versionMap: {"1.5.7": "6b5e5b7a6631f065bf6908986990b37d845f847f"}
 ##[<] 🤖🤖

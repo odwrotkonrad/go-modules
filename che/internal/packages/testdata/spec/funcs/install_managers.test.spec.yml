@@ -1,0 +1,610 @@
+# [>] 🤖🤖
+context:
+  function: packages.Installer.Install
+cases:
+  - name: ShouldInstallBrewWhenMissing
+    input:
+      args:
+        - files: "packages:\n  bat: [brew, apt]"
+        - cfg:
+            os: darwin
+            cmds: [brew]
+            failOn: [brew list]
+            packages: [bat]
+    expected:
+      output:
+        calls: [brew install bat]
+  - name: ShouldSkipBrewWhenInstalled
+    input:
+      args:
+        - files: "packages:\n  bat: [brew, apt]"
+        - cfg:
+            os: darwin
+            cmds: [brew]
+            packages: [bat]
+    expected: {}
+    notExpected:
+      output:
+        calls: [brew install bat]
+  - name: ShouldSpareDependenciesWithOnlyMethods
+    input:
+      args:
+        - files: |
+            packages:
+              nvm: [{script: {url: https://example.com/nvm.sh}}]
+              node:
+                requires: [nvm]
+                installers: [{nvm: {versions: ["24.0.0"], global: "24.0.0"}}]
+        - cfg:
+            onlyMethods: [nvm]
+            packages: [node]
+    expected:
+      output:
+        calls: [che-script-, nvm install 24.0.0]
+  - name: ShouldUpdateBrewIndexOncePerRun
+    input:
+      args:
+        - files: "packages:\n  bat: [brew]\n  fd: [brew]"
+        - cfg:
+            os: darwin
+            cmds: [brew]
+            failOn: [brew list]
+            packages: [bat, fd]
+    expected:
+      output:
+        calls: [brew update --quiet, brew install bat, brew install fd]
+        callCounts:
+          brew update --quiet: 1
+  - name: ShouldTapTrustAndInstallQualifiedFormula
+    input:
+      args:
+        - files: |
+            installerRegistries:
+              brew:
+                - konradodwrot/tap
+            packages:
+              che: [{brew: {fromRegistry: konradodwrot/tap}}]
+        - cfg:
+            os: darwin
+            cmds: [brew]
+            failOn: [brew list]
+            packages: [che]
+    expected:
+      output:
+        exactCalls:
+          - brew list che
+          - brew update --quiet
+          - brew tap konradodwrot/tap
+          - brew trust konradodwrot/tap
+          - brew install konradodwrot/tap/che
+  - name: ShouldErrorOnUnknownBrewRegistry
+    input:
+      args:
+        - files: "packages:\n  che: [{brew: {fromRegistry: nowhere/tap}}]"
+        - cfg:
+            os: darwin
+            cmds: [brew]
+            failOn: [brew list]
+            packages: [che]
+    expected:
+      errorOutput: unknown brew registry "nowhere/tap"
+  - name: ShouldReinstallNpmPinOnDrift
+    input:
+      args:
+        - files: "packages:\n  ccstatusline:\n    version: 2.2.22\n    installers: [npm]"
+        - cfg:
+            os: darwin
+            cmds: [npm, ccstatusline]
+            stubs:
+              - {prefix: "npm ls ", output: "ccstatusline@2.2.0\n"}
+            packages: [ccstatusline]
+    expected:
+      output:
+        calls: [npm install --global ccstatusline@2.2.22]
+  - name: ShouldSkipNpmPinWhenMatching
+    input:
+      args:
+        - files: "packages:\n  ccstatusline:\n    version: 2.2.22\n    installers: [npm]"
+        - cfg:
+            os: darwin
+            cmds: [npm, ccstatusline]
+            stubs:
+              - {prefix: "npm ls ", output: "ccstatusline@2.2.22\n"}
+            packages: [ccstatusline]
+    expected: {}
+    notExpected:
+      output:
+        calls: [npm install --global ccstatusline@2.2.22]
+  - name: ShouldPassGemPinAsVersionRequirement
+    input:
+      args:
+        - files: "packages:\n  ruby-lsp:\n    version: 0.26.10\n    installers: [{gem: {packageName: ruby-lsp}}]"
+        - cfg:
+            cmds: [gem]
+            packages: [ruby-lsp]
+    expected:
+      output:
+        calls: [sudo gem install ruby-lsp -v 0.26.10]
+  - name: ShouldResolveGoPinAsModuleVersion
+    input:
+      args:
+        - files: "packages:\n  gopls:\n    version: 0.23.0\n    installers: [{go: {packageName: golang.org/x/tools/gopls@latest}}]"
+        - cfg:
+            os: darwin
+            cmds: [go]
+            packages: [gopls]
+    expected:
+      output:
+        calls: [go install golang.org/x/tools/gopls@v0.23.0]
+  - name: ShouldUpgradeInstalledBrewOnUpdate
+    input:
+      args:
+        - files: "packages:\n  bat: [brew]"
+        - cfg:
+            os: darwin
+            cmds: [brew]
+            update: true
+            packages: [bat]
+    expected:
+      output:
+        calls: [brew upgrade bat]
+  - name: ShouldSkipPresentCommandWithIfMissing
+    input:
+      args:
+        - files: "packages:\n  bat: [brew]"
+        - cfg:
+            os: darwin
+            cmds: [brew, bat]
+            ifMissing: true
+            packages: [bat]
+    expected:
+      output:
+        exactCalls: []
+  - name: ShouldAnnounceInstallOnDryRunWithoutInstalling
+    input:
+      args:
+        - files: "packages:\n  bat: [brew]"
+        - cfg:
+            os: darwin
+            cmds: [brew]
+            dryRun: true
+            failOn: [brew list]
+            packages: [bat]
+    expected:
+      stdOut: ["install bat via brew (dry run)"]
+    notExpected:
+      output:
+        calls: [brew install bat]
+  - name: ShouldDowngradeMissingMethodToWarning
+    input:
+      args:
+        - files: "packages:\n  bat: [brew]"
+        - cfg:
+            missingMethodWarn: true
+            packages: [bat]
+    expected:
+      stdOut: ["will not install bat: no applicable installation method"]
+      output:
+        exactCalls: []
+  - name: ShouldErrorWhenNoApplicableManager
+    input:
+      args:
+        - files: "packages:\n  bat: [brew]"
+        - cfg:
+            packages: [bat]
+    expected:
+      errorOutput: no applicable installation method for bat
+      output:
+        exactCalls: []
+  - name: ShouldRunScriptViaShWhenCommandMissing
+    input:
+      args:
+        - files: |
+            packages:
+              brew:
+                - script:
+                    os: darwin
+                    run: |
+                      export NONINTERACTIVE=1
+                      /bin/bash -c "$(curl -fsSL https://example.com/install.sh)"
+        - cfg:
+            os: darwin
+            packages: [brew]
+    expected:
+      output:
+        exactCalls: ["/bin/sh -ec export NONINTERACTIVE=1{{/(.|\\n)*/}}"]
+  - name: ShouldSkipScriptWhenCommandPresent
+    input:
+      args:
+        - files: |
+            packages:
+              brew:
+                - script:
+                    os: darwin
+                    run: echo install-brew
+        - cfg:
+            os: darwin
+            cmds: [brew]
+            packages: [brew]
+    expected:
+      output:
+        exactCalls: []
+  - name: ShouldSkipScriptOnForeignOs
+    input:
+      args:
+        - files: |
+            packages:
+              brew:
+                - script:
+                    os: darwin
+                    run: echo install-brew
+        - cfg:
+            os: linux
+            packages: [brew]
+    expected:
+      errorOutput: no applicable installation method for brew
+      output:
+        exactCalls: []
+  - name: ShouldAnnounceScriptOnDryRun
+    input:
+      args:
+        - files: |
+            packages:
+              brew:
+                - script:
+                    os: darwin
+                    run: echo install-brew
+        - cfg:
+            os: darwin
+            dryRun: true
+            packages: [brew]
+    expected:
+      stdOut: ["install brew via script (dry run)"]
+      output:
+        exactCalls: []
+  - name: ShouldErrorWhenScriptPathMissingEverywhere
+    input:
+      args:
+        - files: "packages:\n  x: [{script: {path: scripts/nope.sh}}]"
+        - cfg:
+            builtinFilePath: true
+            packages: [x]
+    expected:
+      errorOutput: "install script not found: scripts/nope.sh"
+  - name: ShouldFetchAndRunRemoteScriptWithEnv
+    input:
+      args:
+        - files: |
+            packages:
+              brew:
+                - script:
+                    os: darwin
+                    url: https://example.com/install.sh
+                    env: {NONINTERACTIVE: "1"}
+        - cfg:
+            os: darwin
+            fetchBodies:
+              https://example.com/install.sh: "echo installing\n"
+            packages: [brew]
+    expected:
+      output:
+        fetches: ["https://example.com/install.sh"]
+        calls: [che-script-]
+        envs: [NONINTERACTIVE=1]
+  - name: ShouldErrorOnRemoteScriptFetchFailure
+    input:
+      args:
+        - files: "packages:\n  x: [{script: {url: https://example.com/install.sh}}]"
+        - cfg:
+            os: darwin
+            fetchError: boom
+            packages: [x]
+    expected:
+      errorOutput: install script fetch failed
+  - name: ShouldReinstallScriptPinOnDrift
+    input:
+      args:
+        - files: |
+            installerRegistries:
+              apt:
+                - url: https://packages.cloud.google.com/apt
+                  verificationKey: https://packages.cloud.google.com/apt/doc/apt-key.gpg
+                  suites: cloud-sdk
+                  components: main
+            packages:
+              gcloud:
+                - apt:
+                    packageName: google-cloud-cli
+                    fromRegistry: packages.cloud.google.com/apt
+                - script:
+                    platformEligibility:
+                      - darwin-arm64: sha256:gsha
+                    os: darwin
+                    version: 572.0.0
+                    run: echo install-gcloud
+        - cfg:
+            os: darwin
+            arch: arm64
+            cmds: [gcloud]
+            builtinFilePath: true
+            stubs:
+              - {prefix: "gcloud ", output: "Google Cloud SDK 570.0.0\n"}
+            packages: [gcloud]
+    expected:
+      output:
+        calls: [/bin/sh -ec]
+  - name: ShouldSkipScriptPinWhenMatching
+    input:
+      args:
+        - files: |
+            packages:
+              gcloud:
+                - script:
+                    platformEligibility:
+                      - darwin-arm64: sha256:gsha
+                    os: darwin
+                    version: 572.0.0
+                    run: echo install-gcloud
+        - cfg:
+            os: darwin
+            arch: arm64
+            cmds: [gcloud]
+            stubs:
+              - {prefix: "gcloud ", output: "Google Cloud SDK 572.0.0\n"}
+            packages: [gcloud]
+    expected:
+      output:
+        exactCalls: [gcloud --version]
+  - name: ShouldGateScriptBySha
+    input:
+      args:
+        - files: |
+            packages:
+              gcloud:
+                - script:
+                    platformEligibility:
+                      - darwin-arm64: sha256:gsha
+                    os: darwin
+                    version: 572.0.0
+                    run: echo install-gcloud
+        - cfg:
+            os: darwin
+            arch: amd64
+            packages: [gcloud]
+    expected:
+      errorOutput: no applicable installation method for gcloud
+      output:
+        exactCalls: []
+  - name: ShouldErrorOnUnknownArchScheme
+    input:
+      args:
+        - files: |
+            packages:
+              x:
+                - binariesRemoteArchive:
+                    archScheme: gnu
+                    platformEligibility: [{linux-amd64: sha256:s}]
+                    version: "1"
+                    url: https://example.com/x-{arch}
+        - cfg:
+            packages: [x]
+    expected:
+      errorOutput: unknown archScheme "gnu"
+  - name: ShouldProbeWithVersionCommandOnly
+    input:
+      args:
+        - files: |
+            packages:
+              kubectl:
+                installers:
+                  - binariesRemoteArchive:
+                      platformEligibility:
+                        - linux-amd64: sha256:goodsha
+                      version: 1.36.3
+                      url: https://example.com/v{version}/kubectl
+                versionCommand: kubectl version --client
+        - cfg:
+            cmds: [kubectl, sha256sum]
+            stubs:
+              - {prefix: kubectl version --client, output: "Client Version: v1.36.3\n"}
+            packages: [kubectl]
+    expected:
+      output:
+        exactCalls: [kubectl version --client]
+  - name: ShouldErrorOnUnknownPackage
+    input:
+      args:
+        - files: "packages: {}"
+        - cfg:
+            os: darwin
+            cmds: [brew]
+            packages: [nope]
+    expected:
+      errorOutput: "unknown package: nope (required entry in packages.yml)"
+  - name: ShouldInstallMissingPyenvVersionAndSetGlobal
+    input:
+      args:
+        - files: |
+            packages:
+              python3:
+                - pyenv:
+                    versions: ["3.14.5", "3.12.9"]
+                    global: "3.14.5"
+        - cfg:
+            cmds: [pyenv]
+            stubs:
+              - {prefix: pyenv versions --bare, output: "3.12.9\n"}
+              - {prefix: pyenv global, output: "3.12.9\n"}
+            packages: [python3]
+    expected:
+      output:
+        calls: [pyenv install --skip-existing 3.14.5, pyenv global 3.14.5]
+    notExpected:
+      output:
+        calls: [pyenv install --skip-existing 3.12.9]
+  - name: ShouldSkipPyenvWhenVersionsAndGlobalSatisfied
+    input:
+      args:
+        - files: |
+            packages:
+              python3:
+                - pyenv:
+                    versions: ["3.14.5", "3.12.9"]
+                    global: "3.14.5"
+        - cfg:
+            cmds: [pyenv]
+            stubs:
+              - {prefix: pyenv versions --bare, output: "3.14.5\n3.12.9\n"}
+              - {prefix: pyenv global, output: "3.14.5\n"}
+            packages: [python3]
+    expected: {}
+    notExpected:
+      output:
+        calls: [pyenv install]
+  - name: ShouldInstallVersionManagerVersionsWithoutToolPresent
+    input:
+      args:
+        - files: |
+            packages:
+              python3:
+                - pyenv:
+                    versions: ["3.14.5", "3.12.9"]
+                    global: "3.14.5"
+        - cfg:
+            packages: [python3]
+    expected:
+      output:
+        calls: [pyenv install]
+  - name: ShouldAnnounceVersionManagerPlanOnDryRun
+    input:
+      args:
+        - files: |
+            packages:
+              python3:
+                - pyenv:
+                    versions: ["3.14.5", "3.12.9"]
+                    global: "3.14.5"
+        - cfg:
+            cmds: [pyenv]
+            dryRun: true
+            packages: [python3]
+    expected:
+      stdOut: ["install python3 via pyenv (versions: 3.14.5 3.12.9, global: 3.14.5) (dry run)"]
+    notExpected:
+      output:
+        calls: [pyenv install]
+  - name: ShouldErrorOnUnknownVersionManagerTool
+    input:
+      args:
+        - files: "packages:\n  x: [{rbenv: {versions: [\"3.4.0\"]}}]"
+        - cfg:
+            packages: [x]
+    expected:
+      errorOutput: "unknown manager for x: rbenv"
+  - name: ShouldInstallGoModuleDirectly
+    input:
+      args:
+        - files: "packages:\n  gopls: [{go: {packageName: \"golang.org/x/tools/gopls@latest\"}}]"
+        - cfg:
+            os: darwin
+            cmds: [go]
+            packages: [gopls]
+    expected:
+      output:
+        exactCalls: [go install golang.org/x/tools/gopls@latest]
+  - name: ShouldSudoGemInstallOnLinux
+    input:
+      args:
+        - files: "packages:\n  ruby-lsp: [{gem: {packageName: ruby-lsp}}]"
+        - cfg:
+            cmds: [gem]
+            packages: [ruby-lsp]
+    expected:
+      output:
+        exactCalls: [sudo gem install ruby-lsp]
+  - name: ShouldInstallCaskWhenMissing
+    input:
+      args:
+        - files: "packages:\n  beekeeper-studio: [{brew/cask: {packageName: beekeeper-studio}}]"
+        - cfg:
+            os: darwin
+            cmds: [brew]
+            failOn: [brew list]
+            packages: [beekeeper-studio]
+    expected:
+      output:
+        calls: [brew install --cask beekeeper-studio]
+  - name: ShouldUpgradeCaskOnUpdate
+    input:
+      args:
+        - files: "packages:\n  beekeeper-studio: [{brew/cask: {packageName: beekeeper-studio}}]"
+        - cfg:
+            os: darwin
+            cmds: [brew]
+            update: true
+            packages: [beekeeper-studio]
+    expected:
+      output:
+        calls: [brew upgrade --cask beekeeper-studio]
+  - name: ShouldUpdateAndOnlyUpgradeAptOnUpdate
+    input:
+      args:
+        - files: "packages:\n  jq: [apt]"
+        - cfg:
+            cmds: [apt-get]
+            update: true
+            packages: [jq]
+    expected:
+      output:
+        calls: [sudo apt-get update, sudo apt-get install --only-upgrade --yes jq]
+  - name: ShouldUpdateNpmGloballyOnUpdate
+    input:
+      args:
+        - files: "packages:\n  corepack: [npm]"
+        - cfg:
+            os: darwin
+            cmds: [npm, corepack]
+            update: true
+            packages: [corepack]
+    expected:
+      output:
+        calls: [npm update --global corepack]
+  - name: ShouldSudoGemUpdateOnUpdate
+    input:
+      args:
+        - files: "packages:\n  ruby-lsp: [{gem: {packageName: ruby-lsp}}]"
+        - cfg:
+            cmds: [gem, ruby-lsp]
+            update: true
+            packages: [ruby-lsp]
+    expected:
+      output:
+        calls: [sudo gem update ruby-lsp]
+  - name: ShouldReinstallGoModuleOnUpdate
+    input:
+      args:
+        - files: "packages:\n  gopls: [{go: {packageName: \"golang.org/x/tools/gopls@latest\"}}]"
+        - cfg:
+            os: darwin
+            cmds: [go, gopls]
+            update: true
+            packages: [gopls]
+    expected:
+      output:
+        calls: [go install golang.org/x/tools/gopls@latest]
+  - name: ShouldAnnounceUpdateOnDryRun
+    input:
+      args:
+        - files: "packages:\n  bat: [brew]"
+        - cfg:
+            os: darwin
+            cmds: [brew]
+            update: true
+            dryRun: true
+            packages: [bat]
+    expected:
+      stdOut: ["update bat via brew (dry run)"]
+    notExpected:
+      output:
+        calls: [brew upgrade bat]
+# [<] 🤖🤖

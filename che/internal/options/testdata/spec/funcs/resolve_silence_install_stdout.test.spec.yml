@@ -1,0 +1,72 @@
+# [>] 🤖🤖
+context:
+  function: options.Options.Resolve
+cases:
+  - name: ShouldDefaultOnAtInfoLevel
+    input:
+      args:
+        - flag: ""
+        - level: ""
+    expected:
+      output: "true"
+  - name: ShouldDefaultOnAtWarnLevel
+    input:
+      args:
+        - flag: ""
+        - level: warn
+    expected:
+      output: "true"
+  - name: ShouldDefaultOffAtDebugLevel
+    input:
+      args:
+        - flag: ""
+        - level: debug
+    expected:
+      output: "false"
+  - name: ShouldDefaultOffAtTraceLevel
+    input:
+      args:
+        - flag: ""
+        - level: trace
+    expected:
+      output: "false"
+  - name: ShouldHonorFalseFlagAtInfoLevel
+    input:
+      args:
+        - flag: "false"
+        - level: ""
+    expected:
+      output: "false"
+  - name: ShouldHonorTrueFlagAtDebugLevel
+    input:
+      args:
+        - flag: "true"
+        - level: debug
+    expected:
+      output: "true"
+  - name: ShouldHonorFalseEnvAtInfoLevel
+    context:
+      env: {CHE_PACKAGES_SILENCE_INSTALL_STDOUT: "false"}
+    input:
+      args:
+        - flag: ""
+        - level: ""
+    expected:
+      output: "false"
+  - name: ShouldHonorTrueEnvAtTraceLevel
+    context:
+      env: {CHE_PACKAGES_SILENCE_INSTALL_STDOUT: "true"}
+    input:
+      args:
+        - flag: ""
+        - level: trace
+    expected:
+      output: "true"
+  - name: ShouldRejectNonBooleanFlagValue
+    input:
+      args:
+        - flag: nope
+        - level: ""
+    expected:
+      errorOutput: silence-install-stdout
+# [<] 🤖🤖

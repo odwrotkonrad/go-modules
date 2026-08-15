@@ -155,12 +155,13 @@ func (r ProfileRecipe) MakeProfile(recipes []ProfileRecipe, workingDir string) (
 		return OperationRecipes{}, nil, err
 	}
 	res := resolved{
-		ExtraDirs: eff.dirs,
-		Packages:  dedupePackages(eff.packages),
-		Scripts:   scripts,
-		Links:     eff.richLink,
-		Copies:    eff.richCopy,
-		Templates: eff.richTmpl,
+		ExtraDirs:    eff.dirs,
+		Packages:     dedupePackages(eff.packages),
+		ToolPackages: dedupeToolPackages(eff.toolPackages),
+		Scripts:      scripts,
+		Links:        eff.richLink,
+		Copies:       eff.richCopy,
+		Templates:    eff.richTmpl,
 	}
 	if err := classify(root, eff, &res); err != nil {
 		return OperationRecipes{}, nil, err
@@ -181,7 +182,7 @@ func (res resolved) operationRecipes() OperationRecipes {
 		MakeLinks:       MakeLinksOperationRecipe{Links: res.Links, Dirs: res.Dirs},
 		MakeCopies:      MakeCopiesOperationRecipe{Copies: res.Copies, Dirs: res.Dirs},
 		RenderTemplates: RenderTemplatesOperationRecipe{Templates: res.Templates},
-		InstallPackages: InstallPackagesOperationRecipe{Packages: res.Packages},
+		InstallPackages: InstallPackagesOperationRecipe{Packages: res.Packages, ToolPackages: res.ToolPackages},
 		RunScripts:      RunScriptsOperationRecipe{Scripts: res.Scripts},
 	}
 }
@@ -322,6 +323,30 @@ func dedupePackages(xs []PackageRef) []PackageRef {
 	return out
 }
 
+// [why] later entries win, so a profile ref can re-pin a tool package version
+func dedupeToolPackages(m map[string][]ToolPackageRef) map[string][]ToolPackageRef {
+	if len(m) == 0 {
+		return nil
+	}
+	out := make(map[string][]ToolPackageRef, len(m))
+	for tool, refs := range m {
+		at := map[string]int{}
+		var kept []ToolPackageRef
+		for _, r := range refs {
+			if i, ok := at[r.Name]; ok {
+				if r.Version != "" {
+					kept[i].Version = r.Version
+				}
+				continue
+			}
+			at[r.Name] = len(kept)
+			kept = append(kept, r)
+		}
+		out[tool] = kept
+	}
+	return out
+}
+
 func dropPackages(xs []PackageRef, globs []string) []PackageRef {
 	if len(globs) == 0 {
 		return xs
@@ -346,6 +371,15 @@ func applyExcludes(ex excludeSet, res *resolved) {
 	res.Templates = dropFiles(res.Templates, tmplG)
 	res.ExtraDirs = dropFiles(res.ExtraDirs, dirG)
 	res.Packages = dropPackages(res.Packages, pkgG)
+	for tool, globs := range ex.InstallToolPackages {
+		if res.ToolPackages[tool] == nil {
+			continue
+		}
+		expanded := fsutil.ExpandAll(globs)
+		res.ToolPackages[tool] = slices.DeleteFunc(res.ToolPackages[tool], func(r ToolPackageRef) bool {
+			return isAnyGlobMatch(expanded, r.Name)
+		})
+	}
 	res.Scripts = dropStrings(res.Scripts, instG)
 
 	res.Dirs = nil
@@ -430,6 +464,12 @@ func mergeRecipe(recipes []ProfileRecipe, eff *effective, ps ProfileRecipe, seen
 		eff.dirs = append(eff.dirs, dirItems(e)...)
 	}
 	eff.packages = append(eff.packages, in.InstallPackages...)
+	for tool, refs := range in.InstallToolPackages {
+		if eff.toolPackages == nil {
+			eff.toolPackages = map[string][]ToolPackageRef{}
+		}
+		eff.toolPackages[tool] = append(eff.toolPackages[tool], refs...)
+	}
 	eff.scripts = append(eff.scripts, in.Scripts...)
 	eff.exclude.append(ps.Exclude)
 	return nil
@@ -441,6 +481,12 @@ func (ex *excludeSet) append(o excludeSet) {
 	ex.RenderTemplates = append(ex.RenderTemplates, o.RenderTemplates...)
 	ex.MakeDirs = append(ex.MakeDirs, o.MakeDirs...)
 	ex.InstallPackages = append(ex.InstallPackages, o.InstallPackages...)
+	for tool, globs := range o.InstallToolPackages {
+		if ex.InstallToolPackages == nil {
+			ex.InstallToolPackages = map[string][]string{}
+		}
+		ex.InstallToolPackages[tool] = append(ex.InstallToolPackages[tool], globs...)
+	}
 	ex.Scripts = append(ex.Scripts, o.Scripts...)
 }
 

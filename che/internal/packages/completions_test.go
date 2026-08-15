@@ -9,7 +9,6 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/require"
-	"gopkg.in/yaml.v3"
 )
 
 const goCompYaml = `packages:
@@ -49,26 +48,6 @@ func goCompSetup(t *testing.T, opts Options) (*Installer, string) {
 	testFetch.Bodies[goArchiveURL] = archive
 	testFetch.Bodies[goCompURL] = goCompBody
 	return in, home
-}
-
-func TestEntryObjectFormParsesManagersAndCompletions(t *testing.T) {
-	in, _ := newInstaller(t, goCompYaml, "linux", cmdMap(nil), Options{})
-	entry, err := in.File.Find("go", "packages.yml")
-	require.NoError(t, err)
-	require.Len(t, entry.Items, 1)
-	require.Equal(t, "binariesRemoteArchive", entry.Items[0].Mgr)
-	require.Equal(t, "_golang", entry.Completions.Zsh.Name)
-	require.Equal(t, "https://example.com/_golang", entry.Completions.Zsh.URL)
-}
-
-func TestEntryObjectFormRequiresManagersOrCompletions(t *testing.T) {
-	var f File
-	err := yaml.Unmarshal([]byte("packages:\n  go: {}\n"), &f)
-	require.ErrorContains(t, err, "installers or completions")
-	err = yaml.Unmarshal([]byte("packages:\n  go:\n    completions:\n      zsh: {name: _go}\n"), &f)
-	require.ErrorContains(t, err, "exactly one of cmd or url")
-	err = yaml.Unmarshal([]byte("packages:\n  go:\n    completions:\n      zsh: {cmd: go env, url: https://example.com}\n"), &f)
-	require.ErrorContains(t, err, "exactly one of cmd or url")
 }
 
 const dockerCompYaml = `packages:

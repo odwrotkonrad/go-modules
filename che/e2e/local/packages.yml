@@ -1,4 +1,8 @@
 ##[>] 🤖🤖
+toolPackages:
+  vscode:
+    e2e.pinned-ext: 1.2.3
+    e2e.rolling-ext:
 packages:
   e2e-present: [{npm: {packageName: e2e-present}}]
   e2e-absent: [{npm: {packageName: e2e-absent}}]

@@ -1,0 +1,136 @@
+# [>] 🤖🤖
+context:
+  function: e2e.resolveVerify
+cases:
+  - name: ShouldDefaultToVersionCmdProbe
+    input:
+      args:
+        - entry: "[apt]"
+        - pkg: foo
+        - method: apt
+    expected:
+      output:
+        - {cmd: "foo --version 2>/dev/null || foo version", wantOut: true}
+  - name: ShouldProbeEntryCommandInsteadOfPackageName
+    input:
+      args:
+        - entry: "{command: foox, installers: [apt]}"
+        - pkg: foo
+        - method: apt
+    expected:
+      output:
+        - {cmd: "foox --version 2>/dev/null || foox version", wantOut: true}
+  - name: ShouldApplyEntryStrategyToAptMethod
+    input:
+      args:
+        - entry: "{verify: pkgMgrVersionCheck, installers: [apt, brew]}"
+        - pkg: foo
+        - method: apt
+    expected:
+      output:
+        - {cmd: "dpkg-query -W -f '${Version}\\n' foo", wantOut: true}
+  - name: ShouldApplyEntryStrategyToBrewMethod
+    input:
+      args:
+        - entry: "{verify: pkgMgrVersionCheck, installers: [apt, brew]}"
+        - pkg: foo
+        - method: brew
+    expected:
+      output:
+        - {cmd: brew list --versions foo, wantOut: true}
+  - name: ShouldLetItemVerifyOverrideEntry
+    input:
+      args:
+        - entry: |
+            verify: pkgMgrVersionCheck
+            installers:
+              - brew
+              - apt:
+                  verify: {cmd: test -x /usr/bin/foo}
+        - pkg: foo
+        - method: apt
+    expected:
+      output:
+        - {cmd: test -x /usr/bin/foo, wantOut: false}
+  - name: ShouldKeepEntryStrategyForItemsWithoutOverride
+    input:
+      args:
+        - entry: |
+            verify: pkgMgrVersionCheck
+            installers:
+              - brew
+              - apt:
+                  verify: {cmd: test -x /usr/bin/foo}
+        - pkg: foo
+        - method: brew
+    expected:
+      output:
+        - {cmd: brew list --versions foo, wantOut: true}
+  - name: ShouldCheckExitCodeOnlyForCmdStrategy
+    input:
+      args:
+        - entry: "{verify: {cmd: test -e /etc/foo}, installers: [apt]}"
+        - pkg: foo
+        - method: apt
+    expected:
+      output:
+        - {cmd: test -e /etc/foo, wantOut: false}
+  - name: ShouldQueryAptByManagerPackageName
+    input:
+      args:
+        - entry: |
+            verify: pkgMgrVersionCheck
+            installers:
+              - apt:
+                  packageName: libfoo-dev
+              - brew:
+                  packageName: foox
+        - pkg: foo
+        - method: apt
+    expected:
+      output:
+        - {cmd: "dpkg-query -W -f '${Version}\\n' libfoo-dev", wantOut: true}
+  - name: ShouldQueryBrewByManagerPackageName
+    input:
+      args:
+        - entry: |
+            verify: pkgMgrVersionCheck
+            installers:
+              - apt:
+                  packageName: libfoo-dev
+              - brew:
+                  packageName: foox
+        - pkg: foo
+        - method: brew
+    expected:
+      output:
+        - {cmd: brew list --versions foox, wantOut: true}
+  - name: ShouldLetLegacyVersionCommandWin
+    input:
+      args:
+        - entry: "{versionCommand: foo status, installers: [apt]}"
+        - pkg: foo
+        - method: apt
+    expected:
+      output:
+        - {cmd: foo status, wantOut: true}
+  - name: ShouldCombineMultipleStrategyKeys
+    input:
+      args:
+        - entry: "{verify: {pkgMgrVersionCheck: true, cmd: test -e /etc/foo}, installers: [apt]}"
+        - pkg: foo
+        - method: apt
+    expected:
+      output:
+        - {cmd: "dpkg-query -W -f '${Version}\\n' foo", wantOut: true}
+        - {cmd: test -e /etc/foo, wantOut: false}
+  - name: ShouldRejectPkgMgrQueryForUnsupportedManager
+    input:
+      args:
+        - entry: "[go]"
+        - pkg: foo
+        - method: go
+        - rawPkgMgrQuery: true
+    expected:
+      errorOutput: no version query for method go
+# [<] 🤖🤖

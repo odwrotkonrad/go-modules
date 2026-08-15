@@ -3,11 +3,18 @@ package database
 // [>] 🤖🤖
 
 import (
+	"embed"
 	"path/filepath"
+	"strings"
 	"testing"
 
 	"github.com/stretchr/testify/require"
+
+	"gitlab.com/konradodwrot/go-modules/lib/testyml"
 )
+
+//go:embed all:testdata
+var td embed.FS
 
 func openTemp(t *testing.T) *DB {
 	t.Helper()
@@ -15,15 +22,6 @@ func openTemp(t *testing.T) *DB {
 	require.NoError(t, err)
 	t.Cleanup(func() { _ = db.Close() })
 	return db
-}
-
-func seedRun(t *testing.T, db *DB) *ProfileDone {
-	t.Helper()
-	spec, err := db.StartSpec("20240101T000000", "che.yml", "all")
-	require.NoError(t, err)
-	prof, err := db.StartProfile(spec, "cli", "cli", "che.yml", "/repo")
-	require.NoError(t, err)
-	return prof
 }
 
 func TestNilDBIsNoop(t *testing.T) {
@@ -38,128 +36,160 @@ func TestNilDBIsNoop(t *testing.T) {
 	require.NoError(t, db.Close())
 }
 
-func TestInstalledLatestPerDest(t *testing.T) {
-	db := openTemp(t)
-	prof := seedRun(t, db)
-	require.NoError(t, db.RecordOperation(prof, OperationDone{OpType: "create", Kind: "link", Dest: "/a"}))
-	require.NoError(t, db.RecordOperation(prof, OperationDone{OpType: "noop", Kind: "link", Dest: "/a"}))
-	require.NoError(t, db.RecordOperation(prof, OperationDone{OpType: "create", Kind: "copy", Dest: "/b"}))
-
-	got, err := db.Installed()
-	require.NoError(t, err)
-	require.Len(t, got, 2)
-	require.Equal(t, "/b", got[0].Dest)
-	require.Equal(t, "/a", got[1].Dest)
-	require.Equal(t, "noop", got[1].OpType)
+type seedBackup struct {
+	Path string `yaml:"path"`
+	Op   string `yaml:"op"`
 }
 
-func TestInstalledExcludesRemoved(t *testing.T) {
-	db := openTemp(t)
-	prof := seedRun(t, db)
-	require.NoError(t, db.RecordOperation(prof, OperationDone{OpType: "create", Kind: "link", Dest: "/a"}))
-	require.NoError(t, db.RecordOperation(prof, OperationDone{OpType: "remove", Kind: "link", Dest: "/a"}))
-
-	got, err := db.Installed()
-	require.NoError(t, err)
-	require.Empty(t, got)
+type seedOp struct {
+	Profile     string `yaml:"profile"`
+	OpType      string `yaml:"opType"`
+	Kind        string `yaml:"kind"`
+	Dest        string `yaml:"dest"`
+	SrcRel      string `yaml:"srcRel"`
+	Mode        string `yaml:"mode"`
+	PrevKind    string `yaml:"prevKind"`
+	NextKind    string `yaml:"nextKind"`
+	NextPresent bool   `yaml:"nextPresent"`
+	NextMode    string `yaml:"nextMode"`
+	BackupPath  string `yaml:"backupPath"`
 }
 
-func TestInstalledForProfileScopes(t *testing.T) {
-	db := openTemp(t)
-	spec, err := db.StartSpec("20240101T000000", "che.yml", "all")
-	require.NoError(t, err)
-	a, err := db.StartProfile(spec, "profA", "profA", "che.yml", "/repo")
-	require.NoError(t, err)
-	b, err := db.StartProfile(spec, "profB", "profB", "che.yml", "/repo")
-	require.NoError(t, err)
-	require.NoError(t, db.RecordOperation(a, OperationDone{OpType: "create", Kind: "link", Dest: "/a"}))
-	require.NoError(t, db.RecordOperation(b, OperationDone{OpType: "create", Kind: "link", Dest: "/b"}))
-
-	got, err := db.InstalledForProfile("profA")
-	require.NoError(t, err)
-	require.Len(t, got, 1)
-	require.Equal(t, "/a", got[0].Dest)
+type seedSpec struct {
+	RunID    string       `yaml:"runId"`
+	Command  string       `yaml:"command"`
+	Profiles []string     `yaml:"profiles"`
+	Backups  []seedBackup `yaml:"backups"`
+	Ops      []seedOp     `yaml:"ops"`
 }
 
-func TestEnsureBackupDedupsByPath(t *testing.T) {
-	db := openTemp(t)
-	spec, err := db.StartSpec("20240101T000000", "che.yml", "all")
-	require.NoError(t, err)
-	b1, err := db.EnsureBackup(spec, "/state/backups/che-make-links-ts.tar.bz2", "make-links")
-	require.NoError(t, err)
-	b2, err := db.EnsureBackup(spec, "/state/backups/che-make-links-ts.tar.bz2", "make-links")
-	require.NoError(t, err)
-	require.Equal(t, b1.ID, b2.ID)
-	require.Equal(t, spec.ID, b1.SpecDoneID)
+type opGot struct {
+	Dest        string `yaml:"dest"`
+	OpType      string `yaml:"opType,omitempty"`
+	Kind        string `yaml:"kind,omitempty"`
+	SrcRel      string `yaml:"srcRel,omitempty"`
+	Mode        string `yaml:"mode,omitempty"`
+	PrevKind    string `yaml:"prevKind,omitempty"`
+	NextPresent bool   `yaml:"nextPresent,omitempty"`
+	ProfileRef  string `yaml:"profileRef,omitempty"`
+	BackupPath  string `yaml:"backupPath,omitempty"`
 }
 
-func TestRecordOperationRoundTripsKindColumns(t *testing.T) {
-	db := openTemp(t)
-	prof := seedRun(t, db)
-	require.NoError(t, db.RecordOperation(prof, OperationDone{
-		OpType: "create", Kind: "render", Dest: "/d", SrcRel: "x.tpl", Mode: "0644",
-		Prev: Object{Kind: "absent"},
-		Next: Object{Kind: "file", Present: true, Mode: "0644"},
-	}))
-	got, err := db.Installed()
-	require.NoError(t, err)
-	require.Len(t, got, 1)
-	require.Equal(t, "render", got[0].Kind)
-	require.Equal(t, "x.tpl", got[0].SrcRel)
-	require.Equal(t, "0644", got[0].Mode)
-	require.Equal(t, "absent", got[0].Prev.Kind)
-	require.True(t, got[0].Next.Present)
+type backupGot struct {
+	Path  string `yaml:"path"`
+	RunID string `yaml:"runId"`
 }
 
-func TestBackupPreloadedOnInstalled(t *testing.T) {
-	db := openTemp(t)
-	prof := seedRun(t, db)
-	spec := &SpecDone{ID: prof.SpecDoneID}
-	backup, err := db.EnsureBackup(spec, "/state/backups/a.tar.bz2", "make-links")
-	require.NoError(t, err)
-	require.NoError(t, db.RecordOperation(prof, OperationDone{
-		OpType: "create", Kind: "link", Dest: "/a", BackupID: &backup.ID,
-	}))
-	got, err := db.Installed()
-	require.NoError(t, err)
-	require.Len(t, got, 1)
-	require.NotNil(t, got[0].Backup)
-	require.Equal(t, "/state/backups/a.tar.bz2", got[0].Backup.Path)
+type dedupGot struct {
+	Same       bool `yaml:"same"`
+	SpecLinked bool `yaml:"specLinked"`
 }
 
-func TestBackupsProjectsRunIDNewestFirst(t *testing.T) {
-	db := openTemp(t)
-	specA, err := db.StartSpec("runaaaaaaaaa", "che.yml", "run")
-	require.NoError(t, err)
-	specB, err := db.StartSpec("runbbbbbbbbb", "che.yml", "run")
-	require.NoError(t, err)
-	_, err = db.EnsureBackup(specA, "/b/cli/backup/t1-ida.tar.bz2", "backup")
-	require.NoError(t, err)
-	_, err = db.EnsureBackup(specB, "/b/cli/backup/t2-idb.tar.bz2", "backup")
-	require.NoError(t, err)
-
-	got, err := db.Backups()
-	require.NoError(t, err)
-	require.Len(t, got, 2)
-	require.Equal(t, "/b/cli/backup/t2-idb.tar.bz2", got[0].Path)
-	require.Equal(t, "runbbbbbbbbb", got[0].RunID)
-	require.Equal(t, "runaaaaaaaaa", got[1].RunID)
+type queriesGot struct {
+	Ops     []opGot     `yaml:"ops,omitempty"`
+	Backups []backupGot `yaml:"backups,omitempty"`
+	Dedup   *dedupGot   `yaml:"dedup,omitempty"`
 }
 
-func TestLatestOpsIncludesRemovesAndProjectsProfileRef(t *testing.T) {
-	db := openTemp(t)
-	prof := seedRun(t, db)
-	require.NoError(t, db.RecordOperation(prof, OperationDone{OpType: "create", Kind: "copy", Dest: "/a"}))
-	require.NoError(t, db.RecordOperation(prof, OperationDone{OpType: "remove", Kind: "copy", Dest: "/a", Next: Object{Kind: "absent"}}))
-	require.NoError(t, db.RecordOperation(prof, OperationDone{OpType: "create", Kind: "copy", Dest: "/b"}))
+func summarizeOps(rows []OperationDone) []opGot {
+	got := make([]opGot, 0, len(rows))
+	for _, r := range rows {
+		g := opGot{
+			Dest: r.Dest, OpType: r.OpType, Kind: r.Kind, SrcRel: r.SrcRel, Mode: r.Mode,
+			PrevKind: r.Prev.Kind, NextPresent: r.Next.Present, ProfileRef: r.ProfileRef,
+		}
+		if r.Backup != nil {
+			g.BackupPath = r.Backup.Path
+		}
+		got = append(got, g)
+	}
+	return got
+}
 
-	got, err := db.LatestOps()
-	require.NoError(t, err)
-	require.Len(t, got, 2)
-	require.Equal(t, "/b", got[0].Dest)
-	require.Equal(t, "cli", got[0].ProfileRef)
-	require.Equal(t, "/a", got[1].Dest)
-	require.Equal(t, "remove", got[1].OpType)
+func seedDB(t *testing.T, db *DB, specs []seedSpec) map[string]*ProfileDone {
+	t.Helper()
+	profiles := map[string]*ProfileDone{}
+	for _, s := range specs {
+		spec, err := db.StartSpec(s.RunID, "che.yml", s.Command)
+		require.NoError(t, err)
+		for _, ref := range s.Profiles {
+			prof, err := db.StartProfile(spec, ref, ref, "che.yml", "/repo")
+			require.NoError(t, err)
+			profiles[ref] = prof
+		}
+		backupsByPath := map[string]*Backup{}
+		for _, b := range s.Backups {
+			backup, err := db.EnsureBackup(spec, b.Path, b.Op)
+			require.NoError(t, err)
+			backupsByPath[b.Path] = backup
+		}
+		for _, o := range s.Ops {
+			done := OperationDone{
+				OpType: o.OpType, Kind: o.Kind, Dest: o.Dest, SrcRel: o.SrcRel, Mode: o.Mode,
+				Prev: Object{Kind: o.PrevKind},
+				Next: Object{Kind: o.NextKind, Present: o.NextPresent, Mode: o.NextMode},
+			}
+			if o.BackupPath != "" {
+				require.NotNilf(t, backupsByPath[o.BackupPath], "op backupPath %q not seeded", o.BackupPath)
+				done.BackupID = &backupsByPath[o.BackupPath].ID
+			}
+			require.NoError(t, db.RecordOperation(profiles[o.Profile], done))
+		}
+	}
+	return profiles
+}
+
+func TestQueries(t *testing.T) {
+	testyml.Eq(t, td, "testdata/spec/funcs/queries.test.spec.yml", func(t *testing.T, c testyml.Case[queriesGot]) (queriesGot, error) {
+		db := openTemp(t)
+		var specs []seedSpec
+		c.Input.Args.To(t, 0, &specs)
+		seedDB(t, db, specs)
+
+		query, arg, _ := strings.Cut(c.Input.Args.String(t, 1), " ")
+		switch query {
+		case "installed":
+			rows, err := db.Installed()
+			if err != nil {
+				return queriesGot{}, err
+			}
+			return queriesGot{Ops: summarizeOps(rows)}, nil
+		case "installedForProfile":
+			rows, err := db.InstalledForProfile(arg)
+			if err != nil {
+				return queriesGot{}, err
+			}
+			return queriesGot{Ops: summarizeOps(rows)}, nil
+		case "latestOps":
+			rows, err := db.LatestOps()
+			if err != nil {
+				return queriesGot{}, err
+			}
+			return queriesGot{Ops: summarizeOps(rows)}, nil
+		case "backups":
+			rows, err := db.Backups()
+			if err != nil {
+				return queriesGot{}, err
+			}
+			got := make([]backupGot, 0, len(rows))
+			for _, b := range rows {
+				got = append(got, backupGot{Path: b.Path, RunID: b.RunID})
+			}
+			return queriesGot{Backups: got}, nil
+		case "ensureBackupDedup":
+			path, op, _ := strings.Cut(arg, " ")
+			spec, err := db.StartSpec("dedupspecrun", "che.yml", "all")
+			require.NoError(t, err)
+			b1, err := db.EnsureBackup(spec, path, op)
+			require.NoError(t, err)
+			b2, err := db.EnsureBackup(spec, path, op)
+			require.NoError(t, err)
+			return queriesGot{Dedup: &dedupGot{Same: b1.ID == b2.ID, SpecLinked: b1.SpecDoneID == spec.ID}}, nil
+		default:
+			t.Fatalf("unknown query %q", query)
+			return queriesGot{}, nil
+		}
+	})
 }
 
 // [<] 🤖🤖

@@ -81,31 +81,14 @@ func TestResolveSettings(t *testing.T) {
 }
 
 func TestResolveSilenceInstallStdout(t *testing.T) {
-	cases := []struct{ name, flag, env, level, want string }{
-		{"default info", "", "", "", "true"},
-		{"default warn", "", "", "warn", "true"},
-		{"default debug", "", "", "debug", "false"},
-		{"default trace", "", "", "trace", "false"},
-		{"flag false at info", "false", "", "", "false"},
-		{"flag true at debug", "true", "", "debug", "true"},
-		{"env false at info", "", "false", "", "false"},
-		{"env true at trace", "", "true", "trace", "true"},
-	}
-	for _, c := range cases {
-		t.Run(c.name, func(t *testing.T) {
-			o := &Options{LogLevel: c.level, PackagesSilenceInstallStdout: c.flag}
-			env := func(k string) string {
-				if k == "CHE_PACKAGES_SILENCE_INSTALL_STDOUT" {
-					return c.env
-				}
-				return ""
-			}
-			require.NoError(t, o.Resolve(env, Layer{}, Layer{}))
-			assert.Equal(t, c.want, o.PackagesSilenceInstallStdout)
-		})
-	}
-	o := &Options{PackagesSilenceInstallStdout: "nope"}
-	require.ErrorContains(t, o.Resolve(func(string) string { return "" }, Layer{}, Layer{}), "silence-install-stdout")
+	testyml.Eq(t, td, "testdata/spec/funcs/resolve_silence_install_stdout.test.spec.yml", func(t *testing.T, c testyml.Case[string]) (string, error) {
+		o := &Options{LogLevel: c.Input.Args.String(t, 1), PackagesSilenceInstallStdout: c.Input.Args.String(t, 0)}
+		env := func(k string) string { return c.Context.Env[k] }
+		if err := o.Resolve(env, Layer{}, Layer{}); err != nil {
+			return "", err
+		}
+		return o.PackagesSilenceInstallStdout, nil
+	})
 }
 
 func TestSettingsDisplay(t *testing.T) {

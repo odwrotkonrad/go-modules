@@ -1,0 +1,187 @@
+# [>] 🤖🤖
+context:
+  function: packages.Installer.InstallRequests
+cases:
+  - name: ShouldErrorOnRequiresCycle
+    input:
+      args:
+        - files: |
+            packages:
+              a:
+                requires: [b]
+                installers: [brew]
+              b:
+                requires: [a]
+                installers: [brew]
+        - cfg:
+            os: darwin
+            cmds: [brew]
+            packages: [a]
+    expected:
+      errorOutput: requires cycle
+  - name: ShouldErrorOnUnknownRequiredPackage
+    input:
+      args:
+        - files: |
+            packages:
+              a:
+                requires: [nope]
+                installers: [brew]
+        - cfg:
+            os: darwin
+            cmds: [brew]
+            packages: [a]
+    expected:
+      errorOutput: "unknown package: nope"
+  - name: ShouldDriveVersionManagerWithRequestedVersion
+    input:
+      args:
+        - files: |
+            packages:
+              libffi:
+                - apt:
+                    packageName: libffi-dev
+              pyenv:
+                - apt:
+                    packageName: pyenv
+              python3:
+                version: "3.14.*"
+                requires: [pyenv, libffi]
+                installers:
+                  - pyenv:
+                      versions: ["3.14.5"]
+                      global: "3.14.5"
+        - cfg:
+            cmds: [apt-get, pyenv]
+            failOn: [dpkg -s]
+            method: installRequests
+            requests:
+              - {name: python3, versions: ["3.14.2"]}
+    expected:
+      output:
+        calls: [pyenv install --skip-existing 3.14.2, pyenv global 3.14.2]
+    notExpected:
+      output:
+        calls: ["3.14.5"]
+  - name: ShouldOverrideEntryDefaultWithRequestedVersion
+    input:
+      args:
+        - files: |
+            packages:
+              libffi:
+                - apt:
+                    packageName: libffi-dev
+              pyenv:
+                - apt:
+                    packageName: pyenv
+              python3:
+                version: "3.14.*"
+                requires: [pyenv, libffi]
+                installers:
+                  - pyenv:
+                      versions: ["3.14.5"]
+                      global: "3.14.5"
+        - cfg:
+            cmds: [apt-get, pyenv]
+            failOn: [dpkg -s]
+            method: installRequests
+            requests:
+              - {name: python3, versions: ["3.13.1"]}
+    expected:
+      output:
+        calls: [pyenv install --skip-existing 3.13.1]
+  - name: ShouldInstallEveryRequestedVersionAndSetGlobal
+    input:
+      args:
+        - files: |
+            packages:
+              libffi:
+                - apt:
+                    packageName: libffi-dev
+              pyenv:
+                - apt:
+                    packageName: pyenv
+              python3:
+                version: "3.14.*"
+                requires: [pyenv, libffi]
+                installers:
+                  - pyenv:
+                      versions: ["3.14.5"]
+                      global: "3.14.5"
+        - cfg:
+            cmds: [apt-get, pyenv]
+            failOn: [dpkg -s]
+            method: installRequests
+            requests:
+              - {name: python3, versions: ["3.14.5", "3.13.1"], global: "3.13.1"}
+    expected:
+      output:
+        calls:
+          - pyenv install --skip-existing 3.14.5
+          - pyenv install --skip-existing 3.13.1
+          - pyenv global 3.13.1
+  - name: ShouldDefaultGlobalToFirstRequestedVersion
+    input:
+      args:
+        - files: |
+            packages:
+              libffi:
+                - apt:
+                    packageName: libffi-dev
+              pyenv:
+                - apt:
+                    packageName: pyenv
+              python3:
+                version: "3.14.*"
+                requires: [pyenv, libffi]
+                installers:
+                  - pyenv:
+                      versions: ["3.14.5"]
+                      global: "3.14.5"
+        - cfg:
+            cmds: [apt-get, pyenv]
+            failOn: [dpkg -s]
+            method: installRequests
+            requests:
+              - {name: python3, versions: ["3.14.5", "3.13.1"]}
+    expected:
+      output:
+        calls: [pyenv global 3.14.5]
+  - name: ShouldRequireVersionManagerForMultipleVersions
+    input:
+      args:
+        - files: |
+            packages:
+              kind:
+                installers:
+                  - binariesRemoteArchive:
+                      platformEligibility: [{linux-amd64: sha256:goodsha}]
+                      version: 0.32.0
+                      url: https://example.com/kind-{version}
+        - cfg:
+            cmds: [sha256sum]
+            method: installRequests
+            requests:
+              - {name: kind, versions: ["0.32.0", "0.31.0"]}
+    expected:
+      errorOutput: multiple versions need a version-manager installation method
+  - name: ShouldRejectRequestedVersionWithoutPinnedAsset
+    input:
+      args:
+        - files: |
+            packages:
+              kind:
+                version: "0.32.*"
+                installers:
+                  - binariesRemoteArchive:
+                      platformEligibility: [{linux-amd64: sha256:goodsha}]
+                      version: 0.32.0
+                      url: https://example.com/kind-{version}
+        - cfg:
+            cmds: [sha256sum]
+            method: installRequests
+            requests:
+              - {name: kind, versions: ["0.32.1"]}
+    expected:
+      errorOutput: no checksum for the requested version
+# [<] 🤖🤖

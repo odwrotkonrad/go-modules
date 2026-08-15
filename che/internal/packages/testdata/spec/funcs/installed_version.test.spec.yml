@@ -1,0 +1,48 @@
+# [>] 🤖🤖
+context:
+  function: packages.Installer.installedVersion
+cases:
+  - name: ShouldReadAptVersionFromDpkgQuery
+    input:
+      args:
+        - mgr: apt
+        - pkg: jq
+        - stubs:
+            - {prefix: dpkg-query, output: "1.6-2\n"}
+    expected:
+      output: 1.6-2
+  - name: ShouldMissNpmVersionForOtherPackage
+    input:
+      args:
+        - mgr: npm
+        - pkg: jq
+        - stubs:
+            - {prefix: npm, output: "other@1.0\n"}
+    expected:
+      output: ""
+  - name: ShouldHaveNoVersionQueryForBrew
+    input:
+      args:
+        - mgr: brew
+        - pkg: jq
+    expected:
+      output: ""
+  - name: ShouldMissAptVersionOnQueryFailure
+    input:
+      args:
+        - mgr: apt
+        - pkg: jq
+        - stubs: []
+        - failOn: [dpkg-query]
+    expected:
+      output: ""
+  - name: ShouldMissNpmVersionOnQueryFailure
+    input:
+      args:
+        - mgr: npm
+        - pkg: jq
+        - stubs: []
+        - failOn: [npm]
+    expected:
+      output: ""
+# [<] 🤖🤖

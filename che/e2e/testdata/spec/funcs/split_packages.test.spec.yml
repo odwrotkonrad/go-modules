@@ -1,0 +1,29 @@
+# [>] 🤖🤖
+context:
+  function: e2e.splitPackages
+cases:
+  - name: ShouldKeepSingleName
+    input:
+      args:
+        - selector: jq
+    expected:
+      output: [jq]
+  - name: ShouldSplitOnCommas
+    input:
+      args:
+        - selector: jq,podman
+    expected:
+      output: [jq, podman]
+  - name: ShouldTrimSpacesAndDropTrailingComma
+    input:
+      args:
+        - selector: " jq , podman ,"
+    expected:
+      output: [jq, podman]
+  - name: ShouldDropEmptySegments
+    input:
+      args:
+        - selector: ",,"
+    expected:
+      output: []
+# [<] 🤖🤖

@@ -1,0 +1,51 @@
+# [>] 🤖🤖
+context:
+  function: che.ProfileReady.ExecOperations
+cases:
+  - name: ShouldRunSelectedOpsInOrderAndContinuePastFailure
+    input:
+      args:
+        - profiles:
+            - ref: p
+              ops:
+                - {name: one, selected: true, delta: 1}
+                - {name: skipped, selected: false}
+                - {name: failing, selected: true, delta: 1, fail: boom}
+                - {name: last, selected: true, delta: 1}
+        - each: false
+    expected:
+      output: {ran: [one, failing, last]}
+      errorOutput: boom
+      stdOut: ["# one"]
+    notExpected:
+      stdOut: ["# skipped"]
+  - name: ShouldAnnounceSkipOpsWithoutSweepBranch
+    input:
+      args:
+        - profiles:
+            - ref: p
+              skipOps: [render-templates]
+              ops:
+                - {name: render-templates, selected: false}
+        - each: false
+    expected:
+      stdOut: ["will not run op render-templates: options.skipOps"]
+    notExpected:
+      stdOut: ["(nothing selected)"]
+  - name: ShouldSkipZeroDeltaProfileInExecEach
+    input:
+      args:
+        - profiles:
+            - ref: settled
+              ops:
+                - {name: make-links, selected: true, delta: 0}
+            - ref: drifted
+              ops:
+                - {name: make-links, selected: true, delta: 1}
+        - each: true
+    expected:
+      output: {executed: [drifted]}
+      stdOut:
+        - "will not run profile settled: no changes"
+        - "will run profile drifted: make-links (1 change)"
+# [<] 🤖🤖

@@ -1,0 +1,69 @@
+# [>] 🤖🤖
+context:
+  function: packages.Installer.managerBinDir
+cases:
+  - name: ShouldAppendBinToBrewPrefix
+    input:
+      args:
+        - mgr: brew
+    expected:
+      output: /opt/homebrew/bin
+  - name: ShouldUseUsrBinForApt
+    input:
+      args:
+        - mgr: apt
+    expected:
+      output: /usr/bin
+  - name: ShouldAppendBinToNpmPrefix
+    input:
+      args:
+        - mgr: npm
+    expected:
+      output: /usr/local/bin
+  - name: ShouldHaveNoBinDirForCask
+    input:
+      args:
+        - mgr: cask
+    expected:
+      output: ""
+  - name: ShouldHaveNoBinDirForGem
+    input:
+      args:
+        - mgr: gem
+    expected:
+      output: ""
+  - name: ShouldHaveNoBinDirForScript
+    input:
+      args:
+        - mgr: script
+    expected:
+      output: ""
+  - name: ShouldUseHomeLocalBinForBinaryArchives
+    input:
+      args:
+        - mgr: binariesRemoteArchive
+        - env: {HOME: /home/u}
+    expected:
+      output: /home/u/.local/bin
+  - name: ShouldDefaultGoBinDirUnderHome
+    input:
+      args:
+        - mgr: go
+        - env: {HOME: /home/u}
+    expected:
+      output: /home/u/go/bin
+  - name: ShouldPreferGopathBinOverHome
+    input:
+      args:
+        - mgr: go
+        - env: {HOME: /home/u, GOPATH: /gopath}
+    expected:
+      output: /gopath/bin
+  - name: ShouldPreferGobinOverGopath
+    input:
+      args:
+        - mgr: go
+        - env: {HOME: /home/u, GOPATH: /gopath, GOBIN: /gobin}
+    expected:
+      output: /gobin
+# [<] 🤖🤖
