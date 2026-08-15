@@ -668,7 +668,12 @@ packages:
             cmd: /nix/var/nix/profiles/default/bin/nix --version
         installers:
             - script:
-                run: curl --proto '=https' --tlsv1.2 -fsSL https://install.determinate.systems/nix | sh -s -- install --no-confirm
+                run: |
+                    if [ "$(uname -s)" = Linux ] && [ ! -d /run/systemd/system ]; then
+                        curl --proto '=https' --tlsv1.2 -fsSL https://install.determinate.systems/nix | sh -s -- install linux --init none --no-confirm
+                    else
+                        curl --proto '=https' --tlsv1.2 -fsSL https://install.determinate.systems/nix | sh -s -- install --no-confirm
+                    fi
                 validateArtifact: /nix/receipt.json
     nmap:
         installers:
