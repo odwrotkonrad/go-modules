@@ -302,4 +302,67 @@ cases:
                   zsh: {cmd: go env, url: https://example.com}
     expected:
       errorOutput: exactly one of cmd or url
+  - name: ShouldParseManpagesOnEntry
+    input:
+      args:
+        - yaml: |
+            packages:
+              foo:
+                manpages: [foo.1, foo-conf.5]
+                installers: [apt]
+    expected:
+      output: {foo: {mgrs: [apt], manpages: "foo.1, foo-conf.5"}}
+  - name: ShouldLetItemManpagesOverrideEntry
+    input:
+      args:
+        - yaml: |
+            packages:
+              foo:
+                manpages: [foo.1]
+                installers:
+                  - apt:
+                      manpages: []
+                  - brew:
+                      manpages: [foo.1, foo.8]
+    expected:
+      output: {foo: {mgrs: [apt, brew], manpages: foo.1, itemManpages: ["[]", "foo.1, foo.8"]}}
+  - name: ShouldRejectSectionlessManpage
+    input:
+      args:
+        - yaml: |
+            packages:
+              foo:
+                manpages: [foo]
+                installers: [apt]
+    expected:
+      errorOutput: 'manpage "foo": want <name>.<section>'
+  - name: ShouldRejectNonNumericManpageSection
+    input:
+      args:
+        - yaml: |
+            packages:
+              foo:
+                installers:
+                  - apt:
+                      manpages: [foo.bar]
+    expected:
+      errorOutput: 'manpage "foo.bar": section must start with a digit'
+  - name: ShouldRoundTripManpages
+    input:
+      args:
+        - yaml: |
+            packages:
+              foo:
+                manpages: [foo.1]
+                installers:
+                  - binariesRemoteArchive:
+                      version: "1.0"
+                      url: https://example.com/foo-{version}.tar.gz
+                      extractBinaries: foo
+                      extractManpages: man/foo.1
+                      manpages: [foo.1]
+        - false
+        - true
+    expected:
+      output: {foo: {mgrs: [binariesRemoteArchive], manpages: foo.1, itemManpages: [foo.1]}}
 # [<] 🤖🤖

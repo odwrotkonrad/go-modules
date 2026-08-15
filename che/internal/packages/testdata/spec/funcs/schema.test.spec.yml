@@ -4,7 +4,7 @@ context:
 cases:
   - name: ShouldValidateBuiltinPackagesYml
     input:
-      args: [path: packages.yml]
+      args: [path: ../../../che-packages/packages.yml]
     expected:
       output: true
   - name: ShouldValidateFixturePackagesYmls

@@ -29,9 +29,9 @@ func renderTarget(t target) string {
 		b.WriteString(t.vals)
 	}
 	b.WriteString("`")
-	if len(t.chain) > 0 {
+	if len(t.deps) > 0 {
 		b.WriteString(": `")
-		b.WriteString(strings.Join(t.chain, " -> "))
+		b.WriteString(strings.Join(t.deps, " -> "))
 		b.WriteString("`")
 	}
 	if t.what != "" {

@@ -41,7 +41,7 @@ type world struct {
 	env                       []string
 }
 
-func binPath(t *testing.T) string {
+func resolveBinPath(t *testing.T) string {
 	t.Helper()
 	bin := os.Getenv("E2E_BIN")
 	if bin == "" {
@@ -55,9 +55,9 @@ func binPath(t *testing.T) string {
 }
 
 func runCase(t *testing.T, name string) {
-	bin := binPath(t)
+	bin := resolveBinPath(t)
 	c := loadCase(t, "e2e.spec.yml", name)
-	w := setup(t, c.Context.Env)
+	w := setupWorld(t, c.Context.Env)
 	w.bin = bin
 	for _, s := range c.Steps {
 		printHeader(s.Name)
@@ -105,7 +105,7 @@ func loadCase(t *testing.T, path, name string) testCase {
 	return testCase{}
 }
 
-func setup(t *testing.T, specEnv map[string]string) *world {
+func setupWorld(t *testing.T, specEnv map[string]string) *world {
 	t.Helper()
 	work, err := os.MkdirTemp("", "che-e2e-")
 	require.NoError(t, err)

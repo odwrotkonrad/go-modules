@@ -26,15 +26,9 @@ import (
 
 	"gitlab.com/konradodwrot/go-modules/che/internal/fsutil"
 	"gitlab.com/konradodwrot/go-modules/che/internal/packages"
+	"gitlab.com/konradodwrot/go-modules/che/internal/testutil"
 )
 
-// [why] installs real packages into a throwaway HOME (with_deps mode) or a fresh
-//
-//	docker container (with_no_deps mode), then runs each one: the only coverage
-//	proving a method works end to end against live sources
-//	E2E_INSTALL_PACKAGE=all (default)|<pkg>|<pkg1>,<pkg2> picks packages, one
-//	subtest per entry method; E2E_INSTALL_METHOD narrows methods (exact or
-//	<method>/ prefix); E2E_INSTALL_PACKAGES_PER_METHOD caps packages per method
 type installJob struct {
 	packages     []string
 	onlyMethods  []string
@@ -45,21 +39,35 @@ type installJob struct {
 	warnMissing  bool
 }
 
+type pkgVerify struct {
+	cmds      []verifyCmd
+	bin       string
+	checkPath bool
+}
+
 type verifyCmd struct {
 	cmd     string
 	wantOut bool
-}
-
-type pkgVerify struct {
-	cmds      []verifyCmd
-	cmd       string
-	checkPath bool
 }
 
 type runCfg struct {
 	mode      string
 	linuxArch string
 	darwinVM  bool
+}
+
+// [why] the only coverage proving an install method works end to end against live
+//
+//	sources: each selected package installs for real into a throwaway HOME
+//	(with_deps) or a fresh container/VM (with_no_deps), then runs
+func TestE2EInstallMethods(t *testing.T) {
+	if os.Getenv("E2E_BIN") == "" {
+		t.Skip("E2E_BIN not set; run via make e2e-install-methods")
+	}
+	cfg, err := resolveRunCfg(os.Getenv("E2E_INSTALL_PLATFORM"), os.Getenv("E2E_INSTALL_MODE"),
+		runtime.GOOS, runtime.GOARCH, fsutil.IsVirtualized(), os.Getenv("E2E_ALLOW_HOST") == "1")
+	require.NoError(t, err)
+	runSelectedPackages(t, cmp.Or(os.Getenv("E2E_INSTALL_PACKAGE"), "all"), os.Getenv("E2E_INSTALL_METHOD"), cfg)
 }
 
 func resolveRunCfg(platform, mode, hostOS, hostArch string, virt, allowHost bool) (runCfg, error) {
@@ -103,99 +111,7 @@ func resolveRunCfg(platform, mode, hostOS, hostArch string, virt, allowHost bool
 	return runCfg{}, fmt.Errorf("E2E_INSTALL_PLATFORM %q: want darwin-arm64, linux-arm64 or linux-amd64", platform)
 }
 
-const noDepsSkipMarker = "CHE_E2E_SKIP_NO_APPLICABLE_MANAGER"
-
-var ansiRe = regexp.MustCompile("\x1b\\[[0-9;]*m")
-
-func noApplicableManager(out string, pkgs []string) bool {
-	stripped := ansiRe.ReplaceAllString(out, "")
-	for _, pkg := range pkgs {
-		if !strings.Contains(stripped, "will not install "+pkg+": no applicable installation method") {
-			return false
-		}
-	}
-	return true
-}
-
-func TestE2EInstallMethods(t *testing.T) {
-	if os.Getenv("E2E_BIN") == "" {
-		t.Skip("E2E_BIN not set; run via make e2e-install-methods")
-	}
-	cfg, err := resolveRunCfg(os.Getenv("E2E_INSTALL_PLATFORM"), os.Getenv("E2E_INSTALL_MODE"),
-		runtime.GOOS, runtime.GOARCH, fsutil.IsVirtualized(), os.Getenv("E2E_ALLOW_HOST") == "1")
-	require.NoError(t, err)
-	runPackageMode(t, cmp.Or(os.Getenv("E2E_INSTALL_PACKAGE"), "all"), os.Getenv("E2E_INSTALL_METHOD"), cfg)
-}
-
-func methodKey(mgr string) string {
-	switch mgr {
-	case "brew":
-		return "brew/formulae"
-	case "cask":
-		return "brew/cask"
-	}
-	return mgr
-}
-
-func installerKey(mgr string) string {
-	if mgr == "cask" {
-		return "brew/cask"
-	}
-	return mgr
-}
-
-func targetHost(cfg runCfg) packages.Host {
-	if cfg.mode == "with_no_deps" && !cfg.darwinVM {
-		return packages.Host{OS: "linux", Arch: cmp.Or(cfg.linuxArch, runtime.GOARCH), Distro: "debian"}
-	}
-	if cfg.darwinVM || runtime.GOOS == "darwin" {
-		return packages.Host{OS: "darwin", Arch: "arm64"}
-	}
-	return packages.Host{OS: "linux", Arch: runtime.GOARCH, Distro: "debian"}
-}
-
-func eligibleMethods(entry packages.Entry, method string, eligible []string) []string {
-	var methods []string
-	for _, it := range entry.Items {
-		if slices.Contains(methods, it.Mgr) || !slices.Contains(eligible, installerKey(it.Mgr)) || !methodMatches(methodKey(it.Mgr), method) {
-			continue
-		}
-		methods = append(methods, it.Mgr)
-	}
-	return methods
-}
-
-func logLevel() string {
-	return cmp.Or(os.Getenv("CHE_LOG_LEVEL"), "info")
-}
-
-func methodMatches(key, selected string) bool {
-	if selected == "" || selected == "all" {
-		return true
-	}
-	return key == selected || strings.HasPrefix(key, selected+"/")
-}
-
-func splitPackages(sel string) []string {
-	names := strings.Split(sel, ",")
-	for i, name := range names {
-		names[i] = strings.TrimSpace(name)
-	}
-	return slices.DeleteFunc(names, func(name string) bool { return name == "" })
-}
-
-func perMethodLimit(t *testing.T) int {
-	t.Helper()
-	v := os.Getenv("E2E_INSTALL_PACKAGES_PER_METHOD")
-	if v == "" {
-		return 0
-	}
-	n, err := strconv.Atoi(v)
-	require.NoError(t, err, "E2E_INSTALL_PACKAGES_PER_METHOD %q", v)
-	return n
-}
-
-func runPackageMode(t *testing.T, sel, method string, cfg runCfg) {
+func runSelectedPackages(t *testing.T, sel, method string, cfg runCfg) {
 	file, err := packages.LoadBuiltin()
 	require.NoError(t, err)
 	lenient := sel == "all"
@@ -208,9 +124,9 @@ func runPackageMode(t *testing.T, sel, method string, cfg runCfg) {
 			require.True(t, ok, "package %s not in the builtin packages.yml", name)
 		}
 	}
-	limit := perMethodLimit(t)
+	limit := resolveMethodLimit(t)
 	used := map[string]int{}
-	eligible := file.EligibleInstallers(targetHost(cfg))
+	eligible := file.EligibleInstallers(resolveTargetHost(cfg))
 	if len(names) == 1 {
 		runPackageMethods(t, file.Packages[names[0]], names[0], method, cfg, eligible, lenient, limit, used)
 		return
@@ -222,6 +138,29 @@ func runPackageMode(t *testing.T, sel, method string, cfg runCfg) {
 	}
 	if lenient {
 		runToolPackages(t, file, method, cfg)
+	}
+}
+
+func runPackageMethods(t *testing.T, entry packages.Entry, pkg, method string, cfg runCfg, eligible []string, lenient bool, limit int, used map[string]int) {
+	methods := resolveEligibleMethods(entry, method, eligible)
+	if len(methods) == 0 {
+		t.Skipf("package %s has no %s method for the target platform", pkg, cmp.Or(method, "install"))
+	}
+	for _, m := range methods {
+		key := resolveMethodKey(m)
+		if limit > 0 && used[key] >= limit {
+			t.Logf("skip %s for %s: %d packages already ran for the method", key, pkg, limit)
+			continue
+		}
+		used[key]++
+		t.Run(key, func(t *testing.T) {
+			runJob(t, installJob{
+				packages:    []string{pkg},
+				onlyMethods: []string{m},
+				verify:      map[string]pkgVerify{pkg: resolveVerify(t, entry, pkg, m)},
+				warnMissing: lenient || os.Getenv("E2E_INSTALL_MISSING_METHOD") == "warn",
+			}, cfg)
+		})
 	}
 }
 
@@ -247,7 +186,7 @@ chmod +x "$HOME/.local/bin/code"`
 func runToolPackages(t *testing.T, file *packages.File, method string, cfg runCfg) {
 	for _, tool := range slices.Sorted(maps.Keys(file.ToolPackages)) {
 		key := "toolPackages/" + tool
-		if !methodMatches(key, method) {
+		if !matchesMethod(key, method) {
 			continue
 		}
 		names := slices.Sorted(maps.Keys(file.ToolPackages[tool]))
@@ -272,30 +211,88 @@ func runToolPackages(t *testing.T, file *packages.File, method string, cfg runCf
 	}
 }
 
-func runPackageMethods(t *testing.T, entry packages.Entry, pkg, method string, cfg runCfg, eligible []string, lenient bool, limit int, used map[string]int) {
-	methods := eligibleMethods(entry, method, eligible)
-	if len(methods) == 0 {
-		t.Skipf("package %s has no %s method for the target platform", pkg, cmp.Or(method, "install"))
-	}
-	for _, m := range methods {
-		key := methodKey(m)
-		if limit > 0 && used[key] >= limit {
-			t.Logf("skip %s for %s: %d packages already ran for the method", key, pkg, limit)
+func resolveEligibleMethods(entry packages.Entry, method string, eligible []string) []string {
+	var methods []string
+	for _, it := range entry.Items {
+		if slices.Contains(methods, it.Mgr) || !slices.Contains(eligible, resolveInstallerKey(it.Mgr)) || !matchesMethod(resolveMethodKey(it.Mgr), method) {
 			continue
 		}
-		used[key]++
-		t.Run(key, func(t *testing.T) {
-			runJob(t, installJob{
-				packages:    []string{pkg},
-				onlyMethods: []string{m},
-				verify:      map[string]pkgVerify{pkg: resolveVerify(t, entry, pkg, m)},
-				warnMissing: lenient || os.Getenv("E2E_INSTALL_MISSING_METHOD") == "warn",
-			}, cfg)
-		})
+		methods = append(methods, it.Mgr)
 	}
+	return methods
+}
+
+func resolveMethodKey(mgr string) string {
+	switch mgr {
+	case "brew":
+		return "brew/formulae"
+	case "cask":
+		return "brew/cask"
+	}
+	return mgr
+}
+
+func resolveInstallerKey(mgr string) string {
+	if mgr == "cask" {
+		return "brew/cask"
+	}
+	return mgr
+}
+
+func matchesMethod(key, selected string) bool {
+	if selected == "" || selected == "all" {
+		return true
+	}
+	return key == selected || strings.HasPrefix(key, selected+"/")
+}
+
+func splitPackages(sel string) []string {
+	names := strings.Split(sel, ",")
+	for i, name := range names {
+		names[i] = strings.TrimSpace(name)
+	}
+	return slices.DeleteFunc(names, func(name string) bool { return name == "" })
+}
+
+func resolveMethodLimit(t *testing.T) int {
+	t.Helper()
+	v := os.Getenv("E2E_INSTALL_PACKAGES_PER_METHOD")
+	if v == "" {
+		return 0
+	}
+	n, err := strconv.Atoi(v)
+	require.NoError(t, err, "E2E_INSTALL_PACKAGES_PER_METHOD %q", v)
+	return n
+}
+
+func resolveTargetHost(cfg runCfg) packages.Host {
+	if cfg.mode == "with_no_deps" && !cfg.darwinVM {
+		return packages.Host{OS: "linux", Arch: cmp.Or(cfg.linuxArch, runtime.GOARCH), Distro: "debian"}
+	}
+	if cfg.darwinVM || runtime.GOOS == "darwin" {
+		return packages.Host{OS: "darwin", Arch: "arm64"}
+	}
+	return packages.Host{OS: "linux", Arch: runtime.GOARCH, Distro: "debian"}
 }
 
 func resolveVerify(t *testing.T, entry packages.Entry, pkg, mgr string) pkgVerify {
+	t.Helper()
+	pv := resolveVerifyStrategies(t, entry, pkg, mgr)
+	pages := entry.Manpages
+	for _, it := range entry.Items {
+		if it.Mgr == mgr && it.Manpages != nil {
+			pages = it.Manpages
+		}
+	}
+	for _, p := range pages {
+		base, section, err := packages.ParseManpage(p)
+		require.NoError(t, err)
+		pv.cmds = append(pv.cmds, verifyCmd{cmd: fmt.Sprintf("man -w %s %s", section, base), wantOut: true})
+	}
+	return pv
+}
+
+func resolveVerifyStrategies(t *testing.T, entry packages.Entry, pkg, mgr string) pkgVerify {
 	t.Helper()
 	spec := entry.Verify
 	for _, it := range entry.Items {
@@ -307,10 +304,10 @@ func resolveVerify(t *testing.T, entry packages.Entry, pkg, mgr string) pkgVerif
 	if entry.Command != "" {
 		name = entry.Command
 	}
-	pv := pkgVerify{cmd: name, checkPath: spec.ChecksPath()}
+	pv := pkgVerify{bin: name, checkPath: spec.ChecksPath()}
 	if spec != nil {
 		if spec.VersionCmd {
-			pv.cmds = append(pv.cmds, defaultVerify(entry, pkg))
+			pv.cmds = append(pv.cmds, makeDefaultVerify(entry, pkg))
 		}
 		if spec.PkgMgrVersionCheck {
 			cmd, err := pkgMgrVersionCheck(entry, pkg, mgr)
@@ -341,14 +338,14 @@ func resolveVerify(t *testing.T, entry packages.Entry, pkg, mgr string) pkgVerif
 				pv.cmds = append(pv.cmds, verifyCmd{cmd: fmt.Sprintf(`test -x "$NVM_DIR/versions/node/v%s/bin/node" && echo v%s`, v, v), wantOut: true})
 			}
 		}
-		pv.cmds = append(pv.cmds, defaultVerify(entry, pkg))
+		pv.cmds = append(pv.cmds, makeDefaultVerify(entry, pkg))
 		return pv
 	}
-	pv.cmds = []verifyCmd{defaultVerify(entry, pkg)}
+	pv.cmds = []verifyCmd{makeDefaultVerify(entry, pkg)}
 	return pv
 }
 
-func defaultVerify(entry packages.Entry, pkg string) verifyCmd {
+func makeDefaultVerify(entry packages.Entry, pkg string) verifyCmd {
 	cmd := pkg
 	if entry.Command != "" {
 		cmd = entry.Command
@@ -407,7 +404,7 @@ func runJob(t *testing.T, job installJob, cfg runCfg) {
 	// [why] a host copy already on PATH makes che skip: the run would then verify the system
 	//   binary and prove nothing about the method under test; in all-packages mode a
 	//   preinstalled package is an environment outcome, not a failure
-	stripped := ansiRe.ReplaceAllString(out, "")
+	stripped := testutil.StripANSI(out)
 	for _, pkg := range job.packages {
 		if regexp.MustCompile(`(?m)installed ` + regexp.QuoteMeta(pkg) + `( \S+)? via `).MatchString(stripped) {
 			continue
@@ -420,7 +417,19 @@ func runJob(t *testing.T, job installJob, cfg runCfg) {
 	}
 }
 
-func installArgv(job installJob) []string {
+const noDepsSkipMarker = "CHE_E2E_SKIP_NO_APPLICABLE_MANAGER"
+
+func reportsNoMethod(out string, pkgs []string) bool {
+	stripped := testutil.StripANSI(out)
+	for _, pkg := range pkgs {
+		if !strings.Contains(stripped, "will not install "+pkg+": no applicable installation method") {
+			return false
+		}
+	}
+	return true
+}
+
+func makeInstallArgv(job installJob) []string {
 	file := packages.BuiltinSentinel
 	if job.packagesYAML != "" {
 		file = "packages.e2e.yml"
@@ -438,7 +447,49 @@ func installArgv(job installJob) []string {
 	return append(argv, job.packages...)
 }
 
-func hostInstallEnv(t *testing.T, home string) []string {
+func resolveLogLevel() string {
+	return cmp.Or(os.Getenv("CHE_LOG_LEVEL"), "info")
+}
+
+func makeVerifyShell(cmd string) string {
+	return `if [ -s "$NVM_DIR/nvm.sh" ]; then . "$NVM_DIR/nvm.sh"; fi; ` +
+		`if [ -s /nix/var/nix/profiles/default/etc/profile.d/nix-daemon.sh ]; then . /nix/var/nix/profiles/default/etc/profile.d/nix-daemon.sh; fi; ` +
+		`if [ -d "$HOME/.local/share/man" ]; then export MANPATH="$HOME/.local/share/man:"; fi; ` + cmd
+}
+
+func shq(s string) string {
+	return "'" + strings.ReplaceAll(s, "'", `'\''`) + "'"
+}
+
+// [why] apt/download caches persist across runs while each environment stays isolated:
+//
+//	with_no_deps mounts /var/cache/apt, /var/lib/apt/lists, /root/.cache and the che
+//	download cache from here; with_deps points CHE_PACKAGES_DOWNLOAD_CACHE_DIR at downloads/
+func ensureDevCacheDir(t *testing.T) string {
+	t.Helper()
+	base := os.Getenv("E2E_INSTALL_CACHE_DIR")
+	if base == "" {
+		home, err := os.UserHomeDir()
+		require.NoError(t, err)
+		base = filepath.Join(home, ".cache", "che", "dev")
+	}
+	for _, d := range []string{"apt-cache", "apt-lists", "xdg", "downloads"} {
+		require.NoError(t, os.MkdirAll(filepath.Join(base, d), 0o755))
+	}
+	return base
+}
+
+func runStreamed(t *testing.T, cmd *exec.Cmd, label string) (string, error) {
+	t.Helper()
+	t.Logf("%s", label)
+	var buf bytes.Buffer
+	w := io.MultiWriter(&buf, os.Stderr)
+	cmd.Stdout, cmd.Stderr = w, w
+	err := cmd.Run()
+	return buf.String(), err
+}
+
+func makeHostEnv(t *testing.T, home string) []string {
 	t.Helper()
 	bin := filepath.Join(home, ".local", "bin")
 	pyenvRoot := filepath.Join(home, ".pyenv")
@@ -468,14 +519,14 @@ func hostInstallEnv(t *testing.T, home string) []string {
 		"XDG_CACHE_HOME=" + filepath.Join(home, ".cache"),
 		"GEM_HOME=" + filepath.Join(home, ".gem"),
 		"CHE_E2E=1",
-		"CHE_LOG_LEVEL=" + logLevel(),
+		"CHE_LOG_LEVEL=" + resolveLogLevel(),
 		"CHE_PACKAGES_BINARIES_REMOTE_ARCHIVE_CHECK_PRESENT_ON_PATH=0",
 		"NVM_DIR=" + filepath.Join(home, ".config", "nvm"),
 		"GOBIN=" + goBin,
 		//[why] GOPATH defaults into the throwaway HOME: without this the module cache's
 		//  read-only dirs make t.TempDir cleanup fail the passing test
 		"GOFLAGS=-modcacherw",
-		"CHE_PACKAGES_DOWNLOAD_CACHE_DIR=" + filepath.Join(devCacheDir(t), "downloads"),
+		"CHE_PACKAGES_DOWNLOAD_CACHE_DIR=" + filepath.Join(ensureDevCacheDir(t), "downloads"),
 	}
 	if v := os.Getenv("SSL_CERT_FILE"); v != "" {
 		env = append(env, "SSL_CERT_FILE="+v)
@@ -489,7 +540,7 @@ func hostInstallEnv(t *testing.T, home string) []string {
 func runJobHost(t *testing.T, job installJob) (string, bool) {
 	t.Helper()
 	home := t.TempDir()
-	env := hostInstallEnv(t, home)
+	env := makeHostEnv(t, home)
 
 	work := t.TempDir()
 	require.NoError(t, os.WriteFile(filepath.Join(work, "che.yml"),
@@ -504,7 +555,7 @@ func runJobHost(t *testing.T, job installJob) (string, bool) {
 		sout, serr := setup.CombinedOutput()
 		require.NoError(t, serr, "job setup: %s", sout)
 	}
-	install := exec.Command(binPath(t), installArgv(job)...)
+	install := exec.Command(resolveBinPath(t), makeInstallArgv(job)...)
 	install.Env = env
 	install.Dir = work
 	var buf bytes.Buffer
@@ -514,13 +565,13 @@ func runJobHost(t *testing.T, job installJob) (string, bool) {
 	err := install.Run()
 	out := buf.String()
 	require.NoError(t, err, "install %s:\n%s", strings.Join(job.packages, " "), out)
-	if noApplicableManager(out, job.packages) {
+	if reportsNoMethod(out, job.packages) {
 		return out, true
 	}
 
 	for pkg, pv := range job.verify {
 		for _, v := range pv.cmds {
-			verify := exec.Command("/bin/bash", "-ec", verifyShell(v.cmd))
+			verify := exec.Command("/bin/bash", "-ec", makeVerifyShell(v.cmd))
 			verify.Env = env
 			verify.Dir = home
 			vout, verr := verify.CombinedOutput()
@@ -538,46 +589,19 @@ func runJobHost(t *testing.T, job installJob) (string, bool) {
 			t.Logf("verify %s on PATH: skipped (checkInPath: false)", pkg)
 			continue
 		}
-		probe := exec.Command("/bin/bash", "-ec", "command -v "+pv.cmd)
+		probe := exec.Command("/bin/bash", "-ec", "command -v "+pv.bin)
 		probe.Env = env
 		pout, perr := probe.Output()
 		if perr != nil {
-			t.Logf("verify %s not on PATH ❌", pv.cmd)
-			require.Fail(t, fmt.Sprintf("%s not on PATH after install", pv.cmd))
+			t.Logf("verify %s not on PATH ❌", pv.bin)
+			require.Fail(t, fmt.Sprintf("%s not on PATH after install", pv.bin))
 		}
-		t.Logf("verify %s on PATH: %s ✅", pv.cmd, strings.TrimSpace(string(pout)))
+		t.Logf("verify %s on PATH: %s ✅", pv.bin, strings.TrimSpace(string(pout)))
 	}
 	return out, false
 }
 
-func shq(s string) string {
-	return "'" + strings.ReplaceAll(s, "'", `'\''`) + "'"
-}
-
-func verifyShell(cmd string) string {
-	return `if [ -s "$NVM_DIR/nvm.sh" ]; then . "$NVM_DIR/nvm.sh"; fi; ` +
-		`if [ -s /nix/var/nix/profiles/default/etc/profile.d/nix-daemon.sh ]; then . /nix/var/nix/profiles/default/etc/profile.d/nix-daemon.sh; fi; ` + cmd
-}
-
-// [why] apt/download caches persist across runs while each environment stays isolated:
-//
-//	with_no_deps mounts /var/cache/apt, /var/lib/apt/lists, /root/.cache and the che
-//	download cache from here; with_deps points CHE_PACKAGES_DOWNLOAD_CACHE_DIR at downloads/
-func devCacheDir(t *testing.T) string {
-	t.Helper()
-	base := os.Getenv("E2E_INSTALL_CACHE_DIR")
-	if base == "" {
-		home, err := os.UserHomeDir()
-		require.NoError(t, err)
-		base = filepath.Join(home, ".cache", "che", "dev")
-	}
-	for _, d := range []string{"apt-cache", "apt-lists", "xdg", "downloads"} {
-		require.NoError(t, os.MkdirAll(filepath.Join(base, d), 0o755))
-	}
-	return base
-}
-
-func noDepsScript(job installJob) string {
+func makeNoDepsScript(job installJob) string {
 	var b strings.Builder
 	b.WriteString(`export HOME=/root
 export PATH=/root/.local/bin:/root/go/bin:/root/.pyenv/bin:/root/.pyenv/shims:/nix/var/nix/profiles/default/bin:/root/.nix-profile/bin:$PATH
@@ -585,7 +609,7 @@ export XDG_CONFIG_HOME=/root/.config XDG_DATA_HOME=/root/.local/share XDG_BIN_HO
 export XDG_STATE_HOME=/root/.local/state XDG_CACHE_HOME=/root/.cache
 export PYENV_ROOT=/root/.pyenv NVM_DIR=/root/.config/nvm GOBIN=/root/go/bin GOFLAGS=-modcacherw
 `)
-	fmt.Fprintf(&b, "export CHE_E2E=1 CHE_LOG_LEVEL=%s CHE_PACKAGES_BINARIES_REMOTE_ARCHIVE_CHECK_PRESENT_ON_PATH=0\n", logLevel())
+	fmt.Fprintf(&b, "export CHE_E2E=1 CHE_LOG_LEVEL=%s CHE_PACKAGES_BINARIES_REMOTE_ARCHIVE_CHECK_PRESENT_ON_PATH=0\n", resolveLogLevel())
 	b.WriteString(`mkdir -p /root/.local/bin /root/.config /root/.local/state /tmp/work
 cd /tmp/work
 printf 'e2e:\n  options: {autoDiscover: true}\n' > che.yml
@@ -607,7 +631,7 @@ func appendJobSetup(b *strings.Builder, job installJob) {
 
 func appendRunVerify(b *strings.Builder, che string, job installJob) {
 	b.WriteString("olog=$(mktemp) rcf=$(mktemp)\n")
-	fmt.Fprintf(b, "{ %s %s 2>&1; echo $? > \"$rcf\"; } | tee \"$olog\"\n", che, strings.Join(installArgv(job), " "))
+	fmt.Fprintf(b, "{ %s %s 2>&1; echo $? > \"$rcf\"; } | tee \"$olog\"\n", che, strings.Join(makeInstallArgv(job), " "))
 	b.WriteString("[ \"$(cat \"$rcf\")\" = 0 ] || exit 1\n")
 	b.WriteString("out=$(cat \"$olog\")\n")
 	b.WriteString("skip=1\n")
@@ -619,7 +643,7 @@ func appendRunVerify(b *strings.Builder, che string, job installJob) {
 	for pkg, pv := range job.verify {
 		for _, v := range pv.cmds {
 			label := fmt.Sprintf("verify %s via `%s`", pkg, v.cmd)
-			fmt.Fprintf(b, "vout=$(bash -c %s 2>&1) || { printf '%%s: %%s ❌\\n' %s \"$vout\"; exit 1; }\n", shq(verifyShell(v.cmd)), shq(label))
+			fmt.Fprintf(b, "vout=$(bash -c %s 2>&1) || { printf '%%s: %%s ❌\\n' %s \"$vout\"; exit 1; }\n", shq(makeVerifyShell(v.cmd)), shq(label))
 			fmt.Fprintf(b, "printf '%%s: %%s ✅\\n' %s \"$vout\"\n", shq(label))
 			if v.wantOut {
 				b.WriteString("test -n \"$vout\"\n")
@@ -629,7 +653,7 @@ func appendRunVerify(b *strings.Builder, che string, job installJob) {
 			fmt.Fprintf(b, "printf 'verify %s on PATH: skipped (checkInPath: false)\\n'\n", pkg)
 			continue
 		}
-		fmt.Fprintf(b, "if p=$(command -v %s); then printf 'verify %s on PATH: %%s ✅\\n' \"$p\"; else printf 'verify %s not on PATH ❌\\n'; exit 1; fi\n", pv.cmd, pv.cmd, pv.cmd)
+		fmt.Fprintf(b, "if p=$(command -v %s); then printf 'verify %s on PATH: %%s ✅\\n' \"$p\"; else printf 'verify %s not on PATH ❌\\n'; exit 1; fi\n", pv.bin, pv.bin, pv.bin)
 	}
 }
 
@@ -644,8 +668,8 @@ func runJobNoDeps(t *testing.T, job installJob, cfg runCfg) (string, bool) {
 	}
 	require.FileExists(t, binLinux)
 	arch := cmp.Or(cfg.linuxArch, runtime.GOARCH)
-	image := noDepsImage(t, arch)
-	cache := devCacheDir(t)
+	image := ensureNoDepsImage(t, arch)
+	cache := ensureDevCacheDir(t)
 	argv := []string{
 		"run", "--rm", "--quiet", "--platform", "linux/" + arch,
 		"-v", binLinux + ":/usr/local/bin/che:ro",
@@ -654,7 +678,7 @@ func runJobNoDeps(t *testing.T, job installJob, cfg runCfg) (string, bool) {
 		"-v", filepath.Join(cache, "xdg") + ":/root/.cache",
 		"-v", filepath.Join(cache, "downloads") + ":/che-cache",
 		"-e", "CHE_PACKAGES_DOWNLOAD_CACHE_DIR=/che-cache",
-		image, "sh", "-ec", noDepsScript(job),
+		image, "sh", "-ec", makeNoDepsScript(job),
 	}
 	run := exec.Command("docker", argv...)
 	out, err := runStreamed(t, run, "with_no_deps install "+strings.Join(job.packages, " "))
@@ -664,7 +688,7 @@ func runJobNoDeps(t *testing.T, job installJob, cfg runCfg) (string, bool) {
 
 var noDepsImages sync.Map
 
-func noDepsImage(t *testing.T, arch string) string {
+func ensureNoDepsImage(t *testing.T, arch string) string {
 	t.Helper()
 	tag := "che-e2e-debian:" + arch
 	once, _ := noDepsImages.LoadOrStore(arch, new(sync.Once))
@@ -680,23 +704,64 @@ func noDepsImage(t *testing.T, arch string) string {
 	return tag
 }
 
-func runStreamed(t *testing.T, cmd *exec.Cmd, label string) (string, error) {
-	t.Helper()
-	t.Logf("%s", label)
-	var buf bytes.Buffer
-	w := io.MultiWriter(&buf, os.Stderr)
-	cmd.Stdout, cmd.Stderr = w, w
-	err := cmd.Run()
-	return buf.String(), err
-}
-
 const vmTemplate = "che-e2e-install-methods-template"
 
 const vmUser = "user"
 
 var vmSeq atomic.Int64
 
-func sshArgs(ip string, cmdline string) []string {
+func runJobVM(t *testing.T, job installJob) (string, bool) {
+	t.Helper()
+	if _, err := exec.LookPath("tart"); err != nil {
+		t.Skip("tart absent; darwin with_no_deps mode needs it")
+	}
+	if !tartHasVM(t, vmTemplate) {
+		t.Skipf("tart template %s absent; run ci/e2e-install-methods-vm-template.zsh (make e2e-install-methods prepares it)", vmTemplate)
+	}
+	vm := fmt.Sprintf("che-e2e-%d-%d", os.Getpid(), vmSeq.Add(1))
+	t.Logf("tart clone %s -> %s", vmTemplate, vm)
+	cloneOut, err := exec.Command("tart", "clone", vmTemplate, vm).CombinedOutput()
+	require.NoError(t, err, "tart clone %s %s: %s", vmTemplate, vm, cloneOut)
+	boot := exec.Command("tart", "run", "--no-graphics",
+		"--dir=che-cache:"+filepath.Join(ensureDevCacheDir(t), "downloads"), vm)
+	require.NoError(t, boot.Start())
+	t.Cleanup(func() {
+		t.Logf("stop + delete %s", vm)
+		_ = exec.Command("tart", "stop", vm).Run()
+		_ = boot.Wait()
+		_ = exec.Command("tart", "delete", vm).Run()
+	})
+	t.Logf("boot %s, waiting for ssh (up to ~3 min)", vm)
+	ip := waitVMSSH(t, vm)
+	t.Logf("%s at %s, pushing che", vm, ip)
+	pushBinToVM(t, ip)
+	run := exec.Command("ssh", makeSSHArgs(ip, "sh -ec "+shq(makeVMScript(job)))...)
+	out, err := runStreamed(t, run, "darwin VM ("+vm+") install "+strings.Join(job.packages, " "))
+	pullCoverFromVM(t, ip)
+	require.NoError(t, err, "darwin VM install %s", strings.Join(job.packages, " "))
+	return out, strings.Contains(out, noDepsSkipMarker)
+}
+
+func makeVMScript(job installJob) string {
+	var b strings.Builder
+	b.WriteString(`export PATH=$HOME/.local/bin:$HOME/go/bin:$HOME/.pyenv/bin:$HOME/.pyenv/shims:/opt/homebrew/bin:/opt/homebrew/sbin:/nix/var/nix/profiles/default/bin:$HOME/.nix-profile/bin:$PATH
+export XDG_CONFIG_HOME=$HOME/.config XDG_DATA_HOME=$HOME/.local/share XDG_BIN_HOME=$HOME/.local/bin
+export XDG_STATE_HOME=$HOME/.local/state XDG_CACHE_HOME=$HOME/.cache
+export PYENV_ROOT=$HOME/.pyenv NVM_DIR=$HOME/.config/nvm GOBIN=$HOME/go/bin GOFLAGS=-modcacherw
+`)
+	fmt.Fprintf(&b, "export CHE_E2E=1 CHE_LOG_LEVEL=%s CHE_PACKAGES_BINARIES_REMOTE_ARCHIVE_CHECK_PRESENT_ON_PATH=0\n", resolveLogLevel())
+	b.WriteString(`if [ -d '/Volumes/My Shared Files/che-cache' ]; then export CHE_PACKAGES_DOWNLOAD_CACHE_DIR='/Volumes/My Shared Files/che-cache'; fi
+export GOCOVERDIR=$HOME/cover
+mkdir -p $HOME/.local/bin $HOME/.config $HOME/.local/state $HOME/cover $HOME/work
+cd $HOME/work
+printf 'e2e:\n  options: {autoDiscover: true}\n' > che.yml
+`)
+	appendJobSetup(&b, job)
+	appendRunVerify(&b, "$HOME/che-e2e/che", job)
+	return b.String()
+}
+
+func makeSSHArgs(ip string, cmdline string) []string {
 	return []string{
 		"-o", "BatchMode=yes", "-o", "StrictHostKeyChecking=no",
 		"-o", "UserKnownHostsFile=/dev/null", "-o", "LogLevel=ERROR",
@@ -729,7 +794,7 @@ func waitVMSSH(t *testing.T, vm string) string {
 	}
 	require.NotEmpty(t, ip, "no ip for %s after 180s", vm)
 	for range 90 {
-		if exec.Command("ssh", sshArgs(ip, "true")...).Run() == nil {
+		if exec.Command("ssh", makeSSHArgs(ip, "true")...).Run() == nil {
 			return ip
 		}
 		time.Sleep(2 * time.Second)
@@ -738,30 +803,11 @@ func waitVMSSH(t *testing.T, vm string) string {
 	return ip
 }
 
-func vmScript(job installJob) string {
-	var b strings.Builder
-	b.WriteString(`export PATH=$HOME/.local/bin:$HOME/go/bin:$HOME/.pyenv/bin:$HOME/.pyenv/shims:/opt/homebrew/bin:/opt/homebrew/sbin:/nix/var/nix/profiles/default/bin:$HOME/.nix-profile/bin:$PATH
-export XDG_CONFIG_HOME=$HOME/.config XDG_DATA_HOME=$HOME/.local/share XDG_BIN_HOME=$HOME/.local/bin
-export XDG_STATE_HOME=$HOME/.local/state XDG_CACHE_HOME=$HOME/.cache
-export PYENV_ROOT=$HOME/.pyenv NVM_DIR=$HOME/.config/nvm GOBIN=$HOME/go/bin GOFLAGS=-modcacherw
-`)
-	fmt.Fprintf(&b, "export CHE_E2E=1 CHE_LOG_LEVEL=%s CHE_PACKAGES_BINARIES_REMOTE_ARCHIVE_CHECK_PRESENT_ON_PATH=0\n", logLevel())
-	b.WriteString(`if [ -d '/Volumes/My Shared Files/che-cache' ]; then export CHE_PACKAGES_DOWNLOAD_CACHE_DIR='/Volumes/My Shared Files/che-cache'; fi
-export GOCOVERDIR=$HOME/cover
-mkdir -p $HOME/.local/bin $HOME/.config $HOME/.local/state $HOME/cover $HOME/work
-cd $HOME/work
-printf 'e2e:\n  options: {autoDiscover: true}\n' > che.yml
-`)
-	appendJobSetup(&b, job)
-	appendRunVerify(&b, "$HOME/che-e2e/che", job)
-	return b.String()
-}
-
-func vmPush(t *testing.T, ip string) {
+func pushBinToVM(t *testing.T, ip string) {
 	t.Helper()
-	bin := binPath(t)
+	bin := resolveBinPath(t)
 	pack := exec.Command("tar", "-cf", "-", "-C", filepath.Dir(bin), filepath.Base(bin))
-	unpack := exec.Command("ssh", sshArgs(ip, "mkdir -p che-e2e && tar -xf - -C che-e2e && mv -f che-e2e/"+filepath.Base(bin)+" che-e2e/che")...)
+	unpack := exec.Command("ssh", makeSSHArgs(ip, "mkdir -p che-e2e && tar -xf - -C che-e2e && mv -f che-e2e/"+filepath.Base(bin)+" che-e2e/che")...)
 	pipe, err := pack.StdoutPipe()
 	require.NoError(t, err)
 	unpack.Stdin = pipe
@@ -771,13 +817,13 @@ func vmPush(t *testing.T, ip string) {
 	require.NoError(t, pack.Wait())
 }
 
-func vmPullCover(t *testing.T, ip string) {
+func pullCoverFromVM(t *testing.T, ip string) {
 	t.Helper()
 	dir := os.Getenv("E2E_GOCOVERDIR")
 	if dir == "" {
 		return
 	}
-	pack := exec.Command("ssh", sshArgs(ip, "tar -cf - -C cover .")...)
+	pack := exec.Command("ssh", makeSSHArgs(ip, "tar -cf - -C cover .")...)
 	unpack := exec.Command("tar", "-xf", "-", "-C", dir)
 	pipe, err := pack.StdoutPipe()
 	require.NoError(t, err)
@@ -786,38 +832,6 @@ func vmPullCover(t *testing.T, ip string) {
 	out, err := unpack.CombinedOutput()
 	require.NoError(t, err, "pull cover dir from VM: %s", out)
 	require.NoError(t, pack.Wait())
-}
-
-func runJobVM(t *testing.T, job installJob) (string, bool) {
-	t.Helper()
-	if _, err := exec.LookPath("tart"); err != nil {
-		t.Skip("tart absent; darwin with_no_deps mode needs it")
-	}
-	if !tartHasVM(t, vmTemplate) {
-		t.Skipf("tart template %s absent; run ci/e2e-install-methods-vm-template.zsh (make e2e-install-methods prepares it)", vmTemplate)
-	}
-	vm := fmt.Sprintf("che-e2e-%d-%d", os.Getpid(), vmSeq.Add(1))
-	t.Logf("tart clone %s -> %s", vmTemplate, vm)
-	cloneOut, err := exec.Command("tart", "clone", vmTemplate, vm).CombinedOutput()
-	require.NoError(t, err, "tart clone %s %s: %s", vmTemplate, vm, cloneOut)
-	boot := exec.Command("tart", "run", "--no-graphics",
-		"--dir=che-cache:"+filepath.Join(devCacheDir(t), "downloads"), vm)
-	require.NoError(t, boot.Start())
-	t.Cleanup(func() {
-		t.Logf("stop + delete %s", vm)
-		_ = exec.Command("tart", "stop", vm).Run()
-		_ = boot.Wait()
-		_ = exec.Command("tart", "delete", vm).Run()
-	})
-	t.Logf("boot %s, waiting for ssh (up to ~3 min)", vm)
-	ip := waitVMSSH(t, vm)
-	t.Logf("%s at %s, pushing che", vm, ip)
-	vmPush(t, ip)
-	run := exec.Command("ssh", sshArgs(ip, "sh -ec "+shq(vmScript(job)))...)
-	out, err := runStreamed(t, run, "darwin VM ("+vm+") install "+strings.Join(job.packages, " "))
-	vmPullCover(t, ip)
-	require.NoError(t, err, "darwin VM install %s", strings.Join(job.packages, " "))
-	return out, strings.Contains(out, noDepsSkipMarker)
 }
 
 // [<] 🤖🤖

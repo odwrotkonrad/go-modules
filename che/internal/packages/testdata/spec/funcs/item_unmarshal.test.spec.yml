@@ -141,4 +141,21 @@ cases:
         - yaml: "{apt: {packageName: jq=1.7-1}}"
     expected:
       errorOutput: "apt item jq=1.7-1: version pins go in versionMap"
+  - name: ShouldDecodeExtractManpages
+    input:
+      args:
+        - yaml: |
+            binariesRemoteArchive:
+              version: "1.0"
+              url: https://example.com/foo-{version}.tar.gz
+              extractManpages: [share/man/man1/foo.1, share/man/man5/foo-conf.5.gz]
+              manpages: [foo.1, foo-conf.5]
+    expected:
+      output: {mgr: binariesRemoteArchive, name: "", version: "1.0", url: "https://example.com/foo-{version}.tar.gz", extractManpages: [share/man/man1/foo.1, share/man/man5/foo-conf.5.gz], manpages: "foo.1, foo-conf.5"}
+  - name: ShouldRejectSectionlessExtractManpageMember
+    input:
+      args:
+        - yaml: "{binariesRemoteArchive: {url: 'https://x/y.tar.gz', extractManpages: [man/foo]}}"
+    expected:
+      errorOutput: 'extractManpages: manpage "foo": want <name>.<section>'
 # [<] 🤖🤖

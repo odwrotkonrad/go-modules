@@ -1,6 +1,6 @@
 # [>] 🤖🤖
 context:
-  function: packages.Host.expandAs
+  function: packages.Host.expandTokens
 cases:
   - name: ShouldExpandAllHolesOnLinuxAmd64
     input:

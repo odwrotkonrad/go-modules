@@ -16,7 +16,7 @@ import (
 	"gitlab.com/konradodwrot/go-modules/che/internal/packages"
 )
 
-func (a *app) packagesCmd() *cobra.Command {
+func (a *app) makePackagesCmd() *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "packages",
 		Short: "install packages from packages.yml and check their state",
@@ -36,7 +36,7 @@ func (a *app) packagesCmd() *cobra.Command {
 	install := &cobra.Command{
 		Use:   "install [pkg...]",
 		Short: "install packages by canonical name (no args: every resolved profile's include.installPackages)",
-		RunE:  a.packagesInstallRunE,
+		RunE:  a.installPackagesRunE,
 	}
 	install.Flags().BoolVar(&a.flags.PackagesUpdate, "update", false,
 		"refresh installed unpinned packages via their manager; pinned ones converge on the pin regardless")
@@ -50,18 +50,123 @@ func (a *app) packagesCmd() *cobra.Command {
 	addPackagesKindFlag(install, &a.packagesKind)
 
 	cmd.AddCommand(install,
-		a.packagesCheckPresentCmd(),
-		a.packagesCheckCmd("check-upgradable", "warn on manager-reported outdated packages and binary pins drifted from --version output",
+		a.makePackagesUpdateCmd(),
+		a.makeCheckPresentCmd(),
+		a.makeCheckCmd("check-upgradable", "warn on manager-reported outdated packages and binary pins drifted from --version output",
 			func(in *packages.Installer, pkgs []string) error { return in.CheckUpgradable(pkgs) }),
-		a.packagesCheckCmd("check-not-shadowed", "warn when a package's manager-expected binary is not the first PATH hit",
+		a.makeCheckCmd("check-not-shadowed", "warn when a package's manager-expected binary is not the first PATH hit",
 			func(in *packages.Installer, pkgs []string) error { return in.CheckNotShadowed(pkgs) }),
-		a.packagesCheckCmd("check-single-present", "warn when a canonical command resolves in more than one PATH dir, listing every location",
+		a.makeCheckCmd("check-single-present", "warn when a canonical command resolves in more than one PATH dir, listing every location",
 			func(in *packages.Installer, pkgs []string) error { return in.CheckSinglePresent(pkgs) }),
-		a.packagesConfigCmd())
+		a.makeCheckCmd("check-manpages", "warn when a declared manpage resolves nowhere on the man search path, or in more than one dir (every location listed)",
+			func(in *packages.Installer, pkgs []string) error { return in.CheckManpages(pkgs) }),
+		a.makePackagesConfigCmd())
 	return cmd
 }
 
-func (a *app) packagesConfigCmd() *cobra.Command {
+func (a *app) installPackagesRunE(cmd *cobra.Command, args []string) error {
+	if err := validatePackagesKind(a.packagesKind); err != nil {
+		return err
+	}
+	if len(args) > 0 {
+		in, err := che.NewPackagesInstallerFromContext(a.ctx, a.opts)
+		if err != nil {
+			return err
+		}
+		if a.packagesKind != "packages" {
+			if err := in.InstallToolPackages(a.packagesKind, packages.Requests(args)); err != nil {
+				return err
+			}
+			if a.opts.DryRun == options.DryRun.Off {
+				in.CheckToolPackagesPresent(a.packagesKind, args)
+			}
+			return nil
+		}
+		if err := in.Install(args); err != nil {
+			return err
+		}
+		if a.opts.DryRun == options.DryRun.Off {
+			in.CheckPresent(args)
+		}
+		return nil
+	}
+	return a.specs.ExecEach(a.runCtx, "install-packages", func(ctx context.Context, p *che.ProfileReady) error {
+		return p.ExecOperationNamed(ctx, "install-packages")
+	})
+}
+
+func (a *app) makePackagesUpdateCmd() *cobra.Command {
+	var force bool
+	cmd := &cobra.Command{
+		Use:   "update",
+		Short: "fetch the latest published package definitions into the cache ($XDG_CACHE_HOME/che/packages); cached definitions supersede the builtin set when no packages file exists",
+		RunE: func(cmd *cobra.Command, args []string) error {
+			res, err := che.UpdatePackagesDefinitions(a.ctx, a.opts, force)
+			if err != nil {
+				return err
+			}
+			switch {
+			case res.Updated:
+				fmt.Printf("definitions updated to %s\n", res.Version)
+			case res.Skipped == "cooldown" && res.Version == "":
+				fmt.Println("update check on cooldown, no cached definitions yet (--force to fetch now)")
+			case res.Skipped == "cooldown":
+				fmt.Printf("definitions %s (checked within cooldown, --force to re-check)\n", res.Version)
+			default:
+				fmt.Printf("definitions %s up to date\n", res.Version)
+			}
+			return nil
+		},
+	}
+	cmd.Flags().BoolVar(&force, "force", false,
+		"skip the cooldown short-circuit and re-check the registry now")
+	return cmd
+}
+
+func (a *app) makeCheckPresentCmd() *cobra.Command {
+	cmd := &cobra.Command{
+		Use:   "check-present [pkg...]",
+		Short: "check the canonical commands resolve on PATH (errors on any missing); --kind=<tool> checks the tool's installed packages instead",
+		RunE: func(cmd *cobra.Command, args []string) error {
+			if err := validatePackagesKind(a.packagesKind); err != nil {
+				return err
+			}
+			in, err := che.NewPackagesInstallerFromContext(a.ctx, a.opts)
+			if err != nil {
+				return err
+			}
+			if a.packagesKind != "packages" {
+				names := a.resolveToolPkgs(in, a.packagesKind, args)
+				if missing := in.CheckToolPackagesPresent(a.packagesKind, names); len(missing) > 0 {
+					return fmt.Errorf("missing %s packages: %s", a.packagesKind, strings.Join(missing, ", "))
+				}
+				return nil
+			}
+			if missing := in.CheckPresent(a.resolvePkgs(in, args)); len(missing) > 0 {
+				return fmt.Errorf("missing commands: %s", strings.Join(missing, ", "))
+			}
+			return nil
+		},
+	}
+	addPackagesKindFlag(cmd, &a.packagesKind)
+	return cmd
+}
+
+func (a *app) makeCheckCmd(name, short string, run func(*packages.Installer, []string) error) *cobra.Command {
+	return &cobra.Command{
+		Use:   name + " [pkg...]",
+		Short: short,
+		RunE: func(cmd *cobra.Command, args []string) error {
+			in, err := che.NewPackagesInstallerFromContext(a.ctx, a.opts)
+			if err != nil {
+				return err
+			}
+			return run(in, a.resolvePkgs(in, args))
+		},
+	}
+}
+
+func (a *app) makePackagesConfigCmd() *cobra.Command {
 	return makeConfigShowCmd(
 		"inspect the resolved packages database",
 		"print the packages database (--all default: the effective merged set; --delta: entries differing from the builtin; --defaults: the builtin only)",
@@ -110,6 +215,26 @@ func (a *app) packagesConfigCmd() *cobra.Command {
 		})
 }
 
+func (a *app) resolvePkgs(in *packages.Installer, args []string) []string {
+	if len(args) > 0 {
+		return args
+	}
+	if pkgs := che.InstallPackageNames(a.specs.AllProfiles()); len(pkgs) > 0 {
+		return pkgs
+	}
+	return slices.Sorted(maps.Keys(in.File.Packages))
+}
+
+func (a *app) resolveToolPkgs(in *packages.Installer, tool string, args []string) []string {
+	if len(args) > 0 {
+		return args
+	}
+	if names := che.InstallToolPackageNames(a.specs.AllProfiles(), tool); len(names) > 0 {
+		return names
+	}
+	return slices.Sorted(maps.Keys(in.File.ToolPackages[tool]))
+}
+
 func addPackagesKindFlag(cmd *cobra.Command, dest *string) {
 	cmd.Flags().StringVar(dest, "kind", "packages",
 		"package kind: packages (canonical entries) or a tool name whose toolPackages entries install via that tool; values: packages | "+strings.Join(packages.KnownTools(), " | "))
@@ -120,101 +245,6 @@ func validatePackagesKind(kind string) error {
 		return nil
 	}
 	return fmt.Errorf("unknown kind %q: want packages or one of %s", kind, strings.Join(packages.KnownTools(), ", "))
-}
-
-func (a *app) packagesInstallRunE(cmd *cobra.Command, args []string) error {
-	if err := validatePackagesKind(a.packagesKind); err != nil {
-		return err
-	}
-	if len(args) > 0 {
-		in, err := che.NewPackagesInstallerFromContext(a.ctx, a.opts)
-		if err != nil {
-			return err
-		}
-		if a.packagesKind != "packages" {
-			if err := in.InstallToolPackages(a.packagesKind, packages.Requests(args)); err != nil {
-				return err
-			}
-			if a.opts.DryRun == options.DryRun.Off {
-				in.CheckToolPackagesPresent(a.packagesKind, args)
-			}
-			return nil
-		}
-		if err := in.Install(args); err != nil {
-			return err
-		}
-		if a.opts.DryRun == options.DryRun.Off {
-			in.CheckPresent(args)
-		}
-		return nil
-	}
-	return a.root.ExecEach(a.runCtx, "install-packages", func(ctx context.Context, p *che.ProfileReady) error {
-		return p.ExecOperationNamed(ctx, "install-packages")
-	})
-}
-
-func (a *app) packagesCheckPresentCmd() *cobra.Command {
-	cmd := &cobra.Command{
-		Use:   "check-present [pkg...]",
-		Short: "check the canonical commands resolve on PATH (errors on any missing); --kind=<tool> checks the tool's installed packages instead",
-		RunE: func(cmd *cobra.Command, args []string) error {
-			if err := validatePackagesKind(a.packagesKind); err != nil {
-				return err
-			}
-			in, err := che.NewPackagesInstallerFromContext(a.ctx, a.opts)
-			if err != nil {
-				return err
-			}
-			if a.packagesKind != "packages" {
-				names := args
-				if len(names) == 0 {
-					names = che.InstallToolPackageNames(a.root.AllProfiles(), a.packagesKind)
-				}
-				if len(names) == 0 {
-					names = slices.Sorted(maps.Keys(in.File.ToolPackages[a.packagesKind]))
-				}
-				if missing := in.CheckToolPackagesPresent(a.packagesKind, names); len(missing) > 0 {
-					return fmt.Errorf("missing %s packages: %s", a.packagesKind, strings.Join(missing, ", "))
-				}
-				return nil
-			}
-			pkgs := args
-			if len(pkgs) == 0 {
-				pkgs = che.InstallPackageNames(a.root.AllProfiles())
-			}
-			if len(pkgs) == 0 {
-				pkgs = slices.Sorted(maps.Keys(in.File.Packages))
-			}
-			if missing := in.CheckPresent(pkgs); len(missing) > 0 {
-				return fmt.Errorf("missing commands: %s", strings.Join(missing, ", "))
-			}
-			return nil
-		},
-	}
-	addPackagesKindFlag(cmd, &a.packagesKind)
-	return cmd
-}
-
-func (a *app) packagesCheckCmd(name, short string, run func(*packages.Installer, []string) error) *cobra.Command {
-	use := name + " [pkg...]"
-	return &cobra.Command{
-		Use:   use,
-		Short: short,
-		RunE: func(cmd *cobra.Command, args []string) error {
-			in, err := che.NewPackagesInstallerFromContext(a.ctx, a.opts)
-			if err != nil {
-				return err
-			}
-			pkgs := args
-			if len(pkgs) == 0 {
-				pkgs = che.InstallPackageNames(a.root.AllProfiles())
-			}
-			if len(pkgs) == 0 {
-				pkgs = slices.Sorted(maps.Keys(in.File.Packages))
-			}
-			return run(in, pkgs)
-		},
-	}
 }
 
 // [<] 🤖🤖🤖

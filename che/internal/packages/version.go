@@ -20,7 +20,7 @@ func PinMatches(out, pin string) bool {
 
 const VersionLatest = "latest"
 
-func (in *Installer) pinFor(pkg, specVersion string) string {
+func (in *Installer) resolvePin(pkg, specVersion string) string {
 	if r, ok := in.requested[pkg]; ok && len(r.Versions) > 0 {
 		return r.globalVersion()
 	}
@@ -49,7 +49,7 @@ func (r Request) globalVersion() string {
 	return ""
 }
 
-func (in *Installer) requestedOverridesPin(pkg, itemVersion string) error {
+func (in *Installer) checkRequestedPin(pkg, itemVersion string) error {
 	r, ok := in.requested[pkg]
 	if !ok || len(r.Versions) == 0 || itemVersion == "" {
 		return nil
@@ -64,7 +64,7 @@ func (in *Installer) requestedOverridesPin(pkg, itemVersion string) error {
 }
 
 func (in *Installer) resolveArchiveVersion(pkg string, b *BinariesRemoteArchiveSpec) (string, error) {
-	if v := in.pinFor(pkg, b.Version); v != "" {
+	if v := in.resolvePin(pkg, b.Version); v != "" {
 		return v, nil
 	}
 	e, ok := in.File.Packages[pkg]

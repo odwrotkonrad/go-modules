@@ -12,14 +12,14 @@ import (
 	"gitlab.com/konradodwrot/go-modules/che/internal/log"
 )
 
-type vmTool struct {
+type versionManagerRoutine struct {
 	installed func(in *Installer, v string) bool
 	global    func(in *Installer) string
 	install   func(in *Installer, v string) error
 	setGlobal func(in *Installer, v string) error
 }
 
-var vmTools = map[string]vmTool{
+var versionManagerRoutines = map[string]versionManagerRoutine{
 	"pyenv": {
 		installed: func(in *Installer, v string) bool {
 			out, ok := in.output([]string{"pyenv", "versions", "--bare"})
@@ -63,7 +63,7 @@ func (in *Installer) linkNvmGlobalBin(global string) {
 		in.emit(log.Levels.Debug, "alias", "nvm global bin absent, nothing to link: "+bin)
 		return
 	}
-	dest := in.userBinDir()
+	dest := in.resolveBinDir()
 	_ = os.MkdirAll(dest, 0o755)
 	for _, e := range entries {
 		_ = makeSymlink(filepath.Join(bin, e.Name()), filepath.Join(dest, e.Name()))
@@ -71,7 +71,7 @@ func (in *Installer) linkNvmGlobalBin(global string) {
 }
 
 func (in *Installer) linkNvmNpmBins() {
-	if v := vmTools["nvm"].global(in); v != "" {
+	if v := versionManagerRoutines["nvm"].global(in); v != "" {
 		in.linkNvmGlobalBin(v)
 	}
 }
@@ -82,7 +82,7 @@ func (in *Installer) execNvm(cmd string) error {
 }
 
 func (in *Installer) installVersionManager(pkg string, s *VersionManagerSpec) error {
-	tool := vmTools[s.Tool]
+	tool := versionManagerRoutines[s.Tool]
 	versions, global := s.Versions, s.Global
 	if r, ok := in.requested[pkg]; ok && len(r.Versions) > 0 {
 		versions, global = r.Versions, r.globalVersion()
@@ -98,18 +98,18 @@ func (in *Installer) installVersionManager(pkg string, s *VersionManagerSpec) er
 	}
 	globalOK := tool.global(in) == global
 	if len(missing) == 0 && globalOK {
-		in.emitPresent(log.Levels.Debug, in.pkgLabel(pkg), "versions present via "+s.Tool)
+		in.emitPresent(log.Levels.Debug, in.labelPkg(pkg), "versions present via "+s.Tool)
 		return nil
 	}
 	if in.Opts.DryRun {
-		in.emitDryRun("install", fmt.Sprintf("%s via %s (versions: %s, global: %s)", in.pkgLabel(pkg), s.Tool, strings.Join(versions, " "), global))
+		in.emitDryRun("install", fmt.Sprintf("%s via %s (versions: %s, global: %s)", in.labelPkg(pkg), s.Tool, strings.Join(versions, " "), global))
 		return nil
 	}
 	for _, v := range missing {
 		if err := tool.install(in, v); err != nil {
 			return err
 		}
-		in.emit(log.Levels.Info, "installed", labelWithVersion(in.pkgLabel(pkg), v)+" via "+s.Tool)
+		in.emit(log.Levels.Info, "installed", labelWithVersion(in.labelPkg(pkg), v)+" via "+s.Tool)
 	}
 	if err := tool.setGlobal(in, global); err != nil {
 		return err

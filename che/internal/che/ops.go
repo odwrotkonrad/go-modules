@@ -72,7 +72,7 @@ func (p *ProfileReady) execBackup(dests []string) error {
 	if err := p.FS.ArchiveDestinations(path, dests); err != nil {
 		return err
 	}
-	// [why] the standalone archive carries no op records, so its ledger Backup
+	// [why] the standalone archive carries no op records, so its ledger Backup row is written here
 	if _, err := p.Ledger.EnsureBackup(p.specDone, path, "backup"); err != nil {
 		log.EmitTrace("ledger", "error", "ensure backup: "+err.Error())
 	}
@@ -194,7 +194,7 @@ func (p *ProfileReady) fixPerms(op, dest string, item spec.FileItem) error {
 	return nil
 }
 
-func (p *ProfileReady) runFileOp(archiveSub, failOp, kind string, dirRelativePaths []string, items []spec.FileItem,
+func (p *ProfileReady) runFileOp(op, kind string, dirRelativePaths []string, items []spec.FileItem,
 	destsOf func(spec.FileItem) []string, settle func(spec.FileItem, string) error,
 ) error {
 	var errs []error
@@ -205,13 +205,13 @@ func (p *ProfileReady) runFileOp(archiveSub, failOp, kind string, dirRelativePat
 	for _, item := range items {
 		dests = append(dests, destsOf(item)...)
 	}
-	if err := p.archiveBefore(archiveSub, dests); err != nil {
+	if err := p.archiveBefore(op, dests); err != nil {
 		return errors.Join(append(errs, err)...)
 	}
 	for _, item := range items {
 		for _, dest := range destsOf(item) {
 			if err := settle(item, dest); err != nil {
-				errs = append(errs, p.failItem(failOp, dest, err))
+				errs = append(errs, p.failItem(op, dest, err))
 			}
 		}
 	}
@@ -222,8 +222,7 @@ func (p *ProfileReady) runFileOp(archiveSub, failOp, kind string, dirRelativePat
 }
 
 func (p *ProfileReady) makeLinks(links []spec.FileItem, dirRelativePaths []string) error {
-	return p.runFileOp("make-links", "make-links", "link", dirRelativePaths, links,
-		p.resolveLinkDests, p.makeLink)
+	return p.runFileOp("make-links", "link", dirRelativePaths, links, p.resolveLinkDests, p.makeLink)
 }
 
 func (p *ProfileReady) resolveLinkDests(item spec.FileItem) []string {
@@ -249,7 +248,7 @@ func (p *ProfileReady) makeLink(item spec.FileItem, dest string) error {
 }
 
 func (p *ProfileReady) makeCopies(copies []spec.FileItem, dirRelativePaths []string) error {
-	return p.runFileOp("make-copies", "make-copies", "copy", dirRelativePaths, copies, p.resolveCopyDests, p.makeCopy)
+	return p.runFileOp("make-copies", "copy", dirRelativePaths, copies, p.resolveCopyDests, p.makeCopy)
 }
 
 func (p *ProfileReady) makeCopy(item spec.FileItem, dest string) error {

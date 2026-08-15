@@ -4,84 +4,84 @@ context:
     execx.CmdExecutor: testutil.CmdMockExecutor
 cases:
   - name: mkdirShouldBuildPlainArgvUnderHomeWithParents
-    context: {function: fsutil.FS.Mkdir}
+    context: {function: fsutil.FS.MakeDir}
     input:
       args: [dest: /Users/x/.config/foo, mode: "0755", parents: true]
     expected:
       output:
         argv: mkdir -p -m 0755 /Users/x/.config/foo
   - name: mkdirShouldUseSudoOutsideHome
-    context: {function: fsutil.FS.Mkdir}
+    context: {function: fsutil.FS.MakeDir}
     input:
       args: [dest: /etc/foo, mode: "0", parents: false]
     expected:
       output:
         argv: sudo mkdir /etc/foo
   - name: symlinkShouldBuildPlainArgvUnderHome
-    context: {function: fsutil.FS.Symlink}
+    context: {function: fsutil.FS.MakeSymlink}
     input:
       args: [target: /repo/root/_home/.config/foo, dest: /Users/x/.config/foo]
     expected:
       output:
         argv: ln -fs ${NODEREF} /repo/root/_home/.config/foo /Users/x/.config/foo
   - name: symlinkShouldUseSudoOutsideHome
-    context: {function: fsutil.FS.Symlink}
+    context: {function: fsutil.FS.MakeSymlink}
     input:
       args: [target: /repo/root/etc/zshrc, dest: /etc/zshrc]
     expected:
       output:
         argv: sudo ln -fs ${NODEREF} /repo/root/etc/zshrc /etc/zshrc
   - name: copyShouldInstallWithModeUnderHome
-    context: {function: fsutil.FS.Copy}
+    context: {function: fsutil.FS.CopyFile}
     input:
       args: [src: /repo/root/_home/.config/foo/f, dest: /Users/x/.config/foo/f, mode: "0644"]
     expected:
       output:
         argv: install -m 0644 /repo/root/_home/.config/foo/f /Users/x/.config/foo/f
   - name: copyShouldUseSudoAndOmitZeroModeOutsideHome
-    context: {function: fsutil.FS.Copy}
+    context: {function: fsutil.FS.CopyFile}
     input:
       args: [src: /repo/root/etc/grafana/g.ini, dest: /etc/grafana/g.ini, mode: "0"]
     expected:
       output:
         argv: sudo install /repo/root/etc/grafana/g.ini /etc/grafana/g.ini
   - name: removeShouldRmForceUnderHome
-    context: {function: fsutil.FS.Remove}
+    context: {function: fsutil.FS.RemoveFile}
     input:
       args: [dest: /Users/x/.config/foo/dead]
     expected:
       output:
         argv: rm -f /Users/x/.config/foo/dead
   - name: removeShouldUseSudoOutsideHome
-    context: {function: fsutil.FS.Remove}
+    context: {function: fsutil.FS.RemoveFile}
     input:
       args: [dest: /etc/stale]
     expected:
       output:
         argv: sudo rm -f /etc/stale
   - name: chownShouldBuildPlainArgvUnderHome
-    context: {function: fsutil.FS.Chown}
+    context: {function: fsutil.FS.ChangeOwner}
     input:
       args: [owner: "ko:staff", dest: /Users/x/.config/foo]
     expected:
       output:
         argv: chown ko:staff /Users/x/.config/foo
   - name: chownShouldUseSudoOutsideHome
-    context: {function: fsutil.FS.Chown}
+    context: {function: fsutil.FS.ChangeOwner}
     input:
       args: [owner: root, dest: /etc/foo]
     expected:
       output:
         argv: sudo chown root /etc/foo
   - name: chmodShouldApplySpecialBitsWithSudoOutsideHome
-    context: {function: fsutil.FS.Chmod}
+    context: {function: fsutil.FS.ChangeMode}
     input:
       args: [chmod: "2775", dest: /etc/foo]
     expected:
       output:
         argv: sudo chmod 2775 /etc/foo
   - name: installShouldPassOwnerFlagWhenOwnerSet
-    context: {function: fsutil.FS.Install}
+    context: {function: fsutil.FS.InstallFile}
     input:
       args: [dest: /Users/x/.config/foo/rendered, mode: "0600", owner: "ko:staff", body: "SECRET\n"]
     expected:
@@ -89,7 +89,7 @@ cases:
         argv: install -m 0600 -o ko -g staff {{/\S+/}} /Users/x/.config/foo/rendered
         body: "SECRET\n"
   - name: installShouldOmitOwnerFlagWhenOwnerEmpty
-    context: {function: fsutil.FS.Install}
+    context: {function: fsutil.FS.InstallFile}
     input:
       args: [dest: /Users/x/.config/foo/rendered, mode: "0644", owner: "", body: "hello\n"]
     expected:
@@ -97,7 +97,7 @@ cases:
         argv: install -m 0644 {{/\S+/}} /Users/x/.config/foo/rendered
         body: "hello\n"
   - name: installShouldUseSudoOutsideHome
-    context: {function: fsutil.FS.Install}
+    context: {function: fsutil.FS.InstallFile}
     input:
       args: [dest: /etc/rendered, mode: "0", owner: "", body: "x\n"]
     expected:

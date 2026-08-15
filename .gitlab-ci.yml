@@ -31,6 +31,7 @@ stages:
   - coverage
   - release
   - publish
+  - trigger-downstream
 
 variables:
   CI_IMAGE: registry.gitlab.com/konradodwrot/infra/oci-images/ci-linux:latest
@@ -49,7 +50,7 @@ warm-go:
   rules:
     - if: $CI_PIPELINE_SOURCE == "merge_request_event"
     - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
-      changes: [che/**/*, lib/**/*, go.work, .gitlab-ci.yml]
+      changes: [che/**/*, che-packages/**/*, lib/**/*, go.work, .gitlab-ci.yml]
   cache:
     - key: go-mod
       paths:
@@ -77,7 +78,7 @@ warm-go-linux-arm64:
   rules:
     - if: $CI_PIPELINE_SOURCE == "merge_request_event"
     - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
-      changes: [che/**/*, lib/**/*, go.work, .gitlab-ci.yml]
+      changes: [che/**/*, che-packages/**/*, lib/**/*, go.work, .gitlab-ci.yml]
   cache:
     - key: go-mod
       paths:
@@ -152,9 +153,9 @@ test-unit-che:
       - che/cover-unit/
   rules:
     - if: $CI_PIPELINE_SOURCE == "merge_request_event"
-      changes: [che/**/*, lib/**/*, go.work, .gitlab-ci.yml]
+      changes: [che/**/*, che-packages/**/*, lib/**/*, go.work, .gitlab-ci.yml]
     - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
-      changes: [che/**/*, lib/**/*, go.work, .gitlab-ci.yml]
+      changes: [che/**/*, che-packages/**/*, lib/**/*, go.work, .gitlab-ci.yml]
 
 .test-e2e-che:
   image: $CI_IMAGE
@@ -164,9 +165,9 @@ test-unit-che:
     - warm-go
   rules:
     - if: $CI_PIPELINE_SOURCE == "merge_request_event"
-      changes: [che/**/*, lib/**/*, go.work, .gitlab-ci.yml]
+      changes: [che/**/*, che-packages/**/*, lib/**/*, go.work, .gitlab-ci.yml]
     - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
-      changes: [che/**/*, lib/**/*, go.work, .gitlab-ci.yml]
+      changes: [che/**/*, che-packages/**/*, lib/**/*, go.work, .gitlab-ci.yml]
 
 test-e2e-che-dryrun:
   extends: .test-e2e-che
@@ -216,9 +217,9 @@ warm-e2e-pkg-installs-image:
     DOCKER_CERT_PATH: "$DOCKER_TLS_CERTDIR/client"
   rules:
     - if: $CI_PIPELINE_SOURCE == "merge_request_event"
-      changes: [che/**/*, lib/**/*, go.work, .gitlab-ci.yml]
+      changes: [che/**/*, che-packages/**/*, lib/**/*, go.work, .gitlab-ci.yml]
     - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
-      changes: [che/**/*, lib/**/*, go.work, .gitlab-ci.yml]
+      changes: [che/**/*, che-packages/**/*, lib/**/*, go.work, .gitlab-ci.yml]
     - if: $CI_PIPELINE_SOURCE == "merge_request_event" || $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
       when: manual
       allow_failure: true
@@ -253,9 +254,9 @@ warm-go-darwin:
       policy: pull-push
   rules:
     - if: $CI_PIPELINE_SOURCE == "merge_request_event"
-      changes: [che/**/*, lib/**/*, go.work, .gitlab-ci.yml]
+      changes: [che/**/*, che-packages/**/*, lib/**/*, go.work, .gitlab-ci.yml]
     - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
-      changes: [che/**/*, lib/**/*, go.work, .gitlab-ci.yml]
+      changes: [che/**/*, che-packages/**/*, lib/**/*, go.work, .gitlab-ci.yml]
   before_script:
     - curl -fsSL --connect-timeout 30 --retry 10 --retry-delay 30 --retry-all-errors -o /tmp/go.tar.gz "https://go.dev/dl/go1.26.4.darwin-arm64.tar.gz"
     - sudo tar -xzf /tmp/go.tar.gz -C /usr/local
@@ -290,9 +291,9 @@ test-e2e-install-methods:
   #[why] MR changes-triggered runs block the merge; main keeps allow_failure, manual stays optional
   rules:
     - if: $CI_PIPELINE_SOURCE == "merge_request_event"
-      changes: [che/**/*, lib/**/*, go.work, .gitlab-ci.yml]
+      changes: [che/**/*, che-packages/**/*, lib/**/*, go.work, .gitlab-ci.yml]
     - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
-      changes: [che/**/*, lib/**/*, go.work, .gitlab-ci.yml]
+      changes: [che/**/*, che-packages/**/*, lib/**/*, go.work, .gitlab-ci.yml]
       allow_failure: true
     - if: $CI_PIPELINE_SOURCE == "merge_request_event" || $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
       when: manual
@@ -338,9 +339,9 @@ coverage-che:
         path: che/coverage.xml
   rules:
     - if: $CI_PIPELINE_SOURCE == "merge_request_event"
-      changes: [che/**/*, lib/**/*, go.work, .gitlab-ci.yml]
+      changes: [che/**/*, che-packages/**/*, lib/**/*, go.work, .gitlab-ci.yml]
     - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
-      changes: [che/**/*, lib/**/*, go.work, .gitlab-ci.yml]
+      changes: [che/**/*, che-packages/**/*, lib/**/*, go.work, .gitlab-ci.yml]
 
 test-unit-get-os-open-files-with:
   extends: .test-module
@@ -385,9 +386,22 @@ release-che:
   extends: .release-module
   variables:
     MODULE: che
+  #[why] manual on che-packages-only changes: opt-in che re-release embedding the checkout's fresh packages.yml (goreleaser builds under go.work, the local che-packages dir wins over the go.mod pin)
   rules:
     - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
       changes: [che/**/*]
+    - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
+      changes: [che-packages/**/*]
+      when: manual
+      allow_failure: true
+
+release-che-packages:
+  extends: .release-module
+  variables:
+    MODULE: che-packages
+  rules:
+    - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
+      changes: [che-packages/**/*]
 
 release-get-os-open-files-with:
   extends: .release-module
@@ -423,8 +437,11 @@ release-lib:
     - cp che/assets/data/che.schema.json che/docs/assets/data/
     - sed -i 's|(\.\./assets/data/che.schema.json)|(assets/data/che.schema.json)|g' che/docs/spec.md
     - printf '# che\n' > che/docs/index.md
-    - tail -n +2 che/assets/docs-agents/purpose.md >> che/docs/index.md
     ##[>] 🤖🤖
+    - PROSE_REF=$(sed -n 's|.*repos/go-modules/che-purpose.md?ref=\(v[0-9.]*\)".*|\1|p' che.yml)
+    - wget -qO che/docs/purpose-src.md "https://gitlab.com/konradodwrot/prose/-/raw/$PROSE_REF/repos/go-modules/che-purpose.md"
+    - tail -n +2 che/docs/purpose-src.md >> che/docs/index.md
+    - rm che/docs/purpose-src.md
     - printf '\n## Install\n\n' >> che/docs/index.md
     - printf '```sh\ncurl -fsSL https://konradodwrot.gitlab.io/go-modules/install.sh | sh\n```\n' >> che/docs/index.md
     ##[<] 🤖🤖
@@ -441,13 +458,13 @@ release-lib:
     paths:
       - public
 
-pages-publish:
+publish-pages:
   extends: .pages-build
   stage: publish
   pages: true
   needs:
     - release-che
-    - apt-build-che
+    - publish-apt-che
   rules:
     - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
       changes: [che/**/*]
@@ -560,7 +577,7 @@ prerelease-darwin-che:
   needs: []
   rules:
     - if: $CI_PIPELINE_SOURCE == "merge_request_event"
-      changes: [che/**/*, lib/**/*]
+      changes: [che/**/*, che-packages/**/*, lib/**/*]
   variables:
     MODULE_VERSION: 0.0.0-mr${CI_MERGE_REQUEST_IID}
     GOPATH: $CI_PROJECT_DIR/.cache/go-path
@@ -602,7 +619,7 @@ prerelease-linux-che:
   needs: []
   rules:
     - if: $CI_PIPELINE_SOURCE == "merge_request_event"
-      changes: [che/**/*, lib/**/*]
+      changes: [che/**/*, che-packages/**/*, lib/**/*]
   variables:
     MODULE_VERSION: 0.0.0-mr${CI_MERGE_REQUEST_IID}
     ARCH: amd64
@@ -640,7 +657,7 @@ publish-che:
     - make publish
 
 ##[>] 🤖🤖
-apt-build-che:
+publish-apt-che:
   stage: publish
   image: $CI_IMAGE
   needs:
@@ -658,12 +675,12 @@ apt-build-che:
       - public-apt
     expire_in: 1 day
 
-pages-publish-tag:
+publish-pages-tag:
   extends: .pages-build
   stage: publish
   pages: true
   needs:
-    - apt-build-che
+    - publish-apt-che
   rules:
     - if: $CI_COMMIT_TAG =~ /^che\/v/
 
@@ -679,8 +696,8 @@ publish-brew-che:
   script:
     - make publish-brew
 
-rebuild-ci-image:
-  stage: publish
+publish-ci-image:
+  stage: trigger-downstream
   needs: [publish-che]
   rules:
     - if: $CI_COMMIT_TAG =~ /^che\/v/
@@ -694,6 +711,17 @@ rebuild-ci-image:
     forward:
       yaml_variables: true
       pipeline_variables: false
+##[<] 🤖🤖
+
+##[>] 🤖🤖
+publish-che-packages:
+  stage: publish
+  image: $CI_IMAGE
+  needs: []
+  rules:
+    - if: $CI_COMMIT_TAG =~ /^che-packages\/v/
+  script:
+    - make publish-packages-defs
 ##[<] 🤖🤖
 
 publish-get-os-open-files-with:

@@ -26,7 +26,7 @@ import (
 	"gitlab.com/konradodwrot/go-modules/lib/testyml"
 )
 
-func repoEnv(t *testing.T, pwd string) (*app, *cobra.Command, string) {
+func setupRepoEnv(t *testing.T, pwd string) (*app, *cobra.Command, string) {
 	t.Helper()
 	if os.Geteuid() == 0 {
 		t.Skip("non-root path only; build resolves home from $HOME")
@@ -93,7 +93,7 @@ func mockPackagesFetch(t *testing.T, home string) {
 
 func setupMock(t *testing.T, pwd, profile string, decl map[string]string, env map[string]string) (*app, *cobra.Command, string) {
 	t.Helper()
-	a, root, home := repoEnv(t, pwd)
+	a, root, home := setupRepoEnv(t, pwd)
 	if _, ok := env["CHE_DRY_RUN"]; !ok {
 		t.Setenv("CHE_DRY_RUN", "")
 	}
@@ -111,7 +111,7 @@ func setupMock(t *testing.T, pwd, profile string, decl map[string]string, env ma
 		s := realSeams(home)
 		s.FS = m.FS
 		s.Reader = &testutil.FileSystemMockReader{Roots: []string{a.flags.CheWorkingDirectory, home}}
-		s.Ledger = nil // [why] record-only tests: no ledger side effects
+		s.Ledger = nil
 		return s
 	})
 
@@ -127,7 +127,7 @@ type buildWant struct {
 func TestInit(t *testing.T) {
 	testyml.Run(t, td, "testdata/spec/funcs/init.test.spec.yml",
 		func(t *testing.T, c testyml.Case[buildWant]) {
-			a, _, _ := repoEnv(t, c.Context.Pwd)
+			a, _, _ := setupRepoEnv(t, c.Context.Pwd)
 			t.Setenv("CHE_DRY_RUN", "")
 			t.Setenv("CHE_VALIDATE_SPEC", "")
 			for k, v := range c.Context.Env {
@@ -149,7 +149,7 @@ func TestInit(t *testing.T) {
 				return
 			}
 			var names []string
-			for _, p := range a.root.AllProfiles() {
+			for _, p := range a.specs.AllProfiles() {
 				names = append(names, p.Ref())
 			}
 			got := buildWant{Profiles: strings.Join(names, ","), DryRunAll: a.opts.DryRun == options.DryRun.All}

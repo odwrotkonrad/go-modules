@@ -18,9 +18,9 @@ type sectionWant struct {
 	OK    bool   `yaml:"ok"`
 }
 
-func TestSectionOpen(t *testing.T) {
-	testyml.Eq(t, td, "testdata/spec/funcs/section_open.test.spec.yml", func(t *testing.T, c testyml.Case[sectionWant]) (sectionWant, error) {
-		label, depth, ok := sectionOpen(c.Input.Args.String(t, 0))
+func TestParseSectionOpen(t *testing.T) {
+	testyml.Eq(t, td, "testdata/spec/funcs/parse_section_open.test.spec.yml", func(t *testing.T, c testyml.Case[sectionWant]) (sectionWant, error) {
+		label, depth, ok := parseSectionOpen(c.Input.Args.String(t, 0))
 		if !ok {
 			depth = 0
 		}
@@ -33,9 +33,9 @@ type valsWant struct {
 	OK   bool   `yaml:"ok"`
 }
 
-func TestValsComment(t *testing.T) {
-	testyml.Eq(t, td, "testdata/spec/funcs/tag_comment.test.spec.yml", func(t *testing.T, c testyml.Case[valsWant]) (valsWant, error) {
-		vals, ok := tagComment(c.Input.Args.String(t, 0), "vals")
+func TestParseTagComment(t *testing.T) {
+	testyml.Eq(t, td, "testdata/spec/funcs/parse_tag_comment.test.spec.yml", func(t *testing.T, c testyml.Case[valsWant]) (valsWant, error) {
+		vals, ok := parseTagComment(c.Input.Args.String(t, 0), "vals")
 		return valsWant{Vals: vals, OK: ok}, nil
 	})
 }

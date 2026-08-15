@@ -26,7 +26,7 @@ func TestResolveVerify(t *testing.T) {
 			if _, err := pkgMgrVersionCheck(entry, pkg, method); err != nil {
 				return nil, err
 			}
-			t.Fatal("rawPkgMgrQuery cases assert errors only")
+			t.Fatal("pkgMgrVersionCheck cases assert errors only")
 		}
 		pv := resolveVerify(t, entry, pkg, method)
 		got := make([]verifyCmdGot, 0, len(pv.cmds))

@@ -2,6 +2,6 @@ package yamlcfg
 
 // [>] 🤖🤖
 
-var CustomPaths = customPaths
+var ResolveCustomPaths = resolveCustomPaths
 
 // [<] 🤖🤖

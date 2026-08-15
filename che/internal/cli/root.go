@@ -5,7 +5,6 @@ package cli
 import (
 	"context"
 	"fmt"
-	"slices"
 
 	"github.com/spf13/cobra"
 	"go.opentelemetry.io/otel/attribute"
@@ -25,7 +24,7 @@ type app struct {
 	opts         options.Options
 	packagesKind string
 	ctx          che.Context
-	root         *che.SpecReady
+	specs        *che.SpecReady
 	tel          *telemetry.Telemetry
 	runCtx       context.Context
 	runSpan      trace.Span
@@ -44,23 +43,7 @@ sourced profile refs included).`,
 		SilenceUsage:  true,
 		SilenceErrors: true,
 		PersistentPreRunE: func(cmd *cobra.Command, args []string) error {
-			name := cmd.Name()
-			if p := cmd.Parent(); p != nil {
-				switch p.Name() {
-				case "config":
-					name = "config"
-				case "packages":
-					name = "packages-" + name
-				case "backup":
-					// [why] backup create stays on the spec path under the
-					if name == "create" {
-						name = "backup"
-					} else {
-						name = "backup-" + name
-					}
-				}
-			}
-			return a.init(name)
+			return a.init(resolveCommandName(cmd))
 		},
 		PersistentPostRunE: func(cmd *cobra.Command, args []string) error {
 			a.shutdownTelemetry()
@@ -90,11 +73,31 @@ sourced profile refs included).`,
 	pf.StringVar(&a.flags.LogLevel, "log-level", "",
 		"human-log level; values: error (failures only) | warn | info (what happened) | debug (adds intentions and won't-happen with reasons) | trace (adds details); default: info; env: CHE_LOG_LEVEL")
 
-	root.AddCommand(a.runCmd(), a.initCmd(), a.backupCmd(), a.discoverCmd(), a.uninstallCmd(), a.configCmd(), a.packagesCmd())
-	for _, o := range ops() {
-		root.AddCommand(a.opCmd(o))
+	root.AddCommand(a.makeRunCmd(), a.makeInitCmd(), a.makeBackupCmd(), a.makeDiscoverCmd(), a.makeUninstallCmd(), a.makeConfigCmd(), a.makePackagesCmd())
+	for _, o := range makeOps() {
+		root.AddCommand(a.makeOpCmd(o))
 	}
 	return root
+}
+
+func resolveCommandName(cmd *cobra.Command) string {
+	name := cmd.Name()
+	p := cmd.Parent()
+	if p == nil {
+		return name
+	}
+	switch p.Name() {
+	case "config":
+		return "config"
+	case "packages":
+		return "packages-" + name
+	case "backup":
+		if name == "create" {
+			return "backup"
+		}
+		return "backup-" + name
+	}
+	return name
 }
 
 func (a *app) init(command string) error {
@@ -107,19 +110,7 @@ func (a *app) init(command string) error {
 	if err != nil {
 		return err
 	}
-	// [why] the dry-run announce opens the whole output, then the config
-	if command != "completion" && command != "__complete" {
-		if a.opts.DryRun != options.DryRun.Off {
-			desc := "no actual operations will be performed, reporting only dests that would change"
-			if a.opts.DryRun == options.DryRun.All {
-				desc = "no actual operations will be performed, reporting every dest's state"
-			}
-			log.EmitInfo("config", "dry-run", "("+string(a.opts.DryRun)+") "+desc)
-		}
-		if command != "config" {
-			log.EmitDebug("config", "config-delta", options.FormatSettings(a.opts.SettingsDelta()))
-		}
-	}
+	a.emitStartupConfig(command)
 	a.startTelemetry(ctx)
 	ctx.Tel = a.tel
 	a.runCtx, a.runSpan = a.tel.Span(context.Background(), "che run",
@@ -130,7 +121,6 @@ func (a *app) init(command string) error {
 	if command == "uninstall" || command == "config" || command == "backup-ls" || command == "backup-restore" {
 		return nil
 	}
-	// [why] the init stage prefetches every remote spec source before
 	if command == "run" {
 		log.EmitHeading(log.Levels.Info, 1, "run", "running", "init-remote-sources")
 	}
@@ -143,12 +133,28 @@ func (a *app) init(command string) error {
 	if command == "run" {
 		log.EmitHeading(log.Levels.Info, 1, "run", "running", "discover-profiles")
 	}
-	a.root, err = che.PrepareSpecs(ctx, a.opts, spec.SpecSourceRecipe{})
+	a.specs, err = che.PrepareSpecs(ctx, a.opts, spec.SpecSourceRecipe{})
 	if err != nil {
 		return err
 	}
 	a.tel.CountSpec(a.runCtx)
 	return nil
+}
+
+func (a *app) emitStartupConfig(command string) {
+	if command == "completion" || command == "__complete" {
+		return
+	}
+	if a.opts.DryRun != options.DryRun.Off {
+		desc := "no actual operations will be performed, reporting only dests that would change"
+		if a.opts.DryRun == options.DryRun.All {
+			desc = "no actual operations will be performed, reporting every dest's state"
+		}
+		log.EmitInfo("config", "dry-run", "("+string(a.opts.DryRun)+") "+desc)
+	}
+	if command != "config" {
+		log.EmitDebug("config", "config-delta", options.FormatSettings(a.opts.SettingsDelta()))
+	}
 }
 
 func (a *app) startTelemetry(ctx che.Context) {
@@ -174,13 +180,12 @@ func (a *app) shutdownTelemetry() {
 	}
 }
 
-func (a *app) runCmd() *cobra.Command {
+func (a *app) makeRunCmd() *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "run",
 		Short: "run every op each profile selects, profile by profile",
 		RunE: func(cmd *cobra.Command, args []string) error {
-			return a.root.ExecEach(a.runCtx, "run", func(ctx context.Context, p *che.ProfileReady) error {
-				// [why] the backup stage archives every op dest once, before the
+			return a.specs.ExecEach(a.runCtx, "run", func(ctx context.Context, p *che.ProfileReady) error {
 				if err := p.ExecBackup(); err != nil {
 					return err
 				}
@@ -193,22 +198,7 @@ func (a *app) runCmd() *cobra.Command {
 	return cmd
 }
 
-func (a *app) uninstallCmd() *cobra.Command {
-	return &cobra.Command{
-		Use:   "uninstall",
-		Short: "back out everything che installed (ledger-driven), restoring pre-install backups",
-		RunE: func(cmd *cobra.Command, args []string) error {
-			u, err := che.NewUninstaller(a.ctx, a.opts)
-			if err != nil {
-				return err
-			}
-			defer func() { _ = u.Close() }()
-			return u.Uninstall()
-		},
-	}
-}
-
-func (a *app) initCmd() *cobra.Command {
+func (a *app) makeInitCmd() *cobra.Command {
 	return &cobra.Command{
 		Use:   "init-remote-sources",
 		Short: "fetch the remote spec sources (clone/pull the cache checkouts) and exit",
@@ -216,7 +206,7 @@ func (a *app) initCmd() *cobra.Command {
 	}
 }
 
-func (a *app) backupCmd() *cobra.Command {
+func (a *app) makeBackupCmd() *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "backup",
 		Short: "manage backup archives: create, ls, restore",
@@ -225,7 +215,7 @@ func (a *app) backupCmd() *cobra.Command {
 		Use:   "create",
 		Short: "archive every op dest (links, copies, host renders) into the per-run backup archive and exit",
 		RunE: func(cmd *cobra.Command, args []string) error {
-			return a.root.ExecEach(a.runCtx, "backup", func(ctx context.Context, p *che.ProfileReady) error {
+			return a.specs.ExecEach(a.runCtx, "backup", func(ctx context.Context, p *che.ProfileReady) error {
 				return p.ExecBackup()
 			})
 		},
@@ -258,18 +248,33 @@ func (a *app) backupCmd() *cobra.Command {
 	return cmd
 }
 
-func (a *app) discoverCmd() *cobra.Command {
+func (a *app) makeDiscoverCmd() *cobra.Command {
 	return &cobra.Command{
 		Use:   "discover-profiles",
 		Short: "log the discovered profiles with their per-op changes and exit",
 		RunE: func(cmd *cobra.Command, args []string) error {
-			a.root.LogDiscovered()
+			a.specs.LogDiscovered()
 			return nil
 		},
 	}
 }
 
-func (a *app) configCmd() *cobra.Command {
+func (a *app) makeUninstallCmd() *cobra.Command {
+	return &cobra.Command{
+		Use:   "uninstall",
+		Short: "back out everything che installed (ledger-driven), restoring pre-install backups",
+		RunE: func(cmd *cobra.Command, args []string) error {
+			u, err := che.NewUninstaller(a.ctx, a.opts)
+			if err != nil {
+				return err
+			}
+			defer func() { _ = u.Close() }()
+			return u.Uninstall()
+		},
+	}
+}
+
+func (a *app) makeConfigCmd() *cobra.Command {
 	return makeConfigShowCmd(
 		"inspect che's resolved configuration",
 		"print the resolved options with their deciding sources (--delta default, --all for every option, --defaults for the code defaults)",
@@ -353,22 +358,6 @@ func emitShowOutput(output string, text func(), yaml func() (string, error)) err
 	default:
 		return fmt.Errorf("invalid --output %q: want text or yaml", output)
 	}
-}
-
-func (a *app) runScriptsRunE(cmd *cobra.Command, args []string) error {
-	total := 0
-	err := a.root.ExecEach(a.runCtx, cmd.Name(), func(ctx context.Context, p *che.ProfileReady) error {
-		n, err := p.ExecRunScripts(ctx, args)
-		total += n
-		return err
-	})
-	if err != nil {
-		return err
-	}
-	if len(args) > 0 && total == 0 && !slices.Contains(a.opts.SkipOps, "run-scripts") {
-		return fmt.Errorf("no script matches: %v", args)
-	}
-	return nil
 }
 
 // [<] 🤖🤖

@@ -1,6 +1,6 @@
 # [>] 🤖🤖
 context:
-  function: fsutil.ModeArg
+  function: fsutil.FormatModeArg
 cases:
   - name: ShouldKeep0644
     input:

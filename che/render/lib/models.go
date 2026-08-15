@@ -3,10 +3,10 @@ package lib
 // [>] 🤖🤖🤖
 
 type target struct {
-	name  string
-	what  string
-	vals  string
-	chain []string
+	name string
+	what string
+	vals string
+	deps []string
 }
 
 type section struct {
@@ -23,6 +23,6 @@ type frame struct {
 	targets []target
 }
 
-type pendingCmt struct{ what, vals string }
+type pendingComment struct{ what, vals string }
 
 // [<] 🤖🤖🤖

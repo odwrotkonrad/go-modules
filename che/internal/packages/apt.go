@@ -18,7 +18,7 @@ func (in *Installer) installAptSpec(pkg string, a *AptSpec) error {
 	if err != nil {
 		return err
 	}
-	binPin, pkgPin := in.aptPins(pkg, a)
+	binPin, pkgPin := in.resolveAptPins(pkg, a)
 	if in.skipInstalledOrEmitReinstall(pkg, "apt", pkgPin, binPin,
 		func() bool { return in.isInstalled(pkg, "apt", name) },
 		func() bool { return in.installedVersion("apt", name) == pkgPin },
@@ -26,7 +26,7 @@ func (in *Installer) installAptSpec(pkg string, a *AptSpec) error {
 		return nil
 	}
 	if in.Opts.DryRun {
-		in.emitDryRun("install", labelWithVersion(in.pkgLabel(pkg), binPin)+" via apt")
+		in.emitDryRun("install", labelWithVersion(in.labelPkg(pkg), binPin)+" via apt")
 		return nil
 	}
 	if err := in.aptUpdate(); err != nil {
@@ -48,7 +48,7 @@ func (in *Installer) installAptSpec(pkg string, a *AptSpec) error {
 	if ver == "" {
 		ver = in.installedVersion("apt", name)
 	}
-	in.emit(log.Levels.Info, "installed", labelWithVersion(in.pkgLabel(pkg), ver)+" via apt")
+	in.emit(log.Levels.Info, "installed", labelWithVersion(in.labelPkg(pkg), ver)+" via apt")
 	return nil
 }
 
@@ -64,14 +64,14 @@ func (in *Installer) ensureAptRegistry(pkg string, a *AptSpec) (*AptRepoSpec, er
 		return nil, fmt.Errorf("%s: apt registry %q requires url and verificationKey", pkg, a.FromRegistry)
 	}
 	if !in.Opts.DryRun {
-		if err := in.ensureAptRepo(aptRegistrySlug(src), src); err != nil {
+		if err := in.ensureAptRepo(makeAptSlug(src), src); err != nil {
 			return nil, err
 		}
 	}
 	return src, nil
 }
 
-func (in *Installer) aptPins(pkg string, a *AptSpec) (binPin, pkgPin string) {
+func (in *Installer) resolveAptPins(pkg string, a *AptSpec) (binPin, pkgPin string) {
 	if r, ok := in.requested[pkg]; ok && len(r.Versions) > 0 {
 		v := r.globalVersion()
 		return v, v
@@ -79,7 +79,7 @@ func (in *Installer) aptPins(pkg string, a *AptSpec) (binPin, pkgPin string) {
 	for bin, pkgVer := range a.VersionMap {
 		return bin, pkgVer
 	}
-	pin := in.pinFor(pkg, "")
+	pin := in.resolvePin(pkg, "")
 	return pin, pin
 }
 

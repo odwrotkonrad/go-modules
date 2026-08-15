@@ -7,6 +7,7 @@ import (
 	"os"
 	"path/filepath"
 	"slices"
+	"strings"
 
 	"gitlab.com/konradodwrot/go-modules/che/internal/log"
 )
@@ -15,26 +16,32 @@ func (in *Installer) aliasBinaries(pkg string, it Item) error {
 	if len(it.AliasBinary) == 0 {
 		return nil
 	}
-	binDir := in.userBinDir()
+	binDir := in.resolveBinDir()
 	for _, from := range slices.Sorted(maps.Keys(it.AliasBinary)) {
 		to := it.AliasBinary[from]
 		src, err := in.Host.LookPath(from)
 		if err != nil {
 			continue
 		}
+		pathDest := strings.ContainsRune(to, '/')
 		dest := filepath.Join(binDir, to)
+		if pathDest {
+			dest = in.expandPath(to)
+		}
 		if resolved, err := os.Readlink(dest); err == nil && resolved == src {
 			continue
 		}
-		if _, err := in.Host.LookPath(to); err == nil && !fileExists(dest) {
-			in.emitPresent(log.Levels.Debug, pkg, to+" already resolves without an alias")
-			continue
+		if !pathDest {
+			if _, err := in.Host.LookPath(to); err == nil && !fileExists(dest) {
+				in.emitPresent(log.Levels.Debug, pkg, to+" already resolves without an alias")
+				continue
+			}
 		}
 		if in.Opts.DryRun {
 			in.emitDryRun("alias", pkg+": "+to+" -> "+src)
 			continue
 		}
-		if err := os.MkdirAll(binDir, 0o755); err != nil {
+		if err := os.MkdirAll(filepath.Dir(dest), 0o755); err != nil {
 			return err
 		}
 		if err := makeSymlink(src, dest); err != nil {
@@ -44,8 +51,6 @@ func (in *Installer) aliasBinaries(pkg string, it Item) error {
 	}
 	return nil
 }
-
-// [<] 🤖🤖
 
 func (in *Installer) runEntryPostInstall(pkg string, e Entry) error {
 	if e.PostInstall == nil {
@@ -61,3 +66,5 @@ func (in *Installer) runEntryPostInstall(pkg string, e Entry) error {
 	in.emit(log.Levels.Info, "post-installed", pkg)
 	return nil
 }
+
+// [<] 🤖🤖

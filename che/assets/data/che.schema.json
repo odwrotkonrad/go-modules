@@ -69,6 +69,20 @@
         }
       ]
     },
+    "ManpagesInstall": {
+      "properties": {
+        "installDestinationCandidates": {
+          "$ref": "#/$defs/StringOrList",
+          "description": "where binary-method manpages install: one path or a candidate list (~/ and $VARs expand); with checkPresentOnManpath the first candidate on the man search path wins, else the first entry; default ~/.local/share/man; cascades profile \u003e spec \u003e user config; overridden by CHE_PACKAGES_MANPAGES_INSTALL_DESTINATION_CANDIDATES (comma-separated)"
+        },
+        "checkPresentOnManpath": {
+          "type": "boolean",
+          "description": "pick the first candidate destination found on the man search path (manpath, else $MANPATH) and warn when none is; default true; overridden by CHE_PACKAGES_MANPAGES_CHECK_PRESENT_ON_MANPATH"
+        }
+      },
+      "additionalProperties": false,
+      "type": "object"
+    },
     "Options": {
       "properties": {
         "writeType": {
@@ -195,6 +209,14 @@
         "completions": {
           "$ref": "#/$defs/CompletionsInstall",
           "description": "zsh completions installation options"
+        },
+        "manpages": {
+          "$ref": "#/$defs/ManpagesInstall",
+          "description": "manpages installation options"
+        },
+        "updateCheck": {
+          "$ref": "#/$defs/UpdateCheck",
+          "description": "check the package registry for newer published package definitions before installs"
         }
       },
       "additionalProperties": false,
@@ -472,6 +494,20 @@
           ]
         }
       ]
+    },
+    "UpdateCheck": {
+      "properties": {
+        "enabled": {
+          "type": "boolean",
+          "description": "before installs, fetch the latest published che-packages definitions into the cache (failures warn and installs fall through to the cached or builtin set); default false; overridden by CHE_PACKAGES_UPDATE_CHECK"
+        },
+        "cooldown": {
+          "type": "string",
+          "description": "minimum interval between update checks (Go duration, e.g. 15m, 1h); default 15m; overridden by CHE_PACKAGES_UPDATE_CHECK_COOLDOWN"
+        }
+      },
+      "additionalProperties": false,
+      "type": "object"
     },
     "dirGroup": {
       "properties": {

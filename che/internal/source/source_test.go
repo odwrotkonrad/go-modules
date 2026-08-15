@@ -28,9 +28,9 @@ func TestSlug(t *testing.T) {
 	})
 }
 
-func TestDir(t *testing.T) {
+func TestResolveDir(t *testing.T) {
 	testyml.Eq(t, td, "testdata/spec/funcs/resolve_dir.test.spec.yml", func(t *testing.T, c testyml.Case[string]) (string, error) {
-		return Dir(c.Input.Args.String(t, 0), c.Input.Args.String(t, 1)), nil
+		return ResolveDir(c.Input.Args.String(t, 0), c.Input.Args.String(t, 1)), nil
 	})
 }
 
@@ -75,7 +75,7 @@ func TestEnsure(t *testing.T) {
 			return e
 		})
 		require.NoError(t, err)
-		assert.Equal(t, Dir(home, url), dir)
+		assert.Equal(t, ResolveDir(home, url), dir)
 		out = testutil.StripANSI(out)
 		vars := map[string]string{"URL": url, "DIR": dir, "ABBRDIR": fsutil.AbbreviateHome(dir, home)}
 		for _, m := range c.Expected.StdOut {

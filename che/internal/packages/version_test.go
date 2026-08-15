@@ -52,8 +52,6 @@ func TestArchiveWithoutVersionNeedsNoPin(t *testing.T) {
 	require.Contains(t, testFetch.Calls(), "https://example.com/aws-latest.zip")
 }
 
-// [<] 🤖🤖
-
 func TestAliasBinaryLinksRenamedBinary(t *testing.T) {
 	const y = `packages:
   bat:
@@ -112,8 +110,6 @@ func TestPostInstallShippedScriptResolves(t *testing.T) {
 	require.NoError(t, in.Install([]string{"kitty"}))
 	requireCalls(t, m, `ln -fs "$app/MacOS/kitten" "$bin/kitten"`, `ln -fs "$app/MacOS/kitty" "$bin/kitty"`)
 }
-
-// [>] 🤖🤖
 
 type scriptPathsGot struct {
 	Items       []string `yaml:"items"`

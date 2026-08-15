@@ -1,6 +1,6 @@
 ##[>] 🤖🤖
 .test-install-package-list: &packages
-{{- range $name, $_ := (file.Read "che/internal/packages/packages.yml" | data.YAML).packages }}
+{{- range $name, $_ := (file.Read "che-packages/packages.yml" | data.YAML).packages }}
   - {{ $name }}
 {{- end }}
 
@@ -9,6 +9,9 @@
     METHOD: all
     E2E_INSTALL_MISSING_METHOD: warn
   rules:
+    - if: $CI_PIPELINE_SOURCE == "merge_request_event"
+      changes: [che-packages/**/*]
+      allow_failure: true
     - if: $CI_PIPELINE_SOURCE == "merge_request_event" || $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
       when: manual
       allow_failure: true

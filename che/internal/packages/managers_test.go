@@ -191,7 +191,7 @@ func TestScriptEnv(t *testing.T) {
 		}
 		require.NotNil(t, s)
 		got := map[string]string{}
-		for _, kv := range in.scriptEnv(pkg, s) {
+		for _, kv := range in.makeScriptEnv(pkg, s) {
 			k, v, _ := strings.Cut(kv, "=")
 			if strings.HasPrefix(k, "CHE_PKG_") {
 				got[k] = v

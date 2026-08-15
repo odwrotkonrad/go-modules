@@ -18,6 +18,7 @@ Available Commands:
   make-dirs               create repo-tree dirs + extra-dirs
   make-links              symlink op (configs into system root)
   packages                install packages from packages.yml and check their state
+    check-manpages        warn when a declared manpage resolves nowhere on the man search path, or in more than one dir (every location listed)
     check-not-shadowed    warn when a package's manager-expected binary is not the first PATH hit
     check-present         check the canonical commands resolve on PATH (errors on any missing); --kind=<tool> checks the tool's installed packages instead
     check-single-present  warn when a canonical command resolves in more than one PATH dir, listing every location
@@ -25,6 +26,7 @@ Available Commands:
     config                inspect the resolved packages database
       show                print the packages database (--all default: the effective merged set; --delta: entries differing from the builtin; --defaults: the builtin only)
     install               install packages by canonical name (no args: every resolved profile's include.installPackages)
+    update                fetch the latest published package definitions into the cache ($XDG_CACHE_HOME/che/packages); cached definitions supersede the builtin set when no packages file exists
   prune-broken-links      delete broken symlinks
   render-templates        render *.tpl sources; each dest path decides target (relative -> repo, ~/ or absolute -> host)
   run                     run every op each profile selects, profile by profile

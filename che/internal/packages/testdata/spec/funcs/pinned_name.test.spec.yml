@@ -1,6 +1,6 @@
 # [>] 🤖🤖
 context:
-  function: packages.pinnedName
+  function: packages.applyPin
 cases:
   - name: ShouldStripGoModuleQueryBeforePinning
     input:

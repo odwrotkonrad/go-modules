@@ -1,6 +1,6 @@
 # [>] 🤖🤖
 context:
-  function: fsutil.TrackedFiles
+  function: fsutil.ListTrackedFiles
 cases:
   - name: ShouldExcludeUntrackedAtRepoRoot
     input:

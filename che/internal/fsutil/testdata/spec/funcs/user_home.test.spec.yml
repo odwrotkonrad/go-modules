@@ -1,6 +1,6 @@
 # [>] 🤖🤖
 context:
-  function: fsutil.UserHome
+  function: fsutil.ResolveUserHome
   mockedInterfaces:
     fsutil.UserLookup: testutil.UserMockLookup
 cases:

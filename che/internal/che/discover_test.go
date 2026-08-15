@@ -67,7 +67,7 @@ func TestDiscoverSummary(t *testing.T) {
 				tpl := filepath.Join(dir, "root/_home/.config/zsh/t.ontoHost.tpl")
 				require.NoError(t, os.WriteFile(tpl, []byte("changed\n"), 0o644))
 			case "realRender":
-				// [why] record-only writer keeps OS perms commands out; the landed
+				// [why] record-only writer keeps OS perms commands out; the landed dest is seeded below
 				m := testutil.ApplyMocks(t, map[string]string{
 					"execx.CmdExecutor":       "testutil.CmdMockExecutor",
 					"fsutil.FileSystemWriter": "testutil.FileSystemMockWriter",

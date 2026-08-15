@@ -55,8 +55,8 @@ func schemaJSON(s *jsonschema.Schema) []byte {
 	return append(b, '\n')
 }
 
-func splitSeg(desc, key string) (rest, val string) {
-	rest, val, _ = strings.Cut(desc, key)
+func cutSeg(desc, sep string) (rest, val string) {
+	rest, val, _ = strings.Cut(desc, sep)
 	return rest, val
 }
 
@@ -71,9 +71,9 @@ func renderOptionsTable(fs *pflag.FlagSet) string {
 	var b strings.Builder
 	b.WriteString("| Option | Env | Values | Default | Description |\n| --- | --- | --- | --- | --- |\n")
 	fs.VisitAll(func(f *pflag.Flag) {
-		desc, env := splitSeg(f.Usage, "; env: ")
-		desc, def := splitSeg(desc, "; default: ")
-		desc, values := splitSeg(desc, "; values: ")
+		desc, env := cutSeg(f.Usage, "; env: ")
+		desc, def := cutSeg(desc, "; default: ")
+		desc, values := cutSeg(desc, "; values: ")
 		env = tick(env)
 		values = tick(strings.ReplaceAll(values, " | ", "` \\| `"))
 		if values == "" {

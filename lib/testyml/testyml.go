@@ -19,6 +19,136 @@ import (
 	"gitlab.com/konradodwrot/go-modules/lib/yamlcfg"
 )
 
+func Run[C any](t *testing.T, fsys fs.FS, path string, fn func(t *testing.T, c C)) {
+	t.Helper()
+	if !strings.HasSuffix(path, ".test.spec.yml") {
+		t.Fatalf("%s: spec files are named <unit-under-test>.test.spec.yml", path)
+	}
+	raw, err := fs.ReadFile(fsys, path)
+	require.NoErrorf(t, err, "read cases %s", path)
+	var file struct {
+		Context yaml.Node   `yaml:"context"`
+		Cases   []yaml.Node `yaml:"cases"`
+	}
+	require.NoErrorf(t, StrictDecode(raw, &file), "decode cases %s", path)
+	require.NotEmptyf(t, file.Cases, "%s: no cases", path)
+	seen := map[string]bool{}
+	for i := range file.Cases {
+		node := &file.Cases[i]
+		name := readCaseName(t, path, i, node)
+		require.Falsef(t, seen[name], "%s: duplicate case name %q", path, name)
+		seen[name] = true
+		requireWantKey(t, path, name, node)
+		mergeCaseContext(t, path, name, &file.Context, node)
+		var c C
+		require.NoErrorf(t, StrictDecodeNode(node, &c), "%s: case %q", path, name)
+		t.Run(name, func(t *testing.T) { fn(t, c) })
+	}
+}
+
+func Eq[W any](t *testing.T, fsys fs.FS, path string, fn func(t *testing.T, c Case[W]) (W, error)) {
+	t.Helper()
+	Run(t, fsys, path, func(t *testing.T, c Case[W]) {
+		for k, v := range c.Context.Env {
+			t.Setenv(k, v)
+		}
+		got, err := fn(t, c)
+		if c.Expected.Check(t, err) {
+			return
+		}
+		assert.Equal(t, c.Expected.Output, got)
+	})
+}
+
+func readCaseName(t *testing.T, path string, i int, node *yaml.Node) string {
+	t.Helper()
+	var head struct {
+		Name string `yaml:"name"`
+	}
+	require.NoErrorf(t, node.Decode(&head), "%s: case %d", path, i)
+	require.NotEmptyf(t, head.Name, "%s: case %d: missing name", path, i)
+	return head.Name
+}
+
+func requireWantKey(t *testing.T, path, name string, node *yaml.Node) {
+	t.Helper()
+	for k := range yamlcfg.MapPairs(node) {
+		switch k.Value {
+		case "expected", "notExpected", "contains":
+			return
+		}
+	}
+	t.Fatalf("%s: case %q: missing expected/notExpected", path, name)
+}
+
+func mergeCaseContext(t *testing.T, path, name string, fileCtx, node *yaml.Node) {
+	t.Helper()
+	merged := yamlcfg.MergeNodes(cloneNode(t, fileCtx), getMapValue(node, "context"))
+	var ctx Context
+	if merged != nil {
+		require.NoErrorf(t, StrictDecodeNode(merged, &ctx), "%s: case %q: context", path, name)
+	}
+	if ctx.Function == "" && ctx.Command == "" {
+		t.Fatalf("%s: case %q: context names neither function nor command", path, name)
+	}
+	if ctx.Pwd != "" && !strings.HasPrefix(ctx.Pwd, "testdata/") {
+		t.Fatalf("%s: case %q: context.pwd %q must start with testdata/", path, name, ctx.Pwd)
+	}
+	setMapValue(node, "context", merged)
+}
+
+func cloneNode(t *testing.T, n *yaml.Node) *yaml.Node {
+	t.Helper()
+	if n == nil || n.Kind == 0 {
+		return nil
+	}
+	enc, err := yaml.Marshal(n)
+	require.NoError(t, err)
+	var doc yaml.Node
+	require.NoError(t, yaml.Unmarshal(enc, &doc))
+	if len(doc.Content) == 0 {
+		return nil
+	}
+	return doc.Content[0]
+}
+
+func getMapValue(m *yaml.Node, key string) *yaml.Node {
+	for k, v := range yamlcfg.MapPairs(m) {
+		if k.Value == key {
+			return v
+		}
+	}
+	return nil
+}
+
+func setMapValue(m *yaml.Node, key string, val *yaml.Node) {
+	if val == nil {
+		return
+	}
+	for i := 0; i+1 < len(m.Content); i += 2 {
+		if m.Content[i].Value == key {
+			m.Content[i+1] = val
+			return
+		}
+	}
+	m.Content = append(m.Content,
+		&yaml.Node{Kind: yaml.ScalarNode, Value: key}, val)
+}
+
+func StrictDecode(raw []byte, out any) error {
+	dec := yaml.NewDecoder(bytes.NewReader(raw))
+	dec.KnownFields(true)
+	return dec.Decode(out)
+}
+
+func StrictDecodeNode(node *yaml.Node, out any) error {
+	enc, err := yaml.Marshal(node)
+	if err != nil {
+		return err
+	}
+	return StrictDecode(enc, out)
+}
+
 func (c Context) CommandArgs() []string {
 	f := strings.Fields(c.Command)
 	if len(f) <= 1 {
@@ -117,50 +247,6 @@ func (e Expected[W]) Check(t *testing.T, err error) bool {
 	return true
 }
 
-func Eq[W any](t *testing.T, fsys fs.FS, path string, fn func(t *testing.T, c Case[W]) (W, error)) {
-	t.Helper()
-	Run(t, fsys, path, func(t *testing.T, c Case[W]) {
-		for k, v := range c.Context.Env {
-			t.Setenv(k, v)
-		}
-		got, err := fn(t, c)
-		if c.Expected.Check(t, err) {
-			return
-		}
-		assert.Equal(t, c.Expected.Output, got)
-	})
-}
-
-func ConfigDir(t *testing.T, configName, raw string) string {
-	t.Helper()
-	Swap(t, &yamlcfg.SystemDir, filepath.Join(t.TempDir(), "no-system"))
-	dir := t.TempDir()
-	if raw != "" {
-		require.NoError(t, os.WriteFile(filepath.Join(dir, configName), []byte(raw), 0o644))
-	}
-	return dir
-}
-
-type helpVersionWant struct {
-	Usage bool `yaml:"usage"`
-	Done  bool `yaml:"done"`
-}
-
-func RunHelpVersionSpec(t *testing.T, fsys fs.FS, path, usage, name, version string) {
-	t.Helper()
-	Eq(t, fsys, path, func(t *testing.T, c Case[helpVersionWant]) (helpVersionWant, error) {
-		out, done := climain.HelpVersion(c.Input.Args.Strings(t, 0), usage, name, version)
-		return helpVersionWant{Usage: out == usage, Done: done}, nil
-	})
-}
-
-func Swap[T any](t testing.TB, ptr *T, v T) {
-	t.Helper()
-	prev := *ptr
-	*ptr = v
-	t.Cleanup(func() { *ptr = prev })
-}
-
 func (m *Matchers) UnmarshalYAML(node *yaml.Node) error {
 	if node.Kind == yaml.ScalarNode {
 		var s string
@@ -178,12 +264,12 @@ func (m *Matchers) UnmarshalYAML(node *yaml.Node) error {
 	return nil
 }
 
-var holeRe = regexp.MustCompile(`\{\{/(.*?)/\}\}`)
+var matcherHoleRe = regexp.MustCompile(`\{\{/(.*?)/\}\}`)
 
-func matcherPattern(matcher string) string {
+func buildMatcherPattern(matcher string) string {
 	var b strings.Builder
 	last := 0
-	for _, loc := range holeRe.FindAllStringSubmatchIndex(matcher, -1) {
+	for _, loc := range matcherHoleRe.FindAllStringSubmatchIndex(matcher, -1) {
 		b.WriteString(regexp.QuoteMeta(matcher[last:loc[0]]))
 		b.WriteString(matcher[loc[2]:loc[3]])
 		last = loc[1]
@@ -193,7 +279,7 @@ func matcherPattern(matcher string) string {
 }
 
 func compileMatcher(matcher string) *regexp.Regexp {
-	return regexp.MustCompile(matcherPattern(matcher))
+	return regexp.MustCompile(buildMatcherPattern(matcher))
 }
 
 func IsMatch(s, matcher string) bool {
@@ -201,7 +287,7 @@ func IsMatch(s, matcher string) bool {
 }
 
 func IsMatchFull(s, matcher string) bool {
-	return regexp.MustCompile(`\A` + matcherPattern(matcher) + `\z`).MatchString(s)
+	return regexp.MustCompile(`\A` + buildMatcherPattern(matcher) + `\z`).MatchString(s)
 }
 
 func MustMatch(t *testing.T, s, matcher string) {
@@ -225,127 +311,18 @@ func MustCount(t *testing.T, s, substr string, n int) {
 	}
 }
 
-func Run[C any](t *testing.T, fsys fs.FS, path string, fn func(t *testing.T, c C)) {
-	t.Helper()
-	if !strings.HasSuffix(path, ".test.spec.yml") {
-		t.Fatalf("%s: spec files are named <unit-under-test>.test.spec.yml", path)
-	}
-	raw, err := fs.ReadFile(fsys, path)
-	require.NoErrorf(t, err, "read cases %s", path)
-	var file struct {
-		Context yaml.Node   `yaml:"context"`
-		Cases   []yaml.Node `yaml:"cases"`
-	}
-	require.NoErrorf(t, StrictDecode(raw, &file), "decode cases %s", path)
-	require.NotEmptyf(t, file.Cases, "%s: no cases", path)
-	seen := map[string]bool{}
-	for i := range file.Cases {
-		node := &file.Cases[i]
-		name := caseName(t, path, i, node)
-		require.Falsef(t, seen[name], "%s: duplicate case name %q", path, name)
-		seen[name] = true
-		requireWantKey(t, path, name, node)
-		mergeCaseContext(t, path, name, &file.Context, node)
-		var c C
-		require.NoErrorf(t, StrictDecodeNode(node, &c), "%s: case %q", path, name)
-		t.Run(name, func(t *testing.T) { fn(t, c) })
-	}
-}
-
-func StrictDecode(raw []byte, out any) error {
-	dec := yaml.NewDecoder(bytes.NewReader(raw))
-	dec.KnownFields(true)
-	return dec.Decode(out)
-}
-
-func StrictDecodeNode(node *yaml.Node, out any) error {
-	enc, err := yaml.Marshal(node)
-	if err != nil {
-		return err
-	}
-	return StrictDecode(enc, out)
-}
-
-func caseName(t *testing.T, path string, i int, node *yaml.Node) string {
-	t.Helper()
-	var head struct {
-		Name string `yaml:"name"`
-	}
-	require.NoErrorf(t, node.Decode(&head), "%s: case %d", path, i)
-	require.NotEmptyf(t, head.Name, "%s: case %d: missing name", path, i)
-	return head.Name
-}
-
-func requireWantKey(t *testing.T, path, name string, node *yaml.Node) {
-	t.Helper()
-	for k := range yamlcfg.MapPairs(node) {
-		switch k.Value {
-		case "expected", "notExpected", "contains":
-			return
-		}
-	}
-	t.Fatalf("%s: case %q: missing expected/notExpected", path, name)
-}
-
-func mergeCaseContext(t *testing.T, path, name string, fileCtx, node *yaml.Node) {
-	t.Helper()
-	merged := yamlcfg.MergeNodes(cloneNode(t, fileCtx), mapValue(node, "context"))
-	var ctx Context
-	if merged != nil {
-		require.NoErrorf(t, StrictDecodeNode(merged, &ctx), "%s: case %q: context", path, name)
-	}
-	if ctx.Function == "" && ctx.Command == "" {
-		t.Fatalf("%s: case %q: context names neither function nor command", path, name)
-	}
-	if ctx.Pwd != "" && !strings.HasPrefix(ctx.Pwd, "testdata/") {
-		t.Fatalf("%s: case %q: context.pwd %q must start with testdata/", path, name, ctx.Pwd)
-	}
-	setMapValue(node, "context", merged)
-}
-
-func cloneNode(t *testing.T, n *yaml.Node) *yaml.Node {
-	t.Helper()
-	if n == nil || n.Kind == 0 {
-		return nil
-	}
-	enc, err := yaml.Marshal(n)
-	require.NoError(t, err)
-	var doc yaml.Node
-	require.NoError(t, yaml.Unmarshal(enc, &doc))
-	if len(doc.Content) == 0 {
-		return nil
-	}
-	return doc.Content[0]
-}
-
-func mapValue(m *yaml.Node, key string) *yaml.Node {
-	for k, v := range yamlcfg.MapPairs(m) {
-		if k.Value == key {
-			return v
-		}
-	}
-	return nil
-}
-
-func setMapValue(m *yaml.Node, key string, val *yaml.Node) {
-	if val == nil {
-		return
-	}
-	for i := 0; i+1 < len(m.Content); i += 2 {
-		if m.Content[i].Value == key {
-			m.Content[i+1] = val
-			return
-		}
-	}
-	m.Content = append(m.Content,
-		&yaml.Node{Kind: yaml.ScalarNode, Value: key}, val)
-}
-
 func Expand(s string, vars map[string]string) string {
 	for k, v := range vars {
 		s = strings.ReplaceAll(s, "${"+k+"}", v)
 	}
 	return s
+}
+
+func Swap[T any](t testing.TB, ptr *T, v T) {
+	t.Helper()
+	prev := *ptr
+	*ptr = v
+	t.Cleanup(func() { *ptr = prev })
 }
 
 func ReadFile(t *testing.T, fsys fs.FS, path string) string {
@@ -378,6 +355,29 @@ func CopyDir(t *testing.T, fsys fs.FS, src, dest string) {
 		return os.WriteFile(target, b, 0o644)
 	})
 	require.NoErrorf(t, err, "copy fixture dir %s -> %s", src, dest)
+}
+
+func ConfigDir(t *testing.T, configName, raw string) string {
+	t.Helper()
+	Swap(t, &yamlcfg.SystemDir, filepath.Join(t.TempDir(), "no-system"))
+	dir := t.TempDir()
+	if raw != "" {
+		require.NoError(t, os.WriteFile(filepath.Join(dir, configName), []byte(raw), 0o644))
+	}
+	return dir
+}
+
+type helpVersionWant struct {
+	Usage bool `yaml:"usage"`
+	Done  bool `yaml:"done"`
+}
+
+func RunHelpVersionSpec(t *testing.T, fsys fs.FS, path, usage, name, version string) {
+	t.Helper()
+	Eq(t, fsys, path, func(t *testing.T, c Case[helpVersionWant]) (helpVersionWant, error) {
+		out, done := climain.HelpVersion(c.Input.Args.Strings(t, 0), usage, name, version)
+		return helpVersionWant{Usage: out == usage, Done: done}, nil
+	})
 }
 
 // [<] 🤖🤖

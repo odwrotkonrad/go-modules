@@ -1,0 +1,45 @@
+# [>] 🤖🤖
+context:
+  function: e2e.resolveEligibleMethods
+cases:
+  - name: ShouldDropAptOnDarwinEligibility
+    input:
+      args:
+        - entry: "[brew, {brew/cask: {packageName: x}}, apt, {binariesRemoteArchive: {url: https://example.com/x}}, {binariesRemoteArchive: {url: https://example.com/y}}]"
+        - method: ""
+        - eligible: [brew, brew/cask, binariesRemoteArchive, script, npm, go, gem, pyenv, nvm]
+    expected:
+      output: [brew, cask, binariesRemoteArchive]
+  - name: ShouldDropBrewAndCaskOnLinuxEligibility
+    input:
+      args:
+        - entry: "[brew, {brew/cask: {packageName: x}}, apt, {binariesRemoteArchive: {url: https://example.com/x}}, {binariesRemoteArchive: {url: https://example.com/y}}]"
+        - method: ""
+        - eligible: [apt, binariesRemoteArchive, script, npm, go, gem, pyenv, nvm]
+    expected:
+      output: [apt, binariesRemoteArchive]
+  - name: ShouldNarrowFurtherBySelectedMethod
+    input:
+      args:
+        - entry: "[brew, {brew/cask: {packageName: x}}, apt, {binariesRemoteArchive: {url: https://example.com/x}}, {binariesRemoteArchive: {url: https://example.com/y}}]"
+        - method: brew
+        - eligible: [brew, brew/cask, binariesRemoteArchive, script, npm, go, gem, pyenv, nvm]
+    expected:
+      output: [brew, cask]
+  - name: ShouldReturnNothingOnMethodPlatformMismatch
+    input:
+      args:
+        - entry: "[brew, {brew/cask: {packageName: x}}, apt, {binariesRemoteArchive: {url: https://example.com/x}}, {binariesRemoteArchive: {url: https://example.com/y}}]"
+        - method: apt
+        - eligible: [brew, brew/cask, binariesRemoteArchive, script, npm, go, gem, pyenv, nvm]
+    expected:
+      output: []
+  - name: ShouldDedupeRepeatedManagers
+    input:
+      args:
+        - entry: "[brew, {brew/cask: {packageName: x}}, apt, {binariesRemoteArchive: {url: https://example.com/x}}, {binariesRemoteArchive: {url: https://example.com/y}}]"
+        - method: binariesRemoteArchive
+        - eligible: [apt, binariesRemoteArchive, script, npm, go, gem, pyenv, nvm]
+    expected:
+      output: [binariesRemoteArchive]
+# [<] 🤖🤖

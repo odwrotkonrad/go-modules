@@ -133,6 +133,10 @@ func (d *DB) InstalledForProfile(ref string) ([]OperationDone, error) {
 	return d.latestOps(ref, true)
 }
 
+func (d *DB) LatestOps() ([]OperationDone, error) {
+	return d.latestOps("", false)
+}
+
 func (d *DB) latestOps(ref string, excludeRemoved bool) ([]OperationDone, error) {
 	if d == nil {
 		return nil, nil
@@ -168,10 +172,6 @@ func (d *DB) Backups() ([]Backup, error) {
 		Order("backups.id DESC").
 		Find(&out).Error
 	return out, err
-}
-
-func (d *DB) LatestOps() ([]OperationDone, error) {
-	return d.latestOps("", false)
 }
 
 func (d *DB) Close() error {

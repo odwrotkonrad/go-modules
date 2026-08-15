@@ -1,0 +1,68 @@
+# [>] 🤖🤖
+context:
+  function: e2e.matchesMethod
+cases:
+  - name: ShouldSelectEverythingOnEmptySelector
+    input:
+      args:
+        - key: apt
+        - selected: ""
+    expected:
+      output: true
+  - name: ShouldSelectEverythingOnAll
+    input:
+      args:
+        - key: brew/cask
+        - selected: all
+    expected:
+      output: true
+  - name: ShouldMatchExactKey
+    input:
+      args:
+        - key: apt
+        - selected: apt
+    expected:
+      output: true
+  - name: ShouldMatchExactSlashedKey
+    input:
+      args:
+        - key: brew/cask
+        - selected: brew/cask
+    expected:
+      output: true
+  - name: ShouldMatchGroupPrefix
+    input:
+      args:
+        - key: brew/formulae
+        - selected: brew
+    expected:
+      output: true
+  - name: ShouldMatchGroupPrefixAcrossSubkeys
+    input:
+      args:
+        - key: brew/cask
+        - selected: brew
+    expected:
+      output: true
+  - name: ShouldRejectPartialWordPrefix
+    input:
+      args:
+        - key: brewx
+        - selected: brew
+    expected:
+      output: false
+  - name: ShouldRejectMismatchedKey
+    input:
+      args:
+        - key: apt
+        - selected: brew
+    expected:
+      output: false
+  - name: ShouldRejectSelectorDeeperThanKey
+    input:
+      args:
+        - key: brew
+        - selected: brew/cask
+    expected:
+      output: false
+# [<] 🤖🤖

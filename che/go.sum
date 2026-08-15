@@ -607,6 +607,8 @@ github.com/xanzy/ssh-agent v0.3.3 h1:+/15pJfg/RsTxqYcX6fHqOXZwwMP+2VyYWJeWM2qQFM
 github.com/xanzy/ssh-agent v0.3.3/go.mod h1:6dzNDKs0J9rVPHPhaGCukekBHKqfl+L3KghI1Bc68Uw=
 github.com/yuin/goldmark v1.2.1/go.mod h1:3hX8gzYuyVAZsxl0MRgGTJEmQBFcNTphYh9decYSb74=
 github.com/yuin/goldmark v1.4.13/go.mod h1:6yULJ656Px+3vBD8DxQVa3kxgyrAnzto9xy5taEt/CY=
+gitlab.com/konradodwrot/go-modules/che-packages v0.0.1 h1:XIGG8MYaaNqVxwhgJP31fPKq0d5GWyuOiY5j+bviSkA=
+gitlab.com/konradodwrot/go-modules/che-packages v0.0.1/go.mod h1:Cv2bGeE7DP5vfbaXoYPmOatDqy6B5mc/Rep69oJ4uRU=
 gitlab.com/konradodwrot/go-modules/lib v0.0.1 h1:AhfjahfzXxR4HQtsdLQFWYxKjoBT77IZXVJNUvFm0RU=
 gitlab.com/konradodwrot/go-modules/lib v0.0.1/go.mod h1:sspDq/K7IRJqWDETHtW6/dq9WmRKvFSwYnM0oKqzfXo=
 go.opencensus.io v0.24.0 h1:y73uSU6J157QMP2kn2r30vwW1A2W2WFwSCGnAVxeaD0=

@@ -129,8 +129,8 @@ func TestRenderMarkdown(t *testing.T) {
 		root := t.TempDir()
 		testyml.CopyDir(t, td, c.Context.Pwd, root)
 		repoRoot := root
-		// [why] tilde paths resolve via HOME, ignoring repoRoot
-		if c.Input.Args.Bool(t, 2) {
+		tildeViaHome := c.Input.Args.Bool(t, 2)
+		if tildeViaHome {
 			t.Setenv("HOME", root)
 			repoRoot = "/unused"
 		}

@@ -4,10 +4,12 @@ package che
 
 import (
 	"cmp"
+	"fmt"
 	"maps"
 	"os"
 	"path/filepath"
 	"slices"
+	"time"
 
 	"gitlab.com/konradodwrot/go-modules/che/internal/log"
 	"gitlab.com/konradodwrot/go-modules/che/internal/options"
@@ -47,6 +49,12 @@ func loadPackagesFile(env map[string]string, home string, opts options.Options) 
 	path := resolvePackagesFile(env, home, opts)
 	if opts.PackagesFile == "" {
 		if _, err := os.Stat(path); err != nil {
+			if dir, _, ok := packages.ResolveCurrentDefinitions(packages.ResolveDefinitionsCacheDir(env, home)); ok {
+				cached := filepath.Join(dir, "packages.yml")
+				if f, err := packages.Load(cached); err == nil {
+					return f, cached, nil
+				}
+			}
 			f, err := packages.LoadBuiltin()
 			return f, packages.BuiltinPath, err
 		}
@@ -55,7 +63,31 @@ func loadPackagesFile(env map[string]string, home string, opts options.Options) 
 	return f, path, err
 }
 
+func checkDefinitionsUpdate(env map[string]string, home string, opts options.Options) error {
+	if !opts.PackagesUpdateCheckEnabled {
+		return nil
+	}
+	cooldown, err := time.ParseDuration(opts.PackagesUpdateCheckCooldown)
+	if err != nil {
+		cooldown = packages.DefaultUpdateCooldown
+	}
+	cacheDir := packages.ResolveDefinitionsCacheDir(env, home)
+	res, err := packages.UpdateDefinitions(cacheDir, packages.ResolveUpdateBaseURL(env), cooldown, false)
+	switch {
+	case err != nil && opts.DryRun != options.DryRun.Off:
+		return fmt.Errorf("packages definitions update failed: %w", err)
+	case err != nil:
+		log.Emit(log.Event{Level: log.Levels.Warn, Scope: packages.Scope, Action: "update-check", Msg: "definitions update failed, using current set: " + err.Error()})
+	case res.Updated:
+		log.Emit(log.Event{Level: log.Levels.Info, Scope: packages.Scope, Action: "update-check", Msg: "definitions updated to " + res.Version})
+	}
+	return nil
+}
+
 func NewPackagesInstaller(env map[string]string, home string, opts options.Options) (*packages.Installer, error) {
+	if err := checkDefinitionsUpdate(env, home, opts); err != nil {
+		return nil, err
+	}
 	f, path, err := loadPackagesFile(env, home, opts)
 	if err != nil {
 		return nil, err
@@ -90,8 +122,23 @@ func NewPackagesInstaller(env map[string]string, home string, opts options.Optio
 			CompletionsEnabled:                         opts.PackagesCompletionsEnabled,
 			CompletionsDestinationCandidates:           opts.PackagesCompletionsDestinationCandidates,
 			CompletionsCheckPresentOnFpath:             opts.PackagesCompletionsCheckPresentOnFpath,
+			ManpagesDestinationCandidates:              opts.PackagesManpagesDestinationCandidates,
+			ManpagesCheckPresentOnManpath:              opts.PackagesManpagesCheckPresentOnManpath,
 		},
 	}, nil
+}
+
+func UpdatePackagesDefinitions(ctx Context, opts options.Options, force bool) (packages.UpdateResult, error) {
+	home, err := resolveInvokingHome(ctx)
+	if err != nil {
+		return packages.UpdateResult{}, err
+	}
+	cooldown, err := time.ParseDuration(opts.PackagesUpdateCheckCooldown)
+	if err != nil {
+		cooldown = packages.DefaultUpdateCooldown
+	}
+	cacheDir := packages.ResolveDefinitionsCacheDir(ctx.Env, home)
+	return packages.UpdateDefinitions(cacheDir, packages.ResolveUpdateBaseURL(ctx.Env), cooldown, force)
 }
 
 func NewPackagesInstallerFromContext(ctx Context, opts options.Options) (*packages.Installer, error) {
@@ -127,6 +174,12 @@ func (p *ProfileReady) newInstaller() (*packages.Installer, error) {
 	}
 	if c := p.Options.Packages.Completions.Zsh.CheckPresentOnFpath; c != nil {
 		opts.PackagesCompletionsCheckPresentOnFpath = *c
+	}
+	if d := p.Options.Packages.Manpages.InstallDestinationCandidates; len(d) > 0 {
+		opts.PackagesManpagesDestinationCandidates = d
+	}
+	if c := p.Options.Packages.Manpages.CheckPresentOnManpath; c != nil {
+		opts.PackagesManpagesCheckPresentOnManpath = *c
 	}
 	in, err := NewPackagesInstaller(p.env, p.home, opts)
 	if err != nil {

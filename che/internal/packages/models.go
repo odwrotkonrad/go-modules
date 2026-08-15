@@ -3,10 +3,10 @@ package packages
 // [>] 🤖🤖🤖
 
 import (
-	"embed"
 	"fmt"
 	"maps"
 	"os"
+	"path"
 	"path/filepath"
 	"slices"
 	"strings"
@@ -14,14 +14,9 @@ import (
 
 	"gopkg.in/yaml.v3"
 
+	chepackages "gitlab.com/konradodwrot/go-modules/che-packages"
 	"gitlab.com/konradodwrot/go-modules/che/internal/fsutil"
 )
-
-//go:embed packages.yml
-var builtinPackages []byte
-
-//go:embed all:scripts
-var builtinScripts embed.FS
 
 const BuiltinPath = "builtin packages.yml"
 
@@ -29,8 +24,20 @@ const BuiltinSentinel = "__builtin__.packages.yml"
 
 func LoadBuiltin() (*File, error) {
 	f := &File{}
-	if err := yaml.Unmarshal(builtinPackages, f); err != nil {
+	if err := yaml.Unmarshal(chepackages.Builtin, f); err != nil {
 		return nil, fmt.Errorf("parse %s: %w", BuiltinPath, err)
+	}
+	return f, nil
+}
+
+func Load(path string) (*File, error) {
+	b, err := os.ReadFile(path)
+	if err != nil {
+		return nil, fmt.Errorf("packages file not found: %s", path)
+	}
+	f := &File{}
+	if err := yaml.Unmarshal(b, f); err != nil {
+		return nil, fmt.Errorf("parse %s: %w", path, err)
 	}
 	return f, nil
 }
@@ -161,7 +168,7 @@ func stripURLScheme(url string) string {
 	return url
 }
 
-func splitAptRegistryRef(ref string) (url, suites, components string) {
+func parseAptRef(ref string) (url, suites, components string) {
 	parts := strings.SplitN(ref, "::", 3)
 	url = parts[0]
 	if len(parts) > 1 {
@@ -174,7 +181,7 @@ func splitAptRegistryRef(ref string) (url, suites, components string) {
 }
 
 func matchAptRegistries(registries []*AptRepoSpec, ref string) []*AptRepoSpec {
-	url, suites, components := splitAptRegistryRef(ref)
+	url, suites, components := parseAptRef(ref)
 	var out []*AptRepoSpec
 	for _, r := range registries {
 		if stripURLScheme(r.URL) != url {
@@ -240,7 +247,7 @@ func (f *File) hasBrewTap(tap string) bool {
 		slices.Contains(orBuiltin(nil, false, func(b *File) []string { return b.InstallerRegistries.brew() }), tap)
 }
 
-func aptRegistrySlug(r *AptRepoSpec) string {
+func makeAptSlug(r *AptRepoSpec) string {
 	parts := []string{stripURLScheme(r.URL)}
 	if r.Suites != "" {
 		parts = append(parts, r.Suites)
@@ -262,10 +269,6 @@ func (f *File) eligibleInstallersOrBuiltin() map[string]InstallerList {
 }
 
 func (f *File) EligibleInstallers(h Host) []string {
-	return f.eligibleInstallers(h)
-}
-
-func (f *File) eligibleInstallers(h Host) []string {
 	m := f.eligibleInstallersOrBuiltin()
 	for _, k := range h.eligibilityKeys() {
 		if v, ok := m[k]; ok {
@@ -286,6 +289,35 @@ type Entry struct {
 	VersionCommand string
 	Verify         *VerifySpec
 	Completions    Completions
+	Manpages       []string
+}
+
+func ParseManpage(name string) (base, section string, err error) {
+	trimmed := name
+	for _, ext := range []string{".gz", ".bz2", ".xz", ".zst"} {
+		if v, ok := strings.CutSuffix(trimmed, ext); ok {
+			trimmed = v
+			break
+		}
+	}
+	i := strings.LastIndex(trimmed, ".")
+	if i <= 0 || i == len(trimmed)-1 {
+		return "", "", fmt.Errorf("manpage %q: want <name>.<section>", name)
+	}
+	base, section = trimmed[:i], trimmed[i+1:]
+	if section[0] < '1' || section[0] > '9' {
+		return "", "", fmt.Errorf("manpage %q: section must start with a digit", name)
+	}
+	return base, section, nil
+}
+
+func validateManpages(pages []string) error {
+	for _, p := range pages {
+		if _, _, err := ParseManpage(p); err != nil {
+			return err
+		}
+	}
+	return nil
 }
 
 type Completions struct {
@@ -318,16 +350,17 @@ type itemBody struct {
 	Version             string      `yaml:"version,omitempty"`
 	FromRegistry        string      `yaml:"fromRegistry,omitempty"`
 	Verify              *VerifySpec `yaml:"verify,omitempty"`
+	Manpages            []string    `yaml:"manpages,omitempty"`
 }
 
-func installerKey(mgr string) string {
+func makeInstallerKey(mgr string) string {
 	if mgr == "cask" {
 		return "brew/cask"
 	}
 	return mgr
 }
 
-func mgrForInstallerKey(key string) (string, bool) {
+func parseInstallerKey(key string) (string, bool) {
 	switch key {
 	case "brew":
 		return "brew", true
@@ -365,15 +398,16 @@ func (it Item) MarshalYAML() (any, error) {
 		Version:             it.Version,
 		FromRegistry:        it.Registry,
 		Verify:              it.Verify,
+		Manpages:            it.Manpages,
 	}
-	if body.isZero() && body.Version == "" && body.FromRegistry == "" && body.Verify == nil {
-		return installerKey(it.Mgr), nil
+	if body.isZero() && body.Version == "" && body.FromRegistry == "" && body.Verify == nil && body.Manpages == nil {
+		return makeInstallerKey(it.Mgr), nil
 	}
-	return map[string]itemBody{installerKey(it.Mgr): body}, nil
+	return map[string]itemBody{makeInstallerKey(it.Mgr): body}, nil
 }
 
 func (e Entry) MarshalYAML() (any, error) {
-	if e.Version == "" && len(e.Requires) == 0 && e.PostInstall == nil && e.Command == "" && e.VersionCommand == "" && e.Verify == nil && e.Completions.Zsh == nil {
+	if e.Version == "" && len(e.Requires) == 0 && e.PostInstall == nil && e.Command == "" && e.VersionCommand == "" && e.Verify == nil && e.Completions.Zsh == nil && e.Manpages == nil {
 		return e.Items, nil
 	}
 	obj := map[string]any{"installers": e.Items}
@@ -397,6 +431,9 @@ func (e Entry) MarshalYAML() (any, error) {
 	}
 	if e.Completions.Zsh != nil {
 		obj["completions"] = e.Completions
+	}
+	if e.Manpages != nil {
+		obj["manpages"] = e.Manpages
 	}
 	return obj, nil
 }
@@ -485,6 +522,7 @@ func (e *Entry) UnmarshalYAML(node *yaml.Node) error {
 		VersionCommand string      `yaml:"versionCommand"`
 		Verify         *VerifySpec `yaml:"verify"`
 		Completions    Completions `yaml:"completions"`
+		Manpages       []string    `yaml:"manpages"`
 	}
 	if err := node.Decode(&obj); err != nil {
 		return err
@@ -505,6 +543,9 @@ func (e *Entry) UnmarshalYAML(node *yaml.Node) error {
 			}
 		}
 	}
+	if err := validateManpages(obj.Manpages); err != nil {
+		return err
+	}
 	e.Items = obj.Installers
 	e.Version = obj.Version
 	e.Requires = obj.Requires
@@ -513,6 +554,7 @@ func (e *Entry) UnmarshalYAML(node *yaml.Node) error {
 	e.VersionCommand = obj.VersionCommand
 	e.Verify = obj.Verify
 	e.Completions = obj.Completions
+	e.Manpages = obj.Manpages
 	return nil
 }
 
@@ -538,6 +580,7 @@ type Item struct {
 	Registry              string
 	AliasBinary           map[string]string
 	Verify                *VerifySpec
+	Manpages              []string
 	BinariesRemoteArchive *BinariesRemoteArchiveSpec
 	BuildFromSource       *BuildFromSourceSpec
 	Script                *ScriptSpec
@@ -625,6 +668,7 @@ type AptSpec struct {
 	InstallerVocabulary `yaml:",inline"`
 	FromRegistry        string      `yaml:"fromRegistry,omitempty"`
 	Verify              *VerifySpec `yaml:"verify,omitempty"`
+	Manpages            []string    `yaml:"manpages,omitempty"`
 }
 
 func (a *AptSpec) packageName(pkg string) string {
@@ -638,6 +682,7 @@ type NixSpec struct {
 	InstallerVocabulary `yaml:",inline"`
 	FromRegistry        string      `yaml:"fromRegistry,omitempty"`
 	Verify              *VerifySpec `yaml:"verify,omitempty"`
+	Manpages            []string    `yaml:"manpages,omitempty"`
 }
 
 func (n *NixSpec) packageName(pkg string) string {
@@ -687,6 +732,7 @@ type ScriptSpec struct {
 	Version             string            `yaml:"version,omitempty"`
 	Env                 map[string]string `yaml:"env,omitempty"`
 	ValidateArtifact    string            `yaml:"validateArtifact,omitempty"`
+	Manpages            []string          `yaml:"manpages,omitempty"`
 }
 
 type ItemPlatforms struct {
@@ -738,6 +784,8 @@ type BinariesRemoteArchiveSpec struct {
 	Version             string      `yaml:"version,omitempty"`
 	URL                 string      `yaml:"url,omitempty"`
 	Verify              *VerifySpec `yaml:"verify,omitempty"`
+	ExtractManpages     Strings     `yaml:"extractManpages,omitempty"`
+	Manpages            []string    `yaml:"manpages,omitempty"`
 }
 
 type BuildFromSourceSpec struct {
@@ -747,6 +795,7 @@ type BuildFromSourceSpec struct {
 	ConfigureArgs       []string      `yaml:"configureArgs,omitempty"`
 	PlatformEligibility ItemPlatforms `yaml:"platformEligibility,omitempty"`
 	Verify              *VerifySpec   `yaml:"verify,omitempty"`
+	Manpages            []string      `yaml:"manpages,omitempty"`
 }
 
 var legacyItemKeys = map[string][]string{
@@ -824,7 +873,11 @@ func (it *Item) UnmarshalYAML(node *yaml.Node) error {
 			it.Script.Run = val.Value
 			return nil
 		}
-		return val.Decode(it.Script)
+		if err := val.Decode(it.Script); err != nil {
+			return err
+		}
+		it.Manpages = it.Script.Manpages
+		return validateManpages(it.Manpages)
 	}
 	return it.unmarshalManager(key.Value, val)
 }
@@ -836,7 +889,7 @@ func (it *Item) unmarshalScalar(v string) error {
 	if err := rejectBareBrewKind(v); err != nil {
 		return err
 	}
-	if mgr, ok := mgrForInstallerKey(v); ok {
+	if mgr, ok := parseInstallerKey(v); ok {
 		it.Mgr = mgr
 		return nil
 	}
@@ -853,10 +906,16 @@ func (it *Item) unmarshalBinariesRemoteArchive(val *yaml.Node) error {
 	if strings.Contains(b.URL+" "+strings.Join(b.ExtractBinaries, " "), "{arch_") {
 		return fmt.Errorf("binariesRemoteArchive tokens {arch_x}/{arch_g} are gone: use {arch} with archScheme")
 	}
+	for _, m := range b.ExtractManpages {
+		if _, _, err := ParseManpage(path.Base(m)); err != nil {
+			return fmt.Errorf("extractManpages: %w", err)
+		}
+	}
 	it.BinariesRemoteArchive = b
 	it.AliasBinary = b.AliasBinary
 	it.Verify = b.Verify
-	return nil
+	it.Manpages = b.Manpages
+	return validateManpages(it.Manpages)
 }
 
 func (it *Item) unmarshalBuildFromSource(val *yaml.Node) error {
@@ -878,7 +937,8 @@ func (it *Item) unmarshalBuildFromSource(val *yaml.Node) error {
 	}
 	it.BuildFromSource = b
 	it.Verify = b.Verify
-	return nil
+	it.Manpages = b.Manpages
+	return validateManpages(it.Manpages)
 }
 
 func (it *Item) unmarshalApt(val *yaml.Node) error {
@@ -899,7 +959,8 @@ func (it *Item) unmarshalApt(val *yaml.Node) error {
 	it.Apt = a
 	it.AliasBinary = a.AliasBinary
 	it.Verify = a.Verify
-	return nil
+	it.Manpages = a.Manpages
+	return validateManpages(it.Manpages)
 }
 
 func (it *Item) unmarshalNix(val *yaml.Node) error {
@@ -920,7 +981,8 @@ func (it *Item) unmarshalNix(val *yaml.Node) error {
 	it.Nix = n
 	it.AliasBinary = n.AliasBinary
 	it.Verify = n.Verify
-	return nil
+	it.Manpages = n.Manpages
+	return validateManpages(it.Manpages)
 }
 
 func (it *Item) unmarshalManager(key string, val *yaml.Node) error {
@@ -931,7 +993,7 @@ func (it *Item) unmarshalManager(key string, val *yaml.Node) error {
 		return err
 	}
 	it.Mgr = key
-	if mgr, ok := mgrForInstallerKey(key); ok {
+	if mgr, ok := parseInstallerKey(key); ok {
 		it.Mgr = mgr
 	}
 	if val.Kind != yaml.MappingNode {
@@ -949,7 +1011,10 @@ func (it *Item) unmarshalManager(key string, val *yaml.Node) error {
 	if body.Version == "__rolling__" {
 		return fmt.Errorf("%s item: the __rolling__ sentinel is gone: omit version, absence means rolling", key)
 	}
-	it.Name, it.Version, it.Registry, it.AliasBinary, it.Verify = body.PackageName, body.Version, body.FromRegistry, body.AliasBinary, body.Verify
+	if err := validateManpages(body.Manpages); err != nil {
+		return err
+	}
+	it.Name, it.Version, it.Registry, it.AliasBinary, it.Verify, it.Manpages = body.PackageName, body.Version, body.FromRegistry, body.AliasBinary, body.Verify, body.Manpages
 	isBrew := it.Mgr == "brew" || it.Mgr == "cask"
 	switch {
 	case it.Registry != "" && !isBrew:
@@ -971,18 +1036,6 @@ func mappingHasKey(node *yaml.Node, key string) bool {
 		}
 	}
 	return false
-}
-
-func Load(path string) (*File, error) {
-	b, err := os.ReadFile(path)
-	if err != nil {
-		return nil, fmt.Errorf("packages file not found: %s", path)
-	}
-	f := &File{}
-	if err := yaml.Unmarshal(b, f); err != nil {
-		return nil, fmt.Errorf("parse %s: %w", path, err)
-	}
-	return f, nil
 }
 
 func (f *File) Merge(override *File) {
@@ -1015,7 +1068,7 @@ func (f *File) mergeRegistries(override *InstallerRegistriesSpec) {
 	}
 	regs := f.InstallerRegistries
 	for _, r := range override.Apt {
-		if len(matchAptRegistries(regs.Apt, aptRegistryRef(r))) == 0 {
+		if len(matchAptRegistries(regs.Apt, formatAptRef(r))) == 0 {
 			regs.Apt = append(regs.Apt, r)
 		}
 	}
@@ -1031,7 +1084,7 @@ func (f *File) mergeRegistries(override *InstallerRegistriesSpec) {
 	}
 }
 
-func aptRegistryRef(r *AptRepoSpec) string {
+func formatAptRef(r *AptRepoSpec) string {
 	ref := stripURLScheme(r.URL)
 	if r.Suites != "" || r.Components != "" {
 		ref += "::" + r.Suites

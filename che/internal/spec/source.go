@@ -47,7 +47,7 @@ func (r SourceRecipe) prepare(repoRoot, home string) (SourceReady, error) {
 
 func (r SourceRecipe) resolveDir(repoRoot, home string) (string, error) {
 	if r.GetSourceType() == SourceTypes.Remote {
-		// [why] @<repo>//<subdir> targets a spec nested in the remote checkout,
+		// [why] @<repo>//<subdir> targets a spec nested in the remote checkout
 		repo, sub := splitRepoSubdir(RemoteSrcRef(r.URI))
 		dir, err := source.EnsureCheckout(home, repo)
 		if err != nil || sub == "" {
@@ -57,14 +57,11 @@ func (r SourceRecipe) resolveDir(repoRoot, home string) (string, error) {
 	}
 	if r.URI == "" {
 		if r.DirectoryPath != "" {
-			return expandDir(r.DirectoryPath, repoRoot, home)
+			return expandDir(r.DirectoryPath, repoRoot, home), nil
 		}
 		return repoRoot, nil
 	}
-	dir, err := expandDir(r.URI, repoRoot, home)
-	if err != nil {
-		return "", err
-	}
+	dir := expandDir(r.URI, repoRoot, home)
 	if !fsutil.IsDir(dir) {
 		return "", fmt.Errorf("source dir not found: %s (from %q)", dir, r.URI)
 	}
@@ -82,7 +79,7 @@ func splitRepoSubdir(ref string) (string, string) {
 	return ref, ""
 }
 
-func expandDir(ref, repoRoot, home string) (string, error) {
+func expandDir(ref, repoRoot, home string) string {
 	dir := fsutil.ExpandHome(os.ExpandEnv(ref), home)
 	if dir == "~" {
 		dir = home
@@ -90,7 +87,7 @@ func expandDir(ref, repoRoot, home string) (string, error) {
 	if !filepath.IsAbs(dir) {
 		dir = filepath.Join(repoRoot, dir)
 	}
-	return dir, nil
+	return dir
 }
 
 func (r SpecSourceRecipe) PrepareSource(repoRoot, home string) (SpecSourceReady, error) {
@@ -163,7 +160,7 @@ func splitSourceRef(src string) (uri, specFile, profile string, err error) {
 	if profile == "" {
 		return "", "", "", fmt.Errorf("include.profiles source %q: missing profile name", src)
 	}
-	// [why] split on the last '/' by hand: path.Dir collapses the // in
+	// [why] split on the last '/' by hand: path.Dir collapses the // in remote refs
 	slash := strings.LastIndex(ref, "/")
 	if slash <= 0 {
 		return "", "", "", fmt.Errorf("include.profiles source %q: needs a <source>/<spec-file>.yml::<profile> path", src)

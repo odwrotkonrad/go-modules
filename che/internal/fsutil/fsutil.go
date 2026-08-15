@@ -3,16 +3,12 @@ package fsutil
 // [>] 🤖🤖
 
 import (
-	"errors"
 	"fmt"
-	"io/fs"
 	"maps"
 	"os"
 	"path/filepath"
 	"runtime"
 	"strings"
-
-	"github.com/go-git/go-git/v5"
 
 	"gitlab.com/konradodwrot/go-modules/che/internal/execx"
 )
@@ -45,19 +41,8 @@ func (OSReader) ReadFileBytes(path string) ([]byte, error)        { return os.Re
 func (OSReader) ReadLink(path string) (string, error)             { return os.Readlink(path) }
 func (OSReader) EvaluateSymlinks(path string) (string, error)     { return filepath.EvalSymlinks(path) }
 
-func IsUnder(path, root string) bool {
-	return path == root || strings.HasPrefix(path, root+"/")
-}
-
 func (f FS) IsUnderHome(dest string) bool {
 	return IsUnder(dest, f.Home)
-}
-
-func AbbreviateHome(path, home string) string {
-	if home != "" && strings.HasPrefix(path, home+string(filepath.Separator)) {
-		return "~" + strings.TrimPrefix(path, home)
-	}
-	return path
 }
 
 func (f FS) escalate(dest string, argv []string) []string {
@@ -82,7 +67,7 @@ func (f FS) BuildMkdirArgv(dest string, mode os.FileMode, parents bool) []string
 }
 
 func (f FS) ChangeMode(chmodArg, dest string) error {
-	return f.RunPrivileged(dest, "chmod", chmodArg, dest)
+	return f.runEscalated(dest, "chmod", chmodArg, dest)
 }
 
 func (f FS) MakeSymlink(target, dest string) error {
@@ -90,23 +75,23 @@ func (f FS) MakeSymlink(target, dest string) error {
 	if runtime.GOOS == "darwin" {
 		noDeref = "-h"
 	}
-	return f.RunPrivileged(dest, "ln", "-fs", noDeref, target, dest)
+	return f.runEscalated(dest, "ln", "-fs", noDeref, target, dest)
 }
 
 func (f FS) CopyFile(src, dest string, mode os.FileMode) error {
-	return f.RunPrivileged(dest, buildInstallArgv(mode, "", src, dest)...)
+	return f.runEscalated(dest, buildInstallArgv(mode, "", src, dest)...)
 }
 
 func (f FS) RemoveFile(dest string) error {
-	return f.RunPrivileged(dest, "rm", "-f", dest)
+	return f.runEscalated(dest, "rm", "-f", dest)
 }
 
 func (f FS) RemoveDir(dest string) error {
-	return f.RunPrivileged(dest, "rmdir", dest)
+	return f.runEscalated(dest, "rmdir", dest)
 }
 
 func (f FS) ChangeOwner(owner, dest string) error {
-	return f.RunPrivileged(dest, "chown", owner, dest)
+	return f.runEscalated(dest, "chown", owner, dest)
 }
 
 func (f FS) InstallFile(dest string, body []byte, mode os.FileMode, owner string) error {
@@ -120,7 +105,7 @@ func (f FS) InstallFile(dest string, body []byte, mode os.FileMode, owner string
 		return err
 	}
 
-	return f.RunPrivileged(dest, buildInstallArgv(mode, owner, tmp.Name(), dest)...)
+	return f.runEscalated(dest, buildInstallArgv(mode, owner, tmp.Name(), dest)...)
 }
 
 func buildInstallArgv(mode os.FileMode, owner, src, dest string) []string {
@@ -132,7 +117,7 @@ func buildInstallArgv(mode os.FileMode, owner, src, dest string) []string {
 	return append(argv, src, dest)
 }
 
-func (f FS) RunPrivileged(dest string, argv ...string) error {
+func (f FS) runEscalated(dest string, argv ...string) error {
 	return run(f.escalate(dest, argv))
 }
 
@@ -154,13 +139,6 @@ func IsDir(p string) bool {
 	return err == nil && fi.IsDir()
 }
 
-func ExpandHome(p, home string) string {
-	if rest, ok := strings.CutPrefix(p, "~/"); ok {
-		return filepath.Join(home, rest)
-	}
-	return p
-}
-
 func MergeMap[K comparable, V any](base, overlay map[K]V) map[K]V {
 	if len(base) == 0 {
 		return overlay
@@ -168,94 +146,6 @@ func MergeMap[K comparable, V any](base, overlay map[K]V) map[K]V {
 	out := maps.Clone(base)
 	maps.Copy(out, overlay)
 	return out
-}
-
-func IsNoRepo(err error) bool { return errors.Is(err, git.ErrRepositoryNotExists) }
-
-func openRepo(dir string) (*git.Repository, string, error) {
-	repo, err := git.PlainOpenWithOptions(dir, &git.PlainOpenOptions{DetectDotGit: true})
-	if err != nil {
-		return nil, "", fmt.Errorf("open git repo from %s: %w", dir, err)
-	}
-	wt, err := repo.Worktree()
-	if err != nil {
-		return nil, "", fmt.Errorf("worktree from %s: %w", dir, err)
-	}
-	root, err := filepath.EvalSymlinks(wt.Filesystem.Root())
-	if err != nil {
-		return nil, "", err
-	}
-	return repo, root, nil
-}
-
-func ResolveRepoRoot(dir string) (string, error) {
-	_, root, err := openRepo(dir)
-	return root, err
-}
-
-func ListTrackedFiles(root string) ([]string, error) {
-	repo, repoRoot, err := openRepo(root)
-	if err != nil {
-		if IsNoRepo(err) {
-			return listFilesWalk(root)
-		}
-		return nil, err
-	}
-	idx, err := repo.Storer.Index()
-	if err != nil {
-		return nil, fmt.Errorf("read git index under %s: %w", root, err)
-	}
-	if root, err = filepath.Abs(root); err != nil {
-		return nil, err
-	}
-	if root, err = filepath.EvalSymlinks(root); err != nil {
-		return nil, err
-	}
-	var files []string
-	for _, e := range idx.Entries {
-		abs := filepath.Join(repoRoot, e.Name)
-		rel, err := filepath.Rel(root, abs)
-		if err != nil || rel == ".." || strings.HasPrefix(rel, "../") {
-			continue
-		}
-		files = append(files, rel)
-	}
-	return files, nil
-}
-
-func listFilesWalk(root string) ([]string, error) {
-	abs, err := filepath.Abs(root)
-	if err != nil {
-		return nil, err
-	}
-	if abs, err = filepath.EvalSymlinks(abs); err != nil {
-		return nil, err
-	}
-	var files []string
-	err = filepath.WalkDir(abs, func(p string, d fs.DirEntry, walkErr error) error {
-		if walkErr != nil {
-			return walkErr
-		}
-		if d.IsDir() {
-			if d.Name() == git.GitDirName {
-				return filepath.SkipDir
-			}
-			return nil
-		}
-		if !d.Type().IsRegular() && d.Type()&fs.ModeSymlink == 0 {
-			return nil
-		}
-		rel, err := filepath.Rel(abs, p)
-		if err != nil {
-			return err
-		}
-		files = append(files, rel)
-		return nil
-	})
-	if err != nil {
-		return nil, fmt.Errorf("list files under %s: %w", root, err)
-	}
-	return files, nil
 }
 
 // [<] 🤖🤖

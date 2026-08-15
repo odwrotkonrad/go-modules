@@ -34,4 +34,25 @@ cases:
           - "otel.protocol=grpc (default)"
           - "otel.endpoint=localhost:4317 (default)"
           - "otel.metrics=true (default)"
+          - "packages.updateCheck.enabled=false (default)"
+          - "packages.updateCheck.cooldown=15m (default)"
+  - name: ShouldLayerUpdateCheckFromEnvConfigSpec
+    context:
+      env: {CHE_PACKAGES_UPDATE_CHECK: "true"}
+    input:
+      args:
+        - flags: {}
+        - user: {packages: {updateCheck: {cooldown: 1h}}}
+        - spec: {}
+    expected:
+      output:
+        delta: "packages.updateCheck.enabled=true (env), packages.updateCheck.cooldown=1h (config-file)"
+  - name: ShouldRejectMalformedUpdateCheckCooldown
+    input:
+      args:
+        - flags: {}
+        - user: {packages: {updateCheck: {cooldown: soon}}}
+        - spec: {}
+    expected:
+      errorOutput: 'invalid packages.updateCheck.cooldown "soon"'
 # [<] 🤖🤖

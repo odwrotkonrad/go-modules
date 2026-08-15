@@ -15,31 +15,31 @@ import (
 )
 
 func (in *Installer) installBuildFromSource(pkg string, b *BuildFromSourceSpec) error {
-	pin := in.pinFor(pkg, b.Version)
+	pin := in.resolvePin(pkg, b.Version)
 	if in.skipInstalledOrEmitReinstall(pkg, "buildFromSource", pin, pin,
 		func() bool { return in.hasCmd(pkg) },
 		func() bool { return in.versionOutputHasPin(pkg, pin) }, nil) {
 		return nil
 	}
-	if err := in.requestedOverridesPin(pkg, b.Version); err != nil {
+	if err := in.checkRequestedPin(pkg, b.Version); err != nil {
 		return err
 	}
 	if in.Opts.DryRun {
-		in.emitDryRun("install", labelWithVersion(in.pkgLabel(pkg), pin)+" via buildFromSource")
+		in.emitDryRun("install", labelWithVersion(in.labelPkg(pkg), pin)+" via buildFromSource")
 		return nil
 	}
 	if pin == "" && strings.Contains(b.URL, "{version}") {
 		return fmt.Errorf("%s: no version pinned: set version on the entry or the buildFromSource item", pkg)
 	}
-	url := in.Host.expandAs(b.URL, pin, "")
-	asset, cached, cleanup, err := in.fetchAsset(url)
+	url := in.Host.expandTokens(b.URL, pin, "")
+	asset, inCache, cleanup, err := in.fetchAsset(url)
 	if err != nil {
 		return err
 	}
 	defer cleanup()
 	if b.Checksum != "" {
 		if err := in.verifyChecksum(pkg, asset, b.Checksum); err != nil {
-			if cached {
+			if inCache {
 				_ = os.Remove(asset)
 			}
 			return err
@@ -50,7 +50,21 @@ func (in *Installer) installBuildFromSource(pkg string, b *BuildFromSourceSpec) 
 	if err := in.buildFromSource(pkg, asset, b); err != nil {
 		return err
 	}
-	in.emit(log.Levels.Info, "installed", labelWithVersion(in.pkgLabel(pkg), pin)+" via buildFromSource")
+	pages := b.Manpages
+	if pages == nil {
+		pages = in.entryManpages(pkg)
+	}
+	if len(pages) > 0 {
+		in.warnManDirOffManpath(pkg, filepath.Join(filepath.Dir(in.resolveBinDir()), "share", "man"))
+	}
+	in.emit(log.Levels.Info, "installed", labelWithVersion(in.labelPkg(pkg), pin)+" via buildFromSource")
+	return nil
+}
+
+func (in *Installer) entryManpages(pkg string) []string {
+	if e, ok := in.File.Packages[pkg]; ok {
+		return e.Manpages
+	}
 	return nil
 }
 
@@ -63,11 +77,11 @@ func (in *Installer) buildFromSource(pkg, asset string, b *BuildFromSourceSpec) 
 	if err := in.extract(asset, tmp); err != nil {
 		return err
 	}
-	src, err := singleSourceDir(tmp)
+	src, err := findSourceDir(tmp)
 	if err != nil {
 		return fmt.Errorf("%s: %w", pkg, err)
 	}
-	prefix := filepath.Dir(in.userBinDir())
+	prefix := filepath.Dir(in.resolveBinDir())
 	install := []string{"make", "install"}
 	if !in.underHome(prefix) {
 		install = in.sudo(install...)
@@ -90,7 +104,7 @@ func (in *Installer) underHome(p string) bool {
 	return home != "" && (p == home || strings.HasPrefix(p, home+string(os.PathSeparator)))
 }
 
-func singleSourceDir(dir string) (string, error) {
+func findSourceDir(dir string) (string, error) {
 	entries, err := os.ReadDir(dir)
 	if err != nil {
 		return "", err

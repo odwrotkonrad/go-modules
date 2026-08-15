@@ -69,7 +69,9 @@ func TestResolveSettings(t *testing.T) {
 		c.Input.Args.To(t, 2, &spec)
 		o := &Options{DryRun: DryRunMode(flags.DryRun)}
 		env := func(k string) string { return c.Context.Env[k] }
-		require.NoError(t, o.Resolve(env, user, spec))
+		if c.Expected.Check(t, o.Resolve(env, user, spec)) {
+			return
+		}
 		if len(c.Expected.Output.AllContains) == 0 {
 			assert.Equal(t, c.Expected.Output.Delta, FormatSettings(o.SettingsDelta()))
 		}

@@ -1,6 +1,6 @@
 # [>] 🤖🤖
 context:
-  function: source.Dir
+  function: source.ResolveDir
 cases:
   - name: ShouldDefaultToHomeCacheChe
     context:

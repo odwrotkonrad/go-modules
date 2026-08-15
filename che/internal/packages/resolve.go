@@ -15,28 +15,30 @@ import (
 )
 
 type Host struct {
-	OS        string
-	Arch      string
-	Distro    string
-	Euid      int
-	LookPath  func(string) (string, error)
-	PathDirs  func() []string
-	FpathDirs func() []string
-	Getenv    func(string) string
-	Stat      func(string) (os.FileInfo, error)
-	ReadFile  func(string) ([]byte, error)
+	OS          string
+	Arch        string
+	Distro      string
+	Euid        int
+	LookPath    func(string) (string, error)
+	PathDirs    func() []string
+	FpathDirs   func() []string
+	ManpathDirs func() []string
+	Getenv      func(string) string
+	Stat        func(string) (os.FileInfo, error)
+	ReadFile    func(string) ([]byte, error)
 }
 
 func NewHost() Host {
 	h := Host{
 		OS: runtime.GOOS, Arch: runtime.GOARCH,
-		Euid:      os.Geteuid(),
-		LookPath:  exec.LookPath,
-		PathDirs:  func() []string { return filepath.SplitList(os.Getenv("PATH")) },
-		FpathDirs: fpathDirs,
-		Getenv:    os.Getenv,
-		Stat:      os.Stat,
-		ReadFile:  os.ReadFile,
+		Euid:        os.Geteuid(),
+		LookPath:    exec.LookPath,
+		PathDirs:    func() []string { return filepath.SplitList(os.Getenv("PATH")) },
+		FpathDirs:   fpathDirs,
+		ManpathDirs: manpathDirs,
+		Getenv:      os.Getenv,
+		Stat:        os.Stat,
+		ReadFile:    os.ReadFile,
 	}
 	if h.OS == "linux" {
 		h.Distro = linuxDistro()
@@ -81,6 +83,26 @@ func fpathDirs() []string {
 	}
 	if v := os.Getenv("FPATH"); v != "" {
 		return filepath.SplitList(v)
+	}
+	return nil
+}
+
+func manpathDirs() []string {
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+	if out, err := exec.CommandContext(ctx, "manpath").Output(); err == nil {
+		var dirs []string
+		for _, d := range filepath.SplitList(strings.TrimSpace(string(out))) {
+			if d != "" {
+				dirs = append(dirs, d)
+			}
+		}
+		if len(dirs) > 0 {
+			return dirs
+		}
+	}
+	if v := os.Getenv("MANPATH"); v != "" {
+		return slices.DeleteFunc(filepath.SplitList(v), func(d string) bool { return d == "" })
 	}
 	return nil
 }
@@ -132,7 +154,7 @@ func (h Host) NixBin() string {
 	return ""
 }
 
-func (h Host) expandAs(s, version, arch string) string {
+func (h Host) expandTokens(s, version, arch string) string {
 	return strings.NewReplacer("{version}", version, "{os}", h.OS, "{arch}", arch).Replace(s)
 }
 
@@ -204,7 +226,7 @@ func (h Host) pickPreferred(pkg string, entry Entry, preferred, only, allowed []
 			if ok && len(only) > 0 && !slices.Contains(only, it.Mgr) {
 				ok = false
 			}
-			if ok && len(allowed) > 0 && !slices.Contains(allowed, methodFamily(it.Mgr)) {
+			if ok && len(allowed) > 0 && !slices.Contains(allowed, makeInstallerKey(it.Mgr)) {
 				ok = false
 			}
 			if ok {
@@ -213,13 +235,6 @@ func (h Host) pickPreferred(pkg string, entry Entry, preferred, only, allowed []
 		}
 	}
 	return Item{}, false, nil
-}
-
-func methodFamily(mgr string) string {
-	if mgr == "cask" {
-		return "brew/cask"
-	}
-	return mgr
 }
 
 var KnownManagers = []string{"brew", "cask", "apt", "npm", "go", "gem", "binariesRemoteArchive", "script", "buildFromSource", "pyenv", "nvm", "nix"}
@@ -231,6 +246,8 @@ var DefaultPreferredMethods = []string{"brew", "cask", "apt", "binariesRemoteArc
 var DefaultBinariesRemoteArchiveDestinationCandidates = []string{"~/.local/bin", "~/bin"}
 
 var DefaultCompletionsDestinationCandidates = []string{"~/.local/share/zsh/site-functions", "~/.zfunc"}
+
+var DefaultManpagesDestinationCandidates = []string{"~/.local/share/man"}
 
 func ValidateManagers(names []string) error {
 	for _, n := range names {
