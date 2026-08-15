@@ -1,0 +1,33 @@
+# [>] 🤖🤖
+context:
+  function: packages.nixProfileEntry
+cases:
+  - name: ShouldParseNameAndStorePathFormat
+    input:
+      args:
+        - out: "Name: jq\nStore paths: /nix/store/h-jq-1.8.2-bin\n"
+        - pkg: jq
+    expected:
+      output: {found: true, version: 1.8.2}
+  - name: ShouldParseLegacyFlakeLineFormat
+    input:
+      args:
+        - out: "0 flake:nixpkgs#legacyPackages.x86_64-linux.jq github:NixOS/nixpkgs/aaa#legacyPackages.x86_64-linux.jq /nix/store/h-jq-1.7.1\n"
+        - pkg: jq
+    expected:
+      output: {found: true, version: 1.7.1}
+  - name: ShouldFindVersionlessStorePath
+    input:
+      args:
+        - out: "Store paths: /nix/store/h-jq\n"
+        - pkg: jq
+    expected:
+      output: {found: true}
+  - name: ShouldNotFindOtherPackage
+    input:
+      args:
+        - out: "Store paths: /nix/store/h-bat-0.24.0\n"
+        - pkg: jq
+    expected:
+      output: {found: false}
+# [<] 🤖🤖

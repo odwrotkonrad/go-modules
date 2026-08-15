@@ -1,0 +1,305 @@
+# [>] 🤖🤖
+context:
+  function: packages.Entry.UnmarshalYAML
+cases:
+  - name: ShouldParseVerifyStrategyOnEntry
+    input:
+      args:
+        - yaml: |
+            packages:
+              foo:
+                verify: pkgMgrVersionCheck
+                installers: [apt]
+    expected:
+      output: {foo: {mgrs: [apt], verify: pkgMgrVersionCheck}}
+  - name: ShouldParseVerifyStrategyOnItems
+    input:
+      args:
+        - yaml: |
+            packages:
+              foo:
+                - apt:
+                    verify: versionCmd
+              bar:
+                - brew:
+                    packageName: barx
+                    verify: pkgMgrVersionCheck
+              baz:
+                - binariesRemoteArchive:
+                    url: https://example.com/{version}.tar.gz
+                    version: "1.0"
+                    verify: {cmd: baz doctor}
+    expected:
+      output:
+        foo: {mgrs: [apt], itemVerifies: [versionCmd]}
+        bar: {mgrs: [brew], itemVerifies: [pkgMgrVersionCheck]}
+        baz: {mgrs: [binariesRemoteArchive], itemVerifies: ["cmd: baz doctor"]}
+  - name: ShouldParseVerifyCmdObject
+    input:
+      args:
+        - yaml: |
+            packages:
+              foo:
+                verify:
+                  cmd: test -e /etc/foo.conf
+                installers: [apt]
+    expected:
+      output: {foo: {mgrs: [apt], verify: "cmd: test -e /etc/foo.conf"}}
+  - name: ShouldRejectUnknownVerifyStrategy
+    input:
+      args:
+        - yaml: |
+            packages:
+              foo:
+                verify: nope
+                installers: [apt]
+    expected:
+      errorOutput: "verify: want versionCmd, pkgMgrVersionCheck or {versionCmd|pkgMgrVersionCheck|cmd|checkInPath}"
+  - name: ShouldRejectEmptyVerifyCmd
+    input:
+      args:
+        - yaml: |
+            packages:
+              foo:
+                verify: {cmd: ""}
+                installers: [apt]
+    expected:
+      errorOutput: "verify: object form requires versionCmd, pkgMgrVersionCheck, cmd, or checkInPath"
+  - name: ShouldRoundTripVerifySpecs
+    input:
+      args:
+        - yaml: |
+            packages:
+                bar:
+                    - apt:
+                        verify:
+                            cmd: test -x /usr/bin/bar
+                foo:
+                    verify: pkgMgrVersionCheck
+                    installers:
+                        - apt
+        - validatePlatforms: false
+        - roundTrip: true
+    expected:
+      output:
+        bar: {mgrs: [apt], itemVerifies: ["cmd: test -x /usr/bin/bar"]}
+        foo: {mgrs: [apt], verify: pkgMgrVersionCheck}
+  - name: ShouldRejectBrewTapQualifiedName
+    input:
+      args:
+        - yaml: "packages:\n  che: [{brew: {packageName: konradodwrot/tap/che}}]"
+    expected:
+      errorOutput: "installerRegistries.brew"
+  - name: ShouldRejectCaskTapQualifiedName
+    input:
+      args:
+        - yaml: "packages:\n  az: [{brew/cask: {packageName: azure/azure-cli/azure-cli-preview}}]"
+    expected:
+      errorOutput: "installerRegistries.brew"
+  - name: ShouldValidatePlatformsWithArchScheme
+    input:
+      args:
+        - yaml: |
+            archSchemes:
+              uname: {amd64: x86_64}
+            osInstallers:
+              linux-amd64: [binariesRemoteArchive]
+            packages:
+              x:
+                - binariesRemoteArchive:
+                    url: https://example.com/x-{arch}.tar.gz
+                    archScheme: uname
+                    platformEligibility: [linux-amd64]
+        - validatePlatforms: true
+    expected:
+      output: {x: {mgrs: [binariesRemoteArchive]}}
+  - name: ShouldRequireArchSchemeForArchToken
+    input:
+      args:
+        - yaml: |
+            archSchemes:
+              uname: {amd64: x86_64}
+            osInstallers:
+              linux-amd64: [binariesRemoteArchive]
+            packages:
+              x:
+                - binariesRemoteArchive:
+                    url: https://example.com/x-{arch}.tar.gz
+                    platformEligibility: [linux-amd64]
+        - validatePlatforms: true
+    expected:
+      errorOutput: "{arch} requires archScheme"
+  - name: ShouldRejectUnknownPlatformName
+    input:
+      args:
+        - yaml: |
+            archSchemes:
+              uname: {amd64: x86_64}
+            osInstallers:
+              linux-amd64: [binariesRemoteArchive]
+            packages:
+              x:
+                - binariesRemoteArchive:
+                    url: https://example.com/x-{arch}.tar.gz
+                    platformEligibility: [drawin-arm64]
+        - validatePlatforms: true
+    expected:
+      errorOutput: unknown platform "drawin-arm64"
+  - name: ShouldRejectUnknownArchScheme
+    input:
+      args:
+        - yaml: |
+            archSchemes:
+              uname: {amd64: x86_64}
+            osInstallers:
+              linux-amd64: [binariesRemoteArchive]
+            packages:
+              x:
+                - binariesRemoteArchive:
+                    url: https://example.com/x-{arch}.tar.gz
+                    archScheme: gnu
+        - validatePlatforms: true
+    expected:
+      errorOutput: unknown archScheme "gnu"
+  - name: ShouldRejectRollingSentinelOnEntry
+    input:
+      args:
+        - yaml: "packages:\n  node:\n    version: __rolling__\n    installers: [brew]"
+    expected:
+      errorOutput: "__rolling__ sentinel is gone"
+  - name: ShouldRejectRollingSentinelOnItem
+    input:
+      args:
+        - yaml: "packages:\n  node:\n    installers: [{brew: {version: __rolling__}}]"
+    expected:
+      errorOutput: "__rolling__ sentinel is gone"
+  - name: ShouldRejectBrewLiteralVersionSuffix
+    input:
+      args:
+        - yaml: |
+            packages:
+              node:
+                version: "24"
+                installers: [{brew: {packageName: node@24}}]
+    expected:
+      errorOutput: appended automatically
+  - name: ShouldRejectBrewObjectFormVersionSuffix
+    input:
+      args:
+        - yaml: |
+            packages:
+              node:
+                version: "24"
+                installers: [{brew: {formula: node@24}}]
+    expected:
+      errorOutput: is gone
+  - name: ShouldRejectAptInstallPackages
+    input:
+      args:
+        - yaml: |
+            packages:
+              legacy:
+                installers: [{apt: {installPackages: [a, b]}}]
+    expected:
+      errorOutput: installPackages is gone
+  - name: ShouldParseAptNameAndAliases
+    input:
+      args:
+        - yaml: |
+            packages:
+              named:
+                installers:
+                  - apt:
+                      packageName: a
+                      aliasBinary: {acat: a}
+    expected:
+      output: {named: {mgrs: [apt], name: a, aliases: {acat: a}}}
+  - name: ShouldRejectAptMultiVersionMap
+    input:
+      args:
+        - yaml: |
+            packages:
+              x:
+                installers:
+                  - apt:
+                      versionMap: {"1.0": "1.0-1", "2.0": "2.0-1"}
+    expected:
+      errorOutput: exactly one binary version
+  - name: ShouldRejectNixMultiVersionMap
+    input:
+      args:
+        - yaml: |
+            packages:
+              x:
+                installers:
+                  - nix:
+                      versionMap: {"1.0": "aaa", "2.0": "bbb"}
+    expected:
+      errorOutput: exactly one binary version
+  - name: ShouldRejectNixPlatformEligibility
+    input:
+      args:
+        - yaml: |
+            packages:
+              x:
+                installers:
+                  - nix: {platformEligibility: [linux-amd64]}
+    expected:
+      errorOutput: platformEligibility
+  - name: ShouldRejectNixEmbeddedAttrVersion
+    input:
+      args:
+        - yaml: |
+            packages:
+              x:
+                installers:
+                  - nix: {packageName: "jq#1.8"}
+    expected:
+      errorOutput: bare nixpkgs attributes
+  - name: ShouldParseManagersAndCompletionsObjectForm
+    input:
+      args:
+        - yaml: |
+            packages:
+              go:
+                installers:
+                  - binariesRemoteArchive:
+                      extractBinaries: [go/bin/go, go/bin/gofmt]
+                      platformEligibility:
+                        - linux-amd64: sha256:goodsha
+                      version: 1.26.4
+                      url: https://example.com/go{version}.{os}-{arch}.tar.gz
+                completions:
+                  zsh:
+                    name: _golang
+                    url: https://example.com/_golang
+                    checksum: sha256:compsha
+    expected:
+      output: {go: {mgrs: [binariesRemoteArchive], completionsZsh: {name: _golang, url: "https://example.com/_golang"}}}
+  - name: ShouldRejectEntryWithoutInstallersOrCompletions
+    input:
+      args:
+        - yaml: "packages:\n  go: {}"
+    expected:
+      errorOutput: installers or completions
+  - name: ShouldRejectZshCompletionsWithoutCmdOrUrl
+    input:
+      args:
+        - yaml: |
+            packages:
+              go:
+                completions:
+                  zsh: {name: _go}
+    expected:
+      errorOutput: exactly one of cmd or url
+  - name: ShouldRejectZshCompletionsWithBothCmdAndUrl
+    input:
+      args:
+        - yaml: |
+            packages:
+              go:
+                completions:
+                  zsh: {cmd: go env, url: https://example.com}
+    expected:
+      errorOutput: exactly one of cmd or url
+# [<] 🤖🤖

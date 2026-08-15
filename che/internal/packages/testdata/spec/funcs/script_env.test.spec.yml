@@ -1,0 +1,31 @@
+# [>] 🤖🤖
+context:
+  function: packages.Installer.scriptEnv
+cases:
+  - name: ShouldCarryPinShaAndHostArchVars
+    input:
+      args:
+        - files: |
+            packages:
+              gcloud:
+                - script:
+                    platformEligibility:
+                      - darwin-arm64: sha256:gsha
+                    os: darwin
+                    version: 572.0.0
+                    run: echo install-gcloud
+        - os: darwin
+        - arch: arm64
+        - pkg: gcloud
+    expected:
+      output:
+        CHE_PKG_NAME: gcloud
+        CHE_PKG_VERSION: 572.0.0
+        CHE_PKG_SHA256: gsha
+        CHE_PKG_OS: darwin
+        CHE_PKG_ARCH: arm64
+        CHE_PKG_ARCH_GO: arm64
+        CHE_PKG_ARCH_ODD: arm64
+        CHE_PKG_ARCH_RUST: "aarch64-unknown-{os}-gnu"
+        CHE_PKG_ARCH_UNAME: aarch64
+# [<] 🤖🤖

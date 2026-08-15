@@ -15,26 +15,9 @@ import (
 )
 
 func TestPinMatches(t *testing.T) {
-	cases := []struct {
-		out, pin string
-		want     bool
-	}{
-		{"kind version 0.32.0", "0.32.0", true},
-		{"kind version 0.32.0", "0.31.0", false},
-		{"Terraform v1.15.8", "1.15.8", true},
-		{"go version go1.26.4 darwin/arm64", "1.26.4", true},
-		{"Python 3.14.5", "3.14.5", true},
-		{"Python 3.14.5", "3.14.4", false},
-		{"prometheus, version 3.5.5 (branch: HEAD, revision: dcd3d551ced8)", "3.5.5", true},
-		{"glab 1.108.0 (5de20850)", "1.107.0", false},
-		{"jq-1.7.1-3", "1.7.1-3", true},
-		{"1:1.7.1-3", "1.7.1-3", true},
-		{"anything", "", true},
-		{"no version here", "1.0.0", false},
-	}
-	for _, c := range cases {
-		require.Equalf(t, c.want, PinMatches(c.out, c.pin), "out=%q pin=%q", c.out, c.pin)
-	}
+	testyml.Eq(t, td, "testdata/spec/funcs/pin_matches.test.spec.yml", func(t *testing.T, c testyml.Case[bool]) (bool, error) {
+		return PinMatches(c.Input.Args.String(t, 0), c.Input.Args.String(t, 1)), nil
+	})
 }
 
 const pinnedBatYaml = `packages:
@@ -140,13 +123,6 @@ func TestBrewPinAppendsVersionedFormula(t *testing.T) {
 	refuteCalls(t, m, "node@24@24")
 }
 
-func TestRollingSentinelIsParseError(t *testing.T) {
-	err := yaml.Unmarshal([]byte("packages:\n  node:\n    version: __rolling__\n    installers: [brew]\n"), &File{})
-	require.ErrorContains(t, err, "__rolling__ sentinel is gone")
-	err = yaml.Unmarshal([]byte("packages:\n  node:\n    installers: [{brew: {version: __rolling__}}]\n"), &File{})
-	require.ErrorContains(t, err, "__rolling__ sentinel is gone")
-}
-
 func TestCaskPinWarnsAndInstallsCurrent(t *testing.T) {
 	const y = `packages:
   claude:
@@ -159,24 +135,6 @@ func TestCaskPinWarnsAndInstallsCurrent(t *testing.T) {
 	require.NoError(t, err)
 	require.Contains(t, out, "cannot be enforced via brew/cask")
 	require.Contains(t, m.Calls(), "brew install --cask claude-code")
-}
-
-func TestBrewLiteralVersionSuffixIsParseError(t *testing.T) {
-	err := yaml.Unmarshal([]byte(`packages:
-  node:
-    version: "24"
-    installers: [{brew: {packageName: node@24}}]
-`), &File{})
-	require.ErrorContains(t, err, "appended automatically")
-}
-
-func TestBrewObjectFormVersionSuffixIsParseError(t *testing.T) {
-	err := yaml.Unmarshal([]byte(`packages:
-  node:
-    version: "24"
-    installers: [{brew: {formula: node@24}}]
-`), &File{})
-	require.ErrorContains(t, err, "is gone")
 }
 
 func TestUnversionedLatestSentinelSkipsPinning(t *testing.T) {
@@ -367,33 +325,6 @@ func TestGoModulePinsFromEntryVersion(t *testing.T) {
 	in, m := newInstaller(t, y, "darwin", cmdMap([]string{"go"}), Options{})
 	require.NoError(t, in.Install([]string{"gopls"}))
 	requireCalls(t, m, "go install golang.org/x/tools/gopls@v0.23.0")
-}
-
-func TestAptVocabularyCarriesNameAndAliases(t *testing.T) {
-	const y = `packages:
-  named:
-    installers:
-      - apt:
-          packageName: a
-          aliasBinary: {acat: a}
-  legacy:
-    installers: [{apt: {installPackages: [a, b]}}]
-`
-	var f File
-	require.ErrorContains(t, yaml.Unmarshal([]byte(y), &f), "installPackages is gone")
-
-	const ok = `packages:
-  named:
-    installers:
-      - apt:
-          packageName: a
-          aliasBinary: {acat: a}
-`
-	var g File
-	require.NoError(t, yaml.Unmarshal([]byte(ok), &g))
-	m := g.Packages["named"].Items[0]
-	require.Equal(t, "a", m.Apt.PackageName)
-	require.Equal(t, map[string]string{"acat": "a"}, m.AliasBinary)
 }
 
 func TestVersionLatestTracksModuleHead(t *testing.T) {

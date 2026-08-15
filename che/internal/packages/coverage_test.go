@@ -59,18 +59,6 @@ func TestNewHostCapturesRuntime(t *testing.T) {
 	require.Equal(t, os.Getenv("PATH"), h.Getenv("PATH"))
 }
 
-func TestApplicableGemAndCask(t *testing.T) {
-	h := testHost("darwin", "amd64", cmdMap([]string{"gem", "brew"}))
-	it, ok, err := h.pickPreferred("x", Entry{Items: []Item{{Mgr: "gem"}}}, nil, nil, nil, false)
-	require.NoError(t, err)
-	require.True(t, ok)
-	require.Equal(t, "gem", it.Mgr)
-	it, ok, err = h.pickPreferred("x", Entry{Items: []Item{{Mgr: "cask", Name: "x"}}}, nil, nil, nil, false)
-	require.NoError(t, err)
-	require.True(t, ok)
-	require.Equal(t, "cask", it.Mgr)
-}
-
 func TestInstallGoModule(t *testing.T) {
 	in, m := newInstaller(t, `packages:
   gopls: [{go: {packageName: "golang.org/x/tools/gopls@latest"}}]`, "darwin", cmdMap([]string{"go"}), Options{})

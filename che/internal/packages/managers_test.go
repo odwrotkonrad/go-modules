@@ -20,6 +20,7 @@ import (
 
 	"gitlab.com/konradodwrot/go-modules/che/internal/execx"
 	"gitlab.com/konradodwrot/go-modules/che/internal/fetchx"
+	"gitlab.com/konradodwrot/go-modules/lib/testyml"
 )
 
 var testFetch *fetchx.Mock
@@ -209,13 +210,6 @@ func TestInstallBrewUnknownRegistryErrors(t *testing.T) {
 	require.ErrorContains(t, in.Install([]string{"che"}), `unknown brew registry "nowhere/tap"`)
 }
 
-func TestBrewTapQualifiedNameIsParseError(t *testing.T) {
-	err := yaml.Unmarshal([]byte("packages:\n  che: [{brew: {packageName: konradodwrot/tap/che}}]"), &File{})
-	require.ErrorContains(t, err, "installerRegistries.brew")
-	err = yaml.Unmarshal([]byte("packages:\n  az: [{brew/cask: {packageName: azure/azure-cli/azure-cli-preview}}]"), &File{})
-	require.ErrorContains(t, err, "installerRegistries.brew")
-}
-
 func TestAptIneligibleOnNonDebianLinux(t *testing.T) {
 	in, m := newInstaller(t, "packages:\n  jq: [apt]", "linux", cmdMap([]string{"apt-get"}), Options{})
 	in.Host.Distro = ""
@@ -294,9 +288,10 @@ func TestInstallGoPinResolvesModuleVersion(t *testing.T) {
 	require.Contains(t, m.Calls(), "go install golang.org/x/tools/gopls@v0.23.0")
 }
 
-func TestPinnedNameGoStripsModuleQuery(t *testing.T) {
-	require.Equal(t, "golang.org/x/tools/gopls@v0.23.0", pinnedName("go", "golang.org/x/tools/gopls@latest", "0.23.0"))
-	require.Equal(t, "example.com/mod@v1.2.3", pinnedName("go", "example.com/mod", "1.2.3"))
+func TestPinnedName(t *testing.T) {
+	testyml.Eq(t, td, "testdata/spec/funcs/pinned_name.test.spec.yml", func(t *testing.T, c testyml.Case[string]) (string, error) {
+		return pinnedName(c.Input.Args.String(t, 0), c.Input.Args.String(t, 1), c.Input.Args.String(t, 2)), nil
+	})
 }
 
 func TestInstallUpdateUpgradesInstalledBrew(t *testing.T) {
@@ -486,45 +481,27 @@ func TestInstallGcloudPicksLinuxAptRepo(t *testing.T) {
 		"--no-install-recommends -t cloud-sdk google-cloud-cli")
 }
 
-func TestScriptEnvCarriesPinShaAndHost(t *testing.T) {
-	in, _ := newInstaller(t, gcloudYaml, "darwin", cmdMap(nil), Options{})
-	in.Host.Arch = "arm64"
-	env := in.scriptEnv("gcloud", &ScriptSpec{Version: "572.0.0", InstallerVocabulary: InstallerVocabulary{PlatformEligibility: ItemPlatforms{Names: []string{"darwin-arm64"}, Checksums: map[string]string{"darwin-arm64": "sha256:gsha"}}}})
-	joined := strings.Join(env, "\n")
-	for _, want := range []string{
-		"CHE_PKG_NAME=gcloud", "CHE_PKG_VERSION=572.0.0", "CHE_PKG_SHA256=gsha",
-		"CHE_PKG_OS=darwin", "CHE_PKG_ARCH=arm64",
-		"CHE_PKG_ARCH_UNAME=aarch64", "CHE_PKG_ARCH_ODD=arm64",
-	} {
-		require.Contains(t, joined, want)
-	}
-}
-
-func TestValidatePlatforms(t *testing.T) {
-	base := `archSchemes:
-  uname: {amd64: x86_64}
-osInstallers:
-  linux-amd64: [binariesRemoteArchive]
-packages:
-  x:
-    - binariesRemoteArchive:
-        url: https://example.com/x-{arch}.tar.gz
-`
-	var f File
-	require.NoError(t, yaml.Unmarshal([]byte(base+"        archScheme: uname\n        platformEligibility: [linux-amd64]\n"), &f))
-	require.NoError(t, f.ValidatePlatforms())
-
-	var missing File
-	require.NoError(t, yaml.Unmarshal([]byte(base+"        platformEligibility: [linux-amd64]\n"), &missing))
-	require.ErrorContains(t, missing.ValidatePlatforms(), "{arch} requires archScheme")
-
-	var bad File
-	require.NoError(t, yaml.Unmarshal([]byte(base+"        platformEligibility: [drawin-arm64]\n"), &bad))
-	require.ErrorContains(t, bad.ValidatePlatforms(), `unknown platform "drawin-arm64"`)
-
-	var badConv File
-	require.NoError(t, yaml.Unmarshal([]byte(base+"        archScheme: gnu\n"), &badConv))
-	require.ErrorContains(t, badConv.ValidatePlatforms(), `unknown archScheme "gnu"`)
+func TestScriptEnv(t *testing.T) {
+	testyml.Eq(t, td, "testdata/spec/funcs/script_env.test.spec.yml", func(t *testing.T, c testyml.Case[map[string]string]) (map[string]string, error) {
+		in, _ := newInstaller(t, c.Input.Args.String(t, 0), c.Input.Args.String(t, 1), cmdMap(nil), Options{})
+		in.Host.Arch = c.Input.Args.String(t, 2)
+		pkg := c.Input.Args.String(t, 3)
+		var s *ScriptSpec
+		for _, it := range in.File.Packages[pkg].Items {
+			if it.Script != nil {
+				s = it.Script
+			}
+		}
+		require.NotNil(t, s)
+		got := map[string]string{}
+		for _, kv := range in.scriptEnv(pkg, s) {
+			k, v, _ := strings.Cut(kv, "=")
+			if strings.HasPrefix(k, "CHE_PKG_") {
+				got[k] = v
+			}
+		}
+		return got, nil
+	})
 }
 
 func TestArchForUnknownConventionErrors(t *testing.T) {

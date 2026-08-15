@@ -8,7 +8,6 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/require"
-	"gopkg.in/yaml.v3"
 )
 
 const dockerAptYaml = `installerRegistries:
@@ -195,23 +194,6 @@ packages:
 	require.ErrorContains(t, in.Install([]string{"x"}), "ambiguous apt registry")
 	require.NoError(t, in.Install([]string{"y"}))
 	requireCalls(t, m, "-t bookworm-backports")
-}
-
-func TestAptVersionsMapValidation(t *testing.T) {
-	err := yaml.Unmarshal([]byte(`packages:
-  x:
-    installers:
-      - apt:
-          versionMap: {"1.0": "1.0-1", "2.0": "2.0-1"}
-`), &File{})
-	require.ErrorContains(t, err, "exactly one binary version")
-	err = yaml.Unmarshal([]byte(`packages:
-  x:
-    installers:
-      - apt:
-          installPackages: [a, b]
-`), &File{})
-	require.ErrorContains(t, err, "installPackages is gone")
 }
 
 func TestCommandOverrideSkipsScriptWhenPresent(t *testing.T) {

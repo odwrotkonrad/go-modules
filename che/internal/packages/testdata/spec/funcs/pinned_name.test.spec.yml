@@ -1,0 +1,21 @@
+# [>] 🤖🤖
+context:
+  function: packages.pinnedName
+cases:
+  - name: ShouldStripGoModuleQueryBeforePinning
+    input:
+      args:
+        - mgr: go
+        - pkg: golang.org/x/tools/gopls@latest
+        - version: 0.23.0
+    expected:
+      output: golang.org/x/tools/gopls@v0.23.0
+  - name: ShouldAppendVPrefixedGoVersion
+    input:
+      args:
+        - mgr: go
+        - pkg: example.com/mod
+        - version: 1.2.3
+    expected:
+      output: example.com/mod@v1.2.3
+# [<] 🤖🤖

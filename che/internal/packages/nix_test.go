@@ -6,7 +6,8 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/require"
-	"gopkg.in/yaml.v3"
+
+	"gitlab.com/konradodwrot/go-modules/lib/testyml"
 )
 
 const nixListPrefix = "nix --extra-experimental-features nix-command flakes profile list"
@@ -125,40 +126,16 @@ func TestInstallNixDryRunAnnounces(t *testing.T) {
 	refuteCalls(t, m, "profile install")
 }
 
-func TestNixItemValidation(t *testing.T) {
-	err := yaml.Unmarshal([]byte(`packages:
-  x:
-    installers:
-      - nix:
-          versionMap: {"1.0": "aaa", "2.0": "bbb"}
-`), &File{})
-	require.ErrorContains(t, err, "exactly one binary version")
-	err = yaml.Unmarshal([]byte(`packages:
-  x:
-    installers:
-      - nix: {platformEligibility: [linux-amd64]}
-`), &File{})
-	require.ErrorContains(t, err, "platformEligibility")
-	err = yaml.Unmarshal([]byte(`packages:
-  x:
-    installers:
-      - nix: {packageName: "jq#1.8"}
-`), &File{})
-	require.ErrorContains(t, err, "bare nixpkgs attributes")
+type nixEntryGot struct {
+	Found   bool   `yaml:"found"`
+	Version string `yaml:"version,omitempty"`
 }
 
-func TestNixProfileEntryParsesFormats(t *testing.T) {
-	found, ver := nixProfileEntry("Name: jq\nStore paths: /nix/store/h-jq-1.8.2-bin\n", "jq")
-	require.True(t, found)
-	require.Equal(t, "1.8.2", ver)
-	found, ver = nixProfileEntry("0 flake:nixpkgs#legacyPackages.x86_64-linux.jq github:NixOS/nixpkgs/aaa#legacyPackages.x86_64-linux.jq /nix/store/h-jq-1.7.1\n", "jq")
-	require.True(t, found)
-	require.Equal(t, "1.7.1", ver)
-	found, ver = nixProfileEntry("Store paths: /nix/store/h-jq\n", "jq")
-	require.True(t, found)
-	require.Empty(t, ver)
-	found, _ = nixProfileEntry("Store paths: /nix/store/h-bat-0.24.0\n", "jq")
-	require.False(t, found)
+func TestNixProfileEntry(t *testing.T) {
+	testyml.Eq(t, td, "testdata/spec/funcs/nix_profile_entry.test.spec.yml", func(t *testing.T, c testyml.Case[nixEntryGot]) (nixEntryGot, error) {
+		found, ver := nixProfileEntry(c.Input.Args.String(t, 0), c.Input.Args.String(t, 1))
+		return nixEntryGot{Found: found, Version: ver}, nil
+	})
 }
 
 // [<] 🤖🤖
