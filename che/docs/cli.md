@@ -200,6 +200,12 @@ install packages from packages.yml and check their state.
 | `--packages-override` | `CHE_PACKAGES_OVERRIDE` | `string` | `$XDG_CONFIG_HOME/che/packages-override.yml if present` | override packages file merged over the effective base (the packages file, or the builtin when none exists): same-name entries replace, new names append |
 | `--preferred-methods` | `CHE_PACKAGES_PREFERRED_METHODS` | `brew` \| `cask` \| `apt` \| `npm` \| `go` \| `gem` \| `binariesRemoteArchive` \| `script` \| `pyenv` \| `nvm` | `[]` | installation-method preference order (comma-separated or repeated): listed managers try first within each package entry, unlisted follow in entry order |
 
+### `$ che packages check-manpages`
+
+warn when a declared manpage resolves nowhere on the man search path, or in more than one dir (every location listed).
+
+Usage: `che packages check-manpages [pkg...]`
+
 ### `$ che packages check-not-shadowed`
 
 warn when a package's manager-expected binary is not the first PATH hit.

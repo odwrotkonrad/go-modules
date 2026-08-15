@@ -133,4 +133,44 @@ cases:
         - pkgMgrVersionCheck: true
     expected:
       errorOutput: no version query for method go
+  - name: ShouldProveEntryManpagesBrowsable
+    input:
+      args:
+        - entry: "{manpages: [foo.1, foo-conf.5], installers: [apt]}"
+        - pkg: foo
+        - method: apt
+    expected:
+      output:
+        - {cmd: "foo --version 2>/dev/null || foo version", wantOut: true}
+        - {cmd: man -w 1 foo, wantOut: true}
+        - {cmd: man -w 5 foo-conf, wantOut: true}
+  - name: ShouldLetItemManpagesOverrideEntry
+    input:
+      args:
+        - entry: |
+            manpages: [foo.1]
+            installers:
+              - apt:
+                  manpages: []
+              - brew
+        - pkg: foo
+        - method: apt
+    expected:
+      output:
+        - {cmd: "foo --version 2>/dev/null || foo version", wantOut: true}
+  - name: ShouldKeepEntryManpagesForItemsWithoutOverride
+    input:
+      args:
+        - entry: |
+            manpages: [foo.1]
+            installers:
+              - apt:
+                  manpages: []
+              - brew
+        - pkg: foo
+        - method: brew
+    expected:
+      output:
+        - {cmd: "foo --version 2>/dev/null || foo version", wantOut: true}
+        - {cmd: man -w 1 foo, wantOut: true}
 # [<] 🤖🤖

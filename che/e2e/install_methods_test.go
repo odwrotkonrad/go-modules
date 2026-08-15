@@ -277,6 +277,23 @@ func resolveTargetHost(cfg runCfg) packages.Host {
 
 func resolveVerify(t *testing.T, entry packages.Entry, pkg, mgr string) pkgVerify {
 	t.Helper()
+	pv := resolveVerifyStrategies(t, entry, pkg, mgr)
+	pages := entry.Manpages
+	for _, it := range entry.Items {
+		if it.Mgr == mgr && it.Manpages != nil {
+			pages = it.Manpages
+		}
+	}
+	for _, p := range pages {
+		base, section, err := packages.ParseManpage(p)
+		require.NoError(t, err)
+		pv.cmds = append(pv.cmds, verifyCmd{cmd: fmt.Sprintf("man -w %s %s", section, base), wantOut: true})
+	}
+	return pv
+}
+
+func resolveVerifyStrategies(t *testing.T, entry packages.Entry, pkg, mgr string) pkgVerify {
+	t.Helper()
 	spec := entry.Verify
 	for _, it := range entry.Items {
 		if it.Mgr == mgr && it.Verify != nil {
@@ -436,7 +453,8 @@ func resolveLogLevel() string {
 
 func makeVerifyShell(cmd string) string {
 	return `if [ -s "$NVM_DIR/nvm.sh" ]; then . "$NVM_DIR/nvm.sh"; fi; ` +
-		`if [ -s /nix/var/nix/profiles/default/etc/profile.d/nix-daemon.sh ]; then . /nix/var/nix/profiles/default/etc/profile.d/nix-daemon.sh; fi; ` + cmd
+		`if [ -s /nix/var/nix/profiles/default/etc/profile.d/nix-daemon.sh ]; then . /nix/var/nix/profiles/default/etc/profile.d/nix-daemon.sh; fi; ` +
+		`if [ -d "$HOME/.local/share/man" ]; then export MANPATH="$HOME/.local/share/man:"; fi; ` + cmd
 }
 
 func shq(s string) string {

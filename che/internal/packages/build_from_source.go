@@ -50,7 +50,21 @@ func (in *Installer) installBuildFromSource(pkg string, b *BuildFromSourceSpec) 
 	if err := in.buildFromSource(pkg, asset, b); err != nil {
 		return err
 	}
+	pages := b.Manpages
+	if pages == nil {
+		pages = in.entryManpages(pkg)
+	}
+	if len(pages) > 0 {
+		in.warnManDirOffManpath(pkg, filepath.Join(filepath.Dir(in.resolveBinDir()), "share", "man"))
+	}
 	in.emit(log.Levels.Info, "installed", labelWithVersion(in.labelPkg(pkg), pin)+" via buildFromSource")
+	return nil
+}
+
+func (in *Installer) entryManpages(pkg string) []string {
+	if e, ok := in.File.Packages[pkg]; ok {
+		return e.Manpages
+	}
 	return nil
 }
 

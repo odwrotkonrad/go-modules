@@ -35,6 +35,8 @@ type Options struct {
 	CompletionsEnabled                         bool
 	CompletionsDestinationCandidates           []string
 	CompletionsCheckPresentOnFpath             bool
+	ManpagesDestinationCandidates              []string
+	ManpagesCheckPresentOnManpath              bool
 	SilenceInstallStdout                       bool
 }
 
@@ -54,6 +56,7 @@ type Installer struct {
 	outdated       map[string]map[string]bool
 	binDir         string
 	compDir        string
+	manDir         string
 	requested      map[string]Request
 	requiredBy     map[string]string
 	baseDone       map[string]bool

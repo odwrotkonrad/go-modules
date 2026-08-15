@@ -437,8 +437,11 @@ release-lib:
     - cp che/assets/data/che.schema.json che/docs/assets/data/
     - sed -i 's|(\.\./assets/data/che.schema.json)|(assets/data/che.schema.json)|g' che/docs/spec.md
     - printf '# che\n' > che/docs/index.md
-    - tail -n +2 che/assets/docs-agents/purpose.md >> che/docs/index.md
     ##[>] 🤖🤖
+    - PROSE_REF=$(sed -n 's|.*repos/go-modules/che-purpose.md?ref=\(v[0-9.]*\)".*|\1|p' che.yml)
+    - wget -qO che/docs/purpose-src.md "https://gitlab.com/konradodwrot/prose/-/raw/$PROSE_REF/repos/go-modules/che-purpose.md"
+    - tail -n +2 che/docs/purpose-src.md >> che/docs/index.md
+    - rm che/docs/purpose-src.md
     - printf '\n## Install\n\n' >> che/docs/index.md
     - printf '```sh\ncurl -fsSL https://konradodwrot.gitlab.io/go-modules/install.sh | sh\n```\n' >> che/docs/index.md
     ##[<] 🤖🤖

@@ -90,6 +90,7 @@ type Packages struct {
 	PreferredInstallationMethods []string                     `yaml:"preferredInstallationMethods" jsonschema:"enum=brew,enum=cask,enum=apt,enum=npm,enum=go,enum=gem,enum=binariesRemoteArchive,enum=script,enum=pyenv,enum=nvm,enum=nix" jsonschema_description:"manager preference order: listed managers are tried first (in this order) within each package entry, unlisted ones follow in entry order; cascades profile > spec > user config; overridden by CHE_PACKAGES_PREFERRED_METHODS"`
 	BinariesRemoteArchive        BinariesRemoteArchiveInstall `yaml:"binariesRemoteArchive" jsonschema_description:"binariesRemoteArchive installation method options"`
 	Completions                  CompletionsInstall           `yaml:"completions" jsonschema_description:"zsh completions installation options"`
+	Manpages                     ManpagesInstall              `yaml:"manpages" jsonschema_description:"manpages installation options"`
 	UpdateCheck                  UpdateCheck                  `yaml:"updateCheck" jsonschema_description:"check the package registry for newer published package definitions before installs"`
 }
 
@@ -106,6 +107,11 @@ type ShellCompletionsInstall struct {
 	Enabled                      *bool        `yaml:"enabled" jsonschema_description:"install zsh completions for packages carrying a completions def; default false; cascades profile > spec > user config; overridden by CHE_PACKAGES_COMPLETIONS_ZSH_ENABLED"`
 	InstallDestinationCandidates StringOrList `yaml:"installDestinationCandidates" jsonschema_description:"where zsh completion files install: one path or a candidate list (~/ and $VARs expand); with checkPresentOnFpath the first candidate on fpath wins, else the first entry; default [~/.local/share/zsh/site-functions, ~/.zfunc]; cascades profile > spec > user config; overridden by CHE_PACKAGES_COMPLETIONS_ZSH_INSTALL_DESTINATION_CANDIDATES (comma-separated)"`
 	CheckPresentOnFpath          *bool        `yaml:"checkPresentOnFpath" jsonschema_description:"pick the first candidate destination found on fpath ($FPATH, else zsh -c fpath) and warn when none is; default true; overridden by CHE_PACKAGES_COMPLETIONS_ZSH_CHECK_PRESENT_ON_FPATH"`
+}
+
+type ManpagesInstall struct {
+	InstallDestinationCandidates StringOrList `yaml:"installDestinationCandidates" jsonschema_description:"where binary-method manpages install: one path or a candidate list (~/ and $VARs expand); with checkPresentOnManpath the first candidate on the man search path wins, else the first entry; default ~/.local/share/man; cascades profile > spec > user config; overridden by CHE_PACKAGES_MANPAGES_INSTALL_DESTINATION_CANDIDATES (comma-separated)"`
+	CheckPresentOnManpath        *bool        `yaml:"checkPresentOnManpath" jsonschema_description:"pick the first candidate destination found on the man search path (manpath, else $MANPATH) and warn when none is; default true; overridden by CHE_PACKAGES_MANPAGES_CHECK_PRESENT_ON_MANPATH"`
 }
 
 type BinariesRemoteArchiveInstall struct {

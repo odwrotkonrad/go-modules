@@ -58,6 +58,8 @@ func (a *app) makePackagesCmd() *cobra.Command {
 			func(in *packages.Installer, pkgs []string) error { return in.CheckNotShadowed(pkgs) }),
 		a.makeCheckCmd("check-single-present", "warn when a canonical command resolves in more than one PATH dir, listing every location",
 			func(in *packages.Installer, pkgs []string) error { return in.CheckSinglePresent(pkgs) }),
+		a.makeCheckCmd("check-manpages", "warn when a declared manpage resolves nowhere on the man search path, or in more than one dir (every location listed)",
+			func(in *packages.Installer, pkgs []string) error { return in.CheckManpages(pkgs) }),
 		a.makePackagesConfigCmd())
 	return cmd
 }

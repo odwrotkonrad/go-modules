@@ -29,6 +29,9 @@
         },
         "verify": {
           "$ref": "#/$defs/Verify"
+        },
+        "manpages": {
+          "$ref": "#/$defs/Manpages"
         }
       },
       "additionalProperties": false,
@@ -98,6 +101,12 @@
         },
         "verify": {
           "$ref": "#/$defs/Verify"
+        },
+        "extractManpages": {
+          "$ref": "#/$defs/ExtractManpages"
+        },
+        "manpages": {
+          "$ref": "#/$defs/Manpages"
         }
       },
       "additionalProperties": false,
@@ -136,6 +145,9 @@
         },
         "verify": {
           "$ref": "#/$defs/Verify"
+        },
+        "manpages": {
+          "$ref": "#/$defs/Manpages"
         }
       },
       "additionalProperties": false,
@@ -218,6 +230,9 @@
             },
             "completions": {
               "$ref": "#/$defs/Completions"
+            },
+            "manpages": {
+              "$ref": "#/$defs/Manpages"
             }
           },
           "additionalProperties": false,
@@ -225,7 +240,7 @@
           "description": "entry object: installers plus shared fields"
         }
       ],
-      "description": "one package: installer item list, or an object adding version/requires/postInstall/command/versionCommand/completions"
+      "description": "one package: installer item list, or an object adding version/requires/postInstall/command/versionCommand/completions/manpages"
     },
     "ExtractBinaries": {
       "oneOf": [
@@ -240,6 +255,20 @@
         }
       ],
       "description": "archive paths extracted onto PATH, {version}/{os}/{arch} tokens allowed"
+    },
+    "ExtractManpages": {
+      "oneOf": [
+        {
+          "type": "string"
+        },
+        {
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        }
+      ],
+      "description": "archive manpage paths linked into the man dir's man\u003csection\u003e subdir, {version}/{os}/{arch} tokens allowed"
     },
     "InstallerList": {
       "oneOf": [
@@ -346,11 +375,22 @@
         },
         "verify": {
           "$ref": "#/$defs/Verify"
+        },
+        "manpages": {
+          "$ref": "#/$defs/Manpages"
         }
       },
       "additionalProperties": false,
       "type": "object",
       "description": "manager item spec"
+    },
+    "Manpages": {
+      "items": {
+        "type": "string",
+        "description": "manpage name \u003cname\u003e.\u003csection\u003e"
+      },
+      "type": "array",
+      "description": "manual pages the package ships (\u003cname\u003e.\u003csection\u003e); on an item it overrides the entry list for that method, [] means none"
     },
     "Nix": {
       "properties": {
@@ -379,6 +419,9 @@
         },
         "verify": {
           "$ref": "#/$defs/Verify"
+        },
+        "manpages": {
+          "$ref": "#/$defs/Manpages"
         }
       },
       "additionalProperties": false,
@@ -476,6 +519,9 @@
             },
             "platformEligibility": {
               "$ref": "#/$defs/PlatformEligibility"
+            },
+            "manpages": {
+              "$ref": "#/$defs/Manpages"
             }
           },
           "additionalProperties": false,

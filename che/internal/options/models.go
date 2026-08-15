@@ -41,6 +41,8 @@ type Options struct {
 	PackagesCompletionsEnabled                         bool
 	PackagesCompletionsDestinationCandidates           []string
 	PackagesCompletionsCheckPresentOnFpath             bool
+	PackagesManpagesDestinationCandidates              []string
+	PackagesManpagesCheckPresentOnManpath              bool
 	PackagesSilenceInstallStdout                       string
 	PackagesUpdateCheckEnabled                         bool
 	PackagesUpdateCheckCooldown                        string

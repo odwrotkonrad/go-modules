@@ -32,7 +32,9 @@ func Schema() *jsonschema.Schema {
 		"PlatformEligibility":   platformEligibilityDef(),
 		"Verify":                verifyDef(),
 		"ExtractBinaries":       extractBinariesDef(),
+		"ExtractManpages":       extractManpagesDef(),
 		"Completions":           completionsDef(),
+		"Manpages":              manpagesDef(),
 	}
 	root := &jsonschema.Schema{
 		Version:              jsonschema.Version,
@@ -117,8 +119,9 @@ func entryDef() *jsonschema.Schema {
 	o.Properties.Set("versionCommand", str("command printing the installed version"))
 	o.Properties.Set("verify", ref("Verify"))
 	o.Properties.Set("completions", ref("Completions"))
+	o.Properties.Set("manpages", ref("Manpages"))
 	return &jsonschema.Schema{
-		Description: "one package: installer item list, or an object adding version/requires/postInstall/command/versionCommand/completions",
+		Description: "one package: installer item list, or an object adding version/requires/postInstall/command/versionCommand/completions/manpages",
 		OneOf: []*jsonschema.Schema{
 			arr(ref("Item")),
 			o,
@@ -166,6 +169,7 @@ func itemBodyDef() *jsonschema.Schema {
 	o.Properties.Set("version", str("pinned version, absent means rolling"))
 	o.Properties.Set("fromRegistry", str("installerRegistries ref (brew tap, apt url), brew/brew-cask/apt only"))
 	o.Properties.Set("verify", ref("Verify"))
+	o.Properties.Set("manpages", ref("Manpages"))
 	return o
 }
 
@@ -180,6 +184,8 @@ func binariesRemoteArchiveDef() *jsonschema.Schema {
 	o.Properties.Set("version", str("pinned version, absent means rolling"))
 	o.Properties.Set("url", str("archive url with {version}/{os}/{arch} tokens"))
 	o.Properties.Set("verify", ref("Verify"))
+	o.Properties.Set("extractManpages", ref("ExtractManpages"))
+	o.Properties.Set("manpages", ref("Manpages"))
 	return o
 }
 
@@ -195,6 +201,7 @@ func buildFromSourceDef() *jsonschema.Schema {
 		Items:       str("platform name <os>-<arch>"),
 	})
 	o.Properties.Set("verify", ref("Verify"))
+	o.Properties.Set("manpages", ref("Manpages"))
 	return o
 }
 
@@ -209,6 +216,7 @@ func scriptDef() *jsonschema.Schema {
 	o.Properties.Set("env", stringMap("env exported around the run"))
 	o.Properties.Set("validateArtifact", str("path whose presence marks the install done"))
 	o.Properties.Set("platformEligibility", ref("PlatformEligibility"))
+	o.Properties.Set("manpages", ref("Manpages"))
 	return scalarOr("inline command", o)
 }
 
@@ -222,6 +230,7 @@ func aptDef() *jsonschema.Schema {
 	o.Properties.Set("aliasBinary", stringMap("alias name in the bin dir, or dest path (~ and $VARS expand, parent dirs created), to target binary"))
 	o.Properties.Set("fromRegistry", str("installerRegistries.apt ref: scheme-less url[::suites[::components]]"))
 	o.Properties.Set("verify", ref("Verify"))
+	o.Properties.Set("manpages", ref("Manpages"))
 	return o
 }
 
@@ -243,6 +252,7 @@ func nixDef() *jsonschema.Schema {
 	o.Properties.Set("aliasBinary", stringMap("alias name in the bin dir, or dest path (~ and $VARS expand, parent dirs created), to target binary"))
 	o.Properties.Set("fromRegistry", str("installerRegistries.nix ref by name; default nixpkgs"))
 	o.Properties.Set("verify", ref("Verify"))
+	o.Properties.Set("manpages", ref("Manpages"))
 	return o
 }
 
@@ -293,6 +303,24 @@ func extractBinariesDef() *jsonschema.Schema {
 			str(""),
 			arr(str("")),
 		},
+	}
+}
+
+func extractManpagesDef() *jsonschema.Schema {
+	return &jsonschema.Schema{
+		Description: "archive manpage paths linked into the man dir's man<section> subdir, {version}/{os}/{arch} tokens allowed",
+		OneOf: []*jsonschema.Schema{
+			str(""),
+			arr(str("")),
+		},
+	}
+}
+
+func manpagesDef() *jsonschema.Schema {
+	return &jsonschema.Schema{
+		Description: "manual pages the package ships (<name>.<section>); on an item it overrides the entry list for that method, [] means none",
+		Type:        "array",
+		Items:       str("manpage name <name>.<section>"),
 	}
 }
 

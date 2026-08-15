@@ -289,6 +289,16 @@ func (o *Options) Resolve(env LookupEnv, user, spec Layer) error {
 	}
 	o.PackagesCompletionsCheckPresentOnFpath = o.resolveBool("packages.completions.zsh.checkPresentOnFpath", false, env("CHE_PACKAGES_COMPLETIONS_ZSH_CHECK_PRESENT_ON_FPATH"), true,
 		boolLayer{user.Packages.Completions.Zsh.CheckPresentOnFpath, "config-file"}, boolLayer{spec.Packages.Completions.Zsh.CheckPresentOnFpath, "specFile"})
+	o.PackagesManpagesDestinationCandidates = o.resolveList("packages.manpages.installDestinationCandidates",
+		envStr(env("CHE_PACKAGES_MANPAGES_INSTALL_DESTINATION_CANDIDATES")),
+		layerList(user.Packages.Manpages.InstallDestinationCandidates, "config-file"),
+		layerList(spec.Packages.Manpages.InstallDestinationCandidates, "specFile"))
+	if len(o.PackagesManpagesDestinationCandidates) == 0 {
+		o.PackagesManpagesDestinationCandidates = packages.DefaultManpagesDestinationCandidates
+		o.setValue("packages.manpages.installDestinationCandidates", "["+strings.Join(packages.DefaultManpagesDestinationCandidates, ", ")+"]")
+	}
+	o.PackagesManpagesCheckPresentOnManpath = o.resolveBool("packages.manpages.checkPresentOnManpath", false, env("CHE_PACKAGES_MANPAGES_CHECK_PRESENT_ON_MANPATH"), true,
+		boolLayer{user.Packages.Manpages.CheckPresentOnManpath, "config-file"}, boolLayer{spec.Packages.Manpages.CheckPresentOnManpath, "specFile"})
 	o.AutoDiscover = o.resolveBool("autoDiscover", false, env("CHE_AUTO_DISCOVER"), true,
 		boolLayer{user.AutoDiscover, "config-file"})
 	return o.resolveOtel(env, user, spec)

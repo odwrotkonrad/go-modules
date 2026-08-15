@@ -4,6 +4,7 @@ package che
 
 import (
 	"cmp"
+	"fmt"
 	"maps"
 	"os"
 	"path/filepath"
@@ -62,9 +63,9 @@ func loadPackagesFile(env map[string]string, home string, opts options.Options) 
 	return f, path, err
 }
 
-func checkDefinitionsUpdate(env map[string]string, home string, opts options.Options) {
+func checkDefinitionsUpdate(env map[string]string, home string, opts options.Options) error {
 	if !opts.PackagesUpdateCheckEnabled {
-		return
+		return nil
 	}
 	cooldown, err := time.ParseDuration(opts.PackagesUpdateCheckCooldown)
 	if err != nil {
@@ -73,15 +74,20 @@ func checkDefinitionsUpdate(env map[string]string, home string, opts options.Opt
 	cacheDir := packages.ResolveDefinitionsCacheDir(env, home)
 	res, err := packages.UpdateDefinitions(cacheDir, packages.ResolveUpdateBaseURL(env), cooldown, false)
 	switch {
+	case err != nil && opts.DryRun != options.DryRun.Off:
+		return fmt.Errorf("packages definitions update failed: %w", err)
 	case err != nil:
 		log.Emit(log.Event{Level: log.Levels.Warn, Scope: packages.Scope, Action: "update-check", Msg: "definitions update failed, using current set: " + err.Error()})
 	case res.Updated:
 		log.Emit(log.Event{Level: log.Levels.Info, Scope: packages.Scope, Action: "update-check", Msg: "definitions updated to " + res.Version})
 	}
+	return nil
 }
 
 func NewPackagesInstaller(env map[string]string, home string, opts options.Options) (*packages.Installer, error) {
-	checkDefinitionsUpdate(env, home, opts)
+	if err := checkDefinitionsUpdate(env, home, opts); err != nil {
+		return nil, err
+	}
 	f, path, err := loadPackagesFile(env, home, opts)
 	if err != nil {
 		return nil, err
@@ -116,6 +122,8 @@ func NewPackagesInstaller(env map[string]string, home string, opts options.Optio
 			CompletionsEnabled:                         opts.PackagesCompletionsEnabled,
 			CompletionsDestinationCandidates:           opts.PackagesCompletionsDestinationCandidates,
 			CompletionsCheckPresentOnFpath:             opts.PackagesCompletionsCheckPresentOnFpath,
+			ManpagesDestinationCandidates:              opts.PackagesManpagesDestinationCandidates,
+			ManpagesCheckPresentOnManpath:              opts.PackagesManpagesCheckPresentOnManpath,
 		},
 	}, nil
 }
@@ -166,6 +174,12 @@ func (p *ProfileReady) newInstaller() (*packages.Installer, error) {
 	}
 	if c := p.Options.Packages.Completions.Zsh.CheckPresentOnFpath; c != nil {
 		opts.PackagesCompletionsCheckPresentOnFpath = *c
+	}
+	if d := p.Options.Packages.Manpages.InstallDestinationCandidates; len(d) > 0 {
+		opts.PackagesManpagesDestinationCandidates = d
+	}
+	if c := p.Options.Packages.Manpages.CheckPresentOnManpath; c != nil {
+		opts.PackagesManpagesCheckPresentOnManpath = *c
 	}
 	in, err := NewPackagesInstaller(p.env, p.home, opts)
 	if err != nil {

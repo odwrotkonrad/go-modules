@@ -60,6 +60,18 @@ type itemGot struct {
 	ScriptOs   string            `yaml:"scriptOs,omitempty"`
 	ScriptPath string            `yaml:"scriptPath,omitempty"`
 	ScriptURL  string            `yaml:"scriptUrl,omitempty"`
+	ExtractMan []string          `yaml:"extractManpages,omitempty"`
+	Manpages   string            `yaml:"manpages,omitempty"`
+}
+
+func formatManpages(pages []string) string {
+	if pages == nil {
+		return ""
+	}
+	if len(pages) == 0 {
+		return "[]"
+	}
+	return strings.Join(pages, ", ")
 }
 
 func TestItemUnmarshal(t *testing.T) {
@@ -68,11 +80,12 @@ func TestItemUnmarshal(t *testing.T) {
 		if err := yaml.Unmarshal([]byte(c.Input.Args.String(t, 0)), &it); err != nil {
 			return itemGot{}, err
 		}
-		got := itemGot{Mgr: it.Mgr, Name: it.Name}
+		got := itemGot{Mgr: it.Mgr, Name: it.Name, Manpages: formatManpages(it.Manpages)}
 		if it.Apt != nil {
 			got.Name = it.Apt.PackageName
 		}
 		if it.BinariesRemoteArchive != nil {
+			got.ExtractMan = it.BinariesRemoteArchive.ExtractManpages
 			got.Version, got.URL, got.Platforms, got.Checksums = it.BinariesRemoteArchive.Version, it.BinariesRemoteArchive.URL, it.BinariesRemoteArchive.PlatformEligibility.Names, it.BinariesRemoteArchive.PlatformEligibility.Checksums
 		}
 		if it.BuildFromSource != nil {
@@ -115,6 +128,8 @@ type entryGot struct {
 	Name         string            `yaml:"name,omitempty"`
 	Aliases      map[string]string `yaml:"aliases,omitempty"`
 	Completions  *zshCompGot       `yaml:"completionsZsh,omitempty"`
+	Manpages     string            `yaml:"manpages,omitempty"`
+	ItemManpages []string          `yaml:"itemManpages,omitempty"`
 }
 
 func formatVerify(v *VerifySpec) string {
@@ -134,13 +149,17 @@ func formatVerify(v *VerifySpec) string {
 func summarizeEntries(f *File) map[string]entryGot {
 	got := map[string]entryGot{}
 	for name, e := range f.Packages {
-		g := entryGot{Verify: formatVerify(e.Verify)}
+		g := entryGot{Verify: formatVerify(e.Verify), Manpages: formatManpages(e.Manpages)}
 		anyItemVerify := false
+		anyItemManpages := false
 		for _, it := range e.Items {
 			g.Mgrs = append(g.Mgrs, it.Mgr)
 			v := formatVerify(it.Verify)
 			g.ItemVerifies = append(g.ItemVerifies, v)
 			anyItemVerify = anyItemVerify || v != ""
+			mp := formatManpages(it.Manpages)
+			g.ItemManpages = append(g.ItemManpages, mp)
+			anyItemManpages = anyItemManpages || mp != ""
 			if it.Apt != nil && it.Apt.PackageName != "" {
 				g.Name = it.Apt.PackageName
 			}
@@ -150,6 +169,9 @@ func summarizeEntries(f *File) map[string]entryGot {
 		}
 		if !anyItemVerify {
 			g.ItemVerifies = nil
+		}
+		if !anyItemManpages {
+			g.ItemManpages = nil
 		}
 		if z := e.Completions.Zsh; z != nil {
 			g.Completions = &zshCompGot{Name: z.Name, URL: z.URL, Cmd: z.Cmd}

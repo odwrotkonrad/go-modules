@@ -1,0 +1,40 @@
+# [>] 🤖🤖
+context:
+  function: packages.ParseManpage
+cases:
+  - name: ShouldSplitNameAndSection
+    input:
+      args: [che.1]
+    expected:
+      output: {base: che, section: "1"}
+  - name: ShouldKeepDotsInBase
+    input:
+      args: [foo.bar.5]
+    expected:
+      output: {base: foo.bar, section: "5"}
+  - name: ShouldAllowLetterSuffixedSection
+    input:
+      args: [zshall.1zsh]
+    expected:
+      output: {base: zshall, section: 1zsh}
+  - name: ShouldStripCompressionSuffix
+    input:
+      args: [che.1.gz]
+    expected:
+      output: {base: che, section: "1"}
+  - name: ShouldRejectSectionlessName
+    input:
+      args: [che]
+    expected:
+      errorOutput: 'manpage "che": want <name>.<section>'
+  - name: ShouldRejectNonNumericSection
+    input:
+      args: [che.conf]
+    expected:
+      errorOutput: 'manpage "che.conf": section must start with a digit'
+  - name: ShouldRejectTrailingDot
+    input:
+      args: [che.]
+    expected:
+      errorOutput: 'manpage "che.": want <name>.<section>'
+# [<] 🤖🤖

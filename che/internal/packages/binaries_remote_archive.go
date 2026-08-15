@@ -154,6 +154,9 @@ func (in *Installer) installMembers(pkg, asset, version, arch string, b *Binarie
 		return err
 	}
 	if !isArchive(asset) {
+		if len(b.ExtractManpages) > 0 {
+			return fmt.Errorf("%s: extractManpages requires an archive asset: %s", pkg, asset)
+		}
 		return installFile(asset, filepath.Join(binDir, pkg), 0o755)
 	}
 	opt := in.resolveOptDir(pkg)
@@ -171,7 +174,7 @@ func (in *Installer) installMembers(pkg, asset, version, arch string, b *Binarie
 			return err
 		}
 	}
-	return nil
+	return in.installManpageMembers(pkg, opt, version, arch, b)
 }
 
 func isArchive(asset string) bool {

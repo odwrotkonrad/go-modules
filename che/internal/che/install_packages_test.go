@@ -3,12 +3,14 @@ package che
 // [>] 🤖🤖
 
 import (
+	"errors"
 	"os"
 	"path/filepath"
 	"testing"
 
 	"github.com/stretchr/testify/require"
 
+	"gitlab.com/konradodwrot/go-modules/che/internal/fetchx"
 	"gitlab.com/konradodwrot/go-modules/che/internal/options"
 	"gitlab.com/konradodwrot/go-modules/che/internal/packages"
 	"gitlab.com/konradodwrot/go-modules/lib/testyml"
@@ -69,6 +71,21 @@ func TestLoadPackagesFileFallsBackToBuiltinWithoutCache(t *testing.T) {
 	_, path, err := loadPackagesFile(env, home, options.Options{})
 	require.NoError(t, err)
 	require.Equal(t, packages.BuiltinPath, path)
+}
+
+func TestNewPackagesInstallerUpdateCheckFailureErrorsInDryRun(t *testing.T) {
+	home, cacheHome := t.TempDir(), t.TempDir()
+	env := map[string]string{"XDG_CONFIG_HOME": filepath.Join(home, ".config"), "CHE_CACHE_HOME": cacheHome, "CHE_PACKAGES_UPDATE_URL": "http://stub"}
+	fetchx.Swap(t, &fetchx.Mock{Err: errors.New("registry down")})
+	opts := options.Options{PackagesUpdateCheckEnabled: true, PackagesUpdateCheckCooldown: "15m"}
+
+	opts.DryRun = options.DryRun.All
+	_, err := NewPackagesInstaller(env, home, opts)
+	require.ErrorContains(t, err, "packages definitions update failed")
+
+	opts.DryRun = options.DryRun.Off
+	_, err = NewPackagesInstaller(env, home, opts)
+	require.NoError(t, err)
 }
 
 func TestResolvePackagesFile(t *testing.T) {
