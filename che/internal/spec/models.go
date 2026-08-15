@@ -417,18 +417,18 @@ type globPerm struct {
 }
 
 type mergedInclude struct {
-	linkGlobs      globSet
-	copyGlobs      globSet
-	tmplGlobs      globSet
-	explicitLinks  []FileItem
-	explicitCopies []FileItem
-	explicitTmpls  []FileItem
-	dirs           []FileItem
-	packages       []PackageRef
-	toolPackages   map[string][]ToolPackageRef
-	scripts        []string
-	refs           []ProfileSourceRecipe
-	exclude        excludeSet
+	linkGlobs         globSet
+	copyGlobs         globSet
+	templateGlobs     globSet
+	explicitLinks     []FileItem
+	explicitCopies    []FileItem
+	explicitTemplates []FileItem
+	dirs              []FileItem
+	packages          []PackageRef
+	toolPackages      map[string][]ToolPackageRef
+	scripts           []string
+	refs              []ProfileSourceRecipe
+	exclude           excludeSet
 }
 
 // [<] 🤖🤖

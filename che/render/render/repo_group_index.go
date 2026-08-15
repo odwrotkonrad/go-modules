@@ -135,16 +135,16 @@ func scanGroup(dir string) (groupNode, error) {
 		return groupNode{}, err
 	}
 	var node groupNode
-	for _, e := range entries {
-		if !e.IsDir() {
+	for _, entry := range entries {
+		if !entry.IsDir() {
 			continue
 		}
-		child := filepath.Join(dir, e.Name())
+		child := filepath.Join(dir, entry.Name())
 		switch {
 		case isRepoDir(child):
-			node.childRepos = append(node.childRepos, e.Name())
+			node.childRepos = append(node.childRepos, entry.Name())
 		case containsRepo(child):
-			node.childSubgroups = append(node.childSubgroups, e.Name())
+			node.childSubgroups = append(node.childSubgroups, entry.Name())
 		}
 	}
 	slices.Sort(node.childRepos)

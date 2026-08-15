@@ -17,20 +17,20 @@ import (
 
 const repoFileMode = 0o660
 
-type tmplDest struct {
+type templateDest struct {
 	path   string
 	host   bool
 	opts   render.Options
 	header string
 }
 
-type tmplItem struct {
+type templateItem struct {
 	item  spec.FileItem
-	dests []tmplDest
+	dests []templateDest
 }
 
 func (p *ProfileReady) renderTemplates(templates []spec.FileItem, skipSecrets bool) error {
-	var keep []tmplItem
+	var keep []templateItem
 	var hostDests []string
 	for _, item := range templates {
 		dests := p.resolveTemplateDests(item)
@@ -40,7 +40,7 @@ func (p *ProfileReady) renderTemplates(templates []spec.FileItem, skipSecrets bo
 			}
 			continue
 		}
-		keep = append(keep, tmplItem{item, dests})
+		keep = append(keep, templateItem{item, dests})
 		for _, d := range dests {
 			if d.host {
 				hostDests = append(hostDests, d.path)
@@ -54,9 +54,9 @@ func (p *ProfileReady) renderTemplates(templates []spec.FileItem, skipSecrets bo
 	}
 	var errs []error
 	if p.isDryRun() { // [why] dry-run predicts via the mock-render cache: no real render, no secret resolve
-		for _, t := range keep {
-			settledMap := p.renderSettled(t.item)
-			for _, d := range t.dests {
+		for _, tpl := range keep {
+			settledMap := p.renderSettled(tpl.item)
+			for _, d := range tpl.dests {
 				settled := settledMap[d.path]
 				switch {
 				case settled && p.isDryRunAll():
@@ -66,7 +66,7 @@ func (p *ProfileReady) renderTemplates(templates []spec.FileItem, skipSecrets bo
 					p.emitDryRun("render-templates", p.wouldAction(d.path), d.path)
 				}
 				if d.host {
-					if err := p.fixPerms("render-templates", d.path, t.item); err != nil {
+					if err := p.fixPerms("render-templates", d.path, tpl.item); err != nil {
 						errs = append(errs, p.failItem("render-templates", d.path, err))
 					}
 				}
@@ -74,9 +74,9 @@ func (p *ProfileReady) renderTemplates(templates []spec.FileItem, skipSecrets bo
 		}
 		return errors.Join(errs...)
 	}
-	for _, t := range keep {
-		if err := p.renderTemplate(t.item, t.dests); err != nil {
-			errs = append(errs, p.failItem("render-templates", t.item.Rel, err))
+	for _, tpl := range keep {
+		if err := p.renderTemplate(tpl.item, tpl.dests); err != nil {
+			errs = append(errs, p.failItem("render-templates", tpl.item.Rel, err))
 		}
 	}
 	errs = append(errs, p.sweepStale("render", hostDests)) // [why] host dests only: repo-doc renders are git-tracked, never swept
@@ -135,25 +135,25 @@ func (p *ProfileReady) isSecretRefInItem(item spec.FileItem) bool {
 	return render.IsSecretRefPresent(src)
 }
 
-func (p *ProfileReady) resolveTemplateDests(item spec.FileItem) []tmplDest {
+func (p *ProfileReady) resolveTemplateDests(item spec.FileItem) []templateDest {
 	if len(item.Dests) == 0 {
-		return []tmplDest{{path: p.toDest(spec.TrimTmplExt(item.Rel)), host: true}}
+		return []templateDest{{path: p.toDest(spec.TrimTemplateExt(item.Rel)), host: true}}
 	}
 	if item.Derived {
-		return []tmplDest{{path: p.toDest(item.Dests[0].Path), host: true}}
+		return []templateDest{{path: p.toDest(item.Dests[0].Path), host: true}}
 	}
-	out := make([]tmplDest, len(item.Dests))
+	out := make([]templateDest, len(item.Dests))
 	for i, d := range item.Dests {
 		if rest, ok := strings.CutPrefix(d.Path, "${invokingSpecGitRoot}/"); ok {
-			out[i] = tmplDest{path: filepath.Join(p.expandEnv("${invokingSpecGitRoot}"), rest), opts: d.Options, header: rest}
+			out[i] = templateDest{path: filepath.Join(p.expandEnv("${invokingSpecGitRoot}"), rest), opts: d.Options, header: rest}
 			continue
 		}
 		// [why] expand env / ~ before the host-vs-repo decision so $HOME/... and ~/... land on the host
 		path := p.expandHome(d.Path)
 		if strings.HasPrefix(path, "/") {
-			out[i] = tmplDest{path: path, host: true, opts: d.Options, header: path}
+			out[i] = templateDest{path: path, host: true, opts: d.Options, header: path}
 		} else {
-			out[i] = tmplDest{path: filepath.Join(p.templateAnchor(item), path), opts: d.Options, header: d.Path}
+			out[i] = templateDest{path: filepath.Join(p.templateAnchor(item), path), opts: d.Options, header: d.Path}
 		}
 	}
 	return out
@@ -167,21 +167,21 @@ func (p *ProfileReady) readTemplateSrc(item spec.FileItem) ([]byte, string, erro
 		}
 		return []byte(content), item.Rel, nil
 	}
-	tmplPath := p.templateSrcPath(item)
-	src, err := os.ReadFile(tmplPath)
-	return src, tmplPath, err
+	templatePath := p.templateSrcPath(item)
+	src, err := os.ReadFile(templatePath)
+	return src, templatePath, err
 }
 
-func (p *ProfileReady) renderTemplate(item spec.FileItem, dests []tmplDest) error {
-	src, tmplPath, err := p.readTemplateSrc(item)
+func (p *ProfileReady) renderTemplate(item spec.FileItem, dests []templateDest) error {
+	src, templatePath, err := p.readTemplateSrc(item)
 	if err != nil {
 		return err
 	}
-	body, err := render.ExecWithCtx(tmplPath, src, p.templateAnchor(item), p.mergedCtx(item.Ctx))
+	body, err := render.ExecWithCtx(templatePath, src, p.templateAnchor(item), p.mergedCtx(item.Ctx))
 	if err != nil {
 		return err
 	}
-	p.storeRenderHashes(item, dests, tmplPath, src, body)
+	p.storeRenderHashes(item, dests, templatePath, src, body)
 	if len(item.Dests) == 0 || item.Derived {
 		return p.placeFile(dests[0].path, body, item)
 	}
@@ -209,7 +209,7 @@ func (p *ProfileReady) renderTemplate(item spec.FileItem, dests []tmplDest) erro
 	return nil
 }
 
-func (p *ProfileReady) composeDest(item spec.FileItem, d tmplDest, body []byte) []byte {
+func (p *ProfileReady) composeDest(item spec.FileItem, d templateDest, body []byte) []byte {
 	if len(item.Dests) == 0 || item.Derived {
 		return body
 	}
@@ -224,7 +224,7 @@ func (p *ProfileReady) composeDest(item spec.FileItem, d tmplDest, body []byte) 
 	})
 }
 
-func (p *ProfileReady) readExistingDest(d tmplDest) ([]byte, error) {
+func (p *ProfileReady) readExistingDest(d templateDest) ([]byte, error) {
 	if d.host {
 		return p.Reader.ReadFileBytes(d.path)
 	}

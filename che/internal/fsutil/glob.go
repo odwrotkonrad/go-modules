@@ -63,10 +63,10 @@ func splitTopLevel(body string) []string {
 	return append(parts, body[start:])
 }
 
-func ExpandAll(xs []string) []string {
+func ExpandAll(patterns []string) []string {
 	var out []string
-	for _, x := range xs {
-		out = append(out, ExpandBraces(x)...)
+	for _, pattern := range patterns {
+		out = append(out, ExpandBraces(pattern)...)
 	}
 	return out
 }

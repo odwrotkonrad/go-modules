@@ -16,7 +16,7 @@ type Fetcher interface {
 	Fetch(url string) ([]byte, error)
 }
 
-var Default Fetcher = Real{}
+var Default Fetcher = HTTP{}
 
 var (
 	Retries    = 10
@@ -31,7 +31,7 @@ var client = &http.Client{
 	},
 }
 
-type Real struct{}
+type HTTP struct{}
 
 func get(url string) (*http.Response, error) {
 	var lastErr error
@@ -57,7 +57,7 @@ func get(url string) (*http.Response, error) {
 	return nil, fmt.Errorf("GET %s failed after %d attempts: %w", url, Retries+1, lastErr)
 }
 
-func (Real) Download(url, dest string) error {
+func (HTTP) Download(url, dest string) error {
 	resp, err := get(url)
 	if err != nil {
 		return err
@@ -75,7 +75,7 @@ func (Real) Download(url, dest string) error {
 	return f.Close()
 }
 
-func (Real) Fetch(url string) ([]byte, error) {
+func (HTTP) Fetch(url string) ([]byte, error) {
 	resp, err := get(url)
 	if err != nil {
 		return nil, err

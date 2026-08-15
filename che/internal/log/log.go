@@ -31,8 +31,8 @@ func (l Level) String() string {
 }
 
 func ParseLevel(s string) (Level, error) {
-	for i, n := range levelNames {
-		if s == n {
+	for i, name := range levelNames {
+		if s == name {
 			return Level(i), nil
 		}
 	}
@@ -41,17 +41,17 @@ func ParseLevel(s string) (Level, error) {
 
 var current = Levels.Info
 
-func SetLevel(l Level) { current = l }
+func SetLevel(level Level) { current = level }
 
 func GetLevel() Level { return current }
 
-func SwapLevel(l Level) func() {
+func SwapLevel(level Level) func() {
 	prev := current
-	current = l
+	current = level
 	return func() { current = prev }
 }
 
-func IsEnabled(l Level) bool { return l <= current }
+func IsEnabled(level Level) bool { return level <= current }
 
 // [<] 🤖🤖 levels
 
@@ -97,19 +97,19 @@ func renderHuman(e Event) string {
 	case e.Action != "":
 		line = bold(displayAction(e.Action)) + " " + e.Msg
 	}
-	pad := strings.Repeat("  ", e.Depth)
-	var b strings.Builder
-	for l := range strings.SplitSeq(line, "\n") {
-		b.WriteString(prefix)
-		b.WriteString(pad)
-		b.WriteString(l)
-		b.WriteString("\n")
+	indent := strings.Repeat("  ", e.Depth)
+	var out strings.Builder
+	for wrapped := range strings.SplitSeq(line, "\n") {
+		out.WriteString(prefix)
+		out.WriteString(indent)
+		out.WriteString(wrapped)
+		out.WriteString("\n")
 	}
-	return b.String()
+	return out.String()
 }
 
-func levelPrefix(l Level) string {
-	switch l {
+func levelPrefix(level Level) string {
+	switch level {
 	case Levels.Error:
 		return "[error] "
 	case Levels.Warn:
@@ -123,7 +123,7 @@ func levelPrefix(l Level) string {
 	}
 }
 
-func displayAction(a string) string { return strings.ReplaceAll(a, "-", " ") }
+func displayAction(action string) string { return strings.ReplaceAll(action, "-", " ") }
 
 // [<] 🤖🤖 events
 
@@ -161,14 +161,14 @@ func EmitHeading(level Level, heading int, scope, action, msg string) {
 
 // [>] 🤖🤖 structural
 
-func PrintHeading(l Level, text string) {
-	if IsEnabled(l) {
+func PrintHeading(level Level, text string) {
+	if IsEnabled(level) {
 		fmt.Println(bold(text))
 	}
 }
 
-func PrintItem(l Level, indent int, text string) {
-	if IsEnabled(l) {
+func PrintItem(level Level, indent int, text string) {
+	if IsEnabled(level) {
 		fmt.Println(strings.Repeat("  ", indent) + text)
 	}
 }

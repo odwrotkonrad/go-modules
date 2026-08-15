@@ -13,11 +13,11 @@ func IsUnder(path, root string) bool {
 	return path == root || strings.HasPrefix(path, root+"/")
 }
 
-func ExpandHome(p, home string) string {
-	if rest, ok := strings.CutPrefix(p, "~/"); ok {
+func ExpandHome(path, home string) string {
+	if rest, ok := strings.CutPrefix(path, "~/"); ok {
 		return filepath.Join(home, rest)
 	}
-	return p
+	return path
 }
 
 func AbbreviateHome(path, home string) string {

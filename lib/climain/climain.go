@@ -11,36 +11,32 @@ import (
 	"gitlab.com/konradodwrot/go-modules/lib/yamlcfg"
 )
 
-func Run(name, version, usage string, run func(args []string) (string, error)) {
-	RunNamed(name, version, usage, func(args []string) (string, error) {
+func RunLine(name, version, usage string, run func(args []string) (string, error)) {
+	Run(name, version, usage, func(args []string) (string, error) {
 		out, err := run(args)
 		return out + "\n", err
 	})
 }
 
-func RunNamed(name, version, usage string, run func(args []string) (string, error)) {
+func Run(name, version, usage string, run func(args []string) (string, error)) {
 	usage = strings.TrimSuffix(usage, "\n")
 	if out, done := HelpVersion(os.Args[1:], usage, name, resolveVersion(version)); done {
 		Exit(out, nil)
 	}
-	RunRaw(run)
-}
-
-func RunRaw(run func(args []string) (string, error)) {
 	out, err := run(os.Args[1:])
-	if err == nil {
-		fmt.Print(out)
-		os.Exit(0)
+	if err != nil {
+		Exit("", err)
 	}
-	Exit("", err)
+	fmt.Print(out)
+	os.Exit(0)
 }
 
 func resolveVersion(version string) string {
 	if version != "" && version != "dev" {
 		return version
 	}
-	if bi, ok := debug.ReadBuildInfo(); ok && bi.Main.Version != "" {
-		return bi.Main.Version
+	if info, ok := debug.ReadBuildInfo(); ok && info.Main.Version != "" {
+		return info.Main.Version
 	}
 	return version
 }

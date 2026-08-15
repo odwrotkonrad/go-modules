@@ -106,9 +106,9 @@ func setupMock(t *testing.T, pwd, profile string, decl map[string]string, env ma
 		testyml.Swap(t, &che.NewPackagesHost, PackagesMockHost)
 		mockPackagesFetch(t, home)
 	}
-	realSeams := che.NewSeams
-	testyml.Swap(t, &che.NewSeams, func(home string) che.Seams {
-		s := realSeams(home)
+	realDeps := che.NewDeps
+	testyml.Swap(t, &che.NewDeps, func(home string) che.Deps {
+		s := realDeps(home)
 		s.FS = m.FS
 		s.Reader = &testutil.FileSystemMockReader{Roots: []string{a.flags.CheWorkingDirectory, home}}
 		s.Ledger = nil

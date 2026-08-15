@@ -21,8 +21,8 @@ func applyRules(order []string, aliases map[string]string, rules []OpenerRule, e
 		if rule.Opener == "" {
 			continue
 		}
-		for _, kind := range rule.Types {
-			for _, ext := range extsByType[kind] {
+		for _, langType := range rule.Types {
+			for _, ext := range extsByType[langType] {
 				if _, seen := aliases[ext]; !seen {
 					order = append(order, ext)
 				}

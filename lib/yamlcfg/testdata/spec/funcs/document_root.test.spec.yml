@@ -1,6 +1,6 @@
 # [>] 🤖🤖
 context:
-  function: yamlcfg.Unwrap
+  function: yamlcfg.DocumentRoot
 cases:
   - name: ShouldReturnSameNonDocumentNode
     input:

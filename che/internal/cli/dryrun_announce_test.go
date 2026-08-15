@@ -24,9 +24,9 @@ func TestDryRunAnnounce(t *testing.T) {
 			}
 			a.flags.Profiles = []string{testutil.CheProfile}
 			m := testutil.ApplyMocks(t, c.Context.MockedInterfaces)
-			realSeams := che.NewSeams
-			testyml.Swap(t, &che.NewSeams, func(home string) che.Seams {
-				s := realSeams(home)
+			realDeps := che.NewDeps
+			testyml.Swap(t, &che.NewDeps, func(home string) che.Deps {
+				s := realDeps(home)
 				s.FS = m.FS
 				s.Reader = &testutil.FileSystemMockReader{Roots: []string{a.flags.CheWorkingDirectory, home}}
 				s.Ledger = nil

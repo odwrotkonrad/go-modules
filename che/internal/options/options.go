@@ -61,32 +61,35 @@ func FormatSettings(settings []Setting) string {
 	return strings.Join(parts, ", ")
 }
 
-type cand struct {
-	val string
-	set bool
-	src string
+type candidate struct {
+	value    string
+	provided bool
+	source   string
 }
 
-func flagStr(v string) cand    { return cand{v, v != "", "cliFlag"} }
-func envStr(v string) cand     { return cand{v, v != "", "env"} }
-func layer(v, src string) cand { return cand{v, v != "", src} }
+func fromFlag(value string) candidate { return candidate{value, value != "", "cliFlag"} }
+func fromEnv(value string) candidate  { return candidate{value, value != "", "env"} }
 
-func layerList(v []string, src string) cand {
-	return cand{strings.Join(v, ","), len(v) > 0, src}
+func fromLayer(value, source string) candidate {
+	return candidate{value, value != "", source}
 }
 
-func firstSet(candidates ...cand) (val, src string) {
-	for _, cd := range candidates {
-		if cd.set {
-			return cd.val, cd.src
+func fromLayerList(values []string, source string) candidate {
+	return candidate{strings.Join(values, ","), len(values) > 0, source}
+}
+
+func firstProvided(candidates ...candidate) (value, source string) {
+	for _, c := range candidates {
+		if c.provided {
+			return c.value, c.source
 		}
 	}
 	return "", ""
 }
 
-type boolLayer struct {
-	val *bool
-	src string
+type boolCandidate struct {
+	value  *bool
+	source string
 }
 
 func parseBoolWord(s string) bool {
@@ -101,23 +104,23 @@ func (o *Options) record(key, value, source string) {
 	o.Settings = append(o.Settings, Setting{Key: key, Value: value, Source: source})
 }
 
-func (o *Options) resolveStr(key, def string, candidates ...cand) string {
-	if val, src := firstSet(candidates...); src != "" {
-		o.record(key, val, src)
-		return val
+func (o *Options) resolveStr(key, def string, candidates ...candidate) string {
+	if value, source := firstProvided(candidates...); source != "" {
+		o.record(key, value, source)
+		return value
 	}
 	o.record(key, def, "default")
 	return def
 }
 
-func (o *Options) resolveList(key string, candidates ...cand) []string {
-	v := o.resolveStr(key, "", candidates...)
+func (o *Options) resolveList(key string, candidates ...candidate) []string {
+	joined := o.resolveStr(key, "", candidates...)
 	o.setKind(key, "list")
-	if v == "" {
+	if joined == "" {
 		o.fillDefault(key, "[]")
 		return nil
 	}
-	return strings.Split(v, ",")
+	return strings.Split(joined, ",")
 }
 
 func (o *Options) updateSetting(key string, fn func(*Setting)) {
@@ -146,30 +149,30 @@ func (o *Options) fillDefault(key, value string) {
 
 func (o *Options) FillDefaultSetting(key, value string) { o.fillDefault(key, value) }
 
-func (o *Options) resolveBool(key string, flagVal bool, envVal string, def bool, layers ...boolLayer) bool {
-	v, src := def, "default"
+func (o *Options) resolveBool(key string, flagVal bool, envVal string, def bool, candidates ...boolCandidate) bool {
+	value, source := def, "default"
 	switch {
 	case flagVal:
-		v, src = true, "cliFlag"
+		value, source = true, "cliFlag"
 	case envVal != "":
-		v, src = parseBoolWord(envVal), "env"
+		value, source = parseBoolWord(envVal), "env"
 	default:
-		for _, l := range layers {
-			if l.val != nil {
-				v, src = *l.val, l.src
+		for _, c := range candidates {
+			if c.value != nil {
+				value, source = *c.value, c.source
 				break
 			}
 		}
 	}
-	o.record(key, strconv.FormatBool(v), src)
+	o.record(key, strconv.FormatBool(value), source)
 	o.setKind(key, "bool")
-	return v
+	return value
 }
 
 func (o *Options) Resolve(env LookupEnv, user, spec Layer) error {
 	o.Settings = nil
 	o.DryRun = DryRunMode(o.resolveStr("dryRun", "",
-		flagStr(string(o.DryRun)), envStr(env("CHE_DRY_RUN")), layer(string(user.DryRun), "config-file"), layer(string(spec.DryRun), "specFile")))
+		fromFlag(string(o.DryRun)), fromEnv(env("CHE_DRY_RUN")), fromLayer(string(user.DryRun), "config-file"), fromLayer(string(spec.DryRun), "specFile")))
 	o.fillDefault("dryRun", "false")
 	o.setKind("dryRun", "dryRun")
 	if o.DryRun == "true" {
@@ -185,7 +188,7 @@ func (o *Options) Resolve(env LookupEnv, user, spec Layer) error {
 	default:
 		return fmt.Errorf("invalid --dry-run mode %q: want delta, all, or true (alias for delta)", o.DryRun)
 	}
-	override, overrideSrc := firstSet(flagStr(string(o.ValidateSpec)), envStr(env("CHE_VALIDATE_SPEC")), layer(user.ValidateSpec, "config-file"))
+	override, overrideSrc := firstProvided(fromFlag(string(o.ValidateSpec)), fromEnv(env("CHE_VALIDATE_SPEC")), fromLayer(user.ValidateSpec, "config-file"))
 	o.ValidateSpecCLI = ValidateSpecMode(override)
 	o.ValidateSpec = ValidateSpecMode(cmp.Or(override, spec.ValidateSpec, string(ValidateSpec.Warn)))
 	switch {
@@ -202,15 +205,15 @@ func (o *Options) Resolve(env LookupEnv, user, spec Layer) error {
 		return fmt.Errorf("invalid --validate-spec mode %q: want warn or error", o.ValidateSpec)
 	}
 	o.CheWorkingDirectory = o.resolveStr("cheWorkingDirectory", "",
-		flagStr(o.CheWorkingDirectory), envStr(env("CHE_WORKING_DIRECTORY")))
+		fromFlag(o.CheWorkingDirectory), fromEnv(env("CHE_WORKING_DIRECTORY")))
 	o.ProfileWorkingDirectory = o.resolveStr("profileWorkingDirectory", "",
-		flagStr(o.ProfileWorkingDirectory), envStr(env("CHE_PROFILE_WORKING_DIRECTORY")), layer(spec.ProfileWorkingDirectory, "specFile"))
+		fromFlag(o.ProfileWorkingDirectory), fromEnv(env("CHE_PROFILE_WORKING_DIRECTORY")), fromLayer(spec.ProfileWorkingDirectory, "specFile"))
 	o.Profiles = o.resolveList("profiles",
-		layerList(o.Profiles, "cliFlag"), envStr(env("CHE_PROFILE")), layerList(user.Profiles, "config-file"), layerList(spec.Profiles, "specFile"))
+		fromLayerList(o.Profiles, "cliFlag"), fromEnv(env("CHE_PROFILE")), fromLayerList(user.Profiles, "config-file"), fromLayerList(spec.Profiles, "specFile"))
 	o.SkipOps = o.resolveList("skipOps",
-		layerList(o.SkipOps, "cliFlag"), envStr(env("CHE_SKIP_OPS")), layerList(user.SkipOps, "config-file"), layerList(spec.SkipOps, "specFile"))
+		fromLayerList(o.SkipOps, "cliFlag"), fromEnv(env("CHE_SKIP_OPS")), fromLayerList(user.SkipOps, "config-file"), fromLayerList(spec.SkipOps, "specFile"))
 	o.RunSkipOps = o.resolveList("run.skipOps",
-		layerList(o.RunSkipOps, "cliFlag"), envStr(env("CHE_RUN_SKIP_OPS")), layerList(user.Run.SkipOps, "config-file"), layerList(spec.Run.SkipOps, "specFile"))
+		fromLayerList(o.RunSkipOps, "cliFlag"), fromEnv(env("CHE_RUN_SKIP_OPS")), fromLayerList(user.Run.SkipOps, "config-file"), fromLayerList(spec.Run.SkipOps, "specFile"))
 	for _, name := range slices.Concat(o.SkipOps, o.RunSkipOps) {
 		if !slices.Contains(OpNames, name) {
 			return fmt.Errorf("invalid skip-ops op %q: want one of %s", name, strings.Join(OpNames, ", "))
@@ -219,9 +222,9 @@ func (o *Options) Resolve(env LookupEnv, user, spec Layer) error {
 	o.SkipRunIf = o.resolveBool("skipRunIf", o.SkipRunIf, env("CHE_SKIP_RUN_IF"), false)
 	o.Errexit = o.resolveBool("errexit", o.Errexit, env("CHE_ERREXIT"), false)
 	o.SkipRemoteRefs = o.resolveBool("skipRemoteRefs", o.SkipRemoteRefs, env("CHE_SKIP_REMOTE_REFS"), false,
-		boolLayer{user.SkipRemoteRefs, "config-file"}, boolLayer{spec.SkipRemoteRefs, "specFile"})
+		boolCandidate{user.SkipRemoteRefs, "config-file"}, boolCandidate{spec.SkipRemoteRefs, "specFile"})
 	o.LogLevel = o.resolveStr("logLevel", "info",
-		flagStr(o.LogLevel), envStr(env("CHE_LOG_LEVEL")), layer(user.LogLevel, "config-file"), layer(spec.LogLevel, "specFile"))
+		fromFlag(o.LogLevel), fromEnv(env("CHE_LOG_LEVEL")), fromLayer(user.LogLevel, "config-file"), fromLayer(spec.LogLevel, "specFile"))
 	if _, err := log.ParseLevel(o.LogLevel); err != nil {
 		return fmt.Errorf("--log-level: %w", err)
 	}
@@ -230,7 +233,7 @@ func (o *Options) Resolve(env LookupEnv, user, spec Layer) error {
 		silenceDefault = "false"
 	}
 	o.PackagesSilenceInstallStdout = o.resolveStr("packages.silenceInstallStdout", silenceDefault,
-		flagStr(o.PackagesSilenceInstallStdout), envStr(env("CHE_PACKAGES_SILENCE_INSTALL_STDOUT")))
+		fromFlag(o.PackagesSilenceInstallStdout), fromEnv(env("CHE_PACKAGES_SILENCE_INSTALL_STDOUT")))
 	o.setKind("packages.silenceInstallStdout", "bool")
 	switch o.PackagesSilenceInstallStdout {
 	case "true", "false":
@@ -238,15 +241,15 @@ func (o *Options) Resolve(env LookupEnv, user, spec Layer) error {
 		return fmt.Errorf("invalid --silence-install-stdout %q: want true or false", o.PackagesSilenceInstallStdout)
 	}
 	o.RenderSkipSecrets = o.resolveBool("renderTemplates.skipSecrets", o.RenderSkipSecrets, env("CHE_RENDER_TEMPLATES_SKIP_SECRETS"), false,
-		boolLayer{user.RenderTemplates.SkipSecrets, "config-file"}, boolLayer{spec.RenderTemplates.SkipSecrets, "specFile"})
+		boolCandidate{user.RenderTemplates.SkipSecrets, "config-file"}, boolCandidate{spec.RenderTemplates.SkipSecrets, "specFile"})
 	o.PackagesFile = o.resolveStr("packages.file", "",
-		flagStr(o.PackagesFile), envStr(env("CHE_PACKAGES_FILE")), layer(user.Packages.File, "config-file"), layer(spec.Packages.File, "specFile"))
+		fromFlag(o.PackagesFile), fromEnv(env("CHE_PACKAGES_FILE")), fromLayer(user.Packages.File, "config-file"), fromLayer(spec.Packages.File, "specFile"))
 	o.fillDefault("packages.file", packages.BuiltinSentinel)
 	o.PackagesOverride = o.resolveStr("packages.override", "",
-		flagStr(o.PackagesOverride), envStr(env("CHE_PACKAGES_OVERRIDE")))
+		fromFlag(o.PackagesOverride), fromEnv(env("CHE_PACKAGES_OVERRIDE")))
 	o.PackagesPreferredMethods = o.resolveList("packages.preferredInstallationMethods",
-		layerList(o.PackagesPreferredMethods, "cliFlag"), envStr(env("CHE_PACKAGES_PREFERRED_METHODS")),
-		layerList(user.Packages.PreferredInstallationMethods, "config-file"), layerList(spec.Packages.PreferredInstallationMethods, "specFile"))
+		fromLayerList(o.PackagesPreferredMethods, "cliFlag"), fromEnv(env("CHE_PACKAGES_PREFERRED_METHODS")),
+		fromLayerList(user.Packages.PreferredInstallationMethods, "config-file"), fromLayerList(spec.Packages.PreferredInstallationMethods, "specFile"))
 	if err := packages.ValidateManagers(o.PackagesPreferredMethods); err != nil {
 		return err
 	}
@@ -255,73 +258,73 @@ func (o *Options) Resolve(env LookupEnv, user, spec Layer) error {
 		o.setValue("packages.preferredInstallationMethods", "["+strings.Join(packages.DefaultPreferredMethods, ", ")+"]")
 	}
 	o.PackagesOnlyMethods = o.resolveList("packages.onlyInstallationMethods",
-		layerList(o.PackagesOnlyMethods, "cliFlag"), envStr(env("CHE_PACKAGES_ONLY_METHODS")))
+		fromLayerList(o.PackagesOnlyMethods, "cliFlag"), fromEnv(env("CHE_PACKAGES_ONLY_METHODS")))
 	if err := packages.ValidateManagers(o.PackagesOnlyMethods); err != nil {
 		return err
 	}
 	o.PackagesUpdateCheckEnabled = o.resolveBool("packages.updateCheck.enabled", false, env("CHE_PACKAGES_UPDATE_CHECK"), false,
-		boolLayer{user.Packages.UpdateCheck.Enabled, "config-file"}, boolLayer{spec.Packages.UpdateCheck.Enabled, "specFile"})
+		boolCandidate{user.Packages.UpdateCheck.Enabled, "config-file"}, boolCandidate{spec.Packages.UpdateCheck.Enabled, "specFile"})
 	o.PackagesUpdateCheckCooldown = o.resolveStr("packages.updateCheck.cooldown", "15m",
-		envStr(env("CHE_PACKAGES_UPDATE_CHECK_COOLDOWN")), layer(user.Packages.UpdateCheck.Cooldown, "config-file"), layer(spec.Packages.UpdateCheck.Cooldown, "specFile"))
+		fromEnv(env("CHE_PACKAGES_UPDATE_CHECK_COOLDOWN")), fromLayer(user.Packages.UpdateCheck.Cooldown, "config-file"), fromLayer(spec.Packages.UpdateCheck.Cooldown, "specFile"))
 	if _, err := time.ParseDuration(o.PackagesUpdateCheckCooldown); err != nil {
 		return fmt.Errorf("invalid packages.updateCheck.cooldown %q: want a Go duration (15m, 1h)", o.PackagesUpdateCheckCooldown)
 	}
 	o.PackagesDownloadCacheDir = o.resolveStr("packages.downloadCacheDir", "",
-		flagStr(o.PackagesDownloadCacheDir), envStr(env("CHE_PACKAGES_DOWNLOAD_CACHE_DIR")))
+		fromFlag(o.PackagesDownloadCacheDir), fromEnv(env("CHE_PACKAGES_DOWNLOAD_CACHE_DIR")))
 	o.PackagesBinariesRemoteArchiveDestinationCandidates = o.resolveList("packages.binariesRemoteArchive.installDestinationCandidates",
-		layerList(o.PackagesBinariesRemoteArchiveDestinationCandidates, "cliFlag"), envStr(env("CHE_PACKAGES_BINARIES_REMOTE_ARCHIVE_INSTALL_DESTINATION_CANDIDATES")),
-		layerList(user.Packages.BinariesRemoteArchive.InstallDestinationCandidates, "config-file"), layerList(spec.Packages.BinariesRemoteArchive.InstallDestinationCandidates, "specFile"))
+		fromLayerList(o.PackagesBinariesRemoteArchiveDestinationCandidates, "cliFlag"), fromEnv(env("CHE_PACKAGES_BINARIES_REMOTE_ARCHIVE_INSTALL_DESTINATION_CANDIDATES")),
+		fromLayerList(user.Packages.BinariesRemoteArchive.InstallDestinationCandidates, "config-file"), fromLayerList(spec.Packages.BinariesRemoteArchive.InstallDestinationCandidates, "specFile"))
 	if len(o.PackagesBinariesRemoteArchiveDestinationCandidates) == 0 {
 		o.PackagesBinariesRemoteArchiveDestinationCandidates = packages.DefaultBinariesRemoteArchiveDestinationCandidates
 		o.setValue("packages.binariesRemoteArchive.installDestinationCandidates", "["+strings.Join(packages.DefaultBinariesRemoteArchiveDestinationCandidates, ", ")+"]")
 	}
 	o.PackagesBinariesRemoteArchiveCheckPresentOnPath = o.resolveBool("packages.binariesRemoteArchive.checkPresentOnPath", false, env("CHE_PACKAGES_BINARIES_REMOTE_ARCHIVE_CHECK_PRESENT_ON_PATH"), true,
-		boolLayer{user.Packages.BinariesRemoteArchive.CheckPresentOnPath, "config-file"}, boolLayer{spec.Packages.BinariesRemoteArchive.CheckPresentOnPath, "specFile"})
+		boolCandidate{user.Packages.BinariesRemoteArchive.CheckPresentOnPath, "config-file"}, boolCandidate{spec.Packages.BinariesRemoteArchive.CheckPresentOnPath, "specFile"})
 	o.PackagesCompletionsEnabled = o.resolveBool("packages.completions.zsh.enabled", false, env("CHE_PACKAGES_COMPLETIONS_ZSH_ENABLED"), false,
-		boolLayer{user.Packages.Completions.Zsh.Enabled, "config-file"}, boolLayer{spec.Packages.Completions.Zsh.Enabled, "specFile"})
+		boolCandidate{user.Packages.Completions.Zsh.Enabled, "config-file"}, boolCandidate{spec.Packages.Completions.Zsh.Enabled, "specFile"})
 	o.PackagesCompletionsDestinationCandidates = o.resolveList("packages.completions.zsh.installDestinationCandidates",
-		envStr(env("CHE_PACKAGES_COMPLETIONS_ZSH_INSTALL_DESTINATION_CANDIDATES")),
-		layerList(user.Packages.Completions.Zsh.InstallDestinationCandidates, "config-file"),
-		layerList(spec.Packages.Completions.Zsh.InstallDestinationCandidates, "specFile"))
+		fromEnv(env("CHE_PACKAGES_COMPLETIONS_ZSH_INSTALL_DESTINATION_CANDIDATES")),
+		fromLayerList(user.Packages.Completions.Zsh.InstallDestinationCandidates, "config-file"),
+		fromLayerList(spec.Packages.Completions.Zsh.InstallDestinationCandidates, "specFile"))
 	if len(o.PackagesCompletionsDestinationCandidates) == 0 {
 		o.PackagesCompletionsDestinationCandidates = packages.DefaultCompletionsDestinationCandidates
 		o.setValue("packages.completions.zsh.installDestinationCandidates", "["+strings.Join(packages.DefaultCompletionsDestinationCandidates, ", ")+"]")
 	}
 	o.PackagesCompletionsCheckPresentOnFpath = o.resolveBool("packages.completions.zsh.checkPresentOnFpath", false, env("CHE_PACKAGES_COMPLETIONS_ZSH_CHECK_PRESENT_ON_FPATH"), true,
-		boolLayer{user.Packages.Completions.Zsh.CheckPresentOnFpath, "config-file"}, boolLayer{spec.Packages.Completions.Zsh.CheckPresentOnFpath, "specFile"})
+		boolCandidate{user.Packages.Completions.Zsh.CheckPresentOnFpath, "config-file"}, boolCandidate{spec.Packages.Completions.Zsh.CheckPresentOnFpath, "specFile"})
 	o.PackagesManpagesDestinationCandidates = o.resolveList("packages.manpages.installDestinationCandidates",
-		envStr(env("CHE_PACKAGES_MANPAGES_INSTALL_DESTINATION_CANDIDATES")),
-		layerList(user.Packages.Manpages.InstallDestinationCandidates, "config-file"),
-		layerList(spec.Packages.Manpages.InstallDestinationCandidates, "specFile"))
+		fromEnv(env("CHE_PACKAGES_MANPAGES_INSTALL_DESTINATION_CANDIDATES")),
+		fromLayerList(user.Packages.Manpages.InstallDestinationCandidates, "config-file"),
+		fromLayerList(spec.Packages.Manpages.InstallDestinationCandidates, "specFile"))
 	if len(o.PackagesManpagesDestinationCandidates) == 0 {
 		o.PackagesManpagesDestinationCandidates = packages.DefaultManpagesDestinationCandidates
 		o.setValue("packages.manpages.installDestinationCandidates", "["+strings.Join(packages.DefaultManpagesDestinationCandidates, ", ")+"]")
 	}
 	o.PackagesManpagesCheckPresentOnManpath = o.resolveBool("packages.manpages.checkPresentOnManpath", false, env("CHE_PACKAGES_MANPAGES_CHECK_PRESENT_ON_MANPATH"), true,
-		boolLayer{user.Packages.Manpages.CheckPresentOnManpath, "config-file"}, boolLayer{spec.Packages.Manpages.CheckPresentOnManpath, "specFile"})
+		boolCandidate{user.Packages.Manpages.CheckPresentOnManpath, "config-file"}, boolCandidate{spec.Packages.Manpages.CheckPresentOnManpath, "specFile"})
 	o.AutoDiscover = o.resolveBool("autoDiscover", false, env("CHE_AUTO_DISCOVER"), true,
-		boolLayer{user.AutoDiscover, "config-file"})
+		boolCandidate{user.AutoDiscover, "config-file"})
 	return o.resolveOtel(env, user, spec)
 }
 
 func (o *Options) resolveOtel(env LookupEnv, user, spec Layer) error {
 	o.Otel.Enabled = o.resolveBool("otel.enabled", false, env("CHE_OTEL_ENABLED"), false,
-		boolLayer{user.Otel.Enabled, "config-file"}, boolLayer{spec.Otel.Enabled, "specFile"})
+		boolCandidate{user.Otel.Enabled, "config-file"}, boolCandidate{spec.Otel.Enabled, "specFile"})
 	o.Otel.Protocol = o.resolveStr("otel.protocol", "grpc",
-		envStr(env("CHE_OTEL_PROTOCOL")), layer(user.Otel.Protocol, "config-file"), layer(spec.Otel.Protocol, "specFile"))
+		fromEnv(env("CHE_OTEL_PROTOCOL")), fromLayer(user.Otel.Protocol, "config-file"), fromLayer(spec.Otel.Protocol, "specFile"))
 	switch o.Otel.Protocol {
 	case "grpc", "http":
 	default:
 		return fmt.Errorf("invalid otel.protocol %q: want grpc or http", o.Otel.Protocol)
 	}
 	o.Otel.Endpoint = o.resolveStr("otel.endpoint", defaultOtelEndpoint(o.Otel.Protocol),
-		envStr(env("CHE_OTEL_ENDPOINT")), layer(user.Otel.Endpoint, "config-file"), layer(spec.Otel.Endpoint, "specFile"))
+		fromEnv(env("CHE_OTEL_ENDPOINT")), fromLayer(user.Otel.Endpoint, "config-file"), fromLayer(spec.Otel.Endpoint, "specFile"))
 	o.Otel.Metrics = o.resolveBool("otel.metrics", false, env("CHE_OTEL_METRICS"), true,
-		boolLayer{user.Otel.Metrics, "config-file"}, boolLayer{spec.Otel.Metrics, "specFile"})
+		boolCandidate{user.Otel.Metrics, "config-file"}, boolCandidate{spec.Otel.Metrics, "specFile"})
 	o.Otel.Logs = o.resolveBool("otel.logs", false, env("CHE_OTEL_LOGS"), true,
-		boolLayer{user.Otel.Logs, "config-file"}, boolLayer{spec.Otel.Logs, "specFile"})
+		boolCandidate{user.Otel.Logs, "config-file"}, boolCandidate{spec.Otel.Logs, "specFile"})
 	o.Otel.Traces = o.resolveBool("otel.traces", false, env("CHE_OTEL_TRACES"), true,
-		boolLayer{user.Otel.Traces, "config-file"}, boolLayer{spec.Otel.Traces, "specFile"})
+		boolCandidate{user.Otel.Traces, "config-file"}, boolCandidate{spec.Otel.Traces, "specFile"})
 	return nil
 }
 

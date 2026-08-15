@@ -46,11 +46,11 @@ func (p *ProfileReady) renderSettled(item spec.FileItem) map[string]bool {
 	for _, d := range dests {
 		settled[d.path] = false
 	}
-	src, tmplPath, err := p.readTemplateSrc(item)
+	src, templatePath, err := p.readTemplateSrc(item)
 	if err != nil {
 		return settled
 	}
-	body, err := render.ExecWithCtxMockSecrets(tmplPath, src, p.templateAnchor(item), p.mergedCtx(item.Ctx))
+	body, err := render.ExecWithCtxMockSecrets(templatePath, src, p.templateAnchor(item), p.mergedCtx(item.Ctx))
 	if err != nil {
 		return settled
 	}
@@ -68,10 +68,10 @@ func (p *ProfileReady) renderSettled(item spec.FileItem) map[string]bool {
 	return settled
 }
 
-func (p *ProfileReady) storeRenderHashes(item spec.FileItem, dests []tmplDest, tmplPath string, src, body []byte) {
+func (p *ProfileReady) storeRenderHashes(item spec.FileItem, dests []templateDest, templatePath string, src, body []byte) {
 	hash := hashHex(body)
 	if render.IsSecretRefPresent(src) {
-		mocked, err := render.ExecWithCtxMockSecrets(tmplPath, src, p.templateAnchor(item), p.mergedCtx(item.Ctx))
+		mocked, err := render.ExecWithCtxMockSecrets(templatePath, src, p.templateAnchor(item), p.mergedCtx(item.Ctx))
 		if err != nil {
 			return
 		}

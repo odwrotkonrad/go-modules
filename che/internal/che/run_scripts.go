@@ -66,12 +66,12 @@ func (p *ProfileReady) runScripts(scripts []string) error {
 		}
 	}
 
-	for _, r := range results {
+	for _, result := range results {
 		action := "ran"
-		if r.status == "fail" {
+		if result.status == "fail" {
 			action = "failed"
 		}
-		p.emit(log.Levels.Info, "run-scripts", action, r.script)
+		p.emit(log.Levels.Info, "run-scripts", action, result.script)
 	}
 
 	if errexitHit {

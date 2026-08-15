@@ -35,9 +35,9 @@ func makeOpRecipes(t *testing.T, dir string) spec.OperationRecipes {
 const testRunID = "00000000T000000"
 
 func newProfile(dir, home string, cfg options.Options) *ProfileReady {
-	seams := NewSeams(home)
-	specRow, _ := seams.Ledger.StartSpec(testRunID, "", "test")
-	profRow, _ := seams.Ledger.StartProfile(specRow, testutil.CheProfile, testutil.CheProfile, "", dir)
+	deps := NewDeps(home)
+	specRow, _ := deps.Ledger.StartSpec(testRunID, "", "test")
+	profRow, _ := deps.Ledger.StartProfile(specRow, testutil.CheProfile, testutil.CheProfile, "", dir)
 	return &ProfileReady{
 		Source:      spec.ProfileSourceReady{ProfileName: testutil.CheProfile},
 		ref:         testutil.CheProfile,
@@ -49,7 +49,7 @@ func newProfile(dir, home string, cfg options.Options) *ProfileReady {
 		runTs:       testRunID,
 		specDone:    specRow,
 		profileDone: profRow,
-		Seams:       seams,
+		Deps:        deps,
 	}
 }
 
