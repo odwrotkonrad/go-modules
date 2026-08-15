@@ -62,11 +62,11 @@ test-e2e-install-package-linux-arm64:
     - saas-linux-small-arm64
   image: $CI_IMAGE_DIND_ARM64
   needs:
-    - job: warm-go
+    - job: warm-go-linux-arm64
       optional: true
     - job: warm-e2e-pkg-installs-image
       optional: true
-  #[why] the shared warm-go artifact's dist/che and dist/e2e.test are amd64: swap in the zig-cross arm64 builds before reuse
+  #[why] the arm64 warm artifact ships under dist/linux-arm64/: swap the zig-cross arm64 builds into dist/ before reuse
   script:
     - test -f e2e-images/che-e2e-debian-arm64.tar && docker load --quiet -i e2e-images/che-e2e-debian-arm64.tar || true
     - test -f che/dist/linux-arm64/e2e.test && cp -f che/dist/linux-arm64/che che/dist/linux-arm64/e2e.test che/dist/ || true

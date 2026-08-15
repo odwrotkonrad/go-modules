@@ -2,7 +2,7 @@
 
 <!-- [>] 🤖 -->
 
-`make e2e-install-methods` proves install methods for real: live installs from
+`make e2e-install-methods` proves install methods live: real installs from
 real registries and archives, each installed command run afterwards. Variables:
 
 - `METHOD` (`E2E_INSTALL_METHOD`): which methods run: `all` (default) | `<method>` | `<method>/` prefix

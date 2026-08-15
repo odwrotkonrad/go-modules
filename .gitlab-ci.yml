@@ -41,7 +41,7 @@ variables:
   GOCACHE: $CI_PROJECT_DIR/.cache/go-build
   CC: clang
 
-#[what] one linux warm build: go caches plus every che artifact the e2e jobs reuse, native amd64 and zig-cross arm64
+#[what] amd64 linux warm build: go caches plus the amd64 che artifacts the e2e jobs reuse, native plus zig-cross amd64
 warm-go:
   stage: warm
   image: $CI_IMAGE
@@ -63,10 +63,37 @@ warm-go:
     - for m in lib che get-os-open-files-with get-term-open-files-with; do (cd $m && echo "## download $m" && go mod download all) || exit 1; done
     - for m in lib che; do (cd $m && echo "## build $m" && go build -v ./...) || exit 1; done
     - make -C che build-cover build-e2e-test build-linux
-    - make -C che build-linux build-cover-linux build-e2e-test-linux PLATFORM=linux-arm64
   artifacts:
     paths:
       - che/dist/
+
+##[>] 🤖🤖
+#[what] arm64 linux warm build: zig-cross arm64 che artifacts for the arm64 install e2e jobs
+#[why] shares goreleaser-linux-che [arm64]'s go-build key: both zig-cross che for arm64, tag and MR pipelines warm each other
+warm-go-linux-arm64:
+  stage: warm
+  image: $CI_IMAGE
+  needs: []
+  rules:
+    - if: $CI_PIPELINE_SOURCE == "merge_request_event"
+    - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
+      changes: [che/**/*, lib/**/*, go.work, .gitlab-ci.yml]
+  cache:
+    - key: go-mod
+      paths:
+        - .cache/go-mod
+      policy: pull
+    - key: go-build-che-zig-arm64
+      paths:
+        - .cache/go-build
+      policy: pull-push
+  script:
+    - make -C che build-linux build-cover-linux build-e2e-test-linux PLATFORM=linux-arm64
+  artifacts:
+    paths:
+      - che/dist/linux-arm64/
+      - che/dist/che-linux-arm64
+##[<] 🤖🤖
 
 verify-precommit-all:
   stage: verify
@@ -95,15 +122,7 @@ verify-precommit-all:
   needs:
     - job: warm-go
       optional: true
-  cache:
-    - key: go-mod
-      paths:
-        - .cache/go-mod
-      policy: pull
-    - key: go-build
-      paths:
-        - .cache/go-build
-      policy: pull
+      artifacts: false
   script:
     - make -C $MODULE test-cover
   coverage: '/total:\s+\(statements\)\s+\d+\.\d+%/'
@@ -117,6 +136,15 @@ test-unit-che:
   extends: .test-module
   variables:
     MODULE: che
+  cache:
+    - key: go-mod
+      paths:
+        - .cache/go-mod
+      policy: pull
+    - key: go-build
+      paths:
+        - .cache/go-build
+      policy: pull
   coverage: null
   artifacts:
     reports: null
@@ -258,7 +286,7 @@ test-e2e-install-methods:
     E2E_INSTALL_CACHE_DIR: $CI_PROJECT_DIR/.cache/che-e2e-install
   parallel:
     matrix:
-      - METHOD: [apt, binariesRemoteArchive, script, pyenv, nvm, npm, go]
+      - METHOD: [apt, binariesRemoteArchive, script, pyenv, nvm, npm, go, nix, buildFromSource]
   #[why] MR changes-triggered runs block the merge; main keeps allow_failure, manual stays optional
   rules:
     - if: $CI_PIPELINE_SOURCE == "merge_request_event"
@@ -279,6 +307,8 @@ test-e2e-install-methods:
         nvm) PACKAGE=node;;
         npm) PACKAGE=ccstatusline,pnpm,tsc,pyright,typescript-language-server;;
         go) PACKAGE=gopls,get-os-open-files-with;;
+        nix) PACKAGE=jq,bat;;
+        buildFromSource) PACKAGE=ruby;;
       esac
     - test -f e2e-images/che-e2e-debian-amd64.tar && docker load --quiet -i e2e-images/che-e2e-debian-amd64.tar || true
     - make -C che e2e-install-methods MODE=with_no_deps METHOD="$METHOD" PACKAGE="$PACKAGE" $(test -x che/dist/e2e.test && echo "BUILD_DEP= E2E_USE_TEST_BIN=1") $(test -x che/dist/che-linux-amd64 && echo "E2E_INSTALL_METHODS_DEPS=")
@@ -298,15 +328,6 @@ coverage-che:
     #[why] conditional/manual allow_failure jobs: optional so skipped runs don't block the report
     - job: test-install-methods
       optional: true
-  cache:
-    - key: go-mod
-      paths:
-        - .cache/go-mod
-      policy: pull
-    - key: go-build
-      paths:
-        - .cache/go-build
-      policy: pull
   script:
     - make -C che cover-report
   coverage: '/total:\s+\(statements\)\s+\d+\.\d+%/'
@@ -465,6 +486,7 @@ goreleaser-darwin-che:
   tags:
     - saas-macos-medium-m1
   image: macos-26-xcode-26
+  needs: []
   rules:
     - if: $CI_COMMIT_TAG =~ /^che\/v/
   variables:
@@ -504,6 +526,7 @@ goreleaser-darwin-che:
 goreleaser-linux-che:
   stage: release
   image: $CI_IMAGE
+  needs: []
   rules:
     - if: $CI_COMMIT_TAG =~ /^che\/v/
   parallel:
@@ -534,6 +557,7 @@ prerelease-darwin-che:
   tags:
     - saas-macos-medium-m1
   image: macos-26-xcode-26
+  needs: []
   rules:
     - if: $CI_PIPELINE_SOURCE == "merge_request_event"
       changes: [che/**/*, lib/**/*]
@@ -575,6 +599,7 @@ prerelease-darwin-che:
 prerelease-linux-che:
   stage: release
   image: $CI_IMAGE
+  needs: []
   rules:
     - if: $CI_PIPELINE_SOURCE == "merge_request_event"
       changes: [che/**/*, lib/**/*]

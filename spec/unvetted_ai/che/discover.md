@@ -4,7 +4,7 @@
 
 `discover-profiles`: expose the resolved runtime spec `che run` would execute.
 
-An os-mutating che command mutates os state: `run`, `backup`, `prune-broken-links`,
+The os-mutating commands: `run`, `backup`, `prune-broken-links`,
 `make-dirs`, `make-links`, `make-copies`, `render-templates`, `run-scripts`,
 `uninstall` (ledger-driven, no discovery).
 
