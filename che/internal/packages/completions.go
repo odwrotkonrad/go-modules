@@ -22,7 +22,7 @@ func (in *Installer) installCompletions(pkg string, e Entry) error {
 	}
 	dest := filepath.Join(dir, name)
 	if _, err := os.Stat(dest); err == nil {
-		in.emitSkip(log.Levels.Debug, pkg+" zsh completions", "already present at "+dest)
+		in.emitPresent(log.Levels.Debug, pkg+" zsh completions", "already present at "+dest)
 		return nil
 	}
 	if in.Opts.DryRun {
@@ -44,7 +44,7 @@ func (in *Installer) installCompletions(pkg string, e Entry) error {
 			return err
 		}
 	} else {
-		if err := in.exec(curlArgv(def.URL, asset)); err != nil {
+		if err := in.download(def.URL, asset); err != nil {
 			return err
 		}
 	}
@@ -53,10 +53,10 @@ func (in *Installer) installCompletions(pkg string, e Entry) error {
 			return err
 		}
 	}
-	if err := in.exec([]string{"mkdir", "-p", dir}); err != nil {
+	if err := os.MkdirAll(dir, 0o755); err != nil {
 		return err
 	}
-	if err := in.exec([]string{"install", "-m", "0644", asset, dest}); err != nil {
+	if err := installFile(asset, dest, 0o644); err != nil {
 		return err
 	}
 	in.emit(log.Levels.Info, "installed", pkg+" zsh completions -> "+dest)

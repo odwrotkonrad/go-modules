@@ -3,6 +3,11 @@ package packages
 // [>] 🤖🤖
 
 import (
+	"archive/tar"
+	"archive/zip"
+	"bytes"
+	"compress/gzip"
+	"crypto/sha256"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -10,10 +15,14 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/require"
+	"github.com/ulikunitz/xz"
 	"gopkg.in/yaml.v3"
 
 	"gitlab.com/konradodwrot/go-modules/che/internal/execx"
+	"gitlab.com/konradodwrot/go-modules/che/internal/fetchx"
 )
+
+var testFetch *fetchx.Mock
 
 func newInstaller(t *testing.T, filesYaml, osname string, cmds map[string]string, opts Options) (*Installer, *execx.Mock) {
 	t.Helper()
@@ -21,6 +30,8 @@ func newInstaller(t *testing.T, filesYaml, osname string, cmds map[string]string
 	require.NoError(t, yaml.Unmarshal([]byte(filesYaml), &f))
 	m := &execx.Mock{}
 	execx.Swap(t, m)
+	testFetch = &fetchx.Mock{Bodies: map[string][]byte{}}
+	fetchx.Swap(t, testFetch)
 	return &Installer{File: &f, FilePath: "packages.yml", Host: testHost(osname, "amd64", cmds), Opts: opts}, m
 }
 
@@ -59,6 +70,70 @@ func chainStubs(stubs ...func(argv []string) ([]byte, error)) func(argv []string
 	}
 }
 
+func tempHome(t *testing.T, in *Installer) string {
+	t.Helper()
+	home := t.TempDir()
+	in.Host.Getenv = func(k string) string {
+		if k == "HOME" {
+			return home
+		}
+		return ""
+	}
+	return home
+}
+
+func shaHex(b []byte) string { return fmt.Sprintf("%x", sha256.Sum256(b)) }
+
+func withSha(yml string, body []byte) string { return strings.ReplaceAll(yml, "goodsha", shaHex(body)) }
+
+func tarBytes(t *testing.T, names ...string) []byte {
+	t.Helper()
+	var buf bytes.Buffer
+	tw := tar.NewWriter(&buf)
+	for _, name := range names {
+		require.NoError(t, tw.WriteHeader(&tar.Header{Name: name, Mode: 0o755, Size: 3}))
+		_, err := tw.Write([]byte("bin"))
+		require.NoError(t, err)
+	}
+	require.NoError(t, tw.Close())
+	return buf.Bytes()
+}
+
+func tarGzBody(t *testing.T, names ...string) []byte {
+	t.Helper()
+	var buf bytes.Buffer
+	gz := gzip.NewWriter(&buf)
+	_, err := gz.Write(tarBytes(t, names...))
+	require.NoError(t, err)
+	require.NoError(t, gz.Close())
+	return buf.Bytes()
+}
+
+func tarXzBody(t *testing.T, names ...string) []byte {
+	t.Helper()
+	var buf bytes.Buffer
+	xw, err := xz.NewWriter(&buf)
+	require.NoError(t, err)
+	_, err = xw.Write(tarBytes(t, names...))
+	require.NoError(t, err)
+	require.NoError(t, xw.Close())
+	return buf.Bytes()
+}
+
+func zipBody(t *testing.T, names ...string) []byte {
+	t.Helper()
+	var buf bytes.Buffer
+	zw := zip.NewWriter(&buf)
+	for _, name := range names {
+		f, err := zw.CreateHeader(&zip.FileHeader{Name: name})
+		require.NoError(t, err)
+		_, err = f.Write([]byte("bin"))
+		require.NoError(t, err)
+	}
+	require.NoError(t, zw.Close())
+	return buf.Bytes()
+}
+
 func requireCalls(t *testing.T, m *execx.Mock, fragments ...string) {
 	t.Helper()
 	joined := strings.Join(m.Calls(), "\n")
@@ -95,14 +170,35 @@ packages:
   che: [{brew: {fromRegistry: konradodwrot/tap}}]
 `
 
+func TestOnlyMethodsSpareDependencies(t *testing.T) {
+	const y = `packages:
+  nvm: [{script: {url: https://example.com/nvm.sh}}]
+  node:
+    requires: [nvm]
+    installers: [{nvm: {versions: ["24.0.0"], global: "24.0.0"}}]
+`
+	in, m := newInstaller(t, y, "linux", cmdMap(nil), Options{OnlyMethods: []string{"nvm"}})
+	require.NoError(t, in.Install([]string{"node"}))
+	requireCalls(t, m, "che-script-", "nvm install 24.0.0")
+}
+
+func TestInstallBrewUpdatesIndexOncePerRun(t *testing.T) {
+	in, m := newInstaller(t, "packages:\n  bat: [brew]\n  fd: [brew]", "darwin", cmdMap([]string{"brew"}), Options{})
+	m.Stub = failOn("brew list")
+	require.NoError(t, in.Install([]string{"bat", "fd"}))
+	requireCalls(t, m, "brew update --quiet", "brew install bat", "brew install fd")
+	require.Equal(t, 1, strings.Count(strings.Join(m.Calls(), "\n"), "brew update --quiet"))
+}
+
 func TestInstallBrewTapQualified(t *testing.T) {
 	in, m := newInstaller(t, tapYaml, "darwin", cmdMap([]string{"brew"}), Options{})
 	m.Stub = failOn("brew list")
 	require.NoError(t, in.Install([]string{"che"}))
 	require.Equal(t, []string{
 		"brew list che",
+		"brew update --quiet",
 		"brew tap konradodwrot/tap",
-		"brew trust --formula konradodwrot/tap/che",
+		"brew trust konradodwrot/tap",
 		"brew install konradodwrot/tap/che",
 	}, m.Calls())
 }
@@ -123,9 +219,8 @@ func TestBrewTapQualifiedNameIsParseError(t *testing.T) {
 func TestAptIneligibleOnNonDebianLinux(t *testing.T) {
 	in, m := newInstaller(t, "packages:\n  jq: [apt]", "linux", cmdMap([]string{"apt-get"}), Options{})
 	in.Host.Distro = ""
-	out, err := captureStdout(t, func() error { return in.Install([]string{"jq"}) })
-	require.NoError(t, err)
-	wantLines(t, out, "will not install jq: no applicable manager")
+	_, err := captureStdout(t, func() error { return in.Install([]string{"jq"}) })
+	require.ErrorContains(t, err, "no applicable installation method for jq")
 	require.Empty(t, m.Calls())
 }
 
@@ -151,6 +246,22 @@ func TestInstallAptSudoAndUpdateOnce(t *testing.T) {
 	require.Contains(t, calls, "sudo apt-get install --yes --no-install-recommends fd-find")
 	require.Contains(t, calls, "sudo apt-get install --yes --no-install-recommends jq")
 	require.Equal(t, 1, strings.Count(strings.Join(calls, "\n"), "apt-get update"))
+}
+
+func TestInstallNpmLinksNvmGlobalBins(t *testing.T) {
+	in, m := newInstaller(t, "packages:\n  tsc: [npm]", "linux", cmdMap([]string{"npm"}), Options{})
+	home := tempHome(t, in)
+	bin := filepath.Join(home, ".nvm", "versions", "node", "v24.0.0", "bin")
+	require.NoError(t, os.MkdirAll(bin, 0o755))
+	require.NoError(t, os.WriteFile(filepath.Join(bin, "tsc"), []byte("#!/bin/sh\n"), 0o755))
+	require.NoError(t, os.MkdirAll(filepath.Join(home, ".nvm", "alias"), 0o755))
+	require.NoError(t, os.WriteFile(filepath.Join(home, ".nvm", "alias", "default"), []byte("v24.0.0\n"), 0o644))
+	m.Stub = failOn("npm ls")
+	require.NoError(t, in.Install([]string{"tsc"}))
+	requireCalls(t, m, "npm install --global tsc")
+	target, err := os.Readlink(filepath.Join(home, ".local", "bin", "tsc"))
+	require.NoError(t, err)
+	require.Equal(t, filepath.Join(bin, "tsc"), target)
 }
 
 func TestInstallNpmPinReinstallsOnDrift(t *testing.T) {
@@ -226,11 +337,18 @@ func TestInstallRoundsServeLaterPackages(t *testing.T) {
 	require.Contains(t, m.Calls(), "sudo npm install --global x")
 }
 
-func TestInstallSkipsNoApplicableManager(t *testing.T) {
-	in, m := newInstaller(t, "packages:\n  bat: [brew]", "linux", cmdMap(nil), Options{})
+func TestInstallMissingMethodWarnDowngrades(t *testing.T) {
+	in, m := newInstaller(t, "packages:\n  bat: [brew]", "linux", cmdMap(nil), Options{MissingMethodWarn: true})
 	out, err := captureStdout(t, func() error { return in.Install([]string{"bat"}) })
 	require.NoError(t, err)
-	wantLines(t, out, "will not install bat: no applicable manager")
+	wantLines(t, out, "will not install bat: no applicable installation method")
+	require.Empty(t, m.Calls())
+}
+
+func TestInstallSkipsNoApplicableManager(t *testing.T) {
+	in, m := newInstaller(t, "packages:\n  bat: [brew]", "linux", cmdMap(nil), Options{})
+	_, err := captureStdout(t, func() error { return in.Install([]string{"bat"}) })
+	require.ErrorContains(t, err, "no applicable installation method for bat")
 	require.Empty(t, m.Calls())
 }
 
@@ -259,9 +377,8 @@ func TestInstallScriptSkipsWhenCommandPresent(t *testing.T) {
 
 func TestInstallScriptSkipsOnForeignOs(t *testing.T) {
 	in, m := newInstaller(t, brewScriptYaml, "linux", cmdMap(nil), Options{})
-	out, err := captureStdout(t, func() error { return in.Install([]string{"brew"}) })
-	require.NoError(t, err)
-	wantLines(t, out, "will not install brew: no applicable manager")
+	_, err := captureStdout(t, func() error { return in.Install([]string{"brew"}) })
+	require.ErrorContains(t, err, "no applicable installation method for brew")
 	require.Empty(t, m.Calls())
 }
 
@@ -298,21 +415,19 @@ func TestInstallScriptRemoteUrlFetchesAndRuns(t *testing.T) {
         env: {NONINTERACTIVE: "1"}
 `
 	in, m := newInstaller(t, yml, "darwin", cmdMap(nil), Options{})
-	m.Stub = stubOutputs("curl ", "echo installing\n")
+	testFetch.Bodies["https://example.com/install.sh"] = []byte("echo installing\n")
 	require.NoError(t, in.Install([]string{"brew"}))
-	calls := m.Calls()
-	require.Contains(t, calls[0], "curl -fsSL")
-	require.Contains(t, calls[0], "https://example.com/install.sh")
-	require.Contains(t, calls[1], "che-script-")
-	require.Contains(t, m.Envs()[1], "NONINTERACTIVE=1")
+	require.Contains(t, testFetch.Calls(), "https://example.com/install.sh")
+	require.Contains(t, m.Calls()[0], "che-script-")
+	require.Contains(t, m.Envs()[0], "NONINTERACTIVE=1")
 }
 
 func TestInstallScriptRemoteUrlFetchFailureErrors(t *testing.T) {
 	const yml = `packages:
   x: [{script: {url: https://example.com/install.sh}}]
 `
-	in, m := newInstaller(t, yml, "darwin", cmdMap(nil), Options{})
-	m.Stub = failOn("curl")
+	in, _ := newInstaller(t, yml, "darwin", cmdMap(nil), Options{})
+	testFetch.Err = fmt.Errorf("boom")
 	require.ErrorContains(t, in.Install([]string{"x"}), "install script fetch failed")
 }
 
@@ -355,9 +470,8 @@ func TestInstallScriptPinSkipsWhenMatching(t *testing.T) {
 func TestInstallScriptShaGatesApplicability(t *testing.T) {
 	in, m := newInstaller(t, gcloudYaml, "darwin", cmdMap(nil), Options{})
 	in.Host.Arch = "amd64"
-	out, err := captureStdout(t, func() error { return in.Install([]string{"gcloud"}) })
-	require.NoError(t, err)
-	wantLines(t, out, "will not install gcloud: no applicable manager")
+	_, err := captureStdout(t, func() error { return in.Install([]string{"gcloud"}) })
+	require.ErrorContains(t, err, "no applicable installation method for gcloud")
 	require.Empty(t, m.Calls())
 }
 
@@ -366,8 +480,8 @@ func TestInstallGcloudPicksLinuxAptRepo(t *testing.T) {
 	in.FilePath = BuiltinPath
 	m.Stub = aptStub(t)
 	require.NoError(t, in.Install([]string{"gcloud"}))
+	require.Contains(t, testFetch.Calls(), "https://packages.cloud.google.com/apt/doc/apt-key.gpg")
 	requireCalls(t, m,
-		"packages.cloud.google.com/apt/doc/apt-key.gpg",
 		"/etc/apt/sources.list.d/packages.cloud.google.com-apt-cloud-sdk-main.sources",
 		"--no-install-recommends -t cloud-sdk google-cloud-cli")
 }
@@ -432,7 +546,7 @@ func TestInstallPythonPyenvPinFromBuiltin(t *testing.T) {
 	require.NoError(t, err)
 	m := &execx.Mock{}
 	execx.Swap(t, m)
-	in := &Installer{File: f, FilePath: BuiltinPath, Host: testHost("darwin", "arm64", cmdMap([]string{"python3", "pyenv"})), Opts: Options{}}
+	in := &Installer{File: f, FilePath: BuiltinPath, Host: testHost("darwin", "arm64", cmdMap([]string{"python3", "pyenv", "brew"})), Opts: Options{}}
 	m.Stub = func(argv []string) ([]byte, error) {
 		if strings.Join(argv, " ") == "pyenv versions --bare" {
 			return []byte("3.9.6\n"), nil
@@ -481,10 +595,13 @@ func TestVersionCommandOverridesProbe(t *testing.T) {
 }
 
 func TestVersionCommandDriftReinstalls(t *testing.T) {
-	in, m := newInstaller(t, kubectlYaml, "linux", cmdMap([]string{"kubectl", "sha256sum"}), Options{})
-	m.Stub = chainStubs(stubOutputs("kubectl ", "Client Version: v1.36.0\n"), shaStub("goodsha"))
+	body := []byte("kubectl-bin")
+	in, m := newInstaller(t, withSha(kubectlYaml, body), "linux", cmdMap([]string{"kubectl"}), Options{})
+	tempHome(t, in)
+	m.Stub = stubOutputs("kubectl ", "Client Version: v1.36.0\n")
+	testFetch.Bodies["https://example.com/v1.36.3/kubectl"] = body
 	require.NoError(t, in.Install([]string{"kubectl"}))
-	requireCalls(t, m, "curl -fsSL")
+	require.NotEmpty(t, testFetch.Calls())
 }
 
 const codeExtYaml = "packages:\n  golang.go: [vscode]\n  redhat.vscode-yaml: [vscode]\n  code: [{brew/cask: {packageName: visual-studio-code}}]"
@@ -512,12 +629,10 @@ func TestInstallCodeExtensionSkipsInstalledAndListsOnce(t *testing.T) {
 	require.Equal(t, []string{"code --list-extensions --show-versions"}, m.Calls())
 }
 
-func TestInstallCodeExtensionSkipsWithoutCodeCommand(t *testing.T) {
+func TestInstallCodeExtensionAttemptsWithoutCodeCommand(t *testing.T) {
 	in, m := newInstaller(t, codeExtYaml, "linux", cmdMap(nil), Options{})
-	out, err := captureStdout(t, func() error { return in.Install([]string{"golang.go"}) })
-	require.NoError(t, err)
-	wantLines(t, out, "will not install golang.go: no applicable manager")
-	require.Empty(t, m.Calls())
+	require.NoError(t, in.Install([]string{"golang.go"}))
+	requireCalls(t, m, "code --install-extension golang.go")
 }
 
 func TestInstallCodeExtensionUpdateForces(t *testing.T) {
@@ -559,7 +674,7 @@ func TestCheckPresentUsesExtensionListForCodePackages(t *testing.T) {
 func TestInstallUnknownPackageErrors(t *testing.T) {
 	in, _ := newInstaller(t, "packages: {}", "darwin", cmdMap([]string{"brew"}), Options{})
 	err := in.Install([]string{"nope"})
-	require.ErrorContains(t, err, "unknown package: nope (add it to packages.yml)")
+	require.ErrorContains(t, err, "unknown package: nope (required entry in packages.yml)")
 }
 
 // [<] 🤖🤖

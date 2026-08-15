@@ -3,12 +3,20 @@ package packages
 // [>] 🤖🤖🤖
 
 import (
+	"archive/tar"
+	"archive/zip"
+	"compress/gzip"
+	"crypto/sha256"
+	"errors"
 	"fmt"
+	"io"
 	"os"
 	"path"
 	"path/filepath"
 	"slices"
 	"strings"
+
+	"github.com/ulikunitz/xz"
 
 	"gitlab.com/konradodwrot/go-modules/che/internal/log"
 )
@@ -17,14 +25,14 @@ func (in *Installer) installBinariesRemoteArchive(pkg string, b *BinariesRemoteA
 	pin := in.pinFor(pkg, b.Version)
 	if in.skipInstalledOrEmitReinstall(pkg, "binariesRemoteArchive", pin, pin,
 		func() bool { return in.hasCmd(pkg) },
-		func() bool { return in.versionOutputHasPin(pkg, pin) }) {
+		func() bool { return in.versionOutputHasPin(pkg, pin) }, nil) {
 		return nil
 	}
 	if err := in.requestedOverridesPin(pkg, b.Version); err != nil {
 		return err
 	}
 	if in.Opts.DryRun {
-		in.emitDryRun("install", labelWithVersion(pkg, pin)+" via binariesRemoteArchive")
+		in.emitDryRun("install", labelWithVersion(in.pkgLabel(pkg), pin)+" via binariesRemoteArchive")
 		return nil
 	}
 	version, err := in.resolveArchiveVersion(pkg, b)
@@ -36,17 +44,16 @@ func (in *Installer) installBinariesRemoteArchive(pkg string, b *BinariesRemoteA
 		return fmt.Errorf("%s: %w", pkg, err)
 	}
 	url := in.Host.expandAs(b.URL, version, arch)
-	tmp, err := os.MkdirTemp("", "che-packages-")
+	asset, cached, cleanup, err := in.fetchAsset(url)
 	if err != nil {
 		return err
 	}
-	defer func() { _ = os.RemoveAll(tmp) }()
-	asset := filepath.Join(tmp, path.Base(url))
-	if err := in.exec(curlArgv(url, asset)); err != nil {
-		return err
-	}
+	defer cleanup()
 	if want, ok := b.PlatformEligibility.Checksums[in.Host.PlatformKey()]; ok {
 		if err := in.verifyChecksum(pkg, asset, want); err != nil {
+			if cached {
+				_ = os.Remove(asset)
+			}
 			return err
 		}
 	} else {
@@ -55,8 +62,35 @@ func (in *Installer) installBinariesRemoteArchive(pkg string, b *BinariesRemoteA
 	if err := in.installMembers(pkg, asset, version, arch, b); err != nil {
 		return err
 	}
-	in.emit(log.Levels.Info, "installed", labelWithVersion(pkg, version)+" via binariesRemoteArchive")
+	in.emit(log.Levels.Info, "installed", labelWithVersion(in.pkgLabel(pkg), version)+" via binariesRemoteArchive")
 	return nil
+}
+
+func (in *Installer) fetchAsset(url string) (string, bool, func(), error) {
+	if in.Opts.DownloadCacheDir != "" {
+		dir := in.expandPath(in.Opts.DownloadCacheDir)
+		if err := os.MkdirAll(dir, 0o755); err != nil {
+			return "", false, nil, err
+		}
+		asset := filepath.Join(dir, fmt.Sprintf("%x-%s", sha256.Sum256([]byte(url)), path.Base(url)))
+		if _, err := os.Stat(asset); err == nil {
+			return asset, true, func() {}, nil
+		}
+		if err := in.download(url, asset); err != nil {
+			return "", false, nil, err
+		}
+		return asset, true, func() {}, nil
+	}
+	tmp, err := os.MkdirTemp("", "che-packages-")
+	if err != nil {
+		return "", false, nil, err
+	}
+	asset := filepath.Join(tmp, path.Base(url))
+	if err := in.download(url, asset); err != nil {
+		_ = os.RemoveAll(tmp)
+		return "", false, nil, err
+	}
+	return asset, false, func() { _ = os.RemoveAll(tmp) }, nil
 }
 
 func (in *Installer) versionOutputHasPin(pkg, pin string) bool {
@@ -77,16 +111,16 @@ func (in *Installer) verifyChecksum(pkg, asset, want string) error {
 	if err != nil {
 		return fmt.Errorf("%s: %w", pkg, err)
 	}
-	argv := []string{"shasum", "-a", "256", asset}
-	if in.Host.HasCmd("sha256sum") {
-		argv = []string{"sha256sum", asset}
+	f, err := os.Open(asset)
+	if err != nil {
+		return fmt.Errorf("%s: sha256 of %s failed: %w", pkg, asset, err)
 	}
-	out, ok := in.output(argv)
-	if !ok {
-		return fmt.Errorf("%s: sha256 of %s failed", pkg, asset)
+	defer func() { _ = f.Close() }()
+	h := sha256.New()
+	if _, err := io.Copy(h, f); err != nil {
+		return fmt.Errorf("%s: sha256 of %s failed: %w", pkg, asset, err)
 	}
-	fields := strings.Fields(out)
-	if len(fields) == 0 || fields[0] != hex {
+	if fmt.Sprintf("%x", h.Sum(nil)) != hex {
 		return fmt.Errorf("%s: sha256 mismatch for %s: want %s", pkg, asset, hex)
 	}
 	return nil
@@ -116,24 +150,24 @@ func (in *Installer) expandMembers(pkg, version, arch string, b *BinariesRemoteA
 
 func (in *Installer) installMembers(pkg, asset, version, arch string, b *BinariesRemoteArchiveSpec) error {
 	binDir := in.userBinDir()
-	if err := in.exec([]string{"mkdir", "-p", binDir}); err != nil {
+	if err := os.MkdirAll(binDir, 0o755); err != nil {
 		return err
 	}
 	if !isArchive(asset) {
-		return in.installBin(asset, filepath.Join(binDir, pkg))
+		return installFile(asset, filepath.Join(binDir, pkg), 0o755)
 	}
 	opt := in.userOptDir(pkg)
-	if err := in.exec([]string{"rm", "-rf", opt}); err != nil {
+	if err := os.RemoveAll(opt); err != nil {
 		return err
 	}
-	if err := in.exec([]string{"mkdir", "-p", opt}); err != nil {
+	if err := os.MkdirAll(opt, 0o755); err != nil {
 		return err
 	}
 	if err := in.extract(asset, opt); err != nil {
 		return err
 	}
 	for _, m := range in.expandMembers(pkg, version, arch, b) {
-		if err := in.exec([]string{"ln", "-sf", filepath.Join(opt, m), filepath.Join(binDir, path.Base(m))}); err != nil {
+		if err := makeSymlink(filepath.Join(opt, m), filepath.Join(binDir, path.Base(m))); err != nil {
 			return err
 		}
 	}
@@ -151,9 +185,132 @@ func isArchive(asset string) bool {
 
 func (in *Installer) extract(asset, dest string) error {
 	if strings.HasSuffix(asset, ".zip") {
-		return in.exec([]string{"unzip", "-oq", asset, "-d", dest})
+		if err := unzip(asset, dest); err != nil {
+			return fmt.Errorf("unzip %s: %w", asset, err)
+		}
+		return nil
 	}
-	return in.exec([]string{"tar", "-x", "-C", dest, "-f", asset})
+	if err := extractTar(asset, dest); err != nil {
+		return fmt.Errorf("extract %s: %w", asset, err)
+	}
+	return nil
+}
+
+func extractTar(asset, dest string) error {
+	f, err := os.Open(asset)
+	if err != nil {
+		return err
+	}
+	defer func() { _ = f.Close() }()
+	var r io.Reader
+	switch {
+	case strings.HasSuffix(asset, ".tar.gz"), strings.HasSuffix(asset, ".tgz"):
+		gz, err := gzip.NewReader(f)
+		if err != nil {
+			return err
+		}
+		defer func() { _ = gz.Close() }()
+		r = gz
+	case strings.HasSuffix(asset, ".tar.xz"):
+		xr, err := xz.NewReader(f)
+		if err != nil {
+			return err
+		}
+		r = xr
+	default:
+		return fmt.Errorf("unsupported archive suffix: %s", asset)
+	}
+	tr := tar.NewReader(r)
+	for {
+		hdr, err := tr.Next()
+		if errors.Is(err, io.EOF) {
+			return nil
+		}
+		if err != nil {
+			return err
+		}
+		target, err := sanitizeArchivePath(dest, hdr.Name)
+		if err != nil {
+			return err
+		}
+		switch hdr.Typeflag {
+		case tar.TypeDir:
+			if err := os.MkdirAll(target, 0o755); err != nil {
+				return err
+			}
+		case tar.TypeReg:
+			if err := os.MkdirAll(filepath.Dir(target), 0o755); err != nil {
+				return err
+			}
+			out, err := os.OpenFile(target, os.O_WRONLY|os.O_CREATE|os.O_TRUNC, os.FileMode(hdr.Mode).Perm()|0o200)
+			if err != nil {
+				return err
+			}
+			_, err = io.Copy(out, tr)
+			if cerr := out.Close(); err == nil {
+				err = cerr
+			}
+			if err != nil {
+				return err
+			}
+		case tar.TypeSymlink:
+			if err := os.MkdirAll(filepath.Dir(target), 0o755); err != nil {
+				return err
+			}
+			if err := makeSymlink(hdr.Linkname, target); err != nil {
+				return err
+			}
+		}
+	}
+}
+
+func unzip(asset, dest string) error {
+	r, err := zip.OpenReader(asset)
+	if err != nil {
+		return err
+	}
+	defer func() { _ = r.Close() }()
+	for _, f := range r.File {
+		target, err := sanitizeArchivePath(dest, f.Name)
+		if err != nil {
+			return err
+		}
+		if f.FileInfo().IsDir() {
+			if err := os.MkdirAll(target, 0o755); err != nil {
+				return err
+			}
+			continue
+		}
+		if err := os.MkdirAll(filepath.Dir(target), 0o755); err != nil {
+			return err
+		}
+		src, err := f.Open()
+		if err != nil {
+			return err
+		}
+		out, err := os.OpenFile(target, os.O_WRONLY|os.O_CREATE|os.O_TRUNC, f.Mode().Perm()|0o200)
+		if err != nil {
+			_ = src.Close()
+			return err
+		}
+		_, err = io.Copy(out, src)
+		_ = src.Close()
+		if cerr := out.Close(); err == nil {
+			err = cerr
+		}
+		if err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func sanitizeArchivePath(dest, name string) (string, error) {
+	target := filepath.Join(dest, name)
+	if target != dest && !strings.HasPrefix(target, dest+string(os.PathSeparator)) {
+		return "", fmt.Errorf("archive member escapes destination: %s", name)
+	}
+	return target, nil
 }
 
 func (in *Installer) userBinDir() string {
@@ -197,8 +354,22 @@ func (in *Installer) userOptDir(pkg string) string {
 	return filepath.Join(in.Host.Getenv("HOME"), ".local", "opt", pkg)
 }
 
-func (in *Installer) installBin(src, dest string) error {
-	return in.exec([]string{"install", "-m", "0755", src, dest})
+func makeSymlink(src, dest string) error {
+	if err := os.Remove(dest); err != nil && !os.IsNotExist(err) {
+		return err
+	}
+	return os.Symlink(src, dest)
+}
+
+func installFile(src, dest string, mode os.FileMode) error {
+	b, err := os.ReadFile(src)
+	if err != nil {
+		return err
+	}
+	if err := os.WriteFile(dest, b, mode); err != nil {
+		return err
+	}
+	return os.Chmod(dest, mode)
 }
 
 // [<] 🤖🤖🤖

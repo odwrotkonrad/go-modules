@@ -67,6 +67,10 @@ func (in *Installer) resolveArchiveVersion(pkg string, b *BinariesRemoteArchiveS
 	if v := in.pinFor(pkg, b.Version); v != "" {
 		return v, nil
 	}
+	e, ok := in.File.Packages[pkg]
+	if b.Version == VersionLatest || (ok && e.Version == VersionLatest) {
+		return VersionLatest, nil
+	}
 	if !strings.Contains(b.URL, "{version}") && !strings.Contains(strings.Join(b.ExtractBinaries, " "), "{version}") {
 		return "", nil
 	}

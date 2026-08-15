@@ -18,14 +18,14 @@ cases:
         - entry: "[brew, apt]"
     expected:
       output: {mgr: apt, picked: true}
-  - name: ShouldSkipNpmWithoutNpmCommand
+  - name: ShouldPickNpmWithoutNpmCommand
     input:
       args:
         - os: linux
         - cmds: []
         - entry: "[{npm: {packageName: x}}]"
     expected:
-      output: {picked: false}
+      output: {mgr: npm, picked: true}
   - name: ShouldPickBinaryWhenShaMatchesHost
     input:
       args:
@@ -83,6 +83,41 @@ cases:
         - preferred: [gem]
     expected:
       output: {mgr: brew, picked: true}
+  - name: ShouldPickOnlyListedMethod
+    input:
+      args:
+        - os: darwin
+        - cmds: [brew]
+        - entry: |
+            - brew
+            - binariesRemoteArchive:
+                platformEligibility:
+                  - darwin-amd64: sha256:abc
+                url: https://example.com/x
+        - preferred: []
+        - only: [binariesRemoteArchive]
+    expected:
+      output: {mgr: binariesRemoteArchive, picked: true}
+  - name: ShouldNotPickWhenOnlyMethodInapplicable
+    input:
+      args:
+        - os: linux
+        - cmds: [apt-get]
+        - entry: "[brew, apt]"
+        - preferred: []
+        - only: [brew]
+    expected:
+      output: {picked: false}
+  - name: ShouldNotFallThroughFromOnlyCaskToBrew
+    input:
+      args:
+        - os: darwin
+        - cmds: [brew]
+        - entry: "[brew]"
+        - preferred: []
+        - only: [cask]
+    expected:
+      output: {picked: false}
   - name: ShouldErrorOnUnknownManager
     input:
       args:

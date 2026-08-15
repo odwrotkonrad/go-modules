@@ -46,13 +46,17 @@
 `test` run all tests
 `test-cover` run all tests with coverage (binary covdata into ./cover-unit), print the per-package and total percentages
 `cover-report` merge every present cover-* covdata dir into coverage.out/coverage.xml, print the combined total
-`build-cover` build the coverage-instrumented binary into ./dist (e2e prerequisite)
-`build-e2e-test` compile the e2e harness into ./dist/e2e.test (with the binary, the only artifacts CI e2e jobs need)
+`build-cover`: `dist/$(BIN)` build the coverage-instrumented binary into ./dist (e2e prerequisite, skipped when current)
+`build-e2e-test`: `dist/e2e.test` compile the e2e harness into ./dist/e2e.test (skipped when current)
+`build-linux` cross-build the linux binary into ./dist/che-linux-<arch> (zig cc, arch from PLATFORM=linux-<arch>, default host arch), the linux-container binary
+`build-cover-linux` cross-build the coverage-instrumented binary for PLATFORM=linux-<arch> into ./dist/linux-<arch>/che (zig cc)
+`build-e2e-test-linux` cross-compile the e2e harness for PLATFORM=linux-<arch> into ./dist/linux-<arch>/e2e.test (zig cc)
 `e2e-dryrun`: `$(BUILD_DEP)` dry-run e2e flow (every command --dry-run=all, CHE_LOG_LEVEL=trace), binary covdata into ./cover-e2e-dryrun
 `e2e-run`: `$(BUILD_DEP)` real full-flow e2e (CHE_LOG_LEVEL=info), binary covdata into ./cover-e2e-run
 `e2e-backup`: `$(BUILD_DEP)` backup e2e flow (create/ls/restore selectors, CHE_LOG_LEVEL=info), binary covdata into ./cover-e2e-backup
 `e2e-packages`: `$(BUILD_DEP)` packages e2e flow (install + checks against fake PATH managers, CHE_LOG_LEVEL=info), binary covdata into ./cover-e2e-packages
-`e2e-install-methods`: `$(BUILD_DEP)` real-install e2e per installation method family (METHOD=<method>, default all, prefix matches sub-groups, see e2e/install_methods.yml): installs live packages into a throwaway HOME, then runs each one, binary covdata into ./cover-e2e-install-methods
+`e2e-install-methods-vm-template` ensure the darwin no-deps tart VM template exists (clone vanilla base, bootstrap ssh key, stop)
+`e2e-install-methods`: `$(BUILD_DEP) -> $(E2E_INSTALL_METHODS_DEPS)` real-install e2e, see spec/vetted_title_only/che/e2e-install-methods.md: each selected package installs live once per eligible entry method, then runs; MODE=with_no_deps (default) gives each install a fresh debian container (linux) or tart VM (darwin), MODE=with_deps a throwaway HOME (bare-metal darwin delegates the run into a tart VM)
 `e2e-registry` registry e2e: every brew formula and cask name in the builtin packages file resolves upstream
 `e2e`: `e2e-dryrun -> e2e-run -> e2e-backup -> e2e-packages` run all e2e flows
 `build` build the binary into ./dist

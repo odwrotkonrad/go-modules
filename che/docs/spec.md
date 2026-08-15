@@ -134,6 +134,18 @@ Spec-wide defaults + che knobs:
   override.
 - `renderTemplates.skipSecrets` (bool): skip `op://` resolution (placeholders);
   flag and env override.
+<!-- [>] 🤖 -->
+- `skipOps` (op-name list): ops skipped everywhere: dropped from the run
+  sequence, direct op subcommands become logged no-ops; `--skip-ops` and
+  `CHE_SKIP_OPS` override.
+- `packages`: installPackages defaults: `file` (packages.yml path),
+  `preferredInstallationMethods`,
+  `binariesRemoteArchive.installDestinationCandidates`,
+  `completions.zsh.installDestinationCandidates`.
+- `otel`: OTLP telemetry knobs (`enabled`, `endpoint`, `protocol`, `metrics`,
+  `logs`, `traces`); `CHE_OTEL_*` env wins. See
+  [observability.md](observability.md).
+<!-- [<] 🤖 -->
 
 Cascade, most nested wins: profile options > spec top-level options > che level
 (flags, env vars, user-config file, local spec `options:`) > defaults. See
@@ -177,8 +189,8 @@ profile runs its full op sequence, profile by profile.
 - `runIf` (string list): predicates, ALL must pass. `<source>` (truthy:
   builtin iff `true`, env iff set non-empty) or `<source> == <literal>`
   (string compare). Sources: `builtin:isOs` (`macos`/`linux`), `builtin:isVirt`
-  (`true`/`false`), `env:<NAME>`. Empty: always. `--skip-exec-if` (env
-  `CHE_SKIP_EXEC_IF`): all pass.
+  (`true`/`false`), `env:<NAME>`. Empty: always. `--skip-run-if` (env
+  `CHE_SKIP_RUN_IF`): all pass.
 - `logLevel` (`error`|`warn`|`info`|`debug`|`trace`): human-log level around
   this profile's ops. Unset: inherit spec, then che level.
 - `profileWorkingDirectory` (path): the profile's load-ops source tree. Unset: inherit
@@ -264,20 +276,23 @@ che-owned env:
 | Purpose | Path under base | XDG base (`+/che`) | che override | Fallback |
 | --- | --- | --- | --- | --- |
 | user-config file | `config.yml` | `XDG_CONFIG_HOME` | `CHE_CONFIG_HOME` | `~/.config/che` |
-| remote source caches | `sources/<slug>` | `XDG_CACHE_HOME` | `CHE_CACHE_HOME` | `~/.cache/che` |
+| remote source caches | `remote-sources/<slug>` | `XDG_CACHE_HOME` | `CHE_CACHE_HOME` | `~/.cache/che` |
 | backup archives | `backups/<profile-slug>/<op>/<ts>-<backup-id>.tar.bz2` | `XDG_STATE_HOME` | `CHE_STATE_HOME` | `~/.local/state/che` |
-| (data — reserved, no current use) | — | `XDG_DATA_HOME` | `CHE_DATA_HOME` | `~/.local/share/che` |
 
 Precedence per base, most specific wins: `CHE_<X>_HOME` > `XDG_<X>_HOME/che` >
 fallback. `CHE_*` points at che's base directly (no `/che`); the XDG base gets
-`/che` appended. E.g. `CHE_CACHE_HOME=/tmp/c` -> `/tmp/c/sources`;
-`XDG_CACHE_HOME=/x` -> `/x/che/sources`; neither -> `~/.cache/che/sources`.
-
-DATA is honored by the resolver but unused today (reserved).
+`/che` appended. E.g. `CHE_CACHE_HOME=/tmp/c` -> `/tmp/c/remote-sources`;
+`XDG_CACHE_HOME=/x` -> `/x/che/remote-sources`; neither ->
+`~/.cache/che/remote-sources`.
 
 ## include
 
 Additive. Seven sections:
+
+<!-- [>] 🤖 -->
+`profiles`, `makeLinks`, `makeCopies`, `renderTemplates`, `makeDirs`,
+`installPackages`, `runScripts`.
+<!-- [<] 🤖 -->
 
 ### profiles
 
@@ -420,6 +435,24 @@ makeDirs:
       - {dest: ["/var/log/{grafana,prometheus}"]}
 ```
 
+### installPackages
+
+<!-- [>] 🤖 -->
+Packages installed from the packages file (default
+`$XDG_CONFIG_HOME/packages/packages.yml`; `--packages-file`, `packages.file`,
+`CHE_PACKAGES_FILE` relocate it). Runs after renderTemplates, before
+runScripts. Items: canonical name scalar, or `{name, version}` pinning a
+version over the entry's default. Composed profiles' lists concatenate and
+dedupe; `exclude.installPackages` drops matching names.
+
+```yaml
+include:
+  installPackages:
+    - ripgrep
+    - {name: terraform, version: "1.10"}
+```
+<!-- [<] 🤖 -->
+
 ### runScripts
 
 Script paths or globs, repo-relative, run in spec order (globs expand sorted
@@ -433,8 +466,8 @@ runScripts:
 ## exclude
 
 Subtractive glob filter, applied last, wins over every include (rich entries
-too). Five flat string-list keys mirroring include's op sections. A match on
-source or any dest drops the item.
+too). Six flat string-list keys mirroring include's op sections. A match on
+source or any dest drops the item; installPackages matches canonical names.
 
 ```yaml
 exclude:
@@ -442,6 +475,7 @@ exclude:
   makeCopies: [Library/LaunchDaemons/grafana.plist*]
   renderTemplates: [HOME/.gitlab-runner/**]
   makeDirs: [/var/log/grafana]
+  installPackages: [terraform]
   runScripts: [ci/zsh/scripts/installs/80-go-host-tools.zsh]
 ```
 

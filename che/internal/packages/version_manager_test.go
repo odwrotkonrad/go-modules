@@ -58,12 +58,11 @@ func TestVersionManagerPyenvSkipsWhenSatisfied(t *testing.T) {
 	refuteCalls(t, m, "pyenv install")
 }
 
-func TestVersionManagerPendsUntilToolPresent(t *testing.T) {
+func TestVersionManagerInstallsWithoutToolPresent(t *testing.T) {
 	in, m := newInstaller(t, pythonVmYaml, "linux", cmdMap(nil), Options{})
-	out, err := captureStdout(t, func() error { return in.Install([]string{"python3"}) })
+	_, err := captureStdout(t, func() error { return in.Install([]string{"python3"}) })
 	require.NoError(t, err)
-	wantLines(t, out, "will not install python3: no applicable manager")
-	require.Empty(t, m.Calls())
+	requireCalls(t, m, "pyenv install")
 }
 
 func nvmHome(t *testing.T, in *Installer) string {

@@ -5,28 +5,51 @@ workflow:
     - if: $CI_PIPELINE_SOURCE == "merge_request_event"
     - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
 
+include:
+  - local: .gitlab/ci/test-install-packages.gitlab-ci.yml
+
+#[why] retry infrastructure flakes (image pulls, runner/network, stuck jobs) twice; script failures never retry, a real test failure stays red
+default:
+  retry:
+    max: 2
+    when:
+      - runner_system_failure
+      - api_failure
+      - stuck_or_timeout_failure
+      - scheduler_failure
+      - unknown_failure
+
 stages:
   - warm
   - verify
   - test-unit
   - test-e2e
-  - test-e2e-installs
+  - test-e2e-method-installs
+  - test-e2e-package-installs-darwin-arm64
+  - test-e2e-package-installs-linux-amd64
+  - test-e2e-package-installs-linux-arm64
   - coverage
   - release
   - publish
 
 variables:
   CI_IMAGE: registry.gitlab.com/konradodwrot/infra/oci-images/ci-linux:latest
+  CI_IMAGE_ARM64: registry.gitlab.com/konradodwrot/infra/oci-images/ci-linux:latest-arm64
+  CI_IMAGE_DIND: registry.gitlab.com/konradodwrot/infra/oci-images/ci-linux-dind:latest
+  CI_IMAGE_DIND_ARM64: registry.gitlab.com/konradodwrot/infra/oci-images/ci-linux-dind:latest-arm64
   GOMODCACHE: $CI_PROJECT_DIR/.cache/go-mod
   GOCACHE: $CI_PROJECT_DIR/.cache/go-build
   CC: clang
 
+#[what] one linux warm build: go caches plus every che artifact the e2e jobs reuse, native amd64 and zig-cross arm64
 warm-go:
   stage: warm
   image: $CI_IMAGE
   needs: []
   rules:
     - if: $CI_PIPELINE_SOURCE == "merge_request_event"
+    - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
+      changes: [che/**/*, lib/**/*, go.work, .gitlab-ci.yml]
   cache:
     - key: go-mod
       paths:
@@ -39,6 +62,11 @@ warm-go:
   script:
     - for m in lib che get-os-open-files-with get-term-open-files-with; do (cd $m && echo "## download $m" && go mod download all) || exit 1; done
     - for m in lib che; do (cd $m && echo "## build $m" && go build -v ./...) || exit 1; done
+    - make -C che build-cover build-e2e-test build-linux
+    - make -C che build-linux build-cover-linux build-e2e-test-linux PLATFORM=linux-arm64
+  artifacts:
+    paths:
+      - che/dist/
 
 verify-precommit-all:
   stage: verify
@@ -85,7 +113,7 @@ verify-precommit-all:
         coverage_format: cobertura
         path: $MODULE/coverage.xml
 
-test-che:
+test-unit-che:
   extends: .test-module
   variables:
     MODULE: che
@@ -100,42 +128,12 @@ test-che:
     - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
       changes: [che/**/*, lib/**/*, go.work, .gitlab-ci.yml]
 
-##[>] 🤖🤖
-#[what] one cover-instrumented che build shared by every e2e job via artifact
-#[why] each e2e job linking the cgo-heavy binary itself repeats the most expensive step per pipeline
-build-che-cover:
-  image: $CI_IMAGE
-  stage: warm
-  needs:
-    - job: warm-go
-      optional: true
-  cache:
-    - key: go-mod
-      paths:
-        - .cache/go-mod
-      policy: pull
-    - key: go-build
-      paths:
-        - .cache/go-build
-      policy: pull
-  script:
-    - make -C che build-cover build-e2e-test
-  artifacts:
-    paths:
-      - che/dist/
-  rules:
-    - if: $CI_PIPELINE_SOURCE == "merge_request_event"
-      changes: [che/**/*, lib/**/*, go.work, .gitlab-ci.yml]
-    - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
-      changes: [che/**/*, lib/**/*, go.work, .gitlab-ci.yml]
-##[<] 🤖🤖
-
 .test-e2e-che:
   image: $CI_IMAGE
   stage: test-e2e
   #[why] only the built artifacts move: the prebuilt binary and e2e harness, no go caches
   needs:
-    - build-che-cover
+    - warm-go
   rules:
     - if: $CI_PIPELINE_SOURCE == "merge_request_event"
       changes: [che/**/*, lib/**/*, go.work, .gitlab-ci.yml]
@@ -177,46 +175,39 @@ test-e2e-che-registry:
 ##[<] 🤖🤖
 
 ##[>] 🤖🤖
-#[what] real-install e2e: each installation method installs live packages into a throwaway HOME, then runs each one
-#[why] every other test stubs exec: only these prove the methods against real registries, archives and repos
-.test-install-methods:
-  stage: test-e2e-installs
+#[what] build the install-e2e container base image (debian + ca-certificates) once per pipeline, both arches, shared as docker-save tars
+warm-e2e-pkg-installs-image:
+  stage: warm
+  image: docker:28
+  services: [docker:dind]
   needs: []
+  variables:
+    DOCKER_HOST: tcp://docker:2376
+    DOCKER_TLS_CERTDIR: "/certs"
+    DOCKER_TLS_VERIFY: "1"
+    DOCKER_CERT_PATH: "$DOCKER_TLS_CERTDIR/client"
   rules:
-    - if: $CI_PIPELINE_SOURCE == "merge_request_event" || $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
-      changes: [che/internal/packages/**/*, che/e2e/install_methods*]
-      allow_failure: true
+    - if: $CI_PIPELINE_SOURCE == "merge_request_event"
+      changes: [che/**/*, lib/**/*, go.work, .gitlab-ci.yml]
+    - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
+      changes: [che/**/*, lib/**/*, go.work, .gitlab-ci.yml]
     - if: $CI_PIPELINE_SOURCE == "merge_request_event" || $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
       when: manual
       allow_failure: true
-  #[why] reuse the build-che-cover artifact when present (linux only, optional: the manual
-  #   rule runs on pipelines where the build job does not exist); darwin never fetches it
-  #   and builds its own binary
   script:
-    - make -C che e2e-install-methods METHOD="$METHOD" $(test -x che/dist/e2e.test && echo "BUILD_DEP= E2E_USE_TEST_BIN=1")
+    - docker run --privileged --rm tonistiigi/binfmt --install arm64
+    - docker context create dind --docker "host=$DOCKER_HOST,ca=$DOCKER_CERT_PATH/ca.pem,cert=$DOCKER_CERT_PATH/cert.pem,key=$DOCKER_CERT_PATH/key.pem"
+    - docker buildx create --use dind
+    - mkdir -p e2e-images
+    - docker buildx build --platform linux/amd64 --tag che-e2e-debian:amd64 --output type=docker,dest=e2e-images/che-e2e-debian-amd64.tar --file che/e2e/install-methods.Dockerfile che/e2e
+    - docker buildx build --platform linux/arm64 --tag che-e2e-debian:arm64 --output type=docker,dest=e2e-images/che-e2e-debian-arm64.tar --file che/e2e/install-methods.Dockerfile che/e2e
   artifacts:
     paths:
-      - che/cover-e2e-install-methods/
+      - e2e-images/
 
-test-install-methods-linux:
-  extends: .test-install-methods
-  image: debian:bookworm-slim
-  needs:
-    - job: build-che-cover
-      optional: true
-  parallel:
-    matrix:
-      - METHOD: [apt, binariesRemoteArchive, script, pyenv, nvm, npm, go]
-  before_script:
-    #[why] bootstrap minimum only: zsh + clang run the Makefile itself, the rest installs through basePackages and each package's requires
-    - apt-get update && apt-get install -y --no-install-recommends ca-certificates curl make sudo zsh clang
-    - curl -fsSL --connect-timeout 30 --retry 10 --retry-delay 30 --retry-all-errors -o /tmp/go.tar.gz https://go.dev/dl/go1.26.4.linux-amd64.tar.gz
-    - tar -xzf /tmp/go.tar.gz -C /usr/local
-    - export PATH=/usr/local/go/bin:$PATH
-
-#[what] darwin build of the cover binary + e2e harness, shared by the darwin install jobs
+#[what] darwin warm build: cover binary + e2e harness, shared by the darwin install jobs via artifact
 #[why] the linux artifact is the wrong platform: without this every darwin matrix job links its own
-build-che-cover-darwin:
+warm-go-darwin:
   stage: warm
   tags:
     - saas-macos-medium-m1
@@ -233,12 +224,10 @@ build-che-cover-darwin:
         - .cache/go-build
       policy: pull-push
   rules:
-    - if: $CI_PIPELINE_SOURCE == "merge_request_event" || $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
-      changes: [che/internal/packages/**/*, che/e2e/install_methods*]
-      allow_failure: true
-    - if: $CI_PIPELINE_SOURCE == "merge_request_event" || $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
-      when: manual
-      allow_failure: true
+    - if: $CI_PIPELINE_SOURCE == "merge_request_event"
+      changes: [che/**/*, lib/**/*, go.work, .gitlab-ci.yml]
+    - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
+      changes: [che/**/*, lib/**/*, go.work, .gitlab-ci.yml]
   before_script:
     - curl -fsSL --connect-timeout 30 --retry 10 --retry-delay 30 --retry-all-errors -o /tmp/go.tar.gz "https://go.dev/dl/go1.26.4.darwin-arm64.tar.gz"
     - sudo tar -xzf /tmp/go.tar.gz -C /usr/local
@@ -249,35 +238,65 @@ build-che-cover-darwin:
     paths:
       - che/dist/
 
-test-install-methods-darwin:
-  extends: .test-install-methods
-  tags:
-    - saas-macos-medium-m1
-  image: macos-26-xcode-26
+#[what] no-deps install e2e: up to 5 chosen packages per method, each install in a fresh debian container via dind
+#[why] with_no_deps proves each package pulls its own dependencies; the curated per-method subset keeps MR pipelines fast and deterministic, the manual per-package jobs and local PACKAGE=all cover the full set
+test-e2e-install-methods:
+  stage: test-e2e-method-installs
+  image: $CI_IMAGE_DIND
+  services: [docker:dind]
   needs:
-    - job: build-che-cover-darwin
+    - job: warm-go
       optional: true
+    - job: warm-e2e-pkg-installs-image
+      optional: true
+  variables:
+    DOCKER_HOST: tcp://docker:2376
+    DOCKER_TLS_CERTDIR: "/certs"
+    DOCKER_TLS_VERIFY: "1"
+    DOCKER_CERT_PATH: "$DOCKER_TLS_CERTDIR/client"
+    #[why] docker run -v paths must live under /builds, the only volume the dind service shares with the job
+    E2E_INSTALL_CACHE_DIR: $CI_PROJECT_DIR/.cache/che-e2e-install
   parallel:
     matrix:
-      - METHOD: [brew/formulae, brew/cask, binariesRemoteArchive, script, pyenv, nvm]
-  before_script:
-    - curl -fsSL --connect-timeout 30 --retry 10 --retry-delay 30 --retry-all-errors -o /tmp/go.tar.gz "https://go.dev/dl/go1.26.4.darwin-arm64.tar.gz"
-    - sudo tar -xzf /tmp/go.tar.gz -C /usr/local
-    - export PATH=/usr/local/go/bin:$PATH
+      - METHOD: [apt, binariesRemoteArchive, script, pyenv, nvm, npm, go]
+  #[why] MR changes-triggered runs block the merge; main keeps allow_failure, manual stays optional
+  rules:
+    - if: $CI_PIPELINE_SOURCE == "merge_request_event"
+      changes: [che/**/*, lib/**/*, go.work, .gitlab-ci.yml]
+    - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
+      changes: [che/**/*, lib/**/*, go.work, .gitlab-ci.yml]
+      allow_failure: true
+    - if: $CI_PIPELINE_SOURCE == "merge_request_event" || $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
+      when: manual
+      allow_failure: true
+  #[why] the chosen packages live here, not in the matrix: matrix variables all land in the job name, METHOD alone keeps it readable
+  script:
+    - case "$METHOD" in
+        apt) PACKAGE=jq,bat,fd,htop,tree;;
+        binariesRemoteArchive) PACKAGE=yq,kubectl,cilium,kind,lefthook;;
+        script) PACKAGE=pyenv,nvm;;
+        pyenv) PACKAGE=python3;;
+        nvm) PACKAGE=node;;
+        npm) PACKAGE=ccstatusline,pnpm,tsc,pyright,typescript-language-server;;
+        go) PACKAGE=gopls,get-os-open-files-with;;
+      esac
+    - test -f e2e-images/che-e2e-debian-amd64.tar && docker load --quiet -i e2e-images/che-e2e-debian-amd64.tar || true
+    - make -C che e2e-install-methods MODE=with_no_deps METHOD="$METHOD" PACKAGE="$PACKAGE" $(test -x che/dist/e2e.test && echo "BUILD_DEP= E2E_USE_TEST_BIN=1") $(test -x che/dist/che-linux-amd64 && echo "E2E_INSTALL_METHODS_DEPS=")
+  artifacts:
+    paths:
+      - che/cover-e2e-install-methods/
 ##[<] 🤖🤖
 
 coverage-che:
   image: $CI_IMAGE
   stage: coverage
   needs:
-    - test-che
+    - test-unit-che
     - test-e2e-che-dryrun
     - test-e2e-che-run
     - test-e2e-che-backup
     #[why] conditional/manual allow_failure jobs: optional so skipped runs don't block the report
-    - job: test-install-methods-linux
-      optional: true
-    - job: test-install-methods-darwin
+    - job: test-install-methods
       optional: true
   cache:
     - key: go-mod
@@ -302,7 +321,7 @@ coverage-che:
     - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
       changes: [che/**/*, lib/**/*, go.work, .gitlab-ci.yml]
 
-test-get-os-open-files-with:
+test-unit-get-os-open-files-with:
   extends: .test-module
   variables:
     MODULE: get-os-open-files-with
@@ -312,7 +331,7 @@ test-get-os-open-files-with:
     - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
       changes: [get-os-open-files-with/**/*, lib/**/*, go.work, .gitlab-ci.yml]
 
-test-get-term-open-files-with:
+test-unit-get-term-open-files-with:
   extends: .test-module
   variables:
     MODULE: get-term-open-files-with
@@ -322,7 +341,7 @@ test-get-term-open-files-with:
     - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
       changes: [get-term-open-files-with/**/*, lib/**/*, go.work, .gitlab-ci.yml]
 
-test-lib:
+test-unit-lib:
   extends: .test-module
   variables:
     MODULE: lib

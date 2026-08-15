@@ -36,7 +36,7 @@ cases:
     expected:
       exitCode: 1
       stdErr:
-        - "unknown package: nope (add it to {{/.*/}}packages.yml)"
+        - "unknown package: nope (required entry in {{/.*/}}packages.yml)"
   - name: ShouldAnnounceInsteadOfInstallingOnDryRun
     context:
       env: {CHE_DRY_RUN: delta}

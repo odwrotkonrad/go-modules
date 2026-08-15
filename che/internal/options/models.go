@@ -32,12 +32,16 @@ type Options struct {
 	PackagesOverride                                   string
 	PackagesUpdate                                     bool
 	PackagesIfMissing                                  bool
+	PackagesMissingMethodWarn                          bool
 	PackagesPreferredMethods                           []string
+	PackagesOnlyMethods                                []string
+	PackagesDownloadCacheDir                           string
 	PackagesBinariesRemoteArchiveDestinationCandidates []string
 	PackagesBinariesRemoteArchiveCheckPresentOnPath    bool
 	PackagesCompletionsEnabled                         bool
 	PackagesCompletionsDestinationCandidates           []string
 	PackagesCompletionsCheckPresentOnFpath             bool
+	PackagesSilenceInstallStdout                       string
 	AutoDiscover                                       bool
 	Otel                                               Otel
 	Settings                                           []Setting

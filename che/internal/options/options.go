@@ -224,6 +224,18 @@ func (c *Options) Resolve(env LookupEnv, user, spec Layer) error {
 	if _, err := log.ParseLevel(c.LogLevel); err != nil {
 		return fmt.Errorf("--log-level: %w", err)
 	}
+	silenceDefault := "true"
+	if lvl, _ := log.ParseLevel(c.LogLevel); lvl >= log.Levels.Debug {
+		silenceDefault = "false"
+	}
+	c.PackagesSilenceInstallStdout = c.resolveStr("packages.silenceInstallStdout", silenceDefault,
+		flagStr(c.PackagesSilenceInstallStdout), envStr(env("CHE_PACKAGES_SILENCE_INSTALL_STDOUT")))
+	c.setKind("packages.silenceInstallStdout", "bool")
+	switch c.PackagesSilenceInstallStdout {
+	case "true", "false":
+	default:
+		return fmt.Errorf("invalid --silence-install-stdout %q: want true or false", c.PackagesSilenceInstallStdout)
+	}
 	c.RenderSkipSecrets = c.resolveBool("renderTemplates.skipSecrets", c.RenderSkipSecrets, env("CHE_RENDER_TEMPLATES_SKIP_SECRETS"), false,
 		boolLayer{user.RenderTemplates.SkipSecrets, "config-file"}, boolLayer{spec.RenderTemplates.SkipSecrets, "specFile"})
 	c.PackagesFile = c.resolveStr("packages.file", "",
@@ -241,6 +253,13 @@ func (c *Options) Resolve(env LookupEnv, user, spec Layer) error {
 		c.PackagesPreferredMethods = packages.DefaultPreferredMethods
 		c.setValue("packages.preferredInstallationMethods", "["+strings.Join(packages.DefaultPreferredMethods, ", ")+"]")
 	}
+	c.PackagesOnlyMethods = c.resolveList("packages.onlyInstallationMethods",
+		layerList(c.PackagesOnlyMethods, "cliFlag"), envStr(env("CHE_PACKAGES_ONLY_METHODS")))
+	if err := packages.ValidateManagers(c.PackagesOnlyMethods); err != nil {
+		return err
+	}
+	c.PackagesDownloadCacheDir = c.resolveStr("packages.downloadCacheDir", "",
+		flagStr(c.PackagesDownloadCacheDir), envStr(env("CHE_PACKAGES_DOWNLOAD_CACHE_DIR")))
 	c.PackagesBinariesRemoteArchiveDestinationCandidates = c.resolveList("packages.binariesRemoteArchive.installDestinationCandidates",
 		layerList(c.PackagesBinariesRemoteArchiveDestinationCandidates, "cliFlag"), envStr(env("CHE_PACKAGES_BINARIES_REMOTE_ARCHIVE_INSTALL_DESTINATION_CANDIDATES")),
 		layerList(user.Packages.BinariesRemoteArchive.InstallDestinationCandidates, "config-file"), layerList(spec.Packages.BinariesRemoteArchive.InstallDestinationCandidates, "specFile"))

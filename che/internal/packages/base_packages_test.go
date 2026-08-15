@@ -3,6 +3,7 @@ package packages
 // [>] 🤖🤖
 
 import (
+	"os"
 	"strings"
 	"testing"
 
@@ -78,6 +79,66 @@ func TestBasePackagesSkippedOnDryRun(t *testing.T) {
 	m.Stub = failOn("dpkg -s")
 	require.NoError(t, in.Install([]string{"jq"}))
 	refuteCalls(t, m, "--no-install-recommends curl")
+}
+
+func TestBasePackagesBrewBootstrapsWhenAbsent(t *testing.T) {
+	const y = `basePackages:
+  brew: [brew]
+  brew/cask: [brew]
+packages:
+  brew:
+    installers: [{script: {os: darwin, url: https://example.com/install.sh}}]
+  jq: [brew]
+  bat:
+    installers: [{brew/cask: {}}]
+`
+	in, m := newInstaller(t, y, "darwin", cmdMap(nil), Options{OnlyMethods: []string{"brew", "cask"}})
+	installed := false
+	in.Host.Stat = func(p string) (os.FileInfo, error) {
+		if installed && p == "/opt/homebrew/bin/brew" {
+			return os.Stat("/bin/sh")
+		}
+		return nil, os.ErrNotExist
+	}
+	m.Stub = func(argv []string) ([]byte, error) {
+		joined := strings.Join(argv, " ")
+		if strings.Contains(joined, "che-script-") {
+			installed = true
+		}
+		if strings.HasPrefix(joined, "curl ") {
+			return []byte("echo installing\n"), nil
+		}
+		if strings.Contains(joined, "brew list") {
+			return nil, os.ErrNotExist
+		}
+		return nil, nil
+	}
+	require.NoError(t, in.Install([]string{"jq", "bat"}))
+	calls := strings.Join(m.Calls(), "\n")
+	scriptAt := strings.Index(calls, "che-script-")
+	jqAt := strings.Index(calls, "install jq")
+	batAt := strings.Index(calls, "install --cask bat")
+	require.Positive(t, scriptAt)
+	require.Positive(t, jqAt)
+	require.Positive(t, batAt)
+	require.Less(t, scriptAt, jqAt)
+	require.Less(t, scriptAt, batAt)
+	require.Equal(t, 1, strings.Count(calls, "che-script-"))
+}
+
+func TestBasePackagesBrewPresentSkipsBootstrap(t *testing.T) {
+	const y = `basePackages:
+  brew: [brew]
+packages:
+  brew:
+    installers: [{script: {os: darwin, url: https://example.com/install.sh}}]
+  jq: [brew]
+`
+	in, m := newInstaller(t, y, "darwin", cmdMap([]string{"brew"}), Options{})
+	m.Stub = failOn("brew list")
+	require.NoError(t, in.Install([]string{"jq"}))
+	requireCalls(t, m, "brew install jq")
+	refuteCalls(t, m, "che-script-")
 }
 
 func TestBasePackagesAbsentIsNoop(t *testing.T) {

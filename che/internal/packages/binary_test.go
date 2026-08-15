@@ -3,6 +3,8 @@ package packages
 // [>] 🤖🤖
 
 import (
+	"os"
+	"path/filepath"
 	"testing"
 
 	"github.com/stretchr/testify/require"
@@ -28,45 +30,75 @@ const kindYaml = `packages:
         url: https://example.com/v{version}/kind-{os}-{arch}
 `
 
-func shaStub(sha string) func(argv []string) ([]byte, error) {
-	return func(argv []string) ([]byte, error) {
-		if argv[0] == "sha256sum" {
-			return []byte(sha + "  " + argv[1] + "\n"), nil
-		}
-		return nil, nil
-	}
+func requireSymlink(t *testing.T, link, target string) {
+	t.Helper()
+	resolved, err := os.Readlink(link)
+	require.NoError(t, err)
+	require.Equal(t, target, resolved)
+	require.FileExists(t, target)
 }
 
 func TestInstallBinaryTarFlow(t *testing.T) {
-	in, m := newInstaller(t, kubectxYaml, "linux", cmdMap([]string{"sha256sum"}), Options{})
-	m.Stub = shaStub("goodsha")
+	body := tarGzBody(t, "kubectx")
+	in, m := newInstaller(t, withSha(kubectxYaml, body), "linux", cmdMap(nil), Options{})
+	home := tempHome(t, in)
+	testFetch.Bodies["https://example.com/v0.11.0/kubectx_v0.11.0_linux_x86_64.tar.gz"] = body
 	require.NoError(t, in.Install([]string{"kubectx"}))
-	requireCalls(t, m,
-		"curl -fsSL",
-		"kubectx_v0.11.0_linux_x86_64.tar.gz https://example.com/v0.11.0/kubectx_v0.11.0_linux_x86_64.tar.gz",
-		"rm -rf /home/u/.local/opt/kubectx",
-		"tar -x -C /home/u/.local/opt/kubectx",
-		"ln -sf /home/u/.local/opt/kubectx/kubectx /home/u/.local/bin/kubectx")
-	refuteCalls(t, m, "sudo", "install -m 0755")
+	require.Contains(t, testFetch.Calls(), "https://example.com/v0.11.0/kubectx_v0.11.0_linux_x86_64.tar.gz")
+	requireSymlink(t, filepath.Join(home, ".local", "bin", "kubectx"), filepath.Join(home, ".local", "opt", "kubectx", "kubectx"))
+	require.Empty(t, m.Calls())
 }
 
 func TestInstallBinaryShaMismatchAborts(t *testing.T) {
-	in, m := newInstaller(t, kubectxYaml, "linux", cmdMap([]string{"sha256sum"}), Options{})
-	m.Stub = shaStub("badsha")
+	in, _ := newInstaller(t, kubectxYaml, "linux", cmdMap(nil), Options{})
+	home := tempHome(t, in)
 	err := in.Install([]string{"kubectx"})
 	require.ErrorContains(t, err, "sha256 mismatch")
-	refuteCalls(t, m, "tar -x")
+	require.NoDirExists(t, filepath.Join(home, ".local", "opt", "kubectx"))
 }
 
 func TestInstallBinaryBareAsset(t *testing.T) {
-	in, m := newInstaller(t, kindYaml, "linux", cmdMap([]string{"sha256sum"}), Options{})
-	m.Stub = shaStub("goodsha")
+	body := []byte("#!/bin/sh\n")
+	in, m := newInstaller(t, withSha(kindYaml, body), "linux", cmdMap(nil), Options{})
+	home := tempHome(t, in)
+	testFetch.Bodies["https://example.com/v0.32.0/kind-linux-amd64"] = body
 	require.NoError(t, in.Install([]string{"kind"}))
-	requireCalls(t, m,
-		"kind-linux-amd64 https://example.com/v0.32.0/kind-linux-amd64",
-		"install -m 0755",
-		"/home/u/.local/bin/kind")
-	refuteCalls(t, m, "tar -x")
+	require.Contains(t, testFetch.Calls(), "https://example.com/v0.32.0/kind-linux-amd64")
+	bin := filepath.Join(home, ".local", "bin", "kind")
+	fi, err := os.Stat(bin)
+	require.NoError(t, err)
+	require.Equal(t, os.FileMode(0o755), fi.Mode().Perm())
+	got, err := os.ReadFile(bin)
+	require.NoError(t, err)
+	require.Equal(t, body, got)
+	require.Empty(t, m.Calls())
+}
+
+func TestInstallBinaryDownloadCacheReusesAsset(t *testing.T) {
+	body := tarGzBody(t, "kubectx")
+	opts := Options{DownloadCacheDir: t.TempDir()}
+	yaml := withSha(kubectxYaml, body)
+	in, _ := newInstaller(t, yaml, "linux", cmdMap(nil), opts)
+	tempHome(t, in)
+	testFetch.Bodies["https://example.com/v0.11.0/kubectx_v0.11.0_linux_x86_64.tar.gz"] = body
+	require.NoError(t, in.Install([]string{"kubectx"}))
+	require.Len(t, testFetch.Calls(), 1)
+	in, _ = newInstaller(t, yaml, "linux", cmdMap(nil), opts)
+	home := tempHome(t, in)
+	require.NoError(t, in.Install([]string{"kubectx"}))
+	require.Empty(t, testFetch.Calls())
+	require.FileExists(t, filepath.Join(home, ".local", "opt", "kubectx", "kubectx"))
+}
+
+func TestInstallBinaryDownloadCacheEvictsOnShaMismatch(t *testing.T) {
+	cache := t.TempDir()
+	in, _ := newInstaller(t, kubectxYaml, "linux", cmdMap(nil), Options{DownloadCacheDir: cache})
+	tempHome(t, in)
+	err := in.Install([]string{"kubectx"})
+	require.ErrorContains(t, err, "sha256 mismatch")
+	entries, err := os.ReadDir(cache)
+	require.NoError(t, err)
+	require.Empty(t, entries)
 }
 
 const zigYaml = `packages:
@@ -81,15 +113,14 @@ const zigYaml = `packages:
 `
 
 func TestInstallBinaryTreeFlow(t *testing.T) {
-	in, m := newInstaller(t, zigYaml, "linux", cmdMap([]string{"sha256sum"}), Options{})
-	m.Stub = shaStub("goodsha")
+	body := tarXzBody(t, "zig-x86_64-linux-0.16.0/zig")
+	in, _ := newInstaller(t, withSha(zigYaml, body), "linux", cmdMap(nil), Options{})
+	home := tempHome(t, in)
+	testFetch.Bodies["https://example.com/0.16.0/zig-x86_64-linux-0.16.0.tar.xz"] = body
 	require.NoError(t, in.Install([]string{"zig"}))
-	requireCalls(t, m,
-		"zig-x86_64-linux-0.16.0.tar.xz https://example.com/0.16.0/zig-x86_64-linux-0.16.0.tar.xz",
-		"mkdir -p /home/u/.local/opt/zig",
-		"tar -x -C /home/u/.local/opt/zig",
-		"ln -sf /home/u/.local/opt/zig/zig-x86_64-linux-0.16.0/zig /home/u/.local/bin/zig")
-	refuteCalls(t, m, "install -m 0755")
+	require.Contains(t, testFetch.Calls(), "https://example.com/0.16.0/zig-x86_64-linux-0.16.0.tar.xz")
+	requireSymlink(t, filepath.Join(home, ".local", "bin", "zig"),
+		filepath.Join(home, ".local", "opt", "zig", "zig-x86_64-linux-0.16.0", "zig"))
 }
 
 const gcloudArchiveYaml = `archSchemes:
@@ -106,28 +137,32 @@ packages:
 `
 
 func TestInstallBinariesRemoteArchiveArchScheme(t *testing.T) {
-	in, m := newInstaller(t, gcloudArchiveYaml, "darwin", cmdMap([]string{"sha256sum"}), Options{})
+	body := tarGzBody(t, "sdk/bin/gcloud", "sdk/bin/gsutil")
+	in, _ := newInstaller(t, withSha(gcloudArchiveYaml, body), "darwin", cmdMap(nil), Options{})
 	in.Host.Arch = "arm64"
-	m.Stub = shaStub("goodsha")
+	home := tempHome(t, in)
+	testFetch.Bodies["https://example.com/cli-572.0.0-darwin-arm.tar.gz"] = body
 	require.NoError(t, in.Install([]string{"gcloud"}))
-	requireCalls(t, m,
-		"cli-572.0.0-darwin-arm.tar.gz https://example.com/cli-572.0.0-darwin-arm.tar.gz",
-		"ln -sf /home/u/.local/opt/gcloud/sdk/bin/gcloud /home/u/.local/bin/gcloud",
-		"ln -sf /home/u/.local/opt/gcloud/sdk/bin/gsutil /home/u/.local/bin/gsutil")
+	require.Contains(t, testFetch.Calls(), "https://example.com/cli-572.0.0-darwin-arm.tar.gz")
+	requireSymlink(t, filepath.Join(home, ".local", "bin", "gcloud"), filepath.Join(home, ".local", "opt", "gcloud", "sdk", "bin", "gcloud"))
+	requireSymlink(t, filepath.Join(home, ".local", "bin", "gsutil"), filepath.Join(home, ".local", "opt", "gcloud", "sdk", "bin", "gsutil"))
 }
 
 func TestInstallBinarySkipsWhenPinPresent(t *testing.T) {
-	in, m := newInstaller(t, kindYaml, "linux", cmdMap([]string{"sha256sum", "kind"}), Options{})
+	in, m := newInstaller(t, kindYaml, "linux", cmdMap([]string{"kind"}), Options{})
 	m.Stub = stubOutputs("kind ", "kind version 0.32.0\n")
 	require.NoError(t, in.Install([]string{"kind"}))
-	refuteCalls(t, m, "curl")
+	require.Empty(t, testFetch.Calls())
 }
 
 func TestInstallBinaryReinstallsOnPinDrift(t *testing.T) {
-	in, m := newInstaller(t, kindYaml, "linux", cmdMap([]string{"sha256sum", "kind"}), Options{})
-	m.Stub = chainStubs(stubOutputs("kind ", "kind version 0.30.0\n"), shaStub("goodsha"))
+	body := []byte("kind-bin")
+	in, m := newInstaller(t, withSha(kindYaml, body), "linux", cmdMap([]string{"kind"}), Options{})
+	tempHome(t, in)
+	m.Stub = stubOutputs("kind ", "kind version 0.30.0\n")
+	testFetch.Bodies["https://example.com/v0.32.0/kind-linux-amd64"] = body
 	require.NoError(t, in.Install([]string{"kind"}))
-	requireCalls(t, m, "curl -fsSL")
+	require.NotEmpty(t, testFetch.Calls())
 }
 
 const awsYaml = `packages:
@@ -144,9 +179,9 @@ const awsYaml = `packages:
 
 func TestInstallAwsScriptOnDarwin(t *testing.T) {
 	in, m := newInstaller(t, awsYaml, "darwin", cmdMap(nil), Options{})
-	m.Stub = stubOutputs("curl ", "echo install-aws")
 	require.NoError(t, in.Install([]string{"aws"}))
-	requireCalls(t, m, "https://awscli.amazonaws.com/v2/install.sh", "che-script-")
+	require.Contains(t, testFetch.Calls(), "https://awscli.amazonaws.com/v2/install.sh")
+	requireCalls(t, m, "che-script-")
 }
 
 func TestInstallAwsSkipsWhenPresent(t *testing.T) {
@@ -157,53 +192,63 @@ func TestInstallAwsSkipsWhenPresent(t *testing.T) {
 
 func TestInstallAwsLinuxArchive(t *testing.T) {
 	in, m := newInstaller(t, awsYaml, "linux", cmdMap(nil), Options{})
+	home := tempHome(t, in)
+	testFetch.Bodies["https://awscli.amazonaws.com/awscli-exe-linux-x86_64.zip"] = zipBody(t, "aws/dist/aws", "aws/dist/aws_completer")
 	require.NoError(t, in.Install([]string{"aws"}))
-	requireCalls(t, m,
-		"awscli-exe-linux-x86_64.zip",
-		"unzip -oq",
-		"ln -sf /home/u/.local/opt/aws/aws/dist/aws /home/u/.local/bin/aws",
-		"ln -sf /home/u/.local/opt/aws/aws/dist/aws_completer /home/u/.local/bin/aws_completer")
+	require.Contains(t, testFetch.Calls(), "https://awscli.amazonaws.com/awscli-exe-linux-x86_64.zip")
+	requireSymlink(t, filepath.Join(home, ".local", "bin", "aws"), filepath.Join(home, ".local", "opt", "aws", "aws", "dist", "aws"))
+	requireSymlink(t, filepath.Join(home, ".local", "bin", "aws_completer"), filepath.Join(home, ".local", "opt", "aws", "aws", "dist", "aws_completer"))
 	refuteCalls(t, m, "install --update")
 }
 
 func TestInstallBinaryCustomDestination(t *testing.T) {
-	in, m := newInstaller(t, kindYaml, "linux", cmdMap([]string{"sha256sum"}), Options{BinariesRemoteArchiveDestinationCandidates: []string{"~/bin"}})
-	m.Stub = shaStub("goodsha")
+	body := []byte("kind-bin")
+	in, _ := newInstaller(t, withSha(kindYaml, body), "linux", cmdMap(nil),
+		Options{BinariesRemoteArchiveDestinationCandidates: []string{"~/bin"}})
+	home := tempHome(t, in)
+	testFetch.Bodies["https://example.com/v0.32.0/kind-linux-amd64"] = body
 	require.NoError(t, in.Install([]string{"kind"}))
-	requireCalls(t, m, "mkdir -p /home/u/bin", "/home/u/bin/kind")
+	require.FileExists(t, filepath.Join(home, "bin", "kind"))
 }
 
 func TestInstallBinaryPicksFirstCandidateOnPath(t *testing.T) {
-	in, m := newInstaller(t, kindYaml, "linux", cmdMap([]string{"sha256sum"}),
+	body := []byte("kind-bin")
+	in, _ := newInstaller(t, withSha(kindYaml, body), "linux", cmdMap(nil),
 		Options{BinariesRemoteArchiveDestinationCandidates: []string{"/custom/bin", "~/bin"}, BinariesRemoteArchiveCheckPresentOnPath: true})
-	in.Host.PathDirs = func() []string { return []string{"/usr/bin", "/home/u/bin"} }
-	m.Stub = shaStub("goodsha")
+	home := tempHome(t, in)
+	in.Host.PathDirs = func() []string { return []string{"/usr/bin", filepath.Join(home, "bin")} }
+	testFetch.Bodies["https://example.com/v0.32.0/kind-linux-amd64"] = body
 	out, err := captureStdout(t, func() error { return in.Install([]string{"kind"}) })
 	require.NoError(t, err)
-	requireCalls(t, m, "/home/u/bin/kind")
+	require.FileExists(t, filepath.Join(home, "bin", "kind"))
 	notLine(t, out, "not on path")
 }
 
 func TestInstallBinaryWarnsWhenNoCandidateOnPath(t *testing.T) {
-	in, m := newInstaller(t, kindYaml, "linux", cmdMap([]string{"sha256sum"}),
-		Options{BinariesRemoteArchiveDestinationCandidates: []string{"/custom/bin", "/other/bin"}, BinariesRemoteArchiveCheckPresentOnPath: true})
+	body := []byte("kind-bin")
+	dirA, dirB := filepath.Join(t.TempDir(), "a"), filepath.Join(t.TempDir(), "b")
+	in, _ := newInstaller(t, withSha(kindYaml, body), "linux", cmdMap(nil),
+		Options{BinariesRemoteArchiveDestinationCandidates: []string{dirA, dirB}, BinariesRemoteArchiveCheckPresentOnPath: true})
 	in.Host.PathDirs = func() []string { return []string{"/usr/bin"} }
-	m.Stub = shaStub("goodsha")
+	testFetch.Bodies["https://example.com/v0.32.0/kind-linux-amd64"] = body
 	out, err := captureStdout(t, func() error { return in.Install([]string{"kind"}) })
 	require.NoError(t, err)
-	wantLines(t, out, "no packages.binariesRemoteArchive.installDestinationCandidates entry is on PATH (/custom/bin, /other/bin), using /custom/bin")
-	requireCalls(t, m, "/custom/bin/kind")
+	wantLines(t, out, "no packages.binariesRemoteArchive.installDestinationCandidates entry is on PATH ("+dirA+", "+dirB+"), using "+dirA)
+	require.FileExists(t, filepath.Join(dirA, "kind"))
 }
 
 func TestInstallBinariesRemoteArchiveCheckPresentOnPathOffUsesFirstCandidate(t *testing.T) {
-	in, m := newInstaller(t, kindYaml, "linux", cmdMap([]string{"sha256sum"}),
-		Options{BinariesRemoteArchiveDestinationCandidates: []string{"/custom/bin", "~/bin"}})
-	in.Host.PathDirs = func() []string { return []string{"/home/u/bin"} }
-	m.Stub = shaStub("goodsha")
+	body := []byte("kind-bin")
+	dirA := filepath.Join(t.TempDir(), "a")
+	in, _ := newInstaller(t, withSha(kindYaml, body), "linux", cmdMap(nil),
+		Options{BinariesRemoteArchiveDestinationCandidates: []string{dirA, "~/bin"}})
+	home := tempHome(t, in)
+	in.Host.PathDirs = func() []string { return []string{filepath.Join(home, "bin")} }
+	testFetch.Bodies["https://example.com/v0.32.0/kind-linux-amd64"] = body
 	out, err := captureStdout(t, func() error { return in.Install([]string{"kind"}) })
 	require.NoError(t, err)
 	notLine(t, out, "not on path")
-	requireCalls(t, m, "/custom/bin/kind")
+	require.FileExists(t, filepath.Join(dirA, "kind"))
 }
 
 // [<] 🤖🤖

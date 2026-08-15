@@ -27,17 +27,17 @@ func (in *Installer) aliasBinaries(pkg string, it Item) error {
 			continue
 		}
 		if _, err := in.Host.LookPath(to); err == nil && !fileExists(dest) {
-			in.emitSkip(log.Levels.Debug, pkg, to+" already resolves without an alias")
+			in.emitPresent(log.Levels.Debug, pkg, to+" already resolves without an alias")
 			continue
 		}
 		if in.Opts.DryRun {
 			in.emitDryRun("alias", pkg+": "+to+" -> "+src)
 			continue
 		}
-		if err := in.exec([]string{"mkdir", "-p", binDir}); err != nil {
+		if err := os.MkdirAll(binDir, 0o755); err != nil {
 			return err
 		}
-		if err := in.exec([]string{"ln", "-sf", src, dest}); err != nil {
+		if err := makeSymlink(src, dest); err != nil {
 			return err
 		}
 		in.emit(log.Levels.Info, "aliased", pkg+": "+dest+" -> "+src)

@@ -11,6 +11,9 @@ ontoRepo:
           - source: templates/2-data/repo-structure.md.ontoRepo.tpl
             dest:
               - {path: assets/data/repo-structure.md}
+          - source: .gitlab/ci/test-install-packages.gitlab-ci.yml.ontoRepo.tpl
+            dest:
+              - {path: .gitlab/ci/test-install-packages.gitlab-ci.yml}
           - source: templates/3-audience/AGENTS.md.ontoRepo.tpl
             dest:
               - {path: CLAUDE.md}

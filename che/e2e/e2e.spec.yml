@@ -534,6 +534,8 @@ testCases:
           stdOut:
             - "installed e2e-absent via npm"
             - "missing e2e-absent"
+        notExpected:
+          stdOut: ["e2e-npm-install-noise"]
 
       - name: InstallBinaryDownloadsVerifiesInstalls
         command: che packages install --packages-file ${LOCAL}/packages.yml e2e-bin-new
@@ -554,14 +556,14 @@ testCases:
         expected:
           exitCode: 1
           stdOut:
-            - "unknown package: nosuchpkg (add it to ${LOCAL}/packages.yml)"
+            - "unknown package: nosuchpkg (required entry in ${LOCAL}/packages.yml)"
 
       - name: InstallFailsOnWrongBinaryUrl
         command: che packages install --packages-file ${LOCAL}/packages.yml e2e-bin-bad
         expected:
           exitCode: 1
           stdOut:
-            - "curl"
+            - "404"
             - "e2e-bin-bad"
         notExpected:
           stdOut: ["installed e2e-bin-bad"]

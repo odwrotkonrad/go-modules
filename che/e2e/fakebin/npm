@@ -7,7 +7,8 @@ case "$1" in
   install)
     for a in "$@"; do
       if [ "$a" = "e2e-missing-pkg" ]; then echo "npm ERR! 404 e2e-missing-pkg" >&2; exit 1; fi
-    done ;;
+    done
+    echo "e2e-npm-install-noise" ;;
 esac
 exit 0
 ##[<] 🤖🤖

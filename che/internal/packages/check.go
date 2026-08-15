@@ -15,6 +15,10 @@ import (
 func (in *Installer) CheckPresent(pkgs []string) []string {
 	var missing []string
 	for _, pkg := range pkgs {
+		if !in.verifySpec(pkg).ChecksPath() {
+			in.emit(log.Levels.Debug, "present", pkg+" (checkInPath disabled)")
+			continue
+		}
 		if in.isCodeManaged(pkg) {
 			if _, ok := in.codeExtensions()[strings.ToLower(pkg)]; ok {
 				in.emit(log.Levels.Debug, "present", pkg+" (code extension)")
@@ -32,6 +36,20 @@ func (in *Installer) CheckPresent(pkgs []string) []string {
 		missing = append(missing, pkg)
 	}
 	return missing
+}
+
+func (in *Installer) verifySpec(pkg string) *VerifySpec {
+	if in.File == nil {
+		return nil
+	}
+	entry, ok := in.File.Packages[pkg]
+	if !ok {
+		return nil
+	}
+	if it, picked, err := in.pickItem(pkg, entry); err == nil && picked && it.Verify != nil {
+		return it.Verify
+	}
+	return entry.Verify
 }
 
 func (in *Installer) isCodeManaged(pkg string) bool {

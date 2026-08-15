@@ -10,16 +10,19 @@ import (
 	"slices"
 	"strings"
 
+	"github.com/invopop/jsonschema"
 	"github.com/spf13/cobra"
 	"github.com/spf13/pflag"
 
 	"gitlab.com/konradodwrot/go-modules/che/internal/cli"
+	"gitlab.com/konradodwrot/go-modules/che/internal/packages"
 	"gitlab.com/konradodwrot/go-modules/che/internal/spec"
 	"gitlab.com/konradodwrot/go-modules/che/internal/telemetry"
 )
 
 const (
 	schemaPath           = "assets/data/che.schema.json"
+	packagesSchemaPath   = "assets/data/packages.schema.json"
 	cliDocPath           = "docs/cli.md"
 	cliUsagePath         = "assets/data/cli-usage.md"
 	observabilityDocPath = "docs/observability.md"
@@ -29,11 +32,12 @@ func main() {
 	must(os.MkdirAll("docs", 0o755))
 	root := cli.New().Root()
 	root.InitDefaultCompletionCmd()
-	must(os.WriteFile(schemaPath, schemaJSON(), 0o644))
+	must(os.WriteFile(schemaPath, schemaJSON(spec.Schema()), 0o644))
+	must(os.WriteFile(packagesSchemaPath, schemaJSON(packages.Schema()), 0o644))
 	must(os.WriteFile(cliDocPath, []byte(cliDoc(root)), 0o644))
 	must(os.WriteFile(cliUsagePath, []byte(cliUsage(root)), 0o644))
 	must(os.WriteFile(observabilityDocPath, []byte(observabilityDoc()), 0o644))
-	for _, p := range []string{schemaPath, cliDocPath, cliUsagePath, observabilityDocPath} {
+	for _, p := range []string{schemaPath, packagesSchemaPath, cliDocPath, cliUsagePath, observabilityDocPath} {
 		fmt.Println("wrote", p)
 	}
 }
@@ -45,8 +49,8 @@ func must(err error) {
 	}
 }
 
-func schemaJSON() []byte {
-	b, err := json.MarshalIndent(spec.Schema(), "", "  ")
+func schemaJSON(s *jsonschema.Schema) []byte {
+	b, err := json.MarshalIndent(s, "", "  ")
 	must(err)
 	return append(b, '\n')
 }

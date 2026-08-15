@@ -1,0 +1,500 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://gitlab.com/konradodwrot/go-modules/-/raw/main/che/assets/data/packages.schema.json",
+  "$defs": {
+    "Apt": {
+      "properties": {
+        "packageName": {
+          "type": "string",
+          "description": "apt package name when it differs from the entry key"
+        },
+        "versionMap": {
+          "additionalProperties": {
+            "type": "string"
+          },
+          "type": "object",
+          "maxProperties": 1,
+          "description": "exactly one binary version to package version pin"
+        },
+        "aliasBinary": {
+          "additionalProperties": {
+            "type": "string"
+          },
+          "type": "object",
+          "description": "alias name to target binary"
+        },
+        "fromRegistry": {
+          "type": "string",
+          "description": "installerRegistries.apt ref: scheme-less url[::suites[::components]]"
+        },
+        "verify": {
+          "$ref": "#/$defs/Verify"
+        }
+      },
+      "additionalProperties": false,
+      "type": "object",
+      "description": "apt item spec"
+    },
+    "AptRegistry": {
+      "properties": {
+        "url": {
+          "type": "string",
+          "description": "repository url"
+        },
+        "verificationKey": {
+          "type": "string",
+          "description": "keyring path or key url"
+        },
+        "suites": {
+          "type": "string"
+        },
+        "components": {
+          "type": "string"
+        }
+      },
+      "additionalProperties": false,
+      "type": "object",
+      "required": [
+        "url"
+      ],
+      "description": "one apt repository, referenced by scheme-less url[::suites[::components]]"
+    },
+    "BinariesRemoteArchive": {
+      "properties": {
+        "packageName": {
+          "type": "string"
+        },
+        "versionMap": {
+          "additionalProperties": {
+            "type": "string"
+          },
+          "type": "object",
+          "description": "binary version to archive version"
+        },
+        "archScheme": {
+          "type": "string",
+          "description": "archSchemes set substituted for {arch}"
+        },
+        "aliasBinary": {
+          "additionalProperties": {
+            "type": "string"
+          },
+          "type": "object",
+          "description": "alias name to target binary"
+        },
+        "platformEligibility": {
+          "$ref": "#/$defs/PlatformEligibility"
+        },
+        "extractBinaries": {
+          "$ref": "#/$defs/ExtractBinaries"
+        },
+        "version": {
+          "type": "string",
+          "description": "pinned version, absent means rolling"
+        },
+        "url": {
+          "type": "string",
+          "description": "archive url with {version}/{os}/{arch} tokens"
+        },
+        "verify": {
+          "$ref": "#/$defs/Verify"
+        }
+      },
+      "additionalProperties": false,
+      "type": "object",
+      "description": "download an archive and extract binaries onto PATH"
+    },
+    "Completions": {
+      "properties": {
+        "zsh": {
+          "properties": {
+            "name": {
+              "type": "string",
+              "description": "completion file name, defaults to _\u003centry\u003e"
+            },
+            "cmd": {
+              "type": "string",
+              "description": "command printing the completion file"
+            },
+            "url": {
+              "type": "string",
+              "description": "completion file url"
+            },
+            "checksum": {
+              "type": "string",
+              "pattern": "^sha256:.+",
+              "description": "sha256:\u003chex\u003e of the fetched file"
+            }
+          },
+          "additionalProperties": false,
+          "type": "object",
+          "description": "zsh completion file from a command or url, exactly one of cmd/url"
+        }
+      },
+      "additionalProperties": false,
+      "type": "object"
+    },
+    "Entry": {
+      "oneOf": [
+        {
+          "items": {
+            "$ref": "#/$defs/Item"
+          },
+          "type": "array"
+        },
+        {
+          "properties": {
+            "installers": {
+              "items": {
+                "$ref": "#/$defs/Item"
+              },
+              "type": "array"
+            },
+            "version": {
+              "type": "string",
+              "description": "pinned version, absent means rolling"
+            },
+            "requires": {
+              "items": {
+                "type": "string",
+                "description": "package names installed first"
+              },
+              "type": "array"
+            },
+            "postInstall": {
+              "$ref": "#/$defs/Script"
+            },
+            "command": {
+              "type": "string",
+              "description": "binary name when it differs from the entry key"
+            },
+            "versionCommand": {
+              "type": "string",
+              "description": "command printing the installed version"
+            },
+            "verify": {
+              "$ref": "#/$defs/Verify"
+            },
+            "completions": {
+              "$ref": "#/$defs/Completions"
+            }
+          },
+          "additionalProperties": false,
+          "type": "object",
+          "description": "entry object: installers plus shared fields"
+        }
+      ],
+      "description": "one package: installer item list, or an object adding version/requires/postInstall/command/versionCommand/completions"
+    },
+    "ExtractBinaries": {
+      "oneOf": [
+        {
+          "type": "string"
+        },
+        {
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        }
+      ],
+      "description": "archive paths extracted onto PATH, {version}/{os}/{arch} tokens allowed"
+    },
+    "InstallerList": {
+      "oneOf": [
+        {
+          "type": "string"
+        },
+        {
+          "items": {
+            "$ref": "#/$defs/InstallerList"
+          },
+          "type": "array"
+        }
+      ],
+      "description": "installer names, scalars or alias-nested lists (flattened on load)"
+    },
+    "Item": {
+      "oneOf": [
+        {
+          "type": "string",
+          "enum": [
+            "brew",
+            "brew/cask",
+            "vscode",
+            "apt",
+            "npm",
+            "go",
+            "gem",
+            "binariesRemoteArchive",
+            "script",
+            "pyenv",
+            "nvm"
+          ],
+          "description": "bare installer name"
+        },
+        {
+          "properties": {
+            "binariesRemoteArchive": {
+              "$ref": "#/$defs/BinariesRemoteArchive"
+            },
+            "script": {
+              "$ref": "#/$defs/Script"
+            },
+            "apt": {
+              "$ref": "#/$defs/Apt"
+            },
+            "pyenv": {
+              "$ref": "#/$defs/VersionManager"
+            },
+            "nvm": {
+              "$ref": "#/$defs/VersionManager"
+            },
+            "brew": {
+              "$ref": "#/$defs/ItemBody"
+            },
+            "brew/cask": {
+              "$ref": "#/$defs/ItemBody"
+            },
+            "vscode": {
+              "$ref": "#/$defs/ItemBody"
+            },
+            "npm": {
+              "$ref": "#/$defs/ItemBody"
+            },
+            "go": {
+              "$ref": "#/$defs/ItemBody"
+            },
+            "gem": {
+              "$ref": "#/$defs/ItemBody"
+            }
+          },
+          "additionalProperties": false,
+          "type": "object",
+          "maxProperties": 1,
+          "minProperties": 1,
+          "description": "single-key map: installer name to its spec"
+        }
+      ],
+      "description": "one installer: bare installer name, or a single-key map with its spec"
+    },
+    "ItemBody": {
+      "properties": {
+        "packageName": {
+          "type": "string",
+          "description": "manager-side package name when it differs from the entry key"
+        },
+        "aliasBinary": {
+          "additionalProperties": {
+            "type": "string"
+          },
+          "type": "object",
+          "description": "alias name to target binary"
+        },
+        "version": {
+          "type": "string",
+          "description": "pinned version, absent means rolling"
+        },
+        "fromRegistry": {
+          "type": "string",
+          "description": "installerRegistries ref (brew tap, apt url), brew/brew-cask/apt only"
+        },
+        "verify": {
+          "$ref": "#/$defs/Verify"
+        }
+      },
+      "additionalProperties": false,
+      "type": "object",
+      "description": "manager item spec"
+    },
+    "PlatformEligibility": {
+      "items": {
+        "oneOf": [
+          {
+            "type": "string",
+            "description": "platform name \u003cos\u003e-\u003carch\u003e"
+          },
+          {
+            "additionalProperties": {
+              "type": "string",
+              "pattern": "^sha256:.+"
+            },
+            "type": "object",
+            "maxProperties": 1,
+            "minProperties": 1,
+            "description": "single platform: sha256:\u003chex\u003e checksum pair"
+          }
+        ]
+      },
+      "type": "array",
+      "description": "eligible \u003cos\u003e-\u003carch\u003e platforms, bare or with an archive checksum"
+    },
+    "Script": {
+      "oneOf": [
+        {
+          "type": "string",
+          "description": "inline command"
+        },
+        {
+          "properties": {
+            "run": {
+              "type": "string",
+              "description": "inline command"
+            },
+            "args": {
+              "items": {
+                "type": "string"
+              },
+              "type": "array"
+            },
+            "path": {
+              "type": "string",
+              "description": "script path, packages-file-relative"
+            },
+            "url": {
+              "type": "string",
+              "description": "script url, downloaded then run"
+            },
+            "os": {
+              "type": "string",
+              "description": "run only on this os"
+            },
+            "version": {
+              "type": "string"
+            },
+            "env": {
+              "additionalProperties": {
+                "type": "string"
+              },
+              "type": "object",
+              "description": "env exported around the run"
+            },
+            "validateArtifact": {
+              "type": "string",
+              "description": "path whose presence marks the install done"
+            },
+            "platformEligibility": {
+              "$ref": "#/$defs/PlatformEligibility"
+            }
+          },
+          "additionalProperties": false,
+          "type": "object",
+          "description": "script spec: run inline, path on disk, or url"
+        }
+      ]
+    },
+    "Verify": {
+      "oneOf": [
+        {
+          "type": "string",
+          "enum": [
+            "versionCmd",
+            "pkgMgrVersionCheck"
+          ],
+          "description": "strategy: versionCmd runs the entry command with --version, pkgMgrVersionCheck asks the installing manager for the installed version"
+        },
+        {
+          "properties": {
+            "versionCmd": {
+              "type": "boolean",
+              "description": "run the entry command with --version (fallback version), exit 0 and non-empty output required"
+            },
+            "pkgMgrVersionCheck": {
+              "type": "boolean",
+              "description": "ask the installing manager for the installed version, exit 0 and non-empty output required"
+            },
+            "cmd": {
+              "type": "string",
+              "description": "command run after install, exit 0 = verified"
+            },
+            "checkInPath": {
+              "type": "boolean",
+              "description": "probe PATH for the package command during presence checks (default true); false for command-less packages"
+            }
+          },
+          "additionalProperties": false,
+          "type": "object",
+          "description": "verify options: strategy keys plus presence-check tuning, multiple keys combine"
+        }
+      ],
+      "description": "install verification: a named strategy shorthand or an options object"
+    },
+    "VersionManager": {
+      "properties": {
+        "versions": {
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "global": {
+          "type": "string",
+          "description": "version set as the global default"
+        }
+      },
+      "additionalProperties": false,
+      "type": "object",
+      "description": "version-manager item: installed tool versions"
+    }
+  },
+  "properties": {
+    "archSchemes": {
+      "additionalProperties": {
+        "additionalProperties": {
+          "type": "string"
+        },
+        "type": "object"
+      },
+      "type": "object",
+      "description": "named {arch: token} sets substituted for {arch} in binariesRemoteArchive urls and extractBinaries"
+    },
+    "osInstallers": {
+      "additionalProperties": {
+        "$ref": "#/$defs/InstallerList"
+      },
+      "type": "object",
+      "description": "eligible installers per \u003cos\u003e[-\u003cdistro\u003e] key, most specific key wins"
+    },
+    "installerRegistries": {
+      "properties": {
+        "apt": {
+          "items": {
+            "$ref": "#/$defs/AptRegistry"
+          },
+          "type": "array"
+        },
+        "brew": {
+          "items": {
+            "type": "string",
+            "description": "brew tap name (\u003cuser\u003e/\u003crepo\u003e)"
+          },
+          "type": "array"
+        }
+      },
+      "additionalProperties": false,
+      "type": "object",
+      "description": "installer package sources referenced by fromRegistry"
+    },
+    "basePackages": {
+      "additionalProperties": {
+        "items": {
+          "type": "string"
+        },
+        "type": "array"
+      },
+      "type": "object",
+      "description": "prerequisite package names per group: common always, an installer name when that installer is eligible"
+    },
+    "packages": {
+      "additionalProperties": {
+        "$ref": "#/$defs/Entry"
+      },
+      "type": "object",
+      "description": "package entries by canonical command name"
+    }
+  },
+  "additionalProperties": false,
+  "type": "object",
+  "title": "packages.yml",
+  "description": "che packages file: installer eligibility per platform, installer registries, base packages, package entries"
+}

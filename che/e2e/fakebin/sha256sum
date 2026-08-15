@@ -1,5 +1,0 @@
-#!/bin/sh
-##[>] 🤖🤖
-for last in "$@"; do :; done
-printf 'e2esha  %s\n' "$last"
-##[<] 🤖🤖

@@ -3,6 +3,8 @@ package packages
 // [>] 🤖🤖
 
 import (
+	"archive/zip"
+	"bytes"
 	"os"
 	"path/filepath"
 	"strings"
@@ -59,11 +61,11 @@ func TestNewHostCapturesRuntime(t *testing.T) {
 
 func TestApplicableGemAndCask(t *testing.T) {
 	h := testHost("darwin", "amd64", cmdMap([]string{"gem", "brew"}))
-	it, ok, err := h.pickPreferred("x", Entry{Items: []Item{{Mgr: "gem"}}}, nil, nil)
+	it, ok, err := h.pickPreferred("x", Entry{Items: []Item{{Mgr: "gem"}}}, nil, nil, nil, false)
 	require.NoError(t, err)
 	require.True(t, ok)
 	require.Equal(t, "gem", it.Mgr)
-	it, ok, err = h.pickPreferred("x", Entry{Items: []Item{{Mgr: "cask", Name: "x"}}}, nil, nil)
+	it, ok, err = h.pickPreferred("x", Entry{Items: []Item{{Mgr: "cask", Name: "x"}}}, nil, nil, nil, false)
 	require.NoError(t, err)
 	require.True(t, ok)
 	require.Equal(t, "cask", it.Mgr)
@@ -206,10 +208,19 @@ func TestInstallBinaryZipAsset(t *testing.T) {
         version: 1.15.0
         url: https://example.com/terraform_{version}_{os}_{arch}.zip
 `
-	in, m := newInstaller(t, zipYaml, "linux", cmdMap([]string{"sha256sum"}), Options{})
-	m.Stub = shaStub("goodsha")
+	var zbuf bytes.Buffer
+	zw := zip.NewWriter(&zbuf)
+	zf, err := zw.CreateHeader(&zip.FileHeader{Name: "terraform"})
+	require.NoError(t, err)
+	_, err = zf.Write([]byte("#!/bin/sh\n"))
+	require.NoError(t, err)
+	require.NoError(t, zw.Close())
+	in, _ := newInstaller(t, withSha(zipYaml, zbuf.Bytes()), "linux", cmdMap(nil), Options{})
+	home := tempHome(t, in)
+	testFetch.Bodies["https://example.com/terraform_1.15.0_linux_amd64.zip"] = zbuf.Bytes()
 	require.NoError(t, in.Install([]string{"terraform"}))
-	requireCalls(t, m, "unzip -oq", "/home/u/.local/bin/terraform")
+	require.FileExists(t, filepath.Join(home, ".local", "opt", "terraform", "terraform"))
+	requireSymlink(t, filepath.Join(home, ".local", "bin", "terraform"), filepath.Join(home, ".local", "opt", "terraform", "terraform"))
 }
 
 func TestDefaultEmittersWriteStdout(t *testing.T) {

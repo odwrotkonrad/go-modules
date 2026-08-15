@@ -73,10 +73,12 @@ func TestEntryVersionPinsArchiveVersion(t *testing.T) {
           platformEligibility: [{linux-amd64: sha256:goodsha}]
           url: https://example.com/kind-{version}
 `
-	in, m := newInstaller(t, y, "linux", cmdMap([]string{"sha256sum"}), Options{})
-	m.Stub = shaStub("goodsha")
+	body := []byte("kind-bin")
+	in, _ := newInstaller(t, withSha(y, body), "linux", cmdMap(nil), Options{})
+	tempHome(t, in)
+	testFetch.Bodies["https://example.com/kind-0.32.0"] = body
 	require.NoError(t, in.Install([]string{"kind"}))
-	requireCalls(t, m, "https://example.com/kind-0.32.0")
+	require.Contains(t, testFetch.Calls(), "https://example.com/kind-0.32.0")
 }
 
 func TestArchiveWithoutVersionNeedsNoPin(t *testing.T) {
@@ -87,9 +89,11 @@ func TestArchiveWithoutVersionNeedsNoPin(t *testing.T) {
         extractBinaries: [aws/dist/aws]
         url: https://example.com/aws-latest.zip
 `
-	in, m := newInstaller(t, y, "linux", cmdMap(nil), Options{})
+	in, _ := newInstaller(t, y, "linux", cmdMap(nil), Options{})
+	tempHome(t, in)
+	testFetch.Bodies["https://example.com/aws-latest.zip"] = zipBody(t, "aws/dist/aws")
 	require.NoError(t, in.Install([]string{"aws"}))
-	requireCalls(t, m, "aws-latest.zip")
+	require.Contains(t, testFetch.Calls(), "https://example.com/aws-latest.zip")
 }
 
 // [<] 🤖🤖
@@ -198,6 +202,21 @@ func TestUnversionedLatestSentinelNotUsedAsArchiveVersion(t *testing.T) {
 	require.ErrorContains(t, in.Install([]string{"kind"}), "no version pinned")
 }
 
+func TestExplicitLatestSentinelResolvesLatestArchiveVersion(t *testing.T) {
+	const y = `packages:
+  kind:
+    version: latest
+    installers:
+      - binariesRemoteArchive:
+          platformEligibility: [linux-amd64]
+          url: https://example.com/kind-{version}
+`
+	in, _ := newInstaller(t, y, "linux", cmdMap(nil), Options{})
+	tempHome(t, in)
+	require.NoError(t, in.Install([]string{"kind"}))
+	require.Contains(t, testFetch.Calls(), "https://example.com/kind-latest")
+}
+
 func TestAliasBinaryLinksRenamedBinary(t *testing.T) {
 	const y = `packages:
   bat:
@@ -209,6 +228,7 @@ func TestAliasBinaryLinksRenamedBinary(t *testing.T) {
 `
 	cmds := cmdMap([]string{"apt-get"})
 	in, m := newInstaller(t, y, "linux", cmds, Options{})
+	home := tempHome(t, in)
 	m.Stub = func(argv []string) ([]byte, error) {
 		joined := strings.Join(argv, " ")
 		if strings.HasPrefix(joined, "dpkg -s") {
@@ -220,7 +240,10 @@ func TestAliasBinaryLinksRenamedBinary(t *testing.T) {
 		return nil, nil
 	}
 	require.NoError(t, in.Install([]string{"bat"}))
-	requireCalls(t, m, "--no-install-recommends bat", "ln -sf /usr/bin/batcat /home/u/.local/bin/bat")
+	requireCalls(t, m, "--no-install-recommends bat")
+	resolved, err := os.Readlink(filepath.Join(home, ".local", "bin", "bat"))
+	require.NoError(t, err)
+	require.Equal(t, "/usr/bin/batcat", resolved)
 }
 
 func TestAliasBinarySkippedWhenSourceAbsent(t *testing.T) {
@@ -231,9 +254,10 @@ func TestAliasBinarySkippedWhenSourceAbsent(t *testing.T) {
           aliasBinary:
             batcat: bat
 `
-	in, m := newInstaller(t, y, "darwin", cmdMap([]string{"brew", "bat"}), Options{})
+	in, _ := newInstaller(t, y, "darwin", cmdMap([]string{"brew", "bat"}), Options{})
+	home := tempHome(t, in)
 	require.NoError(t, in.Install([]string{"bat"}))
-	refuteCalls(t, m, "ln -sf")
+	require.NoFileExists(t, filepath.Join(home, ".local", "bin", "bat"))
 }
 
 func TestPostInstallRunsOnFreshInstallOnly(t *testing.T) {
