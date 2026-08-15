@@ -140,6 +140,7 @@ Scenario: a nix pin is a registry-repo revision
   Then install resolves the ref `<registry-url>/<revision>#<attr>` and the drift check compares the profile's store-path version to the binary version
   And a drifted install reinstalls: `nix profile remove <attr>`, then the pinned ref installs
   And a requested or entry-pinned version with no revision in the versionMap is a hard error naming versionMap
+  And every builtin nix item pins: version and revision from the registry's channel head (nixpkgs-unstable, nixos-26.05), one rev shared per registry
 
 Scenario: brew taps are declared once as registries, entries reference them by tap name
   Status: tested
