@@ -104,6 +104,10 @@ func pinnedVersion(it Item) string {
 		for bin := range it.Apt.VersionMap {
 			return bin
 		}
+	case it.Nix != nil:
+		for bin := range it.Nix.VersionMap {
+			return bin
+		}
 	}
 	return it.Version
 }

@@ -117,6 +117,21 @@ func (h Host) BrewBin() string {
 	return ""
 }
 
+func (h Host) NixBin() string {
+	if p, err := h.LookPath("nix"); err == nil {
+		return p
+	}
+	if h.Stat == nil {
+		return ""
+	}
+	for _, p := range []string{"/nix/var/nix/profiles/default/bin/nix", filepath.Join(h.Getenv("HOME"), ".nix-profile", "bin", "nix")} {
+		if fi, err := h.Stat(p); err == nil && !fi.IsDir() && fi.Mode()&0o111 != 0 {
+			return p
+		}
+	}
+	return ""
+}
+
 func (h Host) expandAs(s, version, arch string) string {
 	return strings.NewReplacer("{version}", version, "{os}", h.OS, "{arch}", arch).Replace(s)
 }
@@ -129,6 +144,8 @@ func (h Host) applicable(pkg string, it Item, strict bool) (bool, error) {
 		return h.OS == "linux" && h.HasCmd("apt-get"), nil
 	case "npm":
 		return !strict || h.HasCmd("npm"), nil
+	case "nix":
+		return !strict || h.NixBin() != "", nil
 	case "vscode":
 		return !strict || h.HasCmd("code"), nil
 	case "gem":
@@ -144,6 +161,12 @@ func (h Host) applicable(pkg string, it Item, strict bool) (bool, error) {
 			return false, fmt.Errorf("package %s: binariesRemoteArchive item missing props", pkg)
 		}
 		return slices.Contains(it.BinariesRemoteArchive.PlatformEligibility.Names, h.PlatformKey()), nil
+	case "buildFromSource":
+		if it.BuildFromSource == nil {
+			return false, fmt.Errorf("package %s: buildFromSource item missing props", pkg)
+		}
+		names := it.BuildFromSource.PlatformEligibility.Names
+		return len(names) == 0 || slices.Contains(names, h.PlatformKey()), nil
 	case "pyenv", "nvm":
 		if it.VersionManager == nil || len(it.VersionManager.Versions) == 0 {
 			return false, fmt.Errorf("package %s: %s item requires versions", pkg, it.Mgr)
@@ -201,11 +224,11 @@ func methodFamily(mgr string) string {
 	return mgr
 }
 
-var KnownManagers = []string{"brew", "cask", "apt", "npm", "go", "gem", "binariesRemoteArchive", "script", "vscode", "pyenv", "nvm"}
+var KnownManagers = []string{"brew", "cask", "apt", "npm", "go", "gem", "binariesRemoteArchive", "script", "buildFromSource", "vscode", "pyenv", "nvm", "nix"}
 
-var PlatformMethods = []string{"brew", "brew/cask", "vscode", "apt", "npm", "go", "gem", "binariesRemoteArchive", "script", "pyenv", "nvm"}
+var PlatformMethods = []string{"brew", "brew/cask", "vscode", "apt", "npm", "go", "gem", "binariesRemoteArchive", "script", "buildFromSource", "pyenv", "nvm", "nix"}
 
-var DefaultPreferredMethods = []string{"brew", "cask", "apt", "binariesRemoteArchive", "script", "npm", "go", "gem", "vscode"}
+var DefaultPreferredMethods = []string{"brew", "cask", "apt", "binariesRemoteArchive", "script", "buildFromSource", "npm", "go", "gem", "vscode", "nix"}
 
 var DefaultBinariesRemoteArchiveDestinationCandidates = []string{"~/.local/bin", "~/bin"}
 

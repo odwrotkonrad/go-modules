@@ -87,7 +87,7 @@ type Run struct {
 
 type Packages struct {
 	File                         string                       `yaml:"file" jsonschema_description:"packages.yml path; default $XDG_CONFIG_HOME/packages/packages.yml; overridden by --packages-file and CHE_PACKAGES_FILE"`
-	PreferredInstallationMethods []string                     `yaml:"preferredInstallationMethods" jsonschema:"enum=brew,enum=cask,enum=apt,enum=npm,enum=go,enum=gem,enum=binariesRemoteArchive,enum=script,enum=vscode,enum=pyenv,enum=nvm" jsonschema_description:"manager preference order: listed managers are tried first (in this order) within each package entry, unlisted ones follow in entry order; cascades profile > spec > user config; overridden by CHE_PACKAGES_PREFERRED_METHODS"`
+	PreferredInstallationMethods []string                     `yaml:"preferredInstallationMethods" jsonschema:"enum=brew,enum=cask,enum=apt,enum=npm,enum=go,enum=gem,enum=binariesRemoteArchive,enum=script,enum=vscode,enum=pyenv,enum=nvm,enum=nix" jsonschema_description:"manager preference order: listed managers are tried first (in this order) within each package entry, unlisted ones follow in entry order; cascades profile > spec > user config; overridden by CHE_PACKAGES_PREFERRED_METHODS"`
 	BinariesRemoteArchive        BinariesRemoteArchiveInstall `yaml:"binariesRemoteArchive" jsonschema_description:"binariesRemoteArchive installation method options"`
 	Completions                  CompletionsInstall           `yaml:"completions" jsonschema_description:"zsh completions installation options"`
 }

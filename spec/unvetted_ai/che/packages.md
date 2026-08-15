@@ -4,7 +4,7 @@
 
 `che packages` declaratively installs packages from a packages file
 (`$XDG_CONFIG_HOME/packages/packages.yml`): each canonical name lists managers
-in preference order (brew, brew/cask, vscode, apt, npm, go, gem, binariesRemoteArchive, script, pyenv, nvm), the first applicable on
+in preference order (brew, brew/cask, vscode, apt, npm, go, gem, binariesRemoteArchive, script, pyenv, nvm, nix), the first applicable on
 this host wins. Profiles declare `include.installPackages` and the run
 sequence installs them before `runScripts`. Four check subcommands report
 presence, upgradability, shadowing, and duplicates.
@@ -18,8 +18,8 @@ Scenario: a package named once, by its CLI name, resolves on every host
 
 Scenario: a user installs a package via a supported installation method
   Status: tested
-  When a user wants to install a package via an installation method: brew, brew/cask, vscode, apt, npm, go, gem, binariesRemoteArchive, script, pyenv, nvm
-  Then they have the ability to do so on any platform where the method is eligible (osInstallers: every platform carries binariesRemoteArchive, script, npm, go, gem, pyenv, nvm. linux-debian adds apt, darwin adds brew, brew/cask, vscode)
+  When a user wants to install a package via an installation method: brew, brew/cask, vscode, apt, npm, go, gem, binariesRemoteArchive, script, pyenv, nvm, nix
+  Then they have the ability to do so on any platform where the method is eligible (osInstallers: every platform carries binariesRemoteArchive, script, npm, go, gem, pyenv, nvm, nix. linux-debian adds apt, darwin adds brew, brew/cask, vscode)
   And a method outside the set is a hard error naming the valid set
 
 Scenario: a user steers method selection with preferred installation methods
@@ -123,6 +123,23 @@ Scenario: apt repositories are declared once as registries, entries reference th
   And a registry with explicit `suites:` installs with `-t <suites>` so exact-version dependencies (curl -> libcurl4) resolve from that suite too
   And a reference to an undeclared registry, or a registry missing url or verificationKey, is a hard error
 
+Scenario: a nix item installs from nixpkgs via nix profile
+  Status: implemented
+  When a package lists a `- nix` item (bare, or `{nix: {packageName: <attr>, versionMap: ..., aliasBinary: ..., verify: ...}}`)
+  Then it is eligible on linux and darwin, last in the default preference order, so it never preempts another applicable manager
+  And on a host without nix the `nix` basePackages group bootstraps nix first via the Determinate Systems installer script (daemon install on hosts, `--init none` in containers; `/nix/receipt.json` marks it installed), and che falls back to `/nix/var/nix/profiles/default/bin/nix` or `~/.nix-profile/bin/nix` while nix is off PATH
+  And an unpinned item installs `nix profile install nixpkgs#<attr>` (attr defaults to the entry key, `packageName` overrides), `--update` runs `nix profile upgrade <attr>`
+  And presence and installed-version read `nix profile list` (store-path parse, defensive across nix output formats; an unparseable version falls back to the `--version` probe)
+  And a packageName carrying `#`, `@`, or `=` is a parse error: names stay bare nixpkgs attributes
+  And `fromRegistry`, `platformEligibility`, `extractBinaries`, and `archScheme` on a nix item are parse errors
+
+Scenario: a nix pin is a nixpkgs revision
+  Status: implemented
+  When a nix item pins via `versionMap: {"<binary-version>": "<nixpkgs-revision>"}` (exactly one pair)
+  Then install resolves the ref `github:NixOS/nixpkgs/<revision>#<attr>` and the drift check compares the profile's store-path version to the binary version
+  And a drifted install reinstalls: `nix profile remove <attr>`, then the pinned ref installs
+  And a requested or entry-pinned version with no revision in the versionMap is a hard error naming versionMap
+
 Scenario: brew taps are declared once as registries, entries reference them by tap name
   Status: tested
   When a formula or cask lives in a third-party tap
@@ -174,7 +191,7 @@ Scenario: top-level archLabelSchemes and osInstallers blocks standardize arch la
   Then the most specific key matching the host wins (`<os>-<distro>-<arch>` > `<os>-<distro>` > `<os>-<arch>` > `<os>`) and only its listed installers are applicable; a host matching no key falls back to the built-in applicability rules
   And apt is eligible only under `linux-debian` (the linux distro read from /etc/os-release ID): apt is not common to every distro, plain `linux` hosts skip apt items
   And item `installerVocabulary.platformEligibility:` ids are `<os>-<arch>`, validated against the block's os prefixes and archLabelSchemes' arches; an unknown value is a hard error naming both
-  And on a host whose platform id is a key, only its listed methods are applicable, named explicitly: `brew`, `brew/cask`, `vscode`, apt, npm, go, gem, binariesRemoteArchive, script, pyenv, nvm; an unlisted host platform falls back to the built-in applicability rules
+  And on a host whose platform id is a key, only its listed methods are applicable, named explicitly: `brew`, `brew/cask`, `vscode`, apt, npm, go, gem, binariesRemoteArchive, script, pyenv, nvm, nix; an unlisted host platform falls back to the built-in applicability rules
   And a key extends another with a yaml anchor/alias, no installer repetition (`linux: &common [script, npm]`, `linux-debian: [apt, *common]`): alias lists flatten
   And a file without the blocks inherits the builtin's
   And an item's `installerVocabulary.archLabelScheme: <set>` picks the spelling `{arch}` expands to; every item using `{arch}` must declare it (the builtin ships `go`, `uname`, `odd`)

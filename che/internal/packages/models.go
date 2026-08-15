@@ -267,10 +267,14 @@ func (it Item) MarshalYAML() (any, error) {
 	switch {
 	case it.BinariesRemoteArchive != nil:
 		return map[string]*BinariesRemoteArchiveSpec{"binariesRemoteArchive": it.BinariesRemoteArchive}, nil
+	case it.BuildFromSource != nil:
+		return map[string]*BuildFromSourceSpec{"buildFromSource": it.BuildFromSource}, nil
 	case it.Script != nil:
 		return map[string]*ScriptSpec{"script": it.Script}, nil
 	case it.Apt != nil:
 		return map[string]*AptSpec{"apt": it.Apt}, nil
+	case it.Nix != nil:
+		return map[string]*NixSpec{"nix": it.Nix}, nil
 	case it.VersionManager != nil:
 		return map[string]*VersionManagerSpec{it.VersionManager.Tool: it.VersionManager}, nil
 	}
@@ -436,8 +440,10 @@ type Item struct {
 	AliasBinary           map[string]string
 	Verify                *VerifySpec
 	BinariesRemoteArchive *BinariesRemoteArchiveSpec
+	BuildFromSource       *BuildFromSourceSpec
 	Script                *ScriptSpec
 	Apt                   *AptSpec
+	Nix                   *NixSpec
 	VersionManager        *VersionManagerSpec
 }
 
@@ -529,6 +535,18 @@ func (a *AptSpec) packageName(pkg string) string {
 	return pkg
 }
 
+type NixSpec struct {
+	InstallerVocabulary `yaml:",inline"`
+	Verify              *VerifySpec `yaml:"verify,omitempty"`
+}
+
+func (n *NixSpec) packageName(pkg string) string {
+	if n.PackageName != "" {
+		return n.PackageName
+	}
+	return pkg
+}
+
 type AptRepoSpec struct {
 	URL             string `yaml:"url,omitempty"`
 	VerificationKey string `yaml:"verificationKey,omitempty"`
@@ -616,10 +634,20 @@ type BinariesRemoteArchiveSpec struct {
 	Verify              *VerifySpec `yaml:"verify,omitempty"`
 }
 
+type BuildFromSourceSpec struct {
+	Version             string        `yaml:"version,omitempty"`
+	URL                 string        `yaml:"url,omitempty"`
+	Checksum            string        `yaml:"checksum,omitempty"`
+	ConfigureArgs       []string      `yaml:"configureArgs,omitempty"`
+	PlatformEligibility ItemPlatforms `yaml:"platformEligibility,omitempty"`
+	Verify              *VerifySpec   `yaml:"verify,omitempty"`
+}
+
 var legacyItemKeys = map[string][]string{
 	"binariesRemoteArchive": {"installerVocabulary"},
 	"script":                {"installerVocabulary"},
 	"apt":                   {"installerVocabulary", "installPackages", "versions"},
+	"nix":                   {"installerVocabulary"},
 	"brew":                  {"installerVocabulary", "formula", "cask", "vscode", "package"},
 	"brew/cask":             {"installerVocabulary", "formula", "cask", "vscode", "package"},
 	"vscode":                {"installerVocabulary", "formula", "cask", "vscode", "package"},
@@ -661,9 +689,15 @@ func (it *Item) UnmarshalYAML(node *yaml.Node) error {
 	switch key.Value {
 	case "binariesRemoteArchive":
 		return it.unmarshalBinariesRemoteArchive(val)
+	case "buildFromSource":
+		return it.unmarshalBuildFromSource(val)
 	case "apt":
 		if val.Kind == yaml.MappingNode {
 			return it.unmarshalApt(val)
+		}
+	case "nix":
+		if val.Kind == yaml.MappingNode {
+			return it.unmarshalNix(val)
 		}
 	case "versionManager":
 		return fmt.Errorf("versionManager items are gone: name the tool as the installer ({pyenv: ...} or {nvm: ...})")
@@ -710,6 +744,28 @@ func (it *Item) unmarshalBinariesRemoteArchive(val *yaml.Node) error {
 	return nil
 }
 
+func (it *Item) unmarshalBuildFromSource(val *yaml.Node) error {
+	it.Mgr = "buildFromSource"
+	b := &BuildFromSourceSpec{}
+	if err := val.Decode(b); err != nil {
+		return err
+	}
+	if b.URL == "" {
+		return fmt.Errorf("buildFromSource item: url required")
+	}
+	if b.Checksum != "" {
+		if _, err := parseChecksumHex(b.Checksum); err != nil {
+			return fmt.Errorf("buildFromSource item: %w", err)
+		}
+	}
+	if len(b.PlatformEligibility.Checksums) > 0 {
+		return fmt.Errorf("buildFromSource item: platformEligibility takes names only, the sum goes in checksum")
+	}
+	it.BuildFromSource = b
+	it.Verify = b.Verify
+	return nil
+}
+
 func (it *Item) unmarshalApt(val *yaml.Node) error {
 	it.Mgr = "apt"
 	a := &AptSpec{}
@@ -728,6 +784,30 @@ func (it *Item) unmarshalApt(val *yaml.Node) error {
 	it.Apt = a
 	it.AliasBinary = a.AliasBinary
 	it.Verify = a.Verify
+	return nil
+}
+
+func (it *Item) unmarshalNix(val *yaml.Node) error {
+	it.Mgr = "nix"
+	if mappingHasKey(val, "fromRegistry") {
+		return fmt.Errorf("nix item: fromRegistry applies to brew, brew/cask, and apt items")
+	}
+	n := &NixSpec{}
+	if err := val.Decode(n); err != nil {
+		return err
+	}
+	if len(n.VersionMap) > 1 {
+		return fmt.Errorf("nix versionMap must map exactly one binary version to one nixpkgs revision")
+	}
+	if len(n.PlatformEligibility.Names) > 0 || len(n.ExtractBinaries) > 0 || n.ArchScheme != "" {
+		return fmt.Errorf("nix item: platformEligibility, extractBinaries, and archScheme apply to binariesRemoteArchive and script items")
+	}
+	if strings.ContainsAny(n.PackageName, "#@=") {
+		return fmt.Errorf("nix item %s: names stay bare nixpkgs attributes, version pins go in versionMap", n.PackageName)
+	}
+	it.Nix = n
+	it.AliasBinary = n.AliasBinary
+	it.Verify = n.Verify
 	return nil
 }
 
@@ -862,16 +942,17 @@ func (f *File) ValidatePlatforms() error {
 	}
 	for _, name := range slices.Sorted(maps.Keys(f.Packages)) {
 		for _, it := range f.Packages[name].Items {
+			if s := it.BuildFromSource; s != nil {
+				if err := validatePlatformNames(name, s.PlatformEligibility.Names, oses, arches); err != nil {
+					return err
+				}
+			}
 			b := it.BinariesRemoteArchive
 			if b == nil {
 				continue
 			}
-			for _, p := range b.PlatformEligibility.Names {
-				osName, arch, ok := strings.Cut(p, "-")
-				if !ok || !oses[osName] || !arches[arch] {
-					return fmt.Errorf("package %s: unknown platform %q (want <os>-<arch>: os from osInstallers keys %s, arch from archSchemes %s)",
-						name, p, strings.Join(slices.Sorted(maps.Keys(oses)), ", "), strings.Join(slices.Sorted(maps.Keys(arches)), ", "))
-				}
+			if err := validatePlatformNames(name, b.PlatformEligibility.Names, oses, arches); err != nil {
+				return err
 			}
 			if b.ArchScheme == "" && strings.Contains(b.URL+" "+strings.Join(b.ExtractBinaries, " "), "{arch}") {
 				return fmt.Errorf("package %s: {arch} requires archScheme (archSchemes sets: %s)", name, strings.Join(slices.Sorted(maps.Keys(archSchemes)), ", "))
@@ -879,6 +960,17 @@ func (f *File) ValidatePlatforms() error {
 			if _, ok := archSchemes[b.ArchScheme]; b.ArchScheme != "" && !ok {
 				return fmt.Errorf("package %s: unknown archScheme %q (archSchemes sets: %s)", name, b.ArchScheme, strings.Join(slices.Sorted(maps.Keys(archSchemes)), ", "))
 			}
+		}
+	}
+	return nil
+}
+
+func validatePlatformNames(pkg string, names []string, oses, arches map[string]bool) error {
+	for _, p := range names {
+		osName, arch, ok := strings.Cut(p, "-")
+		if !ok || !oses[osName] || !arches[arch] {
+			return fmt.Errorf("package %s: unknown platform %q (want <os>-<arch>: os from osInstallers keys %s, arch from archSchemes %s)",
+				pkg, p, strings.Join(slices.Sorted(maps.Keys(oses)), ", "), strings.Join(slices.Sorted(maps.Keys(arches)), ", "))
 		}
 	}
 	return nil

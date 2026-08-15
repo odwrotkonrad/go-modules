@@ -104,6 +104,47 @@
       "type": "object",
       "description": "download an archive and extract binaries onto PATH"
     },
+    "BuildFromSource": {
+      "properties": {
+        "version": {
+          "type": "string",
+          "description": "pinned version, absent means rolling"
+        },
+        "url": {
+          "type": "string",
+          "description": "source tarball url with a {version} token"
+        },
+        "checksum": {
+          "type": "string",
+          "pattern": "^sha256:.+",
+          "description": "sha256:\u003chex\u003e of the source tarball"
+        },
+        "configureArgs": {
+          "items": {
+            "type": "string",
+            "description": "extra ./configure arguments"
+          },
+          "type": "array"
+        },
+        "platformEligibility": {
+          "items": {
+            "type": "string",
+            "description": "platform name \u003cos\u003e-\u003carch\u003e"
+          },
+          "type": "array",
+          "description": "eligible \u003cos\u003e-\u003carch\u003e platforms, names only; empty means all"
+        },
+        "verify": {
+          "$ref": "#/$defs/Verify"
+        }
+      },
+      "additionalProperties": false,
+      "type": "object",
+      "required": [
+        "url"
+      ],
+      "description": "download a source tarball, then ./configure \u0026\u0026 make \u0026\u0026 make install"
+    },
     "Completions": {
       "properties": {
         "zsh": {
@@ -228,8 +269,10 @@
             "gem",
             "binariesRemoteArchive",
             "script",
+            "buildFromSource",
             "pyenv",
-            "nvm"
+            "nvm",
+            "nix"
           ],
           "description": "bare installer name"
         },
@@ -238,11 +281,17 @@
             "binariesRemoteArchive": {
               "$ref": "#/$defs/BinariesRemoteArchive"
             },
+            "buildFromSource": {
+              "$ref": "#/$defs/BuildFromSource"
+            },
             "script": {
               "$ref": "#/$defs/Script"
             },
             "apt": {
               "$ref": "#/$defs/Apt"
+            },
+            "nix": {
+              "$ref": "#/$defs/Nix"
             },
             "pyenv": {
               "$ref": "#/$defs/VersionManager"
@@ -306,6 +355,35 @@
       "additionalProperties": false,
       "type": "object",
       "description": "manager item spec"
+    },
+    "Nix": {
+      "properties": {
+        "packageName": {
+          "type": "string",
+          "description": "nixpkgs attribute when it differs from the entry key"
+        },
+        "versionMap": {
+          "additionalProperties": {
+            "type": "string"
+          },
+          "type": "object",
+          "maxProperties": 1,
+          "description": "exactly one binary version to nixpkgs revision pin"
+        },
+        "aliasBinary": {
+          "additionalProperties": {
+            "type": "string"
+          },
+          "type": "object",
+          "description": "alias name to target binary"
+        },
+        "verify": {
+          "$ref": "#/$defs/Verify"
+        }
+      },
+      "additionalProperties": false,
+      "type": "object",
+      "description": "nix item spec"
     },
     "PlatformEligibility": {
       "items": {

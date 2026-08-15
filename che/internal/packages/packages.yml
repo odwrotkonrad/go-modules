@@ -6,7 +6,7 @@ archSchemes:
     odd: {amd64: x86_64, arm64: arm64}
     rust: {amd64: "x86_64-unknown-{os}-musl", arm64: "aarch64-unknown-{os}-gnu"}
 osInstallers:
-    linux: &base [binariesRemoteArchive, script, npm, go, gem, pyenv, nvm, vscode]
+    linux: &base [binariesRemoteArchive, script, buildFromSource, npm, go, gem, pyenv, nvm, vscode, nix]
     linux-debian: [apt, *base]
     darwin: [brew, brew/cask, *base]
 installerRegistries:
@@ -30,6 +30,12 @@ installerRegistries:
           verificationKey: https://konradodwrot.gitlab.io/go-modules/apt/gpg.key
           suites: stable
           components: main
+        - url: https://packages.gitlab.com/runner/gitlab-runner/debian
+          verificationKey: https://packages.gitlab.com/runner/gitlab-runner/gpgkey
+          components: main
+        - url: https://packages.microsoft.com/repos/azure-cli
+          verificationKey: https://packages.microsoft.com/keys/microsoft.asc
+          components: main
         - url: https://packages.microsoft.com/repos/code
           verificationKey: https://packages.microsoft.com/keys/microsoft.asc
           suites: stable
@@ -47,10 +53,15 @@ basePackages:
         - brew
     brew/cask:
         - brew
+    buildFromSource:
+        - gcc
+        - make
     gem:
         - ruby
     go:
         - go
+    nix:
+        - nix
     npm:
         - node
     nvm:
@@ -90,6 +101,9 @@ packages:
             - brew/cask:
                 packageName: azure-cli-preview
                 fromRegistry: azure/azure-cli
+            - apt:
+                packageName: azure-cli
+                fromRegistry: packages.microsoft.com/repos/azure-cli
     bat:
         installers:
             - brew
@@ -97,6 +111,7 @@ packages:
                 #[why] debian renames the binary (bat is taken by bacula-console-qt): alias it back
                 aliasBinary:
                     batcat: bat
+            - nix
     bats:
         installers:
             - brew:
@@ -234,6 +249,13 @@ packages:
                 packageName: docker-ce-cli
                 versionMap: {"29.7.2": "5:29.7.2-1~debian.12~bookworm"}
                 fromRegistry: download.docker.com/linux/debian
+            - binariesRemoteArchive:
+                archScheme: uname
+                extractBinaries: [docker/docker]
+                platformEligibility:
+                    - linux-amd64: sha256:803d433f226db4776e1768fd319fc6c6e4935a456acf84fcc0080818b854bc8f
+                    - linux-arm64: sha256:43d143448adf2c2787704e7d7704fd6d62d367a54c5edaef0a3f75509cb0938d
+                url: https://download.docker.com/linux/static/stable/{arch}/docker-{version}.tgz
     docker-buildx-plugin:
         version: 0.36.1
         verify:
@@ -324,6 +346,15 @@ packages:
     gitlab-runner:
         installers:
             - brew
+            - apt:
+                fromRegistry: packages.gitlab.com/runner/gitlab-runner/debian
+            - binariesRemoteArchive:
+                archScheme: go
+                platformEligibility:
+                    - linux-amd64: sha256:e59b67160f0f80528317d51fa3fc80981eb8de36f195c1726ec1af112ef7c1f8
+                    - linux-arm64: sha256:7f83c7ee3c0cb2aafc1b9996433426867986421708dbfe355a6ff7bc36bfad4b
+                version: 19.2.2
+                url: https://s3.dualstack.us-east-1.amazonaws.com/gitlab-runner-downloads/v{version}/binaries/gitlab-runner-linux-{arch}
     gitlab-tart-executor:
         installers:
             - brew:
@@ -407,6 +438,8 @@ packages:
         installers:
             - brew
             - apt
+            - nix:
+                versionMap: {"1.8.2": "6b5e5b7a6631f065bf6908986990b37d845f847f"}
     kind:
         completions:
             zsh:
@@ -521,12 +554,24 @@ packages:
         installers:
             - apt:
                 packageName: libsqlite3-dev
+    libssl-dev:
+        verify:
+            pkgMgrVersionCheck: true
+            checkInPath: false
+        installers:
+            - apt
     libtool:
         verify:
             pkgMgrVersionCheck: true
             checkInPath: false
         installers:
             - brew
+            - apt
+    libyaml-dev:
+        verify:
+            pkgMgrVersionCheck: true
+            checkInPath: false
+        installers:
             - apt
     logcli:
         verify:
@@ -572,6 +617,14 @@ packages:
         version: 0.466.0
         installers:
             - vscode
+    nix:
+        verify:
+            checkInPath: false
+            cmd: /nix/var/nix/profiles/default/bin/nix --version
+        installers:
+            - script:
+                run: curl --proto '=https' --tlsv1.2 -fsSL https://install.determinate.systems/nix | sh -s -- install --no-confirm
+                validateArtifact: /nix/receipt.json
     nmap:
         installers:
             - brew
@@ -718,8 +771,19 @@ packages:
         installers:
             - brew/cask
     procs:
+        version: 0.14.12
         installers:
             - brew
+            - binariesRemoteArchive:
+                platformEligibility:
+                    - darwin-arm64: sha256:20c7a33426ed7a43c3e13a48f2d1866ecc979a8ad46733f86ddc78ab7f12d49c
+                url: https://github.com/dalance/procs/releases/download/v{version}/procs-v{version}-aarch64-mac.zip
+            - binariesRemoteArchive:
+                archScheme: uname
+                platformEligibility:
+                    - linux-amd64: sha256:81964faf9d5cd0e9f399d5d0954fb6fe4d4d9f7d3cbec4507633df5a45b11713
+                    - linux-arm64: sha256:74b4f82acc6fe553cbd5af20ba0baac420b42bef9bb0cbb38fef14b8317d9f91
+                url: https://github.com/dalance/procs/releases/download/v{version}/procs-v{version}-{arch}-linux.zip
     prometheus:
         version: 3.13.2
         installers:
@@ -800,24 +864,26 @@ packages:
                 url: https://github.com/BurntSushi/ripgrep/releases/download/{version}/ripgrep-{version}-{arch}.tar.gz
     ruby:
         version: "3.1"
+        requires:
+            - libssl-dev
+            - libyaml-dev
+            - zlib1g-dev
         installers:
             - brew
             - apt:
                 packageName: ruby-full
                 versionMap: {"3.1": "1:3.1"}
-    ruby-dev:
-        verify:
-            pkgMgrVersionCheck: true
-            checkInPath: false
-        installers:
-            - apt
+            - buildFromSource:
+                version: 3.4.10
+                checksum: sha256:ecee2d072a14f2d14347dd56dfd8fe5c3130abf5117bfaacbda0f4ef9cc429ec
+                url: https://cache.ruby-lang.org/pub/ruby/3.4/ruby-{version}.tar.gz
     ruby-lsp:
         version: 0.26.10
         requires:
             - gcc
             - make
             - libc6-dev
-            - ruby-dev
+            - ruby
         installers:
             - gem
     shellcheck:
@@ -952,6 +1018,12 @@ packages:
             - brew
             - apt:
                 packageName: zlib1g-dev
+    zlib1g-dev:
+        verify:
+            pkgMgrVersionCheck: true
+            checkInPath: false
+        installers:
+            - apt
     zsh:
         installers:
             - brew

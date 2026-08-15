@@ -314,9 +314,12 @@ func pkgMgrVersionCheck(entry packages.Entry, pkg, mgr string) (string, error) {
 		if it.Mgr != mgr {
 			continue
 		}
-		if it.Apt != nil && it.Apt.PackageName != "" {
+		switch {
+		case it.Apt != nil && it.Apt.PackageName != "":
 			name = it.Apt.PackageName
-		} else if it.Name != "" {
+		case it.Nix != nil && it.Nix.PackageName != "":
+			name = it.Nix.PackageName
+		case it.Name != "":
 			name = it.Name
 		}
 	}
@@ -332,6 +335,8 @@ func pkgMgrVersionCheck(entry packages.Entry, pkg, mgr string) (string, error) {
 		return "brew list --cask --versions " + name, nil
 	case "npm":
 		return "npm ls --global " + name, nil
+	case "nix":
+		return fmt.Sprintf("nix profile list | grep -i %s", name), nil
 	case "vscode":
 		return fmt.Sprintf("code --list-extensions --show-versions | grep -i '^%s@'", name), nil
 	}
@@ -488,6 +493,7 @@ func shq(s string) string {
 
 func verifyShell(cmd string) string {
 	return `if [ -s "$NVM_DIR/nvm.sh" ]; then . "$NVM_DIR/nvm.sh"; fi; ` +
+		`if [ -s /nix/var/nix/profiles/default/etc/profile.d/nix-daemon.sh ]; then . /nix/var/nix/profiles/default/etc/profile.d/nix-daemon.sh; fi; ` +
 		`if [ "$(id -u)" = 0 ]; then code() { command code --no-sandbox --user-data-dir "$HOME/.vscode-root" "$@"; }; fi; ` + cmd
 }
 
@@ -512,7 +518,7 @@ func devCacheDir(t *testing.T) string {
 func noDepsScript(job installJob) string {
 	var b strings.Builder
 	b.WriteString(`export HOME=/root
-export PATH=/root/.local/bin:/root/go/bin:/root/.pyenv/bin:/root/.pyenv/shims:$PATH
+export PATH=/root/.local/bin:/root/go/bin:/root/.pyenv/bin:/root/.pyenv/shims:/nix/var/nix/profiles/default/bin:/root/.nix-profile/bin:$PATH
 export XDG_CONFIG_HOME=/root/.config XDG_DATA_HOME=/root/.local/share XDG_BIN_HOME=/root/.local/bin
 export XDG_STATE_HOME=/root/.local/state XDG_CACHE_HOME=/root/.cache
 export PYENV_ROOT=/root/.pyenv NVM_DIR=/root/.config/nvm GOBIN=/root/go/bin GOFLAGS=-modcacherw
@@ -660,7 +666,7 @@ func waitVMSSH(t *testing.T, vm string) string {
 
 func vmScript(job installJob) string {
 	var b strings.Builder
-	b.WriteString(`export PATH=$HOME/.local/bin:$HOME/go/bin:$HOME/.pyenv/bin:$HOME/.pyenv/shims:/opt/homebrew/bin:/opt/homebrew/sbin:$PATH
+	b.WriteString(`export PATH=$HOME/.local/bin:$HOME/go/bin:$HOME/.pyenv/bin:$HOME/.pyenv/shims:/opt/homebrew/bin:/opt/homebrew/sbin:/nix/var/nix/profiles/default/bin:$HOME/.nix-profile/bin:$PATH
 export XDG_CONFIG_HOME=$HOME/.config XDG_DATA_HOME=$HOME/.local/share XDG_BIN_HOME=$HOME/.local/bin
 export XDG_STATE_HOME=$HOME/.local/state XDG_CACHE_HOME=$HOME/.cache
 export PYENV_ROOT=$HOME/.pyenv NVM_DIR=$HOME/.config/nvm GOBIN=$HOME/go/bin GOFLAGS=-modcacherw

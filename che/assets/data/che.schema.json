@@ -182,7 +182,8 @@
               "script",
               "vscode",
               "pyenv",
-              "nvm"
+              "nvm",
+              "nix"
             ]
           },
           "type": "array",

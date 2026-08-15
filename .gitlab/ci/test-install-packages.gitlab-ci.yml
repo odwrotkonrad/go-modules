@@ -60,7 +60,9 @@
   - libffi
   - liblzma
   - libsqlite3
+  - libssl-dev
   - libtool
+  - libyaml-dev
   - logcli
   - loki
   - make
@@ -71,6 +73,7 @@
   - ms-python.python
   - ms-python.vscode-python-envs
   - ms-vscode-remote.remote-containers
+  - nix
   - nmap
   - node
   - nvm
@@ -99,7 +102,6 @@
   - redhat.vscode-yaml
   - rg
   - ruby
-  - ruby-dev
   - ruby-lsp
   - shellcheck
   - showkey
@@ -122,6 +124,7 @@
   - yzhang.markdown-all-in-one
   - zig
   - zlib
+  - zlib1g-dev
   - zsh
   - zstd
 

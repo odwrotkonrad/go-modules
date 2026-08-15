@@ -75,6 +75,9 @@ func TestItemUnmarshal(t *testing.T) {
 		if it.BinariesRemoteArchive != nil {
 			got.Version, got.URL, got.Platforms, got.Checksums = it.BinariesRemoteArchive.Version, it.BinariesRemoteArchive.URL, it.BinariesRemoteArchive.PlatformEligibility.Names, it.BinariesRemoteArchive.PlatformEligibility.Checksums
 		}
+		if it.BuildFromSource != nil {
+			got.Version, got.URL, got.Platforms = it.BuildFromSource.Version, it.BuildFromSource.URL, it.BuildFromSource.PlatformEligibility.Names
+		}
 		if it.Script != nil {
 			got.Run, got.ScriptOs = strings.TrimSpace(it.Script.Run), it.Script.OS
 			got.ScriptPath, got.ScriptURL = it.Script.Path, it.Script.URL

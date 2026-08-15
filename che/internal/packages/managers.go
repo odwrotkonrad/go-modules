@@ -352,10 +352,14 @@ func (in *Installer) installVia(pkg string, it Item) error {
 	switch {
 	case it.Mgr == "apt" && it.Apt != nil:
 		return in.installAptSpec(pkg, it.Apt)
+	case it.Mgr == "nix":
+		return in.installNixSpec(pkg, it.Nix)
 	case it.VersionManager != nil:
 		return in.installVersionManager(pkg, it.VersionManager)
 	case it.Mgr == "binariesRemoteArchive":
 		return in.installBinariesRemoteArchive(pkg, it.BinariesRemoteArchive)
+	case it.Mgr == "buildFromSource":
+		return in.installBuildFromSource(pkg, it.BuildFromSource)
 	case it.Mgr == "script":
 		return in.installScript(pkg, it.Script)
 	}
@@ -507,6 +511,13 @@ func (in *Installer) isInstalled(pkg, mgr, base string) bool {
 	case "vscode":
 		_, ok := in.codeExtensions()[strings.ToLower(base)]
 		return ok
+	case "nix":
+		out, ok := in.nixProfileList()
+		if !ok {
+			return false
+		}
+		found, _ := nixProfileEntry(out, base)
+		return found
 	default:
 		return in.hasCmd(pkg)
 	}
@@ -567,6 +578,13 @@ func (in *Installer) installedVersion(mgr, base string) string {
 			return ""
 		}
 		return strings.TrimSpace(strings.Fields(ver)[0])
+	case "nix":
+		out, ok := in.nixProfileList()
+		if !ok {
+			return ""
+		}
+		_, ver := nixProfileEntry(out, base)
+		return ver
 	default:
 		return ""
 	}
@@ -640,6 +658,7 @@ var managerRoutines = map[string]managerRoutine{
 	"go": {
 		install: func(in *Installer, _, name, _ string) error { return in.goInstall(name, name) },
 	},
+	"nix": nixInstallRoutine,
 }
 
 func (in *Installer) update(pkg, mgr, base string) error {

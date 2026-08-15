@@ -23,8 +23,10 @@ func Schema() *jsonschema.Schema {
 		"Item":                  itemDef(),
 		"ItemBody":              itemBodyDef(),
 		"BinariesRemoteArchive": binariesRemoteArchiveDef(),
+		"BuildFromSource":       buildFromSourceDef(),
 		"Script":                scriptDef(),
 		"Apt":                   aptDef(),
+		"Nix":                   nixDef(),
 		"VersionManager":        versionManagerDef(),
 		"PlatformEligibility":   platformEligibilityDef(),
 		"Verify":                verifyDef(),
@@ -121,8 +123,10 @@ func itemDef() *jsonschema.Schema {
 		Properties:           jsonschema.NewProperties(),
 	}
 	m.Properties.Set("binariesRemoteArchive", ref("BinariesRemoteArchive"))
+	m.Properties.Set("buildFromSource", ref("BuildFromSource"))
 	m.Properties.Set("script", ref("Script"))
 	m.Properties.Set("apt", ref("Apt"))
+	m.Properties.Set("nix", ref("Nix"))
 	m.Properties.Set("pyenv", ref("VersionManager"))
 	m.Properties.Set("nvm", ref("VersionManager"))
 	for _, mgr := range []string{"brew", "brew/cask", "vscode", "npm", "go", "gem"} {
@@ -161,6 +165,21 @@ func binariesRemoteArchiveDef() *jsonschema.Schema {
 	return o
 }
 
+func buildFromSourceDef() *jsonschema.Schema {
+	o := obj("download a source tarball, then ./configure && make && make install", []string{"url"})
+	o.Properties.Set("version", str("pinned version, absent means rolling"))
+	o.Properties.Set("url", str("source tarball url with a {version} token"))
+	o.Properties.Set("checksum", &jsonschema.Schema{Description: "sha256:<hex> of the source tarball", Type: "string", Pattern: checksumPattern})
+	o.Properties.Set("configureArgs", arr(str("extra ./configure arguments")))
+	o.Properties.Set("platformEligibility", &jsonschema.Schema{
+		Description: "eligible <os>-<arch> platforms, names only; empty means all",
+		Type:        "array",
+		Items:       str("platform name <os>-<arch>"),
+	})
+	o.Properties.Set("verify", ref("Verify"))
+	return o
+}
+
 func scriptDef() *jsonschema.Schema {
 	o := obj("script spec: run inline, path on disk, or url", nil)
 	o.Properties.Set("run", str("inline command"))
@@ -184,6 +203,18 @@ func aptDef() *jsonschema.Schema {
 	o.Properties.Set("versionMap", vm)
 	o.Properties.Set("aliasBinary", stringMap("alias name to target binary"))
 	o.Properties.Set("fromRegistry", str("installerRegistries.apt ref: scheme-less url[::suites[::components]]"))
+	o.Properties.Set("verify", ref("Verify"))
+	return o
+}
+
+func nixDef() *jsonschema.Schema {
+	one := uint64(1)
+	vm := stringMap("exactly one binary version to nixpkgs revision pin")
+	vm.MaxProperties = &one
+	o := obj("nix item spec", nil)
+	o.Properties.Set("packageName", str("nixpkgs attribute when it differs from the entry key"))
+	o.Properties.Set("versionMap", vm)
+	o.Properties.Set("aliasBinary", stringMap("alias name to target binary"))
 	o.Properties.Set("verify", ref("Verify"))
 	return o
 }
