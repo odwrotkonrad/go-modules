@@ -743,7 +743,7 @@ packages:
     pyenv:
         - brew
         - script:
-            url: https://pyenv.run
+            run: git clone --depth 1 https://github.com/pyenv/pyenv.git "${PYENV_ROOT:-$HOME/.pyenv}"
             validateArtifact: ~/.pyenv/bin/pyenv
     pyright:
         installers:
