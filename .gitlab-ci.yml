@@ -10,6 +10,8 @@ include:
 
 #[why] retry infrastructure flakes (image pulls, runner/network, stuck jobs) twice; script failures never retry, a real test failure stays red
 default:
+  tags:
+    - gke-linux-amd64
   retry:
     max: 2
     when:
@@ -42,8 +44,16 @@ variables:
   GOCACHE: $CI_PROJECT_DIR/.cache/go-build
   CC: clang
 
+#[why] the cgo builds (1Password SDK, tree-sitter) compile several binaries at once and were
+#   OOMKilled at exit 137 on the default medium size's 6Gi ceiling: they get the big runner, whose
+#   12Gi limit holds the peak. everything else stays medium
+.cgo-build:
+  tags:
+    - gke-linux-amd64-big
+
 #[what] amd64 linux warm build: go caches plus the amd64 che artifacts the e2e jobs reuse, native plus zig-cross amd64
 warm-go:
+  extends: .cgo-build
   stage: warm
   image: $CI_IMAGE
   needs: []
@@ -72,6 +82,7 @@ warm-go:
 #[what] arm64 linux warm build: zig-cross arm64 che artifacts for the arm64 install e2e jobs
 #[why] shares goreleaser-linux-che [arm64]'s go-build key: both zig-cross che for arm64, tag and MR pipelines warm each other
 warm-go-linux-arm64:
+  extends: .cgo-build
   stage: warm
   image: $CI_IMAGE
   needs: []
@@ -253,6 +264,8 @@ warm-go-darwin:
         - .cache/go-build
       policy: pull-push
   rules:
+    - if: $ENABLE_DARWIN_CI != "true"
+      when: never
     - if: $CI_PIPELINE_SOURCE == "merge_request_event"
       changes: [che/**/*, che-packages/**/*, lib/**/*, go.work, .gitlab-ci.yml]
     - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
@@ -505,6 +518,8 @@ goreleaser-darwin-che:
   image: macos-26-xcode-26
   needs: []
   rules:
+    - if: $ENABLE_DARWIN_CI != "true"
+      when: never
     - if: $CI_COMMIT_TAG =~ /^che\/v/
   variables:
     GOPATH: $CI_PROJECT_DIR/.cache/go-path
@@ -541,6 +556,7 @@ goreleaser-darwin-che:
     expire_in: 1 day
 
 goreleaser-linux-che:
+  extends: .cgo-build
   stage: release
   image: $CI_IMAGE
   needs: []
@@ -576,6 +592,8 @@ prerelease-darwin-che:
   image: macos-26-xcode-26
   needs: []
   rules:
+    - if: $ENABLE_DARWIN_CI != "true"
+      when: never
     - if: $CI_PIPELINE_SOURCE == "merge_request_event"
       changes: [che/**/*, che-packages/**/*, lib/**/*]
   variables:
@@ -614,6 +632,7 @@ prerelease-darwin-che:
     expire_in: 1 week
 
 prerelease-linux-che:
+  extends: .cgo-build
   stage: release
   image: $CI_IMAGE
   needs: []
@@ -646,7 +665,10 @@ publish-che:
   stage: publish
   image: $CI_IMAGE
   needs:
-    - goreleaser-darwin-che
+    #[why] optional: darwin builds are gated by ENABLE_DARWIN_CI. a needs on a rules-excluded job
+    #   would stop the tag pipeline being created at all, so with darwin CI off this publishes linux-only
+    - job: goreleaser-darwin-che
+      optional: true
     - goreleaser-linux-che
     - docs-che
   rules:
@@ -689,7 +711,8 @@ publish-brew-che:
   image: $CI_IMAGE
   needs:
     - publish-che
-    - goreleaser-darwin-che
+    - job: goreleaser-darwin-che
+      optional: true
     - goreleaser-linux-che
   rules:
     - if: $CI_COMMIT_TAG =~ /^che\/v/

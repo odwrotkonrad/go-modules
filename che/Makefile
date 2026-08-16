@@ -174,7 +174,7 @@ vet:
 
 #[what] install the binary into $GOPATH/bin
 install:
-	CC=$(CC) $(GO) install -v .
+	CC=$(CC) $(GO) install -v -ldflags="-s -w" .
 ##[<] Go
 
 ##[>] Release [genai-include]
