@@ -44,7 +44,10 @@ variables:
   GOCACHE: $CI_PROJECT_DIR/.cache/go-build
   CC: clang
 
-#[what] amd64 linux warm build: go caches plus the amd64 che artifacts the e2e jobs reuse
+#[what] amd64 linux warm build: the go build cache plus the amd64 che artifacts the e2e jobs reuse
+#[why] builds only what the automatic jobs consume. build-linux lives in warm-go-linux-amd64 instead:
+#   it is a CGO_ENABLED=0 cross-target that shares no compiled package with this host build, cost 107s
+#   of this job's critical path, and is read only by the manual install-methods matrix
 warm-go:
   stage: warm
   image: $CI_IMAGE
@@ -54,10 +57,6 @@ warm-go:
     - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
       changes: [che/**/*, che-packages/**/*, lib/**/*, go.work, .gitlab-ci.yml]
   cache:
-    - key: go-mod
-      paths:
-        - .cache/go-mod
-      policy: pull-push
     - key: go-build
       paths:
         - .cache/go-build
@@ -65,14 +64,16 @@ warm-go:
   script:
     - for m in lib che get-os-open-files-with get-term-open-files-with; do (cd $m && echo "## download $m" && go mod download all) || exit 1; done
     - for m in lib che; do (cd $m && echo "## build $m" && go build -v ./...) || exit 1; done
-    - make -C che build-cover build-e2e-test build-linux
+    - make -C che build-cover build-e2e-test
   artifacts:
     paths:
       - che/dist/
 
 ##[>] 🤖🤖
 #[what] arm64 linux warm build: zig-cross arm64 che artifacts for the arm64 install e2e jobs
-#[why] shares goreleaser-linux-che [arm64]'s go-build key: both zig-cross che for arm64, tag and MR pipelines warm each other
+#[why] mr- prefix, deliberately not goreleaser-linux-che [arm64]'s key: this job runs on merge
+#   requests, and the go build cache is served as trusted compiler output without verification, so
+#   what an MR writes must never be what a tag release build restores
 warm-go-linux-arm64:
   stage: warm
   image: $CI_IMAGE
@@ -83,11 +84,7 @@ warm-go-linux-arm64:
       when: manual
       allow_failure: true
   cache:
-    - key: go-mod
-      paths:
-        - .cache/go-mod
-      policy: pull
-    - key: go-build-che-zig-arm64
+    - key: mr-go-build-che-zig-arm64
       paths:
         - .cache/go-build
       policy: pull-push
@@ -97,21 +94,43 @@ warm-go-linux-arm64:
     paths:
       - che/dist/linux-arm64/
       - che/dist/che-linux-arm64
+
+#[what] amd64 linux cross-build: the CGO_ENABLED=0 che binary the amd64 install-methods matrix runs
+#[why] split out of warm-go, where it cost 107s in front of every automatic unit, e2e and prerelease
+#   job while serving only the manual matrix below. manual and optional, exactly like the matrix it
+#   feeds: unclicked, the matrix still builds the binary itself, so nothing depends on this running
+warm-go-linux-amd64:
+  stage: warm
+  image: $CI_IMAGE
+  needs: []
+  rules:
+    - if: $CI_PIPELINE_SOURCE == "merge_request_event" || $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
+      when: manual
+      allow_failure: true
+  #[why] mr- prefix: this runs on merge requests, so it must not write goreleaser-linux-che's key
+  cache:
+    - key: mr-go-build-che-zig-amd64
+      paths:
+        - .cache/go-build
+      policy: pull-push
+  script:
+    - make -C che build-linux PLATFORM=linux-amd64
+  artifacts:
+    paths:
+      - che/dist/che-linux-amd64
 ##[<] 🤖🤖
 
 verify-precommit-all:
   stage: verify
   image: $CI_IMAGE
-  needs: [warm-go]
+  #[why] starts immediately: render-templates builds che itself (make -C che build), so this consumed
+  #   no warm-go artifact, only its go build cache, which the shared cache now supplies directly
+  needs: []
   rules:
     - if: $CI_PIPELINE_SOURCE == "merge_request_event"
   variables:
     LEFTHOOK_OUTPUT: meta,summary,execution,execution_info,execution_out
   cache:
-    - key: go-mod
-      paths:
-        - .cache/go-mod
-      policy: pull
     - key: go-build
       paths:
         - .cache/go-build
@@ -123,10 +142,11 @@ verify-precommit-all:
 .test-module:
   image: $CI_IMAGE
   stage: test-unit
-  needs:
-    - job: warm-go
-      optional: true
-      artifacts: false
+  #[why] starts immediately. these jobs never consumed warm-go's artifacts (artifacts: false), only
+  #   its go build cache, so waiting on it bought nothing but latency: `go test` links its own test
+  #   binaries, a different artifact set from the single binary warm-go produces. with a distributed
+  #   cache they pull the same warm GOCACHE without the dependency
+  needs: []
   script:
     - make -C $MODULE test-cover
   coverage: '/total:\s+\(statements\)\s+\d+\.\d+%/'
@@ -141,10 +161,6 @@ test-unit-che:
   variables:
     MODULE: che
   cache:
-    - key: go-mod
-      paths:
-        - .cache/go-mod
-      policy: pull
     - key: go-build
       paths:
         - .cache/go-build
@@ -242,13 +258,12 @@ warm-go-darwin:
     - saas-macos-medium-m1
   image: macos-26-xcode-26
   needs: []
-  #[why] shares goreleaser-darwin-che's cache keys: both compile che on darwin, tag and MR pipelines warm each other
+  #[why] mr- prefix, deliberately not goreleaser-darwin-che's key: the go build cache serves its
+  #   stored contents as trusted compiler output without verifying them, so a key a merge request
+  #   can write must never be one a tag release build restores. costs a cold compile on the first
+  #   darwin tag build after an expiry, which is the correct trade
   cache:
-    - key: go-mod-che
-      paths:
-        - .cache/go-mod
-      policy: pull-push
-    - key: go-build-che-darwin
+    - key: mr-go-build-che-darwin
       paths:
         - .cache/go-build
       policy: pull-push
@@ -277,6 +292,9 @@ test-e2e-install-methods:
   services: [docker:dind]
   needs:
     - job: warm-go
+      optional: true
+    #[why] optional like the rest: unclicked, the script's `test -x` fallback builds the binary in-job
+    - job: warm-go-linux-amd64
       optional: true
     - job: warm-e2e-pkg-installs-image
       optional: true
@@ -511,10 +529,6 @@ goreleaser-darwin-che:
   rules:
     - if: $CI_COMMIT_TAG =~ /^che\/v/
   cache:
-    - key: go-mod
-      paths:
-        - .cache/go-mod
-      policy: pull
     - key: go-build-che-darwin
       paths:
         - .cache/go-build
@@ -538,10 +552,6 @@ goreleaser-linux-che:
     matrix:
       - ARCH: [amd64, arm64]
   cache:
-    - key: go-mod
-      paths:
-        - .cache/go-mod
-      policy: pull
     - key: go-build-che-zig-$ARCH
       paths:
         - .cache/go-build
@@ -585,12 +595,9 @@ prerelease-darwin-che:
       changes: [che/**/*, che-packages/**/*, lib/**/*, ci/publish-prerelease.zsh, Makefile, .gitlab-ci.yml]
   variables:
     MODULE_VERSION: 0.0.0-mr${CI_MERGE_REQUEST_IID}
+  #[why] mr- prefix: a merge request must not write the cache a tag release build compiles from
   cache:
-    - key: go-mod
-      paths:
-        - .cache/go-mod
-      policy: pull
-    - key: go-build-che-darwin
+    - key: mr-go-build-che-darwin
       paths:
         - .cache/go-build
       policy: pull-push
@@ -632,12 +639,9 @@ prerelease-linux-che:
   variables:
     MODULE_VERSION: 0.0.0-mr${CI_MERGE_REQUEST_IID}
     ARCH: amd64
+  #[why] mr- prefix: a merge request must not write the cache a tag release build compiles from
   cache:
-    - key: go-mod
-      paths:
-        - .cache/go-mod
-      policy: pull
-    - key: go-build-che-zig-amd64
+    - key: mr-go-build-che-zig-amd64
       paths:
         - .cache/go-build
       policy: pull-push
@@ -740,10 +744,6 @@ publish-get-os-open-files-with:
   rules:
     - if: $CI_COMMIT_TAG =~ /^get-os-open-files-with\/v/
   cache:
-    - key: go-mod
-      paths:
-        - .cache/go-mod
-      policy: pull
     - key: go-build-get-os-open-files-with-publish
       paths:
         - .cache/go-build
@@ -757,10 +757,6 @@ publish-get-term-open-files-with:
   rules:
     - if: $CI_COMMIT_TAG =~ /^get-term-open-files-with\/v/
   cache:
-    - key: go-mod
-      paths:
-        - .cache/go-mod
-      policy: pull
     - key: go-build-get-term-open-files-with-publish
       paths:
         - .cache/go-build
