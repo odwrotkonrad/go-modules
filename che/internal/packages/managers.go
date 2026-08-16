@@ -9,6 +9,7 @@ import (
 	"io"
 	"maps"
 	"os"
+	"os/exec"
 	"path"
 	"path/filepath"
 	"slices"
@@ -147,9 +148,24 @@ func (in *Installer) runCmd(c execx.Cmd) error {
 
 func (in *Installer) exec(argv []string) error {
 	if err := in.runCmd(execx.Cmd{Argv: argv}); err != nil {
-		return fmt.Errorf("%s: %w", strings.Join(argv, " "), err)
+		return fmt.Errorf("%s: %w%s", strings.Join(argv, " "), err, hintMissingBin(argv))
 	}
 	return nil
+}
+
+// [why] `sudo <path>` on a missing binary exits 1 with no output: name the culprit instead
+func hintMissingBin(argv []string) string {
+	bin := argv[0]
+	if bin == "sudo" && len(argv) > 1 {
+		bin = argv[1]
+	}
+	if strings.Contains(bin, string(os.PathSeparator)) && !fileExists(bin) {
+		return " (" + bin + " does not exist)"
+	}
+	if _, err := exec.LookPath(bin); err != nil {
+		return " (" + bin + " not found on PATH)"
+	}
+	return ""
 }
 
 func (in *Installer) output(argv []string) (string, bool) {
@@ -438,16 +454,32 @@ func (in *Installer) resolveBrewBin() string {
 
 // [>] 🤖🤖
 func (in *Installer) resolveNpmBin() string {
-	if in.Host.HasCmd("npm") {
-		return "npm"
-	}
-	if v := versionManagerRoutines["nvm"].global(in); v != "" {
-		p := filepath.Join(in.Host.nvmDir(), "versions", "node", "v"+v, "bin", "npm")
-		if fileExists(p) {
-			return p
-		}
+	if p := in.nvmNpmBin(); p != "" {
+		return p
 	}
 	return "npm"
+}
+
+func (in *Installer) nvmNpmBin() string {
+	v := versionManagerRoutines["nvm"].global(in)
+	if v == "" {
+		return ""
+	}
+	p := filepath.Join(in.Host.nvmDir(), "versions", "node", "v"+v, "bin", "npm")
+	if !fileExists(p) {
+		return ""
+	}
+	return p
+}
+
+// [why] an nvm prefix lives in the invoking user's home: sudo would run it as root, resetting PATH
+//
+//	and writing root-owned trees into that home. only a system npm needs elevation.
+func (in *Installer) sudoNpm(argv ...string) []string {
+	if in.nvmNpmBin() != "" {
+		return argv
+	}
+	return in.sudo(argv...)
 }
 
 // [<] 🤖🤖
@@ -592,14 +624,14 @@ var managerRoutines = map[string]managerRoutine{
 	},
 	"npm": {
 		install: func(in *Installer, _, name, _ string) error {
-			if err := in.exec(in.sudo(in.resolveNpmBin(), "install", "--global", name)); err != nil {
+			if err := in.exec(in.sudoNpm(in.resolveNpmBin(), "install", "--global", name)); err != nil {
 				return err
 			}
 			in.linkNvmNpmBins()
 			return nil
 		},
 		update: func(in *Installer, _, base string) error {
-			if err := in.exec(in.sudo(in.resolveNpmBin(), "update", "--global", base)); err != nil {
+			if err := in.exec(in.sudoNpm(in.resolveNpmBin(), "update", "--global", base)); err != nil {
 				return err
 			}
 			in.linkNvmNpmBins()

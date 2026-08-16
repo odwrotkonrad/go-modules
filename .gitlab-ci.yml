@@ -561,10 +561,28 @@ prerelease-darwin-che:
   extends: .goreleaser-build
   stage: release
   image: $CI_IMAGE
-  needs: []
+  #[why] unit + the automatic che e2e jobs: a prerelease must not publish from code failing them.
+  #   the manual install-methods matrix stays out (it would block on a click) and so does the
+  #   registry sweep (it asserts upstream package names, not the binary this ships), keeping the
+  #   coverage stage off the critical path
+  needs:
+    - job: test-unit-che
+      optional: true
+      artifacts: false
+    - job: test-e2e-che-dryrun
+      optional: true
+      artifacts: false
+    - job: test-e2e-che-run
+      optional: true
+      artifacts: false
+    - job: test-e2e-che-backup
+      optional: true
+      artifacts: false
+  #[why] the publish path itself is in scope: a change to the prerelease script, the Makefile target
+  #   or this file must publish a prerelease, or it can never be tested before merging
   rules:
     - if: $CI_PIPELINE_SOURCE == "merge_request_event"
-      changes: [che/**/*, che-packages/**/*, lib/**/*]
+      changes: [che/**/*, che-packages/**/*, lib/**/*, ci/publish-prerelease.zsh, Makefile, .gitlab-ci.yml]
   variables:
     MODULE_VERSION: 0.0.0-mr${CI_MERGE_REQUEST_IID}
   cache:
@@ -578,6 +596,7 @@ prerelease-darwin-che:
       policy: pull-push
   script:
     - cd che && goreleaser release --verbose --snapshot --clean -f .goreleaser.darwin.yaml
+    - make -C .. publish-prerelease DIST_DIR=darwin-dist
   artifacts:
     expose_as: che darwin prerelease
     paths:
@@ -588,10 +607,28 @@ prerelease-linux-che:
   extends: .goreleaser-build
   stage: release
   image: $CI_IMAGE
-  needs: []
+  #[why] unit + the automatic che e2e jobs: a prerelease must not publish from code failing them.
+  #   the manual install-methods matrix stays out (it would block on a click) and so does the
+  #   registry sweep (it asserts upstream package names, not the binary this ships), keeping the
+  #   coverage stage off the critical path
+  needs:
+    - job: test-unit-che
+      optional: true
+      artifacts: false
+    - job: test-e2e-che-dryrun
+      optional: true
+      artifacts: false
+    - job: test-e2e-che-run
+      optional: true
+      artifacts: false
+    - job: test-e2e-che-backup
+      optional: true
+      artifacts: false
+  #[why] the publish path itself is in scope: a change to the prerelease script, the Makefile target
+  #   or this file must publish a prerelease, or it can never be tested before merging
   rules:
     - if: $CI_PIPELINE_SOURCE == "merge_request_event"
-      changes: [che/**/*, che-packages/**/*, lib/**/*]
+      changes: [che/**/*, che-packages/**/*, lib/**/*, ci/publish-prerelease.zsh, Makefile, .gitlab-ci.yml]
   variables:
     MODULE_VERSION: 0.0.0-mr${CI_MERGE_REQUEST_IID}
     ARCH: amd64
@@ -608,6 +645,7 @@ prerelease-linux-che:
     - cd che
     - yq '.builds[].goarch = [strenv(ARCH)]' .goreleaser.yaml > ".goreleaser.linux-$ARCH.yaml"
     - goreleaser release --verbose --snapshot --clean -f ".goreleaser.linux-$ARCH.yaml"
+    - make -C .. publish-prerelease DIST_DIR=dist
   artifacts:
     expose_as: che linux prerelease
     paths:
