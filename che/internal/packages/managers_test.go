@@ -262,3 +262,40 @@ func codeListStub(installed string) func(argv []string) ([]byte, error) {
 }
 
 // [<] 🤖🤖
+
+// [>] 🤖🤖
+func TestInstallNpmSkipsSudoForNvmPrefix(t *testing.T) {
+	nvmDir := t.TempDir()
+	binDir := filepath.Join(nvmDir, "versions", "node", "v22.0.0", "bin")
+	require.NoError(t, os.MkdirAll(binDir, 0o755))
+	require.NoError(t, os.MkdirAll(filepath.Join(nvmDir, "alias"), 0o755))
+	require.NoError(t, os.WriteFile(filepath.Join(nvmDir, "alias", "default"), []byte("v22.0.0\n"), 0o644))
+	npmBin := filepath.Join(binDir, "npm")
+	require.NoError(t, os.WriteFile(npmBin, []byte("#!/bin/sh\n"), 0o755))
+
+	in, m := newInstaller(t, "packages:\n  x: [{npm: {packageName: x}}]", "linux", cmdMap([]string{"npm"}), Options{})
+	in.Host.Getenv = func(k string) string {
+		if k == "NVM_DIR" {
+			return nvmDir
+		}
+		return ""
+	}
+	m.Stub = failOn("npm ls", npmBin+" ls")
+	require.NoError(t, in.Install([]string{"x"}))
+	requireCalls(t, m, npmBin+" install --global x")
+	refuteCalls(t, m, "sudo")
+}
+
+func TestInstallNpmKeepsSudoForSystemPrefix(t *testing.T) {
+	in, m := newInstaller(t, "packages:\n  x: [{npm: {packageName: x}}]", "linux", cmdMap([]string{"npm"}), Options{})
+	m.Stub = failOn("npm ls")
+	require.NoError(t, in.Install([]string{"x"}))
+	requireCalls(t, m, "sudo npm install --global x")
+}
+
+func TestExecNamesMissingBinaryBehindSudo(t *testing.T) {
+	err := (&Installer{}).exec([]string{"sudo", "/nope/npm", "install"})
+	require.ErrorContains(t, err, "/nope/npm does not exist")
+}
+
+// [<] 🤖🤖
