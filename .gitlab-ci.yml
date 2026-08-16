@@ -86,10 +86,11 @@ warm-go-linux-arm64:
   stage: warm
   image: $CI_IMAGE
   needs: []
+  #[why] only feeds the manual arm64 install-e2e matrix: stays manual with it, never auto
   rules:
-    - if: $CI_PIPELINE_SOURCE == "merge_request_event"
-    - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
-      changes: [che/**/*, che-packages/**/*, lib/**/*, go.work, .gitlab-ci.yml]
+    - if: $CI_PIPELINE_SOURCE == "merge_request_event" || $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
+      when: manual
+      allow_failure: true
   cache:
     - key: go-mod
       paths:
@@ -226,11 +227,8 @@ warm-e2e-pkg-installs-image:
     DOCKER_TLS_CERTDIR: "/certs"
     DOCKER_TLS_VERIFY: "1"
     DOCKER_CERT_PATH: "$DOCKER_TLS_CERTDIR/client"
+  #[why] only feeds the manual install-e2e matrices: stays manual with them, never auto
   rules:
-    - if: $CI_PIPELINE_SOURCE == "merge_request_event"
-      changes: [che/**/*, che-packages/**/*, lib/**/*, go.work, .gitlab-ci.yml]
-    - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
-      changes: [che/**/*, che-packages/**/*, lib/**/*, go.work, .gitlab-ci.yml]
     - if: $CI_PIPELINE_SOURCE == "merge_request_event" || $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
       when: manual
       allow_failure: true
@@ -263,13 +261,13 @@ warm-go-darwin:
       paths:
         - .cache/go-build
       policy: pull-push
+  #[why] only feeds the manual darwin install-e2e matrix: stays manual with it, never auto
   rules:
     - if: $ENABLE_DARWIN_CI != "true"
       when: never
-    - if: $CI_PIPELINE_SOURCE == "merge_request_event"
-      changes: [che/**/*, che-packages/**/*, lib/**/*, go.work, .gitlab-ci.yml]
-    - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
-      changes: [che/**/*, che-packages/**/*, lib/**/*, go.work, .gitlab-ci.yml]
+    - if: $CI_PIPELINE_SOURCE == "merge_request_event" || $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
+      when: manual
+      allow_failure: true
   before_script:
     - curl -fsSL --connect-timeout 30 --retry 10 --retry-delay 30 --retry-all-errors -o /tmp/go.tar.gz "https://go.dev/dl/go1.26.4.darwin-arm64.tar.gz"
     - sudo tar -xzf /tmp/go.tar.gz -C /usr/local
@@ -301,13 +299,8 @@ test-e2e-install-methods:
   parallel:
     matrix:
       - METHOD: [apt, binariesRemoteArchive, script, pyenv, nvm, npm, go, nix, buildFromSource]
-  #[why] MR changes-triggered runs block the merge; main keeps allow_failure, manual stays optional
+  #[why] never automatic: these dind matrix jobs flood the runner queue and starve every other repo's pipeline. manual, optional, always
   rules:
-    - if: $CI_PIPELINE_SOURCE == "merge_request_event"
-      changes: [che/**/*, che-packages/**/*, lib/**/*, go.work, .gitlab-ci.yml]
-    - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
-      changes: [che/**/*, che-packages/**/*, lib/**/*, go.work, .gitlab-ci.yml]
-      allow_failure: true
     - if: $CI_PIPELINE_SOURCE == "merge_request_event" || $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
       when: manual
       allow_failure: true

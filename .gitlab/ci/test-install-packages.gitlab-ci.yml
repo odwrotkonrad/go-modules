@@ -131,7 +131,7 @@
     DOCKER_CERT_PATH: "$DOCKER_TLS_CERTDIR/client"
     E2E_INSTALL_CACHE_DIR: $CI_PROJECT_DIR/.cache/che-e2e-install
 
-#[why] hard needs on the darwin warm build: play warm-go-darwin first, its artifacts are the only binaries these jobs run (no in-job go toolchain or self-build)
+#[why] needs the darwin warm build: play warm-go-darwin first, its artifacts are the only binaries these jobs run (no in-job go toolchain or self-build). optional so this manual job never blocks pipeline creation
 test-e2e-install-package-darwin-arm64:
   extends: .test-install-package
   #[why] darwin jobs are gated by the group-level ENABLE_DARWIN_CI toggle; the inherited rules follow
@@ -146,7 +146,8 @@ test-e2e-install-package-darwin-arm64:
     - saas-macos-medium-m1
   image: macos-26-xcode-26
   needs:
-    - warm-go-darwin
+    - job: warm-go-darwin
+      optional: true
   script:
     - make -C che e2e-install-methods PACKAGE="$PACKAGE" METHOD="$METHOD" PLATFORM=darwin-arm64 MODE=with_deps BUILD_DEP= E2E_USE_TEST_BIN=1
   parallel:
