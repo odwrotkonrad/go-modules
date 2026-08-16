@@ -173,7 +173,7 @@ test-e2e-install-package-linux-arm64:
   extends: .test-install-package-linux
   stage: test-e2e-package-installs-linux-arm64
   tags:
-    - saas-linux-small-arm64
+    - gke-linux-arm64-small
   image: $CI_IMAGE_DIND_ARM64
   needs:
     - job: warm-go-linux-arm64
