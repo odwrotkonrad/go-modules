@@ -1,3 +1,4 @@
+# yaml-language-server: $schema=https://gitlab.com/konradodwrot/go-modules/-/raw/main/che/assets/data/che.schema.json
 options:
   profileWorkingDirectory: root
 base:
