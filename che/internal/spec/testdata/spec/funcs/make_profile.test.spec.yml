@@ -193,7 +193,7 @@ cases:
     input:
       args: [spec: schema-invalid/template-empty-node, profile: cli/macos]
     expected:
-      errorOutput: ['renderTemplates node needs a source, a glob or nested renderTemplates']
+      errorOutput: ['renderTemplates node needs a source, a glob or nested <<<']
   - name: ShouldErrorOnMalformedGroupSourcePrefix
     context: {pwd: testdata/fixture/resolve/tree-empty}
     input:

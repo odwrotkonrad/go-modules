@@ -376,7 +376,7 @@ func groupDestPrefix(node templateNode) string {
 func checkTemplateGroup(node templateNode) error {
 	switch {
 	case node.DestRule != "" || node.glob != "":
-		return fmt.Errorf("renderTemplates group %q carries nested renderTemplates and a dest rewrite or glob: it is one or the other", node.Source)
+		return fmt.Errorf("renderTemplates group %q carries nested <<< and a dest rewrite or glob: it is one or the other", node.Source)
 	case len(node.Dest) > 1:
 		return fmt.Errorf("renderTemplates group %q dest is a prefix: want one path, got %d", node.Source, len(node.Dest))
 	case len(node.Dest) == 1 && node.Dest[0].opts != (optionsSpec{}):
@@ -435,7 +435,7 @@ func overlayPerms(override, base Perms) Perms {
 func checkTemplateSpec(file templateNode) error {
 	switch {
 	case file.Source == "" && file.glob == "":
-		return fmt.Errorf("renderTemplates node needs a source, a glob or nested renderTemplates")
+		return fmt.Errorf("renderTemplates node needs a source, a glob or nested <<<")
 	case file.glob != "":
 		if IsRemoteSrc(file.glob) {
 			return fmt.Errorf("renderTemplates glob cannot be remote: %q", file.glob)

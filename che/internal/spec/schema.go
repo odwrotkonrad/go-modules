@@ -166,7 +166,7 @@ func (templateNode) JSONSchema() *jsonschema.Schema {
 	leaf.Properties.Set("options", render.Options{}.JSONSchema())
 	addPerms(leaf)
 
-	group := obj("a source prefix plus shared perms, ctx and options cascading onto nested nodes (innermost wins)", []string{"renderTemplates"})
+	group := obj("a source prefix plus shared perms, ctx and options cascading onto nested nodes (innermost wins)", []string{"<<<"})
 	group.Properties.Set("source", &jsonschema.Schema{
 		Description: "source prefix joined onto every nested node's source; a remote prefix @<repo>[//<path>][?ref=<ref>] recombines so the ref stays last",
 		Type:        "string",
@@ -177,7 +177,7 @@ func (templateNode) JSONSchema() *jsonschema.Schema {
 	})
 	group.Properties.Set("ctx", ctxSchema())
 	group.Properties.Set("options", render.Options{}.JSONSchema())
-	group.Properties.Set("renderTemplates", &jsonschema.Schema{
+	group.Properties.Set("<<<", &jsonschema.Schema{
 		Description: "nested nodes, each a leaf or a further group",
 		Type:        "array",
 		Items:       &jsonschema.Schema{Ref: "#/$defs/templateNode"},

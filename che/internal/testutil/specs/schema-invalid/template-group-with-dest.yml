@@ -4,7 +4,7 @@ base:
     renderTemplates:
       - source: "@gitlab.com/acme/tools?ref=v1.0.0"
         dest: [.claude/agents, .claude/other]
-        renderTemplates:
+        <<<:
           - {source: //snippets/ro.md, dest: ro.md}
 
 cli/macos:
