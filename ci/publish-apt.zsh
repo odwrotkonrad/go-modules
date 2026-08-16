@@ -24,24 +24,38 @@ gpg --batch --import "${APT_GPG_PRIVATE_KEY:?}"
 KEYID="$(gpg --batch --list-secret-keys --with-colons | awk -F: '$1 == "sec" {print $5; exit}')"
 gpg --armor --export "$KEYID" > "$OUT/gpg.key"
 
-typeset -A SEEN
+#[why] every che deb is ~110MB per arch, so the whole registry no longer fits in one job artifact
+#   (GitLab caps at 1GB and the tree crossed it at 5 versions). apt only needs to serve installable
+#   recent versions, and the tree is rebuilt from the registry on every run, so keeping the newest
+#   few is lossless for users and bounds the artifact
+KEEP="${APT_KEEP_VERSIONS:-3}"
+
+typeset -a VERSIONS
 integer page=1
 while (( 1 )) {
   curl_gl -o "$WORK/packages.json" "${API}/projects/${PROJECT}/packages?package_type=generic&package_name=che&per_page=100&page=${page}"
   if [[ "$(yq -p=json 'length' "$WORK/packages.json")" == 0 ]] break
-  yq -p=json -o=tsv '[.[] | select(.name == "che") | [.id, .version]]' "$WORK/packages.json" |
-    while IFS=$'\t' read -r id version; do
-      if [[ -z "$id" || "$version" == latest ]] continue
-      curl_gl -o "$WORK/files.json" "${API}/projects/${PROJECT}/packages/${id}/package_files?per_page=100"
-      yq -p=json '.[].file_name' "$WORK/files.json" | grep '\.deb$' |
-        while read -r f; do
-          if (( ${+SEEN[$f]} )) continue
-          SEEN[$f]=1
-          echo "downloading ${version}/${f}"
-          curl_gl -o "$WORK/debs/$f" "${API}/projects/${PROJECT}/packages/generic/che/${version}/${f}"
-        done || true
-    done
+  VERSIONS+=(${(f)"$(yq -p=json -o=tsv '[.[] | select(.name == "che") | [.id, .version]]' "$WORK/packages.json")"})
   (( page++ ))
+}
+
+typeset -a RECENT
+RECENT=(${(f)"$(print -l $VERSIONS | awk -F'\t' '$2 != "latest" && $2 != "" {print}' | sort -t$'\t' -k2 -V | tail -n $KEEP)"})
+print "apt tree: keeping newest $KEEP of ${#VERSIONS} che versions"
+
+typeset -A SEEN
+for line in $RECENT; {
+  id=${line%%$'\t'*}
+  version=${line#*$'\t'}
+  if [[ -z $id ]] continue
+  curl_gl -o "$WORK/files.json" "${API}/projects/${PROJECT}/packages/${id}/package_files?per_page=100"
+  yq -p=json '.[].file_name' "$WORK/files.json" | grep '\.deb$' |
+    while read -r f; do
+      if (( ${+SEEN[$f]} )) continue
+      SEEN[$f]=1
+      echo "downloading ${version}/${f}"
+      curl_gl -o "$WORK/debs/$f" "${API}/projects/${PROJECT}/packages/generic/che/${version}/${f}"
+    done || true
 }
 
 typeset -a DEBS
