@@ -231,4 +231,12 @@ func TestExpand(t *testing.T) {
 	})
 }
 
+func TestExpandPath(t *testing.T) {
+	testyml.Eq(t, td, "testdata/spec/funcs/expand_path.test.spec.yml", func(t *testing.T, c testyml.Case[string]) (string, error) {
+		env := map[string]string{"HOME": c.Input.Args.String(t, 1), "NVM_DIR": c.Input.Args.String(t, 2)}
+		in := &Installer{Host: Host{Getenv: func(k string) string { return env[k] }}}
+		return in.expandPath(c.Input.Args.String(t, 0)), nil
+	})
+}
+
 // [<] 🤖🤖

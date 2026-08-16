@@ -495,8 +495,16 @@ pages-preview:
       - public
     expire_in: 1 week
 
+#[why] goreleaser builds 5 binaries (che + 4 render CLIs) concurrently, each compiling the full
+#   dep tree (gomplate, gcp sdk, go-git, otel): the peak was OOMKilled at exit 137 on the default
+#   medium size's 6Gi ceiling, the big runner's 12Gi holds it. everything else stays medium
+.goreleaser-build:
+  tags:
+    - gke-linux-amd64-big
+
 #[why] darwin builds cross-compile on linux: che is CGO_ENABLED=0, so no macOS SDK or runner is needed
 goreleaser-darwin-che:
+  extends: .goreleaser-build
   stage: release
   image: $CI_IMAGE
   needs: []
@@ -520,6 +528,7 @@ goreleaser-darwin-che:
     expire_in: 1 day
 
 goreleaser-linux-che:
+  extends: .goreleaser-build
   stage: release
   image: $CI_IMAGE
   needs: []
@@ -549,6 +558,7 @@ goreleaser-linux-che:
     expire_in: 1 day
 
 prerelease-darwin-che:
+  extends: .goreleaser-build
   stage: release
   image: $CI_IMAGE
   needs: []
@@ -575,6 +585,7 @@ prerelease-darwin-che:
     expire_in: 1 week
 
 prerelease-linux-che:
+  extends: .goreleaser-build
   stage: release
   image: $CI_IMAGE
   needs: []

@@ -728,16 +728,15 @@ packages:
                 global: 24.19.0
     nvm:
         verify:
-            cmd: . "${XDG_CONFIG_HOME:-$HOME/.config}/nvm/nvm.sh" && nvm --version
+            cmd: . "${NVM_DIR:-$HOME/.nvm}/nvm.sh" && nvm --version
             checkInPath: false
         installers:
             #[why] since v0.40.6 the upstream installer aborts when $NVM_DIR does not exist (it stopped creating it) and refuses to run under sh, so mkdir first and pipe it to bash
-            #[why] NVM_DIR resolves in the script, not in env: env values expand against the process
-            #   environment with no fallback, and XDG_CONFIG_HOME is unset in CI containers, so
-            #   $XDG_CONFIG_HOME/nvm collapsed to /nvm and the installer rejected it
+            #[why] NVM_DIR resolves in the script, not in env: an env value expands against the process
+            #   environment with no fallback, so an unset var would collapse the path
             - script:
                 run: |
-                    NVM_DIR="${XDG_CONFIG_HOME:-$HOME/.config}/nvm"
+                    NVM_DIR="${NVM_DIR:-$HOME/.nvm}"
                     export NVM_DIR
                     mkdir -p "$NVM_DIR"
                     curl -fsSL https://raw.githubusercontent.com/nvm-sh/nvm/v0.40.6/install.sh | bash
@@ -746,9 +745,7 @@ packages:
                     #   symlink into the configs repo; the zsh config sources nvm itself
                     PROFILE: /dev/null
                 #[why] nvm is a sourced function, never a binary on PATH: this file marks it installed
-                #[why] ~ form, not $XDG_CONFIG_HOME: che expands this path with os.Expand, which has no
-                #   fallback for an unset var, but does expand ~ against HOME
-                validateArtifact: ~/.config/nvm/nvm.sh
+                validateArtifact: ${NVM_DIR:-$HOME/.nvm}/nvm.sh
     ollama:
         requires:
             - zstd
