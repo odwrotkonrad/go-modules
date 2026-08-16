@@ -9,7 +9,7 @@ ops-plain:
     makeCopies:
       - files: [{source: plain/copy.ontoHost.cp, dest: 's:^plain:$HOME/plain:'}]
     renderTemplates:
-      - templates: [{source: plain/tpl.ontoHost.tpl, dest: 's:^plain:$HOME/plain:'}]
+      - {source: plain/tpl.ontoHost.tpl, dest: 's:^plain:$HOME/plain:'}
     makeDirs:
       - directories: [$HOME/plain/made-dir]
     installPackages:
@@ -26,7 +26,7 @@ ops-conditional:
     makeCopies:
       - files: [{source: conditional/copy.ontoHost.cp, dest: 's:^conditional:$HOME/conditional:'}]
     renderTemplates:
-      - templates: [{source: conditional/tpl.ontoHost.tpl, dest: 's:^conditional:$HOME/conditional:'}]
+      - {source: conditional/tpl.ontoHost.tpl, dest: 's:^conditional:$HOME/conditional:'}
     makeDirs:
       - directories: [$HOME/conditional/made-dir]
     installPackages:
@@ -41,7 +41,7 @@ ops-dropped:
     makeCopies:
       - files: [{source: dropped/copy.ontoHost.cp, dest: 's:^dropped:$HOME/dropped:'}]
     renderTemplates:
-      - templates: [{source: dropped/tpl.ontoHost.tpl, dest: 's:^dropped:$HOME/dropped:'}]
+      - {source: dropped/tpl.ontoHost.tpl, dest: 's:^dropped:$HOME/dropped:'}
     makeDirs:
       - directories: [$HOME/dropped/made-dir]
     installPackages:

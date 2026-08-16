@@ -1,11 +1,11 @@
+##[>] 🤖🤖
 base:
   include:
     renderTemplates:
-      - source: "@gitlab.com/acme/tools/snippets/agent.md"
-        dest:
-          - {path: .claude/agents/ro.md}
+      - ctx: {repo: Workspace}
 
 cli/macos:
   options: {autoDiscover: true}
   include:
     profiles: [base]
+##[<] 🤖🤖

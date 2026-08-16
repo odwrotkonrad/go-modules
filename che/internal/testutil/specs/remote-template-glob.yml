@@ -1,7 +1,7 @@
 base:
   include:
     renderTemplates:
-      - templates: ["@gitlab.com/acme/tools//snippets/*.md"]
+      - "@gitlab.com/acme/tools//snippets/*.md"
 
 cli/macos:
   options: {autoDiscover: true}

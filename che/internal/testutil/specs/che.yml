@@ -11,7 +11,7 @@ base:
         files:
           - {source: Library/LaunchDaemons/otelcol.plist.ontoHost.cp, dest: [/Library/LaunchDaemons/otelcol.plist]}
     renderTemplates:
-      - templates: [{source: _home/.config/zsh/**, dest: 's:^_home:$HOME:'}]
+      - {source: _home/.config/zsh/**, dest: 's:^_home:$HOME:'}
     makeDirs:
       - directories: [$HOME/.cache/zsh]
       - chmod: "2775"
@@ -33,6 +33,5 @@ desktop/macos:
 ontoRepo:
   include:
     renderTemplates:
-      - templates:
-          - source: templates/r.ontoRepo.tpl
-            dest: [docs/r.md]
+      - source: templates/r.ontoRepo.tpl
+        dest: [docs/r.md]

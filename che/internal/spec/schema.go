@@ -25,6 +25,7 @@ func Schema() *jsonschema.Schema {
 	defs["Packages"] = optDefs["Packages"]
 	defs["Otel"] = optDefs["Otel"]
 	defs["DestSpec"] = DestSpec{}.JSONSchema()
+	defs["templateNode"] = templateNode{}.JSONSchema()
 
 	defs["ProfileRecipe"].Description = "one profile block: options self-describe eligibility, include.profiles compose refs in order (local scalars, sourced {source, options, env}), include adds, exclude filters last and wins"
 	defs["includeSet"].Description = "additive payload: profile refs, makeLinks globs, makeCopies/renderTemplates/makeDirs perm-groups, runScripts globs"
@@ -128,7 +129,7 @@ func (linkEntry) JSONSchema() *jsonschema.Schema {
 func (fileSpec) JSONSchema() *jsonschema.Schema {
 	o := obj("one source fanned out to explicit dests", []string{"source"})
 	o.Properties.Set("source", &jsonschema.Schema{
-		Description: "source path (host sources workingDirectory-relative, repo-doc sources checkout-relative), or remote ref @<repo>//<path>[?ref=<ref>] (renderTemplates only, explicit dest required)",
+		Description: "source path, workingDirectory-relative",
 		Type:        "string",
 	})
 	o.Properties.Set("dest", &jsonschema.Schema{OneOf: []*jsonschema.Schema{
@@ -139,12 +140,65 @@ func (fileSpec) JSONSchema() *jsonschema.Schema {
 		},
 		destRuleSchema(),
 	}})
-	o.Properties.Set("ctx", &jsonschema.Schema{
-		Description:          "renderTemplates only: values exposed as the template's root context (.key)",
+	return scalarOr("glob over git-tracked files (brace-expanded)", o)
+}
+
+func (templateNode) JSONSchema() *jsonschema.Schema {
+	leaf := obj("one template source fanned out to dests", []string{"source"})
+	leaf.Properties.Set("source", &jsonschema.Schema{
+		Description: "source path (host sources workingDirectory-relative, repo-doc sources checkout-relative), or remote ref @<repo>//<path>[?ref=<ref>] (explicit dest required); joined onto every enclosing group's source prefix",
+		Type:        "string",
+	})
+	leaf.Properties.Set("dest", &jsonschema.Schema{OneOf: []*jsonschema.Schema{
+		{
+			Description: destPathDesc + "; omitted -> derived from the workingDirectory-relative source path",
+			Type:        "string",
+			Not:         destRuleSchema(),
+		},
+		{
+			Description: "dest paths: relative -> repo, ~/ or absolute -> host; omitted -> derived from the workingDirectory-relative source path",
+			Type:        "array",
+			Items:       &jsonschema.Schema{Ref: "#/$defs/DestSpec"},
+		},
+		destRuleSchema(),
+	}})
+	leaf.Properties.Set("ctx", ctxSchema())
+	leaf.Properties.Set("options", render.Options{}.JSONSchema())
+	addPerms(leaf)
+
+	group := obj("a source prefix plus shared perms, ctx and options cascading onto nested nodes (innermost wins)", []string{"renderTemplates"})
+	group.Properties.Set("source", &jsonschema.Schema{
+		Description: "source prefix joined onto every nested node's source; a remote prefix @<repo>[//<path>][?ref=<ref>] recombines so the ref stays last",
+		Type:        "string",
+	})
+	group.Properties.Set("ctx", ctxSchema())
+	group.Properties.Set("options", render.Options{}.JSONSchema())
+	group.Properties.Set("renderTemplates", &jsonschema.Schema{
+		Description: "nested nodes, each a leaf or a further group",
+		Type:        "array",
+		Items:       &jsonschema.Schema{Ref: "#/$defs/templateNode"},
+	})
+	addPerms(group)
+
+	return &jsonschema.Schema{OneOf: []*jsonschema.Schema{
+		{Description: "glob over git-tracked files (brace-expanded)", Type: "string"},
+		leaf,
+		group,
+	}}
+}
+
+func ctxSchema() *jsonschema.Schema {
+	return &jsonschema.Schema{
+		Description:          "values exposed as the template's root context (.key), merged under each nested node's ctx",
 		Type:                 "object",
 		AdditionalProperties: &jsonschema.Schema{Type: "string"},
-	})
-	return scalarOr("glob over git-tracked files (brace-expanded)", o)
+	}
+}
+
+func addPerms(o *jsonschema.Schema) {
+	o.Properties.Set("owner", &jsonschema.Schema{Description: "dest owner user; empty: code default", Type: "string"})
+	o.Properties.Set("ownerGroup", &jsonschema.Schema{Description: "dest owner group; empty: code default", Type: "string"})
+	o.Properties.Set("chmod", &jsonschema.Schema{Description: "dest mode, octal string", Type: "string", Pattern: "^[0-7]{3,4}$"})
 }
 
 func (dirSpec) JSONSchema() *jsonschema.Schema {
