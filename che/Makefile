@@ -85,19 +85,17 @@ build-e2e-test: dist/e2e.test
 
 HOST_GOARCH := $(if $(filter arm64 aarch64,$(shell uname -m)),arm64,amd64)
 E2E_LINUX_ARCH := $(or $(patsubst linux-%,%,$(filter linux-%,$(PLATFORM))),$(HOST_GOARCH))
-ZIG_LINUX_TARGET := $(if $(filter arm64,$(E2E_LINUX_ARCH)),aarch64,x86_64)-linux-gnu
-ZIG_CC := CC="zig cc -target $(ZIG_LINUX_TARGET)" CXX="zig c++ -target $(ZIG_LINUX_TARGET)"
-#[what] cross-build the linux binary into ./dist/che-linux-<arch> (zig cc, arch from PLATFORM=linux-<arch>, default host arch), the linux-container binary
+#[what] cross-build the linux binary into ./dist/che-linux-<arch> (arch from PLATFORM=linux-<arch>, default host arch), the linux-container binary
 build-linux:
-	GOOS=linux GOARCH=$(E2E_LINUX_ARCH) CGO_ENABLED=1 $(ZIG_CC) $(GO) build -o dist/che-linux-$(E2E_LINUX_ARCH) .
+	GOOS=linux GOARCH=$(E2E_LINUX_ARCH) CGO_ENABLED=0 $(GO) build -o dist/che-linux-$(E2E_LINUX_ARCH) .
 
-#[what] cross-build the coverage-instrumented binary for PLATFORM=linux-<arch> into ./dist/linux-<arch>/che (zig cc)
+#[what] cross-build the coverage-instrumented binary for PLATFORM=linux-<arch> into ./dist/linux-<arch>/che
 build-cover-linux:
-	GOOS=linux GOARCH=$(E2E_LINUX_ARCH) CGO_ENABLED=1 $(ZIG_CC) $(GO) build -cover -coverpkg=./... -o dist/linux-$(E2E_LINUX_ARCH)/$(BIN) .
+	GOOS=linux GOARCH=$(E2E_LINUX_ARCH) CGO_ENABLED=0 $(GO) build -cover -coverpkg=./... -o dist/linux-$(E2E_LINUX_ARCH)/$(BIN) .
 
-#[what] cross-compile the e2e harness for PLATFORM=linux-<arch> into ./dist/linux-<arch>/e2e.test (zig cc)
+#[what] cross-compile the e2e harness for PLATFORM=linux-<arch> into ./dist/linux-<arch>/e2e.test
 build-e2e-test-linux:
-	GOOS=linux GOARCH=$(E2E_LINUX_ARCH) CGO_ENABLED=1 $(ZIG_CC) $(GO) test -c -o dist/linux-$(E2E_LINUX_ARCH)/e2e.test ./e2e
+	GOOS=linux GOARCH=$(E2E_LINUX_ARCH) CGO_ENABLED=0 $(GO) test -c -o dist/linux-$(E2E_LINUX_ARCH)/e2e.test ./e2e
 
 ifeq ($(E2E_USE_TEST_BIN),1)
 E2E_RUN = sh -c 'cd e2e && exec ../dist/e2e.test -test.v -test.count=1 -test.timeout 45m -test.run "$$0"'
@@ -183,11 +181,11 @@ release-check:
 	goreleaser check -f .goreleaser.yaml
 	goreleaser check -f .goreleaser.darwin.yaml
 
-#[what] build the darwin archives (native cc) into ./darwin-dist
+#[what] build the darwin archives into ./darwin-dist
 release-darwin:
 	goreleaser release --snapshot --clean -f .goreleaser.darwin.yaml
 
-#[what] local snapshot of all module binaries: darwin (native) + linux (zig), no publish
+#[what] local snapshot of all module binaries: darwin + linux, no publish
 release-snapshot: release-darwin
 	goreleaser release --snapshot --clean -f .goreleaser.yaml
 ##[<] Release

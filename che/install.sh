@@ -11,8 +11,11 @@ for tool in uname tar mktemp; do
   command -v "$tool" >/dev/null 2>&1 || err "missing required tool: $tool"
 done
 
+#[why] no --retry-all-errors: a missing asset (404) is not transient, and retrying it stalls the
+#   caller for retry * retry-delay before the inevitable failure. curl's default retry set already
+#   covers the transient cases (timeouts, 408, 429, 5xx)
 if command -v curl >/dev/null 2>&1; then
-  fetch() { curl -fsSL --connect-timeout 30 --retry 10 --retry-delay 30 --retry-all-errors -o "$1" "$2"; }
+  fetch() { curl -fsSL --connect-timeout 30 --retry 10 --retry-delay 30 -o "$1" "$2"; }
 elif command -v wget >/dev/null 2>&1; then
   fetch() { wget -q -O "$1" "$2"; }
 else
@@ -30,7 +33,7 @@ case "$(uname -m)" in
   *) arch="$(uname -m)" ;;
 esac
 case "${os}_${arch}" in
-  darwin_amd64 | darwin_arm64 | linux_amd64 | linux_arm64) ;;
+  darwin_arm64 | linux_amd64 | linux_arm64) ;;
   *) err "unsupported platform: ${os}/${arch}" ;;
 esac
 

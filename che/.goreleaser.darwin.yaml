@@ -13,71 +13,61 @@ builds:
     main: .
     binary: che
     goos: [darwin]
-    goarch: [amd64, arm64]
+    goarch: [arm64]
     flags:
       - -trimpath
     ldflags:
       - -s -w -X gitlab.com/konradodwrot/go-modules/che/internal/cli.version={{.Version}}
     env:
-      - CGO_ENABLED=1
-      - CC=cc
-      - CXX=c++
+      - CGO_ENABLED=0
 
   - id: render-tpl-darwin
     main: ./render/cmd/render-tpl
     binary: render-tpl
     goos: [darwin]
-    goarch: [amd64, arm64]
+    goarch: [arm64]
     flags:
       - -trimpath
     ldflags:
       - -s -w -X main.version={{.Version}}
     env:
-      - CGO_ENABLED=1
-      - CC=cc
-      - CXX=c++
+      - CGO_ENABLED=0
 
   - id: render-dirs-tree-darwin
     main: ./render/cmd/render-dirs-tree
     binary: render-dirs-tree
     goos: [darwin]
-    goarch: [amd64, arm64]
+    goarch: [arm64]
     flags:
       - -trimpath
     ldflags:
       - -s -w -X main.version={{.Version}}
     env:
-      - CGO_ENABLED=1
-      - CC=cc
-      - CXX=c++
+      - CGO_ENABLED=0
 
   - id: render-makefile-doc-darwin
     main: ./render/cmd/render-makefile-doc
     binary: render-makefile-doc
     goos: [darwin]
-    goarch: [amd64, arm64]
+    goarch: [arm64]
     flags:
       - -trimpath
     ldflags:
       - -s -w -X main.version={{.Version}}
     env:
-      - CGO_ENABLED=1
-      - CC=cc
-      - CXX=c++
+      - CGO_ENABLED=0
 
   - id: render-repo-group-index-darwin
     main: ./render/cmd/render-repo-group-index
     binary: render-repo-group-index
     goos: [darwin]
-    goarch: [amd64, arm64]
+    goarch: [arm64]
     flags:
       - -trimpath
     ldflags:
       - -s -w -X main.version={{.Version}}
     env:
-      - CGO_ENABLED=1
-      - CC=cc
-      - CXX=c++
+      - CGO_ENABLED=0
 
 archives:
   - id: che

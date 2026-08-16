@@ -759,9 +759,18 @@ packages:
                 os: linux
                 url: https://ollama.com/install.sh
     op:
+        #[why] che shells out to op to resolve op:// secret refs at render time
         installers:
             - brew/cask:
                 packageName: 1password-cli
+            - binariesRemoteArchive:
+                archScheme: go
+                extractBinaries: [op]
+                platformEligibility:
+                    - linux-amd64: sha256:7a7b7168f521d31838f0cc59abf172527853308c9b9cceee34895121acb0be0f
+                    - linux-arm64: sha256:854f92932dcfebc26434e83e426729933a8d0aae447889e439cf01f1b213a7fd
+                version: 2.38.1
+                url: https://cache.agilebits.com/dist/1P/op2/pkg/v{version}/op_{os}_{arch}_v{version}.zip
     openssh:
         command: ssh
         verify:
