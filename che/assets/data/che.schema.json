@@ -900,6 +900,10 @@
               "type": "string",
               "description": "source prefix joined onto every nested node's source; a remote prefix @\u003crepo\u003e[//\u003cpath\u003e][?ref=\u003cref\u003e] recombines so the ref stays last"
             },
+            "dest": {
+              "type": "string",
+              "description": "dest prefix joined onto every nested repo-relative dest (host dests: ~/, absolute, $VAR anchor themselves and are left alone)"
+            },
             "ctx": {
               "additionalProperties": {
                 "type": "string"

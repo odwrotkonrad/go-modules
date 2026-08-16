@@ -58,6 +58,20 @@ cases:
                               - {source: /a.md, dest: a.md}
     expected:
       output: true
+  - name: ShouldAcceptGroupDestPrefix
+    input:
+      args:
+        - doc: |
+            p:
+              include:
+                renderTemplates:
+                  - source: templates/2-data
+                    dest: assets/data
+                    renderTemplates:
+                      - {source: a.ontoRepo.tpl, dest: a.md}
+                      - {source: b.ontoRepo.tpl, dest: $HOME/.config/b.md}
+    expected:
+      output: true
   - name: ShouldAcceptScalarDestPath
     input:
       args:

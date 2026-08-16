@@ -282,7 +282,7 @@ type templateNode struct {
 	Source   string            `yaml:"source"`
 	Dest     []DestSpec        `yaml:"dest"`
 	Ctx      map[string]string `yaml:"ctx" jsonschema_description:"template context, merged under each descendant's ctx (innermost keys win)"`
-	Options  render.Options    `yaml:"options" jsonschema_description:"render options, merged under each descendant's options and each explicit dest's options (innermost wins)"`
+	Options  optionsSpec       `yaml:"options" jsonschema_description:"render options, merged under each descendant's options and each explicit dest's options (innermost set field wins, an explicit false overriding an inherited true)"`
 	Children []templateNode    `yaml:"renderTemplates" jsonschema_description:"nested nodes, inheriting this node's source prefix, perms, ctx and options"`
 }
 
@@ -412,10 +412,11 @@ type Evaluator struct {
 }
 
 type templateInherited struct {
-	prefix  string
-	perms   Perms
-	ctx     map[string]string
-	options render.Options
+	prefix     string
+	destPrefix string
+	perms      Perms
+	ctx        map[string]string
+	options    optionsSpec
 }
 
 type globSet []globPerm

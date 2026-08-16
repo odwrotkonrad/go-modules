@@ -171,6 +171,10 @@ func (templateNode) JSONSchema() *jsonschema.Schema {
 		Description: "source prefix joined onto every nested node's source; a remote prefix @<repo>[//<path>][?ref=<ref>] recombines so the ref stays last",
 		Type:        "string",
 	})
+	group.Properties.Set("dest", &jsonschema.Schema{
+		Description: "dest prefix joined onto every nested repo-relative dest (host dests: ~/, absolute, $VAR anchor themselves and are left alone)",
+		Type:        "string",
+	})
 	group.Properties.Set("ctx", ctxSchema())
 	group.Properties.Set("options", render.Options{}.JSONSchema())
 	group.Properties.Set("renderTemplates", &jsonschema.Schema{
