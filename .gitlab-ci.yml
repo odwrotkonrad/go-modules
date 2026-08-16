@@ -44,8 +44,16 @@ variables:
   GOCACHE: $CI_PROJECT_DIR/.cache/go-build
   CC: clang
 
+#[why] the cgo builds (1Password SDK, tree-sitter) compile several binaries at once and were
+#   OOMKilled at exit 137 on the default medium size's 6Gi ceiling: they get the big runner, whose
+#   12Gi limit holds the peak. everything else stays medium
+.cgo-build:
+  tags:
+    - gke-linux-amd64-big
+
 #[what] amd64 linux warm build: go caches plus the amd64 che artifacts the e2e jobs reuse, native plus zig-cross amd64
 warm-go:
+  extends: .cgo-build
   stage: warm
   image: $CI_IMAGE
   needs: []
@@ -74,6 +82,7 @@ warm-go:
 #[what] arm64 linux warm build: zig-cross arm64 che artifacts for the arm64 install e2e jobs
 #[why] shares goreleaser-linux-che [arm64]'s go-build key: both zig-cross che for arm64, tag and MR pipelines warm each other
 warm-go-linux-arm64:
+  extends: .cgo-build
   stage: warm
   image: $CI_IMAGE
   needs: []
@@ -547,6 +556,7 @@ goreleaser-darwin-che:
     expire_in: 1 day
 
 goreleaser-linux-che:
+  extends: .cgo-build
   stage: release
   image: $CI_IMAGE
   needs: []
@@ -622,6 +632,7 @@ prerelease-darwin-che:
     expire_in: 1 week
 
 prerelease-linux-che:
+  extends: .cgo-build
   stage: release
   image: $CI_IMAGE
   needs: []
