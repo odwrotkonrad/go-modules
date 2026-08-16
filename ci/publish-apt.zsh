@@ -47,7 +47,7 @@ typeset -A SEEN
 for line in $RECENT; {
   id=${line%%$'\t'*}
   version=${line#*$'\t'}
-  [[ -z $id ]] && continue
+  if [[ -z $id ]] continue
   curl_gl -o "$WORK/files.json" "${API}/projects/${PROJECT}/packages/${id}/package_files?per_page=100"
   yq -p=json '.[].file_name' "$WORK/files.json" | grep '\.deb$' |
     while read -r f; do
