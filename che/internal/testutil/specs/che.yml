@@ -1,37 +1,56 @@
 base:
   include:
     makeLinks:
-      - {source: _home/.config/zsh/**, dest: 's:^_home:$HOME:'}
+      - source: _home/.config/zsh/**
+        dest: 's:^_home:$HOME:'
       - etc/zshrc
     makeCopies:
-      - files: [{source: _home/.config/zsh/**, dest: 's:^_home:$HOME:'}]
+      - files:
+          - source: _home/.config/zsh/**
+            dest: 's:^_home:$HOME:'
       - owner: root
         ownerGroup: wheel
         chmod: "0644"
         files:
-          - {source: Library/LaunchDaemons/otelcol.plist.ontoHost.cp, dest: [/Library/LaunchDaemons/otelcol.plist]}
+          - source: Library/LaunchDaemons/otelcol.plist.ontoHost.cp
+            dest:
+              - /Library/LaunchDaemons/otelcol.plist
     renderTemplates:
-      - {source: _home/.config/zsh/**, dest: 's:^_home:$HOME:'}
+      - source: _home/.config/zsh/**
+        dest: 's:^_home:$HOME:'
     makeDirs:
-      - directories: [$HOME/.cache/zsh]
+      - directories:
+          - $HOME/.cache/zsh
       - chmod: "2775"
         directories:
-          - {dest: [/var/log/che-test-setgid]}
+          - dest:
+              - /var/log/che-test-setgid
     runScripts:
       - install/setup
 
 cli/macos:
-  options: {autoDiscover: true, runIf: ['builtin:isOs == macos', 'builtin:isVirt']}
+  options:
+    autoDiscover: true
+    runIf:
+      - builtin:isOs == macos
+      - builtin:isVirt
   include:
-    profiles: [base]
+    profiles:
+      - base
 
 desktop/macos:
-  options: {autoDiscover: true, runIf: ['builtin:isOs == macos', 'builtin:isVirt == false']}
+  options:
+    autoDiscover: true
+    runIf:
+      - builtin:isOs == macos
+      - builtin:isVirt == false
   include:
-    profiles: [base]
+    profiles:
+      - base
 
 ontoRepo:
   include:
     renderTemplates:
       - source: templates/r.ontoRepo.tpl
-        dest: [docs/r.md]
+        dest:
+          - docs/r.md

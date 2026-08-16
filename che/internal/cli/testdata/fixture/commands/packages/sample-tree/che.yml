@@ -1,7 +1,11 @@
 ##[>] 🤖🤖
-options: {profileWorkingDirectory: root}
+options:
+  profileWorkingDirectory: root
 cli/macos:
-  options: {autoDiscover: true}
+  options:
+    autoDiscover: true
   include:
-    installPackages: [jq, kubectx]
+    installPackages:
+      - jq
+      - kubectx
 ##[<] 🤖🤖

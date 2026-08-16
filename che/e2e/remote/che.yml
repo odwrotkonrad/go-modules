@@ -1,16 +1,22 @@
 ##[>] 🤖🤖
-options: {profileWorkingDirectory: root}
+options:
+  profileWorkingDirectory: root
 
 ops-remote:
   include:
     makeLinks:
-      - {source: remote/link.txt, dest: 's:^remote:$HOME/remote:'}
+      - source: remote/link.txt
+        dest: 's:^remote:$HOME/remote:'
     makeCopies:
-      - files: [{source: remote/copy.ontoHost.cp, dest: 's:^remote:$HOME/remote:'}]
+      - files:
+          - source: remote/copy.ontoHost.cp
+            dest: 's:^remote:$HOME/remote:'
     renderTemplates:
-      - {source: remote/tpl.ontoHost.tpl, dest: 's:^remote:$HOME/remote:'}
+      - source: remote/tpl.ontoHost.tpl
+        dest: 's:^remote:$HOME/remote:'
     makeDirs:
-      - directories: [$HOME/remote/made-dir]
+      - directories:
+          - $HOME/remote/made-dir
     installPackages:
       - e2e-remote
     runScripts:
