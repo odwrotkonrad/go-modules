@@ -13,7 +13,7 @@ default:
   tags:
     - gke-linux-amd64
   retry:
-    max: 3
+    max: 2
     when:
       - runner_system_failure
       - api_failure
