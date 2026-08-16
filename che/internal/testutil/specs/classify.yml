@@ -8,7 +8,7 @@ base:
     makeCopies:
       - files: [_home/.config/zsh/**, Library/LaunchDaemons/otelcol.plist*]
     renderTemplates:
-      - templates: [_home/.config/zsh/**]
+      - _home/.config/zsh/**
 
 cli/macos:
   options: {autoDiscover: true}

@@ -7,7 +7,7 @@ MODULE_VERSION="${TAG#che/v}"
 PKG="${CI_API_V4_URL}/projects/${CI_PROJECT_ID}/packages/generic/che/${MODULE_VERSION}"
 
 typeset -A SHA
-for plat in darwin_arm64 darwin_amd64 linux_arm64 linux_amd64; do
+for plat in darwin_arm64 linux_arm64 linux_amd64; do
   typeset -a f
   f=(che/dist/che_${MODULE_VERSION}_${plat}.tar.gz(N) che/darwin-dist/che_${MODULE_VERSION}_${plat}.tar.gz(N))
   if [[ ${#f} -ne 1 ]] { echo "expected one archive for ${plat}, got: ${f:-none}" >&2; exit 1 }
@@ -26,10 +26,6 @@ class $1 < Formula
     on_arm do
       url "${PKG}/che_${MODULE_VERSION}_darwin_arm64.tar.gz"
       sha256 "${SHA[darwin_arm64]}"
-    end
-    on_intel do
-      url "${PKG}/che_${MODULE_VERSION}_darwin_amd64.tar.gz"
-      sha256 "${SHA[darwin_amd64]}"
     end
   end
   on_linux do

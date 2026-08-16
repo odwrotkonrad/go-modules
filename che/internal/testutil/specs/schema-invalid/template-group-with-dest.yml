@@ -1,0 +1,14 @@
+##[>] 🤖🤖
+base:
+  include:
+    renderTemplates:
+      - source: "@gitlab.com/acme/tools?ref=v1.0.0"
+        dest: [.claude/agents, .claude/other]
+        <<<:
+          - {source: //snippets/ro.md, dest: ro.md}
+
+cli/macos:
+  options: {autoDiscover: true}
+  include:
+    profiles: [base]
+##[<] 🤖🤖

@@ -44,16 +44,8 @@ variables:
   GOCACHE: $CI_PROJECT_DIR/.cache/go-build
   CC: clang
 
-#[why] the cgo builds (1Password SDK, tree-sitter) compile several binaries at once and were
-#   OOMKilled at exit 137 on the default medium size's 6Gi ceiling: they get the big runner, whose
-#   12Gi limit holds the peak. everything else stays medium
-.cgo-build:
-  tags:
-    - gke-linux-amd64-big
-
-#[what] amd64 linux warm build: go caches plus the amd64 che artifacts the e2e jobs reuse, native plus zig-cross amd64
+#[what] amd64 linux warm build: go caches plus the amd64 che artifacts the e2e jobs reuse
 warm-go:
-  extends: .cgo-build
   stage: warm
   image: $CI_IMAGE
   needs: []
@@ -82,7 +74,6 @@ warm-go:
 #[what] arm64 linux warm build: zig-cross arm64 che artifacts for the arm64 install e2e jobs
 #[why] shares goreleaser-linux-che [arm64]'s go-build key: both zig-cross che for arm64, tag and MR pipelines warm each other
 warm-go-linux-arm64:
-  extends: .cgo-build
   stage: warm
   image: $CI_IMAGE
   needs: []
@@ -444,7 +435,7 @@ release-lib:
     - sed -i 's|(\.\./assets/data/che.schema.json)|(assets/data/che.schema.json)|g' che/docs/spec.md
     - printf '# che\n' > che/docs/index.md
     ##[>] 🤖🤖
-    - PROSE_REF=$(sed -n 's|.*repos/go-modules/che-purpose.md?ref=\(v[0-9.]*\)".*|\1|p' che.yml)
+    - PROSE_REF=$(sed -n 's|.*konradodwrot/prose?ref=\(v[0-9.]*\)".*|\1|p' che.yml | head -1)
     - wget -qO che/docs/purpose-src.md "https://gitlab.com/konradodwrot/prose/-/raw/$PROSE_REF/repos/go-modules/che-purpose.md"
     - tail -n +2 che/docs/purpose-src.md >> che/docs/index.md
     - rm che/docs/purpose-src.md
@@ -504,42 +495,30 @@ pages-preview:
       - public
     expire_in: 1 week
 
-goreleaser-darwin-che:
-  stage: release
+#[why] goreleaser builds 5 binaries (che + 4 render CLIs) concurrently, each compiling the full
+#   dep tree (gomplate, gcp sdk, go-git, otel): the peak was OOMKilled at exit 137 on the default
+#   medium size's 6Gi ceiling, the big runner's 12Gi holds it. everything else stays medium
+.goreleaser-build:
   tags:
-    - saas-macos-medium-m1
-  image: macos-26-xcode-26
+    - gke-linux-amd64-big
+
+#[why] darwin builds cross-compile on linux: che is CGO_ENABLED=0, so no macOS SDK or runner is needed
+goreleaser-darwin-che:
+  extends: .goreleaser-build
+  stage: release
+  image: $CI_IMAGE
   needs: []
   rules:
-    - if: $ENABLE_DARWIN_CI != "true"
-      when: never
     - if: $CI_COMMIT_TAG =~ /^che\/v/
-  variables:
-    GOPATH: $CI_PROJECT_DIR/.cache/go-path
-    GO_VERSION: 1.26.4
-    GO_SHA256_DARWIN_ARM64: b62ad2b6d7d2464f12a5bcad7ff47f19d08325773b5efd21610e445a05a9bf53
-    GORELEASER_VERSION: 2.16.0
-    GORELEASER_SHA256_DARWIN_ARM64: 8f6898256f35531165d90f2db581c5ee0d32bda83ebc25ac231ff5bdb9d2071a
   cache:
-    - key: go-mod-che
+    - key: go-mod
       paths:
         - .cache/go-mod
-      policy: pull-push
+      policy: pull
     - key: go-build-che-darwin
       paths:
         - .cache/go-build
       policy: pull-push
-  before_script:
-    - curl --connect-timeout 30 --retry 10 --retry-delay 30 --retry-all-errors -fsSL -o /tmp/go.tar.gz "https://go.dev/dl/go${GO_VERSION}.darwin-arm64.tar.gz"
-    - echo "$GO_SHA256_DARWIN_ARM64  /tmp/go.tar.gz" | shasum -a 256 -c -
-    - tar -C "$HOME" -xzf /tmp/go.tar.gz
-    - curl --connect-timeout 30 --retry 10 --retry-delay 30 --retry-all-errors -fsSL -o /tmp/goreleaser.tar.gz "https://github.com/goreleaser/goreleaser/releases/download/v${GORELEASER_VERSION}/goreleaser_Darwin_arm64.tar.gz"
-    - echo "$GORELEASER_SHA256_DARWIN_ARM64  /tmp/goreleaser.tar.gz" | shasum -a 256 -c -
-    - mkdir -p "$HOME/bin"
-    - tar -C "$HOME/bin" -xzf /tmp/goreleaser.tar.gz goreleaser
-    - export PATH="$HOME/go/bin:$HOME/bin:$PATH"
-    - go version
-    - goreleaser --version
   script:
     - export MODULE_VERSION="${CI_COMMIT_TAG#che/v}"
     - cd che && goreleaser release --verbose --snapshot --clean -f .goreleaser.darwin.yaml
@@ -549,7 +528,7 @@ goreleaser-darwin-che:
     expire_in: 1 day
 
 goreleaser-linux-che:
-  extends: .cgo-build
+  extends: .goreleaser-build
   stage: release
   image: $CI_IMAGE
   needs: []
@@ -579,43 +558,24 @@ goreleaser-linux-che:
     expire_in: 1 day
 
 prerelease-darwin-che:
+  extends: .goreleaser-build
   stage: release
-  tags:
-    - saas-macos-medium-m1
-  image: macos-26-xcode-26
+  image: $CI_IMAGE
   needs: []
   rules:
-    - if: $ENABLE_DARWIN_CI != "true"
-      when: never
     - if: $CI_PIPELINE_SOURCE == "merge_request_event"
       changes: [che/**/*, che-packages/**/*, lib/**/*]
   variables:
     MODULE_VERSION: 0.0.0-mr${CI_MERGE_REQUEST_IID}
-    GOPATH: $CI_PROJECT_DIR/.cache/go-path
-    GO_VERSION: 1.26.4
-    GO_SHA256_DARWIN_ARM64: b62ad2b6d7d2464f12a5bcad7ff47f19d08325773b5efd21610e445a05a9bf53
-    GORELEASER_VERSION: 2.16.0
-    GORELEASER_SHA256_DARWIN_ARM64: 8f6898256f35531165d90f2db581c5ee0d32bda83ebc25ac231ff5bdb9d2071a
   cache:
-    - key: go-mod-che
+    - key: go-mod
       paths:
         - .cache/go-mod
-      policy: pull-push
+      policy: pull
     - key: go-build-che-darwin
       paths:
         - .cache/go-build
       policy: pull-push
-  before_script:
-    - curl --connect-timeout 30 --retry 10 --retry-delay 30 --retry-all-errors -fsSL -o /tmp/go.tar.gz "https://go.dev/dl/go${GO_VERSION}.darwin-arm64.tar.gz"
-    - echo "$GO_SHA256_DARWIN_ARM64  /tmp/go.tar.gz" | shasum -a 256 -c -
-    - tar -C "$HOME" -xzf /tmp/go.tar.gz
-    - curl --connect-timeout 30 --retry 10 --retry-delay 30 --retry-all-errors -fsSL -o /tmp/goreleaser.tar.gz "https://github.com/goreleaser/goreleaser/releases/download/v${GORELEASER_VERSION}/goreleaser_Darwin_arm64.tar.gz"
-    - echo "$GORELEASER_SHA256_DARWIN_ARM64  /tmp/goreleaser.tar.gz" | shasum -a 256 -c -
-    - mkdir -p "$HOME/bin"
-    - tar -C "$HOME/bin" -xzf /tmp/goreleaser.tar.gz goreleaser
-    - export PATH="$HOME/go/bin:$HOME/bin:$PATH"
-    - go version
-    - goreleaser --version
   script:
     - cd che && goreleaser release --verbose --snapshot --clean -f .goreleaser.darwin.yaml
   artifacts:
@@ -625,7 +585,7 @@ prerelease-darwin-che:
     expire_in: 1 week
 
 prerelease-linux-che:
-  extends: .cgo-build
+  extends: .goreleaser-build
   stage: release
   image: $CI_IMAGE
   needs: []
@@ -658,10 +618,7 @@ publish-che:
   stage: publish
   image: $CI_IMAGE
   needs:
-    #[why] optional: darwin builds are gated by ENABLE_DARWIN_CI. a needs on a rules-excluded job
-    #   would stop the tag pipeline being created at all, so with darwin CI off this publishes linux-only
-    - job: goreleaser-darwin-che
-      optional: true
+    - goreleaser-darwin-che
     - goreleaser-linux-che
     - docs-che
   rules:
@@ -704,8 +661,7 @@ publish-brew-che:
   image: $CI_IMAGE
   needs:
     - publish-che
-    - job: goreleaser-darwin-che
-      optional: true
+    - goreleaser-darwin-che
     - goreleaser-linux-che
   rules:
     - if: $CI_COMMIT_TAG =~ /^che\/v/

@@ -7,6 +7,7 @@ import (
 	"errors"
 	"fmt"
 	"os"
+	"path"
 	"path/filepath"
 	"slices"
 	"strings"
@@ -274,51 +275,167 @@ func (ex *excludeSet) append(other excludeSet) {
 
 func splitEntries(entries []entry, globs *globSet, explicit *[]FileItem) error {
 	for _, group := range entries {
-		if err := splitGroupFiles(group.Files, group.Perms, globs, explicit, nil, func(file fileSpec) FileItem {
-			return FileItem{Rel: file.Source, Dests: file.Dest, Perms: group.Perms}
-		}); err != nil {
+		for _, file := range group.Files {
+			switch {
+			case file.glob != "":
+				globs.add(file.glob, group.Perms)
+			case file.DestRule != "":
+				rule, err := ruleFromDest(file.Source, file.DestRule)
+				if err != nil {
+					return err
+				}
+				globs.addRule(file.Source, group.Perms, rule)
+			default:
+				*explicit = append(*explicit, FileItem{Rel: file.Source, Dests: file.Dest, Perms: group.Perms})
+			}
+		}
+	}
+	return nil
+}
+
+func splitTemplates(nodes []templateNode, globs *globSet, explicit *[]FileItem) error {
+	return splitTemplateNodes(nodes, templateInherited{}, globs, explicit)
+}
+
+func splitTemplateNodes(nodes []templateNode, up templateInherited, globs *globSet, explicit *[]FileItem) error {
+	for _, node := range nodes {
+		down := templateInherited{
+			destPrefix: path.Join(up.destPrefix, groupDestPrefix(node)),
+			perms:      overlayPerms(node.Perms, up.perms),
+			ctx:        fsutil.MergeMap(up.ctx, node.Ctx),
+			options:    overlayRenderOptions(node.Options, up.options),
+		}
+		var err error
+		if down.prefix, err = joinTemplateSource(up.prefix, node.Source); err != nil {
+			return err
+		}
+		if len(node.Children) > 0 {
+			if err := checkTemplateGroup(node); err != nil {
+				return err
+			}
+			if err := splitTemplateNodes(node.Children, down, globs, explicit); err != nil {
+				return err
+			}
+			continue
+		}
+		if err := splitTemplateLeaf(node, down, globs, explicit); err != nil {
 			return err
 		}
 	}
 	return nil
 }
 
-func splitTemplates(entries []templateGroup, globs *globSet, explicit *[]FileItem) error {
-	for _, group := range entries {
-		if err := splitGroupFiles(group.Files, group.Perms, globs, explicit, checkTemplateSpec, func(file fileSpec) FileItem {
-			return FileItem{Rel: file.Source, Dests: mergeDestOptions(group.Options, file.Dest), Ctx: fsutil.MergeMap(group.Ctx, file.Ctx), Perms: group.Perms}
-		}); err != nil {
-			return err
-		}
+func splitTemplateLeaf(node templateNode, down templateInherited, globs *globSet, explicit *[]FileItem) error {
+	leaf := node
+	leaf.Source = down.prefix
+	if err := checkTemplateSpec(leaf); err != nil {
+		return err
 	}
-	return nil
-}
-
-func splitGroupFiles(files []fileSpec, perms Perms, globs *globSet, explicit *[]FileItem, check func(fileSpec) error, makeItem func(fileSpec) FileItem) error {
-	for _, file := range files {
-		if check != nil {
-			if err := check(file); err != nil {
-				return err
-			}
-		}
-		switch {
-		case file.glob != "":
-			globs.add(file.glob, perms)
-		case file.DestRule != "":
-			rule, err := ruleFromDest(file.Source, file.DestRule)
-			if err != nil {
-				return err
-			}
-			globs.addRule(file.Source, perms, rule)
-		default:
-			*explicit = append(*explicit, makeItem(file))
-		}
-	}
-	return nil
-}
-
-func checkTemplateSpec(file fileSpec) error {
 	switch {
+	case leaf.glob != "":
+		globs.add(leaf.glob, down.perms)
+	case leaf.DestRule != "":
+		rule, err := ruleFromDest(leaf.Source, leaf.DestRule)
+		if err != nil {
+			return err
+		}
+		globs.addRule(leaf.Source, down.perms, rule)
+	default:
+		*explicit = append(*explicit, FileItem{
+			Rel:   leaf.Source,
+			Dests: mergeDestOptions(down.options, prefixDests(down.destPrefix, leaf.Dest)),
+			Ctx:   down.ctx,
+			Perms: down.perms,
+		})
+	}
+	return nil
+}
+
+// [why] host dests ($HOME, ~, absolute) anchor themselves: only repo-relative dests take the prefix
+func prefixDests(prefix string, dests []DestSpec) []DestSpec {
+	if prefix == "" {
+		return dests
+	}
+	out := slices.Clone(dests)
+	for i := range out {
+		if p := out[i].Path; !strings.HasPrefix(p, "/") && !strings.HasPrefix(p, "~") && !strings.HasPrefix(p, "$") {
+			out[i].Path = path.Join(prefix, p)
+		}
+	}
+	return out
+}
+
+// [why] a group's dest is a prefix, not a target: one path, no per-dest options
+func groupDestPrefix(node templateNode) string {
+	if len(node.Children) == 0 || len(node.Dest) != 1 {
+		return ""
+	}
+	return node.Dest[0].Path
+}
+
+func checkTemplateGroup(node templateNode) error {
+	switch {
+	case node.DestRule != "" || node.glob != "":
+		return fmt.Errorf("renderTemplates group %q carries nested <<< and a dest rewrite or glob: it is one or the other", node.Source)
+	case len(node.Dest) > 1:
+		return fmt.Errorf("renderTemplates group %q dest is a prefix: want one path, got %d", node.Source, len(node.Dest))
+	case len(node.Dest) == 1 && node.Dest[0].opts != (optionsSpec{}):
+		return fmt.Errorf("renderTemplates group %q dest is a prefix: set options on the group instead", node.Source)
+	}
+	return nil
+}
+
+// [why] parseRemoteRef wants the query last, so a prefix ref and a child path recombine, never concatenate
+func joinTemplateSource(prefix, src string) (string, error) {
+	if prefix == "" || src == "" {
+		return cmp.Or(src, prefix), nil
+	}
+	if !IsRemoteSrc(prefix) {
+		return path.Join(prefix, src), nil
+	}
+	base, upQuery, _ := strings.Cut(prefix, "?")
+	srcPath, downQuery, _ := strings.Cut(src, "?")
+	joined := strings.TrimSuffix(base, "/") + "/" + strings.TrimPrefix(srcPath, "/")
+	if !render.IsRemoteRef(RemoteSrcRef(joined)) {
+		return "", fmt.Errorf("renderTemplates group source %q joins to a malformed remote ref, want @<repo>//<path>[?ref=<ref>]: %q", prefix, joined)
+	}
+	query := cmp.Or(downQuery, upQuery)
+	if query == "" {
+		return joined, nil
+	}
+	return joined + "?" + query, nil
+}
+
+func overlayRenderOptions(override, base optionsSpec) optionsSpec {
+	if override.WriteType == nil {
+		override.WriteType = base.WriteType
+	}
+	if override.SkipAutoGeneratedHeader == nil {
+		override.SkipAutoGeneratedHeader = base.SkipAutoGeneratedHeader
+	}
+	if override.RenderReferencedFiles == nil {
+		override.RenderReferencedFiles = base.RenderReferencedFiles
+	}
+	return override
+}
+
+func overlayPerms(override, base Perms) Perms {
+	if override.Owner == "" {
+		override.Owner = base.Owner
+	}
+	if override.OwnerGroup == "" {
+		override.OwnerGroup = base.OwnerGroup
+	}
+	if override.Chmod == "" {
+		override.Chmod = base.Chmod
+	}
+	return override
+}
+
+func checkTemplateSpec(file templateNode) error {
+	switch {
+	case file.Source == "" && file.glob == "":
+		return fmt.Errorf("renderTemplates node needs a source, a glob or nested <<<")
 	case file.glob != "":
 		if IsRemoteSrc(file.glob) {
 			return fmt.Errorf("renderTemplates glob cannot be remote: %q", file.glob)
@@ -338,13 +455,13 @@ func checkTemplateSpec(file fileSpec) error {
 	return nil
 }
 
-func mergeDestOptions(group render.Options, dests []DestSpec) []DestSpec {
-	if group == (render.Options{}) {
+func mergeDestOptions(inherited optionsSpec, dests []DestSpec) []DestSpec {
+	if inherited == (optionsSpec{}) {
 		return dests
 	}
 	out := slices.Clone(dests)
 	for i := range out {
-		out[i].Options = out[i].opts.over(group)
+		out[i].Options = overlayRenderOptions(out[i].opts, inherited).over(render.Options{})
 	}
 	return out
 }

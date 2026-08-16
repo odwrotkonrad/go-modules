@@ -246,7 +246,7 @@ type includeSet struct {
 	Profiles            []ProfileSourceRecipe       `yaml:"profiles" jsonschema_description:"profile refs composed depth-first before this profile's own payload: local profile name scalar, or {source, options, env} where source is <source>/<spec-file>.yml::<profile> locating a profile in another spec (its own checkout anchor)"`
 	MakeLinks           []linkEntry                 `yaml:"makeLinks" jsonschema_description:"symlink-op entries, workingDirectory-relative: glob string (dest derived 1:1), {source, dest: [paths]} explicit per-file dests, or {source, dest} dest rewrite (sed-style s:^_home:$HOME: or prefix-swap sugar {source: _home/**, dest: $HOME/**} to target home)"`
 	MakeCopies          []entry                     `yaml:"makeCopies" jsonschema_description:"*.ontoHost.cp copy-op perm-groups, workingDirectory-relative sources; a glob source may carry a {source, dest} dest rewrite (sed-style s:^_home:$HOME: or prefix-swap sugar _home/** -> $HOME/**)"`
-	RenderTemplates     []templateGroup             `yaml:"renderTemplates" jsonschema_description:"*.tpl render-op perm-groups; local host sources workingDirectory-relative, repo-doc sources (repo dest) workingDirectory-relative, or remote (@<repo>//<path>[?ref=<ref>], explicit dest required); glob and derived-dest forms are host sources; a glob source may carry a {source, dest} dest rewrite (sed-style s:^_home:$HOME: or prefix-swap sugar _home/** -> $HOME/**); dests expand env vars incl ${invokingSpecGitRoot}, the top-level spec's checkout"`
+	RenderTemplates     []templateNode              `yaml:"renderTemplates" jsonschema_description:"*.tpl render-op tree: a leaf renders one source to its dests, a node carrying nested <<< is a group whose source prefixes, perms, ctx and options cascade onto its descendants (innermost wins, dest options win last); local host sources workingDirectory-relative, repo-doc sources (repo dest) workingDirectory-relative, or remote (@<repo>//<path>[?ref=<ref>], explicit dest required, a group prefix carrying the ref recombines with each leaf path); glob and derived-dest forms are host sources; a glob source may carry a {source, dest} dest rewrite (sed-style s:^_home:$HOME: or prefix-swap sugar _home/** -> $HOME/**); dests expand env vars incl ${invokingSpecGitRoot}, the top-level spec's checkout"`
 	MakeDirs            []dirGroup                  `yaml:"makeDirs" jsonschema_description:"extra-dir perm-groups; each item one dir path (brace-expanded)"`
 	InstallPackages     []PackageRef                `yaml:"installPackages" jsonschema_description:"packages installed from the packages file (default $XDG_CONFIG_HOME/packages/packages.yml): canonical name scalar, or {name, version} to install a specific version (exact or wildcard), overriding the entry's default version; runs before runScripts"`
 	InstallToolPackages map[string][]ToolPackageRef `yaml:"installToolPackages" jsonschema_description:"tool-scoped packages installed from the packages file's toolPackages section, per host tool: name scalar, or {name, version} overriding the entry's pin; runs with installPackages"`
@@ -275,11 +275,15 @@ type entry struct {
 	Files []fileSpec `yaml:"files" jsonschema:"required" jsonschema_description:"the group's items, each inheriting the group's perms"`
 }
 
-type templateGroup struct {
-	Perms   `yaml:",inline"`
-	Ctx     map[string]string `yaml:"ctx" jsonschema_description:"group-level template context, merged under each item's ctx (item keys win)"`
-	Options render.Options    `yaml:"options" jsonschema_description:"group-level render options, merged under each explicit dest's options (dest-set fields win)"`
-	Files   []fileSpec        `yaml:"templates" jsonschema:"required" jsonschema_description:"the group's items, each inheriting the group's perms"`
+type templateNode struct {
+	Perms    `yaml:",inline"`
+	glob     string
+	DestRule string
+	Source   string            `yaml:"source"`
+	Dest     []DestSpec        `yaml:"dest"`
+	Ctx      map[string]string `yaml:"ctx" jsonschema_description:"template context, merged under each descendant's ctx (innermost keys win)"`
+	Options  optionsSpec       `yaml:"options" jsonschema_description:"render options, merged under each descendant's options and each explicit dest's options (innermost set field wins, an explicit false overriding an inherited true)"`
+	Children []templateNode    `yaml:"<<<" jsonschema_description:"nested nodes, inheriting this node's source and dest prefixes, perms, ctx and options"`
 }
 
 type dirGroup struct {
@@ -290,9 +294,8 @@ type dirGroup struct {
 type fileSpec struct {
 	glob     string
 	DestRule string
-	Source   string            `yaml:"source"`
-	Dest     []DestSpec        `yaml:"dest"`
-	Ctx      map[string]string `yaml:"ctx" jsonschema_description:"renderTemplates only: values exposed as the template's root context (.key)"`
+	Source   string     `yaml:"source"`
+	Dest     []DestSpec `yaml:"dest"`
 }
 
 type dirSpec struct {
@@ -406,6 +409,14 @@ type destRule struct {
 type Evaluator struct {
 	builtins  map[string]func() string
 	lookupEnv func(string) string
+}
+
+type templateInherited struct {
+	prefix     string
+	destPrefix string
+	perms      Perms
+	ctx        map[string]string
+	options    optionsSpec
 }
 
 type globSet []globPerm

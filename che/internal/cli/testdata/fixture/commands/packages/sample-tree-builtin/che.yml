@@ -1,7 +1,11 @@
+# yaml-language-server: $schema=https://gitlab.com/konradodwrot/go-modules/-/raw/main/che/assets/data/che.schema.json
 ##[>] 🤖🤖
-options: {profileWorkingDirectory: root}
+options:
+  profileWorkingDirectory: root
 cli/macos:
-  options: {autoDiscover: true}
+  options:
+    autoDiscover: true
   include:
-    installPackages: [jq]
+    installPackages:
+      - jq
 ##[<] 🤖🤖

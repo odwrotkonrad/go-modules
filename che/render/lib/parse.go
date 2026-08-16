@@ -4,9 +4,6 @@ import (
 	"fmt"
 	"os"
 	"strings"
-
-	tsmake "github.com/tree-sitter-grammars/tree-sitter-make/bindings/go"
-	sitter "github.com/tree-sitter/go-tree-sitter"
 )
 
 // [>] 🤖🤖🤖
@@ -17,21 +14,10 @@ func Generate(path string) (string, error) {
 	if err != nil {
 		return "", fmt.Errorf("file not found: %s", path)
 	}
-	sections, err := parse(src)
-	if err != nil {
-		return "", err
-	}
-	return render(sections), nil
+	return render(parse(src)), nil
 }
 
-func parse(src []byte) ([]section, error) {
-	parser := sitter.NewParser()
-	if err := parser.SetLanguage(sitter.NewLanguage(tsmake.Language())); err != nil {
-		return nil, err
-	}
-	tree := parser.Parse(src, nil)
-	root := tree.RootNode()
-
+func parse(src []byte) []section {
 	var out []section
 	var stack []frame
 
@@ -50,14 +36,13 @@ func parse(src []byte) ([]section, error) {
 
 	var pending pendingComment
 
-	for i := range root.NamedChildCount() {
-		node := root.NamedChild(i)
-		text := strings.TrimSpace(node.Utf8Text(src))
+	for _, node := range scan(src) {
+		text := node.text
 		prev := pending
 		pending = pendingComment{}
 
-		switch node.Kind() {
-		case "comment":
+		switch node.kind {
+		case nodeComment:
 			if label, depth, ok := parseSectionOpen(text); ok {
 				if c := cur(); c != nil {
 					emit(*c)
@@ -80,15 +65,15 @@ func parse(src []byte) ([]section, error) {
 			} else if vals, ok := parseTagComment(text, "vals"); ok {
 				pending = pendingComment{what: prev.what, vals: vals}
 			}
-		case "rule":
+		case nodeRule:
 			if c := cur(); c != nil && c.kept {
-				if t, ok := parseRuleTarget(node, src, prev.what); ok {
+				if t, ok := parseRuleTarget(text, prev.what); ok {
 					c.targets = append(c.targets, t)
 				}
 			}
-		case "variable_assignment", "export_directive":
+		case nodeAssignment:
 			if c := cur(); c != nil && c.kept && prev.what != "" {
-				if t, ok := parseParamTarget(node, src, prev.what, prev.vals); ok {
+				if t, ok := parseParamTarget(text, prev.what, prev.vals); ok {
 					c.targets = append(c.targets, t)
 				}
 			}
@@ -98,7 +83,7 @@ func parse(src []byte) ([]section, error) {
 		emit(stack[len(stack)-1])
 		stack = stack[:len(stack)-1]
 	}
-	return out, nil
+	return out
 }
 
 //[<] 🤖🤖🤖

@@ -51,10 +51,9 @@ cases:
             p:
               include:
                 renderTemplates:
-                  - templates:
-                      - source: templates/a.tpl
-                        dest:
-                          - {path: a.md, options: {writeType: bogus}}
+                  - source: templates/a.tpl
+                    dest:
+                      - {path: a.md, options: {writeType: bogus}}
     expected:
       output: writeType
   - name: ShouldFlagNonOctalChmod

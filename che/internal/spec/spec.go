@@ -139,6 +139,33 @@ func (f *fileSpec) UnmarshalYAML(value *yaml.Node) error {
 	return decodeScalarOr(node, &f.glob, (*alias)(f))
 }
 
+func (t *templateNode) UnmarshalYAML(value *yaml.Node) error {
+	node := value
+	scalarDest, rest, hasScalarDest := takeScalarDest(value)
+	if hasScalarDest {
+		node = rest
+	}
+	type alias templateNode
+	if err := decodeScalarOr(node, &t.glob, (*alias)(t)); err != nil {
+		return err
+	}
+	switch {
+	case !hasScalarDest:
+	case isDestRule(scalarDest):
+		t.DestRule = scalarDest
+	default:
+		t.Dest = []DestSpec{{Path: scalarDest}}
+	}
+	return nil
+}
+
+func isDestRule(dest string) bool {
+	if len(dest) >= 2 && dest[0] == 's' && dest[1] != '\\' && !isWord(dest[1]) {
+		return true
+	}
+	return strings.HasSuffix(dest, "/**")
+}
+
 func takeScalarDest(value *yaml.Node) (string, *yaml.Node, bool) {
 	if value.Kind != yaml.MappingNode {
 		return "", nil, false

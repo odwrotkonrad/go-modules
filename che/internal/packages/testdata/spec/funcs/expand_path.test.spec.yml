@@ -1,0 +1,45 @@
+# [>] 🤖🤖
+context:
+  function: packages.Installer.expandPath
+cases:
+  - name: ShouldUseDefaultWhenVarUnset
+    input:
+      args:
+        - path: "${NVM_DIR:-$HOME/.nvm}/nvm.sh"
+        - home: "/home/ko"
+        - nvmDir: ""
+    expected:
+      output: "/home/ko/.nvm/nvm.sh"
+  - name: ShouldPreferVarOverDefaultWhenSet
+    input:
+      args:
+        - path: "${NVM_DIR:-$HOME/.nvm}/nvm.sh"
+        - home: "/home/ko"
+        - nvmDir: "/opt/nvm"
+    expected:
+      output: "/opt/nvm/nvm.sh"
+  - name: ShouldExpandTildeAgainstHome
+    input:
+      args:
+        - path: "~/.nvm/nvm.sh"
+        - home: "/home/ko"
+        - nvmDir: ""
+    expected:
+      output: "/home/ko/.nvm/nvm.sh"
+  - name: ShouldExpandBareVar
+    input:
+      args:
+        - path: "$HOME/x"
+        - home: "/home/ko"
+        - nvmDir: ""
+    expected:
+      output: "/home/ko/x"
+  - name: ShouldEmptyUnsetVarWithoutDefault
+    input:
+      args:
+        - path: "$NVM_DIR/x"
+        - home: "/home/ko"
+        - nvmDir: ""
+    expected:
+      output: "/x"
+# [<] 🤖🤖

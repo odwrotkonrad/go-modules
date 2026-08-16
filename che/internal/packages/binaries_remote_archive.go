@@ -351,11 +351,21 @@ func (in *Installer) resolveDestDir(cached *string, candidates, defaults []strin
 	return *cached
 }
 
+// [why] os.Expand has no fallback form, so ${VAR:-default} would collapse to "" for an unset VAR: resolve the shell fallback here, then expand the chosen branch (packages.yml tracks tools honouring an env var with a documented default, e.g. NVM_DIR)
 func (in *Installer) expandPath(p string) string {
 	if p == "~" || strings.HasPrefix(p, "~/") {
 		p = filepath.Join(in.Host.Getenv("HOME"), strings.TrimPrefix(p, "~"))
 	}
-	return os.Expand(p, in.Host.Getenv)
+	return os.Expand(p, func(ref string) string {
+		name, fallback, hasFallback := strings.Cut(ref, ":-")
+		if v := in.Host.Getenv(name); v != "" {
+			return v
+		}
+		if hasFallback {
+			return in.expandPath(fallback)
+		}
+		return ""
+	})
 }
 
 func (in *Installer) resolveOptDir(pkg string) string {

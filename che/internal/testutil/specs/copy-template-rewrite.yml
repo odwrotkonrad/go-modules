@@ -5,5 +5,5 @@ cli/macos:
     makeCopies:
       - files: [{source: _home/.config/foo/**, dest: 's:^_home:$HOME:'}]
     renderTemplates:
-      - templates: [{source: _home/.config/foo/**, dest: $HOME/.config/foo/**}]
+      - {source: _home/.config/foo/**, dest: $HOME/.config/foo/**}
 ##[<] 🤖🤖

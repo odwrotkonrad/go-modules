@@ -1,7 +1,9 @@
+# yaml-language-server: $schema=https://gitlab.com/konradodwrot/go-modules/-/raw/main/che/assets/data/che.schema.json
 #[>] 🤖🤖
 main:
   include:
     profiles:
       - source: nourl
-        env: {A: b}
+        env:
+          A: b
 #[<] 🤖🤖

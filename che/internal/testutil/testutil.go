@@ -24,7 +24,7 @@ var ansiRe = regexp.MustCompile(`\x1b\[[0-9;]*m`)
 
 func StripANSI(s string) string { return ansiRe.ReplaceAllString(s, "") }
 
-//go:embed specs/*.yml
+//go:embed specs/*.yml specs/schema-invalid/*.yml
 var specsFS embed.FS
 
 //go:embed all:trees

@@ -7,13 +7,17 @@ import (
 	"context"
 	"fmt"
 	"os"
+	"os/exec"
 	"strings"
 	"time"
 
 	secretmanager "cloud.google.com/go/secretmanager/apiv1"
 	secretmanagerpb "cloud.google.com/go/secretmanager/apiv1/secretmanagerpb"
-	onepassword "github.com/1password/onepassword-sdk-go"
+
+	"gitlab.com/konradodwrot/go-modules/che/internal/execx"
 )
+
+const opBin = "op"
 
 var secretSchemes = []string{"op://", "gcp://"}
 
@@ -66,23 +70,30 @@ type secretResolver interface {
 	Resolve(ctx context.Context, ref string) (string, error)
 }
 
-var newOpBackend = func(ctx context.Context) (secretResolver, error) {
-	token := os.Getenv("OP_SERVICE_ACCOUNT_TOKEN")
-	if token == "" {
+var newOpBackend = func(_ context.Context) (secretResolver, error) {
+	if os.Getenv("OP_SERVICE_ACCOUNT_TOKEN") == "" {
 		return nil, fmt.Errorf("OP_SERVICE_ACCOUNT_TOKEN unset")
 	}
-	client, err := onepassword.NewClient(ctx,
-		onepassword.WithServiceAccountToken(token),
-		onepassword.WithIntegrationInfo("che", "1.0.0"),
-	)
-	if err != nil {
-		return nil, err
+	if _, err := exec.LookPath(opBin); err != nil {
+		return nil, fmt.Errorf("%s not found in PATH: %w", opBin, err)
 	}
-	return opBackend{client}, nil
+	return opBackend{}, nil
 }
 
-func (r opBackend) Resolve(ctx context.Context, ref string) (string, error) {
-	return r.client.Secrets().Resolve(ctx, ref)
+func (opBackend) Resolve(ctx context.Context, ref string) (string, error) {
+	var stderr bytes.Buffer
+	out, err := execx.Default.Output(execx.Cmd{
+		Ctx:    ctx,
+		Argv:   []string{opBin, "read", "--no-newline", ref},
+		Stderr: &stderr,
+	})
+	if err != nil {
+		if msg := strings.TrimSpace(stderr.String()); msg != "" {
+			return "", fmt.Errorf("%s read: %s: %w", opBin, msg, err)
+		}
+		return "", fmt.Errorf("%s read: %w", opBin, err)
+	}
+	return strings.TrimRight(string(out), "\n"), nil
 }
 
 var newGCPBackend = func(ctx context.Context) (secretResolver, error) {
