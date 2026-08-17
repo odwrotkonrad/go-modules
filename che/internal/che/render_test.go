@@ -31,6 +31,7 @@ type renderWant struct {
 	Absent      []string            `yaml:"absent"`
 	Rerun       bool                `yaml:"rerun"`
 	RerunStdOut []string            `yaml:"rerunStdOut"`
+	NotStdOut   []string            `yaml:"notStdOut"`
 }
 
 func TestRenderTemplates(t *testing.T) {
@@ -80,6 +81,9 @@ func TestRenderTemplates(t *testing.T) {
 		}
 
 		w := c.Expected.Output
+		for _, f := range w.NotStdOut {
+			assert.NotContains(t, stripped, f, "stdout must not contain %q", f)
+		}
 		checkFiles := func() {
 			for rel, want := range w.Files {
 				assert.Equal(t, want, readDest(t, root, rel), "%s content", rel)

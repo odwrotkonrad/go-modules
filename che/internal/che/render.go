@@ -186,7 +186,11 @@ func (p *ProfileReady) renderTemplate(item spec.FileItem, dests []templateDest) 
 		return p.placeFile(dests[0].path, body, item)
 	}
 	for _, d := range dests {
-		out := p.composeDest(item, d, body)
+		out, err := p.composeDest(item, d, body)
+		if err != nil {
+			return err
+		}
+		p.warnUnresolvedIncludes(item, d, body)
 		if d.host {
 			if err := p.placeFile(d.path, out, item); err != nil {
 				return err
@@ -209,9 +213,18 @@ func (p *ProfileReady) renderTemplate(item spec.FileItem, dests []templateDest) 
 	return nil
 }
 
-func (p *ProfileReady) composeDest(item spec.FileItem, d templateDest, body []byte) []byte {
+func (p *ProfileReady) warnUnresolvedIncludes(item spec.FileItem, d templateDest, body []byte) {
+	if d.opts.RenderReferencedFiles || len(item.Dests) == 0 || item.Derived {
+		return
+	}
+	for _, line := range render.UnresolvedIncludes(p.templateAnchor(item), body) {
+		p.emit(log.Levels.Warn, "render-templates", "", d.path+": unresolved include "+line)
+	}
+}
+
+func (p *ProfileReady) composeDest(item spec.FileItem, d templateDest, body []byte) ([]byte, error) {
 	if len(item.Dests) == 0 || item.Derived {
-		return body
+		return body, nil
 	}
 	existing, _ := p.readExistingDest(d)
 	return render.Compose(render.Composition{

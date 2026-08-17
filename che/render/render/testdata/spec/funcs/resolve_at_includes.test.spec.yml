@@ -6,8 +6,32 @@ cases:
     input:
       args:
         - files:
-            root/HOME/.config/agents/docs/comments.md: "INCLUDED\n"
+            root/_home/.config/agents/docs/comments.md: "INCLUDED\n"
         - body: "before\n@~/.config/agents/docs/comments.md\nafter\n"
     expected:
       output: "before\nINCLUDED\nafter\n"
+  - name: ShouldErrorOnMissingIncludeSource
+    input:
+      args:
+        - files:
+            root/_home/present.md: "INCLUDED\n"
+        - body: "before\n@absent.md\nafter\n"
+    expected:
+      errorOutput: ['@-include "@absent.md"', 'no such file or directory']
+  - name: ShouldErrorOnMissingTildeIncludeSource
+    input:
+      args:
+        - files:
+            root/_home/present.md: "INCLUDED\n"
+        - body: "@~/.config/absent.md\n"
+    expected:
+      errorOutput: ['@-include "@~/.config/absent.md"', 'no such file or directory']
+  - name: ShouldKeepNonIncludeAtLineWithoutSource
+    input:
+      args:
+        - files:
+            root/_home/present.md: "INCLUDED\n"
+        - body: "@absent.md and prose\n"
+    expected:
+      output: "@absent.md and prose\n"
 # [<] 🤖🤖

@@ -62,8 +62,9 @@ func (p *ProfileReady) renderSettled(item spec.FileItem) map[string]bool {
 		return settled
 	}
 	for _, d := range dests {
-		cur, err := p.readExistingDest(d)
-		settled[d.path] = err == nil && bytes.Equal(cur, p.composeDest(item, d, body))
+		cur, readErr := p.readExistingDest(d)
+		out, composeErr := p.composeDest(item, d, body)
+		settled[d.path] = readErr == nil && composeErr == nil && bytes.Equal(cur, out)
 	}
 	return settled
 }
