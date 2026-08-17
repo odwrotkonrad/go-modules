@@ -14,7 +14,10 @@ emulate -L zsh
 REPO="${0:A:h:h}"
 PIN_FILE="${REPO}/che/packages-pin.env"
 DEST="${REPO}/che/internal/packages/builtin/data"
-BASE="${CHE_PACKAGES_URL:-https://gitlab.com/api/v4/projects/konradodwrot%2Fche-packages/packages/generic/che-packages}"
+#[why] still go-modules registry: konradodwrot/che-packages cannot publish its first tag
+#   until a che that understands the catalog's vocabulary ships, and that che builds here.
+#   Repoint with the MR that publishes che-packages v0.0.1, alongside DefaultUpdateBaseURL.
+BASE="${CHE_PACKAGES_URL:-https://gitlab.com/api/v4/projects/konradodwrot%2Fgo-modules/packages/generic/che-packages}"
 
 source "$PIN_FILE"
 VERSION="${CHE_PACKAGES_VERSION:?che/packages-pin.env must set CHE_PACKAGES_VERSION}"
