@@ -21,75 +21,11 @@ builds:
     env:
       - CGO_ENABLED=0
 
-  - id: render-tpl-darwin
-    main: ./render/cmd/render-tpl
-    binary: render-tpl
-    goos: [darwin]
-    goarch: [arm64]
-    flags:
-      - -trimpath
-    ldflags:
-      - -s -w -X main.version={{.Version}}
-    env:
-      - CGO_ENABLED=0
-
-  - id: render-dirs-tree-darwin
-    main: ./render/cmd/render-dirs-tree
-    binary: render-dirs-tree
-    goos: [darwin]
-    goarch: [arm64]
-    flags:
-      - -trimpath
-    ldflags:
-      - -s -w -X main.version={{.Version}}
-    env:
-      - CGO_ENABLED=0
-
-  - id: render-makefile-doc-darwin
-    main: ./render/cmd/render-makefile-doc
-    binary: render-makefile-doc
-    goos: [darwin]
-    goarch: [arm64]
-    flags:
-      - -trimpath
-    ldflags:
-      - -s -w -X main.version={{.Version}}
-    env:
-      - CGO_ENABLED=0
-
-  - id: render-repo-group-index-darwin
-    main: ./render/cmd/render-repo-group-index
-    binary: render-repo-group-index
-    goos: [darwin]
-    goarch: [arm64]
-    flags:
-      - -trimpath
-    ldflags:
-      - -s -w -X main.version={{.Version}}
-    env:
-      - CGO_ENABLED=0
-
 archives:
   - id: che
-    ids: [che-darwin, render-tpl-darwin, render-dirs-tree-darwin, render-makefile-doc-darwin, render-repo-group-index-darwin]
+    ids: [che-darwin]
     formats: [tar.gz]
     name_template: 'che_{{ .Version }}_{{ .Os }}_{{ .Arch }}'
-  - id: render-tpl
-    ids: [render-tpl-darwin]
-    formats: [tar.gz]
-    name_template: 'render-tpl_{{ .Version }}_{{ .Os }}_{{ .Arch }}'
-  - id: render-dirs-tree
-    ids: [render-dirs-tree-darwin]
-    formats: [tar.gz]
-    name_template: 'render-dirs-tree_{{ .Version }}_{{ .Os }}_{{ .Arch }}'
-  - id: render-makefile-doc
-    ids: [render-makefile-doc-darwin]
-    formats: [tar.gz]
-    name_template: 'render-makefile-doc_{{ .Version }}_{{ .Os }}_{{ .Arch }}'
-  - id: render-repo-group-index
-    ids: [render-repo-group-index-darwin]
-    formats: [tar.gz]
-    name_template: 'render-repo-group-index_{{ .Version }}_{{ .Os }}_{{ .Arch }}'
 
 release:
   disable: true

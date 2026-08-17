@@ -4,7 +4,7 @@ context:
 cases:
   - name: ShouldGenerateGenaiIncludeDoc
     input:
-      args: [makefile: ../cmd/render-makefile-doc/testdata/Makefile]
+      args: [makefile: testdata/fixture/makefile_doc/Makefile]
     expected:
-      files: ../cmd/render-makefile-doc/testdata/expected.md
+      files: testdata/fixture/makefile_doc/expected.md
 # [<] 🤖🤖

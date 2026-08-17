@@ -4,6 +4,7 @@ package checkcmd
 
 type Tool struct {
 	Name     string
+	Short    string
 	Version  string
 	Usage    string
 	Label    string

@@ -17,7 +17,6 @@ require (
 	github.com/spf13/pflag v1.0.9
 	github.com/stretchr/testify v1.11.1
 	github.com/ulikunitz/xz v0.5.16
-	gitlab.com/konradodwrot/go-modules/che-packages v0.0.1
 	gitlab.com/konradodwrot/go-modules/lib v0.0.1
 	go.opentelemetry.io/otel v1.42.0
 	go.opentelemetry.io/otel/exporters/otlp/otlplog/otlploggrpc v0.13.0

@@ -73,7 +73,7 @@ sourced profile refs included).`,
 	pf.StringVar(&a.flags.LogLevel, "log-level", "",
 		"human-log level; values: error (failures only) | warn | info (what happened) | debug (adds intentions and won't-happen with reasons) | trace (adds details); default: info; env: CHE_LOG_LEVEL")
 
-	root.AddCommand(a.makeRunCmd(), a.makeInitCmd(), a.makeBackupCmd(), a.makeDiscoverCmd(), a.makeUninstallCmd(), a.makeConfigCmd(), a.makePackagesCmd())
+	root.AddCommand(a.makeRunCmd(), a.makeInitCmd(), a.makeBackupCmd(), a.makeDiscoverCmd(), a.makeUninstallCmd(), a.makeConfigCmd(), a.makePackagesCmd(), a.makeRenderCmd())
 	for _, o := range makeOps() {
 		root.AddCommand(a.makeOpCmd(o))
 	}

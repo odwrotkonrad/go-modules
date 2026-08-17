@@ -12,10 +12,6 @@ Each module has its own `go.mod` (`gitlab.com/konradodwrot/go-modules/<module>`)
 
 @che/assets/docs-agents/purpose.md
 
-## che-packages
-
-@che-packages/assets/docs-agents/purpose.md
-
 ## get-os-open-files-with
 
 @get-os-open-files-with/assets/docs-agents/purpose.md

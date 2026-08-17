@@ -1,0 +1,16 @@
+#!/bin/sh
+##[>] 🤖🤖
+state="${E2E_GCLOUD_STATE:-$HOME/.e2e-gcloud-components}"
+touch "$state"
+case "$2" in
+  install)
+    shift 3
+    for id in "$@"; do
+      printf '%s\tInstalled\n' "$id" >> "$state"
+    done ;;
+  list)
+    printf 'e2e-absent-comp\tNot Installed\n'
+    cat "$state" ;;
+esac
+exit 0
+##[<] 🤖🤖

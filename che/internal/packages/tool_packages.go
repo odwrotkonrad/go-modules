@@ -13,14 +13,31 @@ import (
 )
 
 type toolRoutine struct {
-	baseGroup string
-	command   string
-	list      func(in *Installer) map[string]string
-	install   func(in *Installer, name, pin string) error
-	update    func(in *Installer, name string) error
+	baseGroup  string
+	command    string
+	rejectPins bool
+	list       func(in *Installer) map[string]string
+	install    func(in *Installer, name, pin string) error
+	update     func(in *Installer, name string) error
 }
 
 var toolRoutines = map[string]toolRoutine{
+	"gcloud": {
+		baseGroup:  "gcloud",
+		command:    "gcloud",
+		rejectPins: true,
+		list:       func(in *Installer) map[string]string { return in.listGcloudComponents() },
+		install: func(in *Installer, name, _ string) error {
+			if err := in.exec([]string{"gcloud", "components", "install", "--quiet", name}); err != nil {
+				return err
+			}
+			in.listGcloudComponents()[name] = ""
+			return nil
+		},
+		update: func(in *Installer, _ string) error {
+			return in.exec([]string{"gcloud", "components", "update", "--quiet"})
+		},
+	},
 	"vscode": {
 		baseGroup: "vscode",
 		command:   "code",
@@ -50,6 +67,10 @@ func findToolRoutine(tool string) (toolRoutine, error) {
 		return toolRoutine{}, fmt.Errorf("unknown tool %q: want one of %s", tool, strings.Join(KnownTools(), ", "))
 	}
 	return r, nil
+}
+
+func errPinRejected(tool, name string) error {
+	return fmt.Errorf("toolPackages.%s: %s: %s packages carry no version of their own, omit the pin", tool, name, tool)
 }
 
 func lookupToolPackage(installed map[string]string, name string) (string, bool) {
@@ -86,6 +107,27 @@ func (in *Installer) listCodeExtensions() map[string]string {
 	return in.codeExts
 }
 
+const gcloudStateAbsent = "Not Installed"
+
+func (in *Installer) listGcloudComponents() map[string]string {
+	if in.gcloudComps != nil {
+		return in.gcloudComps
+	}
+	in.gcloudComps = map[string]string{}
+	out, ok := in.output([]string{"gcloud", "components", "list", "--quiet", "--format=value(id,state.name)"})
+	if !ok {
+		return in.gcloudComps
+	}
+	for line := range strings.Lines(out) {
+		id, state, _ := strings.Cut(strings.TrimSpace(line), "\t")
+		if id == "" || strings.TrimSpace(state) == gcloudStateAbsent {
+			continue
+		}
+		in.gcloudComps[id] = ""
+	}
+	return in.gcloudComps
+}
+
 func (in *Installer) InstallToolPackages(tool string, reqs []Request) error {
 	r, err := findToolRoutine(tool)
 	if err != nil {
@@ -98,6 +140,9 @@ func (in *Installer) InstallToolPackages(tool string, reqs []Request) error {
 			return fmt.Errorf("unknown %s package: %s (required entry in toolPackages.%s of %s)", tool, req.Name, tool, in.FilePath)
 		}
 		if v := req.globalVersion(); v != "" {
+			if r.rejectPins {
+				return errPinRejected(tool, req.Name)
+			}
 			pin = v
 		}
 		pins[req.Name] = pin

@@ -1,5 +1,6 @@
 ##[>] 🤖
 /dist/
+/internal/packages/builtin/data/
 /darwin-dist/
 /.cache/
 /public/

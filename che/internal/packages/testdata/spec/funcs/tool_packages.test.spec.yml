@@ -25,7 +25,31 @@ cases:
               pip:
                 requests: 2.0.0
     expected:
-      errorOutput: "toolPackages.pip: unknown tool: want one of vscode"
+      errorOutput: "toolPackages.pip: unknown tool: want one of gcloud, vscode"
+  - name: ShouldRejectPinForUnversionableTool
+    input:
+      args:
+        - op: unmarshal
+        - file: |
+            toolPackages:
+              gcloud:
+                kubectl: 580.0.0
+    expected:
+      errorOutput: "toolPackages.gcloud: kubectl: gcloud packages carry no version of their own, omit the pin"
+  - name: ShouldDecodeUnversionableToolEntriesAsRolling
+    input:
+      args:
+        - op: unmarshal
+        - file: |
+            toolPackages:
+              gcloud:
+                gke-gcloud-auth-plugin:
+                kubectl:
+    expected:
+      output:
+        gcloud:
+          gke-gcloud-auth-plugin: rolling
+          kubectl: rolling
   - name: ShouldRejectNonScalarVersion
     input:
       args:

@@ -73,13 +73,14 @@ func Schema() *jsonschema.Schema {
 		Properties:           jsonschema.NewProperties(),
 	}
 	for _, tool := range KnownTools() {
-		toolPkgs.Properties.Set(tool, &jsonschema.Schema{
-			Type: "object",
-			AdditionalProperties: &jsonschema.Schema{OneOf: []*jsonschema.Schema{
-				{Description: "version pin", Type: "string"},
-				{Description: "rolling", Type: "null"},
-			}},
-		})
+		value := &jsonschema.Schema{OneOf: []*jsonschema.Schema{
+			{Description: "version pin", Type: "string"},
+			{Description: "rolling", Type: "null"},
+		}}
+		if toolRoutines[tool].rejectPins {
+			value = &jsonschema.Schema{Description: "rolling: " + tool + " packages carry no version of their own", Type: "null"}
+		}
+		toolPkgs.Properties.Set(tool, &jsonschema.Schema{Type: "object", AdditionalProperties: value})
 	}
 	root.Properties.Set("toolPackages", toolPkgs)
 	root.Properties.Set("packages", &jsonschema.Schema{

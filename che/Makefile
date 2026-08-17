@@ -11,17 +11,27 @@ STATE_HOME := $(or $(CHE_STATE_HOME),$(if $(XDG_STATE_HOME),$(XDG_STATE_HOME)/ch
 DB := $(STATE_HOME)/ops.db
 BK_APPDB := $(HOME)/Library/Application Support/beekeeper-studio/app.db
 
+BUILTIN := internal/packages/builtin/data/packages.yml
+
 WRAPPERS :=
-COMMANDS := render-docs test test-cover cover-report e2e e2e-dryrun e2e-run e2e-registry e2e-install-methods-vm-template build build-cover build-e2e-test build-linux build-cover-linux build-e2e-test-linux vet lint install release-check release-darwin release-snapshot inspect-db dump-db open-db
+COMMANDS := vendor-packages-defs render-docs test test-cover cover-report e2e e2e-dryrun e2e-run e2e-registry e2e-install-methods-vm-template build build-cover build-e2e-test build-linux build-cover-linux build-e2e-test-linux vet lint install release-check release-darwin release-snapshot inspect-db dump-db open-db
 
 .PHONY: $(WRAPPERS) $(COMMANDS)
 
 E2E_GO_SRC := $(shell find . ../lib -name '*.go' -not -path './dist/*' -not -path './cover-*/*') go.mod go.sum ../go.work
 
-dist/$(BIN): $(E2E_GO_SRC)
+##[>] Packages [genai-include]
+#[what] vendor the pinned che-packages catalog che embeds (CHE_PACKAGES_DIR=<path> vendors a local checkout instead)
+vendor-packages-defs: $(BUILTIN)
+
+$(BUILTIN): packages-pin.env
+	@../ci/vendor-packages-defs.zsh
+##[<] Packages
+
+dist/$(BIN): $(BUILTIN) $(E2E_GO_SRC)
 	CC=$(CC) $(GO) build -cover -coverpkg=./... -o dist/$(BIN) .
 
-dist/e2e.test: $(E2E_GO_SRC)
+dist/e2e.test: $(BUILTIN) $(E2E_GO_SRC)
 	CC=$(CC) $(GO) test -c -o dist/e2e.test ./e2e
 
 ##[>] Docs [genai-include]

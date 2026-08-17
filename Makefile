@@ -2,10 +2,10 @@
 #[what] Monorepo Makefile: repo-wide targets, fans out to module Makefiles
 SHELL := zsh
 .SHELLFLAGS := -c
-MODULES := che che-packages get-os-open-files-with get-term-open-files-with lib
+MODULES := che get-os-open-files-with get-term-open-files-with lib
 
 WRAPPERS :=
-COMMANDS := render-templates render-docs repo-ci-prepare-hooks repo-ci-precommit-all test test-cover build vet lint install create-tag publish publish-prerelease publish-brew publish-apt publish-packages-defs release-check release-snapshot
+COMMANDS := render-templates render-docs repo-ci-prepare-hooks repo-ci-precommit-all test test-cover build vet lint install create-tag publish publish-prerelease publish-brew publish-apt vendor-packages-defs release-check release-snapshot
 
 .PHONY: $(WRAPPERS) $(COMMANDS)
 
@@ -79,9 +79,9 @@ publish-brew:
 publish-apt:
 	@ci/publish-apt.zsh
 
-#[what] tag pipeline: tar che-packages/{packages.yml,scripts} for $CI_COMMIT_TAG's version, upload to the generic package registry with a latest/ alias + version.txt, link release assets
-publish-packages-defs:
-	@ci/publish-packages-defs.zsh
+#[what] vendor the pinned che-packages catalog into che/internal/packages/builtin/data (CHE_PACKAGES_DIR=<path> vendors a local checkout instead)
+vendor-packages-defs:
+	@ci/vendor-packages-defs.zsh
 
 #[what] validate every module's goreleaser configs
 release-check:

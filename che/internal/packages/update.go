@@ -20,6 +20,11 @@ import (
 
 const DefaultUpdateBaseURL = "https://gitlab.com/api/v4/projects/konradodwrot%2Fgo-modules/packages/generic/che-packages"
 
+// [why] the URL above still points at go-modules: konradodwrot/che-packages serves
+//
+//	definitions once it has published a tag. Flip it with the MR that publishes
+//	che-packages v0.0.1, or every che run warns and falls back until then.
+
 const DefaultUpdateCooldown = 15 * time.Minute
 
 const (

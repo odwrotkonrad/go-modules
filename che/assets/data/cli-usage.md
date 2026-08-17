@@ -28,6 +28,11 @@ Available Commands:
     install               install packages by canonical name (no args: every resolved profile's include.installPackages)
     update                fetch the latest published package definitions into the cache ($XDG_CACHE_HOME/che/packages); cached definitions supersede the builtin set when no packages file exists
   prune-broken-links      delete broken symlinks
+  render                  render templates and generated docs with the shared engine
+    dirs-tree             print the cwd repo's tracked-file directory tree
+    makefile-doc          emit makefile.agents.md from a Makefile's [genai-include] sections
+    repo-group-index      print the repo-group index for a subgroup dir
+    tpl                   render a template with the shared engine, to stdout
   render-templates        render *.tpl sources; each dest path decides target (relative -> repo, ~/ or absolute -> host)
   run                     run every op each profile selects, profile by profile
   run-scripts             run the profile's scripts, optionally filtered by name substring
