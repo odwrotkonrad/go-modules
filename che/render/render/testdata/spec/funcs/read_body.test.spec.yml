@@ -10,4 +10,12 @@ cases:
         - path: d.yml
     expected:
       output: "k: v\n"
+  - name: ShouldErrorOnMissingSource
+    input:
+      args:
+        - files:
+            d.yml: "k: v\n"
+        - path: absent.yml
+    expected:
+      errorOutput: ['absent.yml', 'no such file or directory']
 # [<] 🤖🤖

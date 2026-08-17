@@ -5,8 +5,10 @@ package che
 import (
 	"bytes"
 	"errors"
+	"fmt"
 	"os"
 	"path/filepath"
+	"slices"
 	"strings"
 
 	"gitlab.com/konradodwrot/go-modules/che/internal/fsutil"
@@ -27,6 +29,72 @@ type templateDest struct {
 type templateItem struct {
 	item  spec.FileItem
 	dests []templateDest
+}
+
+// [why] a dest can @-include another dest this same pass renders, and che renders in spec order,
+//
+//	which says nothing about that dependency. AGENTS.md includes four generated files: two happen
+//	to be listed earlier and resolve, two are listed later and do not. Every one is gitignored, so
+//	a working copy carries them from an earlier run and only a clean checkout fails
+func (p *ProfileReady) orderByIncludes(keep []templateItem) ([]templateItem, error) {
+	producedBy := map[string]int{}
+	for i, tpl := range keep {
+		for _, d := range tpl.dests {
+			producedBy[d.path] = i
+		}
+	}
+
+	needs := make([][]int, len(keep))
+	for i, tpl := range keep {
+		if !slices.ContainsFunc(tpl.dests, func(d templateDest) bool { return d.opts.RenderReferencedFiles }) {
+			continue
+		}
+		src, templatePath, err := p.readTemplateSrc(tpl.item)
+		if err != nil {
+			continue
+		}
+		body, err := render.ExecWithCtx(templatePath, src, p.templateAnchor(tpl.item), p.mergedCtx(tpl.item.Ctx))
+		if err != nil {
+			continue
+		}
+		for _, path := range render.IncludePaths(p.templateAnchor(tpl.item), body) {
+			if j, ok := producedBy[path]; ok && j != i {
+				needs[i] = append(needs[i], j)
+			}
+		}
+	}
+
+	const (
+		unvisited = 0
+		active    = 1
+		done      = 2
+	)
+	state := make([]int, len(keep))
+	out := make([]templateItem, 0, len(keep))
+	var visit func(int, []string) error
+	visit = func(i int, trail []string) error {
+		switch state[i] {
+		case done:
+			return nil
+		case active:
+			return fmt.Errorf("render-templates: include cycle: %s", strings.Join(append(trail, keep[i].item.Rel), " -> "))
+		}
+		state[i] = active
+		for _, j := range needs[i] {
+			if err := visit(j, append(trail, keep[i].item.Rel)); err != nil {
+				return err
+			}
+		}
+		state[i] = done
+		out = append(out, keep[i])
+		return nil
+	}
+	for i := range keep {
+		if err := visit(i, nil); err != nil {
+			return nil, err
+		}
+	}
+	return out, nil
 }
 
 func (p *ProfileReady) renderTemplates(templates []spec.FileItem, skipSecrets bool) error {
@@ -52,6 +120,12 @@ func (p *ProfileReady) renderTemplates(templates []spec.FileItem, skipSecrets bo
 			return err
 		}
 	}
+	// [why] before both loops, so a dry run predicts the order the real render takes
+	ordered, err := p.orderByIncludes(keep)
+	if err != nil {
+		return err
+	}
+	keep = ordered
 	var errs []error
 	if p.isDryRun() { // [why] dry-run predicts via the mock-render cache: no real render, no secret resolve
 		for _, tpl := range keep {
@@ -186,7 +260,11 @@ func (p *ProfileReady) renderTemplate(item spec.FileItem, dests []templateDest) 
 		return p.placeFile(dests[0].path, body, item)
 	}
 	for _, d := range dests {
-		out := p.composeDest(item, d, body)
+		out, err := p.composeDest(item, d, body)
+		if err != nil {
+			return err
+		}
+		p.warnUnresolvedIncludes(item, d, body)
 		if d.host {
 			if err := p.placeFile(d.path, out, item); err != nil {
 				return err
@@ -209,9 +287,18 @@ func (p *ProfileReady) renderTemplate(item spec.FileItem, dests []templateDest) 
 	return nil
 }
 
-func (p *ProfileReady) composeDest(item spec.FileItem, d templateDest, body []byte) []byte {
+func (p *ProfileReady) warnUnresolvedIncludes(item spec.FileItem, d templateDest, body []byte) {
+	if d.opts.RenderReferencedFiles || len(item.Dests) == 0 || item.Derived {
+		return
+	}
+	for _, line := range render.UnresolvedIncludes(p.templateAnchor(item), body) {
+		p.emit(log.Levels.Warn, "render-templates", "", d.path+": unresolved include "+line)
+	}
+}
+
+func (p *ProfileReady) composeDest(item spec.FileItem, d templateDest, body []byte) ([]byte, error) {
 	if len(item.Dests) == 0 || item.Derived {
-		return body
+		return body, nil
 	}
 	existing, _ := p.readExistingDest(d)
 	return render.Compose(render.Composition{

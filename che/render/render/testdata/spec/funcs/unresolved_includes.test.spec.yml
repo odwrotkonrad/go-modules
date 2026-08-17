@@ -1,0 +1,37 @@
+# [>] 🤖🤖
+context:
+  function: render.UnresolvedIncludes
+cases:
+  - name: ShouldReportMissingIncludeLine
+    input:
+      args:
+        - files:
+            present.md: "HERE\n"
+        - body: "@present.md\n@absent.md\n"
+    expected:
+      output: ["@absent.md"]
+  - name: ShouldReportMissingTildeIncludeLine
+    input:
+      args:
+        - files:
+            root/_home/present.md: "HERE\n"
+        - body: "@~/present.md\n@~/absent.md\n"
+    expected:
+      output: ["@~/absent.md"]
+  - name: ShouldReportNothingWhenEveryIncludeResolves
+    input:
+      args:
+        - files:
+            present.md: "HERE\n"
+        - body: "before\n@present.md\nafter\n"
+    expected:
+      output: []
+  - name: ShouldIgnoreAtLinesThatAreNotIncludes
+    input:
+      args:
+        - files:
+            present.md: "HERE\n"
+        - body: "@absent.md and prose\n@\n"
+    expected:
+      output: []
+# [<] 🤖🤖

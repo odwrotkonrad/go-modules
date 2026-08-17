@@ -15,4 +15,28 @@ cases:
         - body: 'hello {{ "world" }}'
     expected:
       output: hello world
+  - name: ShouldFailOnMissingLocalFileSource
+    input:
+      args:
+        - body: '{{ localFile "absent.md" }}'
+    expected:
+      errorOutput: ['render template t.tpl', 'localFile "', 'absent.md', 'no such file or directory']
+  - name: ShouldFailOnMissingFrontmatterSource
+    input:
+      args:
+        - body: '{{ frontmatter "absent.md" }}'
+    expected:
+      errorOutput: ['render template t.tpl', 'absent.md', 'no such file or directory']
+  - name: ShouldFailOnMissingReadBodySource
+    input:
+      args:
+        - body: '{{ readBody "absent.md" }}'
+    expected:
+      errorOutput: ['render template t.tpl', 'absent.md', 'no such file or directory']
+  - name: ShouldFailOnMissingRenderMarkdownSource
+    input:
+      args:
+        - body: '{{ renderMarkdown "absent.md" }}'
+    expected:
+      errorOutput: ['render template t.tpl', 'absent.md', 'no such file or directory']
 # [<] 🤖🤖

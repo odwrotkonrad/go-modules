@@ -30,7 +30,16 @@ func TestResolveAtIncludes(t *testing.T) {
 	testyml.Eq(t, td, "testdata/spec/funcs/resolve_at_includes.test.spec.yml", func(t *testing.T, c testyml.Case[string]) (string, error) {
 		var files map[string]string
 		c.Input.Args.To(t, 0, &files)
-		return string(resolveAtIncludes(testutil.Tree(t, files), []byte(c.Input.Args.String(t, 1)))), nil
+		got, err := resolveAtIncludes(testutil.Tree(t, files), []byte(c.Input.Args.String(t, 1)))
+		return string(got), err
+	})
+}
+
+func TestUnresolvedIncludes(t *testing.T) {
+	testyml.Eq(t, td, "testdata/spec/funcs/unresolved_includes.test.spec.yml", func(t *testing.T, c testyml.Case[[]string]) ([]string, error) {
+		var files map[string]string
+		c.Input.Args.To(t, 0, &files)
+		return UnresolvedIncludes(testutil.Tree(t, files), []byte(c.Input.Args.String(t, 1))), nil
 	})
 }
 
@@ -72,14 +81,15 @@ func TestCompose(t *testing.T) {
 		if len(files) > 0 {
 			root = testutil.Tree(t, files)
 		}
-		return string(Compose(Composition{
+		got, err := Compose(Composition{
 			Body:       []byte(a.String(t, 0)),
 			HeaderDest: a.String(t, 1),
 			TmplName:   a.String(t, 2),
 			Opts:       opts,
 			Existing:   existing,
 			RepoRoot:   root,
-		})), nil
+		})
+		return string(got), err
 	})
 }
 
