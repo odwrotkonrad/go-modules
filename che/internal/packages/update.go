@@ -18,7 +18,7 @@ import (
 	"gitlab.com/konradodwrot/go-modules/che/internal/fetchx"
 )
 
-const DefaultUpdateBaseURL = "https://gitlab.com/api/v4/projects/konradodwrot%2Fgo-modules/packages/generic/che-packages"
+const DefaultUpdateBaseURL = "https://gitlab.com/api/v4/projects/konradodwrot%2Fche-packages/packages/generic/che-packages"
 
 // [why] the URL above still points at go-modules: konradodwrot/che-packages serves
 //
