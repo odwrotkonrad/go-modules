@@ -14,13 +14,16 @@ emulate -L zsh
 REPO="${0:A:h:h}"
 PIN_FILE="${REPO}/che/packages-pin.env"
 DEST="${REPO}/che/internal/packages/builtin/data"
-#[why] still go-modules registry: konradodwrot/che-packages cannot publish its first tag
-#   until a che that understands the catalog's vocabulary ships, and that che builds here.
-#   Repoint with the MR that publishes che-packages v0.0.1, alongside DefaultUpdateBaseURL.
-BASE="${CHE_PACKAGES_URL:-https://gitlab.com/api/v4/projects/konradodwrot%2Fgo-modules/packages/generic/che-packages}"
-
 source "$PIN_FILE"
 VERSION="${CHE_PACKAGES_VERSION:?che/packages-pin.env must set CHE_PACKAGES_VERSION}"
+PROJECT="${CHE_PACKAGES_PROJECT:?che/packages-pin.env must set CHE_PACKAGES_PROJECT}"
+
+#[why] built after the pin file is sourced, not before: the project and version both come from it,
+#   and reading them first yields an empty project and a /projects//packages URL that 404s
+#[why] the project is declared beside the version rather than hardcoded here: the catalog moved out
+#   of go-modules, and a hardcoded registry is how the pin ended up naming a project the catalog
+#   had already left, fetching 0.0.5 while the catalog shipped 0.0.7
+BASE="${CHE_PACKAGES_URL:-https://gitlab.com/api/v4/projects/${PROJECT}/packages/generic/che-packages}"
 
 if [[ -z "${CHE_PACKAGES_DIR:-}" && -f "${DEST}/version.txt" && "$(<${DEST}/version.txt)" == "$VERSION" ]] {
   print -r -- "che-packages ${VERSION} already vendored"
