@@ -76,16 +76,13 @@ done
 tmp="$(mktemp -d)"
 trap 'rm -rf "$tmp"' EXIT
 fetch "${tmp}/che.tar.gz" "$url"
-tar -xzf "${tmp}/che.tar.gz" -C "$tmp" \
-  che render-tpl render-dirs-tree render-makefile-doc render-repo-group-index
+tar -xzf "${tmp}/che.tar.gz" -C "$tmp" che
 
-for bin in che render-tpl render-dirs-tree render-makefile-doc render-repo-group-index; do
-  if [ -n "$use_sudo" ]; then
-    sudo install -m 0755 "${tmp}/${bin}" "${dir}/${bin}"
-  else
-    install -m 0755 "${tmp}/${bin}" "${dir}/${bin}"
-  fi
-done
+if [ -n "$use_sudo" ]; then
+  sudo install -m 0755 "${tmp}/che" "${dir}/che"
+else
+  install -m 0755 "${tmp}/che" "${dir}/che"
+fi
 
 "${dir}/che" --version
 printf 'installed che %s into %s\n' "$version" "$dir"
