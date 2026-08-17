@@ -13,8 +13,6 @@ workflow:
 #   sees, and a half-published tag, package or apt tree is worse than a slow one
 default:
   interruptible: true
-  before_script:
-    - ci/vendor-packages-defs.zsh
   tags:
     - gke-linux-amd64
   retry:
@@ -46,11 +44,19 @@ variables:
   GOCACHE: $CI_PROJECT_DIR/.cache/go-build
   CC: clang
 
+#[why] the vendored builtin catalog is gitignored, so any job that compiles or tests che has to
+#   fetch the pinned release first. an explicit anchor, not a default before_script: jobs like
+#   pages-preview run on images with no zsh and need no catalog, and a global hook broke them
+.vendors-packages:
+  before_script:
+    - ci/vendor-packages-defs.zsh
+
 #[what] amd64 linux warm build: the go build cache plus the amd64 che artifacts the e2e jobs reuse
 #[why] builds only what the automatic jobs consume. build-linux lives in warm-go-linux-amd64 instead:
 #   it is a CGO_ENABLED=0 cross-target that shares no compiled package with this host build, cost 107s
 #   of this job's critical path, and is read only by the manual install-methods matrix
 warm-go:
+  extends: .vendors-packages
   stage: warm
   image: $CI_IMAGE
   needs: []
@@ -77,6 +83,7 @@ warm-go:
 #   requests, and the go build cache is served as trusted compiler output without verification, so
 #   what an MR writes must never be what a tag release build restores
 warm-go-linux-arm64:
+  extends: .vendors-packages
   stage: warm
   image: $CI_IMAGE
   needs: []
@@ -102,6 +109,7 @@ warm-go-linux-arm64:
 #   job while serving only the manual matrix below. manual and optional, exactly like the matrix it
 #   feeds: unclicked, the matrix still builds the binary itself, so nothing depends on this running
 warm-go-linux-amd64:
+  extends: .vendors-packages
   stage: warm
   image: $CI_IMAGE
   needs: []
@@ -123,6 +131,7 @@ warm-go-linux-amd64:
 ##[<] 🤖🤖
 
 verify-precommit-all:
+  extends: .vendors-packages
   stage: verify
   image: $CI_IMAGE
   #[why] starts immediately: render-templates builds che itself (make -C che build), so this consumed
@@ -160,6 +169,8 @@ verify-precommit-all:
 
 test-unit-che:
   extends: .test-module
+  before_script:
+    - ci/vendor-packages-defs.zsh
   variables:
     MODULE: che
   cache:
@@ -179,6 +190,7 @@ test-unit-che:
       changes: [che/**/*, lib/**/*, go.work, .gitlab-ci.yml]
 
 .test-e2e-che:
+  extends: .vendors-packages
   image: $CI_IMAGE
   stage: test-e2e
   #[why] only the built artifacts move: the prebuilt binary and e2e harness, no go caches
@@ -255,6 +267,7 @@ warm-e2e-pkg-installs-image:
 #[what] darwin warm build: cover binary + e2e harness, shared by the darwin install jobs via artifact
 #[why] the linux artifact is the wrong platform: without this every darwin matrix job links its own
 warm-go-darwin:
+  extends: .vendors-packages
   stage: warm
   tags:
     - saas-macos-medium-m1
@@ -289,6 +302,7 @@ warm-go-darwin:
 #[what] no-deps install e2e: up to 5 chosen packages per method, each install in a fresh debian container via dind
 #[why] with_no_deps proves each package pulls its own dependencies; the curated per-method subset keeps MR pipelines fast and deterministic, the manual per-package jobs and local PACKAGE=all cover the full set
 test-e2e-install-methods:
+  extends: .vendors-packages
   stage: test-e2e-method-installs
   image: $CI_IMAGE_DIND
   services: [docker:dind]
@@ -336,6 +350,7 @@ test-e2e-install-methods:
 ##[<] 🤖🤖
 
 coverage-che:
+  extends: .vendors-packages
   image: $CI_IMAGE
   stage: coverage
   needs:
@@ -509,6 +524,7 @@ pages-preview:
 #   dep tree (gomplate, gcp sdk, go-git, otel): the peak was OOMKilled at exit 137 on the default
 #   medium size's 6Gi ceiling, the big runner's 12Gi holds it. everything else stays medium
 .goreleaser-build:
+  extends: .vendors-packages
   tags:
     - gke-linux-amd64-big
 
