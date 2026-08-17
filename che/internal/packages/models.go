@@ -14,8 +14,8 @@ import (
 
 	"gopkg.in/yaml.v3"
 
-	chepackages "gitlab.com/konradodwrot/go-modules/che-packages"
 	"gitlab.com/konradodwrot/go-modules/che/internal/fsutil"
+	"gitlab.com/konradodwrot/go-modules/che/internal/packages/builtin"
 )
 
 const BuiltinPath = "builtin packages.yml"
@@ -24,7 +24,7 @@ const BuiltinSentinel = "__builtin__.packages.yml"
 
 func LoadBuiltin() (*File, error) {
 	f := &File{}
-	if err := yaml.Unmarshal(chepackages.Builtin, f); err != nil {
+	if err := yaml.Unmarshal(builtin.Catalog, f); err != nil {
 		return nil, fmt.Errorf("parse %s: %w", BuiltinPath, err)
 	}
 	return f, nil
@@ -60,12 +60,20 @@ func (m *ToolPackagesMap) UnmarshalYAML(node *yaml.Node) error {
 	*m = ToolPackagesMap{}
 	for i := 0; i+1 < len(node.Content); i += 2 {
 		tool := node.Content[i].Value
-		if _, ok := toolRoutines[tool]; !ok {
+		routine, ok := toolRoutines[tool]
+		if !ok {
 			return fmt.Errorf("toolPackages.%s: unknown tool: want one of %s", tool, strings.Join(KnownTools(), ", "))
 		}
 		var set ToolPackageSet
 		if err := node.Content[i+1].Decode(&set); err != nil {
 			return fmt.Errorf("toolPackages.%s: %w", tool, err)
+		}
+		if routine.rejectPins {
+			for _, name := range slices.Sorted(maps.Keys(set)) {
+				if set[name] != "" {
+					return errPinRejected(tool, name)
+				}
+			}
 		}
 		(*m)[tool] = set
 	}

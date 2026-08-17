@@ -624,6 +624,31 @@ testCases:
         notExpected:
           stdOut: ["installed vscode/e2e.pinned-ext"]
 
+      - name: InstallGcloudComponentsInstallsAbsentOnly
+        command: che packages install --packages-file ${LOCAL}/packages.yml --kind=gcloud e2e-comp
+        expected:
+          exitCode: 0
+          stdOut:
+            - "installed gcloud/e2e-comp via gcloud"
+
+      - name: InstallGcloudComponentsSecondRunSkipsPresent
+        command: che packages install --packages-file ${LOCAL}/packages.yml --kind=gcloud e2e-comp
+        expected:
+          exitCode: 0
+          stdOut:
+            - "gcloud/e2e-comp: ✅ already installed via gcloud"
+        notExpected:
+          stdOut: ["installed gcloud/e2e-comp"]
+
+      - name: CheckGcloudComponentsPresentFailsOnNotInstalledState
+        command: che packages check-present --packages-file ${LOCAL}/packages.yml --kind=gcloud e2e-comp e2e-absent-comp
+        expected:
+          exitCode: 1
+          stdOut:
+            - "missing gcloud/e2e-absent-comp"
+        notExpected:
+          stdOut: ["missing gcloud/e2e-comp"]
+
       - name: InstallToolPackagesFailsOnUnknownName
         command: che packages install --packages-file ${LOCAL}/packages.yml --kind=vscode nosuch.ext
         expected:

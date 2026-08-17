@@ -2,17 +2,17 @@
 cases:
   - name: ShouldPassCheckWhenTreeMatches
     context:
-      command: render-dirs-tree --check ${DIR}/good.tree
+      command: che render dirs-tree --check ${DIR}/good.tree
     expected:
       exitCode: 0
   - name: ShouldExit22WhenTreeDiffers
     context:
-      command: render-dirs-tree --check ${DIR}/stale.tree
+      command: che render dirs-tree --check ${DIR}/stale.tree
     expected:
       exitCode: 22
   - name: ShouldExit13WhenTreeFileAbsent
     context:
-      command: render-dirs-tree --check ${DIR}/absent.tree
+      command: che render dirs-tree --check ${DIR}/absent.tree
     expected:
       exitCode: 13
 # [<] 🤖🤖

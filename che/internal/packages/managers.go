@@ -15,10 +15,10 @@ import (
 	"slices"
 	"strings"
 
-	chepackages "gitlab.com/konradodwrot/go-modules/che-packages"
 	"gitlab.com/konradodwrot/go-modules/che/internal/execx"
 	"gitlab.com/konradodwrot/go-modules/che/internal/fetchx"
 	"gitlab.com/konradodwrot/go-modules/che/internal/log"
+	"gitlab.com/konradodwrot/go-modules/che/internal/packages/builtin"
 )
 
 const Scope = "install-packages"
@@ -54,6 +54,7 @@ type Installer struct {
 	aptUpdated     bool
 	brewUpdated    bool
 	codeExts       map[string]string
+	gcloudComps    map[string]string
 	outdated       map[string]map[string]bool
 	binDir         string
 	compDir        string
@@ -828,7 +829,7 @@ func (in *Installer) makeScriptArgv(pkg string, s *ScriptSpec) ([]string, func()
 		}
 	}
 	if in.FilePath == BuiltinPath && !filepath.IsAbs(s.Path) {
-		if b, err := chepackages.Scripts.ReadFile("scripts/" + path.Base(s.Path)); err == nil {
+		if b, err := builtin.ReadScript(path.Base(s.Path)); err == nil {
 			return withScriptArgs([]string{"/bin/sh", "-ec", string(b)}, s), nil, nil
 		}
 	}

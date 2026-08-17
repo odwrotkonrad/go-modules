@@ -640,6 +640,13 @@
     },
     "toolPackages": {
       "properties": {
+        "gcloud": {
+          "additionalProperties": {
+            "type": "null",
+            "description": "rolling: gcloud packages carry no version of their own"
+          },
+          "type": "object"
+        },
         "vscode": {
           "additionalProperties": {
             "oneOf": [

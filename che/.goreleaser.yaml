@@ -19,79 +19,15 @@ builds:
     env:
       - CGO_ENABLED=0
 
-  - id: render-tpl-linux
-    main: ./render/cmd/render-tpl
-    binary: render-tpl
-    goos: [linux]
-    goarch: [amd64, arm64]
-    flags:
-      - -trimpath
-    ldflags:
-      - -s -w -X main.version={{.Version}}
-    env:
-      - CGO_ENABLED=0
-
-  - id: render-dirs-tree-linux
-    main: ./render/cmd/render-dirs-tree
-    binary: render-dirs-tree
-    goos: [linux]
-    goarch: [amd64, arm64]
-    flags:
-      - -trimpath
-    ldflags:
-      - -s -w -X main.version={{.Version}}
-    env:
-      - CGO_ENABLED=0
-
-  - id: render-makefile-doc-linux
-    main: ./render/cmd/render-makefile-doc
-    binary: render-makefile-doc
-    goos: [linux]
-    goarch: [amd64, arm64]
-    flags:
-      - -trimpath
-    ldflags:
-      - -s -w -X main.version={{.Version}}
-    env:
-      - CGO_ENABLED=0
-
-  - id: render-repo-group-index-linux
-    main: ./render/cmd/render-repo-group-index
-    binary: render-repo-group-index
-    goos: [linux]
-    goarch: [amd64, arm64]
-    flags:
-      - -trimpath
-    ldflags:
-      - -s -w -X main.version={{.Version}}
-    env:
-      - CGO_ENABLED=0
-
 archives:
   - id: che
-    ids: [che-linux, render-tpl-linux, render-dirs-tree-linux, render-makefile-doc-linux, render-repo-group-index-linux]
+    ids: [che-linux]
     formats: [tar.gz]
     name_template: 'che_{{ .Version }}_{{ .Os }}_{{ .Arch }}'
-  - id: render-tpl
-    ids: [render-tpl-linux]
-    formats: [tar.gz]
-    name_template: 'render-tpl_{{ .Version }}_{{ .Os }}_{{ .Arch }}'
-  - id: render-dirs-tree
-    ids: [render-dirs-tree-linux]
-    formats: [tar.gz]
-    name_template: 'render-dirs-tree_{{ .Version }}_{{ .Os }}_{{ .Arch }}'
-  - id: render-makefile-doc
-    ids: [render-makefile-doc-linux]
-    formats: [tar.gz]
-    name_template: 'render-makefile-doc_{{ .Version }}_{{ .Os }}_{{ .Arch }}'
-  - id: render-repo-group-index
-    ids: [render-repo-group-index-linux]
-    formats: [tar.gz]
-    name_template: 'render-repo-group-index_{{ .Version }}_{{ .Os }}_{{ .Arch }}'
 
 nfpms:
   - id: che-deb
-    ids: [che-linux, render-tpl-linux, render-dirs-tree-linux, render-makefile-doc-linux, render-repo-group-index-linux]
+    ids: [che-linux]
     package_name: che
     file_name_template: 'che_{{ .Version }}_linux_{{ .Arch }}'
     formats: [deb]
@@ -99,7 +35,7 @@ nfpms:
     vendor: konradodwrot
     homepage: https://gitlab.com/konradodwrot/go-modules
     maintainer: Konrad Odwrot <odwrotkonrad@gmail.com>
-    description: Spec-driven dotfile configuration loader, with the render CLIs
+    description: Spec-driven dotfile configuration loader
     license: MIT
     section: utils
     priority: optional

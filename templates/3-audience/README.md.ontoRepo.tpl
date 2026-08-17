@@ -6,8 +6,7 @@
 
 | Module | What |
 | --- | --- |
-| [che](che/) | Spec-driven dotfile configuration loader, plus the shared render engine and doc-rendering CLIs (`render-tpl`, `render-dirs-tree`, `render-makefile-doc`, `render-repo-group-index`) under `che/render/` |
-| [che-packages](che-packages/) | Builtin package database: `packages.yml` + `scripts/`, embedded into che and published as an updatable definitions tarball |
+| [che](che/) | Spec-driven dotfile configuration loader, plus the shared render engine under `che/render/`, exposed as `che render {tpl,dirs-tree,makefile-doc,repo-group-index}` |
 | [get-os-open-files-with](get-os-open-files-with/) | CLI printing macOS file-handler association lines for duti |
 | [get-term-open-files-with](get-term-open-files-with/) | CLI printing zsh suffix-alias lines for terminal file opening |
 | [lib](lib/) | Shared library for the CLI modules: `yamlcfg` config loading, `climain` main-shape helpers (no binaries) |
@@ -27,8 +26,8 @@ Pin a version via its versioned formula:
 brew install che@0.0.67
 ```
 
-Binary formula for `{darwin,linux}_{amd64,arm64}`: installs `che` and the render
-CLIs from the prebuilt release archives, updated by each che tag pipeline. The
+Binary formula for `{darwin,linux}_{amd64,arm64}`: installs `che` from the
+prebuilt release archives, updated by each che tag pipeline. The
 tap is mirrored to [GitHub](https://github.com/odwrotkonrad/homebrew-tap), which
 `brew tap` resolves by default.
 
@@ -46,7 +45,7 @@ Pin a version (the pool keeps every release):
 sudo apt install che=0.0.67
 ```
 
-Binary package for `linux_{amd64,arm64}`: installs `che` and the render CLIs
+Binary package for `linux_{amd64,arm64}`: installs `che`
 into `/usr/bin`. The repo is GPG-signed and rebuilt from the package registry
 by each che tag pipeline.
 
@@ -54,18 +53,17 @@ by each che tag pipeline.
 
 Prebuilt: each [release](https://gitlab.com/konradodwrot/go-modules/-/releases)
 `<module>/vX.Y.Z` attaches `<binary>_<version>_{darwin,linux}_{amd64,arm64}.tar.gz`
-plus `checksums.txt` (che: also the render CLI archives and `che.schema.json`).
+plus `checksums.txt` (che: also `che.schema.json`).
 
 ### From source
 
 ```sh
 go install gitlab.com/konradodwrot/go-modules/che@latest
-go install gitlab.com/konradodwrot/go-modules/che/render/cmd/render-tpl@latest
 go install gitlab.com/konradodwrot/go-modules/get-os-open-files-with@latest
 go install gitlab.com/konradodwrot/go-modules/get-term-open-files-with@latest
 ```
 
-che and the render CLIs need CGO (1Password SDK): a C compiler at build time.
+che needs CGO (1Password SDK): a C compiler at build time.
 
 ## Docs
 

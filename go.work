@@ -2,12 +2,9 @@ go 1.26.3
 
 use (
 	./che
-	./che-packages
 	./get-os-open-files-with
 	./get-term-open-files-with
 	./lib
 )
 
 replace gitlab.com/konradodwrot/go-modules/lib v0.0.1 => ./lib
-
-replace gitlab.com/konradodwrot/go-modules/che-packages v0.0.1 => ./che-packages

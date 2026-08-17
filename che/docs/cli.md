@@ -220,7 +220,7 @@ Usage: `che packages check-present [pkg...] [flags]`
 
 | Option | Env | Values | Default | Description |
 | --- | --- | --- | --- | --- |
-| `--kind` |  | `packages` \| `vscode` | `packages` | package kind: packages (canonical entries) or a tool name whose toolPackages entries install via that tool |
+| `--kind` |  | `packages` \| `gcloud` \| `vscode` | `packages` | package kind: packages (canonical entries) or a tool name whose toolPackages entries install via that tool |
 
 ### `$ che packages check-single-present`
 
@@ -258,7 +258,7 @@ Usage: `che packages install [pkg...] [flags]`
 | Option | Env | Values | Default | Description |
 | --- | --- | --- | --- | --- |
 | `--if-missing` |  | `bool` | `false` | skip packages whose canonical command exists anywhere on PATH, regardless of manager |
-| `--kind` |  | `packages` \| `vscode` | `packages` | package kind: packages (canonical entries) or a tool name whose toolPackages entries install via that tool |
+| `--kind` |  | `packages` \| `gcloud` \| `vscode` | `packages` | package kind: packages (canonical entries) or a tool name whose toolPackages entries install via that tool |
 | `--missing-method-warn` |  | `bool` | `false` | warn instead of erroring when a requested package has no applicable installation method on this host |
 | `--silence-install-stdout` | `CHE_PACKAGES_SILENCE_INSTALL_STDOUT` | `true (bare-flag default)` \| `false (stream as it runs)` | `true at error/warn/info log level, false at debug/trace` | silence the installation method's stdout/stderr (a failing method's captured output always prints) |
 | `--update` |  | `bool` | `false` | refresh installed unpinned packages via their manager; pinned ones converge on the pin regardless |
@@ -274,6 +274,74 @@ fetch the latest published package definitions into the cache ($XDG_CACHE_HOME/c
 ### `$ che prune-broken-links`
 
 delete broken symlinks.
+
+### `$ che render`
+
+render templates and generated docs with the shared engine.
+
+render drives che's shared render engine: gomplate built-ins, op:// (1Password)
+and gcp:// (GCP Secret Manager) secret refs, remoteFile cross-repo inclusion,
+frontmatter and markdown transforms.
+
+Every subcommand writes to stdout and reads paths relative to the cwd. The
+generating subcommands take --check <file> instead, regenerating and diffing
+against <file>: exit 0 match, 22 differ (unified diff on stderr).
+
+### `$ che render dirs-tree`
+
+print the cwd repo's tracked-file directory tree.
+
+usage: che render dirs-tree
+       che render dirs-tree --check <file>
+
+Print the plain directory tree of the cwd repo's tracked files (stdout):
+read tracked paths from the git index, drop each file leaf, nest and sort
+the remaining dirs, 2-space indented, one dir per line.
+--check regenerates and diffs against <file>:
+exit 0 match, 22 differ (unified diff on stderr).
+
+
+### `$ che render makefile-doc`
+
+emit makefile.agents.md from a Makefile's [genai-include] sections.
+
+usage: che render makefile-doc <makefile-path>
+       che render makefile-doc --check <doc-file>
+
+Emit makefile.agents.md from a Makefile's [genai-include] sections (stdout).
+--check regenerates from ./Makefile and diffs against <doc-file>:
+exit 0 match, 22 differ (unified diff on stderr).
+
+
+### `$ che render repo-group-index`
+
+print the repo-group index for a subgroup dir.
+
+usage: che render repo-group-index <subgroup-dir>
+       che render repo-group-index --check <file>
+
+Print the repo-group index for <subgroup-dir> (stdout): a # Repositories
+section (where you are, the group's directory structure tree, then each direct
+child repo (a dir with .git) as ## Repo: ./<rel-path> with its
+assets/docs-agents/purpose.md body inlined, or a placeholder when missing),
+then each child subgroup as ## Subgroup: ./<rel-path> with its repos inlined
+recursively (purposes only, no repeated tree or section headings).
+--check regenerates for <file>'s dir and diffs against <file>:
+exit 0 match, 22 differ (unified diff on stderr).
+
+
+### `$ che render tpl`
+
+render a template with the shared engine, to stdout.
+
+usage: che render tpl -f <template>
+
+Render <template> with the shared engine (gomplate built-ins + op:// (1Password)
+and gcp:// (GCP Secret Manager) secrets + frontmatter/readBody + native
+generators), env vars visible via env.Getenv, to
+stdout. Drop-in for 'gomplate -f'. Paths in frontmatter/readBody/renderDirsTree
+resolve against the cwd.
+
 
 ### `$ che render-templates`
 
