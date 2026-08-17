@@ -420,9 +420,12 @@ release-che:
   variables:
     MODULE: che
   #[why] the catalog lives in konradodwrot/che-packages now: a catalog release triggers this repo, which re-vendors at the raised pin in che/packages-pin.env
+  #[why] the publish scripts too, not just che/: the brew formula and the install script are written
+  #   by them and only republished by a tag, so a fix to either sat unreleased on main while
+  #   `brew install che` kept failing on binaries the tarball no longer ships
   rules:
     - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
-      changes: [che/**/*]
+      changes: [che/**/*, ci/publish-brew-formula.zsh, ci/publish.zsh]
 
 release-get-os-open-files-with:
   extends: .release-module
