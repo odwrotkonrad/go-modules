@@ -40,7 +40,7 @@ class $1 < Formula
   end
 
   def install
-    bin.install "che", "render-tpl", "render-dirs-tree", "render-makefile-doc", "render-repo-group-index"
+    bin.install "che"
   end
 
   test do
