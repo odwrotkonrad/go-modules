@@ -91,6 +91,18 @@ func atIncludePath(repoRoot, line string) string {
 	return filepath.Join(repoRoot, path)
 }
 
+// IncludePaths returns the resolved path of every @-include line in body.
+func IncludePaths(repoRoot string, body []byte) []string {
+	var paths []string
+	for line := range strings.Lines(string(body)) {
+		line = strings.TrimSuffix(line, "\n")
+		if isAtIncludeLine(line) {
+			paths = append(paths, atIncludePath(repoRoot, line))
+		}
+	}
+	return paths
+}
+
 func UnresolvedIncludes(repoRoot string, body []byte) []string {
 	missing := []string{}
 	for line := range strings.Lines(string(body)) {
