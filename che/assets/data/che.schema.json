@@ -144,6 +144,11 @@
             "globalVersion": {
               "type": "string",
               "description": "which installed version becomes the default (version-manager methods only); defaults to the first listed"
+            },
+            "checksum": {
+              "type": "string",
+              "pattern": "^sha256:.+",
+              "description": "sha256:\u003chex\u003e of the artifact the pinned version downloads, overriding the packages-file item's checksum"
             }
           },
           "additionalProperties": false,
@@ -172,6 +177,7 @@
               "gem",
               "binariesRemoteArchive",
               "script",
+              "buildFromSource",
               "pyenv",
               "nvm",
               "nix"
@@ -179,6 +185,27 @@
           },
           "type": "array",
           "description": "manager preference order: listed managers are tried first (in this order) within each package entry, unlisted ones follow in entry order; cascades profile \u003e spec \u003e user config; overridden by CHE_PACKAGES_PREFERRED_METHODS"
+        },
+        "onlyInstallationMethods": {
+          "items": {
+            "type": "string",
+            "enum": [
+              "brew",
+              "cask",
+              "apt",
+              "npm",
+              "go",
+              "gem",
+              "binariesRemoteArchive",
+              "script",
+              "buildFromSource",
+              "pyenv",
+              "nvm",
+              "nix"
+            ]
+          },
+          "type": "array",
+          "description": "restrict installs to the listed managers: items using any other manager are skipped with no fallthrough, packages pulled in as requires dependencies are exempt; cascades profile \u003e spec \u003e user config; overridden by CHE_PACKAGES_ONLY_METHODS"
         },
         "binariesRemoteArchive": {
           "$ref": "#/$defs/BinariesRemoteArchiveInstall",

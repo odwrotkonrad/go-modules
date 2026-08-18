@@ -258,7 +258,8 @@ func (o *Options) Resolve(env LookupEnv, user, spec Layer) error {
 		o.setValue("packages.preferredInstallationMethods", "["+strings.Join(packages.DefaultPreferredMethods, ", ")+"]")
 	}
 	o.PackagesOnlyMethods = o.resolveList("packages.onlyInstallationMethods",
-		fromLayerList(o.PackagesOnlyMethods, "cliFlag"), fromEnv(env("CHE_PACKAGES_ONLY_METHODS")))
+		fromLayerList(o.PackagesOnlyMethods, "cliFlag"), fromEnv(env("CHE_PACKAGES_ONLY_METHODS")),
+		fromLayerList(user.Packages.OnlyInstallationMethods, "config-file"), fromLayerList(spec.Packages.OnlyInstallationMethods, "specFile"))
 	if err := packages.ValidateManagers(o.PackagesOnlyMethods); err != nil {
 		return err
 	}

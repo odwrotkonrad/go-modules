@@ -37,8 +37,8 @@ func (in *Installer) installBuildFromSource(pkg string, b *BuildFromSourceSpec) 
 		return err
 	}
 	defer cleanup()
-	if b.Checksum != "" {
-		if err := in.verifyChecksum(pkg, asset, b.Checksum); err != nil {
+	if sum := in.resolveChecksum(pkg, b.Checksum); sum != "" {
+		if err := in.verifyChecksum(pkg, asset, sum); err != nil {
 			if inCache {
 				_ = os.Remove(asset)
 			}

@@ -29,6 +29,19 @@ func yamlInstance(t *testing.T, b []byte) any {
 	return inst
 }
 
+func TestSpecInstallationMethodEnums(t *testing.T) {
+	want := make([]any, len(KnownManagers))
+	for i, m := range KnownManagers {
+		want[i] = m
+	}
+	props := spec.Schema().Definitions["Packages"].Properties
+	for _, field := range []string{"preferredInstallationMethods", "onlyInstallationMethods"} {
+		f, ok := props.Get(field)
+		require.Truef(t, ok, "spec schema has no %s", field)
+		assert.Equalf(t, want, f.Items.Enum, "%s enum drifted from KnownManagers", field)
+	}
+}
+
 func TestSchemaValidate(t *testing.T) {
 	testyml.Run(t, td, "testdata/spec/funcs/schema.test.spec.yml", func(t *testing.T, c testyml.Case[bool]) {
 		sch := compileSchema(t)

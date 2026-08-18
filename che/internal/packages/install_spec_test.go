@@ -25,6 +25,7 @@ type requestSpec struct {
 	Name     string   `yaml:"name"`
 	Versions []string `yaml:"versions"`
 	Global   string   `yaml:"global"`
+	Checksum string   `yaml:"checksum"`
 }
 
 type installCfg struct {

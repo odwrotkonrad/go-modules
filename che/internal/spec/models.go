@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"regexp"
 	"slices"
+	"strings"
 
 	"github.com/invopop/jsonschema"
 	"gopkg.in/yaml.v3"
@@ -87,7 +88,8 @@ type Run struct {
 
 type Packages struct {
 	File                         string                       `yaml:"file" jsonschema_description:"packages.yml path; default $XDG_CONFIG_HOME/packages/packages.yml; overridden by --packages-file and CHE_PACKAGES_FILE"`
-	PreferredInstallationMethods []string                     `yaml:"preferredInstallationMethods" jsonschema:"enum=brew,enum=cask,enum=apt,enum=npm,enum=go,enum=gem,enum=binariesRemoteArchive,enum=script,enum=pyenv,enum=nvm,enum=nix" jsonschema_description:"manager preference order: listed managers are tried first (in this order) within each package entry, unlisted ones follow in entry order; cascades profile > spec > user config; overridden by CHE_PACKAGES_PREFERRED_METHODS"`
+	PreferredInstallationMethods []string                     `yaml:"preferredInstallationMethods" jsonschema:"enum=brew,enum=cask,enum=apt,enum=npm,enum=go,enum=gem,enum=binariesRemoteArchive,enum=script,enum=buildFromSource,enum=pyenv,enum=nvm,enum=nix" jsonschema_description:"manager preference order: listed managers are tried first (in this order) within each package entry, unlisted ones follow in entry order; cascades profile > spec > user config; overridden by CHE_PACKAGES_PREFERRED_METHODS"`
+	OnlyInstallationMethods      []string                     `yaml:"onlyInstallationMethods" jsonschema:"enum=brew,enum=cask,enum=apt,enum=npm,enum=go,enum=gem,enum=binariesRemoteArchive,enum=script,enum=buildFromSource,enum=pyenv,enum=nvm,enum=nix" jsonschema_description:"restrict installs to the listed managers: items using any other manager are skipped with no fallthrough, packages pulled in as requires dependencies are exempt; cascades profile > spec > user config; overridden by CHE_PACKAGES_ONLY_METHODS"`
 	BinariesRemoteArchive        BinariesRemoteArchiveInstall `yaml:"binariesRemoteArchive" jsonschema_description:"binariesRemoteArchive installation method options"`
 	Completions                  CompletionsInstall           `yaml:"completions" jsonschema_description:"zsh completions installation options"`
 	Manpages                     ManpagesInstall              `yaml:"manpages" jsonschema_description:"manpages installation options"`
@@ -123,6 +125,7 @@ type PackageRef struct {
 	Name          string       `yaml:"name" jsonschema_description:"canonical package name in the packages file"`
 	Versions      StringOrList `yaml:"versions,omitempty" jsonschema_description:"version(s) to install: one version or a list (exact 24.16.0 or wildcard 24.*), overriding the packages-file entry's default; multiple versions require a version-manager installation method"`
 	GlobalVersion string       `yaml:"globalVersion,omitempty" jsonschema_description:"which installed version becomes the default (version-manager methods only); defaults to the first version listed"`
+	Checksum      string       `yaml:"checksum,omitempty" jsonschema_description:"sha256:<hex> of the artifact the pinned version downloads, overriding the packages-file item's checksum"`
 }
 
 func (p *PackageRef) UnmarshalYAML(node *yaml.Node) error {
@@ -134,6 +137,7 @@ func (p *PackageRef) UnmarshalYAML(node *yaml.Node) error {
 		Name          string       `yaml:"name"`
 		Versions      StringOrList `yaml:"versions"`
 		GlobalVersion string       `yaml:"globalVersion"`
+		Checksum      string       `yaml:"checksum"`
 	}
 	if err := node.Decode(&obj); err != nil {
 		return err
@@ -144,7 +148,10 @@ func (p *PackageRef) UnmarshalYAML(node *yaml.Node) error {
 	if obj.GlobalVersion != "" && !slices.Contains(obj.Versions, obj.GlobalVersion) {
 		return fmt.Errorf("installPackages %s: globalVersion %s is not among versions %v", obj.Name, obj.GlobalVersion, []string(obj.Versions))
 	}
-	p.Name, p.Versions, p.GlobalVersion = obj.Name, obj.Versions, obj.GlobalVersion
+	if obj.Checksum != "" && !strings.HasPrefix(obj.Checksum, "sha256:") {
+		return fmt.Errorf("installPackages %s: checksum must be sha256:<hex>: %q", obj.Name, obj.Checksum)
+	}
+	p.Name, p.Versions, p.GlobalVersion, p.Checksum = obj.Name, obj.Versions, obj.GlobalVersion, obj.Checksum
 	return nil
 }
 
@@ -162,6 +169,7 @@ func (p PackageRef) JSONSchema() *jsonschema.Schema {
 	obj.Properties.Set("name", &jsonschema.Schema{Type: "string", Description: "canonical package name in the packages file"})
 	obj.Properties.Set("versions", strOrList)
 	obj.Properties.Set("globalVersion", &jsonschema.Schema{Type: "string", Description: "which installed version becomes the default (version-manager methods only); defaults to the first listed"})
+	obj.Properties.Set("checksum", &jsonschema.Schema{Type: "string", Pattern: "^sha256:.+", Description: "sha256:<hex> of the artifact the pinned version downloads, overriding the packages-file item's checksum"})
 	return &jsonschema.Schema{OneOf: []*jsonschema.Schema{{Type: "string"}, obj}}
 }
 

@@ -160,6 +160,12 @@ func (p *ProfileReady) newInstaller() (*packages.Installer, error) {
 		}
 		opts.PackagesPreferredMethods = m
 	}
+	if m := p.Options.Packages.OnlyInstallationMethods; len(m) > 0 {
+		if err := packages.ValidateManagers(m); err != nil {
+			return nil, err
+		}
+		opts.PackagesOnlyMethods = m
+	}
 	if d := p.Options.Packages.BinariesRemoteArchive.InstallDestinationCandidates; len(d) > 0 {
 		opts.PackagesBinariesRemoteArchiveDestinationCandidates = d
 	}
@@ -218,7 +224,7 @@ func (p *ProfileReady) installPackages(refs []spec.PackageRef) error {
 	}
 	reqs := make([]packages.Request, len(refs))
 	for i, r := range refs {
-		reqs[i] = packages.Request{Name: r.Name, Versions: r.Versions, Global: r.GlobalVersion}
+		reqs[i] = packages.Request{Name: r.Name, Versions: r.Versions, Global: r.GlobalVersion, Checksum: r.Checksum}
 	}
 	if err := in.InstallRequests(reqs); err != nil {
 		return err

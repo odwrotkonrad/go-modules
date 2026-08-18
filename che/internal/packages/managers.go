@@ -80,6 +80,7 @@ type Request struct {
 	Name     string
 	Versions []string
 	Global   string
+	Checksum string
 }
 
 func Requests(names []string) []Request {
@@ -347,7 +348,7 @@ func (in *Installer) plan(reqs []Request) ([]string, error) {
 		return nil
 	}
 	for _, req := range reqs {
-		if len(req.Versions) > 0 {
+		if len(req.Versions) > 0 || req.Checksum != "" {
 			in.requested[req.Name] = req
 		}
 		if err := walk(req.Name, nil); err != nil {

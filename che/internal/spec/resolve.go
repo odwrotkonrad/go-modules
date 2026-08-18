@@ -735,6 +735,9 @@ func overlayPackages(override, base Packages) Packages {
 	if len(override.PreferredInstallationMethods) == 0 {
 		override.PreferredInstallationMethods = base.PreferredInstallationMethods
 	}
+	if len(override.OnlyInstallationMethods) == 0 {
+		override.OnlyInstallationMethods = base.OnlyInstallationMethods
+	}
 	if len(override.BinariesRemoteArchive.InstallDestinationCandidates) == 0 {
 		override.BinariesRemoteArchive.InstallDestinationCandidates = base.BinariesRemoteArchive.InstallDestinationCandidates
 	}
