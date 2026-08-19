@@ -10,20 +10,19 @@ import (
 	"encoding/hex"
 	"fmt"
 	"io"
+	"io/fs"
 	"os"
 	"path/filepath"
 	"strings"
 	"time"
 
+	"github.com/go-git/go-git/v5"
+	"github.com/go-git/go-git/v5/plumbing"
+
 	"gitlab.com/konradodwrot/go-modules/che/internal/fetchx"
 )
 
-const DefaultUpdateBaseURL = "https://gitlab.com/api/v4/projects/konradodwrot%2Fche-packages/packages/generic/che-packages"
-
-// [why] the URL above still points at go-modules: konradodwrot/che-packages serves
-//
-//	definitions once it has published a tag. Flip it with the MR that publishes
-//	che-packages v0.0.1, or every che run warns and falls back until then.
+const DefaultSourceURL = "https://gitlab.com/api/v4/projects/konradodwrot%2Fche-packages/packages/generic/che-packages"
 
 const DefaultUpdateCooldown = 15 * time.Minute
 
@@ -32,9 +31,42 @@ const (
 	checkStamp    = "last-check"
 )
 
-func ResolveUpdateBaseURL(env map[string]string) string {
-	return cmp.Or(env["CHE_PACKAGES_UPDATE_URL"], DefaultUpdateBaseURL)
+type SourceKind int
+
+const (
+	SourceRegistry SourceKind = iota
+	SourceGit
+)
+
+// Source locates package definitions: where to read them from, and which version.
+type Source struct {
+	URL string
+	Ref string
 }
+
+// Kind reports how the source publishes definitions, recognised from the URL's shape.
+func (s Source) Kind() SourceKind {
+	u := strings.TrimSuffix(s.URL, "/")
+	switch {
+	case strings.HasPrefix(u, "git+"), strings.HasSuffix(u, ".git"):
+		return SourceGit
+	case strings.HasPrefix(u, "git@"), strings.HasPrefix(u, "ssh://"):
+		return SourceGit
+	default:
+		return SourceRegistry
+	}
+}
+
+func (s Source) gitURL() string { return strings.TrimPrefix(s.URL, "git+") }
+
+// Pinned reports whether the source names an exact version rather than the newest one.
+func (s Source) Pinned() bool { return s.Ref != "" }
+
+func ResolveSourceURL(env map[string]string) string {
+	return cmp.Or(env["CHE_PACKAGES_SOURCE_URL"], env["CHE_PACKAGES_UPDATE_URL"], DefaultSourceURL)
+}
+
+func ResolveSourceRef(env map[string]string) string { return env["CHE_PACKAGES_REF"] }
 
 func ResolveDefinitionsCacheDir(env map[string]string, home string) string {
 	if che := env["CHE_CACHE_HOME"]; che != "" {
@@ -63,7 +95,17 @@ type UpdateResult struct {
 	Skipped string
 }
 
-func UpdateDefinitions(cacheDir, baseURL string, cooldown time.Duration, force bool) (UpdateResult, error) {
+// UpdateDefinitions fetches package definitions from src into cacheDir and marks them current.
+//
+// [why] the cooldown exists to stop repeated runs re-resolving which version is newest: a
+//
+//	pinned ref resolves nothing, so applying it there would only withhold the exact
+//	version the caller asked for.
+func UpdateDefinitions(cacheDir string, src Source, cooldown time.Duration, force bool) (UpdateResult, error) {
+	src.URL = cmp.Or(src.URL, DefaultSourceURL)
+	if src.Pinned() {
+		cooldown = 0
+	}
 	stamp := filepath.Join(cacheDir, checkStamp)
 	if !force && cooldown > 0 {
 		if fi, err := os.Stat(stamp); err == nil && time.Since(fi.ModTime()) < cooldown {
@@ -71,13 +113,9 @@ func UpdateDefinitions(cacheDir, baseURL string, cooldown time.Duration, force b
 			return UpdateResult{Version: version, Skipped: "cooldown"}, nil
 		}
 	}
-	b, err := fetchx.Default.Fetch(baseURL + "/latest/version.txt")
+	version, err := resolveVersion(src)
 	if err != nil {
-		return UpdateResult{}, fmt.Errorf("resolve latest definitions version: %w", err)
-	}
-	version := strings.TrimSpace(string(b))
-	if version == "" {
-		return UpdateResult{}, fmt.Errorf("resolve latest definitions version: empty version.txt at %s", baseURL)
+		return UpdateResult{}, err
 	}
 	if err := os.MkdirAll(cacheDir, 0o755); err != nil {
 		return UpdateResult{}, err
@@ -89,7 +127,7 @@ func UpdateDefinitions(cacheDir, baseURL string, cooldown time.Duration, force b
 		}
 		return UpdateResult{Version: version, Skipped: "up-to-date"}, nil
 	}
-	if err := downloadDefinitions(cacheDir, baseURL, version, versionDir); err != nil {
+	if err := fetchDefinitions(cacheDir, src, version, versionDir); err != nil {
 		return UpdateResult{}, err
 	}
 	if err := finishUpdate(cacheDir, version); err != nil {
@@ -97,6 +135,31 @@ func UpdateDefinitions(cacheDir, baseURL string, cooldown time.Duration, force b
 	}
 	pruneDefinitions(cacheDir, version)
 	return UpdateResult{Version: version, Updated: true}, nil
+}
+
+func resolveVersion(src Source) (string, error) {
+	if src.Kind() == SourceGit {
+		return gitVersion(src)
+	}
+	if src.Pinned() {
+		return src.Ref, nil
+	}
+	b, err := fetchx.Default.Fetch(src.URL + "/latest/version.txt")
+	if err != nil {
+		return "", fmt.Errorf("resolve latest definitions version: %w", err)
+	}
+	version := strings.TrimSpace(string(b))
+	if version == "" {
+		return "", fmt.Errorf("resolve latest definitions version: empty version.txt at %s", src.URL)
+	}
+	return version, nil
+}
+
+func fetchDefinitions(cacheDir string, src Source, version, versionDir string) error {
+	if src.Kind() == SourceGit {
+		return cloneDefinitions(cacheDir, src, versionDir)
+	}
+	return downloadDefinitions(cacheDir, src.URL, version, versionDir)
 }
 
 func downloadDefinitions(cacheDir, baseURL, version, versionDir string) error {
@@ -128,6 +191,108 @@ func downloadDefinitions(cacheDir, baseURL, version, versionDir string) error {
 		return err
 	}
 	return nil
+}
+
+// [why] a shallow clone into a temp dir, not a fetch of two paths: a git source has no
+//
+//	manifest naming what the catalog consists of, and scripts/ is an open-ended tree.
+func cloneDefinitions(cacheDir string, src Source, versionDir string) error {
+	tmp, err := os.MkdirTemp(cacheDir, ".update-")
+	if err != nil {
+		return err
+	}
+	defer func() { _ = os.RemoveAll(tmp) }()
+	clone := filepath.Join(tmp, "clone")
+	if _, err := cloneAt(src, clone); err != nil {
+		return err
+	}
+	extracted := filepath.Join(tmp, "extracted")
+	if err := os.MkdirAll(filepath.Join(extracted, "scripts"), 0o755); err != nil {
+		return err
+	}
+	if err := copyFile(filepath.Join(clone, "packages.yml"), filepath.Join(extracted, "packages.yml")); err != nil {
+		return fmt.Errorf("definitions repo %s carries no packages.yml: %w", src.URL, err)
+	}
+	if err := copyTree(filepath.Join(clone, "scripts"), filepath.Join(extracted, "scripts")); err != nil {
+		return err
+	}
+	return os.Rename(extracted, versionDir)
+}
+
+// [why] the resolved commit, never the ref: a branch names different content over time, and a
+//
+//	cache dir keyed on it would serve the first clone forever.
+func gitVersion(src Source) (string, error) {
+	tmp, err := os.MkdirTemp("", "che-packages-ref-")
+	if err != nil {
+		return "", err
+	}
+	defer func() { _ = os.RemoveAll(tmp) }()
+	head, err := cloneAt(src, filepath.Join(tmp, "clone"))
+	if err != nil {
+		return "", err
+	}
+	return head, nil
+}
+
+func cloneAt(src Source, dest string) (string, error) {
+	opts := &git.CloneOptions{URL: src.gitURL(), Depth: 1, SingleBranch: true, Tags: git.NoTags}
+	if src.Pinned() {
+		opts.ReferenceName = plumbing.NewBranchReferenceName(src.Ref)
+	}
+	repo, err := git.PlainClone(dest, false, opts)
+	if err != nil && src.Pinned() {
+		opts.ReferenceName = plumbing.NewTagReferenceName(src.Ref)
+		_ = os.RemoveAll(dest)
+		repo, err = git.PlainClone(dest, false, opts)
+	}
+	if err != nil {
+		return "", fmt.Errorf("clone definitions from %s at %s: %w", src.URL, cmp.Or(src.Ref, "default branch"), err)
+	}
+	head, err := repo.Head()
+	if err != nil {
+		return "", fmt.Errorf("resolve cloned head of %s: %w", src.URL, err)
+	}
+	return head.Hash().String()[:12], nil
+}
+
+func copyFile(src, dst string) error {
+	b, err := os.ReadFile(src)
+	if err != nil {
+		return err
+	}
+	return os.WriteFile(dst, b, 0o644)
+}
+
+func copyTree(src, dst string) error {
+	if _, err := os.Stat(src); err != nil {
+		return nil
+	}
+	return filepath.WalkDir(src, func(path string, entry fs.DirEntry, walkErr error) error {
+		if walkErr != nil {
+			return walkErr
+		}
+		rel, err := filepath.Rel(src, path)
+		if err != nil {
+			return err
+		}
+		target := filepath.Join(dst, rel)
+		if entry.IsDir() {
+			return os.MkdirAll(target, 0o755)
+		}
+		if !entry.Type().IsRegular() {
+			return nil
+		}
+		info, err := entry.Info()
+		if err != nil {
+			return err
+		}
+		b, err := os.ReadFile(path)
+		if err != nil {
+			return err
+		}
+		return os.WriteFile(target, b, info.Mode().Perm())
+	})
 }
 
 func finishUpdate(cacheDir, version string) error {

@@ -26,7 +26,7 @@ Available Commands:
     config                inspect the resolved packages database
       show                print the packages database (--all default: the effective merged set; --delta: entries differing from the builtin; --defaults: the builtin only)
     install               install packages by canonical name (no args: every resolved profile's include.installPackages)
-    update                fetch the latest published package definitions into the cache ($XDG_CACHE_HOME/che/packages); cached definitions supersede the builtin set when no packages file exists
+    update                fetch package definitions from packages.source into the cache ($XDG_CACHE_HOME/che/packages); cached definitions supersede the builtin set when no packages file exists
   prune-broken-links      delete broken symlinks
   render                  render templates and generated docs with the shared engine
     dirs-tree             print the cwd repo's tracked-file directory tree

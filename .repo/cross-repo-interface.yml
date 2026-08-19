@@ -7,8 +7,8 @@ upstream:
   - configs/llm/claude
   - infra/oci-images/ci-linux
   - infra/oci-images/ci-linux-dind
-  #[why] che embeds the catalog at the version pinned in che/packages-pin.env: a catalog release
-  #   has to reach this repo as a pin bump, which is what makes this an upstream edge
+  #[why] che embeds the catalog at the version the $CHE_PACKAGES_REF group CI variable names: a
+  #   catalog release has to reach that variable, which is what makes this an upstream edge
   - che-packages/catalog
 edges:
   go-modules/lib: [che, get-os-open-files-with, get-term-open-files-with]

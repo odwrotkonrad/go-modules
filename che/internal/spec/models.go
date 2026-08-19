@@ -93,12 +93,31 @@ type Packages struct {
 	BinariesRemoteArchive        BinariesRemoteArchiveInstall `yaml:"binariesRemoteArchive" jsonschema_description:"binariesRemoteArchive installation method options"`
 	Completions                  CompletionsInstall           `yaml:"completions" jsonschema_description:"zsh completions installation options"`
 	Manpages                     ManpagesInstall              `yaml:"manpages" jsonschema_description:"manpages installation options"`
-	UpdateCheck                  UpdateCheck                  `yaml:"updateCheck" jsonschema_description:"check the package registry for newer published package definitions before installs"`
+	Source                       PackagesSource               `yaml:"source" jsonschema_description:"where package definitions are read from"`
+	AutoUpdate                   AutoUpdate                   `yaml:"autoUpdate" jsonschema_description:"fetch newer published package definitions before installs"`
 }
 
-type UpdateCheck struct {
-	Enabled  *bool  `yaml:"enabled" jsonschema_description:"before installs, fetch the latest published che-packages definitions into the cache (failures warn and installs fall through to the cached or builtin set); default false; overridden by CHE_PACKAGES_UPDATE_CHECK"`
-	Cooldown string `yaml:"cooldown" jsonschema_description:"minimum interval between update checks (Go duration, e.g. 15m, 1h); default 15m; overridden by CHE_PACKAGES_UPDATE_CHECK_COOLDOWN"`
+type PackagesSource struct {
+	URL string `yaml:"url" jsonschema_description:"definitions source: a generic package registry base or a git repository URL, recognised by shape; default the konradodwrot/che-packages registry; cascades profile > spec > user config; overridden by CHE_PACKAGES_SOURCE_URL"`
+	Ref string `yaml:"ref" jsonschema_description:"exact version to fetch: a published version for a registry source, a branch, tag or commit for a git one; empty resolves the newest published version; cascades profile > spec > user config; overridden by CHE_PACKAGES_REF"`
+}
+
+type AutoUpdate struct {
+	Enabled *bool        `yaml:"enabled" jsonschema_description:"before installs, fetch definitions from packages.source into the cache (failures warn and installs fall through to the cached or builtin set); runs once per che execution; default true; overridden by CHE_PACKAGES_AUTO_UPDATE"`
+	If      AutoUpdateIf `yaml:"if" jsonschema_description:"conditions narrowing when autoUpdate behaviour applies"`
+}
+
+type AutoUpdateIf struct {
+	RefIsLatest  AutoUpdateIfRefIsLatest  `yaml:"refIsLatest" jsonschema_description:"applies while packages.source.ref is empty, i.e. the newest version is resolved on each check"`
+	DryRunIsTrue AutoUpdateIfDryRunIsTrue `yaml:"dryRunIsTrue" jsonschema_description:"applies while the run is a dry run"`
+}
+
+type AutoUpdateIfRefIsLatest struct {
+	Cooldown string `yaml:"cooldown" jsonschema_description:"minimum interval between update checks (Go duration, e.g. 15m, 1h); ignored when packages.source.ref pins a version; default 15m; overridden by CHE_PACKAGES_AUTO_UPDATE_COOLDOWN"`
+}
+
+type AutoUpdateIfDryRunIsTrue struct {
+	Enabled *bool `yaml:"enabled" jsonschema_description:"check for updates during a dry run; false plans against the cached or builtin set with no fetch; default true; overridden by CHE_PACKAGES_AUTO_UPDATE_IF_DRY_RUN"`
 }
 
 type CompletionsInstall struct {

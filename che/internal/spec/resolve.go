@@ -759,11 +759,20 @@ func overlayPackages(override, base Packages) Packages {
 	if override.Manpages.CheckPresentOnManpath == nil {
 		override.Manpages.CheckPresentOnManpath = base.Manpages.CheckPresentOnManpath
 	}
-	if override.UpdateCheck.Enabled == nil {
-		override.UpdateCheck.Enabled = base.UpdateCheck.Enabled
+	if override.Source.URL == "" {
+		override.Source.URL = base.Source.URL
 	}
-	if override.UpdateCheck.Cooldown == "" {
-		override.UpdateCheck.Cooldown = base.UpdateCheck.Cooldown
+	if override.Source.Ref == "" {
+		override.Source.Ref = base.Source.Ref
+	}
+	if override.AutoUpdate.Enabled == nil {
+		override.AutoUpdate.Enabled = base.AutoUpdate.Enabled
+	}
+	if override.AutoUpdate.If.RefIsLatest.Cooldown == "" {
+		override.AutoUpdate.If.RefIsLatest.Cooldown = base.AutoUpdate.If.RefIsLatest.Cooldown
+	}
+	if override.AutoUpdate.If.DryRunIsTrue.Enabled == nil {
+		override.AutoUpdate.If.DryRunIsTrue.Enabled = base.AutoUpdate.If.DryRunIsTrue.Enabled
 	}
 	return override
 }
