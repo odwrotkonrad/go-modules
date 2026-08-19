@@ -20,6 +20,7 @@ import (
 	"github.com/go-git/go-git/v5/plumbing"
 
 	"gitlab.com/konradodwrot/go-modules/che/internal/fetchx"
+	"gitlab.com/konradodwrot/go-modules/che/internal/packages/builtin"
 )
 
 const DefaultSourceURL = "https://gitlab.com/api/v4/projects/konradodwrot%2Fche-packages/packages/generic/che-packages"
@@ -91,6 +92,10 @@ func ResolveCurrentDefinitions(cacheDir string) (dir, version string, ok bool) {
 
 type UpdateResult struct {
 	Version string
+	// Previous is the version that was current before this update, empty on a first fetch.
+	Previous string
+	// Builtin is the catalog version compiled into this binary.
+	Builtin string
 	Updated bool
 	Skipped string
 }
@@ -106,11 +111,15 @@ func UpdateDefinitions(cacheDir string, src Source, cooldown time.Duration, forc
 	if src.Pinned() {
 		cooldown = 0
 	}
+	//[why] read before anything replaces it: the caller reports which version this run moved away
+	//   from, and after finishUpdate the marker already names the new one
+	_, previous, _ := ResolveCurrentDefinitions(cacheDir)
+	res := UpdateResult{Previous: previous, Builtin: builtin.Version()}
 	stamp := filepath.Join(cacheDir, checkStamp)
 	if !force && cooldown > 0 {
 		if fi, err := os.Stat(stamp); err == nil && time.Since(fi.ModTime()) < cooldown {
-			_, version, _ := ResolveCurrentDefinitions(cacheDir)
-			return UpdateResult{Version: version, Skipped: "cooldown"}, nil
+			res.Version, res.Skipped = previous, "cooldown"
+			return res, nil
 		}
 	}
 	version, err := resolveVersion(src)
@@ -120,12 +129,14 @@ func UpdateDefinitions(cacheDir string, src Source, cooldown time.Duration, forc
 	if err := os.MkdirAll(cacheDir, 0o755); err != nil {
 		return UpdateResult{}, err
 	}
+	res.Version = version
 	versionDir := filepath.Join(cacheDir, version)
 	if _, statErr := os.Stat(filepath.Join(versionDir, "packages.yml")); statErr == nil {
 		if err := finishUpdate(cacheDir, version); err != nil {
 			return UpdateResult{}, err
 		}
-		return UpdateResult{Version: version, Skipped: "up-to-date"}, nil
+		res.Skipped = "up-to-date"
+		return res, nil
 	}
 	if err := fetchDefinitions(cacheDir, src, version, versionDir); err != nil {
 		return UpdateResult{}, err
@@ -134,7 +145,8 @@ func UpdateDefinitions(cacheDir string, src Source, cooldown time.Duration, forc
 		return UpdateResult{}, err
 	}
 	pruneDefinitions(cacheDir, version)
-	return UpdateResult{Version: version, Updated: true}, nil
+	res.Updated = true
+	return res, nil
 }
 
 func resolveVersion(src Source) (string, error) {

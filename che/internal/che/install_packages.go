@@ -82,7 +82,7 @@ func checkDefinitionsUpdate(env map[string]string, home string, opts options.Opt
 		case err != nil:
 			log.Emit(log.Event{Level: log.Levels.Warn, Scope: packages.Scope, Action: "update-check", Msg: "definitions update failed, using current set: " + err.Error()})
 		case res.Updated:
-			log.Emit(log.Event{Level: log.Levels.Info, Scope: packages.Scope, Action: "update-check", Msg: "definitions updated to " + res.Version})
+			log.Emit(log.Event{Level: log.Levels.Info, Scope: packages.Scope, Action: "update-check", Msg: "definitions " + cmp.Or(res.Previous, "none cached") + " -> " + res.Version + " (builtin " + res.Builtin + ")"})
 		}
 	})
 }

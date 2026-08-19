@@ -13,6 +13,7 @@ import (
 	"gitlab.com/konradodwrot/go-modules/che/internal/che"
 	"gitlab.com/konradodwrot/go-modules/che/internal/log"
 	"gitlab.com/konradodwrot/go-modules/che/internal/options"
+	"gitlab.com/konradodwrot/go-modules/che/internal/packages/builtin"
 	"gitlab.com/konradodwrot/go-modules/che/internal/spec"
 	"gitlab.com/konradodwrot/go-modules/che/internal/telemetry"
 )
@@ -34,8 +35,11 @@ func New() *app { return &app{} }
 
 func (a *app) Root() *cobra.Command {
 	root := &cobra.Command{
-		Use:     "che",
-		Version: version,
+		Use: "che",
+		//[why] the embedded catalog beside the binary version: a che install and the package
+		//   definitions it falls back to move on separate release streams, so the binary version
+		//   alone never said which packages.yml it carries
+		Version: version + " (builtin packages " + builtin.Version() + ")",
 		Short:   "Spec-driven config loader",
 		Long: `che resolves every eligible profile in che.yml (runIf predicates), then
 runs each profile's full op sequence, profile by profile (composed specs and
