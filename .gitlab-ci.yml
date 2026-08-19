@@ -492,8 +492,7 @@ release-lib:
     #   and exits "unrecognized option". the `|| rm -rf` swallowed that, so the carry silently did
     #   nothing and a deploy dropped apt/ from the live site
     - if [ ! -d ../public-apt ] && [ "$CARRY_APT" = "1" ]; then
-        (command -v wget >/dev/null && wget --help 2>&1 | grep -q -- --mirror) || apk add --no-cache wget;
-        wget -q --mirror --no-host-directories --no-parent --cut-dirs=1 --directory-prefix=../public-apt "$APT_SITE_URL/" || rm -rf ../public-apt;
+        ../ci/carry-apt.sh ../public-apt;
       fi
     #[why] a carry that was possible and did not happen fails the job: silently replacing the live
     #   apt repo with one that 404s is worse than not deploying. a site that serves no apt/ yet is
