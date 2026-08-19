@@ -41,6 +41,9 @@ variables:
   CI_IMAGE_DIND: $GRP_VAR_ARTIFACT_REGISTRY/ci-linux-dind:$GRP_VAR_CI_IMAGES_REF
   CI_IMAGE_DIND_ARM64: $GRP_VAR_ARTIFACT_REGISTRY/ci-linux-dind:$GRP_VAR_CI_IMAGES_REF-arm64
   CHE_PACKAGES_REF: $GRP_VAR_CHE_PACKAGES_REF
+  #[why] GOMODCACHE is set but deliberately never cached: it holds downloaded dependencies, and
+  #   artifacts:/cache: here carry intermediates only. it stays because it keeps module downloads
+  #   inside the project dir, off the pod's root fs
   GOMODCACHE: $CI_PROJECT_DIR/.cache/go-mod
   GOCACHE: $CI_PROJECT_DIR/.cache/go-build
   CC: clang
@@ -65,6 +68,11 @@ warm-go:
     - if: $CI_PIPELINE_SOURCE == "merge_request_event"
     - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
       changes: [che/**/*, lib/**/*, go.work, .gitlab-ci.yml]
+  #[why] the go-build keys across this file are one per (compiler target × trust boundary). the
+  #   targets are host-native, zig-amd64, zig-arm64 and darwin: they share no compiled package, so
+  #   one key would thrash. the mr- prefix is the trust boundary: the cache is restored as trusted
+  #   compiler output with no verification, so a key a merge request can write must never be one a
+  #   tag release build restores. it costs a cold compile on the first tag build after an expiry
   cache:
     - key: go-build
       paths:
@@ -80,9 +88,6 @@ warm-go:
 
 ##[>] 🤖🤖
 #[what] arm64 linux warm build: zig-cross arm64 che artifacts for the arm64 install e2e jobs
-#[why] mr- prefix, deliberately not goreleaser-linux-che [arm64]'s key: this job runs on merge
-#   requests, and the go build cache is served as trusted compiler output without verification, so
-#   what an MR writes must never be what a tag release build restores
 warm-go-linux-arm64:
   extends: .vendors-packages
   stage: warm
@@ -118,7 +123,6 @@ warm-go-linux-amd64:
     - if: $CI_PIPELINE_SOURCE == "merge_request_event" || $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
       when: manual
       allow_failure: true
-  #[why] mr- prefix: this runs on merge requests, so it must not write goreleaser-linux-che's key
   cache:
     - key: mr-go-build-che-zig-amd64
       paths:
@@ -135,13 +139,16 @@ verify-precommit-all:
   extends: .vendors-packages
   stage: verify
   image: $CI_IMAGE
-  #[why] starts immediately: render-templates builds che itself (make -C che build), so this consumed
-  #   no warm-go artifact, only its go build cache, which the shared cache now supplies directly
-  needs: []
+  #[why] takes warm-go's che/dist artifact: render-templates reuses that binary instead of compiling
+  #   a fourth che per pipeline. the cover binary renders identically, it only writes covdata when
+  #   GOCOVERDIR is set, which it is not here
+  needs:
+    - warm-go
   rules:
     - if: $CI_PIPELINE_SOURCE == "merge_request_event"
   variables:
     LEFTHOOK_OUTPUT: meta,summary,execution,execution_info,execution_out
+  #[why] cache still pulled: `make lint` and `render-docs` compile the tree, no artifact replaces that
   cache:
     - key: go-build
       paths:
@@ -276,10 +283,6 @@ warm-go-darwin:
     - saas-macos-medium-m1
   image: macos-26-xcode-26
   needs: []
-  #[why] mr- prefix, deliberately not goreleaser-darwin-che's key: the go build cache serves its
-  #   stored contents as trusted compiler output without verifying them, so a key a merge request
-  #   can write must never be one a tag release build restores. costs a cold compile on the first
-  #   darwin tag build after an expiry, which is the correct trade
   cache:
     - key: mr-go-build-che-darwin
       paths:
@@ -494,9 +497,11 @@ publish-pages:
   extends: .pages-build
   stage: publish
   pages: true
+  #[why] no publish-apt-che: that job is tag-only now, so it never exists in a main pipeline. the
+  #   site published from main omits apt/ (.pages-build guards it with `if [ -d ../public-apt ]`);
+  #   publish-pages-tag still ships the full site, apt included, on every che tag
   needs:
     - release-che
-    - publish-apt-che
   rules:
     - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
       changes: [che/**/*]
@@ -616,7 +621,6 @@ prerelease-darwin-che:
       changes: [che/**/*, lib/**/*, ci/publish-prerelease.zsh, Makefile, .gitlab-ci.yml]
   variables:
     MODULE_VERSION: 0.0.0-mr${CI_MERGE_REQUEST_IID}
-  #[why] mr- prefix: a merge request must not write the cache a tag release build compiles from
   cache:
     - key: mr-go-build-che-darwin
       paths:
@@ -661,7 +665,6 @@ prerelease-linux-che:
   variables:
     MODULE_VERSION: 0.0.0-mr${CI_MERGE_REQUEST_IID}
     ARCH: amd64
-  #[why] mr- prefix: a merge request must not write the cache a tag release build compiles from
   cache:
     - key: mr-go-build-che-zig-amd64
       paths:
@@ -694,6 +697,8 @@ publish-che:
     - make publish
 
 ##[>] 🤖🤖
+#[why] tag only: the apt tree is rebuilt from the .debs in the package registry, and only a tag adds
+#   one. on main it re-signed an unchanged tree on every commit touching che/
 publish-apt-che:
   interruptible: false
   stage: publish
@@ -703,8 +708,6 @@ publish-apt-che:
       optional: true
   rules:
     - if: $CI_COMMIT_TAG =~ /^che\/v/
-    - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
-      changes: [che/**/*]
   script:
     - apt-get update && apt-get install -y --no-install-recommends aptly gnupg
     - make publish-apt
@@ -760,11 +763,6 @@ publish-get-os-open-files-with:
   image: $CI_IMAGE
   rules:
     - if: $CI_COMMIT_TAG =~ /^get-os-open-files-with\/v/
-  cache:
-    - key: go-build-get-os-open-files-with-publish
-      paths:
-        - .cache/go-build
-      policy: pull-push
   script:
     - make publish
 
@@ -774,11 +772,6 @@ publish-get-term-open-files-with:
   image: $CI_IMAGE
   rules:
     - if: $CI_COMMIT_TAG =~ /^get-term-open-files-with\/v/
-  cache:
-    - key: go-build-get-term-open-files-with-publish
-      paths:
-        - .cache/go-build
-      policy: pull-push
   script:
     - make publish
 ##[<] 🤖🤖

@@ -24,10 +24,18 @@ repo-prepare-deps:
 
 ##[>] Docs [genai-include]
 #[why] ontoRepo only: claude-agents renders untracked .claude/ from prose-generated snippets absent in a clone
+#[why] this checkout's build wins: an MR may change che's own rendering, so a release che from PATH
+#   would render the wrong output here. CI hands this job warm-go's che/dist artifact, so reusing it
+#   skips che's fourth compile in one pipeline, and a repeat local run skips the rebuild too
+#[why] che from PATH is the fallback: a fresh clone rendering its docs (repo-prepare-dev-env) must
+#   not have to compile che first, which is slow and needs a full go toolchain. building is the last
+#   resort, for a machine with neither
 #[what] render *.ontoRepo.tpl onto the repo with this checkout's che build
 render-templates:
-	@$(MAKE) -C che build
-	@che/dist/che render-templates --profiles ontoRepo
+	@che_bin=che/dist/che; \
+	if [[ ! -x $$che_bin ]] che_bin=$$(command -v che || true); \
+	if [[ -z $$che_bin ]] { $(MAKE) -C che build; che_bin=che/dist/che }; \
+	$$che_bin render-templates --profiles ontoRepo
 
 #[what] generate che docs (docs/cli.md, che.schema.json, cli-usage.md) from the Go source
 render-docs:
