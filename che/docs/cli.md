@@ -195,10 +195,12 @@ install packages from packages.yml and check their state.
 | Option | Env | Values | Default | Description |
 | --- | --- | --- | --- | --- |
 | `--download-cache-dir` | `CHE_PACKAGES_DOWNLOAD_CACHE_DIR` | `string` |  | binariesRemoteArchive download cache directory: assets download to <dir>/<sha256(url)>-<basename> and later installs reuse the file, a checksum mismatch evicts it; empty disables caching |
-| `--only-methods` | `CHE_PACKAGES_ONLY_METHODS` | `brew` \| `cask` \| `apt` \| `npm` \| `go` \| `gem` \| `binariesRemoteArchive` \| `script` \| `pyenv` \| `nvm` | `[]` | restrict installs to the listed managers (comma-separated or repeated): items using any other manager are skipped, a package with no listed manager applicable is not installed |
+| `--only-methods` | `CHE_PACKAGES_ONLY_METHODS` | `brew` \| `cask` \| `apt` \| `npm` \| `go` \| `gem` \| `binariesRemoteArchive` \| `script` \| `buildFromSource` \| `pyenv` \| `nvm` \| `nix` | `[]` | restrict installs to the listed managers (comma-separated or repeated): items using any other manager are skipped, a package with no listed manager applicable is not installed, requires dependencies are exempt |
 | `--packages-file` | `CHE_PACKAGES_FILE` | `string` | `$XDG_CONFIG_HOME/packages/packages.yml` | packages.yml path, fully superseding the builtin packages.yml shipped in che (a set file must exist; the builtin serves only when no file exists at the default path) |
 | `--packages-override` | `CHE_PACKAGES_OVERRIDE` | `string` | `$XDG_CONFIG_HOME/che/packages-override.yml if present` | override packages file merged over the effective base (the packages file, or the builtin when none exists): same-name entries replace, new names append |
-| `--preferred-methods` | `CHE_PACKAGES_PREFERRED_METHODS` | `brew` \| `cask` \| `apt` \| `npm` \| `go` \| `gem` \| `binariesRemoteArchive` \| `script` \| `pyenv` \| `nvm` | `[]` | installation-method preference order (comma-separated or repeated): listed managers try first within each package entry, unlisted follow in entry order |
+| `--packages-source-ref` | `CHE_PACKAGES_REF` | `string` |  | exact definitions version to fetch: a published version for a registry source, a branch, tag or commit for a git one; pinning bypasses the update cooldown; empty resolves the newest published version |
+| `--packages-source-url` | `CHE_PACKAGES_SOURCE_URL` | `string` | `the konradodwrot/che-packages registry` | where package definitions are read from: a generic package registry base or a git repository URL, recognised by shape |
+| `--preferred-methods` | `CHE_PACKAGES_PREFERRED_METHODS` | `brew` \| `cask` \| `apt` \| `npm` \| `go` \| `gem` \| `binariesRemoteArchive` \| `script` \| `buildFromSource` \| `pyenv` \| `nvm` \| `nix` | `[]` | installation-method preference order (comma-separated or repeated): listed managers try first within each package entry, unlisted follow in entry order |
 
 ### `$ che packages check-manpages`
 
@@ -265,11 +267,11 @@ Usage: `che packages install [pkg...] [flags]`
 
 ### `$ che packages update`
 
-fetch the latest published package definitions into the cache ($XDG_CACHE_HOME/che/packages); cached definitions supersede the builtin set when no packages file exists.
+fetch package definitions from packages.source into the cache ($XDG_CACHE_HOME/che/packages); cached definitions supersede the builtin set when no packages file exists.
 
 | Option | Env | Values | Default | Description |
 | --- | --- | --- | --- | --- |
-| `--force` |  | `bool` | `false` | skip the cooldown short-circuit and re-check the registry now |
+| `--force` |  | `bool` | `false` | skip the cooldown short-circuit and re-check the source now (a pinned --packages-source-ref never waits on the cooldown anyway) |
 
 ### `$ che prune-broken-links`
 

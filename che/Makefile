@@ -21,10 +21,13 @@ COMMANDS := vendor-packages-defs render-docs test test-cover cover-report e2e e2
 E2E_GO_SRC := $(shell find . ../lib -name '*.go' -not -path './dist/*' -not -path './cover-*/*') go.mod go.sum ../go.work
 
 ##[>] Packages [genai-include]
-#[what] vendor the pinned che-packages catalog che embeds (CHE_PACKAGES_DIR=<path> vendors a local checkout instead)
+#[what] vendor the che-packages catalog che embeds, at $CHE_PACKAGES_REF or latest when unset (CHE_PACKAGES_DIR=<path> vendors a local checkout instead)
 vendor-packages-defs: $(BUILTIN)
 
-$(BUILTIN): packages-pin.env
+#[why] the script is the only thing that knows whether the vendored copy is current: the pin
+#   moved out of the tree into $CHE_PACKAGES_REF, so there is no file whose mtime could gate this.
+#   re-running with an unchanged pin is a no-op, which is what keeps this cheap
+$(BUILTIN):
 	@../ci/vendor-packages-defs.zsh
 ##[<] Packages
 

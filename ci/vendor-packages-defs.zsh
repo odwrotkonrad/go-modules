@@ -1,29 +1,34 @@
 #!/usr/bin/env zsh
 ##[>] 🤖🤖
 # Vendor the che-packages catalog che embeds. Reads the pinned version from
-# che/packages-pin.env, downloads that release's tarball from the che-packages
-# generic package registry, verifies its sha256 against the published
-# checksums.txt, and unpacks packages.yml + scripts/ into
-# che/internal/packages/builtin/ (gitignored, rebuilt on demand). Re-running
-# with an unchanged pin is a no-op.
+# $CHE_PACKAGES_REF, a group-wide CI variable raised by a catalog release,
+# downloads that release's tarball from the che-packages generic package
+# registry, verifies its sha256 against the published checksums.txt, and unpacks
+# packages.yml + scripts/ into che/internal/packages/builtin/ (gitignored,
+# rebuilt on demand). Re-running with an unchanged pin is a no-op.
 set -eu
 #[why] the user zshrc aliases rm to trash, which errors on a missing path: a
 #   non-interactive run must reach the real binaries
 emulate -L zsh
 
 REPO="${0:A:h:h}"
-PIN_FILE="${REPO}/che/packages-pin.env"
 DEST="${REPO}/che/internal/packages/builtin/data"
-source "$PIN_FILE"
-VERSION="${CHE_PACKAGES_VERSION:?che/packages-pin.env must set CHE_PACKAGES_VERSION}"
-PROJECT="${CHE_PACKAGES_PROJECT:?che/packages-pin.env must set CHE_PACKAGES_PROJECT}"
+PROJECT="${CHE_PACKAGES_PROJECT:-konradodwrot%2Fche-packages}"
 
-#[why] built after the pin file is sourced, not before: the project and version both come from it,
-#   and reading them first yields an empty project and a /projects//packages URL that 404s
-#[why] the project is declared beside the version rather than hardcoded here: the catalog moved out
-#   of go-modules, and a hardcoded registry is how the pin ended up naming a project the catalog
-#   had already left, fetching 0.0.5 while the catalog shipped 0.0.7
+#[why] a group CI variable, not a file in che/: a pin file inside the module matched
+#   release-che's `changes: [che/**/*]` rule, so raising it cut a che release carrying no che
+#   change. a variable matches no path, releases nothing, and is the same name che's own
+#   packages.source.ref reads, so CI and a config file pin through one mechanism
 BASE="${CHE_PACKAGES_URL:-https://gitlab.com/api/v4/projects/${PROJECT}/packages/generic/che-packages}"
+
+#[why] unset resolves the newest published catalog rather than failing: a local build wants
+#   current definitions, and only CI, where the variable is set, needs an exact one
+VERSION="${CHE_PACKAGES_REF:-}"
+if [[ -z "$VERSION" && -z "${CHE_PACKAGES_DIR:-}" ]] {
+  print -r -- "CHE_PACKAGES_REF unset, resolving latest"
+  VERSION="$(curl -fsSL --connect-timeout 30 --retry 5 --retry-delay 5 "${BASE}/latest/version.txt" | tr -d '[:space:]')"
+  [[ -n "$VERSION" ]] || { print -ru2 -- "could not resolve latest che-packages version from ${BASE}"; exit 1 }
+}
 
 if [[ -z "${CHE_PACKAGES_DIR:-}" && -f "${DEST}/version.txt" && "$(<${DEST}/version.txt)" == "$VERSION" ]] {
   print -r -- "che-packages ${VERSION} already vendored"
@@ -39,7 +44,7 @@ if [[ -n "${CHE_PACKAGES_DIR:-}" ]] {
   mkdir -p "${DEST}/scripts"
   cp "${CHE_PACKAGES_DIR}/packages.yml" "${DEST}/packages.yml"
   cp -R "${CHE_PACKAGES_DIR}/scripts/." "${DEST}/scripts/"
-  print -r -- "${VERSION}+local" > "${DEST}/version.txt"
+  print -r -- "${VERSION:-0.0.0}+local" > "${DEST}/version.txt"
   print -r -- "vendored che-packages from ${CHE_PACKAGES_DIR} (local)"
   exit 0
 }

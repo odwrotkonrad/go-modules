@@ -258,17 +258,33 @@ func (o *Options) Resolve(env LookupEnv, user, spec Layer) error {
 		o.setValue("packages.preferredInstallationMethods", "["+strings.Join(packages.DefaultPreferredMethods, ", ")+"]")
 	}
 	o.PackagesOnlyMethods = o.resolveList("packages.onlyInstallationMethods",
-		fromLayerList(o.PackagesOnlyMethods, "cliFlag"), fromEnv(env("CHE_PACKAGES_ONLY_METHODS")))
+		fromLayerList(o.PackagesOnlyMethods, "cliFlag"), fromEnv(env("CHE_PACKAGES_ONLY_METHODS")),
+		fromLayerList(user.Packages.OnlyInstallationMethods, "config-file"), fromLayerList(spec.Packages.OnlyInstallationMethods, "specFile"))
 	if err := packages.ValidateManagers(o.PackagesOnlyMethods); err != nil {
 		return err
 	}
-	o.PackagesUpdateCheckEnabled = o.resolveBool("packages.updateCheck.enabled", false, env("CHE_PACKAGES_UPDATE_CHECK"), false,
-		boolCandidate{user.Packages.UpdateCheck.Enabled, "config-file"}, boolCandidate{spec.Packages.UpdateCheck.Enabled, "specFile"})
-	o.PackagesUpdateCheckCooldown = o.resolveStr("packages.updateCheck.cooldown", "15m",
-		fromEnv(env("CHE_PACKAGES_UPDATE_CHECK_COOLDOWN")), fromLayer(user.Packages.UpdateCheck.Cooldown, "config-file"), fromLayer(spec.Packages.UpdateCheck.Cooldown, "specFile"))
-	if _, err := time.ParseDuration(o.PackagesUpdateCheckCooldown); err != nil {
-		return fmt.Errorf("invalid packages.updateCheck.cooldown %q: want a Go duration (15m, 1h)", o.PackagesUpdateCheckCooldown)
+	//[why] the default is assigned, not merely displayed: `url:` written with no value resolves to
+	//   an empty string that every layer treats as "set", and an empty base URL fetched
+	//   "/latest/version.txt" as a schemeless path, retried 11 times, then failed
+	o.PackagesSourceURL = o.resolveStr("packages.source.url", packages.DefaultSourceURL,
+		fromFlag(o.PackagesSourceURL), fromEnv(env("CHE_PACKAGES_SOURCE_URL")), fromEnv(env("CHE_PACKAGES_UPDATE_URL")),
+		fromLayer(user.Packages.Source.URL, "config-file"), fromLayer(spec.Packages.Source.URL, "specFile"))
+	if o.PackagesSourceURL == "" {
+		o.PackagesSourceURL = packages.DefaultSourceURL
+		o.setValue("packages.source.url", packages.DefaultSourceURL)
 	}
+	o.PackagesSourceRef = o.resolveStr("packages.source.ref", "",
+		fromFlag(o.PackagesSourceRef), fromEnv(env("CHE_PACKAGES_REF")),
+		fromLayer(user.Packages.Source.Ref, "config-file"), fromLayer(spec.Packages.Source.Ref, "specFile"))
+	o.PackagesAutoUpdateEnabled = o.resolveBool("packages.autoUpdate.enabled", false, env("CHE_PACKAGES_AUTO_UPDATE"), true,
+		boolCandidate{user.Packages.AutoUpdate.Enabled, "config-file"}, boolCandidate{spec.Packages.AutoUpdate.Enabled, "specFile"})
+	o.PackagesAutoUpdateCooldown = o.resolveStr("packages.autoUpdate.if.refIsLatest.cooldown", "15m",
+		fromEnv(env("CHE_PACKAGES_AUTO_UPDATE_COOLDOWN")), fromLayer(user.Packages.AutoUpdate.If.RefIsLatest.Cooldown, "config-file"), fromLayer(spec.Packages.AutoUpdate.If.RefIsLatest.Cooldown, "specFile"))
+	if _, err := time.ParseDuration(o.PackagesAutoUpdateCooldown); err != nil {
+		return fmt.Errorf("invalid packages.autoUpdate.if.refIsLatest.cooldown %q: want a Go duration (15m, 1h)", o.PackagesAutoUpdateCooldown)
+	}
+	o.PackagesAutoUpdateDryRunEnabled = o.resolveBool("packages.autoUpdate.if.dryRunIsTrue.enabled", false, env("CHE_PACKAGES_AUTO_UPDATE_IF_DRY_RUN"), true,
+		boolCandidate{user.Packages.AutoUpdate.If.DryRunIsTrue.Enabled, "config-file"}, boolCandidate{spec.Packages.AutoUpdate.If.DryRunIsTrue.Enabled, "specFile"})
 	o.PackagesDownloadCacheDir = o.resolveStr("packages.downloadCacheDir", "",
 		fromFlag(o.PackagesDownloadCacheDir), fromEnv(env("CHE_PACKAGES_DOWNLOAD_CACHE_DIR")))
 	o.PackagesBinariesRemoteArchiveDestinationCandidates = o.resolveList("packages.binariesRemoteArchive.installDestinationCandidates",

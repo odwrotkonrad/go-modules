@@ -59,6 +59,36 @@ func TestInstallBuildFromSourceShaMismatchAborts(t *testing.T) {
 	require.Empty(t, m.Calls())
 }
 
+const rubyUnpinnedSourceYaml = `packages:
+  ruby:
+    - buildFromSource:
+        url: https://example.com/ruby-{version}.tar.gz
+`
+
+func TestInstallBuildFromSourceRequestChecksumVerifies(t *testing.T) {
+	body := tarGzBody(t, "ruby-3.4.10/configure")
+	in, m := newInstaller(t, rubyUnpinnedSourceYaml, "linux", cmdMap(nil), Options{})
+	home := tempHome(t, in)
+	testFetch.Bodies["https://example.com/ruby-3.4.10.tar.gz"] = body
+	req := Request{Name: "ruby", Versions: []string{"3.4.10"}, Checksum: "sha256:" + shaHex(body)}
+	require.NoError(t, in.InstallRequests([]Request{req}))
+	require.Equal(t, []string{
+		"./configure --prefix=" + filepath.Join(home, ".local"),
+		makeJ(),
+		"make install",
+	}, m.Calls())
+}
+
+func TestInstallBuildFromSourceRequestChecksumMismatchAborts(t *testing.T) {
+	in, m := newInstaller(t, rubyUnpinnedSourceYaml, "linux", cmdMap(nil), Options{})
+	tempHome(t, in)
+	testFetch.Bodies["https://example.com/ruby-3.4.10.tar.gz"] = tarGzBody(t, "ruby-3.4.10/configure")
+	req := Request{Name: "ruby", Versions: []string{"3.4.10"}, Checksum: "sha256:badsha"}
+	err := in.InstallRequests([]Request{req})
+	require.ErrorContains(t, err, "sha256 mismatch")
+	require.Empty(t, m.Calls())
+}
+
 func TestInstallBuildFromSourceSkipsWhenPinPresent(t *testing.T) {
 	in, m := newInstaller(t, rubySourceYaml, "linux", cmdMap([]string{"ruby"}), Options{})
 	m.Stub = stubOutputs("ruby --version", "ruby 3.4.10 (2025-12-25 revision abc)\n")

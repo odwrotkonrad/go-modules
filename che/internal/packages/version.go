@@ -39,6 +39,13 @@ func (in *Installer) resolvePin(pkg, specVersion string) string {
 	return ""
 }
 
+func (in *Installer) resolveChecksum(pkg, specChecksum string) string {
+	if r, ok := in.requested[pkg]; ok && r.Checksum != "" {
+		return r.Checksum
+	}
+	return specChecksum
+}
+
 func (r Request) globalVersion() string {
 	if r.Global != "" {
 		return r.Global

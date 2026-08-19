@@ -2,6 +2,54 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://gitlab.com/konradodwrot/go-modules/-/raw/main/che/assets/data/che.schema.json",
   "$defs": {
+    "AutoUpdate": {
+      "properties": {
+        "enabled": {
+          "type": "boolean",
+          "description": "before installs, fetch definitions from packages.source into the cache (failures warn and installs fall through to the cached or builtin set); runs once per che execution; default true; overridden by CHE_PACKAGES_AUTO_UPDATE"
+        },
+        "if": {
+          "$ref": "#/$defs/AutoUpdateIf",
+          "description": "conditions narrowing when autoUpdate behaviour applies"
+        }
+      },
+      "additionalProperties": false,
+      "type": "object"
+    },
+    "AutoUpdateIf": {
+      "properties": {
+        "refIsLatest": {
+          "$ref": "#/$defs/AutoUpdateIfRefIsLatest",
+          "description": "applies while packages.source.ref is empty, i.e. the newest version is resolved on each check"
+        },
+        "dryRunIsTrue": {
+          "$ref": "#/$defs/AutoUpdateIfDryRunIsTrue",
+          "description": "applies while the run is a dry run"
+        }
+      },
+      "additionalProperties": false,
+      "type": "object"
+    },
+    "AutoUpdateIfDryRunIsTrue": {
+      "properties": {
+        "enabled": {
+          "type": "boolean",
+          "description": "check for updates during a dry run; false plans against the cached or builtin set with no fetch; default true; overridden by CHE_PACKAGES_AUTO_UPDATE_IF_DRY_RUN"
+        }
+      },
+      "additionalProperties": false,
+      "type": "object"
+    },
+    "AutoUpdateIfRefIsLatest": {
+      "properties": {
+        "cooldown": {
+          "type": "string",
+          "description": "minimum interval between update checks (Go duration, e.g. 15m, 1h); ignored when packages.source.ref pins a version; default 15m; overridden by CHE_PACKAGES_AUTO_UPDATE_COOLDOWN"
+        }
+      },
+      "additionalProperties": false,
+      "type": "object"
+    },
     "BinariesRemoteArchiveInstall": {
       "properties": {
         "installDestinationCandidates": {
@@ -144,6 +192,11 @@
             "globalVersion": {
               "type": "string",
               "description": "which installed version becomes the default (version-manager methods only); defaults to the first listed"
+            },
+            "checksum": {
+              "type": "string",
+              "pattern": "^sha256:.+",
+              "description": "sha256:\u003chex\u003e of the artifact the pinned version downloads, overriding the packages-file item's checksum"
             }
           },
           "additionalProperties": false,
@@ -172,6 +225,7 @@
               "gem",
               "binariesRemoteArchive",
               "script",
+              "buildFromSource",
               "pyenv",
               "nvm",
               "nix"
@@ -179,6 +233,27 @@
           },
           "type": "array",
           "description": "manager preference order: listed managers are tried first (in this order) within each package entry, unlisted ones follow in entry order; cascades profile \u003e spec \u003e user config; overridden by CHE_PACKAGES_PREFERRED_METHODS"
+        },
+        "onlyInstallationMethods": {
+          "items": {
+            "type": "string",
+            "enum": [
+              "brew",
+              "cask",
+              "apt",
+              "npm",
+              "go",
+              "gem",
+              "binariesRemoteArchive",
+              "script",
+              "buildFromSource",
+              "pyenv",
+              "nvm",
+              "nix"
+            ]
+          },
+          "type": "array",
+          "description": "restrict installs to the listed managers: items using any other manager are skipped with no fallthrough, packages pulled in as requires dependencies are exempt; cascades profile \u003e spec \u003e user config; overridden by CHE_PACKAGES_ONLY_METHODS"
         },
         "binariesRemoteArchive": {
           "$ref": "#/$defs/BinariesRemoteArchiveInstall",
@@ -192,9 +267,27 @@
           "$ref": "#/$defs/ManpagesInstall",
           "description": "manpages installation options"
         },
-        "updateCheck": {
-          "$ref": "#/$defs/UpdateCheck",
-          "description": "check the package registry for newer published package definitions before installs"
+        "source": {
+          "$ref": "#/$defs/PackagesSource",
+          "description": "where package definitions are read from"
+        },
+        "autoUpdate": {
+          "$ref": "#/$defs/AutoUpdate",
+          "description": "fetch newer published package definitions before installs"
+        }
+      },
+      "additionalProperties": false,
+      "type": "object"
+    },
+    "PackagesSource": {
+      "properties": {
+        "url": {
+          "type": "string",
+          "description": "definitions source: a generic package registry base or a git repository URL, recognised by shape; default the konradodwrot/che-packages registry; cascades profile \u003e spec \u003e user config; overridden by CHE_PACKAGES_SOURCE_URL"
+        },
+        "ref": {
+          "type": "string",
+          "description": "exact version to fetch: a published version for a registry source, a branch, tag or commit for a git one; empty resolves the newest published version; cascades profile \u003e spec \u003e user config; overridden by CHE_PACKAGES_REF"
         }
       },
       "additionalProperties": false,
@@ -472,20 +565,6 @@
           ]
         }
       ]
-    },
-    "UpdateCheck": {
-      "properties": {
-        "enabled": {
-          "type": "boolean",
-          "description": "before installs, fetch the latest published che-packages definitions into the cache (failures warn and installs fall through to the cached or builtin set); default false; overridden by CHE_PACKAGES_UPDATE_CHECK"
-        },
-        "cooldown": {
-          "type": "string",
-          "description": "minimum interval between update checks (Go duration, e.g. 15m, 1h); default 15m; overridden by CHE_PACKAGES_UPDATE_CHECK_COOLDOWN"
-        }
-      },
-      "additionalProperties": false,
-      "type": "object"
     },
     "dirGroup": {
       "properties": {

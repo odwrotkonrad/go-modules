@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"regexp"
 	"slices"
+	"strings"
 
 	"github.com/invopop/jsonschema"
 	"gopkg.in/yaml.v3"
@@ -87,16 +88,36 @@ type Run struct {
 
 type Packages struct {
 	File                         string                       `yaml:"file" jsonschema_description:"packages.yml path; default $XDG_CONFIG_HOME/packages/packages.yml; overridden by --packages-file and CHE_PACKAGES_FILE"`
-	PreferredInstallationMethods []string                     `yaml:"preferredInstallationMethods" jsonschema:"enum=brew,enum=cask,enum=apt,enum=npm,enum=go,enum=gem,enum=binariesRemoteArchive,enum=script,enum=pyenv,enum=nvm,enum=nix" jsonschema_description:"manager preference order: listed managers are tried first (in this order) within each package entry, unlisted ones follow in entry order; cascades profile > spec > user config; overridden by CHE_PACKAGES_PREFERRED_METHODS"`
+	PreferredInstallationMethods []string                     `yaml:"preferredInstallationMethods" jsonschema:"enum=brew,enum=cask,enum=apt,enum=npm,enum=go,enum=gem,enum=binariesRemoteArchive,enum=script,enum=buildFromSource,enum=pyenv,enum=nvm,enum=nix" jsonschema_description:"manager preference order: listed managers are tried first (in this order) within each package entry, unlisted ones follow in entry order; cascades profile > spec > user config; overridden by CHE_PACKAGES_PREFERRED_METHODS"`
+	OnlyInstallationMethods      []string                     `yaml:"onlyInstallationMethods" jsonschema:"enum=brew,enum=cask,enum=apt,enum=npm,enum=go,enum=gem,enum=binariesRemoteArchive,enum=script,enum=buildFromSource,enum=pyenv,enum=nvm,enum=nix" jsonschema_description:"restrict installs to the listed managers: items using any other manager are skipped with no fallthrough, packages pulled in as requires dependencies are exempt; cascades profile > spec > user config; overridden by CHE_PACKAGES_ONLY_METHODS"`
 	BinariesRemoteArchive        BinariesRemoteArchiveInstall `yaml:"binariesRemoteArchive" jsonschema_description:"binariesRemoteArchive installation method options"`
 	Completions                  CompletionsInstall           `yaml:"completions" jsonschema_description:"zsh completions installation options"`
 	Manpages                     ManpagesInstall              `yaml:"manpages" jsonschema_description:"manpages installation options"`
-	UpdateCheck                  UpdateCheck                  `yaml:"updateCheck" jsonschema_description:"check the package registry for newer published package definitions before installs"`
+	Source                       PackagesSource               `yaml:"source" jsonschema_description:"where package definitions are read from"`
+	AutoUpdate                   AutoUpdate                   `yaml:"autoUpdate" jsonschema_description:"fetch newer published package definitions before installs"`
 }
 
-type UpdateCheck struct {
-	Enabled  *bool  `yaml:"enabled" jsonschema_description:"before installs, fetch the latest published che-packages definitions into the cache (failures warn and installs fall through to the cached or builtin set); default false; overridden by CHE_PACKAGES_UPDATE_CHECK"`
-	Cooldown string `yaml:"cooldown" jsonschema_description:"minimum interval between update checks (Go duration, e.g. 15m, 1h); default 15m; overridden by CHE_PACKAGES_UPDATE_CHECK_COOLDOWN"`
+type PackagesSource struct {
+	URL string `yaml:"url" jsonschema_description:"definitions source: a generic package registry base or a git repository URL, recognised by shape; default the konradodwrot/che-packages registry; cascades profile > spec > user config; overridden by CHE_PACKAGES_SOURCE_URL"`
+	Ref string `yaml:"ref" jsonschema_description:"exact version to fetch: a published version for a registry source, a branch, tag or commit for a git one; empty resolves the newest published version; cascades profile > spec > user config; overridden by CHE_PACKAGES_REF"`
+}
+
+type AutoUpdate struct {
+	Enabled *bool        `yaml:"enabled" jsonschema_description:"before installs, fetch definitions from packages.source into the cache (failures warn and installs fall through to the cached or builtin set); runs once per che execution; default true; overridden by CHE_PACKAGES_AUTO_UPDATE"`
+	If      AutoUpdateIf `yaml:"if" jsonschema_description:"conditions narrowing when autoUpdate behaviour applies"`
+}
+
+type AutoUpdateIf struct {
+	RefIsLatest  AutoUpdateIfRefIsLatest  `yaml:"refIsLatest" jsonschema_description:"applies while packages.source.ref is empty, i.e. the newest version is resolved on each check"`
+	DryRunIsTrue AutoUpdateIfDryRunIsTrue `yaml:"dryRunIsTrue" jsonschema_description:"applies while the run is a dry run"`
+}
+
+type AutoUpdateIfRefIsLatest struct {
+	Cooldown string `yaml:"cooldown" jsonschema_description:"minimum interval between update checks (Go duration, e.g. 15m, 1h); ignored when packages.source.ref pins a version; default 15m; overridden by CHE_PACKAGES_AUTO_UPDATE_COOLDOWN"`
+}
+
+type AutoUpdateIfDryRunIsTrue struct {
+	Enabled *bool `yaml:"enabled" jsonschema_description:"check for updates during a dry run; false plans against the cached or builtin set with no fetch; default true; overridden by CHE_PACKAGES_AUTO_UPDATE_IF_DRY_RUN"`
 }
 
 type CompletionsInstall struct {
@@ -123,6 +144,7 @@ type PackageRef struct {
 	Name          string       `yaml:"name" jsonschema_description:"canonical package name in the packages file"`
 	Versions      StringOrList `yaml:"versions,omitempty" jsonschema_description:"version(s) to install: one version or a list (exact 24.16.0 or wildcard 24.*), overriding the packages-file entry's default; multiple versions require a version-manager installation method"`
 	GlobalVersion string       `yaml:"globalVersion,omitempty" jsonschema_description:"which installed version becomes the default (version-manager methods only); defaults to the first version listed"`
+	Checksum      string       `yaml:"checksum,omitempty" jsonschema_description:"sha256:<hex> of the artifact the pinned version downloads, overriding the packages-file item's checksum"`
 }
 
 func (p *PackageRef) UnmarshalYAML(node *yaml.Node) error {
@@ -134,6 +156,7 @@ func (p *PackageRef) UnmarshalYAML(node *yaml.Node) error {
 		Name          string       `yaml:"name"`
 		Versions      StringOrList `yaml:"versions"`
 		GlobalVersion string       `yaml:"globalVersion"`
+		Checksum      string       `yaml:"checksum"`
 	}
 	if err := node.Decode(&obj); err != nil {
 		return err
@@ -144,7 +167,10 @@ func (p *PackageRef) UnmarshalYAML(node *yaml.Node) error {
 	if obj.GlobalVersion != "" && !slices.Contains(obj.Versions, obj.GlobalVersion) {
 		return fmt.Errorf("installPackages %s: globalVersion %s is not among versions %v", obj.Name, obj.GlobalVersion, []string(obj.Versions))
 	}
-	p.Name, p.Versions, p.GlobalVersion = obj.Name, obj.Versions, obj.GlobalVersion
+	if obj.Checksum != "" && !strings.HasPrefix(obj.Checksum, "sha256:") {
+		return fmt.Errorf("installPackages %s: checksum must be sha256:<hex>: %q", obj.Name, obj.Checksum)
+	}
+	p.Name, p.Versions, p.GlobalVersion, p.Checksum = obj.Name, obj.Versions, obj.GlobalVersion, obj.Checksum
 	return nil
 }
 
@@ -162,6 +188,7 @@ func (p PackageRef) JSONSchema() *jsonschema.Schema {
 	obj.Properties.Set("name", &jsonschema.Schema{Type: "string", Description: "canonical package name in the packages file"})
 	obj.Properties.Set("versions", strOrList)
 	obj.Properties.Set("globalVersion", &jsonschema.Schema{Type: "string", Description: "which installed version becomes the default (version-manager methods only); defaults to the first listed"})
+	obj.Properties.Set("checksum", &jsonschema.Schema{Type: "string", Pattern: "^sha256:.+", Description: "sha256:<hex> of the artifact the pinned version downloads, overriding the packages-file item's checksum"})
 	return &jsonschema.Schema{OneOf: []*jsonschema.Schema{{Type: "string"}, obj}}
 }
 

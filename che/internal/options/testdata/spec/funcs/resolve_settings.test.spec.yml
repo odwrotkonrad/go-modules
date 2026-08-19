@@ -34,25 +34,51 @@ cases:
           - "otel.protocol=grpc (default)"
           - "otel.endpoint=localhost:4317 (default)"
           - "otel.metrics=true (default)"
-          - "packages.updateCheck.enabled=false (default)"
-          - "packages.updateCheck.cooldown=15m (default)"
-  - name: ShouldLayerUpdateCheckFromEnvConfigSpec
+          - "packages.autoUpdate.enabled=true (default)"
+          - "packages.autoUpdate.if.refIsLatest.cooldown=15m (default)"
+          - "packages.autoUpdate.if.dryRunIsTrue.enabled=true (default)"
+          - "packages.source.url=https://gitlab.com/api/v4/projects/konradodwrot%2Fche-packages/packages/generic/che-packages (default)"
+          - "packages.source.ref= (default)"
+  - name: ShouldLayerAutoUpdateFromEnvConfigSpec
     context:
-      env: {CHE_PACKAGES_UPDATE_CHECK: "true"}
+      env: {CHE_PACKAGES_AUTO_UPDATE: "false"}
     input:
       args:
         - flags: {}
-        - user: {packages: {updateCheck: {cooldown: 1h}}}
+        - user: {packages: {autoUpdate: {if: {refIsLatest: {cooldown: 1h}}}}}
         - spec: {}
     expected:
       output:
-        delta: "packages.updateCheck.enabled=true (env), packages.updateCheck.cooldown=1h (config-file)"
-  - name: ShouldRejectMalformedUpdateCheckCooldown
+        delta: "packages.autoUpdate.enabled=false (env), packages.autoUpdate.if.refIsLatest.cooldown=1h (config-file)"
+  - name: ShouldLayerPackagesSourceFromEnvConfigSpec
+    context:
+      env: {CHE_PACKAGES_REF: "0.0.11"}
     input:
       args:
         - flags: {}
-        - user: {packages: {updateCheck: {cooldown: soon}}}
+        - user: {packages: {source: {url: "https://example.test/catalog.git"}}}
         - spec: {}
     expected:
-      errorOutput: 'invalid packages.updateCheck.cooldown "soon"'
+      output:
+        delta: "packages.source.url=https://example.test/catalog.git (config-file), packages.source.ref=0.0.11 (env)"
+  #[why] `url:` written with no value is a set-but-empty layer: without an assigned default it
+  #   resolved to "" and fetched a schemeless "/latest/version.txt"
+  - name: ShouldDefaultPackagesSourceUrlWhenConfigLeavesItBlank
+    input:
+      args:
+        - flags: {}
+        - user: {packages: {source: {url: "", ref: ""}}}
+        - spec: {}
+    expected:
+      output:
+        allContains:
+          - "packages.source.url=https://gitlab.com/api/v4/projects/konradodwrot%2Fche-packages/packages/generic/che-packages"
+  - name: ShouldRejectMalformedAutoUpdateCooldown
+    input:
+      args:
+        - flags: {}
+        - user: {packages: {autoUpdate: {if: {refIsLatest: {cooldown: soon}}}}}
+        - spec: {}
+    expected:
+      errorOutput: 'invalid packages.autoUpdate.if.refIsLatest.cooldown "soon"'
 # [<] 🤖🤖

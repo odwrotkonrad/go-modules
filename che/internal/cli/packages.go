@@ -27,11 +27,15 @@ func (a *app) makePackagesCmd() *cobra.Command {
 	pf.StringVar(&a.flags.PackagesOverride, "packages-override", "",
 		"override packages file merged over the effective base (the packages file, or the builtin when none exists): same-name entries replace, new names append; default: $XDG_CONFIG_HOME/che/packages-override.yml if present; env: CHE_PACKAGES_OVERRIDE")
 	pf.StringSliceVar(&a.flags.PackagesPreferredMethods, "preferred-methods", nil,
-		"installation-method preference order (comma-separated or repeated): listed managers try first within each package entry, unlisted follow in entry order; values: brew | cask | apt | npm | go | gem | binariesRemoteArchive | script | pyenv | nvm; env: CHE_PACKAGES_PREFERRED_METHODS")
+		"installation-method preference order (comma-separated or repeated): listed managers try first within each package entry, unlisted follow in entry order; values: brew | cask | apt | npm | go | gem | binariesRemoteArchive | script | buildFromSource | pyenv | nvm | nix; env: CHE_PACKAGES_PREFERRED_METHODS")
 	pf.StringSliceVar(&a.flags.PackagesOnlyMethods, "only-methods", nil,
-		"restrict installs to the listed managers (comma-separated or repeated): items using any other manager are skipped, a package with no listed manager applicable is not installed; values: brew | cask | apt | npm | go | gem | binariesRemoteArchive | script | pyenv | nvm; env: CHE_PACKAGES_ONLY_METHODS")
+		"restrict installs to the listed managers (comma-separated or repeated): items using any other manager are skipped, a package with no listed manager applicable is not installed, requires dependencies are exempt; values: brew | cask | apt | npm | go | gem | binariesRemoteArchive | script | buildFromSource | pyenv | nvm | nix; env: CHE_PACKAGES_ONLY_METHODS")
 	pf.StringVar(&a.flags.PackagesDownloadCacheDir, "download-cache-dir", "",
 		"binariesRemoteArchive download cache directory: assets download to <dir>/<sha256(url)>-<basename> and later installs reuse the file, a checksum mismatch evicts it; empty disables caching; env: CHE_PACKAGES_DOWNLOAD_CACHE_DIR")
+	pf.StringVar(&a.flags.PackagesSourceURL, "packages-source-url", "",
+		"where package definitions are read from: a generic package registry base or a git repository URL, recognised by shape; default: the konradodwrot/che-packages registry; env: CHE_PACKAGES_SOURCE_URL")
+	pf.StringVar(&a.flags.PackagesSourceRef, "packages-source-ref", "",
+		"exact definitions version to fetch: a published version for a registry source, a branch, tag or commit for a git one; pinning bypasses the update cooldown; empty resolves the newest published version; env: CHE_PACKAGES_REF")
 
 	install := &cobra.Command{
 		Use:   "install [pkg...]",
@@ -99,7 +103,7 @@ func (a *app) makePackagesUpdateCmd() *cobra.Command {
 	var force bool
 	cmd := &cobra.Command{
 		Use:   "update",
-		Short: "fetch the latest published package definitions into the cache ($XDG_CACHE_HOME/che/packages); cached definitions supersede the builtin set when no packages file exists",
+		Short: "fetch package definitions from packages.source into the cache ($XDG_CACHE_HOME/che/packages); cached definitions supersede the builtin set when no packages file exists",
 		RunE: func(cmd *cobra.Command, args []string) error {
 			res, err := che.UpdatePackagesDefinitions(a.ctx, a.opts, force)
 			if err != nil {
@@ -119,7 +123,7 @@ func (a *app) makePackagesUpdateCmd() *cobra.Command {
 		},
 	}
 	cmd.Flags().BoolVar(&force, "force", false,
-		"skip the cooldown short-circuit and re-check the registry now")
+		"skip the cooldown short-circuit and re-check the source now (a pinned --packages-source-ref never waits on the cooldown anyway)")
 	return cmd
 }
 

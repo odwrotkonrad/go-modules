@@ -4,11 +4,11 @@ package che
 
 import (
 	"cmp"
-	"fmt"
 	"maps"
 	"os"
 	"path/filepath"
 	"slices"
+	"sync"
 	"time"
 
 	"gitlab.com/konradodwrot/go-modules/che/internal/log"
@@ -63,31 +63,42 @@ func loadPackagesFile(env map[string]string, home string, opts options.Options) 
 	return f, path, err
 }
 
-func checkDefinitionsUpdate(env map[string]string, home string, opts options.Options) error {
-	if !opts.PackagesUpdateCheckEnabled {
-		return nil
+// [why] one check per che execution, not per profile: every profile builds its own installer,
+//
+//	and a ten-profile apply made ten round-trips for one answer. the cooldown stamp dampened
+//	that by accident, which stopped being true once a pinned ref bypasses the cooldown.
+var updateCheckOnce sync.Once
+
+func checkDefinitionsUpdate(env map[string]string, home string, opts options.Options) {
+	if !opts.PackagesAutoUpdateEnabled {
+		return
 	}
-	cooldown, err := time.ParseDuration(opts.PackagesUpdateCheckCooldown)
+	if opts.DryRun != options.DryRun.Off && !opts.PackagesAutoUpdateDryRunEnabled {
+		return
+	}
+	updateCheckOnce.Do(func() {
+		res, err := runDefinitionsUpdate(env, home, opts, false)
+		switch {
+		case err != nil:
+			log.Emit(log.Event{Level: log.Levels.Warn, Scope: packages.Scope, Action: "update-check", Msg: "definitions update failed, using current set: " + err.Error()})
+		case res.Updated:
+			log.Emit(log.Event{Level: log.Levels.Info, Scope: packages.Scope, Action: "update-check", Msg: "definitions updated to " + res.Version})
+		}
+	})
+}
+
+func runDefinitionsUpdate(env map[string]string, home string, opts options.Options, force bool) (packages.UpdateResult, error) {
+	src := packages.Source{URL: opts.PackagesSourceURL, Ref: opts.PackagesSourceRef}
+	cooldown, err := time.ParseDuration(opts.PackagesAutoUpdateCooldown)
 	if err != nil {
 		cooldown = packages.DefaultUpdateCooldown
 	}
 	cacheDir := packages.ResolveDefinitionsCacheDir(env, home)
-	res, err := packages.UpdateDefinitions(cacheDir, packages.ResolveUpdateBaseURL(env), cooldown, false)
-	switch {
-	case err != nil && opts.DryRun != options.DryRun.Off:
-		return fmt.Errorf("packages definitions update failed: %w", err)
-	case err != nil:
-		log.Emit(log.Event{Level: log.Levels.Warn, Scope: packages.Scope, Action: "update-check", Msg: "definitions update failed, using current set: " + err.Error()})
-	case res.Updated:
-		log.Emit(log.Event{Level: log.Levels.Info, Scope: packages.Scope, Action: "update-check", Msg: "definitions updated to " + res.Version})
-	}
-	return nil
+	return packages.UpdateDefinitions(cacheDir, src, cooldown, force)
 }
 
 func NewPackagesInstaller(env map[string]string, home string, opts options.Options) (*packages.Installer, error) {
-	if err := checkDefinitionsUpdate(env, home, opts); err != nil {
-		return nil, err
-	}
+	checkDefinitionsUpdate(env, home, opts)
 	f, path, err := loadPackagesFile(env, home, opts)
 	if err != nil {
 		return nil, err
@@ -128,17 +139,17 @@ func NewPackagesInstaller(env map[string]string, home string, opts options.Optio
 	}, nil
 }
 
+// UpdatePackagesDefinitions fetches package definitions from the configured source into the cache.
+//
+// [why] never behind updateCheckOnce: an explicit `che packages update` must act every time,
+//
+//	including after an automatic check already ran in the same execution.
 func UpdatePackagesDefinitions(ctx Context, opts options.Options, force bool) (packages.UpdateResult, error) {
 	home, err := resolveInvokingHome(ctx)
 	if err != nil {
 		return packages.UpdateResult{}, err
 	}
-	cooldown, err := time.ParseDuration(opts.PackagesUpdateCheckCooldown)
-	if err != nil {
-		cooldown = packages.DefaultUpdateCooldown
-	}
-	cacheDir := packages.ResolveDefinitionsCacheDir(ctx.Env, home)
-	return packages.UpdateDefinitions(cacheDir, packages.ResolveUpdateBaseURL(ctx.Env), cooldown, force)
+	return runDefinitionsUpdate(ctx.Env, home, opts, force)
 }
 
 func NewPackagesInstallerFromContext(ctx Context, opts options.Options) (*packages.Installer, error) {
@@ -159,6 +170,12 @@ func (p *ProfileReady) newInstaller() (*packages.Installer, error) {
 			return nil, err
 		}
 		opts.PackagesPreferredMethods = m
+	}
+	if m := p.Options.Packages.OnlyInstallationMethods; len(m) > 0 {
+		if err := packages.ValidateManagers(m); err != nil {
+			return nil, err
+		}
+		opts.PackagesOnlyMethods = m
 	}
 	if d := p.Options.Packages.BinariesRemoteArchive.InstallDestinationCandidates; len(d) > 0 {
 		opts.PackagesBinariesRemoteArchiveDestinationCandidates = d
@@ -218,7 +235,7 @@ func (p *ProfileReady) installPackages(refs []spec.PackageRef) error {
 	}
 	reqs := make([]packages.Request, len(refs))
 	for i, r := range refs {
-		reqs[i] = packages.Request{Name: r.Name, Versions: r.Versions, Global: r.GlobalVersion}
+		reqs[i] = packages.Request{Name: r.Name, Versions: r.Versions, Global: r.GlobalVersion, Checksum: r.Checksum}
 	}
 	if err := in.InstallRequests(reqs); err != nil {
 		return err

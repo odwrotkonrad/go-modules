@@ -44,8 +44,11 @@ type Options struct {
 	PackagesManpagesDestinationCandidates              []string
 	PackagesManpagesCheckPresentOnManpath              bool
 	PackagesSilenceInstallStdout                       string
-	PackagesUpdateCheckEnabled                         bool
-	PackagesUpdateCheckCooldown                        string
+	PackagesSourceURL                                  string
+	PackagesSourceRef                                  string
+	PackagesAutoUpdateEnabled                          bool
+	PackagesAutoUpdateCooldown                         string
+	PackagesAutoUpdateDryRunEnabled                    bool
 	AutoDiscover                                       bool
 	Otel                                               Otel
 	Settings                                           []Setting
