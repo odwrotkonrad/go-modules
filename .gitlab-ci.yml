@@ -488,8 +488,22 @@ release-lib:
     #[why] a Pages deploy replaces the whole site: without this, a build that has no apt tree drops
     #   apt/ from the live site and breaks `apt-get update` until the next che tag. from the site,
     #   not the job artifact: that expires in a day
+    #[why] gnu wget, installed first: the mkdocs image is alpine, whose busybox wget has no --mirror
+    #   and exits "unrecognized option". the `|| rm -rf` swallowed that, so the carry silently did
+    #   nothing and a deploy dropped apt/ from the live site
     - if [ ! -d ../public-apt ] && [ "$CARRY_APT" = "1" ]; then
+        (command -v wget >/dev/null && wget --help 2>&1 | grep -q -- --mirror) || apk add --no-cache wget;
         wget -q --mirror --no-host-directories --no-parent --cut-dirs=1 --directory-prefix=../public-apt "$APT_SITE_URL/" || rm -rf ../public-apt;
+      fi
+    #[why] a carry that was possible and did not happen fails the job: silently replacing the live
+    #   apt repo with one that 404s is worse than not deploying. a site that serves no apt/ yet is
+    #   the exception, since the tree only returns with the next che tag, so the probe decides
+    - if [ "$CARRY_APT" = "1" ] && [ ! -s ../public-apt/dists/stable/Release ]; then
+        if wget -q -O /dev/null "$APT_SITE_URL/dists/stable/Release"; then
+          echo "apt is live but the carry produced no Release file, refusing to deploy without it" >&2;
+          exit 1;
+        fi;
+        echo "no apt/ on the live site yet, deploying without it (returns with the next che tag)";
       fi
     - if [ -d ../public-apt ]; then cp -R ../public-apt ../public/apt; fi
     ##[<] 🤖🤖
