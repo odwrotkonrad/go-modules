@@ -4,7 +4,6 @@ SHELL := zsh
 .SHELLFLAGS := -c
 GO ?= go
 GOCOVER_COBERTURA_PKG ?= github.com/t-yuki/gocover-cobertura@v0.0.0-20180217150009-aaee18c8195c
-#[why] the ci-linux image bakes the binary: prefer it, fall back to a local `go run` off the pin
 GOCOVER_COBERTURA ?= $(if $(shell command -v gocover-cobertura),gocover-cobertura,$(GO) run $(GOCOVER_COBERTURA_PKG))
 CC ?= clang
 BIN := che

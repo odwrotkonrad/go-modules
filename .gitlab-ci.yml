@@ -41,9 +41,8 @@ variables:
   CI_IMAGE_DIND: $GRP_VAR_ARTIFACT_REGISTRY/ci-linux-dind:$GRP_VAR_CI_IMAGES_REF
   CI_IMAGE_DIND_ARM64: $GRP_VAR_ARTIFACT_REGISTRY/ci-linux-dind:$GRP_VAR_CI_IMAGES_REF-arm64
   CHE_PACKAGES_REF: $GRP_VAR_CHE_PACKAGES_REF
-  #[why] GOMODCACHE is set but deliberately never cached: it holds downloaded dependencies, and
-  #   artifacts:/cache: here carry intermediates only. it stays because it keeps module downloads
-  #   inside the project dir, off the pod's root fs
+  #[why] set but never cached: it holds dependencies, and cache: here carries intermediates only.
+  #   it stays to keep downloads in the project dir, off the pod's root fs
   GOMODCACHE: $CI_PROJECT_DIR/.cache/go-mod
   GOCACHE: $CI_PROJECT_DIR/.cache/go-build
   CC: clang
@@ -68,11 +67,9 @@ warm-go:
     - if: $CI_PIPELINE_SOURCE == "merge_request_event"
     - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
       changes: [che/**/*, lib/**/*, go.work, .gitlab-ci.yml]
-  #[why] the go-build keys across this file are one per (compiler target × trust boundary). the
-  #   targets are host-native, zig-amd64, zig-arm64 and darwin: they share no compiled package, so
-  #   one key would thrash. the mr- prefix is the trust boundary: the cache is restored as trusted
-  #   compiler output with no verification, so a key a merge request can write must never be one a
-  #   tag release build restores. it costs a cold compile on the first tag build after an expiry
+  #[why] one go-build key per (compiler target × trust boundary): host-native, zig-amd64, zig-arm64,
+  #   darwin share no compiled package. the mr- prefix keeps what an MR writes out of what a tag
+  #   release restores, since the cache is trusted unverified
   cache:
     - key: go-build
       paths:
@@ -139,9 +136,8 @@ verify-precommit-all:
   extends: .vendors-packages
   stage: verify
   image: $CI_IMAGE
-  #[why] takes warm-go's che/dist artifact: render-templates reuses that binary instead of compiling
-  #   a fourth che per pipeline. the cover binary renders identically, it only writes covdata when
-  #   GOCOVERDIR is set, which it is not here
+  #[why] takes warm-go's che/dist: render-templates reuses it instead of compiling a fourth che per
+  #   pipeline. the cover binary renders identically, it only writes covdata under GOCOVERDIR
   needs:
     - warm-go
   rules:
@@ -466,6 +462,10 @@ release-lib:
     name: squidfunk/mkdocs-material:9
     entrypoint: [""]
   needs: []
+  #[why] off by default: only the job publishing the live site needs the carry
+  variables:
+    CARRY_APT: "0"
+    APT_SITE_URL: https://konradodwrot.gitlab.io/go-modules/apt
   script:
     - mkdir -p che/docs/assets/data
     - cp che/assets/data/che.schema.json che/docs/assets/data/
@@ -485,6 +485,12 @@ release-lib:
     - cd che && mkdocs build --site-dir ../public
     ##[>] 🤖🤖
     - cp install.sh ../public/install.sh
+    #[why] a Pages deploy replaces the whole site: without this, a build that has no apt tree drops
+    #   apt/ from the live site and breaks `apt-get update` until the next che tag. from the site,
+    #   not the job artifact: that expires in a day
+    - if [ ! -d ../public-apt ] && [ "$CARRY_APT" = "1" ]; then
+        wget -q --mirror --no-host-directories --no-parent --cut-dirs=1 --directory-prefix=../public-apt "$APT_SITE_URL/" || rm -rf ../public-apt;
+      fi
     - if [ -d ../public-apt ]; then cp -R ../public-apt ../public/apt; fi
     ##[<] 🤖🤖
     - echo "docs preview -> https://konradodwrot.gitlab.io/-/go-modules/-/jobs/$CI_JOB_ID/artifacts/public/index.html"
@@ -497,11 +503,12 @@ publish-pages:
   extends: .pages-build
   stage: publish
   pages: true
-  #[why] no publish-apt-che: that job is tag-only now, so it never exists in a main pipeline. the
-  #   site published from main omits apt/ (.pages-build guards it with `if [ -d ../public-apt ]`);
-  #   publish-pages-tag still ships the full site, apt included, on every che tag
+  #[why] no publish-apt-che: it is tag-only now, so no apt tree exists in a main pipeline. CARRY_APT
+  #   copies the last published one through rather than rebuilding it
   needs:
     - release-che
+  variables:
+    CARRY_APT: "1"
   rules:
     - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
       changes: [che/**/*]
@@ -697,8 +704,8 @@ publish-che:
     - make publish
 
 ##[>] 🤖🤖
-#[why] tag only: the apt tree is rebuilt from the .debs in the package registry, and only a tag adds
-#   one. on main it re-signed an unchanged tree on every commit touching che/
+#[why] tag only: the tree is rebuilt from the registry's .debs, and only a tag adds one. on main it
+#   re-signed an unchanged tree on every commit touching che/
 publish-apt-che:
   interruptible: false
   stage: publish
