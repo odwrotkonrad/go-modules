@@ -21,8 +21,9 @@ type Options struct {
 	ValidateSpec                                       ValidateSpecMode
 	ValidateSpecCLI                                    ValidateSpecMode
 	Profiles                                           []string
-	SkipOps                                            []string
 	RunSkipOps                                         []string
+	BackupAutoCreateFlag                               *bool
+	BackupAutoCreateDisabled                           bool
 	SkipRunIf                                          bool
 	SkipRemoteRefs                                     bool
 	Errexit                                            bool

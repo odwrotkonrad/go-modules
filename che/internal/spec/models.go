@@ -76,8 +76,8 @@ type Options struct {
 	DryRun                  Scalar          `yaml:"dryRun" jsonschema:"enum=delta,enum=all,enum=true,enum=false" jsonschema_description:"default dry-run mode: delta (changed dests) | all (every dest) | true (alias for delta) | false (off, the default); overridden by the flag and env var"`
 	Profiles                []string        `yaml:"profiles" jsonschema_description:"profiles to run (autoDiscover skipped, runIf still enforced); overridden by --profiles and CHE_PROFILE"`
 	SkipRemoteRefs          *bool           `yaml:"skipRemoteRefs" jsonschema_description:"skip sourced include.profiles refs; overridden by the flag and env var"`
-	SkipOps                 []string        `yaml:"skipOps" jsonschema:"enum=prune-broken-links,enum=make-dirs,enum=make-links,enum=make-copies,enum=render-templates,enum=install-packages,enum=run-scripts" jsonschema_description:"ops skipped everywhere: dropped from the run sequence, direct op subcommands become logged no-ops; overridden by --skip-ops and CHE_SKIP_OPS"`
 	Run                     Run             `yaml:"run" jsonschema_description:"run-command options"`
+	Backup                  Backup          `yaml:"backup" jsonschema_description:"backup op defaults"`
 	RenderTemplates         RenderTemplates `yaml:"renderTemplates" jsonschema_description:"renderTemplates op defaults"`
 	Packages                Packages        `yaml:"packages" jsonschema_description:"installPackages op defaults"`
 	Otel                    Otel            `yaml:"otel" jsonschema_description:"OTLP telemetry (metrics + logs) to a local collector; overridden by CHE_OTEL_* env"`
@@ -85,6 +85,14 @@ type Options struct {
 
 type Run struct {
 	SkipOps []string `yaml:"skipOps" jsonschema:"enum=prune-broken-links,enum=make-dirs,enum=make-links,enum=make-copies,enum=render-templates,enum=install-packages,enum=run-scripts" jsonschema_description:"ops skipped in the run sequence only (direct op subcommands unaffected); overridden by che run --skip-ops and CHE_RUN_SKIP_OPS"`
+}
+
+type Backup struct {
+	AutoCreate BackupAutoCreate `yaml:"autoCreate" jsonschema_description:"archive every would-change dest before it is mutated"`
+}
+
+type BackupAutoCreate struct {
+	Enabled *bool `yaml:"enabled" jsonschema_description:"archive would-change dests before mutating them, both as the run sequence's backup stage and before a directly invoked op; false disables both and leaves che backup create untouched; default true; overridden by --backup-auto-create and CHE_BACKUP_AUTO_CREATE"`
 }
 
 type Packages struct {

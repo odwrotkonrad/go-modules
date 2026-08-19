@@ -29,7 +29,7 @@ cases:
                 - {name: render-templates, selected: false}
         - each: false
     expected:
-      stdOut: ["will not run op render-templates: options.skipOps"]
+      stdOut: ["will not run op render-templates: options.run.skipOps"]
     notExpected:
       stdOut: ["(nothing selected)"]
   - name: ShouldSkipZeroDeltaProfileInExecEach

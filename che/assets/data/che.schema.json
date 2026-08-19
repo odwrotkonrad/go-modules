@@ -50,6 +50,26 @@
       "additionalProperties": false,
       "type": "object"
     },
+    "Backup": {
+      "properties": {
+        "autoCreate": {
+          "$ref": "#/$defs/BackupAutoCreate",
+          "description": "archive every would-change dest before it is mutated"
+        }
+      },
+      "additionalProperties": false,
+      "type": "object"
+    },
+    "BackupAutoCreate": {
+      "properties": {
+        "enabled": {
+          "type": "boolean",
+          "description": "archive would-change dests before mutating them, both as the run sequence's backup stage and before a directly invoked op; false disables both and leaves che backup create untouched; default true; overridden by --backup-auto-create and CHE_BACKUP_AUTO_CREATE"
+        }
+      },
+      "additionalProperties": false,
+      "type": "object"
+    },
     "BinariesRemoteArchiveInstall": {
       "properties": {
         "installDestinationCandidates": {
@@ -492,25 +512,13 @@
           "type": "boolean",
           "description": "skip sourced include.profiles refs; overridden by the flag and env var"
         },
-        "skipOps": {
-          "items": {
-            "type": "string",
-            "enum": [
-              "prune-broken-links",
-              "make-dirs",
-              "make-links",
-              "make-copies",
-              "render-templates",
-              "install-packages",
-              "run-scripts"
-            ]
-          },
-          "type": "array",
-          "description": "ops skipped everywhere: dropped from the run sequence, direct op subcommands become logged no-ops; overridden by --skip-ops and CHE_SKIP_OPS"
-        },
         "run": {
           "$ref": "#/$defs/Run",
           "description": "run-command options"
+        },
+        "backup": {
+          "$ref": "#/$defs/Backup",
+          "description": "backup op defaults"
         },
         "renderTemplates": {
           "$ref": "#/$defs/RenderTemplates",

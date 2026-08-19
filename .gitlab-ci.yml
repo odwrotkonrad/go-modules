@@ -36,10 +36,13 @@ stages:
   - trigger-downstream
 
 variables:
-  CI_IMAGE: registry.gitlab.com/konradodwrot/infra/oci-images/ci-linux:latest
-  CI_IMAGE_ARM64: registry.gitlab.com/konradodwrot/infra/oci-images/ci-linux:latest-arm64
-  CI_IMAGE_DIND: registry.gitlab.com/konradodwrot/infra/oci-images/ci-linux-dind:latest
-  CI_IMAGE_DIND_ARM64: registry.gitlab.com/konradodwrot/infra/oci-images/ci-linux-dind:latest-arm64
+  CI_IMAGE: $GRP_VAR_ARTIFACT_REGISTRY/ci-linux:$GRP_VAR_CI_IMAGES_REF
+  CI_IMAGE_ARM64: $GRP_VAR_ARTIFACT_REGISTRY/ci-linux:$GRP_VAR_CI_IMAGES_REF-arm64
+  CI_IMAGE_DIND: $GRP_VAR_ARTIFACT_REGISTRY/ci-linux-dind:$GRP_VAR_CI_IMAGES_REF
+  CI_IMAGE_DIND_ARM64: $GRP_VAR_ARTIFACT_REGISTRY/ci-linux-dind:$GRP_VAR_CI_IMAGES_REF-arm64
+  CHE_PACKAGES_REF: $GRP_VAR_CHE_PACKAGES_REF
+  #[why] set but never cached: it holds dependencies, and cache: here carries intermediates only.
+  #   it stays to keep downloads in the project dir, off the pod's root fs
   GOMODCACHE: $CI_PROJECT_DIR/.cache/go-mod
   GOCACHE: $CI_PROJECT_DIR/.cache/go-build
   CC: clang
@@ -64,6 +67,9 @@ warm-go:
     - if: $CI_PIPELINE_SOURCE == "merge_request_event"
     - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
       changes: [che/**/*, lib/**/*, go.work, .gitlab-ci.yml]
+  #[why] one go-build key per (compiler target × trust boundary): host-native, zig-amd64, zig-arm64,
+  #   darwin share no compiled package. the mr- prefix keeps what an MR writes out of what a tag
+  #   release restores, since the cache is trusted unverified
   cache:
     - key: go-build
       paths:
@@ -79,9 +85,6 @@ warm-go:
 
 ##[>] 🤖🤖
 #[what] arm64 linux warm build: zig-cross arm64 che artifacts for the arm64 install e2e jobs
-#[why] mr- prefix, deliberately not goreleaser-linux-che [arm64]'s key: this job runs on merge
-#   requests, and the go build cache is served as trusted compiler output without verification, so
-#   what an MR writes must never be what a tag release build restores
 warm-go-linux-arm64:
   extends: .vendors-packages
   stage: warm
@@ -117,7 +120,6 @@ warm-go-linux-amd64:
     - if: $CI_PIPELINE_SOURCE == "merge_request_event" || $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
       when: manual
       allow_failure: true
-  #[why] mr- prefix: this runs on merge requests, so it must not write goreleaser-linux-che's key
   cache:
     - key: mr-go-build-che-zig-amd64
       paths:
@@ -134,13 +136,15 @@ verify-precommit-all:
   extends: .vendors-packages
   stage: verify
   image: $CI_IMAGE
-  #[why] starts immediately: render-templates builds che itself (make -C che build), so this consumed
-  #   no warm-go artifact, only its go build cache, which the shared cache now supplies directly
-  needs: []
+  #[why] takes warm-go's che/dist: render-templates reuses it instead of compiling a fourth che per
+  #   pipeline. the cover binary renders identically, it only writes covdata under GOCOVERDIR
+  needs:
+    - warm-go
   rules:
     - if: $CI_PIPELINE_SOURCE == "merge_request_event"
   variables:
     LEFTHOOK_OUTPUT: meta,summary,execution,execution_info,execution_out
+  #[why] cache still pulled: `make lint` and `render-docs` compile the tree, no artifact replaces that
   cache:
     - key: go-build
       paths:
@@ -240,8 +244,10 @@ test-e2e-che-registry:
 #[what] build the install-e2e container base image (debian + ca-certificates) once per pipeline, both arches, shared as docker-save tars
 warm-e2e-pkg-installs-image:
   stage: warm
-  image: docker:28
-  services: [docker:dind]
+  image: $GRP_VAR_ARTIFACT_REGISTRY_PROXY_DOCKERHUB/library/docker:28
+  services:
+    - name: $GRP_VAR_ARTIFACT_REGISTRY_PROXY_DOCKERHUB/library/docker:dind
+      alias: docker
   needs: []
   variables:
     DOCKER_HOST: tcp://docker:2376
@@ -258,8 +264,8 @@ warm-e2e-pkg-installs-image:
     - docker context create dind --docker "host=$DOCKER_HOST,ca=$DOCKER_CERT_PATH/ca.pem,cert=$DOCKER_CERT_PATH/cert.pem,key=$DOCKER_CERT_PATH/key.pem"
     - docker buildx create --use dind
     - mkdir -p e2e-images
-    - docker buildx build --platform linux/amd64 --tag che-e2e-debian:amd64 --output type=docker,dest=e2e-images/che-e2e-debian-amd64.tar --file che/e2e/install-methods.Dockerfile che/e2e
-    - docker buildx build --platform linux/arm64 --tag che-e2e-debian:arm64 --output type=docker,dest=e2e-images/che-e2e-debian-arm64.tar --file che/e2e/install-methods.Dockerfile che/e2e
+    - docker buildx build --platform linux/amd64 --tag che-e2e-debian:amd64 --build-arg "BASE_IMAGE=$GRP_VAR_ARTIFACT_REGISTRY_PROXY_DOCKERHUB/library/debian:bookworm-slim" --output type=docker,dest=e2e-images/che-e2e-debian-amd64.tar --file che/e2e/install-methods.Dockerfile che/e2e
+    - docker buildx build --platform linux/arm64 --tag che-e2e-debian:arm64 --build-arg "BASE_IMAGE=$GRP_VAR_ARTIFACT_REGISTRY_PROXY_DOCKERHUB/library/debian:bookworm-slim" --output type=docker,dest=e2e-images/che-e2e-debian-arm64.tar --file che/e2e/install-methods.Dockerfile che/e2e
   artifacts:
     paths:
       - e2e-images/
@@ -273,10 +279,6 @@ warm-go-darwin:
     - saas-macos-medium-m1
   image: macos-26-xcode-26
   needs: []
-  #[why] mr- prefix, deliberately not goreleaser-darwin-che's key: the go build cache serves its
-  #   stored contents as trusted compiler output without verifying them, so a key a merge request
-  #   can write must never be one a tag release build restores. costs a cold compile on the first
-  #   darwin tag build after an expiry, which is the correct trade
   cache:
     - key: mr-go-build-che-darwin
       paths:
@@ -284,7 +286,7 @@ warm-go-darwin:
       policy: pull-push
   #[why] only feeds the manual darwin install-e2e matrix: stays manual with it, never auto
   rules:
-    - if: $ENABLE_DARWIN_CI != "true"
+    - if: $GRP_VAR_ENABLE_DARWIN_CI != "true"
       when: never
     - if: $CI_PIPELINE_SOURCE == "merge_request_event" || $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
       when: manual
@@ -305,7 +307,9 @@ test-e2e-install-methods:
   extends: .vendors-packages
   stage: test-e2e-method-installs
   image: $CI_IMAGE_DIND
-  services: [docker:dind]
+  services:
+    - name: $GRP_VAR_ARTIFACT_REGISTRY_PROXY_DOCKERHUB/library/docker:dind
+      alias: docker
   needs:
     - job: warm-go
       optional: true
@@ -458,6 +462,10 @@ release-lib:
     name: squidfunk/mkdocs-material:9
     entrypoint: [""]
   needs: []
+  #[why] off by default: only the job publishing the live site needs the carry
+  variables:
+    CARRY_APT: "0"
+    APT_SITE_URL: https://konradodwrot.gitlab.io/go-modules/apt
   script:
     - mkdir -p che/docs/assets/data
     - cp che/assets/data/che.schema.json che/docs/assets/data/
@@ -477,6 +485,12 @@ release-lib:
     - cd che && mkdocs build --site-dir ../public
     ##[>] 🤖🤖
     - cp install.sh ../public/install.sh
+    #[why] a Pages deploy replaces the whole site: without this, a build that has no apt tree drops
+    #   apt/ from the live site and breaks `apt-get update` until the next che tag. from the site,
+    #   not the job artifact: that expires in a day
+    - if [ ! -d ../public-apt ] && [ "$CARRY_APT" = "1" ]; then
+        wget -q --mirror --no-host-directories --no-parent --cut-dirs=1 --directory-prefix=../public-apt "$APT_SITE_URL/" || rm -rf ../public-apt;
+      fi
     - if [ -d ../public-apt ]; then cp -R ../public-apt ../public/apt; fi
     ##[<] 🤖🤖
     - echo "docs preview -> https://konradodwrot.gitlab.io/-/go-modules/-/jobs/$CI_JOB_ID/artifacts/public/index.html"
@@ -489,9 +503,12 @@ publish-pages:
   extends: .pages-build
   stage: publish
   pages: true
+  #[why] no publish-apt-che: it is tag-only now, so no apt tree exists in a main pipeline. CARRY_APT
+  #   copies the last published one through rather than rebuilding it
   needs:
     - release-che
-    - publish-apt-che
+  variables:
+    CARRY_APT: "1"
   rules:
     - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
       changes: [che/**/*]
@@ -611,7 +628,6 @@ prerelease-darwin-che:
       changes: [che/**/*, lib/**/*, ci/publish-prerelease.zsh, Makefile, .gitlab-ci.yml]
   variables:
     MODULE_VERSION: 0.0.0-mr${CI_MERGE_REQUEST_IID}
-  #[why] mr- prefix: a merge request must not write the cache a tag release build compiles from
   cache:
     - key: mr-go-build-che-darwin
       paths:
@@ -656,7 +672,6 @@ prerelease-linux-che:
   variables:
     MODULE_VERSION: 0.0.0-mr${CI_MERGE_REQUEST_IID}
     ARCH: amd64
-  #[why] mr- prefix: a merge request must not write the cache a tag release build compiles from
   cache:
     - key: mr-go-build-che-zig-amd64
       paths:
@@ -689,6 +704,8 @@ publish-che:
     - make publish
 
 ##[>] 🤖🤖
+#[why] tag only: the tree is rebuilt from the registry's .debs, and only a tag adds one. on main it
+#   re-signed an unchanged tree on every commit touching che/
 publish-apt-che:
   interruptible: false
   stage: publish
@@ -698,8 +715,6 @@ publish-apt-che:
       optional: true
   rules:
     - if: $CI_COMMIT_TAG =~ /^che\/v/
-    - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
-      changes: [che/**/*]
   script:
     - apt-get update && apt-get install -y --no-install-recommends aptly gnupg
     - make publish-apt
@@ -755,11 +770,6 @@ publish-get-os-open-files-with:
   image: $CI_IMAGE
   rules:
     - if: $CI_COMMIT_TAG =~ /^get-os-open-files-with\/v/
-  cache:
-    - key: go-build-get-os-open-files-with-publish
-      paths:
-        - .cache/go-build
-      policy: pull-push
   script:
     - make publish
 
@@ -769,11 +779,6 @@ publish-get-term-open-files-with:
   image: $CI_IMAGE
   rules:
     - if: $CI_COMMIT_TAG =~ /^get-term-open-files-with\/v/
-  cache:
-    - key: go-build-get-term-open-files-with-publish
-      paths:
-        - .cache/go-build
-      policy: pull-push
   script:
     - make publish
 ##[<] 🤖🤖

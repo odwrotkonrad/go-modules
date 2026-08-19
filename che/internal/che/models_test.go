@@ -383,7 +383,7 @@ func TestExecOperations(t *testing.T) {
 		var ran []string
 		profiles := make([]*ProfileReady, 0, len(specs))
 		for _, ps := range specs {
-			p := &ProfileReady{ref: ps.Ref, opts: options.Options{SkipOps: ps.SkipOps}}
+			p := &ProfileReady{ref: ps.Ref, opts: options.Options{RunSkipOps: ps.SkipOps}}
 			for _, op := range ps.Ops {
 				var fail error
 				if op.Fail != "" {

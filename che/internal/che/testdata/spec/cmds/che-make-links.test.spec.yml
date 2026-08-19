@@ -17,4 +17,14 @@ cases:
         created {{/.*/}}/make-links/{{/.*/}}.tar.bz2
         created ${HOME}/.config/zsh/.zshrc
         created /etc/zshrc
+  - name: ShouldSymlinkWithoutArchivingWhenAutoCreateDisabled
+    input:
+      args: [backupAutoCreateDisabled: true]
+    expected:
+      stdOut:
+        - created ${HOME}/.config/zsh/.zshrc
+        - created /etc/zshrc
+    notExpected:
+      stdOut:
+        - .tar.bz2
 # [<] 🤖

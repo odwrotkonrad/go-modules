@@ -25,6 +25,8 @@ import (
 	"gitlab.com/konradodwrot/go-modules/che/render/render"
 )
 
+const skipOpsReason = "options.run.skipOps"
+
 type Deps struct {
 	FS      fsutil.FileSystemWriter
 	Reader  fsutil.FileSystemReader
@@ -603,12 +605,7 @@ func (s *SpecReady) ExecEach(ctx context.Context, opName string, fn func(context
 		if ops := p.commandOps(opName); len(ops) == 0 {
 			reasons := []string{"not defined"}
 			if scoped := p.commandScopedOps(opName); len(scoped) > 0 {
-				reasons = nil
-				for _, op := range scoped {
-					if reason := p.skipOpsReason(op.Name()); !slices.Contains(reasons, reason) {
-						reasons = append(reasons, reason)
-					}
-				}
+				reasons = []string{skipOpsReason}
 			}
 			log.EmitSkip(log.Levels.Debug, opName, "run", "profile "+p.Ref(), reasons...)
 			continue
@@ -785,7 +782,7 @@ func (p *ProfileReady) recordOperation(dest string, info opInfo, prev database.O
 }
 
 func (p *ProfileReady) skippedOps() []string {
-	return slices.Concat(p.opts.SkipOps, p.opts.RunSkipOps)
+	return p.opts.RunSkipOps
 }
 
 func (p *ProfileReady) LogDiscovered() {
@@ -824,10 +821,17 @@ func formatChanges(n int) string {
 	}
 }
 
+// [why] skipping belongs to the run sequence alone: every other command is an explicit request for
+//
+//	its op, so it runs whatever run.skipOps lists
 func (p *ProfileReady) commandOps(opName string) []operationReady {
+	scoped := p.commandScopedOps(opName)
+	if opName != "run" {
+		return scoped
+	}
 	skips := p.skippedOps()
 	var out []operationReady
-	for _, op := range p.commandScopedOps(opName) {
+	for _, op := range scoped {
 		if !slices.Contains(skips, op.Name()) {
 			out = append(out, op)
 		}
@@ -885,13 +889,6 @@ func resolvePastAction(action string, existed bool) string {
 		return "overwritten"
 	}
 	return "created"
-}
-
-func (p *ProfileReady) skipOpsReason(op string) string {
-	if slices.Contains(p.opts.SkipOps, op) {
-		return "options.skipOps"
-	}
-	return "options.run.skipOps"
 }
 
 func (p *ProfileReady) wouldAction(dest string) string {
@@ -961,7 +958,7 @@ func (p *ProfileReady) ExecOperations(ctx context.Context) error {
 		for _, op := range p.OperationsReady {
 			// [why] a config-skipped op is a plain skip, never a sweep: skipping must not prune installed dests
 			if slices.Contains(skipOps, op.Name()) {
-				p.emit(log.Levels.Debug, "run", "run-op", op.Name(), p.skipOpsReason(op.Name()))
+				p.emit(log.Levels.Debug, "run", "run-op", op.Name(), skipOpsReason)
 				continue
 			}
 			if !op.Selected() {
@@ -1031,10 +1028,6 @@ func (p *ProfileReady) ExecOperation(ctx context.Context, op operationReady) err
 }
 
 func (p *ProfileReady) ExecOperationNamed(ctx context.Context, name string) error {
-	if slices.Contains(p.opts.SkipOps, name) {
-		p.emit(log.Levels.Debug, "run", "run-op", name, p.skipOpsReason(name))
-		return nil
-	}
 	for _, op := range p.OperationsReady {
 		if op.Name() == name {
 			return p.ExecOperation(ctx, op)
@@ -1044,10 +1037,6 @@ func (p *ProfileReady) ExecOperationNamed(ctx context.Context, name string) erro
 }
 
 func (p *ProfileReady) ExecRunScripts(ctx context.Context, names []string) (int, error) {
-	if slices.Contains(p.opts.SkipOps, "run-scripts") {
-		p.emit(log.Levels.Debug, "run", "run-op", "run-scripts", p.skipOpsReason("run-scripts"))
-		return 0, nil
-	}
 	matched := 0
 	err := p.withLogLevel(func() error {
 		for _, op := range p.OperationsReady {

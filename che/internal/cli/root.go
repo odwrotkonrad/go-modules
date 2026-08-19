@@ -47,6 +47,13 @@ sourced profile refs included).`,
 		SilenceUsage:  true,
 		SilenceErrors: true,
 		PersistentPreRunE: func(cmd *cobra.Command, args []string) error {
+			if f := cmd.Flags().Lookup("backup-auto-create"); f != nil && f.Changed {
+				enabled, err := cmd.Flags().GetBool("backup-auto-create")
+				if err != nil {
+					return err
+				}
+				a.flags.BackupAutoCreateFlag = &enabled
+			}
 			return a.init(resolveCommandName(cmd))
 		},
 		PersistentPostRunE: func(cmd *cobra.Command, args []string) error {
@@ -66,8 +73,8 @@ sourced profile refs included).`,
 		"validate each loaded che.yml spec against the JSON Schema; values: warn (log violations) | error (abort on violations); default: warn; env: CHE_VALIDATE_SPEC")
 	pf.StringSliceVar(&a.flags.Profiles, "profiles", nil,
 		"run only these profiles (comma-separated or repeated; autoDiscover skipped, runIf still enforced); env: CHE_PROFILE (comma-separated)")
-	pf.StringSliceVar(&a.flags.SkipOps, "skip-ops", nil,
-		"skip these ops everywhere (comma-separated or repeated; dropped from the run sequence, direct op subcommands become logged no-ops); values: prune-broken-links | make-dirs | make-links | make-copies | render-templates | install-packages | run-scripts; env: CHE_SKIP_OPS")
+	pf.Bool("backup-auto-create", true,
+		"archive every would-change dest before mutating it, in the run sequence and before a directly invoked op; false disables both, leaving che backup create untouched; env: CHE_BACKUP_AUTO_CREATE")
 	pf.BoolVar(&a.flags.SkipRunIf, "skip-run-if", false,
 		"treat every runIf predicate as passing; env: CHE_SKIP_RUN_IF")
 	pf.BoolVar(&a.flags.Errexit, "errexit", false,
@@ -190,8 +197,10 @@ func (a *app) makeRunCmd() *cobra.Command {
 		Short: "run every op each profile selects, profile by profile",
 		RunE: func(cmd *cobra.Command, args []string) error {
 			return a.specs.ExecEach(a.runCtx, "run", func(ctx context.Context, p *che.ProfileReady) error {
-				if err := p.ExecBackup(); err != nil {
-					return err
+				if !a.opts.BackupAutoCreateDisabled {
+					if err := p.ExecBackup(); err != nil {
+						return err
+					}
 				}
 				return p.ExecOperations(ctx)
 			})

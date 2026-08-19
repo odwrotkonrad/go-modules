@@ -29,22 +29,22 @@ cases:
     notExpected:
       stdOut:
         - 'ran '
-  - name: ShouldNoOpWhenGloballySkipped
+  - name: ShouldRunWhenRunSequenceSkipsIt
     context:
-      env: {CHE_SKIP_OPS: run-scripts, CHE_LOG_LEVEL: debug}
+      env: {CHE_RUN_SKIP_OPS: run-scripts, CHE_LOG_LEVEL: debug}
     expected:
-      stdOut:
-        - 'will not run profile cli/macos: options.skipOps'
-    notExpected:
       stdOut:
         - 'ran '
-  - name: ShouldNotErrorOnNameFilterWhenGloballySkipped
+    notExpected:
+      stdOut:
+        - 'will not run profile cli/macos: options.run.skipOps'
+  - name: ShouldStillErrorOnNameFilterWhenRunSequenceSkipsIt
     context:
       command: che run-scripts nonExistingScript
-      env: {CHE_SKIP_OPS: run-scripts, CHE_LOG_LEVEL: debug}
+      env: {CHE_RUN_SKIP_OPS: run-scripts, CHE_LOG_LEVEL: debug}
     expected:
-      stdOut:
-        - 'will not run profile cli/macos: options.skipOps'
+      errorOutput:
+        - 'no script matches: [nonExistingScript]'
     notExpected:
       stdOut:
         - 'ran '

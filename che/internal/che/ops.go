@@ -19,6 +19,11 @@ func (p *ProfileReady) resolveArchivePath(op string) string {
 }
 
 func (p *ProfileReady) archiveBefore(sub string, dests []string) error {
+	if p.opts.BackupAutoCreateDisabled {
+		p.currentArchive = ""
+		p.currentSub = sub
+		return nil
+	}
 	if p.backedUp {
 		p.currentArchive = p.backupArchive // [why] "" when the stage archived nothing: records carry no backup ref
 		p.currentSub = "backup"

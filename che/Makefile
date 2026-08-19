@@ -3,7 +3,8 @@
 SHELL := zsh
 .SHELLFLAGS := -c
 GO ?= go
-GOCOVER_COBERTURA ?= github.com/t-yuki/gocover-cobertura@v0.0.0-20180217150009-aaee18c8195c
+GOCOVER_COBERTURA_PKG ?= github.com/t-yuki/gocover-cobertura@v0.0.0-20180217150009-aaee18c8195c
+GOCOVER_COBERTURA ?= $(if $(shell command -v gocover-cobertura),gocover-cobertura,$(GO) run $(GOCOVER_COBERTURA_PKG))
 CC ?= clang
 BIN := che
 BUILD_DEP ?= build-cover
@@ -75,7 +76,7 @@ test-cover:
 	CC=$(CC) $(GO) test -v -cover -coverpkg=./... ./... -args -test.gocoverdir=$(CURDIR)/cover-unit
 	@$(GO) tool covdata textfmt -i=cover-unit -o coverage.out
 	@sed -i.bak '\|/che/e2e/|d' coverage.out && rm coverage.out.bak
-	@$(GO) run $(GOCOVER_COBERTURA) < coverage.out > coverage.xml
+	@$(GOCOVER_COBERTURA) < coverage.out > coverage.xml
 	@sed -i.bak 's|filename="gitlab.com/konradodwrot/go-modules/|filename="|g' coverage.xml && rm coverage.xml.bak
 	@$(GO) tool cover -func=coverage.out | tail -1
 
@@ -86,7 +87,7 @@ cover-report:
 		print "merging covdata: $$dirs"; \
 		$(GO) tool covdata textfmt -i=$$dirs -o coverage.out
 	@sed -i.bak '\|/che/e2e/|d' coverage.out && rm coverage.out.bak
-	@$(GO) run $(GOCOVER_COBERTURA) < coverage.out > coverage.xml
+	@$(GOCOVER_COBERTURA) < coverage.out > coverage.xml
 	@sed -i.bak 's|filename="gitlab.com/konradodwrot/go-modules/|filename="|g' coverage.xml && rm coverage.xml.bak
 	@$(GO) tool cover -func=coverage.out | tail -1
 

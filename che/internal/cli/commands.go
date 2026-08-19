@@ -5,7 +5,6 @@ package cli
 import (
 	"context"
 	"fmt"
-	"slices"
 
 	"github.com/spf13/cobra"
 
@@ -58,7 +57,7 @@ func (a *app) runScriptsRunE(cmd *cobra.Command, args []string) error {
 	if err != nil {
 		return err
 	}
-	if len(args) > 0 && total == 0 && !slices.Contains(a.opts.SkipOps, "run-scripts") {
+	if len(args) > 0 && total == 0 {
 		return fmt.Errorf("no script matches: %v", args)
 	}
 	return nil
