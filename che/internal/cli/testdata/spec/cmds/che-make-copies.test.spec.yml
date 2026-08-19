@@ -22,13 +22,13 @@ cases:
           created /Library/LaunchDaemons/otelcol.plist
           chown root:wheel /Library/LaunchDaemons/otelcol.plist
           created ${HOME}/.config/zsh/c
-  - name: ShouldNoOpWhenGloballySkipped
+  - name: ShouldRunWhenRunSequenceSkipsIt
     context:
-      env: {CHE_SKIP_OPS: make-copies, CHE_LOG_LEVEL: debug}
+      env: {CHE_RUN_SKIP_OPS: make-copies, CHE_LOG_LEVEL: debug}
     expected:
       stdOut:
-        - 'will not run profile cli/macos: options.skipOps'
+        - created /Library/LaunchDaemons/otelcol.plist
     notExpected:
       stdOut:
-        - created /Library/LaunchDaemons/otelcol.plist
+        - 'will not run profile cli/macos: options.run.skipOps'
 # [<] 🤖

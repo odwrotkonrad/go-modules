@@ -58,17 +58,17 @@ render_formula "CheAT${MODULE_VERSION//[.-]/}" "$VERSIONED_FILE"
 if [[ "${RENDER_ONLY:-0}" == 1 ]] { echo "rendered ${FORMULA_FILE} ${VERSIONED_FILE}"; exit 0 }
 
 commit_formula() {
-  curl -fsSL --connect-timeout 30 --retry 10 --retry-delay 30 --request POST --header "PRIVATE-TOKEN: ${HOMEBREW_TAP_TOKEN:?}" \
+  curl -fsSL --connect-timeout 30 --retry 10 --retry-delay 30 --request POST --header "PRIVATE-TOKEN: ${REPO_VAR_HOMEBREW_TAP_TOKEN:?}" \
     --data-urlencode "branch=main" \
     --data-urlencode "commit_message=chore: che ${MODULE_VERSION}" \
     --data-urlencode "actions[][action]=$1" \
     --data-urlencode "actions[][file_path]=$2" \
     --data-urlencode "actions[][content]=$(<"$3")" \
-    "${CI_API_V4_URL}/projects/${HOMEBREW_TAP_PROJECT_ID:?}/repository/commits"
+    "${CI_API_V4_URL}/projects/${REPO_VAR_HOMEBREW_TAP_PROJECT_ID:?}/repository/commits"
 }
 
 publish_formula() {
-  echo "pushing $1 (${MODULE_VERSION}) to tap project ${HOMEBREW_TAP_PROJECT_ID:?}"
+  echo "pushing $1 (${MODULE_VERSION}) to tap project ${REPO_VAR_HOMEBREW_TAP_PROJECT_ID:?}"
   if ! commit_formula update "$1" "$2"; then
     echo "update failed, trying create"
     commit_formula create "$1" "$2"

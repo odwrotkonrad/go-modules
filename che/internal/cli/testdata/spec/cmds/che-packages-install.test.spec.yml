@@ -47,15 +47,15 @@ cases:
     notExpected:
       stdOut:
         - "installed jq via apt"
-  - name: ShouldSkipStageWhenGloballySkipped
+  - name: ShouldInstallWhenRunSequenceSkipsIt
     context:
-      env: {CHE_SKIP_OPS: install-packages, CHE_LOG_LEVEL: debug}
+      env: {CHE_RUN_SKIP_OPS: install-packages, CHE_LOG_LEVEL: debug}
     expected:
       stdOut:
-        - "will not run profile cli/macos: options.skipOps"
+        - "installed jq via apt"
     notExpected:
       stdOut:
-        - "installed jq"
+        - "will not run profile cli/macos: options.run.skipOps"
   - name: ShouldFallBackToBuiltinPackagesFile
     context:
       pwd: testdata/fixture/commands/packages/sample-tree-builtin

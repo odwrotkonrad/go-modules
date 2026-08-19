@@ -1,5 +1,6 @@
 ##[>] 🤖🤖
-FROM debian:bookworm-slim
+ARG BASE_IMAGE=debian:bookworm-slim
+FROM ${BASE_IMAGE}
 ENV DEBIAN_FRONTEND=noninteractive
 RUN rm -f /etc/apt/apt.conf.d/docker-clean /etc/dpkg/dpkg.cfg.d/docker \
  && apt-get -qq update \

@@ -81,13 +81,25 @@ cases:
       stdOut:
         - '## run-scripts'
         - 'ran '
+  - name: ShouldRunEveryOpWithNoBackupStageWhenAutoCreateDisabled
+    context:
+      pwd: testdata/fixture/commands/common/sample-tree
+      env: {CHE_BACKUP_AUTO_CREATE: "false"}
+    expected:
+      stdOut:
+        - '## make-links'
+        - created ${HOME}/.config/zsh/.zshrc
+    notExpected:
+      stdOut:
+        - '## backup'
+        - .tar.bz2
   - name: ShouldSkipOpsListedInSkipOpsEnv
     context:
       pwd: testdata/fixture/commands/common/sample-tree
-      env: {CHE_SKIP_OPS: "run-scripts,make-copies", CHE_LOG_LEVEL: debug}
+      env: {CHE_RUN_SKIP_OPS: "run-scripts,make-copies", CHE_LOG_LEVEL: debug}
     expected:
       stdOut:
-        - 'will not run op make-copies: options.skipOps'
+        - 'will not run op make-copies: options.run.skipOps'
         - '## render-templates'
     notExpected:
       stdOut:

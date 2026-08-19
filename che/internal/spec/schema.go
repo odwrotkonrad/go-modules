@@ -21,6 +21,8 @@ func Schema() *jsonschema.Schema {
 	optDefs := r.Reflect(Options{}).Definitions
 	defs["SpecOptions"] = optDefs["Options"]
 	defs["Run"] = optDefs["Run"]
+	defs["Backup"] = optDefs["Backup"]
+	defs["BackupAutoCreate"] = optDefs["BackupAutoCreate"]
 	defs["RenderTemplates"] = optDefs["RenderTemplates"]
 	defs["Packages"] = optDefs["Packages"]
 	defs["Otel"] = optDefs["Otel"]

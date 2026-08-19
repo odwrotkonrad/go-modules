@@ -35,19 +35,18 @@ func TestResolveBoolOr(t *testing.T) {
 }
 
 type skipOpsGot struct {
-	SkipOps    []string `yaml:"skipOps"`
-	RunSkipOps []string `yaml:"allSkipOps"`
+	RunSkipOps []string `yaml:"runSkipOps"`
 }
 
 func TestResolveSkipOps(t *testing.T) {
 	testyml.Eq(t, td, "testdata/spec/funcs/resolve_skip_ops.test.spec.yml", func(t *testing.T, c testyml.Case[skipOpsGot]) (skipOpsGot, error) {
 		env := func(k string) string { return c.Context.Env[k] }
-		o := Options{SkipOps: c.Input.Args.Strings(t, 0), RunSkipOps: c.Input.Args.Strings(t, 1)}
+		o := Options{RunSkipOps: c.Input.Args.Strings(t, 0)}
 		var user, spec Layer
-		c.Input.Args.To(t, 2, &user)
-		c.Input.Args.To(t, 3, &spec)
+		c.Input.Args.To(t, 1, &user)
+		c.Input.Args.To(t, 2, &spec)
 		err := o.Resolve(env, user, spec)
-		return skipOpsGot{SkipOps: o.SkipOps, RunSkipOps: o.RunSkipOps}, err
+		return skipOpsGot{RunSkipOps: o.RunSkipOps}, err
 	})
 }
 

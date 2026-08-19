@@ -29,4 +29,10 @@ cases:
       stdOut: |
         backup delta make-links ({{/[0-9]+/}} change{{/s?/}}), make-copies ({{/[0-9]+/}} change{{/s?/}}), render-templates ({{/[0-9]+/}} change{{/s?/}})
           created {{/.*/}}B, ${HOME}/.local/state/che/backups/cli-macos/backup/{{/.*/}}.tar.bz2
+  - name: ShouldArchiveEvenWhenAutoCreateDisabled
+    input:
+      args: [driftLink: true, backupAutoCreateDisabled: true]
+    expected:
+      stdOut:
+        - 'created {{/.*/}}B, ${HOME}/.local/state/che/backups/cli-macos/backup/{{/.*/}}.tar.bz2'
 # [<] 🤖🤖

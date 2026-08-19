@@ -149,6 +149,22 @@ func (o *Options) fillDefault(key, value string) {
 
 func (o *Options) FillDefaultSetting(key, value string) { o.fillDefault(key, value) }
 
+// [why] a default-true option needs a flag that can say "false", which a bare bool cannot: an unset
+//
+//	bool and an explicit --flag=false are both false, so the flag would mask every layer below it
+func (o *Options) resolveBoolPtr(key string, flagVal *bool, envVal string, def bool, candidates ...boolCandidate) bool {
+	if flagVal != nil {
+		return o.recordBool(key, *flagVal, "cliFlag")
+	}
+	return o.resolveBool(key, false, envVal, def, candidates...)
+}
+
+func (o *Options) recordBool(key string, value bool, source string) bool {
+	o.record(key, strconv.FormatBool(value), source)
+	o.setKind(key, "bool")
+	return value
+}
+
 func (o *Options) resolveBool(key string, flagVal bool, envVal string, def bool, candidates ...boolCandidate) bool {
 	value, source := def, "default"
 	switch {
@@ -164,9 +180,7 @@ func (o *Options) resolveBool(key string, flagVal bool, envVal string, def bool,
 			}
 		}
 	}
-	o.record(key, strconv.FormatBool(value), source)
-	o.setKind(key, "bool")
-	return value
+	return o.recordBool(key, value, source)
 }
 
 func (o *Options) Resolve(env LookupEnv, user, spec Layer) error {
@@ -210,15 +224,15 @@ func (o *Options) Resolve(env LookupEnv, user, spec Layer) error {
 		fromFlag(o.ProfileWorkingDirectory), fromEnv(env("CHE_PROFILE_WORKING_DIRECTORY")), fromLayer(spec.ProfileWorkingDirectory, "specFile"))
 	o.Profiles = o.resolveList("profiles",
 		fromLayerList(o.Profiles, "cliFlag"), fromEnv(env("CHE_PROFILE")), fromLayerList(user.Profiles, "config-file"), fromLayerList(spec.Profiles, "specFile"))
-	o.SkipOps = o.resolveList("skipOps",
-		fromLayerList(o.SkipOps, "cliFlag"), fromEnv(env("CHE_SKIP_OPS")), fromLayerList(user.SkipOps, "config-file"), fromLayerList(spec.SkipOps, "specFile"))
 	o.RunSkipOps = o.resolveList("run.skipOps",
 		fromLayerList(o.RunSkipOps, "cliFlag"), fromEnv(env("CHE_RUN_SKIP_OPS")), fromLayerList(user.Run.SkipOps, "config-file"), fromLayerList(spec.Run.SkipOps, "specFile"))
-	for _, name := range slices.Concat(o.SkipOps, o.RunSkipOps) {
+	for _, name := range o.RunSkipOps {
 		if !slices.Contains(OpNames, name) {
 			return fmt.Errorf("invalid skip-ops op %q: want one of %s", name, strings.Join(OpNames, ", "))
 		}
 	}
+	o.BackupAutoCreateDisabled = !o.resolveBoolPtr("backup.autoCreate.enabled", o.BackupAutoCreateFlag, env("CHE_BACKUP_AUTO_CREATE"), true,
+		boolCandidate{user.Backup.AutoCreate.Enabled, "config-file"}, boolCandidate{spec.Backup.AutoCreate.Enabled, "specFile"})
 	o.SkipRunIf = o.resolveBool("skipRunIf", o.SkipRunIf, env("CHE_SKIP_RUN_IF"), false)
 	o.Errexit = o.resolveBool("errexit", o.Errexit, env("CHE_ERREXIT"), false)
 	o.SkipRemoteRefs = o.resolveBool("skipRemoteRefs", o.SkipRemoteRefs, env("CHE_SKIP_REMOTE_REFS"), false,

@@ -118,6 +118,8 @@ func applyScenario(t *testing.T, a testyml.Args, m *testutil.MockSet, p *Profile
 				require.NoError(t, os.MkdirAll(filepath.Dir(dest), 0o755))
 				require.NoError(t, os.WriteFile(dest, []byte("drifted\n"), 0o644))
 			}
+		case "backupAutoCreateDisabled":
+			p.opts.BackupAutoCreateDisabled = a.Bool(t, i)
 		default:
 			t.Fatalf("unknown scenario arg %q", name)
 		}

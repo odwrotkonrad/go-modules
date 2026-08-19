@@ -9,13 +9,13 @@ sourced profile refs included).
 
 | Option | Env | Values | Default | Description |
 | --- | --- | --- | --- | --- |
+| `--backup-auto-create` | `CHE_BACKUP_AUTO_CREATE` | `bool` | `true` | archive every would-change dest before mutating it, in the run sequence and before a directly invoked op; false disables both, leaving che backup create untouched |
 | `-C`, `--che-working-directory` | `CHE_WORKING_DIRECTORY` | `string` |  | change into this directory before resolving the repo |
 | `--dry-run` | `CHE_DRY_RUN` | `delta (changed dests, bare-flag default)` \| `all (every dest)` \| `true (alias for delta)` | `off` | print mutating actions instead of executing them |
 | `--errexit` | `CHE_ERREXIT` | `bool` | `continue and report all failures` | stop the run at the first script failure (remaining scripts, ops, profiles skipped) |
 | `--log-level` | `CHE_LOG_LEVEL` | `error (failures only)` \| `warn` \| `info (what happened)` \| `debug (adds intentions and won't-happen with reasons)` \| `trace (adds details)` | `info` | human-log level |
 | `--profile-working-directory` | `CHE_PROFILE_WORKING_DIRECTORY` | `string` |  | the load-ops source tree (che level; spec/profile options.profileWorkingDirectory override); default root |
 | `--profiles` | `CHE_PROFILE (comma-separated)` | `stringSlice` | `[]` | run only these profiles (comma-separated or repeated; autoDiscover skipped, runIf still enforced) |
-| `--skip-ops` | `CHE_SKIP_OPS` | `prune-broken-links` \| `make-dirs` \| `make-links` \| `make-copies` \| `render-templates` \| `install-packages` \| `run-scripts` | `[]` | skip these ops everywhere (comma-separated or repeated; dropped from the run sequence, direct op subcommands become logged no-ops) |
 | `--skip-remote-refs` | `CHE_SKIP_REMOTE_REFS` | `bool` | `false` | skip sourced include.profiles refs, load only the local repo's specs |
 | `--skip-run-if` | `CHE_SKIP_RUN_IF` | `bool` | `false` | treat every runIf predicate as passing |
 | `--validate-spec` | `CHE_VALIDATE_SPEC` | `warn (log violations)` \| `error (abort on violations)` | `warn` | validate each loaded che.yml spec against the JSON Schema |

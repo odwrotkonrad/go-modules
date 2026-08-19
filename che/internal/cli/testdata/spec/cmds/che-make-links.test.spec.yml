@@ -38,4 +38,20 @@ cases:
         # Run profile cli/macos
         ## make-links
           created ${HOME}/.config
+  - name: ShouldMutateWithoutArchivingWhenAutoCreateDisabled
+    context:
+      env: {CHE_BACKUP_AUTO_CREATE: "false"}
+    expected:
+      stdOut:
+        - created ${HOME}/.config/zsh/.zshrc
+        - created /etc/zshrc
+    notExpected:
+      stdOut:
+        - .tar.bz2
+  - name: ShouldArchiveWhenAutoCreateEnabledExplicitly
+    context:
+      env: {CHE_BACKUP_AUTO_CREATE: "true"}
+    expected:
+      stdOut:
+        - created ${HOME}/.local/state/che/backups/cli-macos/make-links/{{/\S*/}}.tar.bz2
 # [<] 🤖

@@ -36,10 +36,11 @@ stages:
   - trigger-downstream
 
 variables:
-  CI_IMAGE: registry.gitlab.com/konradodwrot/infra/oci-images/ci-linux:latest
-  CI_IMAGE_ARM64: registry.gitlab.com/konradodwrot/infra/oci-images/ci-linux:latest-arm64
-  CI_IMAGE_DIND: registry.gitlab.com/konradodwrot/infra/oci-images/ci-linux-dind:latest
-  CI_IMAGE_DIND_ARM64: registry.gitlab.com/konradodwrot/infra/oci-images/ci-linux-dind:latest-arm64
+  CI_IMAGE: $GRP_VAR_ARTIFACT_REGISTRY/ci-linux:$GRP_VAR_CI_IMAGES_REF
+  CI_IMAGE_ARM64: $GRP_VAR_ARTIFACT_REGISTRY/ci-linux:$GRP_VAR_CI_IMAGES_REF-arm64
+  CI_IMAGE_DIND: $GRP_VAR_ARTIFACT_REGISTRY/ci-linux-dind:$GRP_VAR_CI_IMAGES_REF
+  CI_IMAGE_DIND_ARM64: $GRP_VAR_ARTIFACT_REGISTRY/ci-linux-dind:$GRP_VAR_CI_IMAGES_REF-arm64
+  CHE_PACKAGES_REF: $GRP_VAR_CHE_PACKAGES_REF
   GOMODCACHE: $CI_PROJECT_DIR/.cache/go-mod
   GOCACHE: $CI_PROJECT_DIR/.cache/go-build
   CC: clang
@@ -240,8 +241,10 @@ test-e2e-che-registry:
 #[what] build the install-e2e container base image (debian + ca-certificates) once per pipeline, both arches, shared as docker-save tars
 warm-e2e-pkg-installs-image:
   stage: warm
-  image: docker:28
-  services: [docker:dind]
+  image: $GRP_VAR_ARTIFACT_REGISTRY_PROXY_DOCKERHUB/library/docker:28
+  services:
+    - name: $GRP_VAR_ARTIFACT_REGISTRY_PROXY_DOCKERHUB/library/docker:dind
+      alias: docker
   needs: []
   variables:
     DOCKER_HOST: tcp://docker:2376
@@ -258,8 +261,8 @@ warm-e2e-pkg-installs-image:
     - docker context create dind --docker "host=$DOCKER_HOST,ca=$DOCKER_CERT_PATH/ca.pem,cert=$DOCKER_CERT_PATH/cert.pem,key=$DOCKER_CERT_PATH/key.pem"
     - docker buildx create --use dind
     - mkdir -p e2e-images
-    - docker buildx build --platform linux/amd64 --tag che-e2e-debian:amd64 --output type=docker,dest=e2e-images/che-e2e-debian-amd64.tar --file che/e2e/install-methods.Dockerfile che/e2e
-    - docker buildx build --platform linux/arm64 --tag che-e2e-debian:arm64 --output type=docker,dest=e2e-images/che-e2e-debian-arm64.tar --file che/e2e/install-methods.Dockerfile che/e2e
+    - docker buildx build --platform linux/amd64 --tag che-e2e-debian:amd64 --build-arg "BASE_IMAGE=$GRP_VAR_ARTIFACT_REGISTRY_PROXY_DOCKERHUB/library/debian:bookworm-slim" --output type=docker,dest=e2e-images/che-e2e-debian-amd64.tar --file che/e2e/install-methods.Dockerfile che/e2e
+    - docker buildx build --platform linux/arm64 --tag che-e2e-debian:arm64 --build-arg "BASE_IMAGE=$GRP_VAR_ARTIFACT_REGISTRY_PROXY_DOCKERHUB/library/debian:bookworm-slim" --output type=docker,dest=e2e-images/che-e2e-debian-arm64.tar --file che/e2e/install-methods.Dockerfile che/e2e
   artifacts:
     paths:
       - e2e-images/
@@ -284,7 +287,7 @@ warm-go-darwin:
       policy: pull-push
   #[why] only feeds the manual darwin install-e2e matrix: stays manual with it, never auto
   rules:
-    - if: $ENABLE_DARWIN_CI != "true"
+    - if: $GRP_VAR_ENABLE_DARWIN_CI != "true"
       when: never
     - if: $CI_PIPELINE_SOURCE == "merge_request_event" || $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
       when: manual
@@ -305,7 +308,9 @@ test-e2e-install-methods:
   extends: .vendors-packages
   stage: test-e2e-method-installs
   image: $CI_IMAGE_DIND
-  services: [docker:dind]
+  services:
+    - name: $GRP_VAR_ARTIFACT_REGISTRY_PROXY_DOCKERHUB/library/docker:dind
+      alias: docker
   needs:
     - job: warm-go
       optional: true
