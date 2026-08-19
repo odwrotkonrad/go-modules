@@ -280,7 +280,17 @@ func (p *ProfileReady) renderTemplate(item spec.FileItem, dests []templateDest) 
 		if err := os.MkdirAll(filepath.Dir(d.path), 0o755); err != nil {
 			return err
 		}
-		if err := os.WriteFile(d.path, out, repoFileMode); err != nil {
+		mode := os.FileMode(repoFileMode)
+		if parsed, ok := fsutil.ParseMode(item.Chmod); ok {
+			mode = parsed
+		} else if item.Chmod != "" {
+			return fmt.Errorf("render %s: malformed chmod %q: want an octal string", d.path, item.Chmod)
+		}
+		if err := os.WriteFile(d.path, out, mode); err != nil {
+			return err
+		}
+		//[why] WriteFile leaves an existing file's mode untouched: chmod so a re-render fixes perms too
+		if err := os.Chmod(d.path, mode); err != nil {
 			return err
 		}
 	}

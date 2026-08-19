@@ -11,6 +11,7 @@ import (
 	"github.com/invopop/jsonschema"
 	"gopkg.in/yaml.v3"
 
+	"gitlab.com/konradodwrot/go-modules/che/internal/execx"
 	"gitlab.com/konradodwrot/go-modules/che/render/render"
 )
 
@@ -436,6 +437,7 @@ type destRule struct {
 type Evaluator struct {
 	builtins  map[string]func() string
 	lookupEnv func(string) string
+	exec      execx.CmdExecutor
 }
 
 type templateInherited struct {

@@ -312,4 +312,51 @@ cases:
       output:
         contains:
           root/AGENTS.md: ["ON DISK"]
+  - name: ShouldDefaultRepoDestToGroupWritableMode
+    input:
+      args:
+        - tree:
+            root/templates/x.ontoRepo.tpl: |
+              body
+        - items:
+            - {rel: templates/x.ontoRepo.tpl, dests: [out.md]}
+    expected:
+      output:
+        modes:
+          root/out.md: "0660"
+  - name: ShouldApplyChmodToRepoDest
+    input:
+      args:
+        - tree:
+            root/templates/s.zsh.ontoRepo.tpl: |
+              #!/usr/bin/env zsh
+        - items:
+            - {rel: templates/s.zsh.ontoRepo.tpl, dests: [ci/s.zsh], perms: {chmod: "0755"}}
+    expected:
+      output:
+        modes:
+          root/ci/s.zsh: "0755"
+  - name: ShouldKeepChmodOnRerender
+    input:
+      args:
+        - tree:
+            root/templates/s.zsh.ontoRepo.tpl: |
+              #!/usr/bin/env zsh
+        - items:
+            - {rel: templates/s.zsh.ontoRepo.tpl, dests: [ci/s.zsh], perms: {chmod: "0755"}}
+    expected:
+      output:
+        rerun: true
+        modes:
+          root/ci/s.zsh: "0755"
+  - name: ShouldRejectMalformedChmodOnRepoDest
+    input:
+      args:
+        - tree:
+            root/templates/x.ontoRepo.tpl: |
+              body
+        - items:
+            - {rel: templates/x.ontoRepo.tpl, dests: [out.md], perms: {chmod: "notoctal"}}
+    expected:
+      errorOutput: ['malformed chmod "notoctal": want an octal string']
 # [<] 🤖🤖

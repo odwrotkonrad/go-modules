@@ -300,7 +300,7 @@
             "type": "string"
           },
           "type": "array",
-          "description": "predicate expressions `\u003csource\u003e` or `\u003csource\u003e == \u003cliteral\u003e`, sources builtin:*/env:*; empty: always"
+          "description": "predicate expressions `\u003csource\u003e` or `\u003csource\u003e == \u003cliteral\u003e`, sources builtin:*/env:*/cmd:\u003cargv\u003e (exit 0 passes, run on every evaluation, argv split on whitespace, no shell); empty: always"
         },
         "autoDiscover": {
           "type": "boolean",

@@ -3,6 +3,7 @@ package che
 // [>] 🤖🤖
 
 import (
+	"fmt"
 	"os"
 	"path/filepath"
 	"testing"
@@ -26,6 +27,7 @@ func readDest(t *testing.T, root, rel string) string {
 
 type renderWant struct {
 	Files       map[string]string   `yaml:"files"`
+	Modes       map[string]string   `yaml:"modes"`
 	Contains    map[string][]string `yaml:"contains"`
 	NotContains map[string][]string `yaml:"notContains"`
 	Absent      []string            `yaml:"absent"`
@@ -87,6 +89,11 @@ func TestRenderTemplates(t *testing.T) {
 		checkFiles := func() {
 			for rel, want := range w.Files {
 				assert.Equal(t, want, readDest(t, root, rel), "%s content", rel)
+			}
+			for rel, want := range w.Modes {
+				info, statErr := os.Stat(filepath.Join(root, rel))
+				require.NoErrorf(t, statErr, "stat %s", rel)
+				assert.Equal(t, want, fmt.Sprintf("%04o", info.Mode().Perm()), "%s mode", rel)
 			}
 		}
 		checkFiles()
