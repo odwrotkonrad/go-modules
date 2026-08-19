@@ -9,6 +9,7 @@ import (
 	"strings"
 	"sync"
 
+	"gitlab.com/konradodwrot/go-modules/che/internal/execx"
 	"gitlab.com/konradodwrot/go-modules/che/internal/fsutil"
 )
 
@@ -19,6 +20,7 @@ func NewEvaluator(lookupEnv func(string) string) *Evaluator {
 			"isVirt": sync.OnceValue(func() string { return strconv.FormatBool(fsutil.IsVirtualized()) }),
 		},
 		lookupEnv: lookupEnv,
+		exec:      execx.Default,
 	}
 }
 
@@ -51,8 +53,15 @@ func (e *Evaluator) resolve(src string) (string, bool, error) {
 	case strings.HasPrefix(src, "env:"):
 		value := e.lookupEnv(strings.TrimPrefix(src, "env:"))
 		return value, value != "", nil
+	case strings.HasPrefix(src, "cmd:"):
+		argv := strings.Fields(strings.TrimPrefix(src, "cmd:"))
+		if len(argv) == 0 {
+			return "", false, fmt.Errorf("empty command in %q: want cmd:<argv>", src)
+		}
+		ok := e.exec.Exec(execx.Cmd{Argv: argv}) == nil
+		return strconv.FormatBool(ok), ok, nil
 	default:
-		return "", false, fmt.Errorf("unknown source %q: want builtin:<name> or env:<NAME>", src)
+		return "", false, fmt.Errorf("unknown source %q: want builtin:<name>, env:<NAME> or cmd:<argv>", src)
 	}
 }
 

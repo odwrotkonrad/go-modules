@@ -1,6 +1,8 @@
 # [>] 🤖🤖
 context:
-  function: spec.Evaluator.EvalExecIf
+  function: spec.Evaluator.EvalRunIf
+  mockedInterfaces:
+    execx.CmdExecutor: testutil.CmdMockExecutor
 cases:
   - name: ShouldBeTrueForSetEnv
     context:
@@ -90,4 +92,44 @@ cases:
       args: [expr: a == b == c]
     expected:
       errorOutput: ['malformed expression: want <source> or <source> == <literal>']
+  - name: ShouldPassCmdOnZeroExit
+    input:
+      args: [expr: 'cmd:glab auth status', execFails: false]
+    expected:
+      output: true
+  - name: ShouldFailCmdOnNonZeroExit
+    input:
+      args: [expr: 'cmd:glab auth status', execFails: true]
+    expected:
+      output: false
+  - name: ShouldMatchCmdEqualsTrue
+    input:
+      args: [expr: 'cmd:glab auth status == true', execFails: false]
+    expected:
+      output: true
+  - name: ShouldMatchCmdEqualsFalseWhenFailing
+    input:
+      args: [expr: 'cmd:glab auth status == false', execFails: true]
+    expected:
+      output: true
+  - name: ShouldRejectCmdEqualsTrueWhenFailing
+    input:
+      args: [expr: 'cmd:glab auth status == true', execFails: true]
+    expected:
+      output: false
+  - name: ShouldErrorOnEmptyCmd
+    input:
+      args: [expr: 'cmd:']
+    expected:
+      errorOutput: ['empty command in "cmd:": want cmd:<argv>']
+  - name: ShouldErrorOnWhitespaceOnlyCmd
+    input:
+      args: [expr: 'cmd:   ']
+    expected:
+      errorOutput: ['empty command in "cmd:": want cmd:<argv>']
+  - name: ShouldNameCmdAmongAcceptedSourcesOnUnknown
+    input:
+      args: [expr: shell:true]
+    expected:
+      errorOutput: ['unknown source "shell:true": want builtin:<name>, env:<NAME> or cmd:<argv>']
 # [<] 🤖🤖

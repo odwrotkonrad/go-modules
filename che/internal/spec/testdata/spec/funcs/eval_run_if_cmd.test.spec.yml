@@ -1,0 +1,22 @@
+# [>] 🤖🤖
+context:
+  function: spec.Evaluator.EvalRunIf
+  mockedInterfaces:
+    execx.CmdExecutor: testutil.CmdMockExecutor
+cases:
+  - name: ShouldRunCommandOnEveryEvaluation
+    input:
+      args: [expr: 'cmd:glab auth status']
+    expected:
+      output:
+        value: true
+        execCalls: 2
+        execCmd: glab auth status
+  - name: ShouldCacheBuiltinAcrossEvaluations
+    input:
+      args: [expr: builtin:isOs == macos]
+    expected:
+      output:
+        value: true
+        execCalls: 0
+# [<] 🤖🤖
