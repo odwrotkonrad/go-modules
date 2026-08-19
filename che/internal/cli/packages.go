@@ -109,15 +109,22 @@ func (a *app) makePackagesUpdateCmd() *cobra.Command {
 			if err != nil {
 				return err
 			}
+			//[why] the version moved from, and the one this binary embeds: "updated to X" alone
+			//   never said what X replaced, and never distinguished a fetched catalog from the
+			//   compiled-in fallback, which is the whole question when a pin is meant to be in play
+			from := res.Previous
+			if from == "" {
+				from = "none cached"
+			}
 			switch {
 			case res.Updated:
-				fmt.Printf("definitions updated to %s\n", res.Version)
+				fmt.Printf("definitions %s -> %s (builtin %s)\n", from, res.Version, res.Builtin)
 			case res.Skipped == "cooldown" && res.Version == "":
-				fmt.Println("update check on cooldown, no cached definitions yet (--force to fetch now)")
+				fmt.Printf("update check on cooldown, no cached definitions yet, builtin %s (--force to fetch now)\n", res.Builtin)
 			case res.Skipped == "cooldown":
-				fmt.Printf("definitions %s (checked within cooldown, --force to re-check)\n", res.Version)
+				fmt.Printf("definitions %s (checked within cooldown, builtin %s, --force to re-check)\n", res.Version, res.Builtin)
 			default:
-				fmt.Printf("definitions %s up to date\n", res.Version)
+				fmt.Printf("definitions %s up to date (builtin %s)\n", res.Version, res.Builtin)
 			}
 			return nil
 		},

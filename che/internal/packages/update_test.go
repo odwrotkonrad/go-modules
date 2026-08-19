@@ -17,6 +17,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"gitlab.com/konradodwrot/go-modules/che/internal/fetchx"
+	"gitlab.com/konradodwrot/go-modules/che/internal/packages/builtin"
 	"gitlab.com/konradodwrot/go-modules/che/internal/testutil"
 )
 
@@ -35,8 +36,9 @@ func makeDefinitionsTarGz(t *testing.T, files map[string]string) []byte {
 	return buf.Bytes()
 }
 
-func mockDefinitionsRegistry(t *testing.T, base, version string, archive []byte) {
+func mockDefinitionsRegistry(t *testing.T, version string, archive []byte) {
 	t.Helper()
+	base := "http://stub"
 	sum := sha256.Sum256(archive)
 	name := "che-packages_" + version + ".tar.gz"
 	fetchx.Swap(t, &fetchx.Mock{Bodies: map[string][]byte{
@@ -52,11 +54,11 @@ func TestUpdateDefinitionsFetchesVerifiesAndActivates(t *testing.T) {
 		"packages.yml":            "packages: {}\n",
 		"scripts/post-install.sh": "echo ok\n",
 	})
-	mockDefinitionsRegistry(t, "http://stub", "0.1.0", archive)
+	mockDefinitionsRegistry(t, "0.1.0", archive)
 
 	res, err := UpdateDefinitions(cacheDir, Source{URL: "http://stub"}, DefaultUpdateCooldown, false)
 	require.NoError(t, err)
-	assert.Equal(t, UpdateResult{Version: "0.1.0", Updated: true}, res)
+	assert.Equal(t, UpdateResult{Version: "0.1.0", Updated: true, Builtin: builtin.Version()}, res)
 	dir, version, ok := ResolveCurrentDefinitions(cacheDir)
 	require.True(t, ok)
 	assert.Equal(t, "0.1.0", version)
@@ -82,7 +84,7 @@ func TestUpdateDefinitionsForceIgnoresCooldown(t *testing.T) {
 	require.NoError(t, os.MkdirAll(cacheDir, 0o755))
 	require.NoError(t, os.WriteFile(filepath.Join(cacheDir, "last-check"), nil, 0o644))
 	archive := makeDefinitionsTarGz(t, map[string]string{"packages.yml": "packages: {}\n"})
-	mockDefinitionsRegistry(t, "http://stub", "0.1.1", archive)
+	mockDefinitionsRegistry(t, "0.1.1", archive)
 
 	res, err := UpdateDefinitions(cacheDir, Source{URL: "http://stub"}, time.Hour, true)
 	require.NoError(t, err)
@@ -99,10 +101,37 @@ func TestUpdateDefinitionsReportsUpToDatePresentVersion(t *testing.T) {
 
 	res, err := UpdateDefinitions(cacheDir, Source{URL: "http://stub"}, 0, false)
 	require.NoError(t, err)
-	assert.Equal(t, UpdateResult{Version: "0.1.0", Skipped: "up-to-date"}, res)
+	assert.Equal(t, UpdateResult{Version: "0.1.0", Skipped: "up-to-date", Builtin: builtin.Version()}, res)
 	_, version, ok := ResolveCurrentDefinitions(cacheDir)
 	require.True(t, ok)
 	assert.Equal(t, "0.1.0", version)
+}
+
+// [why] "updated to X" never said what X replaced, so a run that changed nothing and one that
+//
+//	moved two versions read identically.
+func TestUpdateDefinitionsReportsTheVersionItMovedFrom(t *testing.T) {
+	cacheDir := filepath.Join(t.TempDir(), "packages")
+	require.NoError(t, os.MkdirAll(filepath.Join(cacheDir, "0.1.0"), 0o755))
+	require.NoError(t, os.WriteFile(filepath.Join(cacheDir, "0.1.0", "packages.yml"), []byte("packages: {}\n"), 0o644))
+	require.NoError(t, os.WriteFile(filepath.Join(cacheDir, "current"), []byte("0.1.0\n"), 0o644))
+	archive := makeDefinitionsTarGz(t, map[string]string{"packages.yml": "packages: {}\n"})
+	mockDefinitionsRegistry(t, "0.2.0", archive)
+
+	res, err := UpdateDefinitions(cacheDir, Source{URL: "http://stub"}, 0, false)
+	require.NoError(t, err)
+	assert.Equal(t, "0.1.0", res.Previous)
+	assert.Equal(t, "0.2.0", res.Version)
+	assert.Equal(t, builtin.Version(), res.Builtin)
+}
+
+func TestUpdateDefinitionsReportsNoPreviousOnFirstFetch(t *testing.T) {
+	archive := makeDefinitionsTarGz(t, map[string]string{"packages.yml": "packages: {}\n"})
+	mockDefinitionsRegistry(t, "0.1.0", archive)
+
+	res, err := UpdateDefinitions(filepath.Join(t.TempDir(), "packages"), Source{URL: "http://stub"}, 0, false)
+	require.NoError(t, err)
+	assert.Empty(t, res.Previous)
 }
 
 func TestUpdateDefinitionsRejectsChecksumMismatch(t *testing.T) {
@@ -125,7 +154,7 @@ func TestUpdateDefinitionsPrunesOlderVersions(t *testing.T) {
 	cacheDir := filepath.Join(t.TempDir(), "packages")
 	require.NoError(t, os.MkdirAll(filepath.Join(cacheDir, "0.0.9"), 0o755))
 	archive := makeDefinitionsTarGz(t, map[string]string{"packages.yml": "packages: {}\n"})
-	mockDefinitionsRegistry(t, "http://stub", "0.1.0", archive)
+	mockDefinitionsRegistry(t, "0.1.0", archive)
 
 	_, err := UpdateDefinitions(cacheDir, Source{URL: "http://stub"}, 0, false)
 	require.NoError(t, err)
@@ -224,7 +253,7 @@ func TestUpdateDefinitionsPinnedRefFetchesExactVersionWithoutResolvingLatest(t *
 
 	res, err := UpdateDefinitions(cacheDir, Source{URL: "http://stub", Ref: "0.3.0"}, 0, false)
 	require.NoError(t, err)
-	assert.Equal(t, UpdateResult{Version: "0.3.0", Updated: true}, res)
+	assert.Equal(t, UpdateResult{Version: "0.3.0", Updated: true, Builtin: builtin.Version()}, res)
 	assert.NotContains(t, m.Calls(), "http://stub/latest/version.txt")
 }
 
