@@ -4,10 +4,23 @@ SHELL := zsh
 .SHELLFLAGS := -c
 MODULES := che get-os-open-files-with get-term-open-files-with lib
 
-WRAPPERS :=
-COMMANDS := render-templates render-docs repo-ci-prepare-hooks repo-ci-precommit-all test test-cover build vet lint install create-tag publish publish-prerelease publish-brew publish-apt vendor-packages-defs release-check release-snapshot
+WRAPPERS := repo-prepare-dev-env
+COMMANDS := render-templates repo-prepare-deps render-docs repo-ci-prepare-hooks repo-ci-precommit-all test test-cover build vet lint install create-tag publish publish-prerelease publish-brew publish-apt vendor-packages-defs release-check release-snapshot
 
 .PHONY: $(WRAPPERS) $(COMMANDS)
+
+##[>] Dev Environment [genai-include]
+#[why] render precedes hooks: the docsgen pre-commit hook runs render-templates and fails on drift,
+#   so a fresh clone whose generated files were never rendered would fail its first commit
+#[why] deps installs the toolchain only, never `install`: that builds each module's binaries into
+#   GOPATH, an output rather than a prerequisite, so preparing an environment must not run it
+#[what] make a fresh clone a working checkout: generated docs, toolchain, git hooks
+repo-prepare-dev-env: render-templates repo-prepare-deps repo-ci-prepare-hooks
+
+#[what] install this repo's toolchain
+repo-prepare-deps:
+	@che run --profiles=devEnv
+##[<] Dev Environment
 
 ##[>] Docs [genai-include]
 #[why] ontoRepo only: claude-agents renders untracked .claude/ from prose-generated snippets absent in a clone

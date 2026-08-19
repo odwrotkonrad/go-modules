@@ -65,4 +65,11 @@ claude-agents:
       - source: "@https://gitlab.com/konradodwrot/configs//profiles/llm/claude/che.yml::llm/claude/virt"
         ctx:
           repo: GoModules
+
+#[why] the repo declares the toolchain it builds and tests with, so no host or image has to carry go
+#   in advance for this repo to prepare
+devEnv:
+  include:
+    installPackages:
+      - go
 ##[<] 🤖🤖
