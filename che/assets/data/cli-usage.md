@@ -42,6 +42,7 @@ Flags:
       --backup-auto-create                 archive every would-change dest before mutating it, in the run sequence and before a directly invoked op; false disables both, leaving che backup create untouched; env: CHE_BACKUP_AUTO_CREATE (default true)
   -C, --che-working-directory string       change into this directory before resolving the repo; env: CHE_WORKING_DIRECTORY
       --dry-run string[="delta"]           print mutating actions instead of executing them; values: delta (changed dests, bare-flag default) | all (every dest) | true (alias for delta); default: off; env: CHE_DRY_RUN
+      --env-unset string                   what a bare ${{ env.NAME }} in che.yml does when NAME is unset or empty; values: error (abort, profiles selected to run only) | empty (reads as ""); default: error; env: CHE_ENV_UNSET
       --errexit                            stop the run at the first script failure (remaining scripts, ops, profiles skipped); default: continue and report all failures; env: CHE_ERREXIT
       --log-level string                   human-log level; values: error (failures only) | warn | info (what happened) | debug (adds intentions and won't-happen with reasons) | trace (adds details); default: info; env: CHE_LOG_LEVEL
       --profile-working-directory string   the load-ops source tree (che level; spec/profile options.profileWorkingDirectory override); default root; env: CHE_PROFILE_WORKING_DIRECTORY

@@ -14,14 +14,16 @@ import (
 )
 
 type Context struct {
-	Env     map[string]string
-	Cwd     string
-	Euid    int
-	RunID   string
-	RunTs   string
-	Command string
-	Tel     *telemetry.Telemetry
-	RunCtx  context.Context
+	Env        map[string]string
+	ProcessEnv map[string]string
+	DotEnv     map[string]string
+	Cwd        string
+	Euid       int
+	RunID      string
+	RunTs      string
+	Command    string
+	Tel        *telemetry.Telemetry
+	RunCtx     context.Context
 }
 
 func (c Context) runContext() context.Context {

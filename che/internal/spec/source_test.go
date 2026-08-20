@@ -52,7 +52,7 @@ func TestRunIfGate(t *testing.T) {
 			t.Cleanup(log.SwapLevel(log.Levels.Trace))
 		}
 		dir := testutil.Tree(t, map[string]string{"che.yml": "p:\n  options:\n    runIf: ['env:X']\n"})
-		d, err := Load(filepath.Join(dir, "che.yml"))
+		d, err := Load(filepath.Join(dir, "che.yml"), Interp{})
 		require.NoError(t, err)
 		var ok bool
 		out, err := testutil.CaptureStdout(t, func() error {

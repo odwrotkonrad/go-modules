@@ -5,7 +5,7 @@ SHELL := zsh
 MODULES := che get-os-open-files-with get-term-open-files-with lib
 
 WRAPPERS := repo-prepare-dev-env
-COMMANDS := render-templates repo-prepare-deps render-docs repo-ci-prepare-hooks repo-ci-precommit-all test test-cover build vet lint install create-tag publish publish-prerelease publish-brew publish-apt vendor-packages-defs release-check release-snapshot
+COMMANDS := render-templates repo-render-env repo-prepare-deps render-docs repo-ci-prepare-hooks repo-ci-precommit-all test test-cover build vet lint install create-tag publish publish-prerelease publish-brew publish-apt vendor-packages-defs release-check release-snapshot
 
 .PHONY: $(WRAPPERS) $(COMMANDS)
 
@@ -15,7 +15,7 @@ COMMANDS := render-templates repo-prepare-deps render-docs repo-ci-prepare-hooks
 #[why] deps installs the toolchain only, never `install`: that builds each module's binaries into
 #   GOPATH, an output rather than a prerequisite, so preparing an environment must not run it
 #[what] make a fresh clone a working checkout: generated docs, toolchain, git hooks
-repo-prepare-dev-env: render-templates repo-prepare-deps repo-ci-prepare-hooks
+repo-prepare-dev-env: repo-render-env render-templates repo-prepare-deps repo-ci-prepare-hooks
 
 #[what] install this repo's toolchain
 repo-prepare-deps:
@@ -34,6 +34,10 @@ render-templates:
 	if [[ ! -x $$che_bin ]] che_bin=$$(command -v che || true); \
 	if [[ -z $$che_bin ]] { $(MAKE) -C che build; che_bin=che/dist/che }; \
 	$$che_bin render-templates --profiles ontoRepo
+
+#[what] render .env.tpl to .env: upstream refs and CI variables via glab, secrets via op
+repo-render-env:
+	@CHE_ENV_UNSET=empty che render-templates --profiles=envSeed
 
 #[what] generate che docs (docs/cli.md, che.schema.json, cli-usage.md) from the Go source
 render-docs:

@@ -1,0 +1,26 @@
+# [>] 🤖🤖
+context:
+  function: envinterp.Refs
+cases:
+  - name: ShouldListBareAndDefaultedRefs
+    input:
+      args:
+        - s: '${{ env.A }}/${{ env.B || two }}'
+    expected:
+      output:
+        - {name: A, default: "", hasdefault: false}
+        - {name: B, default: two, hasdefault: true}
+  - name: ShouldReportEmptyDefaultAsDefault
+    input:
+      args:
+        - s: '${{ env.A || }}'
+    expected:
+      output:
+        - {name: A, default: "", hasdefault: true}
+  - name: ShouldReturnNothingForPlainText
+    input:
+      args:
+        - s: 'no refs $HERE'
+    expected:
+      output: ~
+# [<] 🤖🤖

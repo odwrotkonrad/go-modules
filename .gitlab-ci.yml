@@ -36,11 +36,16 @@ stages:
   - trigger-downstream
 
 variables:
-  CI_IMAGE: $GRP_VAR_ARTIFACT_REGISTRY/ci-linux:$GRP_VAR_CI_IMAGES_REF
-  CI_IMAGE_ARM64: $GRP_VAR_ARTIFACT_REGISTRY/ci-linux:$GRP_VAR_CI_IMAGES_REF-arm64
-  CI_IMAGE_DIND: $GRP_VAR_ARTIFACT_REGISTRY/ci-linux-dind:$GRP_VAR_CI_IMAGES_REF
-  CI_IMAGE_DIND_ARM64: $GRP_VAR_ARTIFACT_REGISTRY/ci-linux-dind:$GRP_VAR_CI_IMAGES_REF-arm64
-  CHE_PACKAGES_REF: $GRP_VAR_CHE_PACKAGES_REF
+  ARTIFACT_REGISTRY: $GRP_KO_VAR_ARTIFACT_REGISTRY
+  ARTIFACT_REGISTRY_PROXY_DOCKERHUB: $GRP_KO_VAR_ARTIFACT_REGISTRY_PROXY_DOCKERHUB
+  CI_IMAGES_REF: $GRP_KO_VAR_CI_IMAGES_REF
+  CHE_PACKAGES_REF: $GRP_KO_VAR_CHE_PACKAGES_REF
+  ENABLE_DARWIN_CI: $GRP_KO_VAR_ENABLE_DARWIN_CI
+  PROSE_REF: $GRP_KO_VAR_PROSE_REF
+  CI_IMAGE: $ARTIFACT_REGISTRY/ci-linux:$CI_IMAGES_REF
+  CI_IMAGE_ARM64: $ARTIFACT_REGISTRY/ci-linux:$CI_IMAGES_REF-arm64
+  CI_IMAGE_DIND: $ARTIFACT_REGISTRY/ci-linux-dind:$CI_IMAGES_REF
+  CI_IMAGE_DIND_ARM64: $ARTIFACT_REGISTRY/ci-linux-dind:$CI_IMAGES_REF-arm64
   #[why] set but never cached: it holds dependencies, and cache: here carries intermediates only.
   #   it stays to keep downloads in the project dir, off the pod's root fs
   GOMODCACHE: $CI_PROJECT_DIR/.cache/go-mod
@@ -244,9 +249,9 @@ test-e2e-che-registry:
 #[what] build the install-e2e container base image (debian + ca-certificates) once per pipeline, both arches, shared as docker-save tars
 warm-e2e-pkg-installs-image:
   stage: warm
-  image: $GRP_VAR_ARTIFACT_REGISTRY_PROXY_DOCKERHUB/library/docker:28
+  image: $ARTIFACT_REGISTRY_PROXY_DOCKERHUB/library/docker:28
   services:
-    - name: $GRP_VAR_ARTIFACT_REGISTRY_PROXY_DOCKERHUB/library/docker:dind
+    - name: $ARTIFACT_REGISTRY_PROXY_DOCKERHUB/library/docker:dind
       alias: docker
   needs: []
   variables:
@@ -264,8 +269,8 @@ warm-e2e-pkg-installs-image:
     - docker context create dind --docker "host=$DOCKER_HOST,ca=$DOCKER_CERT_PATH/ca.pem,cert=$DOCKER_CERT_PATH/cert.pem,key=$DOCKER_CERT_PATH/key.pem"
     - docker buildx create --use dind
     - mkdir -p e2e-images
-    - docker buildx build --platform linux/amd64 --tag che-e2e-debian:amd64 --build-arg "BASE_IMAGE=$GRP_VAR_ARTIFACT_REGISTRY_PROXY_DOCKERHUB/library/debian:bookworm-slim" --output type=docker,dest=e2e-images/che-e2e-debian-amd64.tar --file che/e2e/install-methods.Dockerfile che/e2e
-    - docker buildx build --platform linux/arm64 --tag che-e2e-debian:arm64 --build-arg "BASE_IMAGE=$GRP_VAR_ARTIFACT_REGISTRY_PROXY_DOCKERHUB/library/debian:bookworm-slim" --output type=docker,dest=e2e-images/che-e2e-debian-arm64.tar --file che/e2e/install-methods.Dockerfile che/e2e
+    - docker buildx build --platform linux/amd64 --tag che-e2e-debian:amd64 --build-arg "BASE_IMAGE=$ARTIFACT_REGISTRY_PROXY_DOCKERHUB/library/debian:bookworm-slim" --output type=docker,dest=e2e-images/che-e2e-debian-amd64.tar --file che/e2e/install-methods.Dockerfile che/e2e
+    - docker buildx build --platform linux/arm64 --tag che-e2e-debian:arm64 --build-arg "BASE_IMAGE=$ARTIFACT_REGISTRY_PROXY_DOCKERHUB/library/debian:bookworm-slim" --output type=docker,dest=e2e-images/che-e2e-debian-arm64.tar --file che/e2e/install-methods.Dockerfile che/e2e
   artifacts:
     paths:
       - e2e-images/
@@ -286,7 +291,7 @@ warm-go-darwin:
       policy: pull-push
   #[why] only feeds the manual darwin install-e2e matrix: stays manual with it, never auto
   rules:
-    - if: $GRP_VAR_ENABLE_DARWIN_CI != "true"
+    - if: $ENABLE_DARWIN_CI != "true"
       when: never
     - if: $CI_PIPELINE_SOURCE == "merge_request_event" || $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
       when: manual
@@ -308,7 +313,7 @@ test-e2e-install-methods:
   stage: test-e2e-method-installs
   image: $CI_IMAGE_DIND
   services:
-    - name: $GRP_VAR_ARTIFACT_REGISTRY_PROXY_DOCKERHUB/library/docker:dind
+    - name: $ARTIFACT_REGISTRY_PROXY_DOCKERHUB/library/docker:dind
       alias: docker
   needs:
     - job: warm-go
@@ -472,7 +477,6 @@ release-lib:
     - sed -i 's|(\.\./assets/data/che.schema.json)|(assets/data/che.schema.json)|g' che/docs/spec.md
     - printf '# che\n' > che/docs/index.md
     ##[>] 🤖🤖
-    - PROSE_REF=$(sed -n 's|.*konradodwrot/prose?ref=\(v[0-9.]*\)".*|\1|p' che.yml | head -1)
     - wget -qO che/docs/purpose-src.md "https://gitlab.com/konradodwrot/prose/-/raw/$PROSE_REF/repos/go-modules/che-purpose.md"
     - tail -n +2 che/docs/purpose-src.md >> che/docs/index.md
     - rm che/docs/purpose-src.md
@@ -728,6 +732,9 @@ publish-apt-che:
       optional: true
   rules:
     - if: $CI_COMMIT_TAG =~ /^che\/v/
+  variables:
+    APT_GPG_PRIVATE_KEY: $REPO_VAR_APT_GPG_PRIVATE_KEY
+    APT_GPG_PASSPHRASE: $REPO_VAR_APT_GPG_PASSPHRASE
   script:
     - apt-get update && apt-get install -y --no-install-recommends aptly gnupg
     - make publish-apt
@@ -756,6 +763,9 @@ publish-brew-che:
     - goreleaser-linux-che
   rules:
     - if: $CI_COMMIT_TAG =~ /^che\/v/
+  variables:
+    HOMEBREW_TAP_TOKEN: $REPO_VAR_HOMEBREW_TAP_TOKEN
+    HOMEBREW_TAP_PROJECT_ID: $REPO_VAR_HOMEBREW_TAP_PROJECT_ID
   script:
     - make publish-brew
 

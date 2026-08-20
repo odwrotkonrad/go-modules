@@ -43,6 +43,8 @@ func (a *app) makeOpCmd(o op) *cobra.Command {
 	if o.name == "render-templates" {
 		cmd.Flags().BoolVar(&a.flags.RenderSkipSecrets, "skip-secrets", false,
 			"skip sources carrying op:// or gcp:// secret refs (logged, dests untouched); env: CHE_RENDER_TEMPLATES_SKIP_SECRETS")
+		cmd.Flags().BoolVar(&a.flags.RenderSkipVariables, "skip-variables", false,
+			"skip sources carrying a shell call (logged, dests untouched); env: CHE_RENDER_TEMPLATES_SKIP_VARIABLES")
 	}
 	return cmd
 }

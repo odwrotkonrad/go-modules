@@ -20,7 +20,7 @@ import (
 
 func makeOpRecipes(t *testing.T, dir string) spec.OperationRecipes {
 	t.Helper()
-	d, err := spec.Load(filepath.Join(dir, "che.yml"))
+	d, err := spec.Load(filepath.Join(dir, "che.yml"), spec.Interp{})
 	require.NoError(t, err)
 	for i := range d.ProfileRecipes {
 		d.ProfileRecipes[i].Source.DirectoryPath = dir
@@ -74,7 +74,7 @@ var ops = map[string]func(*ProfileReady, spec.OperationRecipes) error{
 		return p.makeCopies(r.MakeCopies.Copies, r.MakeCopies.Dirs)
 	},
 	"render-templates": func(p *ProfileReady, r spec.OperationRecipes) error {
-		return p.renderTemplates(r.RenderTemplates.Templates, false)
+		return p.renderTemplates(r.RenderTemplates.Templates, renderSkips{})
 	},
 	"make-dirs":          func(p *ProfileReady, r spec.OperationRecipes) error { return p.makeDirs(r.MakeDirs.Dirs) },
 	"prune-broken-links": func(p *ProfileReady, _ spec.OperationRecipes) error { return p.pruneBrokenLinks() },

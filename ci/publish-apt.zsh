@@ -3,8 +3,8 @@
 # Builds the apt repo tree into ./public-apt from every che .deb in the
 # generic package registry (source of truth: Pages deploys replace the whole
 # site, so the tree is regenerated from the registry every time). Imports the
-# signing key from $REPO_VAR_APT_GPG_PRIVATE_KEY (file var, armored private key,
-# optional $REPO_VAR_APT_GPG_PASSPHRASE), aptly-publishes distribution "stable"
+# signing key from $APT_GPG_PRIVATE_KEY (file var, armored private key,
+# optional $APT_GPG_PASSPHRASE), aptly-publishes distribution "stable"
 # component "main" for amd64+arm64, exports the armored public key to
 # public-apt/gpg.key. No debs in the registry yet -> only gpg.key, exit 0.
 set -eu
@@ -20,7 +20,7 @@ mkdir -p "$OUT" "$WORK/debs"
 
 export GNUPGHOME="$WORK/gnupg"
 mkdir -m 700 "$GNUPGHOME"
-gpg --batch --import "${REPO_VAR_APT_GPG_PRIVATE_KEY:?}"
+gpg --batch --import "${APT_GPG_PRIVATE_KEY:?}"
 KEYID="$(gpg --batch --list-secret-keys --with-colons | awk -F: '$1 == "sec" {print $5; exit}')"
 gpg --armor --export "$KEYID" > "$OUT/gpg.key"
 
@@ -70,7 +70,7 @@ aptly -config="$WORK/aptly.conf" repo create -distribution=stable -component=mai
 aptly -config="$WORK/aptly.conf" repo add che "$WORK/debs"
 typeset -a SIGN
 SIGN=(-batch -gpg-key="$KEYID")
-if [[ -n "${REPO_VAR_APT_GPG_PASSPHRASE:-}" ]] SIGN+=(-passphrase="$REPO_VAR_APT_GPG_PASSPHRASE")
+if [[ -n "${APT_GPG_PASSPHRASE:-}" ]] SIGN+=(-passphrase="$APT_GPG_PASSPHRASE")
 aptly -config="$WORK/aptly.conf" publish repo $SIGN -architectures=amd64,arm64 che
 cp -R "$WORK/aptly/public/." "$OUT/"
 echo "apt tree ready: $OUT"

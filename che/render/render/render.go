@@ -18,7 +18,11 @@ import (
 )
 
 func Exec(name string, body []byte, repoRoot string) ([]byte, error) {
-	return ExecWithCtx(name, body, repoRoot, nil)
+	out, err := ExecWithCtx(name, body, repoRoot, nil)
+	if err != nil {
+		return nil, err
+	}
+	return StripMergeActions(out), nil
 }
 
 func ExecWithCtx(name string, body []byte, repoRoot string, itemCtx map[string]string) ([]byte, error) {
@@ -35,7 +39,10 @@ func execWithCtx(name string, body []byte, repoRoot string, itemCtx map[string]s
 		secret = newSecretFunc(ctx)
 	}
 	funcs := template.FuncMap{
-		"secret": secret,
+		"secret":         withMergeAction(MergeActionAlwaysUpdate, secret),
+		"shell":          withMergeAction(MergeActionAlwaysUpdate, newShellFunc(ctx, repoRoot)),
+		"alwaysUpdate":   mergeActionFunc(MergeActionAlwaysUpdate),
+		"keepIfExisting": mergeActionFunc(MergeActionKeepIfExisting),
 		"renderDirsTree": func(rel ...string) (string, error) {
 			if len(rel) > 0 {
 				return DirsTree(filepath.Join(repoRoot, rel[0]))

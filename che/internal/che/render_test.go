@@ -42,7 +42,8 @@ func TestRenderTemplates(t *testing.T) {
 		var tree, fetch map[string]string
 		var dirs []string
 		var items []spec.FileItem
-		var skipSecrets, remote bool
+		var skips renderSkips
+		var remote bool
 		a := c.Input.Args
 		for i := range a {
 			switch name := a.Name(i); name {
@@ -53,7 +54,9 @@ func TestRenderTemplates(t *testing.T) {
 			case "items":
 				a.To(t, i, &items)
 			case "skipSecrets":
-				skipSecrets = a.Bool(t, i)
+				skips.Secrets = a.Bool(t, i)
+			case "skipVariables":
+				skips.Variables = a.Bool(t, i)
 			case "fetch":
 				a.To(t, i, &fetch)
 				remote = true
@@ -70,7 +73,7 @@ func TestRenderTemplates(t *testing.T) {
 			p.Fetcher = testutil.RemoteMockFetcher(fetch)
 		}
 		renderOnce := func() (string, error) {
-			return testutil.CaptureStdout(t, func() error { return p.renderTemplates(items, skipSecrets) })
+			return testutil.CaptureStdout(t, func() error { return p.renderTemplates(items, skips) })
 		}
 
 		t.Cleanup(log.SwapLevel(log.Levels.Debug))

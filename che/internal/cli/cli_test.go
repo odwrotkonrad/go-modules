@@ -158,3 +158,30 @@ func TestInit(t *testing.T) {
 }
 
 // [<] 🤖🤖
+
+// [>] 🤖🤖
+func TestDiscoverReportsUnsetEnvRefs(t *testing.T) {
+	a, _, _ := setupRepoEnv(t, "testdata/fixture/commands/common/sample-tree")
+	t.Setenv("CHE_DRY_RUN", "")
+	t.Setenv("CHE_VALIDATE_SPEC", "")
+	f, err := os.OpenFile(filepath.Join(a.flags.CheWorkingDirectory, "che.yml"), os.O_APPEND|os.O_WRONLY, 0o644)
+	require.NoError(t, err)
+	_, err = f.WriteString("\nenvB:\n  include:\n    makeLinks: ['_home/${{ env.CHE_TEST_B_UNSET }}/**']\n")
+	require.NoError(t, err)
+	require.NoError(t, f.Close())
+	a.flags.Profiles = []string{"envB"}
+	out, err := testutil.CaptureStdout(t, func() error {
+		if err := a.init("discover-profiles"); err != nil {
+			return err
+		}
+		a.specs.LogDiscovered()
+		return nil
+	})
+	require.NoError(t, err)
+	stripped := testutil.StripANSI(out)
+	assert.Contains(t, stripped, "CHE_TEST_B_UNSET  required  UNSET  [envB]")
+	assert.Contains(t, stripped, "unset env: CHE_TEST_B_UNSET")
+	assert.Empty(t, a.specs.AllProfiles())
+}
+
+// [<] 🤖🤖

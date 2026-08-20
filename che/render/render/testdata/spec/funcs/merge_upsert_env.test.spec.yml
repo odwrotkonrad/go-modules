@@ -16,4 +16,32 @@ cases:
         - rendered: "B=y\nA=x\n"
     expected:
       output: "A=x\nB=y\n"
+  - name: ShouldOverwriteExistingOnAlwaysUpdate
+    input:
+      args:
+        - existing: "REF=old\n"
+        - rendered: "REF=\x1ealwaysUpdate\x1fnew\n"
+    expected:
+      output: "REF=new\n"
+  - name: ShouldKeepExistingOnKeepIfExisting
+    input:
+      args:
+        - existing: "REF=old\n"
+        - rendered: "REF=\x1ekeepIfExisting\x1fnew\n"
+    expected:
+      output: "REF=old\n"
+  - name: ShouldWriteAbsentKeyWhateverTheAction
+    input:
+      args:
+        - existing: "OTHER=1\n"
+        - rendered: "REF=\x1ekeepIfExisting\x1fnew\n"
+    expected:
+      output: "OTHER=1\nREF=new\n"
+  - name: ShouldKeepUserAddedKeys
+    input:
+      args:
+        - existing: "MINE=1\nREF=old\n"
+        - rendered: "REF=\x1ealwaysUpdate\x1fnew\n"
+    expected:
+      output: "MINE=1\nREF=new\n"
 # [<] 🤖🤖

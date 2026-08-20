@@ -1,0 +1,128 @@
+# [>] 🤖🤖
+context:
+  function: spec.Load
+cases:
+  - name: ShouldSubstituteProcessEnvInAnyValue
+    input:
+      args:
+        - spec: |
+            env: {TREE: '${{ env.BASE }}/tree'}
+            include: {sources: ['${{ env.BASE }}/other']}
+            web:
+              options: {profileWorkingDirectory: '${{ env.TREE }}/${{ env.APP || app }}'}
+        - process: {BASE: /b}
+        - dotenv: {}
+        - ref: {}
+        - policy: error
+    expected:
+      output:
+        env: {TREE: /b/tree}
+        include: [/b/other]
+        workdir: {web: /b/tree/app}
+        unset: {}
+        sources: {BASE: process env, TREE: spec env}
+  - name: ShouldLetSpecEnvWinOverProcessAndRefWinOverSpec
+    input:
+      args:
+        - spec: |
+            env: {A: spec, B: spec}
+            web:
+              options: {profileWorkingDirectory: '${{ env.A }}-${{ env.B }}'}
+        - process: {A: process, B: process}
+        - dotenv: {}
+        - ref: {B: ref}
+        - policy: error
+    expected:
+      output:
+        env: {A: spec, B: spec}
+        workdir: {web: spec-ref}
+        unset: {}
+        sources: {A: spec env, B: ref env}
+  - name: ShouldExpandEnvBlockFromLaunchEnvNeverSiblings
+    input:
+      args:
+        - spec: |
+            env: {A: one, B: '${{ env.A || none }}'}
+        - process: {A: process}
+        - dotenv: {}
+        - ref: {}
+        - policy: error
+    expected:
+      output:
+        env: {A: one, B: process}
+        unset: {}
+        sources: {A: process env}
+  - name: ShouldReadDotEnvBeneathProcess
+    input:
+      args:
+        - spec: |
+            web:
+              options: {profileWorkingDirectory: '${{ env.A }}-${{ env.B }}'}
+        - process: {B: process}
+        - dotenv: {A: file, B: file}
+        - ref: {}
+        - policy: error
+    expected:
+      output:
+        workdir: {web: file-process}
+        unset: {}
+        sources: {A: .env, B: process env}
+  - name: ShouldFailOnUnsetTopLevelRefsListingEveryGap
+    input:
+      args:
+        - spec: |
+            env: {X: '${{ env.A }}'}
+            include: {sources: ['${{ env.B }}/other']}
+        - process: {}
+        - dotenv: {}
+        - ref: {}
+        - policy: error
+    expected:
+      errorOutput: ['che.yml: unset env vars:', 'A at /env/X', 'B at /include/sources/0', 'options.envUnset: empty']
+  - name: ShouldRecordProfileRefsWithoutFailing
+    input:
+      args:
+        - spec: |
+            a:
+              options: {profileWorkingDirectory: '${{ env.A }}'}
+            b:
+              options: {profileWorkingDirectory: '${{ env.B }}/x'}
+        - process: {A: set}
+        - dotenv: {}
+        - ref: {}
+        - policy: error
+    expected:
+      output:
+        workdir: {a: set, b: /x}
+        unset: {b: ['B@/b/options/profileWorkingDirectory']}
+        sources: {A: process env}
+  - name: ShouldReadUnsetAsEmptyUnderEmptyPolicy
+    input:
+      args:
+        - spec: |
+            env: {X: '${{ env.A }}'}
+        - process: {}
+        - dotenv: {}
+        - ref: {}
+        - policy: empty
+    expected:
+      output:
+        env: {X: ""}
+        unset: {"": ['A@/env/X']}
+        sources: {}
+  - name: ShouldKeepMappingKeysLiteral
+    input:
+      args:
+        - spec: |
+            '${{ env.NAME }}':
+              options: {profileWorkingDirectory: x}
+        - process: {NAME: web}
+        - dotenv: {}
+        - ref: {}
+        - policy: error
+    expected:
+      output:
+        workdir: {'${{ env.NAME }}': x}
+        unset: {}
+        sources: {}
+# [<] 🤖🤖
