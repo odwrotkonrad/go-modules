@@ -97,14 +97,14 @@ func (p *ProfileReady) orderByIncludes(keep []templateItem) ([]templateItem, err
 	return out, nil
 }
 
-func (p *ProfileReady) renderTemplates(templates []spec.FileItem, skipSecrets bool) error {
+func (p *ProfileReady) renderTemplates(templates []spec.FileItem, skips renderSkips) error {
 	var keep []templateItem
 	var hostDests []string
 	for _, item := range templates {
 		dests := p.resolveTemplateDests(item)
-		if skipSecrets && p.isSecretRefInItem(item) {
+		if reason := p.skipReason(item, skips); reason != "" {
 			for _, d := range dests {
-				p.emit(log.Levels.Debug, "render-templates", p.wouldAction(d.path), d.path, "options.renderTemplates.skipSecrets")
+				p.emit(log.Levels.Debug, "render-templates", p.wouldAction(d.path), d.path, reason)
 			}
 			continue
 		}
@@ -191,22 +191,44 @@ func isGitRootDest(path string) bool {
 	return strings.HasPrefix(path, "${invokingSpecGitRoot}/")
 }
 
-func (p *ProfileReady) isSecretRefInItem(item spec.FileItem) bool {
+type renderSkips struct {
+	Secrets   bool
+	Variables bool
+}
+
+func (p *ProfileReady) skipReason(item spec.FileItem, skips renderSkips) string {
+	if !skips.Secrets && !skips.Variables {
+		return ""
+	}
+	body, ok := p.templateBody(item)
+	if !ok {
+		return ""
+	}
+	switch {
+	case skips.Secrets && render.IsSecretRefPresent(body):
+		return "options.renderTemplates.skipSecrets"
+	case skips.Variables && render.IsShellCallPresent(body):
+		return "options.renderTemplates.skipVariables"
+	}
+	return ""
+}
+
+func (p *ProfileReady) templateBody(item spec.FileItem) ([]byte, bool) {
 	if spec.IsRemoteSrc(item.Rel) {
 		if p.isDryRun() {
-			return false
+			return nil, false
 		}
 		content, err := p.fetchRemote(spec.RemoteSrcRef(item.Rel))
 		if err != nil {
-			return false
+			return nil, false
 		}
-		return render.IsSecretRefPresent([]byte(content))
+		return []byte(content), true
 	}
 	src, err := os.ReadFile(p.templateSrcPath(item))
 	if err != nil {
-		return false
+		return nil, false
 	}
-	return render.IsSecretRefPresent(src)
+	return src, true
 }
 
 func (p *ProfileReady) resolveTemplateDests(item spec.FileItem) []templateDest {
@@ -257,7 +279,7 @@ func (p *ProfileReady) renderTemplate(item spec.FileItem, dests []templateDest) 
 	}
 	p.storeRenderHashes(item, dests, templatePath, src, body)
 	if len(item.Dests) == 0 || item.Derived {
-		return p.placeFile(dests[0].path, body, item)
+		return p.placeFile(dests[0].path, render.StripMergeActions(body), item)
 	}
 	for _, d := range dests {
 		out, err := p.composeDest(item, d, body)
@@ -308,7 +330,7 @@ func (p *ProfileReady) warnUnresolvedIncludes(item spec.FileItem, d templateDest
 
 func (p *ProfileReady) composeDest(item spec.FileItem, d templateDest, body []byte) ([]byte, error) {
 	if len(item.Dests) == 0 || item.Derived {
-		return body, nil
+		return render.StripMergeActions(body), nil
 	}
 	existing, _ := p.readExistingDest(d)
 	return render.Compose(render.Composition{

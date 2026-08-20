@@ -1,9 +1,8 @@
 #!/usr/bin/env zsh
 ##[>] 🤖🤖
 # Vendor the che-packages catalog che embeds. Reads the pinned version from
-# $GRP_VAR_CHE_PACKAGES_REF, a group-wide CI variable raised by a catalog
-# release, falling back to che's own $CHE_PACKAGES_REF for a local run,
-# downloads that release's tarball from the che-packages generic package
+# $CHE_PACKAGES_REF (CI derives it from the group's GRP_KO_VAR_CHE_PACKAGES_REF,
+# a host seeds it in .env), downloads that release's tarball from the che-packages generic package
 # registry, verifies its sha256 against the published checksums.txt, and unpacks
 # packages.yml + scripts/ into che/internal/packages/builtin/ (gitignored,
 # rebuilt on demand). Re-running with an unchanged pin is a no-op.
@@ -24,9 +23,9 @@ BASE="${CHE_PACKAGES_URL:-https://gitlab.com/api/v4/projects/${PROJECT}/packages
 
 #[why] unset resolves the newest published catalog rather than failing: a local build wants
 #   current definitions, and only CI, where the variable is set, needs an exact one
-VERSION="${GRP_VAR_CHE_PACKAGES_REF:-${CHE_PACKAGES_REF:-}}"
+VERSION="${CHE_PACKAGES_REF:-}"
 if [[ -z "$VERSION" && -z "${CHE_PACKAGES_DIR:-}" ]] {
-  print -r -- "GRP_VAR_CHE_PACKAGES_REF unset, resolving latest"
+  print -r -- "CHE_PACKAGES_REF unset, resolving latest"
   VERSION="$(curl -fsSL --connect-timeout 30 --retry 5 --retry-delay 5 "${BASE}/latest/version.txt" | tr -d '[:space:]')"
   [[ -n "$VERSION" ]] || { print -ru2 -- "could not resolve latest che-packages version from ${BASE}"; exit 1 }
 }

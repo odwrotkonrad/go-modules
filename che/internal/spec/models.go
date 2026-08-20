@@ -65,7 +65,12 @@ type Doc struct {
 	Env            map[string]string
 	Include        []SpecSourceRecipe
 	ProfileRecipes []ProfileRecipe
+	EnvUnset       map[string][]EnvUnset
+	EnvRefs        []EnvRef
 }
+
+// ProfileEnvUnset returns the unset bare env refs recorded under one profile, nil when none.
+func (d *Doc) ProfileEnvUnset(name string) []EnvUnset { return d.EnvUnset[name] }
 
 type Options struct {
 	RunIf                   []string        `yaml:"runIf" jsonschema_description:"spec-level predicates: gate every profile of this spec (ANDed with each profile's own); spec-only"`
@@ -73,6 +78,7 @@ type Options struct {
 	LogLevel                string          `yaml:"logLevel" jsonschema:"enum=error,enum=warn,enum=info,enum=debug,enum=trace" jsonschema_description:"human-log level default for profiles that don't set it; overridden by --log-level and CHE_LOG_LEVEL"`
 	ProfileWorkingDirectory string          `yaml:"profileWorkingDirectory" jsonschema_description:"the load-ops source tree (absolute, relative to the checkout, ~/, $VAR, env vars expanded); default the checkout itself; makeLinks/makeCopies/renderTemplates host sources resolve against it; home targeting is explicit via a $HOME dest rewrite; spec-only"`
 	ValidateSpec            string          `yaml:"validateSpec" jsonschema:"enum=warn,enum=error" jsonschema_description:"how this spec's schema violations report (per-spec: each included spec honors its own); overridden by the flag and env var"`
+	EnvUnset                string          `yaml:"envUnset" jsonschema:"enum=error,enum=empty" jsonschema_description:"what a bare ${{ env.NAME }} does when NAME is unset or empty: error (default, profiles selected to run only) | empty (reads as \"\"); a || default never errors; literal only, read before interpolation; overridden by --env-unset and CHE_ENV_UNSET"`
 	DryRun                  Scalar          `yaml:"dryRun" jsonschema:"enum=delta,enum=all,enum=true,enum=false" jsonschema_description:"default dry-run mode: delta (changed dests) | all (every dest) | true (alias for delta) | false (off, the default); overridden by the flag and env var"`
 	Profiles                []string        `yaml:"profiles" jsonschema_description:"profiles to run (autoDiscover skipped, runIf still enforced); overridden by --profiles and CHE_PROFILE"`
 	SkipRemoteRefs          *bool           `yaml:"skipRemoteRefs" jsonschema_description:"skip sourced include.profiles refs; overridden by the flag and env var"`
@@ -251,7 +257,8 @@ func (StringOrList) JSONSchema() *jsonschema.Schema {
 }
 
 type RenderTemplates struct {
-	SkipSecrets *bool `yaml:"skipSecrets" jsonschema_description:"skip op:// (1Password) and gcp:// (GCP Secret Manager) secret resolution, render placeholders; overridden by the flag and env var"`
+	SkipSecrets   *bool `yaml:"skipSecrets" jsonschema_description:"skip templates carrying op:// (1Password) or gcp:// (GCP Secret Manager) secret refs; overridden by the flag and env var"`
+	SkipVariables *bool `yaml:"skipVariables" jsonschema_description:"skip templates carrying a shell call; overridden by the flag and env var"`
 }
 
 type Otel struct {

@@ -12,6 +12,7 @@ import (
 
 	"gitlab.com/konradodwrot/go-modules/che/internal/log"
 	"gitlab.com/konradodwrot/go-modules/che/internal/packages"
+	"gitlab.com/konradodwrot/go-modules/che/internal/spec/envinterp"
 )
 
 type LookupEnv func(string) string
@@ -218,6 +219,11 @@ func (o *Options) Resolve(env LookupEnv, user, spec Layer) error {
 	default:
 		return fmt.Errorf("invalid --validate-spec mode %q: want warn or error", o.ValidateSpec)
 	}
+	o.EnvUnset = envinterp.Policy(o.resolveStr("envUnset", string(envinterp.Policies.Error),
+		fromFlag(string(o.EnvUnset)), fromEnv(env("CHE_ENV_UNSET")), fromLayer(user.EnvUnset, "config-file"), fromLayer(spec.EnvUnset, "specFile")))
+	if !envinterp.ValidPolicy(o.EnvUnset) {
+		return fmt.Errorf("invalid --env-unset policy %q: want error or empty", o.EnvUnset)
+	}
 	o.CheWorkingDirectory = o.resolveStr("cheWorkingDirectory", "",
 		fromFlag(o.CheWorkingDirectory), fromEnv(env("CHE_WORKING_DIRECTORY")))
 	o.ProfileWorkingDirectory = o.resolveStr("profileWorkingDirectory", "",
@@ -256,6 +262,8 @@ func (o *Options) Resolve(env LookupEnv, user, spec Layer) error {
 	}
 	o.RenderSkipSecrets = o.resolveBool("renderTemplates.skipSecrets", o.RenderSkipSecrets, env("CHE_RENDER_TEMPLATES_SKIP_SECRETS"), false,
 		boolCandidate{user.RenderTemplates.SkipSecrets, "config-file"}, boolCandidate{spec.RenderTemplates.SkipSecrets, "specFile"})
+	o.RenderSkipVariables = o.resolveBool("renderTemplates.skipVariables", o.RenderSkipVariables, env("CHE_RENDER_TEMPLATES_SKIP_VARIABLES"), false,
+		boolCandidate{user.RenderTemplates.SkipVariables, "config-file"}, boolCandidate{spec.RenderTemplates.SkipVariables, "specFile"})
 	o.PackagesFile = o.resolveStr("packages.file", "",
 		fromFlag(o.PackagesFile), fromEnv(env("CHE_PACKAGES_FILE")), fromLayer(user.Packages.File, "config-file"), fromLayer(spec.Packages.File, "specFile"))
 	o.fillDefault("packages.file", packages.BuiltinSentinel)

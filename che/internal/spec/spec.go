@@ -10,6 +10,7 @@ import (
 
 	"gopkg.in/yaml.v3"
 
+	"gitlab.com/konradodwrot/go-modules/che/internal/spec/envinterp"
 	"gitlab.com/konradodwrot/go-modules/che/render/render"
 )
 
@@ -189,7 +190,7 @@ func DestRel(it FileItem) string {
 	return it.Rel
 }
 
-func Load(path string) (*Doc, error) {
+func Load(path string, in Interp) (*Doc, error) {
 	b, err := os.ReadFile(path)
 	if err != nil {
 		return nil, fmt.Errorf("spec not found: %s", path)
@@ -203,6 +204,12 @@ func Load(path string) (*Doc, error) {
 		return d, nil
 	}
 	m := doc.Content[0]
+	it := newInterpolator(in, m)
+	it.walkDoc(m)
+	d.EnvUnset, d.EnvRefs = it.unset, it.refs
+	if in.Policy != envinterp.Policies.Empty && len(d.EnvUnset[topLevelProfile]) > 0 {
+		return nil, EnvUnsetError(path, d.EnvUnset[topLevelProfile])
+	}
 	for i := 0; i+1 < len(m.Content); i += 2 {
 		key, node := m.Content[i].Value, m.Content[i+1]
 		if err := d.decodeKey(key, node); err != nil {

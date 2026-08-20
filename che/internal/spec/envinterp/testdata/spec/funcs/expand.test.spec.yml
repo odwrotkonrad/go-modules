@@ -1,0 +1,75 @@
+# [>] 🤖🤖
+context:
+  function: envinterp.Expand
+cases:
+  - name: ShouldSubstituteSetVar
+    input:
+      args:
+        - s: 'x/${{ env.A }}/y'
+        - env: {A: one}
+    expected:
+      output: {value: x/one/y}
+  - name: ShouldReportUnsetBareRef
+    input:
+      args:
+        - s: '${{ env.A }}'
+        - env: {}
+    expected:
+      output: {value: "", unset: [A]}
+  - name: ShouldTreatEmptyAsUnset
+    input:
+      args:
+        - s: '${{ env.A }}'
+        - env: {A: ""}
+    expected:
+      output: {value: "", unset: [A]}
+  - name: ShouldUseDefaultWhenUnset
+    input:
+      args:
+        - s: '${{ env.A || fallback }}'
+        - env: {}
+    expected:
+      output: {value: fallback}
+  - name: ShouldPreferValueOverDefault
+    input:
+      args:
+        - s: '${{ env.A || fallback }}'
+        - env: {A: set}
+    expected:
+      output: {value: set}
+  - name: ShouldKeepDefaultLiteral
+    input:
+      args:
+        - s: '${{ env.A || ${{ env.B }} }}'
+        - env: {B: nested}
+    expected:
+      output: {value: '${{ env.B }}'}
+  - name: ShouldIgnoreWhitespace
+    input:
+      args:
+        - s: '${{   env.A   ||   v a l   }}'
+        - env: {}
+    expected:
+      output: {value: v a l}
+  - name: ShouldSubstituteSeveralRefs
+    input:
+      args:
+        - s: '${{ env.A }}:${{ env.B || b }}:${{ env.C }}'
+        - env: {A: a}
+    expected:
+      output: {value: 'a:b:', unset: [C]}
+  - name: ShouldLeaveDollarVarAlone
+    input:
+      args:
+        - s: '$HOME/${HOME}/${{ HOME }}/${{ env. }}/${{ env.1A }}'
+        - env: {HOME: h}
+    expected:
+      output: {value: '$HOME/${HOME}/${{ HOME }}/${{ env. }}/${{ env.1A }}'}
+  - name: ShouldLeavePlainTextAlone
+    input:
+      args:
+        - s: plain
+        - env: {}
+    expected:
+      output: {value: plain}
+# [<] 🤖🤖

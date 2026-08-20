@@ -2,7 +2,10 @@ package options
 
 // [>] 🤖🤖
 
-import "gitlab.com/konradodwrot/go-modules/che/internal/spec"
+import (
+	"gitlab.com/konradodwrot/go-modules/che/internal/spec"
+	"gitlab.com/konradodwrot/go-modules/che/internal/spec/envinterp"
+)
 
 type DryRunMode string
 
@@ -20,6 +23,8 @@ type Options struct {
 	DryRun                                             DryRunMode
 	ValidateSpec                                       ValidateSpecMode
 	ValidateSpecCLI                                    ValidateSpecMode
+	EnvUnset                                           envinterp.Policy
+	EnvUnsetReport                                     bool
 	Profiles                                           []string
 	RunSkipOps                                         []string
 	BackupAutoCreateFlag                               *bool
@@ -29,6 +34,7 @@ type Options struct {
 	Errexit                                            bool
 	LogLevel                                           string
 	RenderSkipSecrets                                  bool
+	RenderSkipVariables                                bool
 	PackagesFile                                       string
 	PackagesOverride                                   string
 	PackagesUpdate                                     bool

@@ -39,4 +39,44 @@ cases:
         - body: '{{ renderMarkdown "absent.md" }}'
     expected:
       errorOutput: ['render template t.tpl', 'absent.md', 'no such file or directory']
+  - name: ShouldSubstituteShellStdoutTrimmed
+    context:
+      env: {CHE_TEST_SHELL_VAR: fromenv}
+    input:
+      args:
+        - body: |-
+            v={{ shell "echo $CHE_TEST_SHELL_VAR" }}
+    expected:
+      output: "v=\x1ealwaysUpdate\x1ffromenv"
+  - name: ShouldRunShellInRepoRoot
+    input:
+      args:
+        - body: |-
+            {{ shell "cat x" }}
+    expected:
+      output: "\x1ealwaysUpdate\x1fx"
+  - name: ShouldRetagShellWithKeepIfExisting
+    input:
+      args:
+        - body: '{{ shell "cat x" | keepIfExisting }}'
+    expected:
+      output: "\x1ekeepIfExisting\x1fx"
+  - name: ShouldTagLiteralWithAlwaysUpdate
+    input:
+      args:
+        - body: '{{ "lit" | alwaysUpdate }}'
+    expected:
+      output: "\x1ealwaysUpdate\x1flit"
+  - name: ShouldLeaveUnpipedLiteralUntagged
+    input:
+      args:
+        - body: 'k={{ "lit" }}'
+    expected:
+      output: k=lit
+  - name: ShouldFailOnShellNonZeroExit
+    input:
+      args:
+        - body: '{{ shell "echo boom >&2; exit 3" }}'
+    expected:
+      errorOutput: ['render template t.tpl', 'shell "echo boom >&2; exit 3"', 'exit status 3', 'boom']
 # [<] 🤖🤖

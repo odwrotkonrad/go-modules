@@ -12,6 +12,7 @@ sourced profile refs included).
 | `--backup-auto-create` | `CHE_BACKUP_AUTO_CREATE` | `bool` | `true` | archive every would-change dest before mutating it, in the run sequence and before a directly invoked op; false disables both, leaving che backup create untouched |
 | `-C`, `--che-working-directory` | `CHE_WORKING_DIRECTORY` | `string` |  | change into this directory before resolving the repo |
 | `--dry-run` | `CHE_DRY_RUN` | `delta (changed dests, bare-flag default)` \| `all (every dest)` \| `true (alias for delta)` | `off` | print mutating actions instead of executing them |
+| `--env-unset` | `CHE_ENV_UNSET` | `error (abort, profiles selected to run only)` \| `empty (reads as "")` | `error` | what a bare ${{ env.NAME }} in che.yml does when NAME is unset or empty |
 | `--errexit` | `CHE_ERREXIT` | `bool` | `continue and report all failures` | stop the run at the first script failure (remaining scripts, ops, profiles skipped) |
 | `--log-level` | `CHE_LOG_LEVEL` | `error (failures only)` \| `warn` \| `info (what happened)` \| `debug (adds intentions and won't-happen with reasons)` \| `trace (adds details)` | `info` | human-log level |
 | `--profile-working-directory` | `CHE_PROFILE_WORKING_DIRECTORY` | `string` |  | the load-ops source tree (che level; spec/profile options.profileWorkingDirectory override); default root |
@@ -282,8 +283,11 @@ delete broken symlinks.
 render templates and generated docs with the shared engine.
 
 render drives che's shared render engine: gomplate built-ins, op:// (1Password)
-and gcp:// (GCP Secret Manager) secret refs, remoteFile cross-repo inclusion,
-frontmatter and markdown transforms.
+and gcp:// (GCP Secret Manager) secret refs, shell command output, remoteFile
+cross-repo inclusion, frontmatter and markdown transforms. Under a mergeUpsert
+dest a secret or shell value overwrites the existing key and a plain value
+keeps it; "| alwaysUpdate" and "| keepIfExisting" after any value decide per
+line.
 
 Every subcommand writes to stdout and reads paths relative to the cwd. The
 generating subcommands take --check <file> instead, regenerating and diffing
@@ -352,6 +356,7 @@ render *.tpl sources; each dest path decides target (relative -> repo, ~/ or abs
 | Option | Env | Values | Default | Description |
 | --- | --- | --- | --- | --- |
 | `--skip-secrets` | `CHE_RENDER_TEMPLATES_SKIP_SECRETS` | `bool` | `false` | skip sources carrying op:// or gcp:// secret refs (logged, dests untouched) |
+| `--skip-variables` | `CHE_RENDER_TEMPLATES_SKIP_VARIABLES` | `bool` | `false` | skip sources carrying a shell call (logged, dests untouched) |
 
 ### `$ che run`
 

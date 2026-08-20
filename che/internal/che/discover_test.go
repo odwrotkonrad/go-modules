@@ -76,7 +76,7 @@ func TestDiscoverSummary(t *testing.T) {
 				fs, reader := p.FS, p.Reader
 				p.FS, p.Reader = m.FS, m.Reader
 				_, err := testutil.CaptureStdout(t, func() error {
-					return p.renderTemplates(res.RenderTemplates.Templates, false)
+					return p.renderTemplates(res.RenderTemplates.Templates, renderSkips{})
 				})
 				require.NoError(t, err)
 				p.FS, p.Reader = fs, reader

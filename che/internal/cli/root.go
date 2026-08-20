@@ -71,6 +71,8 @@ sourced profile refs included).`,
 	pf.Lookup("dry-run").NoOptDefVal = "delta"
 	pf.StringVar((*string)(&a.flags.ValidateSpec), "validate-spec", "",
 		"validate each loaded che.yml spec against the JSON Schema; values: warn (log violations) | error (abort on violations); default: warn; env: CHE_VALIDATE_SPEC")
+	pf.StringVar((*string)(&a.flags.EnvUnset), "env-unset", "",
+		"what a bare ${{ env.NAME }} in che.yml does when NAME is unset or empty; values: error (abort, profiles selected to run only) | empty (reads as \"\"); default: error; env: CHE_ENV_UNSET")
 	pf.StringSliceVar(&a.flags.Profiles, "profiles", nil,
 		"run only these profiles (comma-separated or repeated; autoDiscover skipped, runIf still enforced); env: CHE_PROFILE (comma-separated)")
 	pf.Bool("backup-auto-create", true,

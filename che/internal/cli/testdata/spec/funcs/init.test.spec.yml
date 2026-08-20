@@ -72,4 +72,48 @@ cases:
       output:
         profiles: cli/macos,desktop/macos
         dryRunAll: true
+  - name: ShouldIgnoreUnsetEnvRefsOfUnselectedProfiles
+    context:
+      env: {CHE_TEST_A: set}
+    input:
+      args:
+        - profile: envA
+        - validateSpecMode: ""
+        - appendSpec: |
+            envA:
+              include:
+                makeLinks: ['_home/${{ env.CHE_TEST_A }}/**']
+            envB:
+              include:
+                makeLinks: ['_home/${{ env.CHE_TEST_B_UNSET }}/**']
+    expected:
+      output:
+        profiles: envA
+        dryRunAll: false
+  - name: ShouldFailOnUnsetEnvRefOfSelectedProfile
+    input:
+      args:
+        - profile: envB
+        - validateSpecMode: ""
+        - appendSpec: |
+            envB:
+              include:
+                makeLinks: ['_home/${{ env.CHE_TEST_B_UNSET }}/**']
+    expected:
+      errorOutput: ['unset env vars:', 'CHE_TEST_B_UNSET at /envB/include/makeLinks/0']
+  - name: ShouldReadUnsetEnvRefAsEmptyWithPolicyEnv
+    context:
+      env: {CHE_ENV_UNSET: empty}
+    input:
+      args:
+        - profile: envB
+        - validateSpecMode: ""
+        - appendSpec: |
+            envB:
+              include:
+                makeLinks: ['_home/${{ env.CHE_TEST_B_UNSET }}/**']
+    expected:
+      output:
+        profiles: envB
+        dryRunAll: false
 # [<] 🤖🤖

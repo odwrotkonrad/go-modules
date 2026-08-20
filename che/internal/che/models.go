@@ -21,6 +21,7 @@ import (
 	"gitlab.com/konradodwrot/go-modules/che/internal/log"
 	"gitlab.com/konradodwrot/go-modules/che/internal/options"
 	"gitlab.com/konradodwrot/go-modules/che/internal/spec"
+	"gitlab.com/konradodwrot/go-modules/che/internal/spec/envinterp"
 	"gitlab.com/konradodwrot/go-modules/che/internal/telemetry"
 	"gitlab.com/konradodwrot/go-modules/che/render/render"
 )
@@ -84,12 +85,20 @@ func PrepareApplicationOptions(ctx Context, opts options.Options) (Context, opti
 	if err != nil {
 		return ctx, resolved, err
 	}
+	ctx, err = ctx.withDotEnv(filepath.Join(repoRoot, ".env"))
+	if err != nil {
+		return ctx, resolved, err
+	}
 	home, err := resolveInvokingHome(ctx)
 	if err != nil {
 		return ctx, resolved, err
 	}
 	if err := resolved.Resolve(ctx.lookupEnv(), readUserLayer(fsutil.ResolveUserConfigPath(home)), readSpecLayer(filepath.Join(repoRoot, "che.yml"))); err != nil {
 		return ctx, resolved, err
+	}
+	if ctx.Command == "discover-profiles" {
+		resolved.EnvUnset = envinterp.Policies.Empty
+		resolved.EnvUnsetReport = true
 	}
 	level, err := log.ParseLevel(resolved.LogLevel)
 	if err != nil {
@@ -211,7 +220,11 @@ func (p *specPreparer) prepare(src spec.SpecSourceRecipe, anchor string, forced 
 		return nil, nil
 	}
 	p.seenSpecs[recipe.sourceReady.DirectoryPath] = true
-	if err := recipe.PrepareProfileRecipes(p.opts, root); err != nil {
+	var refEnv map[string]string
+	if forced != nil {
+		refEnv = forced.Env
+	}
+	if err := recipe.PrepareProfileRecipes(p.opts, root, p.ctx.interp(refEnv, p.opts.EnvUnset)); err != nil {
 		return nil, err
 	}
 	return recipe.PrepareProfiles(p, forced, root)
@@ -285,6 +298,10 @@ type SpecRecipe struct {
 	Options        spec.Options
 	Env            map[string]string
 	ProfileRecipes []spec.ProfileRecipe
+	EnvUnset       map[string][]spec.EnvUnset
+	EnvRefs        []spec.EnvRef
+	envUnsetPolicy envinterp.Policy
+	envUnsetReport bool
 	sourceReady    spec.SpecSourceReady
 }
 
@@ -297,15 +314,16 @@ func (r *SpecRecipe) PrepareSpec(anchor, home string) error {
 	return nil
 }
 
-func (r *SpecRecipe) PrepareProfileRecipes(opts options.Options, root bool) error {
+func (r *SpecRecipe) PrepareProfileRecipes(opts options.Options, root bool, in spec.Interp) error {
 	if err := r.validateSchema(opts.ValidateSpecCLI); err != nil {
 		return err
 	}
-	doc, err := spec.Load(r.sourceReady.DefinitionURI)
+	doc, err := spec.Load(r.sourceReady.DefinitionURI, in)
 	if err != nil {
 		return err
 	}
 	r.Options, r.Env, r.Include = doc.Options, doc.Env, doc.Include
+	r.EnvUnset, r.EnvRefs, r.envUnsetPolicy, r.envUnsetReport = doc.EnvUnset, doc.EnvRefs, in.Policy, opts.EnvUnsetReport
 	// [why] che-level (flag/env/user-config) seeds the spec default, cascading into every profile recipe
 	if root && r.Options.ProfileWorkingDirectory == "" {
 		r.Options.ProfileWorkingDirectory = opts.ProfileWorkingDirectory
@@ -375,7 +393,7 @@ func (r *SpecRecipe) candidateSummary() (all, autoDiscoverable string) {
 }
 
 func (r *SpecRecipe) PrepareProfiles(p *specPreparer, forced *spec.ProfileSourceRecipe, root bool) (*SpecReady, error) {
-	ready := &SpecReady{Source: r.sourceReady, Options: r.Options, Env: r.Env, recipes: r.ProfileRecipes, tel: p.tel}
+	ready := &SpecReady{Source: r.sourceReady, Options: r.Options, Env: r.Env, EnvRefs: r.EnvRefs, recipes: r.ProfileRecipes, tel: p.tel}
 	if root { // [why] candidates log once, for the invoked spec only
 		all, auto := r.candidateSummary()
 		log.EmitTrace("discover-profiles", "listed-candidates", all)
@@ -399,10 +417,48 @@ func (r *SpecRecipe) PrepareProfiles(p *specPreparer, forced *spec.ProfileSource
 	if err != nil || len(names) == 0 {
 		return ready, err
 	}
+	names, err = r.filterEnvSet(names)
+	if err != nil || len(names) == 0 {
+		return ready, err
+	}
 	if err := r.assembleProfiles(p, ready, lookup, names, forced); err != nil {
 		return nil, err
 	}
 	return ready, nil
+}
+
+func (r *SpecRecipe) filterEnvSet(names []string) ([]string, error) {
+	if r.envUnsetPolicy == envinterp.Policies.Empty && !r.envUnsetReport {
+		return names, nil
+	}
+	var unset []spec.EnvUnset
+	var kept []string
+	for _, name := range names {
+		missing := r.EnvUnset[name]
+		if len(missing) == 0 {
+			kept = append(kept, name)
+			continue
+		}
+		if r.envUnsetReport {
+			log.EmitSkip(log.Levels.Info, "discover-profiles", "load-spec", "profile "+name, "unset env: "+strings.Join(envUnsetNames(missing), ", "))
+			continue
+		}
+		unset = append(unset, missing...)
+	}
+	if len(unset) > 0 {
+		return nil, spec.EnvUnsetError(r.sourceReady.DefinitionURI, unset)
+	}
+	return kept, nil
+}
+
+func envUnsetNames(unset []spec.EnvUnset) []string {
+	var names []string
+	for _, u := range unset {
+		if !slices.Contains(names, u.Name) {
+			names = append(names, u.Name)
+		}
+	}
+	return names
 }
 
 func (p *specPreparer) evalWith(overlay map[string]string) func(string) (bool, error) {
@@ -564,10 +620,48 @@ type SpecReady struct {
 	Include  []*SpecReady
 	Options  spec.Options
 	Env      map[string]string
+	EnvRefs  []spec.EnvRef
 	Profiles []*ProfileReady
 	Rejected []spec.Rejection
 	recipes  []spec.ProfileRecipe
 	tel      *telemetry.Telemetry
+}
+
+func (s *SpecReady) LogEnvRequirements() {
+	if len(s.EnvRefs) > 0 {
+		log.Emit(log.Event{
+			Level: log.Levels.Info, Scope: "discover-profiles", Action: "env-requirements",
+			Msg: "Env requirements " + s.Source.DefinitionURI, Heading: 2,
+		})
+	}
+	seen := map[string]bool{}
+	for _, ref := range s.EnvRefs {
+		key := ref.Profile + "/" + ref.Name
+		if seen[key] {
+			continue
+		}
+		seen[key] = true
+		log.Emit(log.Event{
+			Level: log.Levels.Info, Scope: "discover-profiles", Msg: formatEnvRef(ref), Depth: 1,
+			Attrs: map[string]string{"profile": ref.Profile, "name": ref.Name, "set": fmt.Sprint(ref.Set), "source": ref.Source},
+		})
+	}
+	for _, included := range s.Include {
+		included.LogEnvRequirements()
+	}
+}
+
+func formatEnvRef(ref spec.EnvRef) string {
+	need := "required"
+	if ref.HasDefault {
+		need = "default: " + cmp.Or(ref.Default, `""`)
+	}
+	state := "UNSET"
+	if ref.Set {
+		state = "set (" + ref.Source + ")"
+	}
+	scope := cmp.Or(ref.Profile, "spec")
+	return fmt.Sprintf("%s  %s  %s  [%s]", ref.Name, need, state, scope)
 }
 
 func (s *SpecReady) LogRejected() {
@@ -582,6 +676,7 @@ func (s *SpecReady) LogRejected() {
 
 func (s *SpecReady) LogDiscovered() {
 	s.LogRejected()
+	s.LogEnvRequirements()
 	for _, p := range s.AllProfiles() {
 		p.LogDiscovered()
 	}
@@ -619,7 +714,9 @@ func (s *SpecReady) ExecEach(ctx context.Context, opName string, fn func(context
 		log.EmitDebug(opName, "will-run", "profile "+p.Ref()+": "+p.describeOpDeltas(opName))
 		p.emitHeading(log.Levels.Info, opName, "run-profile", "Run profile "+p.Ref(), 1)
 		p.logDepth = 1
+		restore := exportEnv(p.env)
 		err := fn(pctx, p)
+		restore()
 		if err != nil {
 			pspan.RecordError(err)
 			errs = append(errs, fmt.Errorf("%s: %w", p.Ref(), err))
@@ -1095,7 +1192,7 @@ func (p *ProfileReady) prepareOperations(ops spec.OperationRecipes) ([]operation
 		&MakeDirsOperationReady{Dirs: ops.MakeDirs.Dirs},
 		&MakeLinksOperationReady{Links: ops.MakeLinks.Links, Dirs: ops.MakeLinks.Dirs},
 		&MakeCopiesOperationReady{Copies: ops.MakeCopies.Copies, Dirs: ops.MakeCopies.Dirs},
-		&RenderTemplatesOperationReady{Templates: ops.RenderTemplates.Templates, SkipSecrets: p.opts.RenderSkipSecrets},
+		&RenderTemplatesOperationReady{Templates: ops.RenderTemplates.Templates, SkipSecrets: p.opts.RenderSkipSecrets, SkipVariables: p.opts.RenderSkipVariables},
 		&InstallPackagesOperationReady{Packages: ops.InstallPackages.Packages, ToolPackages: ops.InstallPackages.ToolPackages},
 		&RunScriptsOperationReady{Scripts: scripts},
 	}, nil
@@ -1223,14 +1320,15 @@ func (o *MakeCopiesOperationReady) unsettledDests(p *ProfileReady) (int, int, []
 
 type RenderTemplatesOperationReady struct {
 	OperationReady
-	Templates   []spec.FileItem
-	SkipSecrets bool
+	Templates     []spec.FileItem
+	SkipSecrets   bool
+	SkipVariables bool
 }
 
 func (o *RenderTemplatesOperationReady) Name() string   { return "render-templates" }
 func (o *RenderTemplatesOperationReady) Selected() bool { return len(o.Templates) > 0 }
 func (o *RenderTemplatesOperationReady) execOperation(p *ProfileReady) error {
-	return p.renderTemplates(o.Templates, o.SkipSecrets)
+	return p.renderTemplates(o.Templates, renderSkips{Secrets: o.SkipSecrets, Variables: o.SkipVariables})
 }
 
 func (o *RenderTemplatesOperationReady) counts(p *ProfileReady) (int, int) {
