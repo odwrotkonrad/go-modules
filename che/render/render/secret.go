@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"os"
 	"os/exec"
+	"regexp"
 	"strings"
 	"time"
 
@@ -146,13 +147,11 @@ func isRateLimitErr(err error) bool {
 	return err != nil && strings.Contains(err.Error(), "rate limit exceeded")
 }
 
+var secretActionPattern = regexp.MustCompile(`\{\{[^}]*?(op|gcp):\/\/`)
+
+// IsSecretRefPresent reports whether a template body resolves an op:// or gcp:// ref inside an action.
 func IsSecretRefPresent(body []byte) bool {
-	for _, scheme := range secretSchemes {
-		if bytes.Contains(body, []byte(scheme)) {
-			return true
-		}
-	}
-	return false
+	return secretActionPattern.Match(body)
 }
 
 func schemeOf(ref string) string {
