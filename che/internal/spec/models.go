@@ -288,7 +288,7 @@ type ProfileOptions struct {
 type includeSet struct {
 	Profiles            []ProfileSourceRecipe       `yaml:"profiles" jsonschema_description:"profile refs composed depth-first before this profile's own payload: local profile name scalar, or {source, options, env} where source is <source>/<spec-file>.yml::<profile> locating a profile in another spec (its own checkout anchor)"`
 	MakeLinks           []linkEntry                 `yaml:"makeLinks" jsonschema_description:"symlink-op entries, workingDirectory-relative: glob string (dest derived 1:1), {source, dest: [paths]} explicit per-file dests, or {source, dest} dest rewrite (sed-style s:^_home:$HOME: or prefix-swap sugar {source: _home/**, dest: $HOME/**} to target home)"`
-	MakeCopies          []entry                     `yaml:"makeCopies" jsonschema_description:"*.ontoHost.cp copy-op perm-groups, workingDirectory-relative sources; a glob source may carry a {source, dest} dest rewrite (sed-style s:^_home:$HOME: or prefix-swap sugar _home/** -> $HOME/**)"`
+	MakeCopies          []copyNode                  `yaml:"makeCopies" jsonschema_description:"copy-op tree: a leaf copies one source verbatim to its dests, a node carrying nested <<< is a group whose source and dest prefixes and perms cascade onto its descendants (innermost wins); local *.ontoHost.cp sources workingDirectory-relative, or remote (@<repo>//<path>[?ref=<ref>], explicit dest required, a group prefix carrying the ref recombines with each leaf path); a glob source may carry a {source, dest} dest rewrite (sed-style s:^_home:$HOME: or prefix-swap sugar _home/** -> $HOME/**)"`
 	RenderTemplates     []templateNode              `yaml:"renderTemplates" jsonschema_description:"*.tpl render-op tree: a leaf renders one source to its dests, a node carrying nested <<< is a group whose source prefixes, perms, ctx and options cascade onto its descendants (innermost wins, dest options win last); local host sources workingDirectory-relative, repo-doc sources (repo dest) workingDirectory-relative, or remote (@<repo>//<path>[?ref=<ref>], explicit dest required, a group prefix carrying the ref recombines with each leaf path); glob and derived-dest forms are host sources; a glob source may carry a {source, dest} dest rewrite (sed-style s:^_home:$HOME: or prefix-swap sugar _home/** -> $HOME/**); dests expand env vars incl ${invokingSpecGitRoot}, the top-level spec's checkout"`
 	MakeDirs            []dirGroup                  `yaml:"makeDirs" jsonschema_description:"extra-dir perm-groups; each item one dir path (brace-expanded)"`
 	InstallPackages     []PackageRef                `yaml:"installPackages" jsonschema_description:"packages installed from the packages file (default $XDG_CONFIG_HOME/packages/packages.yml): canonical name scalar, or {name, version} to install a specific version (exact or wildcard), overriding the entry's default version; runs before runScripts"`
@@ -313,9 +313,13 @@ type linkEntry struct {
 	Dest     []DestSpec `yaml:"dest"`
 }
 
-type entry struct {
-	Perms `yaml:",inline"`
-	Files []fileSpec `yaml:"files" jsonschema:"required" jsonschema_description:"the group's items, each inheriting the group's perms"`
+type copyNode struct {
+	Perms    `yaml:",inline"`
+	glob     string
+	DestRule string
+	Source   string     `yaml:"source"`
+	Dest     []DestSpec `yaml:"dest"`
+	Children []copyNode `yaml:"<<<" jsonschema_description:"nested nodes, inheriting this node's source and dest prefixes and perms"`
 }
 
 type templateNode struct {
@@ -332,13 +336,6 @@ type templateNode struct {
 type dirGroup struct {
 	Perms `yaml:",inline"`
 	Files []dirSpec `yaml:"directories" jsonschema:"required" jsonschema_description:"the group's items, each inheriting the group's perms"`
-}
-
-type fileSpec struct {
-	glob     string
-	DestRule string
-	Source   string     `yaml:"source"`
-	Dest     []DestSpec `yaml:"dest"`
 }
 
 type dirSpec struct {
@@ -456,6 +453,7 @@ type Evaluator struct {
 }
 
 type templateInherited struct {
+	op         string
 	prefix     string
 	destPrefix string
 	perms      Perms

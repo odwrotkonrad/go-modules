@@ -6,7 +6,10 @@ base:
       - etc/zshrc
       - etc/zsh/**
     makeCopies:
-      - files: [_home/.config/zsh/**, Library/LaunchDaemons/otelcol.plist*]
+      - source: _home/.config/zsh/**
+        dest: $HOME/.config/zsh/**
+      - source: Library/LaunchDaemons/otelcol.plist*
+        dest: 's:^Library:/Library:'
     renderTemplates:
       - _home/.config/zsh/**
 

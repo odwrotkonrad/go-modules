@@ -1,0 +1,37 @@
+# [>] 🤖🤖
+context:
+  function: che.ProfileReady.makeCopies
+  mockedInterfaces:
+    che.RemoteFetcher: testutil.RemoteMockFetcher
+cases:
+  - name: ShouldInstallRemoteSourceVerbatim
+    input:
+      args:
+        - fetch:
+            gitlab.com/acme/tools//prompts/a.md.tpl?ref=v1.0.0: |
+              Diff: {{ getenv "DIFF_FULL" }}
+        - items:
+            - rel: "@gitlab.com/acme/tools//prompts/a.md.tpl?ref=v1.0.0"
+              dests: [$HOME/prompts/a.md.tpl]
+              perms: {chmod: "0640"}
+    expected:
+      stdOut: "created ${HOME}/prompts/a.md.tpl"
+      output:
+        files:
+          home/prompts/a.md.tpl: |
+            Diff: {{ getenv "DIFF_FULL" }}
+        modes:
+          home/prompts/a.md.tpl: "0640"
+        rerun: true
+        notRerunStdOut: ["created ${HOME}/prompts"]
+  - name: ShouldFailOnRemoteFetchError
+    input:
+      args:
+        - fetch: {}
+        - items:
+            - {rel: "@gitlab.com/acme/tools//prompts/absent.md.tpl", dests: [$HOME/prompts/absent.md.tpl]}
+    expected:
+      errorOutput: 'RemoteMockFetcher: no fixture for "gitlab.com/acme/tools//prompts/absent.md.tpl"'
+      output:
+        absent: [home/prompts/absent.md.tpl]
+# [<] 🤖🤖

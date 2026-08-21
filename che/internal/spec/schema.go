@@ -28,9 +28,10 @@ func Schema() *jsonschema.Schema {
 	defs["Otel"] = optDefs["Otel"]
 	defs["DestSpec"] = DestSpec{}.JSONSchema()
 	defs["templateNode"] = templateNode{}.JSONSchema()
+	defs["copyNode"] = copyNode{}.JSONSchema()
 
 	defs["ProfileRecipe"].Description = "one profile block: options self-describe eligibility, include.profiles compose refs in order (local scalars, sourced {source, options, env}), include adds, exclude filters last and wins"
-	defs["includeSet"].Description = "additive payload: profile refs, makeLinks globs, makeCopies/renderTemplates/makeDirs perm-groups, runScripts globs"
+	defs["includeSet"].Description = "additive payload: profile refs, makeLinks globs, makeCopies/renderTemplates trees, makeDirs perm-groups, runScripts globs"
 	defs["excludeSet"].Description = "subtractive glob filter, applied last, wins over every include (rich entries too)"
 	defs["SpecOptions"].Description = "reserved top-level options: block: spec-wide defaults (runIf gate, autoDiscover/logLevel/workingDirectory) + che knobs (validateSpec/dryRun/profiles/skipRemoteRefs/renderTemplates.skipSecrets); same shape as the user-config file"
 	prop(defs["ProfileOptions"], "runIf").Description = "predicate expressions `<source>` or `<source> == <literal>`, sources builtin:*/env:*/cmd:<argv> (exit 0 passes, run on every evaluation, argv split on whitespace, no shell); empty: always"
@@ -128,21 +129,49 @@ func (linkEntry) JSONSchema() *jsonschema.Schema {
 	return scalarOr("glob over git-tracked files (brace-expanded), workingDirectory-relative, dest derived 1:1", o)
 }
 
-func (fileSpec) JSONSchema() *jsonschema.Schema {
-	o := obj("one source fanned out to explicit dests", []string{"source"})
-	o.Properties.Set("source", &jsonschema.Schema{
-		Description: "source path, workingDirectory-relative",
+func (copyNode) JSONSchema() *jsonschema.Schema {
+	leaf := obj("one copy source fanned out to dests, bytes copied verbatim", []string{"source"})
+	leaf.Properties.Set("source", &jsonschema.Schema{
+		Description: "*.ontoHost.cp source path, workingDirectory-relative, or remote ref @<repo>//<path>[?ref=<ref>] (explicit dest required); joined onto every enclosing group's source prefix",
 		Type:        "string",
 	})
-	o.Properties.Set("dest", &jsonschema.Schema{OneOf: []*jsonschema.Schema{
+	leaf.Properties.Set("dest", &jsonschema.Schema{OneOf: []*jsonschema.Schema{
 		{
-			Description: "dest paths: relative -> repo, ~/ or absolute -> host; omitted -> derived from the workingDirectory-relative source path",
+			Description: "host dest path (~/ or absolute); omitted -> derived from the workingDirectory-relative source path, .ontoHost.cp stripped",
+			Type:        "string",
+			Not:         destRuleSchema(),
+		},
+		{
+			Description: "host dest paths (~/ or absolute); omitted -> derived from the workingDirectory-relative source path, .ontoHost.cp stripped",
 			Type:        "array",
 			Items:       &jsonschema.Schema{Ref: "#/$defs/DestSpec"},
 		},
 		destRuleSchema(),
 	}})
-	return scalarOr("glob over git-tracked files (brace-expanded)", o)
+	addPerms(leaf)
+
+	group := obj("a source and/or dest prefix plus shared perms cascading onto nested nodes (innermost wins); at least one prefix required", []string{"<<<"})
+	group.AnyOf = []*jsonschema.Schema{{Required: []string{"source"}}, {Required: []string{"dest"}}}
+	group.Properties.Set("source", &jsonschema.Schema{
+		Description: "source prefix joined onto every nested node's source; a remote prefix @<repo>[//<path>][?ref=<ref>] recombines so the ref stays last",
+		Type:        "string",
+	})
+	group.Properties.Set("dest", &jsonschema.Schema{
+		Description: "dest prefix joined onto every nested relative dest (~/, absolute and $VAR dests anchor themselves and are left alone)",
+		Type:        "string",
+	})
+	group.Properties.Set("<<<", &jsonschema.Schema{
+		Description: "nested nodes, each a leaf or a further group",
+		Type:        "array",
+		Items:       &jsonschema.Schema{Ref: "#/$defs/copyNode"},
+	})
+	addPerms(group)
+
+	return &jsonschema.Schema{OneOf: []*jsonschema.Schema{
+		{Description: "glob over git-tracked *.ontoHost.cp files (brace-expanded)", Type: "string"},
+		leaf,
+		group,
+	}}
 }
 
 func (templateNode) JSONSchema() *jsonschema.Schema {
@@ -168,7 +197,8 @@ func (templateNode) JSONSchema() *jsonschema.Schema {
 	leaf.Properties.Set("options", render.Options{}.JSONSchema())
 	addPerms(leaf)
 
-	group := obj("a source prefix plus shared perms, ctx and options cascading onto nested nodes (innermost wins)", []string{"<<<"})
+	group := obj("a source and/or dest prefix plus shared perms, ctx and options cascading onto nested nodes (innermost wins); at least one prefix required", []string{"<<<"})
+	group.AnyOf = []*jsonschema.Schema{{Required: []string{"source"}}, {Required: []string{"dest"}}}
 	group.Properties.Set("source", &jsonschema.Schema{
 		Description: "source prefix joined onto every nested node's source; a remote prefix @<repo>[//<path>][?ref=<ref>] recombines so the ref stays last",
 		Type:        "string",

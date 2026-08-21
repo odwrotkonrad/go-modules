@@ -1,0 +1,11 @@
+##[>] 🤖🤖
+base:
+  include:
+    makeCopies:
+      - "@gitlab.com/acme/tools//prompts/**"
+
+cli/macos:
+  options: {autoDiscover: true}
+  include:
+    profiles: [base]
+##[<] 🤖🤖

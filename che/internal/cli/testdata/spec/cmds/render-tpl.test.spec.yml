@@ -2,14 +2,14 @@
 cases:
   - name: ShouldRenderTemplateWithEnv
     context:
-      command: che render tpl -f ${DIR}/t.tmpl.md
+      command: che render tpl -f ${DIR}/t.md.tpl
       pwd: testdata/fixture/render/tpl/tree-renders
       env: {WHO: there}
     expected:
       exitCode: 0
   - name: ShouldReadBodyRelativeToCwd
     context:
-      command: che render tpl -f t.tmpl.md
+      command: che render tpl -f t.md.tpl
       pwd: testdata/fixture/render/tpl/tree-read_body
     expected:
       exitCode: 0

@@ -188,6 +188,18 @@ cases:
       args: [spec: schema-invalid/template-group-with-dest, profile: cli/macos]
     expected:
       errorOutput: ['dest is a prefix: want one path, got 2']
+  - name: ShouldErrorOnTemplateGroupWithoutPrefix
+    context: {pwd: testdata/fixture/resolve/tree-empty}
+    input:
+      args: [spec: schema-invalid/template-bare-group, profile: cli/macos]
+    expected:
+      errorOutput: ['renderTemplates group carries nested <<< without a source or dest prefix']
+  - name: ShouldErrorOnCopyGroupWithoutPrefix
+    context: {pwd: testdata/fixture/resolve/tree-empty}
+    input:
+      args: [spec: schema-invalid/copy-bare-group, profile: cli/macos]
+    expected:
+      errorOutput: ['makeCopies group carries nested <<< without a source or dest prefix']
   - name: ShouldErrorOnNodeWithoutSourceGlobOrChildren
     context: {pwd: testdata/fixture/resolve/tree-empty}
     input:
@@ -308,6 +320,92 @@ cases:
       dirs: [$HOME/.config/foo]
     notExpected:
       dirs: [_home/.config/foo]
+  - name: ShouldJoinCopyGroupPrefixesRecombiningRemoteRef
+    context: {pwd: testdata/fixture/resolve/tree-empty}
+    input:
+      args: [spec: copy-nested, profile: cli/macos]
+    expected:
+      copies:
+        - "@gitlab.com/acme/tools//prompts/a.md.tpl?ref=v1.0.0"
+        - "@gitlab.com/acme/tools//prompts/nested/b.md.tpl?ref=v1.0.0"
+        - "@gitlab.com/acme/tools//prompts/nested/c.md.tpl?ref=v1.0.0"
+        - "@gitlab.com/acme/tools//prompts/pinned.md.tpl?ref=v2.0.0"
+        - _home/.config/foo/x.ontoHost.cp
+      dests:
+        "@gitlab.com/acme/tools//prompts/a.md.tpl?ref=v1.0.0": [/usr/local/share/acme/a.md.tpl]
+        "@gitlab.com/acme/tools//prompts/nested/b.md.tpl?ref=v1.0.0": [/usr/local/share/acme/b.md.tpl]
+        "@gitlab.com/acme/tools//prompts/nested/c.md.tpl?ref=v1.0.0": [$HOME/.config/acme/c.md.tpl]
+        "@gitlab.com/acme/tools//prompts/pinned.md.tpl?ref=v2.0.0": [/usr/local/share/acme/pinned.md.tpl]
+        _home/.config/foo/x.ontoHost.cp: [$HOME/.config/foo/x]
+  - name: ShouldAssembleRemoteCopySourceAndDestOneLevel
+    context: {pwd: testdata/fixture/resolve/tree-empty}
+    input:
+      args: [spec: copy-assembly, profile: remote-one-level]
+    expected:
+      copies:
+        - "@gitlab.com/acme/tools//prompts/commit.md.tpl?ref=v1.0.0"
+        - "@gitlab.com/acme/tools//prompts/mr.md.tpl?ref=v1.0.0"
+      dests:
+        "@gitlab.com/acme/tools//prompts/commit.md.tpl?ref=v1.0.0": [/usr/local/share/prompts/commit.md.tpl]
+        "@gitlab.com/acme/tools//prompts/mr.md.tpl?ref=v1.0.0": [/usr/local/share/prompts/mr.md.tpl]
+  - name: ShouldAssembleLocalCopySourceAndDestOneLevel
+    context: {pwd: testdata/fixture/resolve/tree-empty}
+    input:
+      args: [spec: copy-assembly, profile: local-one-level]
+    expected:
+      copies: [etc/daemons/a.plist.ontoHost.cp, etc/daemons/b.plist.ontoHost.cp]
+      dests:
+        etc/daemons/a.plist.ontoHost.cp: [/Library/LaunchDaemons/a.plist]
+        etc/daemons/b.plist.ontoHost.cp: [/Library/LaunchDaemons/b.plist]
+  - name: ShouldAssembleRemoteCopySourceAndDestTwoLevels
+    context: {pwd: testdata/fixture/resolve/tree-empty}
+    input:
+      args: [spec: copy-assembly, profile: remote-two-levels]
+    expected:
+      copies:
+        - "@gitlab.com/acme/tools//prompts/commit.md.tpl?ref=v1.0.0"
+        - "@gitlab.com/acme/tools//snippets/ro.md?ref=v1.0.0"
+      dests:
+        "@gitlab.com/acme/tools//prompts/commit.md.tpl?ref=v1.0.0": [/usr/local/share/prompts/commit.md.tpl]
+        "@gitlab.com/acme/tools//snippets/ro.md?ref=v1.0.0": [/usr/local/share/snippets/ro.md]
+  - name: ShouldAssembleLocalCopySourceAndDestTwoLevels
+    context: {pwd: testdata/fixture/resolve/tree-empty}
+    input:
+      args: [spec: copy-assembly, profile: local-two-levels]
+    expected:
+      copies: [etc/cron/nightly.ontoHost.cp, etc/daemons/a.plist.ontoHost.cp]
+      dests:
+        etc/cron/nightly.ontoHost.cp: [/etc/cron.d/nightly]
+        etc/daemons/a.plist.ontoHost.cp: [/etc/daemons/a.plist]
+  - name: ShouldCascadeCopyPermsThroughNestedGroups
+    context: {pwd: testdata/fixture/resolve/tree-empty}
+    input:
+      args: [spec: copy-nested, profile: cli/macos]
+    expected:
+      perms:
+        "@gitlab.com/acme/tools//prompts/a.md.tpl?ref=v1.0.0": {owner: root, chmod: "0644"}
+        "@gitlab.com/acme/tools//prompts/nested/b.md.tpl?ref=v1.0.0": {owner: root, chmod: "0600"}
+        "@gitlab.com/acme/tools//prompts/pinned.md.tpl?ref=v2.0.0": {owner: root, chmod: "0644"}
+    contains:
+      dirs: [/usr/local/share/acme, $HOME/.config/acme]
+  - name: ShouldErrorOnRemoteCopyGlob
+    context: {pwd: testdata/fixture/resolve/tree-empty}
+    input:
+      args: [spec: remote-copy-glob, profile: cli/macos]
+    expected:
+      errorOutput: [makeCopies glob cannot be remote]
+  - name: ShouldErrorOnRemoteCopyDestRewrite
+    context: {pwd: testdata/fixture/resolve/tree-empty}
+    input:
+      args: [spec: remote-copy-rewrite, profile: cli/macos]
+    expected:
+      errorOutput: [makeCopies dest rewrite cannot be remote]
+  - name: ShouldErrorOnRemoteCopyWithoutDest
+    context: {pwd: testdata/fixture/resolve/tree-empty}
+    input:
+      args: [spec: remote-copy-no-dest, profile: cli/macos]
+    expected:
+      errorOutput: [makeCopies remote source requires explicit dest]
   - name: ShouldErrorOnLocalRefWithEnv
     context: {pwd: testdata/fixture/resolve/tree-ref-env-local}
     input:

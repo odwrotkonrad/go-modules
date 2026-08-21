@@ -586,6 +586,134 @@
         }
       ]
     },
+    "copyNode": {
+      "oneOf": [
+        {
+          "type": "string",
+          "description": "glob over git-tracked *.ontoHost.cp files (brace-expanded)"
+        },
+        {
+          "properties": {
+            "source": {
+              "type": "string",
+              "description": "*.ontoHost.cp source path, workingDirectory-relative, or remote ref @\u003crepo\u003e//\u003cpath\u003e[?ref=\u003cref\u003e] (explicit dest required); joined onto every enclosing group's source prefix"
+            },
+            "dest": {
+              "oneOf": [
+                {
+                  "not": {
+                    "oneOf": [
+                      {
+                        "type": "string",
+                        "pattern": "^s\\W.+\\W(g)?$",
+                        "description": "sed-style rewrite s\u003cdelim\u003e\u003cpattern\u003e\u003cdelim\u003e\u003creplacement\u003e\u003cdelim\u003e[g] (Go regexp pattern, literal replacement so $HOME survives; g: every match, absent: first only), applied to the workingDirectory-relative dest path before host mapping (:-delimited is the blessed form; e.g. s:^_home:$HOME: targets the invoking user's home)"
+                      },
+                      {
+                        "type": "string",
+                        "pattern": "/\\*\\*$",
+                        "description": "prefix-swap sugar \u003cprefix\u003e/**: with source \u003csrcPrefix\u003e/** it desugars to s:^\u003csrcPrefix\u003e:\u003cprefix\u003e: (e.g. dest $HOME/** with source _home/** targets home)"
+                      }
+                    ]
+                  },
+                  "type": "string",
+                  "description": "host dest path (~/ or absolute); omitted -\u003e derived from the workingDirectory-relative source path, .ontoHost.cp stripped"
+                },
+                {
+                  "items": {
+                    "$ref": "#/$defs/DestSpec"
+                  },
+                  "type": "array",
+                  "description": "host dest paths (~/ or absolute); omitted -\u003e derived from the workingDirectory-relative source path, .ontoHost.cp stripped"
+                },
+                {
+                  "oneOf": [
+                    {
+                      "type": "string",
+                      "pattern": "^s\\W.+\\W(g)?$",
+                      "description": "sed-style rewrite s\u003cdelim\u003e\u003cpattern\u003e\u003cdelim\u003e\u003creplacement\u003e\u003cdelim\u003e[g] (Go regexp pattern, literal replacement so $HOME survives; g: every match, absent: first only), applied to the workingDirectory-relative dest path before host mapping (:-delimited is the blessed form; e.g. s:^_home:$HOME: targets the invoking user's home)"
+                    },
+                    {
+                      "type": "string",
+                      "pattern": "/\\*\\*$",
+                      "description": "prefix-swap sugar \u003cprefix\u003e/**: with source \u003csrcPrefix\u003e/** it desugars to s:^\u003csrcPrefix\u003e:\u003cprefix\u003e: (e.g. dest $HOME/** with source _home/** targets home)"
+                    }
+                  ]
+                }
+              ]
+            },
+            "owner": {
+              "type": "string",
+              "description": "dest owner user; empty: code default"
+            },
+            "ownerGroup": {
+              "type": "string",
+              "description": "dest owner group; empty: code default"
+            },
+            "chmod": {
+              "type": "string",
+              "pattern": "^[0-7]{3,4}$",
+              "description": "dest mode, octal string"
+            }
+          },
+          "additionalProperties": false,
+          "type": "object",
+          "required": [
+            "source"
+          ],
+          "description": "one copy source fanned out to dests, bytes copied verbatim"
+        },
+        {
+          "anyOf": [
+            {
+              "required": [
+                "source"
+              ]
+            },
+            {
+              "required": [
+                "dest"
+              ]
+            }
+          ],
+          "properties": {
+            "source": {
+              "type": "string",
+              "description": "source prefix joined onto every nested node's source; a remote prefix @\u003crepo\u003e[//\u003cpath\u003e][?ref=\u003cref\u003e] recombines so the ref stays last"
+            },
+            "dest": {
+              "type": "string",
+              "description": "dest prefix joined onto every nested relative dest (~/, absolute and $VAR dests anchor themselves and are left alone)"
+            },
+            "\u003c\u003c\u003c": {
+              "items": {
+                "$ref": "#/$defs/copyNode"
+              },
+              "type": "array",
+              "description": "nested nodes, each a leaf or a further group"
+            },
+            "owner": {
+              "type": "string",
+              "description": "dest owner user; empty: code default"
+            },
+            "ownerGroup": {
+              "type": "string",
+              "description": "dest owner group; empty: code default"
+            },
+            "chmod": {
+              "type": "string",
+              "pattern": "^[0-7]{3,4}$",
+              "description": "dest mode, octal string"
+            }
+          },
+          "additionalProperties": false,
+          "type": "object",
+          "required": [
+            "\u003c\u003c\u003c"
+          ],
+          "description": "a source and/or dest prefix plus shared perms cascading onto nested nodes (innermost wins); at least one prefix required"
+        }
+      ]
+    },
     "dirGroup": {
       "properties": {
         "owner": {
@@ -637,35 +765,6 @@
             "dest"
           ]
         }
-      ]
-    },
-    "entry": {
-      "properties": {
-        "owner": {
-          "type": "string",
-          "description": "dest owner user; empty: code default"
-        },
-        "ownerGroup": {
-          "type": "string",
-          "description": "dest owner group; empty: code default"
-        },
-        "chmod": {
-          "type": "string",
-          "pattern": "^[0-7]{3,4}$",
-          "description": "dest mode, octal string"
-        },
-        "files": {
-          "items": {
-            "$ref": "#/$defs/fileSpec"
-          },
-          "type": "array",
-          "description": "the group's items, each inheriting the group's perms"
-        }
-      },
-      "additionalProperties": false,
-      "type": "object",
-      "required": [
-        "files"
       ]
     },
     "excludeSet": {
@@ -727,53 +826,6 @@
       "type": "object",
       "description": "subtractive glob filter, applied last, wins over every include (rich entries too)"
     },
-    "fileSpec": {
-      "oneOf": [
-        {
-          "type": "string",
-          "description": "glob over git-tracked files (brace-expanded)"
-        },
-        {
-          "properties": {
-            "source": {
-              "type": "string",
-              "description": "source path, workingDirectory-relative"
-            },
-            "dest": {
-              "oneOf": [
-                {
-                  "items": {
-                    "$ref": "#/$defs/DestSpec"
-                  },
-                  "type": "array",
-                  "description": "dest paths: relative -\u003e repo, ~/ or absolute -\u003e host; omitted -\u003e derived from the workingDirectory-relative source path"
-                },
-                {
-                  "oneOf": [
-                    {
-                      "type": "string",
-                      "pattern": "^s\\W.+\\W(g)?$",
-                      "description": "sed-style rewrite s\u003cdelim\u003e\u003cpattern\u003e\u003cdelim\u003e\u003creplacement\u003e\u003cdelim\u003e[g] (Go regexp pattern, literal replacement so $HOME survives; g: every match, absent: first only), applied to the workingDirectory-relative dest path before host mapping (:-delimited is the blessed form; e.g. s:^_home:$HOME: targets the invoking user's home)"
-                    },
-                    {
-                      "type": "string",
-                      "pattern": "/\\*\\*$",
-                      "description": "prefix-swap sugar \u003cprefix\u003e/**: with source \u003csrcPrefix\u003e/** it desugars to s:^\u003csrcPrefix\u003e:\u003cprefix\u003e: (e.g. dest $HOME/** with source _home/** targets home)"
-                    }
-                  ]
-                }
-              ]
-            }
-          },
-          "additionalProperties": false,
-          "type": "object",
-          "required": [
-            "source"
-          ],
-          "description": "one source fanned out to explicit dests"
-        }
-      ]
-    },
     "includeSet": {
       "properties": {
         "profiles": {
@@ -792,10 +844,10 @@
         },
         "makeCopies": {
           "items": {
-            "$ref": "#/$defs/entry"
+            "$ref": "#/$defs/copyNode"
           },
           "type": "array",
-          "description": "*.ontoHost.cp copy-op perm-groups, workingDirectory-relative sources; a glob source may carry a {source, dest} dest rewrite (sed-style s:^_home:$HOME: or prefix-swap sugar _home/** -\u003e $HOME/**)"
+          "description": "copy-op tree: a leaf copies one source verbatim to its dests, a node carrying nested \u003c\u003c\u003c is a group whose source and dest prefixes and perms cascade onto its descendants (innermost wins); local *.ontoHost.cp sources workingDirectory-relative, or remote (@\u003crepo\u003e//\u003cpath\u003e[?ref=\u003cref\u003e], explicit dest required, a group prefix carrying the ref recombines with each leaf path); a glob source may carry a {source, dest} dest rewrite (sed-style s:^_home:$HOME: or prefix-swap sugar _home/** -\u003e $HOME/**)"
         },
         "renderTemplates": {
           "items": {
@@ -838,7 +890,7 @@
       },
       "additionalProperties": false,
       "type": "object",
-      "description": "additive payload: profile refs, makeLinks globs, makeCopies/renderTemplates/makeDirs perm-groups, runScripts globs"
+      "description": "additive payload: profile refs, makeLinks globs, makeCopies/renderTemplates trees, makeDirs perm-groups, runScripts globs"
     },
     "linkEntry": {
       "oneOf": [
@@ -994,6 +1046,18 @@
           "description": "one template source fanned out to dests"
         },
         {
+          "anyOf": [
+            {
+              "required": [
+                "source"
+              ]
+            },
+            {
+              "required": [
+                "dest"
+              ]
+            }
+          ],
           "properties": {
             "source": {
               "type": "string",
@@ -1058,7 +1122,7 @@
           "required": [
             "\u003c\u003c\u003c"
           ],
-          "description": "a source prefix plus shared perms, ctx and options cascading onto nested nodes (innermost wins)"
+          "description": "a source and/or dest prefix plus shared perms, ctx and options cascading onto nested nodes (innermost wins); at least one prefix required"
         }
       ]
     }

@@ -10,16 +10,14 @@ base:
       - source: _home/.config/foo/**
         dest: 's:^_home/.config/foo:$HOME/.config/bar:'
     makeCopies:
-      - files:
-          - source: _home/.config/zsh/**
-            dest: 's:^_home:$HOME:'
+      - source: _home/.config/zsh/**
+        dest: 's:^_home:$HOME:'
       - owner: root
         ownerGroup: wheel
         chmod: "0644"
-        files:
-          - source: Library/LaunchDaemons/otelcol.plist.ontoHost.cp
-            dest:
-              - /Library/LaunchDaemons/otelcol.plist
+        source: Library/LaunchDaemons/otelcol.plist.ontoHost.cp
+        dest:
+          - /Library/LaunchDaemons/otelcol.plist
     renderTemplates:
       - source: _home/.config/zsh/**
         dest: 's:^_home:$HOME:'
