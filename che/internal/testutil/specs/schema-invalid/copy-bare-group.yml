@@ -1,0 +1,13 @@
+##[>] 🤖🤖
+base:
+  include:
+    makeCopies:
+      - chmod: "0644"
+        <<<:
+          - {source: a.ontoHost.cp, dest: [/etc/a]}
+
+cli/macos:
+  options: {autoDiscover: true}
+  include:
+    profiles: [base]
+##[<] 🤖🤖

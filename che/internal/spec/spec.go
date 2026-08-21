@@ -130,32 +130,31 @@ func (d *dirSpec) UnmarshalYAML(value *yaml.Node) error {
 	return decodeScalarOr(value, &d.glob, (*alias)(d))
 }
 
-func (f *fileSpec) UnmarshalYAML(value *yaml.Node) error {
-	node := value
-	if rule, rest, ok := takeScalarDest(value); ok {
-		f.DestRule = rule
-		node = rest
-	}
-	type alias fileSpec
-	return decodeScalarOr(node, &f.glob, (*alias)(f))
+func (c *copyNode) UnmarshalYAML(value *yaml.Node) error {
+	type alias copyNode
+	return decodeTreeNode(value, &c.glob, &c.DestRule, &c.Dest, (*alias)(c))
 }
 
 func (t *templateNode) UnmarshalYAML(value *yaml.Node) error {
+	type alias templateNode
+	return decodeTreeNode(value, &t.glob, &t.DestRule, &t.Dest, (*alias)(t))
+}
+
+func decodeTreeNode[T any](value *yaml.Node, glob, destRule *string, dest *[]DestSpec, obj *T) error {
 	node := value
 	scalarDest, rest, hasScalarDest := takeScalarDest(value)
 	if hasScalarDest {
 		node = rest
 	}
-	type alias templateNode
-	if err := decodeScalarOr(node, &t.glob, (*alias)(t)); err != nil {
+	if err := decodeScalarOr(node, glob, obj); err != nil {
 		return err
 	}
 	switch {
 	case !hasScalarDest:
 	case isDestRule(scalarDest):
-		t.DestRule = scalarDest
+		*destRule = scalarDest
 	default:
-		t.Dest = []DestSpec{{Path: scalarDest}}
+		*dest = []DestSpec{{Path: scalarDest}}
 	}
 	return nil
 }

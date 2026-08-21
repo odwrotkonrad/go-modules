@@ -46,19 +46,24 @@ base:
       - {source: _home/**, dest: $HOME/**}
       - etc/{grafana,prometheus}/**
     makeCopies:
-      - files: [{source: _home/**, dest: $HOME/**}]
+      - {source: _home/**, dest: $HOME/**}
       - owner: root
         ownerGroup: "0"
         chmod: "0644"
-        files:
-          - {source: Library/LaunchDaemons/otelcol.plist.ontoHost.cp, dest: [/Library/LaunchDaemons/otelcol.plist]}
+        source: Library/LaunchDaemons/otelcol.plist.ontoHost.cp
+        dest: [/Library/LaunchDaemons/otelcol.plist]
+      - source: "@gitlab.com/org/prompts?ref=v1.2.0"
+        dest: /usr/local/share/prompts
+        <<<:
+          - {source: //commit.md.tpl, dest: commit.md.tpl}
+          - {source: //mr.md.tpl, dest: mr.md.tpl}
     renderTemplates:
       - {source: _home/**, dest: $HOME/**}
       - owner: root
         ownerGroup: "0"
         chmod: "0440"
-        <<<:
-          - {source: etc/sudoers.d/configs.ontoHost.tpl, dest: [/etc/sudoers.d/configs]}
+        source: etc/sudoers.d/configs.ontoHost.tpl
+        dest: [/etc/sudoers.d/configs]
     makeDirs:
       - directories:
           - $HOME/.local/{bin,share}
@@ -280,9 +285,8 @@ glob prefix-swap, or as a glob sed rewrite:
 makeLinks:
   - {source: _home/**, dest: $HOME/**}              # prefix-swap sugar
 makeCopies:
-  - files:
-      - {source: _home/**, dest: 's:^_home:$HOME:'}  # glob + sed rewrite
-      - {source: _home/foo.ontoHost.cp, dest: [$HOME/.config/foo]}  # explicit
+  - {source: _home/**, dest: 's:^_home:$HOME:'}  # glob + sed rewrite
+  - {source: _home/foo.ontoHost.cp, dest: [$HOME/.config/foo]}  # explicit
 renderTemplates:
   - {source: _home/**, dest: $HOME/**}
   - {source: _home/x.tpl, dest: [$HOME/.config/x]}
@@ -420,22 +424,39 @@ source file to each listed host path.
 
 ### makeCopies
 
-Perm-groups of `*.ontoHost.cp` sources copied onto the host. Group perms apply
-to every item in `files`.
+A tree of sources copied onto the host byte-for-byte, never rendered: a
+gomplate-bearing file lands intact. Same node shape as renderTemplates, minus
+`ctx` and `options`: a leaf (glob string, or `{source, dest}`) or a group (a
+node with nested `<<<`, its `source` and `dest` prefixes and perms cascading
+onto every descendant, innermost wins).
+
+Local sources are `*.ontoHost.cp` files, profileWorkingDirectory-relative. A
+source may be remote, `@<repo>//<path>[?ref=<ref>]`, explicit dest required; a
+group prefix carrying the ref recombines with each leaf path so the pin is
+typed once. Remote globs and remote dest rewrites are rejected at load.
 
 ```yaml
 makeCopies:
-  - files: [{source: _home/**, dest: 's:^_home:$HOME:'}]
+  - {source: _home/**, dest: 's:^_home:$HOME:'}
   - owner: root
     ownerGroup: "0"
     chmod: "0644"
-    files:
-      - {source: Library/LaunchDaemons/otelcol.plist.ontoHost.cp, dest: [/Library/LaunchDaemons/otelcol.plist]}
+    source: Library/LaunchDaemons/otelcol.plist.ontoHost.cp
+    dest: [/Library/LaunchDaemons/otelcol.plist]
+  - source: "@gitlab.com/org/prompts?ref=v1.2.0"
+    dest: /usr/local/share/prompts
+    chmod: "0644"
+    <<<:
+      - {source: //commit.md.tpl, dest: commit.md.tpl}
+      - {source: //mr.md.tpl, dest: mr.md.tpl}
 ```
 
-`files` items: glob string (derived dest, `.ontoHost.cp` stripped),
-`{source, dest: [paths]}` (one source, explicit dests), or `{source, dest: <rule>}`
-(glob source + sed-style dest rewrite, `.ontoHost.cp` stripped first).
+Leaves: glob string (derived dest, `.ontoHost.cp` stripped),
+`{source, dest: [paths]}` (one source, explicit host dests), or
+`{source, dest: <rule>}` (glob source + sed-style dest rewrite, `.ontoHost.cp`
+stripped first). Perms sit on the leaf itself, or on a group when several
+leaves share them. A group `dest` is one path, prefixed onto each nested
+relative dest; `~/`, absolute and `$VAR` dests anchor themselves.
 
 ### renderTemplates
 
@@ -518,8 +539,12 @@ Cascade, outermost first, innermost wins:
   `false` overrides an inherited `true`: a group carries the common case, a
   leaf opts out.
 
-A node with nested `renderTemplates` may not also carry a dest rewrite rule or
-a glob.
+A group exists to assemble paths: it carries a `source` prefix, a `dest`
+prefix, or both. A node with nested `<<<` and neither is rejected at load, as
+is one that also carries a dest rewrite rule or a glob. Perms, `ctx` or
+`options` shared by leaves that share no path go on each leaf.
+
+makeCopies groups follow the same rules, minus `ctx` and `options`.
 
 ### makeDirs
 
@@ -604,9 +629,9 @@ exclude:
 
 ## Perms Cascade
 
-`owner`, `ownerGroup`, `chmod` on a makeCopies/makeDirs group apply to every
-item in its `files`/`directories`, on a renderTemplates group to every nested
-node at any depth. Innermost non-empty field wins. Glob matches count too, last
+`owner`, `ownerGroup`, `chmod` on a makeDirs group apply to every item in its
+`directories`, on a makeCopies/renderTemplates group to every nested node at
+any depth. Innermost non-empty field wins. Glob matches count too, last
 matching glob wins. Empty falls back to the code default.
 
 ## See Also

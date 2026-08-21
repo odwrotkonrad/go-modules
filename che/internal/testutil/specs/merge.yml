@@ -6,7 +6,8 @@ base:
       - etc/grafana/**
     makeCopies:
       - chmod: "0600"
-        files: [Library/LaunchDaemons/**]
+        source: Library/LaunchDaemons/**
+        dest: /Library/LaunchDaemons/**
     makeDirs:
       - directories: [_home/.cache/zsh]
       - chmod: "2775"

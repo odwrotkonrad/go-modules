@@ -67,7 +67,7 @@ cases:
                     directories: [_home/.cache]
     expected:
       output: chmod
-  - name: ShouldFlagGroupWithoutFiles
+  - name: ShouldFlagCopyNodeWithoutSourceOrChildren
     input:
       args:
         - doc: |
@@ -75,6 +75,16 @@ cases:
               include:
                 makeCopies:
                   - chmod: "0644"
+    expected:
+      output: makeCopies
+  - name: ShouldFlagDroppedCopyFilesKey
+    input:
+      args:
+        - doc: |
+            p:
+              include:
+                makeCopies:
+                  - files: [_home/**]
     expected:
       output: files
   - name: ShouldFlagDroppedPluginsKey

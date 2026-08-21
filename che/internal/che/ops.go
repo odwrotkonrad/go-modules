@@ -3,6 +3,7 @@ package che
 // [>] 🤖🤖
 
 import (
+	"bytes"
 	"errors"
 	"fmt"
 	"os"
@@ -257,6 +258,9 @@ func (p *ProfileReady) makeCopies(copies []spec.FileItem, dirRelativePaths []str
 }
 
 func (p *ProfileReady) makeCopy(item spec.FileItem, dest string) error {
+	if spec.IsRemoteSrc(item.Rel) {
+		return p.makeRemoteCopy(item, dest)
+	}
 	src := p.resolveSrc(item.Rel)
 	if fsutil.IsSameContent(p.Reader, src, dest) {
 		if p.isDryRunAll() {
@@ -270,6 +274,26 @@ func (p *ProfileReady) makeCopy(item spec.FileItem, dest string) error {
 		return err
 	}
 	return p.chownIfSet("make-copies", item, dest)
+}
+
+// [why] a dry run never fetches: it predicts the write and leaves the network alone
+func (p *ProfileReady) makeRemoteCopy(item spec.FileItem, dest string) error {
+	mode, _ := fsutil.ParseMode(item.Chmod)
+	info := opInfo{kind: "copy", srcRel: item.Rel, mode: item.Chmod, owner: formatOwnerSpec(item)}
+	if p.isDryRun() {
+		return p.mutate("make-copies", "create", dest, dest, info, nil)
+	}
+	content, err := p.fetchRemote(spec.RemoteSrcRef(item.Rel))
+	if err != nil {
+		return err
+	}
+	body := []byte(content)
+	if cur, err := p.Reader.ReadFileBytes(dest); err == nil && bytes.Equal(cur, body) {
+		return p.fixPerms("make-copies", dest, item)
+	}
+	return p.mutate("make-copies", "create", dest, dest, info, func() error {
+		return p.FS.InstallFile(dest, body, mode, formatOwnerSpec(item))
+	})
 }
 
 func (p *ProfileReady) resolveCopyDests(item spec.FileItem) []string {

@@ -3,7 +3,7 @@ cli/macos:
   options: {autoDiscover: true}
   include:
     makeCopies:
-      - files: [{source: _home/.config/foo/**, dest: 's:^_home:$HOME:'}]
+      - {source: _home/.config/foo/**, dest: 's:^_home:$HOME:'}
     renderTemplates:
       - {source: _home/.config/foo/**, dest: $HOME/.config/foo/**}
 ##[<] 🤖🤖

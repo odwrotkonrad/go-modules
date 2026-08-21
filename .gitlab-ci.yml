@@ -201,6 +201,8 @@ test-unit-che:
 
 .test-e2e-che:
   extends: .vendors-packages
+  tags:
+    - gke-linux-amd64-small
   image: $CI_IMAGE
   stage: test-e2e
   #[why] only the built artifacts move: the prebuilt binary and e2e harness, no go caches
@@ -266,7 +268,8 @@ warm-e2e-pkg-installs-image:
       when: manual
       allow_failure: true
   script:
-    - docker run --privileged --rm tonistiigi/binfmt --install arm64
+    - docker pull $ARTIFACT_REGISTRY_PROXY_DOCKERHUB/tonistiigi/binfmt
+    - docker run --privileged --rm $ARTIFACT_REGISTRY_PROXY_DOCKERHUB/tonistiigi/binfmt --install arm64
     - docker context create dind --docker "host=$DOCKER_HOST,ca=$DOCKER_CERT_PATH/ca.pem,cert=$DOCKER_CERT_PATH/cert.pem,key=$DOCKER_CERT_PATH/key.pem"
     - docker buildx create --use dind
     - mkdir -p e2e-images
@@ -331,6 +334,7 @@ test-e2e-install-methods:
     DOCKER_CERT_PATH: "$DOCKER_TLS_CERTDIR/client"
     #[why] docker run -v paths must live under /builds, the only volume the dind service shares with the job
     E2E_INSTALL_CACHE_DIR: $CI_PROJECT_DIR/.cache/che-e2e-install
+    CHE_E2E_BASE_IMAGE: $ARTIFACT_REGISTRY_PROXY_DOCKERHUB/library/debian:bookworm-slim
   parallel:
     matrix:
       - METHOD: [apt, binariesRemoteArchive, script, pyenv, nvm, npm, go, nix, buildFromSource]
@@ -416,6 +420,8 @@ test-unit-lib:
       changes: [lib/**/*, go.work, .gitlab-ci.yml]
 
 .release-module:
+  tags:
+    - gke-linux-amd64-small
   interruptible: false
   stage: release
   image: $CI_IMAGE
@@ -464,8 +470,10 @@ release-lib:
       changes: [lib/**/*]
 
 .pages-build:
+  tags:
+    - gke-linux-amd64-small
   image:
-    name: squidfunk/mkdocs-material:9
+    name: $ARTIFACT_REGISTRY_PROXY_DOCKERHUB/squidfunk/mkdocs-material:9
     entrypoint: [""]
   needs: []
   #[why] off by default: only the job publishing the live site needs the carry
@@ -644,6 +652,8 @@ prerelease-darwin-che:
   rules:
     - if: $CI_PIPELINE_SOURCE == "merge_request_event"
       changes: [che/**/*, lib/**/*, ci/publish-prerelease.zsh, Makefile, .gitlab-ci.yml]
+      when: manual
+      allow_failure: true
   variables:
     MODULE_VERSION: 0.0.0-mr${CI_MERGE_REQUEST_IID}
   cache:
@@ -687,6 +697,8 @@ prerelease-linux-che:
   rules:
     - if: $CI_PIPELINE_SOURCE == "merge_request_event"
       changes: [che/**/*, lib/**/*, ci/publish-prerelease.zsh, Makefile, .gitlab-ci.yml]
+      when: manual
+      allow_failure: true
   variables:
     MODULE_VERSION: 0.0.0-mr${CI_MERGE_REQUEST_IID}
     ARCH: amd64
@@ -707,6 +719,8 @@ prerelease-linux-che:
     expire_in: 1 week
 
 publish-che:
+  tags:
+    - gke-linux-amd64-small
   interruptible: false
   stage: publish
   image: $CI_IMAGE
@@ -725,6 +739,8 @@ publish-che:
 #[why] tag only: the tree is rebuilt from the registry's .debs, and only a tag adds one. on main it
 #   re-signed an unchanged tree on every commit touching che/
 publish-apt-che:
+  tags:
+    - gke-linux-amd64-small
   interruptible: false
   stage: publish
   image: $CI_IMAGE
@@ -755,6 +771,8 @@ publish-pages-tag:
     - if: $CI_COMMIT_TAG =~ /^che\/v/
 
 publish-brew-che:
+  tags:
+    - gke-linux-amd64-small
   interruptible: false
   stage: publish
   image: $CI_IMAGE
@@ -789,6 +807,8 @@ publish-ci-image:
 ##[<] 🤖🤖
 
 publish-get-os-open-files-with:
+  tags:
+    - gke-linux-amd64-small
   interruptible: false
   stage: publish
   image: $CI_IMAGE
@@ -798,6 +818,8 @@ publish-get-os-open-files-with:
     - make publish
 
 publish-get-term-open-files-with:
+  tags:
+    - gke-linux-amd64-small
   interruptible: false
   stage: publish
   image: $CI_IMAGE

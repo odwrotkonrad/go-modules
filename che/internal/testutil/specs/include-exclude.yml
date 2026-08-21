@@ -6,8 +6,7 @@ base:
       - _home/.config/extra/**
       - _home/.config/oneoff/**
     makeCopies:
-      - files:
-          - {source: _home/.config/zsh/c.ontoHost.cp, dest: [~/.config/zsh/c]}
+      - {source: _home/.config/zsh/c.ontoHost.cp, dest: [~/.config/zsh/c]}
     runScripts:
       - ci/zsh/scripts/installs/10-brew.zsh
       - ci/zsh/scripts/installs/20-foo.zsh

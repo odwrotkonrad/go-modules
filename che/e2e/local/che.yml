@@ -13,9 +13,8 @@ ops-plain:
           - $HOME/plain/link-explicit-a.txt
           - $HOME/plain/link-explicit-b.txt
     makeCopies:
-      - files:
-          - source: plain/copy.ontoHost.cp
-            dest: 's:^plain:$HOME/plain:'
+      - source: plain/copy.ontoHost.cp
+        dest: 's:^plain:$HOME/plain:'
     renderTemplates:
       - source: plain/tpl.ontoHost.tpl
         dest: 's:^plain:$HOME/plain:'
@@ -36,9 +35,8 @@ ops-conditional:
       - source: conditional/link.txt
         dest: 's:^conditional:$HOME/conditional:'
     makeCopies:
-      - files:
-          - source: conditional/copy.ontoHost.cp
-            dest: 's:^conditional:$HOME/conditional:'
+      - source: conditional/copy.ontoHost.cp
+        dest: 's:^conditional:$HOME/conditional:'
     renderTemplates:
       - source: conditional/tpl.ontoHost.tpl
         dest: 's:^conditional:$HOME/conditional:'
@@ -56,9 +54,8 @@ ops-dropped:
       - source: dropped/link.txt
         dest: 's:^dropped:$HOME/dropped:'
     makeCopies:
-      - files:
-          - source: dropped/copy.ontoHost.cp
-            dest: 's:^dropped:$HOME/dropped:'
+      - source: dropped/copy.ontoHost.cp
+        dest: 's:^dropped:$HOME/dropped:'
     renderTemplates:
       - source: dropped/tpl.ontoHost.tpl
         dest: 's:^dropped:$HOME/dropped:'

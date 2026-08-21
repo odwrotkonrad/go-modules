@@ -1,0 +1,25 @@
+##[>] 🤖🤖
+base:
+  include:
+    makeCopies:
+      - source: "@gitlab.com/acme/tools?ref=v1.0.0"
+        dest: /usr/local/share/acme
+        owner: root
+        chmod: "0644"
+        <<<:
+          - {source: //prompts/a.md.tpl, dest: a.md.tpl}
+          - source: //prompts/nested
+            chmod: "0600"
+            <<<:
+              - {source: /b.md.tpl, dest: b.md.tpl}
+              - {source: /c.md.tpl, dest: $HOME/.config/acme/c.md.tpl}
+          - {source: "//prompts/pinned.md.tpl?ref=v2.0.0", dest: pinned.md.tpl}
+      - source: _home/.config/foo
+        <<<:
+          - {source: x.ontoHost.cp, dest: [$HOME/.config/foo/x]}
+
+cli/macos:
+  options: {autoDiscover: true}
+  include:
+    profiles: [base]
+##[<] 🤖🤖

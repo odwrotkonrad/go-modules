@@ -9,9 +9,8 @@ ops-remote:
       - source: remote/link.txt
         dest: 's:^remote:$HOME/remote:'
     makeCopies:
-      - files:
-          - source: remote/copy.ontoHost.cp
-            dest: 's:^remote:$HOME/remote:'
+      - source: remote/copy.ontoHost.cp
+        dest: 's:^remote:$HOME/remote:'
     renderTemplates:
       - source: remote/tpl.ontoHost.tpl
         dest: 's:^remote:$HOME/remote:'

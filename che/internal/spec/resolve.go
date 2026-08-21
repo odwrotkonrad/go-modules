@@ -237,7 +237,7 @@ func mergeRecipe(recipes []ProfileRecipe, merged *mergedInclude, rec ProfileReci
 			merged.explicitLinks = append(merged.explicitLinks, FileItem{Rel: entry.Source, Dests: entry.Dest})
 		}
 	}
-	if err := splitEntries(include.MakeCopies, &merged.copyGlobs, &merged.explicitCopies); err != nil {
+	if err := splitCopies(include.MakeCopies, &merged.copyGlobs, &merged.explicitCopies); err != nil {
 		return fmt.Errorf("profile %q: %w", name, err)
 	}
 	if err := splitTemplates(include.RenderTemplates, &merged.templateGlobs, &merged.explicitTemplates); err != nil {
@@ -273,44 +273,45 @@ func (ex *excludeSet) append(other excludeSet) {
 	ex.Scripts = append(ex.Scripts, other.Scripts...)
 }
 
-func splitEntries(entries []entry, globs *globSet, explicit *[]FileItem) error {
-	for _, group := range entries {
-		for _, file := range group.Files {
-			switch {
-			case file.glob != "":
-				globs.add(file.glob, group.Perms)
-			case file.DestRule != "":
-				rule, err := ruleFromDest(file.Source, file.DestRule)
-				if err != nil {
-					return err
-				}
-				globs.addRule(file.Source, group.Perms, rule)
-			default:
-				*explicit = append(*explicit, FileItem{Rel: file.Source, Dests: file.Dest, Perms: group.Perms})
-			}
+// [why] one walker for both trees: a copy node is a template node with no ctx and no options
+func splitCopies(nodes []copyNode, globs *globSet, explicit *[]FileItem) error {
+	return splitTemplateNodes(copyTreeAsTemplates(nodes), templateInherited{op: "makeCopies"}, globs, explicit)
+}
+
+func copyTreeAsTemplates(nodes []copyNode) []templateNode {
+	out := make([]templateNode, len(nodes))
+	for i, node := range nodes {
+		out[i] = templateNode{
+			Perms:    node.Perms,
+			glob:     node.glob,
+			DestRule: node.DestRule,
+			Source:   node.Source,
+			Dest:     node.Dest,
+			Children: copyTreeAsTemplates(node.Children),
 		}
 	}
-	return nil
+	return out
 }
 
 func splitTemplates(nodes []templateNode, globs *globSet, explicit *[]FileItem) error {
-	return splitTemplateNodes(nodes, templateInherited{}, globs, explicit)
+	return splitTemplateNodes(nodes, templateInherited{op: "renderTemplates"}, globs, explicit)
 }
 
 func splitTemplateNodes(nodes []templateNode, up templateInherited, globs *globSet, explicit *[]FileItem) error {
 	for _, node := range nodes {
 		down := templateInherited{
+			op:         up.op,
 			destPrefix: path.Join(up.destPrefix, groupDestPrefix(node)),
 			perms:      overlayPerms(node.Perms, up.perms),
 			ctx:        fsutil.MergeMap(up.ctx, node.Ctx),
 			options:    overlayRenderOptions(node.Options, up.options),
 		}
 		var err error
-		if down.prefix, err = joinTemplateSource(up.prefix, node.Source); err != nil {
+		if down.prefix, err = joinTemplateSource(up.op, up.prefix, node.Source); err != nil {
 			return err
 		}
 		if len(node.Children) > 0 {
-			if err := checkTemplateGroup(node); err != nil {
+			if err := checkTemplateGroup(up.op, node); err != nil {
 				return err
 			}
 			if err := splitTemplateNodes(node.Children, down, globs, explicit); err != nil {
@@ -328,7 +329,7 @@ func splitTemplateNodes(nodes []templateNode, up templateInherited, globs *globS
 func splitTemplateLeaf(node templateNode, down templateInherited, globs *globSet, explicit *[]FileItem) error {
 	leaf := node
 	leaf.Source = down.prefix
-	if err := checkTemplateSpec(leaf); err != nil {
+	if err := checkTemplateSpec(down.op, leaf); err != nil {
 		return err
 	}
 	switch {
@@ -373,20 +374,22 @@ func groupDestPrefix(node templateNode) string {
 	return node.Dest[0].Path
 }
 
-func checkTemplateGroup(node templateNode) error {
+func checkTemplateGroup(op string, node templateNode) error {
 	switch {
 	case node.DestRule != "" || node.glob != "":
-		return fmt.Errorf("renderTemplates group %q carries nested <<< and a dest rewrite or glob: it is one or the other", node.Source)
+		return fmt.Errorf("%s group %q carries nested <<< and a dest rewrite or glob: it is one or the other", op, node.Source)
+	case node.Source == "" && len(node.Dest) == 0:
+		return fmt.Errorf("%s group carries nested <<< without a source or dest prefix: <<< assembles paths, put a leaf at this level instead", op)
 	case len(node.Dest) > 1:
-		return fmt.Errorf("renderTemplates group %q dest is a prefix: want one path, got %d", node.Source, len(node.Dest))
+		return fmt.Errorf("%s group %q dest is a prefix: want one path, got %d", op, node.Source, len(node.Dest))
 	case len(node.Dest) == 1 && node.Dest[0].opts != (optionsSpec{}):
-		return fmt.Errorf("renderTemplates group %q dest is a prefix: set options on the group instead", node.Source)
+		return fmt.Errorf("%s group %q dest is a prefix: set options on the group instead", op, node.Source)
 	}
 	return nil
 }
 
 // [why] parseRemoteRef wants the query last, so a prefix ref and a child path recombine, never concatenate
-func joinTemplateSource(prefix, src string) (string, error) {
+func joinTemplateSource(op, prefix, src string) (string, error) {
 	if prefix == "" || src == "" {
 		return cmp.Or(src, prefix), nil
 	}
@@ -397,7 +400,7 @@ func joinTemplateSource(prefix, src string) (string, error) {
 	srcPath, downQuery, _ := strings.Cut(src, "?")
 	joined := strings.TrimSuffix(base, "/") + "/" + strings.TrimPrefix(srcPath, "/")
 	if !render.IsRemoteRef(RemoteSrcRef(joined)) {
-		return "", fmt.Errorf("renderTemplates group source %q joins to a malformed remote ref, want @<repo>//<path>[?ref=<ref>]: %q", prefix, joined)
+		return "", fmt.Errorf("%s group source %q joins to a malformed remote ref, want @<repo>//<path>[?ref=<ref>]: %q", op, prefix, joined)
 	}
 	query := cmp.Or(downQuery, upQuery)
 	if query == "" {
@@ -432,24 +435,24 @@ func overlayPerms(override, base Perms) Perms {
 	return override
 }
 
-func checkTemplateSpec(file templateNode) error {
+func checkTemplateSpec(op string, file templateNode) error {
 	switch {
 	case file.Source == "" && file.glob == "":
-		return fmt.Errorf("renderTemplates node needs a source, a glob or nested <<<")
+		return fmt.Errorf("%s node needs a source, a glob or nested <<<", op)
 	case file.glob != "":
 		if IsRemoteSrc(file.glob) {
-			return fmt.Errorf("renderTemplates glob cannot be remote: %q", file.glob)
+			return fmt.Errorf("%s glob cannot be remote: %q", op, file.glob)
 		}
 	case file.DestRule != "":
 		if IsRemoteSrc(file.Source) {
-			return fmt.Errorf("renderTemplates dest rewrite cannot be remote: %q", file.Source)
+			return fmt.Errorf("%s dest rewrite cannot be remote: %q", op, file.Source)
 		}
 	case IsRemoteSrc(file.Source):
 		if !render.IsRemoteRef(RemoteSrcRef(file.Source)) {
-			return fmt.Errorf("renderTemplates remote source malformed, want @<repo>//<path>[?ref=<ref>]: %q", file.Source)
+			return fmt.Errorf("%s remote source malformed, want @<repo>//<path>[?ref=<ref>]: %q", op, file.Source)
 		}
 		if len(file.Dest) == 0 {
-			return fmt.Errorf("renderTemplates remote source requires explicit dest: %q", file.Source)
+			return fmt.Errorf("%s remote source requires explicit dest: %q", op, file.Source)
 		}
 	}
 	return nil
