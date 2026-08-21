@@ -201,6 +201,8 @@ test-unit-che:
 
 .test-e2e-che:
   extends: .vendors-packages
+  tags:
+    - gke-linux-amd64-small
   image: $CI_IMAGE
   stage: test-e2e
   #[why] only the built artifacts move: the prebuilt binary and e2e harness, no go caches
@@ -416,6 +418,8 @@ test-unit-lib:
       changes: [lib/**/*, go.work, .gitlab-ci.yml]
 
 .release-module:
+  tags:
+    - gke-linux-amd64-small
   interruptible: false
   stage: release
   image: $CI_IMAGE
@@ -464,6 +468,8 @@ release-lib:
       changes: [lib/**/*]
 
 .pages-build:
+  tags:
+    - gke-linux-amd64-small
   image:
     name: squidfunk/mkdocs-material:9
     entrypoint: [""]
@@ -707,6 +713,8 @@ prerelease-linux-che:
     expire_in: 1 week
 
 publish-che:
+  tags:
+    - gke-linux-amd64-small
   interruptible: false
   stage: publish
   image: $CI_IMAGE
@@ -725,6 +733,8 @@ publish-che:
 #[why] tag only: the tree is rebuilt from the registry's .debs, and only a tag adds one. on main it
 #   re-signed an unchanged tree on every commit touching che/
 publish-apt-che:
+  tags:
+    - gke-linux-amd64-small
   interruptible: false
   stage: publish
   image: $CI_IMAGE
@@ -755,6 +765,8 @@ publish-pages-tag:
     - if: $CI_COMMIT_TAG =~ /^che\/v/
 
 publish-brew-che:
+  tags:
+    - gke-linux-amd64-small
   interruptible: false
   stage: publish
   image: $CI_IMAGE
@@ -789,6 +801,8 @@ publish-ci-image:
 ##[<] 🤖🤖
 
 publish-get-os-open-files-with:
+  tags:
+    - gke-linux-amd64-small
   interruptible: false
   stage: publish
   image: $CI_IMAGE
@@ -798,6 +812,8 @@ publish-get-os-open-files-with:
     - make publish
 
 publish-get-term-open-files-with:
+  tags:
+    - gke-linux-amd64-small
   interruptible: false
   stage: publish
   image: $CI_IMAGE
