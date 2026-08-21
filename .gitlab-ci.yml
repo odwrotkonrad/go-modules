@@ -650,6 +650,8 @@ prerelease-darwin-che:
   rules:
     - if: $CI_PIPELINE_SOURCE == "merge_request_event"
       changes: [che/**/*, lib/**/*, ci/publish-prerelease.zsh, Makefile, .gitlab-ci.yml]
+      when: manual
+      allow_failure: true
   variables:
     MODULE_VERSION: 0.0.0-mr${CI_MERGE_REQUEST_IID}
   cache:
@@ -693,6 +695,8 @@ prerelease-linux-che:
   rules:
     - if: $CI_PIPELINE_SOURCE == "merge_request_event"
       changes: [che/**/*, lib/**/*, ci/publish-prerelease.zsh, Makefile, .gitlab-ci.yml]
+      when: manual
+      allow_failure: true
   variables:
     MODULE_VERSION: 0.0.0-mr${CI_MERGE_REQUEST_IID}
     ARCH: amd64
