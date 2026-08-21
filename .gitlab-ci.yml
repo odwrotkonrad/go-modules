@@ -41,7 +41,8 @@ variables:
   CI_IMAGES_REF: $GRP_KO_VAR_CI_IMAGES_REF
   CHE_PACKAGES_REF: $GRP_KO_VAR_CHE_PACKAGES_REF
   ENABLE_DARWIN_CI: $GRP_KO_VAR_ENABLE_DARWIN_CI
-  PROSE_REF: $GRP_KO_VAR_PROSE_REF
+  PROSE_ASSETS_REF: $GRP_KO_VAR_PROSE_ASSETS_REF
+  PROSE_SPEC_REF: $GRP_KO_VAR_PROSE_SPEC_REF
   CI_IMAGE: $ARTIFACT_REGISTRY/ci-linux:$CI_IMAGES_REF
   CI_IMAGE_ARM64: $ARTIFACT_REGISTRY/ci-linux:$CI_IMAGES_REF-arm64
   CI_IMAGE_DIND: $ARTIFACT_REGISTRY/ci-linux-dind:$CI_IMAGES_REF
@@ -477,7 +478,7 @@ release-lib:
     - sed -i 's|(\.\./assets/data/che.schema.json)|(assets/data/che.schema.json)|g' che/docs/spec.md
     - printf '# che\n' > che/docs/index.md
     ##[>] 🤖🤖
-    - wget -qO che/docs/purpose-src.md "https://gitlab.com/konradodwrot/prose/-/raw/$PROSE_REF/repos/go-modules/che-purpose.md"
+    - wget -qO che/docs/purpose-src.md "https://gitlab.com/konradodwrot/cross-repo/prose/assets/-/raw/$PROSE_ASSETS_REF/repos/go-modules/che-purpose.md"
     - tail -n +2 che/docs/purpose-src.md >> che/docs/index.md
     - rm che/docs/purpose-src.md
     - printf '\n## Install\n\n' >> che/docs/index.md
@@ -780,7 +781,7 @@ publish-ci-image:
   variables:
     BUILD_ALL_IMAGES: "true"
   trigger:
-    project: konradodwrot/infra/oci-images
+    project: konradodwrot/cross-repo/infra/oci-images
     branch: main
     forward:
       yaml_variables: true

@@ -1,19 +1,19 @@
 ##[>] 🤖🤖
 upstream:
-  - prose/repo-prose
-  - prose/conventions-doc
-  - prose/doc-templates
-  - prose/license
+  - cross-repo/prose/assets/repo-prose
+  - cross-repo/prose/spec/conventions-doc
+  - cross-repo/prose/assets/doc-templates
+  - cross-repo/prose/assets/license
   - configs/llm/claude
-  - infra/oci-images/ci-linux
-  - infra/oci-images/ci-linux-dind
+  - cross-repo/infra/oci-images/ci-linux
+  - cross-repo/infra/oci-images/ci-linux-dind
   #[why] che embeds the catalog at the version the $CHE_PACKAGES_REF group CI variable names: a
   #   catalog release has to reach that variable, which is what makes this an upstream edge
   - che-packages/catalog
-  - infra/iac/ci-var/artifact-registry
-  - infra/iac/ci-var/ci-images-ref
-  - infra/iac/ci-var/che-packages-ref
-  - infra/iac/ci-var/enable-darwin-ci
+  - cross-repo/infra/iac/ci-var/artifact-registry
+  - cross-repo/infra/iac/ci-var/ci-images-ref
+  - cross-repo/infra/iac/ci-var/che-packages-ref
+  - cross-repo/infra/iac/ci-var/enable-darwin-ci
 edges:
   go-modules/lib: [che, get-os-open-files-with, get-term-open-files-with]
 downstream:
