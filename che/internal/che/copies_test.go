@@ -31,6 +31,7 @@ func TestMakeCopies(t *testing.T) {
 		testutil.RequireRegistered(t, c.Context.MockedInterfaces)
 		var fetch map[string]string
 		var items []spec.FileItem
+		var opts options.Options
 		a := c.Input.Args
 		for i := range a {
 			switch name := a.Name(i); name {
@@ -38,6 +39,8 @@ func TestMakeCopies(t *testing.T) {
 				a.To(t, i, &fetch)
 			case "items":
 				a.To(t, i, &items)
+			case "dryRun":
+				opts.DryRun = options.DryRunMode(a.String(t, i))
 			default:
 				t.Fatalf("unknown arg %q", name)
 			}
@@ -45,7 +48,7 @@ func TestMakeCopies(t *testing.T) {
 		root := testutil.Tree(t, map[string]string{})
 		home := filepath.Join(root, "home")
 		require.NoError(t, os.MkdirAll(filepath.Join(home, "prompts"), 0o755))
-		p := newProfile(root, home, options.Options{}).withDir(root)
+		p := newProfile(root, home, opts).withDir(root)
 		p.Fetcher = testutil.RemoteMockFetcher(fetch)
 		copyOnce := func() (string, error) {
 			return testutil.CaptureStdout(t, func() error { return p.makeCopies(items, nil) })

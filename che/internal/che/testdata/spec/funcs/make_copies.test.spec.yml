@@ -24,6 +24,17 @@ cases:
           home/prompts/a.md.tpl: "0640"
         rerun: true
         notRerunStdOut: ["created ${HOME}/prompts"]
+  - name: ShouldPredictRemoteCopyWithoutFetchingOnDryRun
+    input:
+      args:
+        - fetch: {}
+        - items:
+            - {rel: "@gitlab.com/acme/tools//prompts/a.md.tpl?ref=v1.0.0", dests: [$HOME/prompts/a.md.tpl]}
+        - dryRun: all
+    expected:
+      stdOut: "create ${HOME}/prompts/a.md.tpl (dry run)"
+      output:
+        absent: [home/prompts/a.md.tpl]
   - name: ShouldFailOnRemoteFetchError
     input:
       args:
