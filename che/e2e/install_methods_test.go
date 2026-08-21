@@ -696,8 +696,14 @@ func ensureNoDepsImage(t *testing.T, arch string) string {
 		if exec.Command("docker", "image", "inspect", tag).Run() == nil {
 			return
 		}
-		build := exec.Command("docker", "build", "--quiet", "--platform", "linux/"+arch,
-			"--file", "install-methods.Dockerfile", "--tag", tag, ".")
+		args := []string{
+			"build", "--quiet", "--platform", "linux/" + arch,
+			"--file", "install-methods.Dockerfile", "--tag", tag,
+		}
+		if base := os.Getenv("CHE_E2E_BASE_IMAGE"); base != "" {
+			args = append(args, "--build-arg", "BASE_IMAGE="+base)
+		}
+		build := exec.Command("docker", append(args, ".")...)
 		out, err := build.CombinedOutput()
 		require.NoError(t, err, "build %s: %s", tag, out)
 	})

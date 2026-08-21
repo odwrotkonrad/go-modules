@@ -266,7 +266,8 @@ warm-e2e-pkg-installs-image:
       when: manual
       allow_failure: true
   script:
-    - docker run --privileged --rm tonistiigi/binfmt --install arm64
+    - docker pull $ARTIFACT_REGISTRY_PROXY_DOCKERHUB/tonistiigi/binfmt
+    - docker run --privileged --rm $ARTIFACT_REGISTRY_PROXY_DOCKERHUB/tonistiigi/binfmt --install arm64
     - docker context create dind --docker "host=$DOCKER_HOST,ca=$DOCKER_CERT_PATH/ca.pem,cert=$DOCKER_CERT_PATH/cert.pem,key=$DOCKER_CERT_PATH/key.pem"
     - docker buildx create --use dind
     - mkdir -p e2e-images
@@ -331,6 +332,7 @@ test-e2e-install-methods:
     DOCKER_CERT_PATH: "$DOCKER_TLS_CERTDIR/client"
     #[why] docker run -v paths must live under /builds, the only volume the dind service shares with the job
     E2E_INSTALL_CACHE_DIR: $CI_PROJECT_DIR/.cache/che-e2e-install
+    CHE_E2E_BASE_IMAGE: $ARTIFACT_REGISTRY_PROXY_DOCKERHUB/library/debian:bookworm-slim
   parallel:
     matrix:
       - METHOD: [apt, binariesRemoteArchive, script, pyenv, nvm, npm, go, nix, buildFromSource]
@@ -465,7 +467,7 @@ release-lib:
 
 .pages-build:
   image:
-    name: squidfunk/mkdocs-material:9
+    name: $ARTIFACT_REGISTRY_PROXY_DOCKERHUB/squidfunk/mkdocs-material:9
     entrypoint: [""]
   needs: []
   #[why] off by default: only the job publishing the live site needs the carry
