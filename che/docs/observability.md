@@ -1,6 +1,6 @@
 # che observability
 
-che emits OTLP telemetry (metrics, traces, mirrored logs) to a local collector, wired in `internal/telemetry`. Off by default: a nil provider is a no-op.
+che emits OTLP telemetry (metrics, traces, mirrored logs) to a local collector, wired in `internal/telemetry`. Off by default: a nil provider no-ops.
 
 ## Metrics
 
