@@ -3,6 +3,7 @@ package lib
 import (
 	"fmt"
 	"os"
+	"path/filepath"
 	"strings"
 )
 
@@ -14,10 +15,53 @@ func Generate(path string) (string, error) {
 	if err != nil {
 		return "", fmt.Errorf("file not found: %s", path)
 	}
-	return render(parse(src)), nil
+	nodes, err := expandIncludes(scan(src), filepath.Dir(path), map[string]bool{})
+	if err != nil {
+		return "", err
+	}
+	return render(parseNodes(nodes)), nil
 }
 
-func parse(src []byte) []section {
+// [why] a makefile that -includes its targets from elsewhere documents nothing
+//
+//	without this: splice each included file's nodes in where the directive sat,
+//	so its targets land under the section that reached for them
+func expandIncludes(nodes []node, dir string, seen map[string]bool) ([]node, error) {
+	var out []node
+	for _, n := range nodes {
+		if n.kind != nodeInclude {
+			out = append(out, n)
+			continue
+		}
+		body, _ := cutDirective(n.text)
+		paths, _ := cutIncludeDirective(body)
+		for _, rel := range paths {
+			path := rel
+			if !filepath.IsAbs(path) {
+				path = filepath.Join(dir, rel)
+			}
+			if seen[path] {
+				continue
+			}
+			seen[path] = true
+			src, err := os.ReadFile(path)
+			if err != nil {
+				if os.IsNotExist(err) && strings.HasPrefix(body, "-") {
+					continue
+				}
+				return nil, fmt.Errorf("include %s: %w", rel, err)
+			}
+			nested, err := expandIncludes(scan(src), filepath.Dir(path), seen)
+			if err != nil {
+				return nil, err
+			}
+			out = append(out, nested...)
+		}
+	}
+	return out, nil
+}
+
+func parseNodes(nodes []node) []section {
 	var out []section
 	var stack []frame
 
@@ -36,7 +80,7 @@ func parse(src []byte) []section {
 
 	var pending pendingComment
 
-	for _, node := range scan(src) {
+	for _, node := range nodes {
 		text := node.text
 		prev := pending
 		pending = pendingComment{}

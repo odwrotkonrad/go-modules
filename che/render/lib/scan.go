@@ -9,6 +9,7 @@ const (
 	nodeComment nodeKind = iota
 	nodeRule
 	nodeAssignment
+	nodeInclude
 )
 
 type node struct {
@@ -54,6 +55,12 @@ func continues(line string) bool {
 func classify(line string) (nodeKind, bool) {
 	body, exported := cutDirective(line)
 
+	// [why] an include names the file whose targets belong in this doc, and it
+	//   carries no colon of its own: classify it before the rule and assign tests
+	if _, ok := cutIncludeDirective(body); ok {
+		return nodeInclude, true
+	}
+
 	assignAt := findAssign(body)
 	colonAt := findRuleColon(body)
 
@@ -70,6 +77,25 @@ func classify(line string) (nodeKind, bool) {
 		return nodeAssignment, true
 	}
 	return 0, false
+}
+
+// cutIncludeDirective returns the paths an include line names, and whether the
+// line was an include at all. A leading - marks the include optional to make.
+func cutIncludeDirective(body string) ([]string, bool) {
+	rest, ok := strings.CutPrefix(body, "include ")
+	if !ok {
+		if rest, ok = strings.CutPrefix(body, "-include "); !ok {
+			rest, ok = strings.CutPrefix(body, "sinclude ")
+		}
+	}
+	if !ok {
+		return nil, false
+	}
+	paths := strings.Fields(rest)
+	if len(paths) == 0 {
+		return nil, false
+	}
+	return paths, true
 }
 
 func cutDirective(line string) (body string, exported bool) {
