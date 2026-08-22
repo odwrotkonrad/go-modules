@@ -376,12 +376,16 @@ include:
         GITLAB_GROUP: konradodwrot
 ```
 
-- `source`: `<source>/<spec-file>.yml::<profile>`. `::` splits off the profile
-  name, the last path segment before it is the spec file (`.yml`), the rest the
-  source: `@<giturl>` (remote, cloned/pulled into a managed cache checkout) or
-  `<dir>` (local, used in place, no git: `$VAR` and `~` expand, a relative path
-  resolves against the referencing spec's checkout). A bare `<profile>` with no
-  `::` is a local profile, written as a scalar.
+- `source`: `<source>/<spec-file>.yml::<profile>[?ref=<git-ref>]`. `::` splits
+  off the profile name, the last path segment before it is the spec file
+  (`.yml`), the rest the source: `@<giturl>` (remote, cloned/pulled into a
+  managed cache checkout) or `<dir>` (local, used in place, no git: `$VAR` and
+  `~` expand, a relative path resolves against the referencing spec's
+  checkout). A bare `<profile>` with no `::` is a local profile, written as a
+  scalar.
+- `?ref=<git-ref>` pins a remote source to a tag or branch, its own cache
+  checkout per ref, unset means the default branch HEAD. Remote only: a local
+  dir source errors. The same query pins `include.sources` entries.
 - `options`: override the referenced profile's own. One more cascade level, most
   nested wins.
 - `env`: exported around everything done for the referenced profile,
