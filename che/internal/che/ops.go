@@ -283,7 +283,7 @@ func (p *ProfileReady) makeRemoteCopy(item spec.FileItem, dest string) error {
 	if p.isDryRun() {
 		return p.mutate("make-copies", "create", dest, dest, info, nil)
 	}
-	content, err := p.fetchRemote(spec.RemoteSrcRef(item.Rel))
+	content, err := p.fetchRemote(item.Rel)
 	if err != nil {
 		return err
 	}

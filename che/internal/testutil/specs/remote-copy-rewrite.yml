@@ -2,7 +2,7 @@
 base:
   include:
     makeCopies:
-      - {source: "@gitlab.com/acme/tools//prompts/**", dest: 's:^prompts:$HOME/prompts:'}
+      - {source: "git::gitlab.com/acme/tools//prompts/**", dest: 's:^prompts:$HOME/prompts:'}
 
 cli/macos:
   options: {autoDiscover: true}

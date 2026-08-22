@@ -20,6 +20,16 @@ cases:
         - url: https://example.com/x.git
     expected:
       output: /o/remote-sources/example.com-x
+  - name: ShouldSuffixCacheDirWithRef
+    context:
+      env: {CHE_CACHE_HOME: /o, XDG_CACHE_HOME: ""}
+    input:
+      args:
+        - home: /h
+        - url: https://example.com/x.git
+        - ref: v1.2.3
+    expected:
+      output: /o/remote-sources/example.com-x-v1.2.3
   - name: ShouldNestUnderXdgCacheHome
     context:
       env: {CHE_CACHE_HOME: "", XDG_CACHE_HOME: /x}

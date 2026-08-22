@@ -116,7 +116,7 @@ cases:
             env:
               GITLAB_GROUP: konradodwrot
             include:
-              sources: ["@https://gitlab.com/g/r.git", ./sibling]
+              sources: ["git::https://gitlab.com/g/r.git", ./sibling]
             p:
               include:
                 makeLinks: [_home/**]
@@ -130,7 +130,7 @@ cases:
               include:
                 profiles:
                   - base
-                  - source: "@https://gitlab.com/g/r.git/che.yml::gitlabGroup"
+                  - source: "git::https://gitlab.com/g/r.git/che.yml::gitlabGroup"
                     env: {GITLAB_GROUP: konradodwrot}
     expected:
       output: ""

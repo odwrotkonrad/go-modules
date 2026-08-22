@@ -2,7 +2,7 @@
 base:
   include:
     makeCopies:
-      - source: "@gitlab.com/acme/tools?ref=v1.0.0"
+      - source: "git::gitlab.com/acme/tools@v1.0.0"
         dest: /usr/local/share/acme
         owner: root
         chmod: "0644"
@@ -13,7 +13,12 @@ base:
             <<<:
               - {source: /b.md.tpl, dest: b.md.tpl}
               - {source: /c.md.tpl, dest: $HOME/.config/acme/c.md.tpl}
-          - {source: "//prompts/pinned.md.tpl?ref=v2.0.0", dest: pinned.md.tpl}
+      - source: "git::gitlab.com/acme/tools@v2.0.0"
+        dest: /usr/local/share/acme
+        owner: root
+        chmod: "0644"
+        <<<:
+          - {source: //prompts/pinned.md.tpl, dest: pinned.md.tpl}
       - source: _home/.config/foo
         <<<:
           - {source: x.ontoHost.cp, dest: [$HOME/.config/foo/x]}

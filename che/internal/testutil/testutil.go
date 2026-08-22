@@ -74,6 +74,16 @@ func GitRepo(t *testing.T, dir string) {
 	require.NoError(t, err)
 }
 
+func GitTag(t *testing.T, dir, tag string) {
+	t.Helper()
+	repo, err := git.PlainOpen(dir)
+	require.NoError(t, err)
+	head, err := repo.Head()
+	require.NoError(t, err)
+	_, err = repo.CreateTag(tag, head.Hash(), nil)
+	require.NoError(t, err)
+}
+
 func Repo(t *testing.T, files map[string]string) string {
 	t.Helper()
 	dir := Tree(t, files)

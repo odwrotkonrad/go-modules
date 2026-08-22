@@ -218,7 +218,7 @@ func (p *ProfileReady) templateBody(item spec.FileItem) ([]byte, bool) {
 		if p.isDryRun() {
 			return nil, false
 		}
-		content, err := p.fetchRemote(spec.RemoteSrcRef(item.Rel))
+		content, err := p.fetchRemote(item.Rel)
 		if err != nil {
 			return nil, false
 		}
@@ -257,7 +257,7 @@ func (p *ProfileReady) resolveTemplateDests(item spec.FileItem) []templateDest {
 
 func (p *ProfileReady) readTemplateSrc(item spec.FileItem) ([]byte, string, error) {
 	if spec.IsRemoteSrc(item.Rel) {
-		content, err := p.fetchRemote(spec.RemoteSrcRef(item.Rel))
+		content, err := p.fetchRemote(item.Rel)
 		if err != nil {
 			return nil, item.Rel, err
 		}

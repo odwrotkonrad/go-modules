@@ -38,14 +38,14 @@ func TestIsRemoteRef(t *testing.T) {
 
 func TestRemoteFile(t *testing.T) {
 	testyml.Eq(t, td, "testdata/spec/funcs/remote_file.test.spec.yml", func(t *testing.T, c testyml.Case[string]) (string, error) {
-		url := "file://" + initRemoteFixture(t)
+		url := GitMarker + "file://" + initRemoteFixture(t)
 		return NewRemoteFetcher()(url + c.Input.Args.String(t, 0))
 	})
 }
 
 func TestNewRemoteFetcher(t *testing.T) {
 	testyml.Run(t, td, "testdata/spec/funcs/new_remote_fetcher.test.spec.yml", func(t *testing.T, c testyml.Case[string]) {
-		url := "file://" + initRemoteFixture(t)
+		url := GitMarker + "file://" + initRemoteFixture(t)
 		fetch := NewRemoteFetcher()
 		// [why] every fetch past the first must hit the shared clone cache
 		for range c.Input.Args.Int(t, 1) {
@@ -58,7 +58,7 @@ func TestNewRemoteFetcher(t *testing.T) {
 
 func TestExecRemoteFile(t *testing.T) {
 	testyml.Run(t, td, "testdata/spec/funcs/exec_remote_file.test.spec.yml", func(t *testing.T, c testyml.Case[string]) {
-		url := "file://" + initRemoteFixture(t)
+		url := GitMarker + "file://" + initRemoteFixture(t)
 		repoRoot := testutil.Repo(t, map[string]string{"x": "x"})
 		body := testyml.Expand(c.Input.Args.String(t, 0), map[string]string{"URL": url})
 		got, err := Exec("t.tpl", []byte(body), repoRoot)

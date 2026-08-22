@@ -61,7 +61,7 @@ func (w *initWalker) walkSpec(src spec.SpecSourceRecipe, anchor, name string, re
 		for _, ref := range rec.SourcedRefs() {
 			log.EmitTrace("init-remote-sources", "detected-remote-ref", "profile "+ref.ProfileName+": "+ref.String())
 			err := w.walkSpec(
-				spec.SpecSourceRecipe{SourceRecipe: spec.SourceRecipe{URI: ref.URI, SpecFile: ref.SpecFile}},
+				spec.SpecSourceRecipe{SourceRecipe: spec.SourceRecipe{URI: ref.URI, SpecFile: ref.SpecFile, Ref: ref.Ref}},
 				ready.DirectoryPath, ref.ProfileName, ref.Env)
 			if err != nil {
 				return err
