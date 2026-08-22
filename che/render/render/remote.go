@@ -18,23 +18,78 @@ import (
 
 func (r remoteRef) key() string { return r.repoURL + "?" + r.gitRef }
 
+// GitMarker prefixes every git remote source: git::<repo>[@<ref>]//<path>.
+const GitMarker = "git::"
+
+// CutGitMarker strips the git:: marker, reporting whether the source carried one.
+func CutGitMarker(source string) (rest string, ok bool) {
+	return strings.CutPrefix(source, GitMarker)
+}
+
+// CutRefSuffix splits a marker-less remote source into its repo-and-path and its @<ref>.
+//
+// [why] the ref anchors to the last '@' inside the repo path, past the authority: a scheme or scp user '@' precedes the host, so it never reads as one
+func CutRefSuffix(source string) (rest, gitRef string, err error) {
+	start := 0
+	if i := strings.Index(source, "://"); i >= 0 {
+		start = i + 3
+	}
+	head, tail := source, ""
+	hasPath := false
+	if j := strings.Index(source[start:], "//"); j >= 0 {
+		head, tail, hasPath = source[:start+j], source[start+j+2:], true
+	}
+	at := strings.LastIndex(head, "@")
+	if at < 0 || at < repoPathStart(head, start) {
+		return source, "", nil
+	}
+	gitRef = head[at+1:]
+	if gitRef == "" {
+		return "", "", fmt.Errorf("source %q: bare %q, want %s<repo>@<ref>", source, "@", GitMarker)
+	}
+	rest = head[:at]
+	if hasPath {
+		rest += "//" + tail
+	}
+	return rest, gitRef, nil
+}
+
+// [why] the authority runs to the first '/' or ':' past any userinfo '@': the repo path starts there
+func repoPathStart(head string, start int) int {
+	authority := head[start:]
+	sep := strings.IndexAny(authority, "/:")
+	// [why] userinfo needs a host after it: a trailing '@' is a malformed ref, not a user
+	if at := strings.Index(authority, "@"); at >= 0 && at < len(authority)-1 && (sep < 0 || at < sep) {
+		start += at + 1
+		authority = head[start:]
+		sep = strings.IndexAny(authority, "/:")
+	}
+	if sep >= 0 {
+		return start + sep
+	}
+	// [why] no authority/path boundary means no userinfo either: any '@' left is the ref
+	return start
+}
+
 func parseRemoteRef(ref string) (remoteRef, error) {
-	scheme, rest := "", ref
-	if i := strings.Index(ref, "://"); i >= 0 {
-		scheme, rest = ref[:i+3], ref[i+3:]
+	rest, ok := CutGitMarker(ref)
+	if !ok {
+		return remoteRef{}, fmt.Errorf("remote source %q: want %s<repo>[@<ref>]//<path>", ref, GitMarker)
+	}
+	if strings.Contains(rest, "?ref=") {
+		return remoteRef{}, fmt.Errorf("remote source %q: ?ref= is gone, pin with %s<repo>@<ref>//<path>", ref, GitMarker)
+	}
+	rest, gitRef, err := CutRefSuffix(rest)
+	if err != nil {
+		return remoteRef{}, err
+	}
+	scheme := ""
+	if i := strings.Index(rest, "://"); i >= 0 {
+		scheme, rest = rest[:i+3], rest[i+3:]
 	}
 	repo, path, ok := strings.Cut(rest, "//")
 	if !ok || repo == "" || path == "" {
-		return remoteRef{}, fmt.Errorf("remoteFile %q: want <repo>//<path>[?ref=<ref>]", ref)
-	}
-	path, query, _ := strings.Cut(path, "?")
-	var gitRef string
-	if query != "" {
-		v, ok := strings.CutPrefix(query, "ref=")
-		if !ok || v == "" {
-			return remoteRef{}, fmt.Errorf("remoteFile %q: unknown query %q, want ref=<ref>", ref, query)
-		}
-		gitRef = v
+		return remoteRef{}, fmt.Errorf("remote source %q: want %s<repo>[@<ref>]//<path>", ref, GitMarker)
 	}
 	out := remoteRef{path: path, gitRef: gitRef}
 	if scheme == "" {

@@ -63,7 +63,7 @@ cases:
                 options: {autoDiscover: true}
                 include:
                   profiles:
-                    - source: "@file://${REF_DIR}/che.yml::gitlabGroup"
+                    - source: "git::file://${REF_DIR}/che.yml::gitlabGroup"
                   runScripts: [scripts/local.zsh]
             scripts/local.zsh: "#!/bin/zsh\n"
         - flags: {logLevel: trace}
@@ -486,7 +486,7 @@ cases:
                 options: {autoDiscover: true}
                 include:
                   profiles:
-                    - source: "@file://${REF_DIR}/che.yml::gitlabGroup"
+                    - source: "git::file://${REF_DIR}/che.yml::gitlabGroup"
                       options: {profileWorkingDirectory: override-tree}
         - flags: {}
     expected:

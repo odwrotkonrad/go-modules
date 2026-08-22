@@ -24,9 +24,12 @@ var templateExts = []string{".ontoHost.tpl", ".ontoRepo.tpl", ".tpl"}
 
 func IsTemplateSrc(rel string) bool { return strings.HasSuffix(rel, TemplateExt) }
 
-const RemoteSrcPrefix = "@"
+const RemoteSrcPrefix = render.GitMarker
 
-func IsRemoteSrc(source string) bool { return strings.HasPrefix(source, RemoteSrcPrefix) }
+func IsRemoteSrc(source string) bool {
+	_, ok := render.CutGitMarker(source)
+	return ok
+}
 
 func (r ProfileRecipe) IncludedProfileRefs() []string {
 	var out []string
@@ -46,7 +49,10 @@ func (r ProfileRecipe) SourcedRefs() []ProfileSourceRecipe {
 	return out
 }
 
-func RemoteSrcRef(source string) string { return strings.TrimPrefix(source, RemoteSrcPrefix) }
+func RemoteSrcRef(source string) string {
+	rest, _ := render.CutGitMarker(source)
+	return rest
+}
 
 func TrimTemplateExt(rel string) string {
 	for _, ext := range templateExts {
@@ -232,7 +238,15 @@ func (d *Doc) decodeKey(key string, node *yaml.Node) error {
 			return fmt.Errorf("parse include: %w", err)
 		}
 		for _, s := range inc.Sources {
-			d.Include = append(d.Include, SpecSourceRecipe{SourceRecipe{URI: s}})
+			uri, gitRef, err := cutSourceRef(s)
+			if err != nil {
+				return err
+			}
+			rec := SpecSourceRecipe{SourceRecipe{URI: uri, Ref: gitRef}}
+			if err := rec.IsValid(); err != nil {
+				return err
+			}
+			d.Include = append(d.Include, rec)
 		}
 		return nil
 	default:

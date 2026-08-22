@@ -4,16 +4,16 @@ context:
 cases:
   - name: ShouldParseBareHostPath
     input:
-      args: [ref: "gitlab.com/konradodwrot/conventions//conventions/comments/convention.md"]
+      args: [ref: "git::gitlab.com/konradodwrot/conventions//conventions/comments/convention.md"]
     expected:
       output:
         repoURL: "https://gitlab.com/konradodwrot/conventions.git"
         sshURL: "ssh://git@gitlab.com/konradodwrot/conventions.git"
         path: conventions/comments/convention.md
         gitRef: ""
-  - name: ShouldParseRefQuery
+  - name: ShouldParseRefSuffix
     input:
-      args: [ref: "github.com/foo/bar//docs/x.md?ref=v1.2.3"]
+      args: [ref: "git::github.com/foo/bar@v1.2.3//docs/x.md"]
     expected:
       output:
         repoURL: "https://github.com/foo/bar.git"
@@ -22,31 +22,64 @@ cases:
         gitRef: v1.2.3
   - name: ShouldKeepExplicitSchemeVerbatim
     input:
-      args: [ref: "file:///tmp/repo//a/b.md?ref=main"]
+      args: [ref: "git::file:///tmp/repo@main//a/b.md"]
     expected:
       output:
         repoURL: "file:///tmp/repo"
         sshURL: ""
         path: a/b.md
         gitRef: main
+  - name: ShouldAnchorRefToLastAtBeforePath
+    input:
+      args: [ref: "git::git@gitlab.com:g/r.git@v1//p/x.md"]
+    expected:
+      output:
+        repoURL: "https://git@gitlab.com:g/r.git.git"
+        sshURL: "ssh://git@git@gitlab.com:g/r.git.git"
+        path: p/x.md
+        gitRef: v1
+  - name: ShouldNotEatScpUserAsRef
+    input:
+      args: [ref: "git::ssh://git@gitlab.com/g/r.git//p/x.md"]
+    expected:
+      output:
+        repoURL: "ssh://git@gitlab.com/g/r.git"
+        sshURL: ""
+        path: p/x.md
+        gitRef: ""
+  - name: ShouldErrorWithoutGitMarker
+    input:
+      args: [ref: "gitlab.com/x/y//a.md"]
+    expected:
+      errorOutput: ['want git::<repo>[@<ref>]//<path>']
+  - name: ShouldErrorOnRefQuery
+    input:
+      args: [ref: "git::gitlab.com/x/y//a.md?ref=v1"]
+    expected:
+      errorOutput: ['?ref= is gone', 'git::<repo>@<ref>//<path>']
+  - name: ShouldErrorOnBareTrailingAt
+    input:
+      args: [ref: "git::gitlab.com/x/y@//a.md"]
+    expected:
+      errorOutput: ['bare "@"']
+  - name: ShouldErrorOnBareTrailingAtWithoutPathSegment
+    input:
+      args: [ref: "git::repo@//a.md"]
+    expected:
+      errorOutput: ['bare "@"']
   - name: ShouldErrorWithoutPathSeparator
     input:
-      args: [ref: "gitlab.com/x/y"]
+      args: [ref: "git::gitlab.com/x/y"]
     expected:
-      errorOutput: ['want <repo>//<path>']
+      errorOutput: ['want git::<repo>[@<ref>]//<path>']
   - name: ShouldErrorOnEmptyPath
     input:
-      args: [ref: "gitlab.com/x/y//"]
+      args: [ref: "git::gitlab.com/x/y//"]
     expected:
-      errorOutput: ['want <repo>//<path>']
+      errorOutput: ['want git::<repo>[@<ref>]//<path>']
   - name: ShouldErrorOnEmptyRepo
     input:
-      args: [ref: "//a.md"]
+      args: [ref: "git::///a.md"]
     expected:
-      errorOutput: ['want <repo>//<path>']
-  - name: ShouldErrorOnUnknownQuery
-    input:
-      args: [ref: "gitlab.com/x/y//a.md?tag=v1"]
-    expected:
-      errorOutput: ['unknown query']
+      errorOutput: ['want git::<repo>[@<ref>]//<path>']
 # [<] 🤖🤖

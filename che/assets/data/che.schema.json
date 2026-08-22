@@ -376,7 +376,7 @@
           "properties": {
             "source": {
               "type": "string",
-              "description": "\u003csource\u003e/\u003cspec-file\u003e.yml::\u003cprofile\u003e: source @\u003cgiturl\u003e (remote) or \u003cdir\u003e (local); bare \u003cprofile\u003e for the local spec"
+              "description": "\u003csource\u003e/\u003cspec-file\u003e.yml::\u003cprofile\u003e: source git::\u003cgiturl\u003e[@\u003cref\u003e] (remote, @\u003cref\u003e pins a tag or branch) or \u003cdir\u003e (local, no ref); bare \u003cprofile\u003e for the local spec"
             },
             "options": {
               "$ref": "#/$defs/ProfileOptions"
@@ -401,7 +401,7 @@
           "required": [
             "source"
           ],
-          "description": "sourced profile ref: source is \u003csource\u003e/\u003cspec-file\u003e.yml::\u003cprofile\u003e, options override its options, env overlays its run"
+          "description": "sourced profile ref: source is git::\u003crepo\u003e[@\u003cref\u003e][//\u003csubdir\u003e]/\u003cspec-file\u003e.yml::\u003cprofile\u003e, options override its options, env overlays its run"
         }
       ]
     },
@@ -596,7 +596,7 @@
           "properties": {
             "source": {
               "type": "string",
-              "description": "*.ontoHost.cp source path, workingDirectory-relative, or remote ref @\u003crepo\u003e//\u003cpath\u003e[?ref=\u003cref\u003e] (explicit dest required); joined onto every enclosing group's source prefix"
+              "description": "*.ontoHost.cp source path, workingDirectory-relative, or remote ref git::\u003crepo\u003e[@\u003cref\u003e]//\u003cpath\u003e (explicit dest required); joined onto every enclosing group's source prefix"
             },
             "dest": {
               "oneOf": [
@@ -678,7 +678,7 @@
           "properties": {
             "source": {
               "type": "string",
-              "description": "source prefix joined onto every nested node's source; a remote prefix @\u003crepo\u003e[//\u003cpath\u003e][?ref=\u003cref\u003e] recombines so the ref stays last"
+              "description": "source prefix joined onto every nested node's source; a remote prefix git::\u003crepo\u003e[@\u003cref\u003e][//\u003cpath\u003e] concatenates with each leaf path"
             },
             "dest": {
               "type": "string",
@@ -833,7 +833,7 @@
             "$ref": "#/$defs/ProfileSourceRecipe"
           },
           "type": "array",
-          "description": "profile refs composed depth-first before this profile's own payload: local profile name scalar, or {source, options, env} where source is \u003csource\u003e/\u003cspec-file\u003e.yml::\u003cprofile\u003e locating a profile in another spec (its own checkout anchor)"
+          "description": "profile refs composed depth-first before this profile's own payload: local profile name scalar, or {source, options, env} where source is git::\u003crepo\u003e[@\u003cref\u003e][//\u003csubdir\u003e]/\u003cspec-file\u003e.yml::\u003cprofile\u003e locating a profile in another spec (its own checkout anchor, @\u003cref\u003e pins a remote source to a tag or branch)"
         },
         "makeLinks": {
           "items": {
@@ -847,14 +847,14 @@
             "$ref": "#/$defs/copyNode"
           },
           "type": "array",
-          "description": "copy-op tree: a leaf copies one source verbatim to its dests, a node carrying nested \u003c\u003c\u003c is a group whose source and dest prefixes and perms cascade onto its descendants (innermost wins); local *.ontoHost.cp sources workingDirectory-relative, or remote (@\u003crepo\u003e//\u003cpath\u003e[?ref=\u003cref\u003e], explicit dest required, a group prefix carrying the ref recombines with each leaf path); a glob source may carry a {source, dest} dest rewrite (sed-style s:^_home:$HOME: or prefix-swap sugar _home/** -\u003e $HOME/**)"
+          "description": "copy-op tree: a leaf copies one source verbatim to its dests, a node carrying nested \u003c\u003c\u003c is a group whose source and dest prefixes and perms cascade onto its descendants (innermost wins); local *.ontoHost.cp sources workingDirectory-relative, or remote (git::\u003crepo\u003e[@\u003cref\u003e]//\u003cpath\u003e, explicit dest required, a group prefix carrying the ref concatenates with each leaf path); a glob source may carry a {source, dest} dest rewrite (sed-style s:^_home:$HOME: or prefix-swap sugar _home/** -\u003e $HOME/**)"
         },
         "renderTemplates": {
           "items": {
             "$ref": "#/$defs/templateNode"
           },
           "type": "array",
-          "description": "*.tpl render-op tree: a leaf renders one source to its dests, a node carrying nested \u003c\u003c\u003c is a group whose source prefixes, perms, ctx and options cascade onto its descendants (innermost wins, dest options win last); local host sources workingDirectory-relative, repo-doc sources (repo dest) workingDirectory-relative, or remote (@\u003crepo\u003e//\u003cpath\u003e[?ref=\u003cref\u003e], explicit dest required, a group prefix carrying the ref recombines with each leaf path); glob and derived-dest forms are host sources; a glob source may carry a {source, dest} dest rewrite (sed-style s:^_home:$HOME: or prefix-swap sugar _home/** -\u003e $HOME/**); dests expand env vars incl ${invokingSpecGitRoot}, the top-level spec's checkout"
+          "description": "*.tpl render-op tree: a leaf renders one source to its dests, a node carrying nested \u003c\u003c\u003c is a group whose source prefixes, perms, ctx and options cascade onto its descendants (innermost wins, dest options win last); local host sources workingDirectory-relative, repo-doc sources (repo dest) workingDirectory-relative, or remote (git::\u003crepo\u003e[@\u003cref\u003e]//\u003cpath\u003e, explicit dest required, a group prefix carrying the ref concatenates with each leaf path); glob and derived-dest forms are host sources; a glob source may carry a {source, dest} dest rewrite (sed-style s:^_home:$HOME: or prefix-swap sugar _home/** -\u003e $HOME/**); dests expand env vars incl ${invokingSpecGitRoot}, the top-level spec's checkout"
         },
         "makeDirs": {
           "items": {
@@ -950,7 +950,7 @@
           "properties": {
             "source": {
               "type": "string",
-              "description": "source path (host sources workingDirectory-relative, repo-doc sources checkout-relative), or remote ref @\u003crepo\u003e//\u003cpath\u003e[?ref=\u003cref\u003e] (explicit dest required); joined onto every enclosing group's source prefix"
+              "description": "source path (host sources workingDirectory-relative, repo-doc sources checkout-relative), or remote ref git::\u003crepo\u003e[@\u003cref\u003e]//\u003cpath\u003e (explicit dest required); joined onto every enclosing group's source prefix"
             },
             "dest": {
               "oneOf": [
@@ -1061,7 +1061,7 @@
           "properties": {
             "source": {
               "type": "string",
-              "description": "source prefix joined onto every nested node's source; a remote prefix @\u003crepo\u003e[//\u003cpath\u003e][?ref=\u003cref\u003e] recombines so the ref stays last"
+              "description": "source prefix joined onto every nested node's source; a remote prefix git::\u003crepo\u003e[@\u003cref\u003e][//\u003cpath\u003e] concatenates with each leaf path"
             },
             "dest": {
               "type": "string",
@@ -1145,7 +1145,7 @@
             "type": "string"
           },
           "type": "array",
-          "description": "spec sources, each a \u003cdir\u003e (absolute, relative, ~/, $VAR) or @\u003cgiturl\u003e"
+          "description": "spec sources, each a \u003cdir\u003e (absolute, relative, ~/, $VAR) or git::\u003cgiturl\u003e[@\u003cgit-ref\u003e] (@\u003cref\u003e pins a tag or branch)"
         }
       },
       "additionalProperties": false,

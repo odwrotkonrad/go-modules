@@ -8,10 +8,10 @@ cases:
     input:
       args:
         - fetch:
-            gitlab.com/acme/tools//prompts/a.md.tpl?ref=v1.0.0: |
+            git::gitlab.com/acme/tools@v1.0.0//prompts/a.md.tpl: |
               Diff: {{ getenv "DIFF_FULL" }}
         - items:
-            - rel: "@gitlab.com/acme/tools//prompts/a.md.tpl?ref=v1.0.0"
+            - rel: "git::gitlab.com/acme/tools@v1.0.0//prompts/a.md.tpl"
               dests: [$HOME/prompts/a.md.tpl]
               perms: {chmod: "0640"}
     expected:
@@ -29,7 +29,7 @@ cases:
       args:
         - fetch: {}
         - items:
-            - {rel: "@gitlab.com/acme/tools//prompts/a.md.tpl?ref=v1.0.0", dests: [$HOME/prompts/a.md.tpl]}
+            - {rel: "git::gitlab.com/acme/tools@v1.0.0//prompts/a.md.tpl", dests: [$HOME/prompts/a.md.tpl]}
         - dryRun: all
     expected:
       stdOut: "create ${HOME}/prompts/a.md.tpl (dry run)"
@@ -40,9 +40,9 @@ cases:
       args:
         - fetch: {}
         - items:
-            - {rel: "@gitlab.com/acme/tools//prompts/absent.md.tpl", dests: [$HOME/prompts/absent.md.tpl]}
+            - {rel: "git::gitlab.com/acme/tools//prompts/absent.md.tpl", dests: [$HOME/prompts/absent.md.tpl]}
     expected:
-      errorOutput: 'RemoteMockFetcher: no fixture for "gitlab.com/acme/tools//prompts/absent.md.tpl"'
+      errorOutput: 'RemoteMockFetcher: no fixture for "git::gitlab.com/acme/tools//prompts/absent.md.tpl"'
       output:
         absent: [home/prompts/absent.md.tpl]
 # [<] 🤖🤖

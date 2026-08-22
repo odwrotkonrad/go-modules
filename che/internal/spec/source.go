@@ -13,6 +13,7 @@ import (
 
 	"gitlab.com/konradodwrot/go-modules/che/internal/fsutil"
 	"gitlab.com/konradodwrot/go-modules/che/internal/source"
+	"gitlab.com/konradodwrot/go-modules/che/render/render"
 )
 
 func (r SourceRecipe) GetSourceType() SourceType {
@@ -23,7 +24,13 @@ func (r SourceRecipe) GetSourceType() SourceType {
 }
 
 func (r SourceRecipe) IsValid() error {
-	if r.GetSourceType() == SourceTypes.Remote && RemoteSrcRef(r.URI) == "" {
+	if r.GetSourceType() != SourceTypes.Remote {
+		if r.Ref != "" {
+			return fmt.Errorf("source %q: ref %s needs a remote %q source", r.URI, r.Ref, RemoteSrcPrefix)
+		}
+		return nil
+	}
+	if RemoteSrcRef(r.URI) == "" {
 		return fmt.Errorf("source %q: empty git url after %q", r.URI, RemoteSrcPrefix)
 	}
 	return nil
@@ -49,7 +56,7 @@ func (r SourceRecipe) resolveDir(repoRoot, home string) (string, error) {
 	if r.GetSourceType() == SourceTypes.Remote {
 		// [why] @<repo>//<subdir> targets a spec nested in the remote checkout
 		repo, sub := splitRepoSubdir(RemoteSrcRef(r.URI))
-		dir, err := source.EnsureCheckout(home, repo)
+		dir, err := source.EnsureCheckout(home, repo, r.Ref)
 		if err != nil || sub == "" {
 			return dir, err
 		}
@@ -108,7 +115,26 @@ func (r ProfileSourceRecipe) String() string {
 	if r.URI == "" {
 		return r.ProfileName
 	}
-	return r.URI + "/" + cmp.Or(r.SpecFile, "che.yml") + "::" + r.ProfileName
+	return withRefSuffix(r.URI, r.refSuffix()) + "/" + cmp.Or(r.SpecFile, "che.yml") + "::" + r.ProfileName
+}
+
+// [why] the ref sits in the repo position: before the //, after any scp user
+func withRefSuffix(uri, suffix string) string {
+	if suffix == "" {
+		return uri
+	}
+	repo, sub := splitRepoSubdir(uri)
+	if sub == "" {
+		return repo + suffix
+	}
+	return repo + suffix + "//" + sub
+}
+
+func (r ProfileSourceRecipe) refSuffix() string {
+	if r.Ref == "" {
+		return ""
+	}
+	return "@" + r.Ref
 }
 
 func (r ProfileSourceRecipe) DisplayRef() string {
@@ -116,7 +142,11 @@ func (r ProfileSourceRecipe) DisplayRef() string {
 		return r.ProfileName
 	}
 	if IsRemoteSrc(r.URI) {
-		return "remote:" + repoName(RemoteSrcRef(r.URI)) + ":" + r.ProfileName
+		at := ""
+		if r.Ref != "" {
+			at = "@" + r.Ref
+		}
+		return "remote:" + repoName(RemoteSrcRef(r.URI)) + at + ":" + r.ProfileName
 	}
 	return r.String()
 }
@@ -139,37 +169,61 @@ func (r *ProfileSourceRecipe) UnmarshalYAML(value *yaml.Node) error {
 	if src == "" {
 		return fmt.Errorf("include.profiles entry missing source")
 	}
-	uri, specFile, profile, err := splitSourceRef(src)
+	uri, specFile, profile, gitRef, err := splitSourceRef(src)
 	if err != nil {
 		return err
 	}
-	r.URI, r.SpecFile, r.ProfileName = uri, specFile, profile
+	r.URI, r.SpecFile, r.ProfileName, r.Ref = uri, specFile, profile, gitRef
 	r.Src = ""
+	if err := r.IsValid(); err != nil {
+		return err
+	}
 	if r.URI == "" && len(r.Env) > 0 {
 		return fmt.Errorf("include.profiles entry %q: env requires a source", r.ProfileName)
 	}
 	return nil
 }
 
-func splitSourceRef(src string) (uri, specFile, profile string, err error) {
+func splitSourceRef(src string) (uri, specFile, profile, gitRef string, err error) {
+	// [why] the ref rides the repo, never the profile name: cut it before the :: split
+	src, gitRef, err = cutSourceRef(src)
+	if err != nil {
+		return "", "", "", "", err
+	}
 	i := strings.LastIndex(src, "::")
 	if i < 0 {
-		return "", "", src, nil
+		return "", "", src, gitRef, nil
 	}
 	ref, profile := src[:i], src[i+2:]
 	if profile == "" {
-		return "", "", "", fmt.Errorf("include.profiles source %q: missing profile name", src)
+		return "", "", "", "", fmt.Errorf("include.profiles source %q: missing profile name", src)
 	}
 	// [why] split on the last '/' by hand: path.Dir collapses the // in remote refs
 	slash := strings.LastIndex(ref, "/")
 	if slash <= 0 {
-		return "", "", "", fmt.Errorf("include.profiles source %q: needs a <source>/<spec-file>.yml::<profile> path", src)
+		return "", "", "", "", fmt.Errorf("include.profiles source %q: needs a <source>/<spec-file>.yml::<profile> path", src)
 	}
-	dir, file := ref[:slash], ref[slash+1:]
+	// [why] a spec file directly under the repo leaves the '//' separator's second slash on the dir
+	dir, file := strings.TrimSuffix(ref[:slash], "/"), ref[slash+1:]
 	if !strings.HasSuffix(file, ".yml") {
-		return "", "", "", fmt.Errorf("include.profiles source %q: needs a <source>/<spec-file>.yml::<profile> path", src)
+		return "", "", "", "", fmt.Errorf("include.profiles source %q: needs a <source>/<spec-file>.yml::<profile> path", src)
 	}
-	return dir, file, profile, nil
+	return dir, file, profile, gitRef, nil
+}
+
+func cutSourceRef(src string) (rest, gitRef string, err error) {
+	if strings.Contains(src, "?ref=") {
+		return "", "", fmt.Errorf("source %q: ?ref= is gone, pin with %s<repo>@<ref>", src, RemoteSrcPrefix)
+	}
+	marker, ok := render.CutGitMarker(src)
+	if !ok {
+		return src, "", nil
+	}
+	rest, gitRef, err = render.CutRefSuffix(marker)
+	if err != nil {
+		return "", "", err
+	}
+	return RemoteSrcPrefix + rest, gitRef, nil
 }
 
 // [<] 🤖🤖

@@ -13,8 +13,12 @@ import (
 	"gitlab.com/konradodwrot/go-modules/che/internal/log"
 )
 
-func ResolveDir(home, url string) string {
-	return filepath.Join(fsutil.ResolveCacheHome(home), "remote-sources", slug(url))
+func ResolveDir(home, url, ref string) string {
+	name := slug(url)
+	if ref != "" {
+		name += "-" + slug(ref)
+	}
+	return filepath.Join(fsutil.ResolveCacheHome(home), "remote-sources", name)
 }
 
 func slug(url string) string {
@@ -28,45 +32,66 @@ func slug(url string) string {
 	return strings.Trim(slug, "-")
 }
 
+func refSuffix(ref string) string {
+	if ref == "" {
+		return ""
+	}
+	return "@" + ref
+}
+
 var checkouts = map[string]string{}
 
 func ResetCache() { checkouts = map[string]string{} }
 
-func EnsureCheckout(home, url string) (string, error) {
-	if dir, ok := checkouts[url]; ok {
+func EnsureCheckout(home, url, ref string) (string, error) {
+	key := url + "?" + ref
+	if dir, ok := checkouts[key]; ok {
 		return dir, nil
 	}
-	dir, err := cloneOrUpdate(home, url)
+	dir, err := cloneOrUpdate(home, url, ref)
 	if err == nil {
-		checkouts[url] = dir
+		checkouts[key] = dir
 	}
 	return dir, err
 }
 
-func cloneOrUpdate(home, url string) (string, error) {
-	dir := ResolveDir(home, url)
-	msg := "remote " + url + " into " + fsutil.AbbreviateHome(dir, home)
+func cloneOrUpdate(home, url, ref string) (string, error) {
+	dir := ResolveDir(home, url, ref)
+	msg := "remote " + url + refSuffix(ref) + " into " + fsutil.AbbreviateHome(dir, home)
 	emitAction := func(action string) {
 		log.Emit(log.Event{
 			Level: log.Levels.Info, Scope: "init-remote-sources", Action: action,
-			Msg: msg, Attrs: map[string]string{"url": url, "checkout": dir},
+			Msg: msg, Attrs: map[string]string{"url": url, "ref": ref, "checkout": dir},
 		})
 	}
 	if _, err := os.Stat(filepath.Join(dir, ".git")); err != nil {
-		if err := git("clone", "--quiet", "--depth", "1", "--single-branch", url, dir); err != nil {
-			return "", fmt.Errorf("source clone %s: %w", url, err)
+		argv := []string{"clone", "--quiet", "--depth", "1", "--single-branch"}
+		if ref != "" {
+			argv = append(argv, "--branch", ref)
+		}
+		if err := git(append(argv, url, dir)...); err != nil {
+			return "", fmt.Errorf("source clone %s%s: %w", url, refSuffix(ref), err)
 		}
 		emitAction("cloned")
 		return dir, nil
 	}
 	headBefore, _ := gitOutput("-C", dir, "rev-parse", "HEAD")
+	fetch := []string{"-C", dir, "fetch", "--quiet", "--depth", "1"}
+	if ref != "" {
+		fetch = append(fetch, "origin", ref)
+	}
 	// [why] a shallow --ff-only pull fails once the fetched history is truncated
-	if err := git("-C", dir, "fetch", "--quiet", "--depth", "1"); err != nil {
-		log.EmitWarn("init-remote-sources", "warning", fmt.Sprintf("fetch failed, using cached checkout %s: %v", dir, err))
+	if err := git(fetch...); err != nil {
+		// [why] a pin names one immutable commit: serving a different cached one is a silent lie
+		if ref != "" {
+			return "", fmt.Errorf("source fetch %s%s: %w", url, refSuffix(ref), err)
+		}
 		return dir, nil
 	}
 	if err := git("-C", dir, "reset", "--hard", "--quiet", "FETCH_HEAD"); err != nil {
-		log.EmitWarn("init-remote-sources", "warning", fmt.Sprintf("update failed, using cached checkout %s: %v", dir, err))
+		if ref != "" {
+			return "", fmt.Errorf("source checkout %s%s: %w", url, refSuffix(ref), err)
+		}
 		return dir, nil
 	}
 	if headAfter, _ := gitOutput("-C", dir, "rev-parse", "HEAD"); headAfter != headBefore {

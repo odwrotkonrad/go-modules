@@ -2,7 +2,7 @@
 base:
   include:
     renderTemplates:
-      - source: "@gitlab.com/acme/tools?ref=v1.0.0"
+      - source: "git::gitlab.com/acme/tools@v1.0.0"
         <<<:
           - {source: snippets/ro.md, dest: .claude/agents/ro.md}
 

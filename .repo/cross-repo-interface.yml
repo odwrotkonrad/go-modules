@@ -1,7 +1,6 @@
 ##[>] 🤖🤖
 upstream:
   - cross-repo/prose/assets/repo-prose
-  - cross-repo/prose/spec/conventions-doc
   - cross-repo/prose/assets/doc-templates
   - cross-repo/prose/assets/license
   - configs/llm/claude

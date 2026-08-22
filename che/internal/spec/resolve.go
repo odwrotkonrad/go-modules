@@ -203,7 +203,7 @@ func mergeRecipe(recipes []ProfileRecipe, merged *mergedInclude, rec ProfileReci
 	for _, ref := range rec.Include.Profiles {
 		if ref.URI != "" {
 			dup := slices.ContainsFunc(merged.refs, func(seen ProfileSourceRecipe) bool {
-				return seen.URI == ref.URI && seen.ProfileName == ref.ProfileName
+				return seen.URI == ref.URI && seen.ProfileName == ref.ProfileName && seen.Ref == ref.Ref
 			})
 			if !dup {
 				merged.refs = append(merged.refs, ref)
@@ -388,7 +388,7 @@ func checkTemplateGroup(op string, node templateNode) error {
 	return nil
 }
 
-// [why] parseRemoteRef wants the query last, so a prefix ref and a child path recombine, never concatenate
+// [why] the ref rides the repo, so a remote prefix and a leaf path plainly concatenate
 func joinTemplateSource(op, prefix, src string) (string, error) {
 	if prefix == "" || src == "" {
 		return cmp.Or(src, prefix), nil
@@ -396,17 +396,11 @@ func joinTemplateSource(op, prefix, src string) (string, error) {
 	if !IsRemoteSrc(prefix) {
 		return path.Join(prefix, src), nil
 	}
-	base, upQuery, _ := strings.Cut(prefix, "?")
-	srcPath, downQuery, _ := strings.Cut(src, "?")
-	joined := strings.TrimSuffix(base, "/") + "/" + strings.TrimPrefix(srcPath, "/")
-	if !render.IsRemoteRef(RemoteSrcRef(joined)) {
-		return "", fmt.Errorf("%s group source %q joins to a malformed remote ref, want @<repo>//<path>[?ref=<ref>]: %q", op, prefix, joined)
+	joined := strings.TrimSuffix(prefix, "/") + "/" + strings.TrimPrefix(src, "/")
+	if !render.IsRemoteRef(joined) {
+		return "", fmt.Errorf("%s group source %q joins to a malformed remote ref, want %s<repo>[@<ref>]//<path>: %q", op, prefix, RemoteSrcPrefix, joined)
 	}
-	query := cmp.Or(downQuery, upQuery)
-	if query == "" {
-		return joined, nil
-	}
-	return joined + "?" + query, nil
+	return joined, nil
 }
 
 func overlayRenderOptions(override, base optionsSpec) optionsSpec {
@@ -448,8 +442,8 @@ func checkTemplateSpec(op string, file templateNode) error {
 			return fmt.Errorf("%s dest rewrite cannot be remote: %q", op, file.Source)
 		}
 	case IsRemoteSrc(file.Source):
-		if !render.IsRemoteRef(RemoteSrcRef(file.Source)) {
-			return fmt.Errorf("%s remote source malformed, want @<repo>//<path>[?ref=<ref>]: %q", op, file.Source)
+		if !render.IsRemoteRef(file.Source) {
+			return fmt.Errorf("%s remote source malformed, want %s<repo>[@<ref>]//<path>: %q", op, RemoteSrcPrefix, file.Source)
 		}
 		if len(file.Dest) == 0 {
 			return fmt.Errorf("%s remote source requires explicit dest: %q", op, file.Source)

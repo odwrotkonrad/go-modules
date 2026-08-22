@@ -4,14 +4,24 @@ context:
 cases:
   - name: ShouldAcceptBareHostPath
     input:
-      args: [ref: "gitlab.com/acme/tools//snippets/agent.md"]
+      args: [ref: "git::gitlab.com/acme/tools//snippets/agent.md"]
     expected:
       output: true
   - name: ShouldAcceptExplicitSchemeWithRef
     input:
-      args: [ref: "file:///tmp/repo//a/b.md?ref=main"]
+      args: [ref: "git::file:///tmp/repo@main//a/b.md"]
     expected:
       output: true
+  - name: ShouldRejectMissingGitMarker
+    input:
+      args: [ref: "gitlab.com/acme/tools//snippets/agent.md"]
+    expected:
+      output: false
+  - name: ShouldRejectRefQuery
+    input:
+      args: [ref: "git::gitlab.com/acme/tools//snippets/agent.md?ref=v1"]
+    expected:
+      output: false
   - name: ShouldRejectRepoTemplatePath
     input:
       args: [ref: "templates/agents/ro.md.ontoRepo.tpl"]
@@ -24,7 +34,7 @@ cases:
       output: false
   - name: ShouldRejectRepoWithoutPath
     input:
-      args: [ref: "gitlab.com/acme/tools"]
+      args: [ref: "git::gitlab.com/acme/tools"]
     expected:
       output: false
 # [<] 🤖🤖

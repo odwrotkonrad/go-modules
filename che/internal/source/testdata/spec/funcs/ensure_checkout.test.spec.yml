@@ -15,11 +15,22 @@ cases:
       args: [priorEnsures: 1, commitExtra: false]
     expected:
       stdOut: ["up to date remote ${URL} into ${ABBRDIR}"]
-  - name: ShouldWarnAndUseCacheWhenFetchFails
+  - name: ShouldSilentlyUseCacheWhenUnpinnedFetchFails
     input:
       args: [priorEnsures: 1, commitExtra: false, debug: false, upstreamGone: true]
     expected:
-      stdOut: ["using cached checkout ${DIR}"]
+      output: {silent: true}
+  - name: ShouldCloneAtTagWhenRefGiven
+    input:
+      args: [priorEnsures: 0, commitExtra: false, debug: false, upstreamGone: false, ref: v1.2.3]
+    expected:
+      output: {files: [che.yml]}
+      stdOut: ["cloned remote ${URL}@v1.2.3 into ${ABBRDIR}"]
+  - name: ShouldErrorWhenPinnedFetchFails
+    input:
+      args: [priorEnsures: 1, commitExtra: false, debug: false, upstreamGone: true, ref: v1.2.3]
+    expected:
+      errorOutput: ["@v1.2.3"]
   - name: ShouldHardResetAndLogUpdatedOnUpstreamChange
     input:
       args: [priorEnsures: 1, commitExtra: true]

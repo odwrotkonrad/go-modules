@@ -55,7 +55,7 @@ func Schema() *jsonschema.Schema {
 func topIncludeSchema() *jsonschema.Schema {
 	o := obj("other specs composed into this one", nil)
 	o.Properties.Set("sources", &jsonschema.Schema{
-		Description: "spec sources, each a <dir> (absolute, relative, ~/, $VAR) or @<giturl>",
+		Description: "spec sources, each a <dir> (absolute, relative, ~/, $VAR) or git::<giturl>[@<git-ref>] (@<ref> pins a tag or branch)",
 		Type:        "array",
 		Items:       &jsonschema.Schema{Type: "string"},
 	})
@@ -132,7 +132,7 @@ func (linkEntry) JSONSchema() *jsonschema.Schema {
 func (copyNode) JSONSchema() *jsonschema.Schema {
 	leaf := obj("one copy source fanned out to dests, bytes copied verbatim", []string{"source"})
 	leaf.Properties.Set("source", &jsonschema.Schema{
-		Description: "*.ontoHost.cp source path, workingDirectory-relative, or remote ref @<repo>//<path>[?ref=<ref>] (explicit dest required); joined onto every enclosing group's source prefix",
+		Description: "*.ontoHost.cp source path, workingDirectory-relative, or remote ref git::<repo>[@<ref>]//<path> (explicit dest required); joined onto every enclosing group's source prefix",
 		Type:        "string",
 	})
 	leaf.Properties.Set("dest", &jsonschema.Schema{OneOf: []*jsonschema.Schema{
@@ -153,7 +153,7 @@ func (copyNode) JSONSchema() *jsonschema.Schema {
 	group := obj("a source and/or dest prefix plus shared perms cascading onto nested nodes (innermost wins); at least one prefix required", []string{"<<<"})
 	group.AnyOf = []*jsonschema.Schema{{Required: []string{"source"}}, {Required: []string{"dest"}}}
 	group.Properties.Set("source", &jsonschema.Schema{
-		Description: "source prefix joined onto every nested node's source; a remote prefix @<repo>[//<path>][?ref=<ref>] recombines so the ref stays last",
+		Description: "source prefix joined onto every nested node's source; a remote prefix git::<repo>[@<ref>][//<path>] concatenates with each leaf path",
 		Type:        "string",
 	})
 	group.Properties.Set("dest", &jsonschema.Schema{
@@ -177,7 +177,7 @@ func (copyNode) JSONSchema() *jsonschema.Schema {
 func (templateNode) JSONSchema() *jsonschema.Schema {
 	leaf := obj("one template source fanned out to dests", []string{"source"})
 	leaf.Properties.Set("source", &jsonschema.Schema{
-		Description: "source path (host sources workingDirectory-relative, repo-doc sources checkout-relative), or remote ref @<repo>//<path>[?ref=<ref>] (explicit dest required); joined onto every enclosing group's source prefix",
+		Description: "source path (host sources workingDirectory-relative, repo-doc sources checkout-relative), or remote ref git::<repo>[@<ref>]//<path> (explicit dest required); joined onto every enclosing group's source prefix",
 		Type:        "string",
 	})
 	leaf.Properties.Set("dest", &jsonschema.Schema{OneOf: []*jsonschema.Schema{
@@ -200,7 +200,7 @@ func (templateNode) JSONSchema() *jsonschema.Schema {
 	group := obj("a source and/or dest prefix plus shared perms, ctx and options cascading onto nested nodes (innermost wins); at least one prefix required", []string{"<<<"})
 	group.AnyOf = []*jsonschema.Schema{{Required: []string{"source"}}, {Required: []string{"dest"}}}
 	group.Properties.Set("source", &jsonschema.Schema{
-		Description: "source prefix joined onto every nested node's source; a remote prefix @<repo>[//<path>][?ref=<ref>] recombines so the ref stays last",
+		Description: "source prefix joined onto every nested node's source; a remote prefix git::<repo>[@<ref>][//<path>] concatenates with each leaf path",
 		Type:        "string",
 	})
 	group.Properties.Set("dest", &jsonschema.Schema{
@@ -255,9 +255,9 @@ func (DestSpec) JSONSchema() *jsonschema.Schema {
 }
 
 func (ProfileSourceRecipe) JSONSchema() *jsonschema.Schema {
-	o := obj("sourced profile ref: source is <source>/<spec-file>.yml::<profile>, options override its options, env overlays its run", []string{"source"})
+	o := obj("sourced profile ref: source is git::<repo>[@<ref>][//<subdir>]/<spec-file>.yml::<profile>, options override its options, env overlays its run", []string{"source"})
 	o.Properties.Set("source", &jsonschema.Schema{
-		Description: "<source>/<spec-file>.yml::<profile>: source @<giturl> (remote) or <dir> (local); bare <profile> for the local spec",
+		Description: "<source>/<spec-file>.yml::<profile>: source git::<giturl>[@<ref>] (remote, @<ref> pins a tag or branch) or <dir> (local, no ref); bare <profile> for the local spec",
 		Type:        "string",
 	})
 	o.Properties.Set("options", &jsonschema.Schema{Ref: "#/$defs/ProfileOptions"})

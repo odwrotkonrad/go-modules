@@ -552,7 +552,7 @@ func (r *SpecRecipe) assembleProfiles(p *specPreparer, ready *SpecReady, lookup 
 			continue
 		}
 		for _, ref := range refs {
-			child, err := p.prepare(spec.SpecSourceRecipe{SourceRecipe: spec.SourceRecipe{URI: ref.URI, SpecFile: ref.SpecFile}}, r.sourceReady.DirectoryPath, &ref, false)
+			child, err := p.prepare(spec.SpecSourceRecipe{SourceRecipe: spec.SourceRecipe{URI: ref.URI, SpecFile: ref.SpecFile, Ref: ref.Ref}}, r.sourceReady.DirectoryPath, &ref, false)
 			if err != nil {
 				return fmt.Errorf("ref %s: %w", ref, err)
 			}

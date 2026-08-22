@@ -30,7 +30,7 @@ func TestSlug(t *testing.T) {
 
 func TestResolveDir(t *testing.T) {
 	testyml.Eq(t, td, "testdata/spec/funcs/resolve_dir.test.spec.yml", func(t *testing.T, c testyml.Case[string]) (string, error) {
-		return ResolveDir(c.Input.Args.String(t, 0), c.Input.Args.String(t, 1)), nil
+		return ResolveDir(c.Input.Args.String(t, 0), c.Input.Args.String(t, 1), c.Input.Args.String(t, 2)), nil
 	})
 }
 
@@ -53,9 +53,13 @@ func TestEnsure(t *testing.T) {
 		home := t.TempDir()
 		url := "file://" + up
 		a := c.Input.Args
+		gitRef := a.String(t, 4)
+		if gitRef != "" {
+			testutil.GitTag(t, up, gitRef)
+		}
 		for range a.Int(t, 0) {
 			_, err := testutil.CaptureStdout(t, func() error {
-				_, e := EnsureCheckout(home, url)
+				_, e := EnsureCheckout(home, url, gitRef)
 				return e
 			})
 			require.NoError(t, err, "prior EnsureCheckout")
@@ -71,11 +75,13 @@ func TestEnsure(t *testing.T) {
 		var dir string
 		out, err := testutil.CaptureStdout(t, func() error {
 			var e error
-			dir, e = EnsureCheckout(home, url)
+			dir, e = EnsureCheckout(home, url, gitRef)
 			return e
 		})
-		require.NoError(t, err)
-		assert.Equal(t, ResolveDir(home, url), dir)
+		if c.Expected.Check(t, err) {
+			return
+		}
+		assert.Equal(t, ResolveDir(home, url, gitRef), dir)
 		out = testutil.StripANSI(out)
 		vars := map[string]string{"URL": url, "DIR": dir, "ABBRDIR": fsutil.AbbreviateHome(dir, home)}
 		for _, m := range c.Expected.StdOut {
