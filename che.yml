@@ -60,7 +60,7 @@ claude-agents:
       - builtin:isVirt
   include:
     profiles:
-      - source: "git::https://gitlab.com/konradodwrot/configs//profiles/llm/claude/che.yml::llm/claude/virt"
+      - source: "git::https://gitlab.com/konradodwrot/configs@${{ env.CONFIGS_REF }}//profiles/llm/claude/che.yml::llm/claude/virt"
         ctx:
           repo: GoModules
 

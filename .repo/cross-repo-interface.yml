@@ -10,6 +10,7 @@ upstream:
   #   catalog release has to reach that variable, which is what makes this an upstream edge
   - che-packages/catalog
   - cross-repo/infra/iac/ci-var/artifact-registry
+  - cross-repo/infra/iac/ci-var/configs-ref
   - cross-repo/infra/iac/ci-var/ci-images-ref
   - cross-repo/infra/iac/ci-var/che-packages-ref
   - cross-repo/infra/iac/ci-var/enable-darwin-ci
