@@ -39,7 +39,7 @@ env:
 include:
   sources:
     - ./sibling-spec
-    - "@git@gitlab.com:group/specs.git"
+    - "git::git@gitlab.com:group/specs.git"
 base:
   include:
     makeLinks:
@@ -52,7 +52,7 @@ base:
         chmod: "0644"
         source: Library/LaunchDaemons/otelcol.plist.ontoHost.cp
         dest: [/Library/LaunchDaemons/otelcol.plist]
-      - source: "@gitlab.com/org/prompts?ref=v1.2.0"
+      - source: "git::gitlab.com/org/prompts@v1.2.0"
         dest: /usr/local/share/prompts
         <<<:
           - {source: //commit.md.tpl, dest: commit.md.tpl}
@@ -91,8 +91,8 @@ desktop/macos:
   include:
     profiles:
       - base
-      - source: "@git@gitlab.com:group/repo.git/che.yml::someProfile"
-      - source: "@https://gitlab.com/group/other.git/che.yml::otherProfile"
+      - source: "git::git@gitlab.com:group/repo.git/che.yml::someProfile"
+      - source: "git::https://gitlab.com/group/other.git/che.yml::otherProfile"
         env:
           SOME_VAR: value
 
@@ -182,7 +182,7 @@ of the file's interpolation.
 ### include
 
 `sources`: other specs composed into this one, as if run together. Each entry
-is a `<dir>` (absolute, relative, `~/`, `$VAR`) or `@<giturl>` (cloned/pulled
+is a `<dir>` (absolute, relative, `~/`, `$VAR`) or `git::<giturl>[@<ref>]` (cloned/pulled
 into a managed cache checkout). A composed spec keeps its own anchor, env and
 profile eligibility. Its profile names become referenceable from this spec's
 `include.profiles` (bare-name collisions error). Duplicates and cycles load
@@ -201,7 +201,7 @@ web:
   options: {profileWorkingDirectory: '${{ env.TREE }}'}
   include:
     profiles:
-      - source: '@gitlab.com/org/shared//che.yml::app?ref=${{ env.SHARED_REF }}'
+      - source: 'git::gitlab.com/org/shared@${{ env.SHARED_REF }}//che.yml::app'
         env: {APP_NAME: web}
 ```
 
@@ -371,21 +371,24 @@ references a profile in another spec, loaded and anchored at its own checkout.
 include:
   profiles:
     - base
-    - source: "@https://gitlab.com/konradodwrot/workspace.git/che.yml::gitlabGroup"
+    - source: "git::https://gitlab.com/konradodwrot/workspace.git/che.yml::gitlabGroup"
       env:
         GITLAB_GROUP: konradodwrot
 ```
 
-- `source`: `<source>/<spec-file>.yml::<profile>[?ref=<git-ref>]`. `::` splits
+- `source`: `<source>/<spec-file>.yml::<profile>`. `::` splits
   off the profile name, the last path segment before it is the spec file
-  (`.yml`), the rest the source: `@<giturl>` (remote, cloned/pulled into a
-  managed cache checkout) or `<dir>` (local, used in place, no git: `$VAR` and
-  `~` expand, a relative path resolves against the referencing spec's
-  checkout). A bare `<profile>` with no `::` is a local profile, written as a
-  scalar.
-- `?ref=<git-ref>` pins a remote source to a tag or branch, its own cache
-  checkout per ref, unset means the default branch HEAD. Remote only: a local
-  dir source errors. The same query pins `include.sources` entries.
+  (`.yml`), the rest the source: `git::<giturl>[@<ref>]` (remote, cloned/pulled
+  into a managed cache checkout) or `<dir>` (local, used in place, no git:
+  `$VAR` and `~` expand, a relative path resolves against the referencing
+  spec's checkout). A bare `<profile>` with no `::` is a local profile, written
+  as a scalar.
+- `@<git-ref>` pins a remote source to a tag or branch, its own cache
+  checkout per ref, unset means the default branch HEAD. It sits in the repo
+  position, before the `//` path separator, anchored to the last `@` there so
+  an SCP user (`git@host:group/repo.git`) is never mistaken for it. Remote
+  only: a local dir keeps any `@` as a literal name. The same suffix pins
+  `include.sources` entries. `?ref=` is rejected.
 - `options`: override the referenced profile's own. One more cascade level, most
   nested wins.
 - `env`: exported around everything done for the referenced profile,
@@ -435,8 +438,8 @@ node with nested `<<<`, its `source` and `dest` prefixes and perms cascading
 onto every descendant, innermost wins).
 
 Local sources are `*.ontoHost.cp` files, profileWorkingDirectory-relative. A
-source may be remote, `@<repo>//<path>[?ref=<ref>]`, explicit dest required; a
-group prefix carrying the ref recombines with each leaf path so the pin is
+source may be remote, `git::<repo>[@<ref>]//<path>`, explicit dest required; a
+group prefix carrying the ref concatenates with each leaf path so the pin is
 typed once. Remote globs and remote dest rewrites are rejected at load.
 
 ```yaml
@@ -447,7 +450,7 @@ makeCopies:
     chmod: "0644"
     source: Library/LaunchDaemons/otelcol.plist.ontoHost.cp
     dest: [/Library/LaunchDaemons/otelcol.plist]
-  - source: "@gitlab.com/org/prompts?ref=v1.2.0"
+  - source: "git::gitlab.com/org/prompts@v1.2.0"
     dest: /usr/local/share/prompts
     chmod: "0644"
     <<<:
@@ -477,7 +480,7 @@ derived dest, or any `~/`/absolute dest) and repo-doc sources (repo dest) are
 both profileWorkingDirectory-relative. Glob and dest-omitted forms derive a
 host dest.
 
-A source may be remote, `@<repo>//<path>[?ref=<ref>]`, explicit dest required.
+A source may be remote, `git::<repo>[@<ref>]//<path>`, explicit dest required.
 Dests expand env vars, including `${invokingSpecGitRoot}`, the top-level
 spec's checkout.
 
@@ -517,7 +520,7 @@ everything nested under it, at any depth.
 
 ```yaml
 renderTemplates:
-  - source: "@gitlab.com/konradodwrot/cross-repo/prose/assets?ref=v0.0.38"
+  - source: "git::gitlab.com/konradodwrot/cross-repo/prose/assets@v0.0.38"
     options: {skipAutoGeneratedHeader: true}
     <<<:
       - {source: //repos/configs/purpose.md, dest: assets/docs-agents/purpose.md}
@@ -530,10 +533,11 @@ renderTemplates:
 
 Cascade, outermost first, innermost wins:
 
-- `source`: joined as a prefix. A remote prefix recombines so the `?ref=` query
-  stays last: `@<repo>?ref=<ref>` plus leaf `//<path>` yields
-  `@<repo>//<path>?ref=<ref>`. A leaf's own `?ref=` overrides the group's. A
-  local prefix joins as a path.
+- `source`: joined as a prefix. The ref rides the repo, so a remote prefix and
+  its leaves plainly concatenate: `git::<repo>@<ref>` plus leaf `//<path>`
+  yields `git::<repo>@<ref>//<path>`. One ref per group: a leaf is a path and
+  carries none, so pinning a leaf apart means its own top-level entry. A local
+  prefix joins as a path.
 - `dest`: one path on a group, joined onto every descendant's repo-relative
   dest. Host dests anchor themselves: a descendant dest starting with `/`, `~`
   or `$` is left alone. A group dest takes no per-dest `options`.
