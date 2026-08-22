@@ -18,7 +18,7 @@ also shipped as a release asset.
 
 ## Load Validation
 
-Every loaded che.yml is validated against this schema: local repo, composed
+Every loaded che.yml validates against this schema: local repo, composed
 specs, sourced-ref checkouts. Violations warn. `--validate-spec error` (env
 `CHE_VALIDATE_SPEC=error`) aborts.
 
@@ -539,10 +539,10 @@ Cascade, outermost first, innermost wins:
   `false` overrides an inherited `true`: a group carries the common case, a
   leaf opts out.
 
-A group exists to assemble paths: it carries a `source` prefix, a `dest`
-prefix, or both. A node with nested `<<<` and neither is rejected at load, as
-is one that also carries a dest rewrite rule or a glob. Perms, `ctx` or
-`options` shared by leaves that share no path go on each leaf.
+A group assembles paths: it carries a `source` prefix, a `dest` prefix, or
+both. A node with nested `<<<` and neither is rejected at load, as is one
+carrying a dest rewrite rule or a glob. Perms, `ctx` or `options` shared by
+leaves that share no path go on each leaf.
 
 makeCopies groups follow the same rules, minus `ctx` and `options`.
 
