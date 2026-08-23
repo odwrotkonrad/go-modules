@@ -11,11 +11,11 @@ dependsOn:
     - uri: gitlab.com/konradodwrot/cross-repo/prose/spec
       type: gitRepository
     - uri: gitlab.com/konradodwrot/go-modules/che-schema
-      type: gitRepository
+      type: file
     - uri: gitlab.com/konradodwrot/go-modules/lib
       type: goModule
     - uri: gitlab.com/konradodwrot/go-modules/che-packages-schema
-      type: gitRepository
+      type: file
   gitlab.com/konradodwrot/go-modules/che-schema: []
   gitlab.com/konradodwrot/go-modules/che-packages-schema: []
   gitlab.com/konradodwrot/go-modules/get-os-open-files-with:
