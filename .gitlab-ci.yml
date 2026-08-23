@@ -25,12 +25,8 @@ default:
       - unknown_failure
 
 include:
-  - project: konradodwrot/cross-repo/misc
-    ref: $GRP_KO_VAR_MISC_REF
-    file: shared/ci/templates/PipelineGate.gitlab-ci.yml
 
 stages:
-  - .pre
   - warm
   - verify
   - test-unit
@@ -48,6 +44,7 @@ variables:
   CHE_SCHEMA_REF: $GRP_KO_VAR_CHE_SCHEMA_REF
   CHE_PACKAGES_SCHEMA_REF: $GRP_KO_VAR_CHE_PACKAGES_SCHEMA_REF
   CHE_PACKAGES_REF: $GRP_KO_VAR_CHE_PACKAGES_REF
+  MISC_REF: $GRP_KO_VAR_MISC_REF
   ENABLE_DARWIN_CI: $GRP_KO_VAR_ENABLE_DARWIN_CI
   PROSE_ASSETS_REF: $GRP_KO_VAR_PROSE_ASSETS_REF
   AI_CONFIGS_REF: $GRP_KO_VAR_AI_CONFIGS_REF
@@ -76,13 +73,14 @@ warm-go:
   extends: .vendors-packages
   stage: warm
   image: $CI_IMAGE
-  needs:
-    - job: pipeline-gate
-      optional: true
+  needs: []
   rules:
-    - if: $DISABLE_PIPELINE == "true"
-      when: never
     - if: $CI_PIPELINE_SOURCE == "merge_request_event"
+      changes:
+          - che/**/*
+          - lib/**/*
+          - go.work
+          - .gitlab-ci.yml
     - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
       changes: [che/**/*, lib/**/*, go.work, .gitlab-ci.yml]
   #[why] one go-build key per (compiler target × trust boundary): host-native, zig-amd64, zig-arm64,
@@ -107,14 +105,15 @@ warm-go-linux-arm64:
   extends: .vendors-packages
   stage: warm
   image: $CI_IMAGE
-  needs:
-    - job: pipeline-gate
-      optional: true
+  needs: []
   #[why] only feeds the manual arm64 install-e2e matrix: stays manual with it, never auto
   rules:
-    - if: $DISABLE_PIPELINE == "true"
-      when: never
     - if: $CI_PIPELINE_SOURCE == "merge_request_event" || $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
+      changes:
+        - che/**/*
+        - lib/**/*
+        - go.work
+        - .gitlab-ci.yml
       when: manual
       allow_failure: true
   cache:
@@ -137,13 +136,14 @@ warm-go-linux-amd64:
   extends: .vendors-packages
   stage: warm
   image: $CI_IMAGE
-  needs:
-    - job: pipeline-gate
-      optional: true
+  needs: []
   rules:
-    - if: $DISABLE_PIPELINE == "true"
-      when: never
     - if: $CI_PIPELINE_SOURCE == "merge_request_event" || $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
+      changes:
+        - che/**/*
+        - lib/**/*
+        - go.work
+        - .gitlab-ci.yml
       when: manual
       allow_failure: true
   cache:
@@ -167,9 +167,12 @@ verify-precommit-all:
   needs:
     - warm-go
   rules:
-    - if: $DISABLE_PIPELINE == "true"
-      when: never
     - if: $CI_PIPELINE_SOURCE == "merge_request_event"
+      changes:
+        - che/**/*
+        - lib/**/*
+        - go.work
+        - .gitlab-ci.yml
   variables:
     LEFTHOOK_OUTPUT: meta,summary,execution,execution_info,execution_out
   #[why] cache still pulled: `make lint` and `render-docs` compile the tree, no artifact replaces that
@@ -216,8 +219,6 @@ test-unit-che:
     paths:
       - che/cover-unit/
   rules:
-    - if: $DISABLE_PIPELINE == "true"
-      when: never
     - if: $CI_PIPELINE_SOURCE == "merge_request_event"
       changes: [che/**/*, lib/**/*, go.work, .gitlab-ci.yml]
     - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
@@ -233,8 +234,6 @@ test-unit-che:
   needs:
     - warm-go
   rules:
-    - if: $DISABLE_PIPELINE == "true"
-      when: never
     - if: $CI_PIPELINE_SOURCE == "merge_request_event"
       changes: [che/**/*, lib/**/*, go.work, .gitlab-ci.yml]
     - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
@@ -282,9 +281,7 @@ warm-e2e-pkg-installs-image:
   services:
     - name: $ARTIFACT_REGISTRY_PROXY_DOCKERHUB/library/docker:dind
       alias: docker
-  needs:
-    - job: pipeline-gate
-      optional: true
+  needs: []
   variables:
     DOCKER_HOST: tcp://docker:2376
     DOCKER_TLS_CERTDIR: "/certs"
@@ -292,9 +289,12 @@ warm-e2e-pkg-installs-image:
     DOCKER_CERT_PATH: "$DOCKER_TLS_CERTDIR/client"
   #[why] only feeds the manual install-e2e matrices: stays manual with them, never auto
   rules:
-    - if: $DISABLE_PIPELINE == "true"
-      when: never
     - if: $CI_PIPELINE_SOURCE == "merge_request_event" || $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
+      changes:
+        - che/**/*
+        - lib/**/*
+        - go.work
+        - .gitlab-ci.yml
       when: manual
       allow_failure: true
   script:
@@ -317,9 +317,7 @@ warm-go-darwin:
   tags:
     - saas-macos-medium-m1
   image: macos-26-xcode-26
-  needs:
-    - job: pipeline-gate
-      optional: true
+  needs: []
   cache:
     - key: mr-go-build-che-darwin
       paths:
@@ -327,11 +325,14 @@ warm-go-darwin:
       policy: pull-push
   #[why] only feeds the manual darwin install-e2e matrix: stays manual with it, never auto
   rules:
-    - if: $DISABLE_PIPELINE == "true"
-      when: never
     - if: $ENABLE_DARWIN_CI != "true"
       when: never
     - if: $CI_PIPELINE_SOURCE == "merge_request_event" || $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
+      changes:
+        - che/**/*
+        - lib/**/*
+        - go.work
+        - .gitlab-ci.yml
       when: manual
       allow_failure: true
   before_script:
@@ -374,9 +375,12 @@ test-e2e-install-methods:
       - METHOD: [apt, binariesRemoteArchive, script, pyenv, nvm, npm, go, nix, buildFromSource]
   #[why] never automatic: these dind matrix jobs flood the runner queue and starve every other repo's pipeline. manual, optional, always
   rules:
-    - if: $DISABLE_PIPELINE == "true"
-      when: never
     - if: $CI_PIPELINE_SOURCE == "merge_request_event" || $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
+      changes:
+        - che/**/*
+        - lib/**/*
+        - go.work
+        - .gitlab-ci.yml
       when: manual
       allow_failure: true
   #[why] the chosen packages live here, not in the matrix: matrix variables all land in the job name, METHOD alone keeps it readable
@@ -420,8 +424,6 @@ coverage-che:
         coverage_format: cobertura
         path: che/coverage.xml
   rules:
-    - if: $DISABLE_PIPELINE == "true"
-      when: never
     - if: $CI_PIPELINE_SOURCE == "merge_request_event"
       changes: [che/**/*, lib/**/*, go.work, .gitlab-ci.yml]
     - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
@@ -432,8 +434,6 @@ test-unit-get-os-open-files-with:
   variables:
     MODULE: get-os-open-files-with
   rules:
-    - if: $DISABLE_PIPELINE == "true"
-      when: never
     - if: $CI_PIPELINE_SOURCE == "merge_request_event"
       changes: [get-os-open-files-with/**/*, lib/**/*, go.work, .gitlab-ci.yml]
     - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
@@ -444,8 +444,6 @@ test-unit-get-term-open-files-with:
   variables:
     MODULE: get-term-open-files-with
   rules:
-    - if: $DISABLE_PIPELINE == "true"
-      when: never
     - if: $CI_PIPELINE_SOURCE == "merge_request_event"
       changes: [get-term-open-files-with/**/*, lib/**/*, go.work, .gitlab-ci.yml]
     - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
@@ -456,8 +454,6 @@ test-unit-lib:
   variables:
     MODULE: lib
   rules:
-    - if: $DISABLE_PIPELINE == "true"
-      when: never
     - if: $CI_PIPELINE_SOURCE == "merge_request_event"
       changes: [lib/**/*, go.work, .gitlab-ci.yml]
     - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
@@ -485,14 +481,10 @@ che-next-version:
   interruptible: false
   stage: release
   image: $CI_IMAGE
-  needs:
-    - job: pipeline-gate
-      optional: true
+  needs: []
   variables:
     GIT_DEPTH: "0"
   rules:
-    - if: $DISABLE_PIPELINE == "true"
-      when: never
     - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
       changes: [che/**/*, ci/publish-brew-formula.zsh, ci/publish.zsh, ci/publish-schema.zsh, ci/release-schemas.zsh, ci/schema-version.zsh]
   script:
@@ -520,8 +512,6 @@ release-schemas:
     GIT_DEPTH: "0"
     SCHEMA_VERSIONS_ENV: schema-versions.env
   rules:
-    - if: $DISABLE_PIPELINE == "true"
-      when: never
     - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
       changes: [che/**/*, ci/publish-schema.zsh, ci/release-schemas.zsh, ci/schema-version.zsh]
   #[why] render-docs first: the comparison is against freshly generated bytes, and a stale checkout
@@ -547,8 +537,6 @@ release-che:
   #   by them and only republished by a tag, so a fix to either sat unreleased on main while
   #   `brew install che` kept failing on binaries the tarball no longer ships
   rules:
-    - if: $DISABLE_PIPELINE == "true"
-      when: never
     - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
       changes: [che/**/*, ci/publish-brew-formula.zsh, ci/publish.zsh]
 
@@ -557,8 +545,6 @@ release-get-os-open-files-with:
   variables:
     MODULE: get-os-open-files-with
   rules:
-    - if: $DISABLE_PIPELINE == "true"
-      when: never
     - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
       changes: [get-os-open-files-with/**/*]
 
@@ -567,8 +553,6 @@ release-get-term-open-files-with:
   variables:
     MODULE: get-term-open-files-with
   rules:
-    - if: $DISABLE_PIPELINE == "true"
-      when: never
     - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
       changes: [get-term-open-files-with/**/*]
 
@@ -577,8 +561,6 @@ release-lib:
   variables:
     MODULE: lib
   rules:
-    - if: $DISABLE_PIPELINE == "true"
-      when: never
     - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
       changes: [lib/**/*]
 
@@ -649,8 +631,6 @@ publish-pages:
   variables:
     CARRY_APT: "1"
   rules:
-    - if: $DISABLE_PIPELINE == "true"
-      when: never
     - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
       changes: [che/**/*]
 
@@ -658,8 +638,6 @@ docs-che:
   extends: .pages-build
   stage: release
   rules:
-    - if: $DISABLE_PIPELINE == "true"
-      when: never
     - if: $CI_COMMIT_TAG =~ /^che\/v/
   variables:
     DOCS_DIR_URLS: "false"
@@ -671,13 +649,14 @@ docs-che:
 pages-preview:
   extends: .pages-build
   stage: verify
-  needs:
-    - job: pipeline-gate
-      optional: true
+  needs: []
   rules:
-    - if: $DISABLE_PIPELINE == "true"
-      when: never
     - if: $CI_PIPELINE_SOURCE == "merge_request_event"
+      changes:
+        - che/**/*
+        - lib/**/*
+        - go.work
+        - .gitlab-ci.yml
   variables:
     DOCS_DIR_URLS: "false"
   environment:
@@ -703,12 +682,8 @@ goreleaser-darwin-che:
   extends: .goreleaser-build
   stage: release
   image: $CI_IMAGE
-  needs:
-    - job: pipeline-gate
-      optional: true
+  needs: []
   rules:
-    - if: $DISABLE_PIPELINE == "true"
-      when: never
     - if: $CI_COMMIT_TAG =~ /^che\/v/
   cache:
     - key: go-build-che-darwin
@@ -728,12 +703,8 @@ goreleaser-linux-che:
   extends: .goreleaser-build
   stage: release
   image: $CI_IMAGE
-  needs:
-    - job: pipeline-gate
-      optional: true
+  needs: []
   rules:
-    - if: $DISABLE_PIPELINE == "true"
-      when: never
     - if: $CI_COMMIT_TAG =~ /^che\/v/
   parallel:
     matrix:
@@ -779,8 +750,6 @@ prerelease-darwin-che:
   #[why] the publish path itself is in scope: a change to the prerelease script, the Makefile target
   #   or this file must publish a prerelease, or it can never be tested before merging
   rules:
-    - if: $DISABLE_PIPELINE == "true"
-      when: never
     - if: $CI_PIPELINE_SOURCE == "merge_request_event"
       changes: [che/**/*, lib/**/*, ci/publish-prerelease.zsh, Makefile, .gitlab-ci.yml]
       when: manual
@@ -826,8 +795,6 @@ prerelease-linux-che:
   #[why] the publish path itself is in scope: a change to the prerelease script, the Makefile target
   #   or this file must publish a prerelease, or it can never be tested before merging
   rules:
-    - if: $DISABLE_PIPELINE == "true"
-      when: never
     - if: $CI_PIPELINE_SOURCE == "merge_request_event"
       changes: [che/**/*, lib/**/*, ci/publish-prerelease.zsh, Makefile, .gitlab-ci.yml]
       when: manual
@@ -869,8 +836,6 @@ publish-schema-prerelease:
       optional: true
       artifacts: false
   rules:
-    - if: $DISABLE_PIPELINE == "true"
-      when: never
     - if: $CI_PIPELINE_SOURCE == "merge_request_event"
       changes: [che/**/*, ci/publish-schema-prerelease.zsh, Makefile, .gitlab-ci.yml]
       when: manual
@@ -890,8 +855,6 @@ publish-che:
     - goreleaser-linux-che
     - docs-che
   rules:
-    - if: $DISABLE_PIPELINE == "true"
-      when: never
     - if: $CI_COMMIT_TAG =~ /^che\/v/
   variables:
     PUBLISH_PREBUILT: "1"
@@ -911,8 +874,6 @@ publish-apt-che:
     - job: publish-che
       optional: true
   rules:
-    - if: $DISABLE_PIPELINE == "true"
-      when: never
     - if: $CI_COMMIT_TAG =~ /^che\/v/
   variables:
     APT_GPG_PRIVATE_KEY: $REPO_VAR_APT_GPG_PRIVATE_KEY
@@ -933,8 +894,6 @@ publish-pages-tag:
   needs:
     - publish-apt-che
   rules:
-    - if: $DISABLE_PIPELINE == "true"
-      when: never
     - if: $CI_COMMIT_TAG =~ /^che\/v/
 
 publish-brew-che:
@@ -948,8 +907,6 @@ publish-brew-che:
     - goreleaser-darwin-che
     - goreleaser-linux-che
   rules:
-    - if: $DISABLE_PIPELINE == "true"
-      when: never
     - if: $CI_COMMIT_TAG =~ /^che\/v/
   variables:
     HOMEBREW_TAP_TOKEN: $REPO_VAR_HOMEBREW_TAP_TOKEN
@@ -962,8 +919,6 @@ publish-ci-image:
   stage: trigger-downstream
   needs: [publish-che]
   rules:
-    - if: $DISABLE_PIPELINE == "true"
-      when: never
     - if: $CI_COMMIT_TAG =~ /^che\/v/
   inherit:
     variables: false
@@ -984,8 +939,6 @@ publish-get-os-open-files-with:
   stage: publish
   image: $CI_IMAGE
   rules:
-    - if: $DISABLE_PIPELINE == "true"
-      when: never
     - if: $CI_COMMIT_TAG =~ /^get-os-open-files-with\/v/
   script:
     - make publish
@@ -997,12 +950,8 @@ publish-get-term-open-files-with:
   stage: publish
   image: $CI_IMAGE
   rules:
-    - if: $DISABLE_PIPELINE == "true"
-      when: never
     - if: $CI_COMMIT_TAG =~ /^get-term-open-files-with\/v/
   script:
     - make publish
-pipeline-gate:
-  extends: .pipeline-gate
 
 ##[<] 🤖🤖
