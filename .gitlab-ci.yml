@@ -24,8 +24,6 @@ default:
       - scheduler_failure
       - unknown_failure
 
-include:
-
 stages:
   - warm
   - verify
