@@ -24,7 +24,13 @@ default:
       - scheduler_failure
       - unknown_failure
 
+include:
+  - project: konradodwrot/cross-repo/misc
+    ref: $GRP_KO_VAR_MISC_REF
+    file: shared/ci/templates/PipelineGate.gitlab-ci.yml
+
 stages:
+  - .pre
   - warm
   - verify
   - test-unit
@@ -72,9 +78,7 @@ warm-go:
   image: $CI_IMAGE
   needs: []
   rules:
-    - changes:
-        paths: [.repo/artifacts-produced.yml, .repo/artifacts-consumed.yml]
-        compare_to: refs/heads/main
+    - if: $DISABLE_PIPELINE == "true"
       when: never
     - if: $CI_PIPELINE_SOURCE == "merge_request_event"
     - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
@@ -104,9 +108,7 @@ warm-go-linux-arm64:
   needs: []
   #[why] only feeds the manual arm64 install-e2e matrix: stays manual with it, never auto
   rules:
-    - changes:
-        paths: [.repo/artifacts-produced.yml, .repo/artifacts-consumed.yml]
-        compare_to: refs/heads/main
+    - if: $DISABLE_PIPELINE == "true"
       when: never
     - if: $CI_PIPELINE_SOURCE == "merge_request_event" || $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
       when: manual
@@ -133,9 +135,7 @@ warm-go-linux-amd64:
   image: $CI_IMAGE
   needs: []
   rules:
-    - changes:
-        paths: [.repo/artifacts-produced.yml, .repo/artifacts-consumed.yml]
-        compare_to: refs/heads/main
+    - if: $DISABLE_PIPELINE == "true"
       when: never
     - if: $CI_PIPELINE_SOURCE == "merge_request_event" || $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
       when: manual
@@ -161,9 +161,7 @@ verify-precommit-all:
   needs:
     - warm-go
   rules:
-    - changes:
-        paths: [.repo/artifacts-produced.yml, .repo/artifacts-consumed.yml]
-        compare_to: refs/heads/main
+    - if: $DISABLE_PIPELINE == "true"
       when: never
     - if: $CI_PIPELINE_SOURCE == "merge_request_event"
   variables:
@@ -212,9 +210,7 @@ test-unit-che:
     paths:
       - che/cover-unit/
   rules:
-    - changes:
-        paths: [.repo/artifacts-produced.yml, .repo/artifacts-consumed.yml]
-        compare_to: refs/heads/main
+    - if: $DISABLE_PIPELINE == "true"
       when: never
     - if: $CI_PIPELINE_SOURCE == "merge_request_event"
       changes: [che/**/*, lib/**/*, go.work, .gitlab-ci.yml]
@@ -231,9 +227,7 @@ test-unit-che:
   needs:
     - warm-go
   rules:
-    - changes:
-        paths: [.repo/artifacts-produced.yml, .repo/artifacts-consumed.yml]
-        compare_to: refs/heads/main
+    - if: $DISABLE_PIPELINE == "true"
       when: never
     - if: $CI_PIPELINE_SOURCE == "merge_request_event"
       changes: [che/**/*, lib/**/*, go.work, .gitlab-ci.yml]
@@ -290,9 +284,7 @@ warm-e2e-pkg-installs-image:
     DOCKER_CERT_PATH: "$DOCKER_TLS_CERTDIR/client"
   #[why] only feeds the manual install-e2e matrices: stays manual with them, never auto
   rules:
-    - changes:
-        paths: [.repo/artifacts-produced.yml, .repo/artifacts-consumed.yml]
-        compare_to: refs/heads/main
+    - if: $DISABLE_PIPELINE == "true"
       when: never
     - if: $CI_PIPELINE_SOURCE == "merge_request_event" || $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
       when: manual
@@ -325,9 +317,7 @@ warm-go-darwin:
       policy: pull-push
   #[why] only feeds the manual darwin install-e2e matrix: stays manual with it, never auto
   rules:
-    - changes:
-        paths: [.repo/artifacts-produced.yml, .repo/artifacts-consumed.yml]
-        compare_to: refs/heads/main
+    - if: $DISABLE_PIPELINE == "true"
       when: never
     - if: $ENABLE_DARWIN_CI != "true"
       when: never
@@ -374,9 +364,7 @@ test-e2e-install-methods:
       - METHOD: [apt, binariesRemoteArchive, script, pyenv, nvm, npm, go, nix, buildFromSource]
   #[why] never automatic: these dind matrix jobs flood the runner queue and starve every other repo's pipeline. manual, optional, always
   rules:
-    - changes:
-        paths: [.repo/artifacts-produced.yml, .repo/artifacts-consumed.yml]
-        compare_to: refs/heads/main
+    - if: $DISABLE_PIPELINE == "true"
       when: never
     - if: $CI_PIPELINE_SOURCE == "merge_request_event" || $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
       when: manual
@@ -422,9 +410,7 @@ coverage-che:
         coverage_format: cobertura
         path: che/coverage.xml
   rules:
-    - changes:
-        paths: [.repo/artifacts-produced.yml, .repo/artifacts-consumed.yml]
-        compare_to: refs/heads/main
+    - if: $DISABLE_PIPELINE == "true"
       when: never
     - if: $CI_PIPELINE_SOURCE == "merge_request_event"
       changes: [che/**/*, lib/**/*, go.work, .gitlab-ci.yml]
@@ -436,9 +422,7 @@ test-unit-get-os-open-files-with:
   variables:
     MODULE: get-os-open-files-with
   rules:
-    - changes:
-        paths: [.repo/artifacts-produced.yml, .repo/artifacts-consumed.yml]
-        compare_to: refs/heads/main
+    - if: $DISABLE_PIPELINE == "true"
       when: never
     - if: $CI_PIPELINE_SOURCE == "merge_request_event"
       changes: [get-os-open-files-with/**/*, lib/**/*, go.work, .gitlab-ci.yml]
@@ -450,9 +434,7 @@ test-unit-get-term-open-files-with:
   variables:
     MODULE: get-term-open-files-with
   rules:
-    - changes:
-        paths: [.repo/artifacts-produced.yml, .repo/artifacts-consumed.yml]
-        compare_to: refs/heads/main
+    - if: $DISABLE_PIPELINE == "true"
       when: never
     - if: $CI_PIPELINE_SOURCE == "merge_request_event"
       changes: [get-term-open-files-with/**/*, lib/**/*, go.work, .gitlab-ci.yml]
@@ -464,9 +446,7 @@ test-unit-lib:
   variables:
     MODULE: lib
   rules:
-    - changes:
-        paths: [.repo/artifacts-produced.yml, .repo/artifacts-consumed.yml]
-        compare_to: refs/heads/main
+    - if: $DISABLE_PIPELINE == "true"
       when: never
     - if: $CI_PIPELINE_SOURCE == "merge_request_event"
       changes: [lib/**/*, go.work, .gitlab-ci.yml]
@@ -499,9 +479,7 @@ che-next-version:
   variables:
     GIT_DEPTH: "0"
   rules:
-    - changes:
-        paths: [.repo/artifacts-produced.yml, .repo/artifacts-consumed.yml]
-        compare_to: refs/heads/main
+    - if: $DISABLE_PIPELINE == "true"
       when: never
     - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
       changes: [che/**/*, ci/publish-brew-formula.zsh, ci/publish.zsh, ci/publish-schema.zsh, ci/release-schemas.zsh, ci/schema-version.zsh]
@@ -518,8 +496,6 @@ che-next-version:
 #[why] before release-che, never after: a che release records the schema versions it ships, so the
 #   schemas must already exist. an unchanged schema mints nothing and reports the standing version
 release-schemas:
-  tags:
-    - gke-linux-amd64-small
   interruptible: false
   stage: release
   image: $CI_IMAGE
@@ -532,9 +508,7 @@ release-schemas:
     GIT_DEPTH: "0"
     SCHEMA_VERSIONS_ENV: schema-versions.env
   rules:
-    - changes:
-        paths: [.repo/artifacts-produced.yml, .repo/artifacts-consumed.yml]
-        compare_to: refs/heads/main
+    - if: $DISABLE_PIPELINE == "true"
       when: never
     - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
       changes: [che/**/*, ci/publish-schema.zsh, ci/release-schemas.zsh, ci/schema-version.zsh]
@@ -561,9 +535,7 @@ release-che:
   #   by them and only republished by a tag, so a fix to either sat unreleased on main while
   #   `brew install che` kept failing on binaries the tarball no longer ships
   rules:
-    - changes:
-        paths: [.repo/artifacts-produced.yml, .repo/artifacts-consumed.yml]
-        compare_to: refs/heads/main
+    - if: $DISABLE_PIPELINE == "true"
       when: never
     - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
       changes: [che/**/*, ci/publish-brew-formula.zsh, ci/publish.zsh]
@@ -573,9 +545,7 @@ release-get-os-open-files-with:
   variables:
     MODULE: get-os-open-files-with
   rules:
-    - changes:
-        paths: [.repo/artifacts-produced.yml, .repo/artifacts-consumed.yml]
-        compare_to: refs/heads/main
+    - if: $DISABLE_PIPELINE == "true"
       when: never
     - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
       changes: [get-os-open-files-with/**/*]
@@ -585,9 +555,7 @@ release-get-term-open-files-with:
   variables:
     MODULE: get-term-open-files-with
   rules:
-    - changes:
-        paths: [.repo/artifacts-produced.yml, .repo/artifacts-consumed.yml]
-        compare_to: refs/heads/main
+    - if: $DISABLE_PIPELINE == "true"
       when: never
     - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
       changes: [get-term-open-files-with/**/*]
@@ -597,9 +565,7 @@ release-lib:
   variables:
     MODULE: lib
   rules:
-    - changes:
-        paths: [.repo/artifacts-produced.yml, .repo/artifacts-consumed.yml]
-        compare_to: refs/heads/main
+    - if: $DISABLE_PIPELINE == "true"
       when: never
     - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
       changes: [lib/**/*]
@@ -671,9 +637,7 @@ publish-pages:
   variables:
     CARRY_APT: "1"
   rules:
-    - changes:
-        paths: [.repo/artifacts-produced.yml, .repo/artifacts-consumed.yml]
-        compare_to: refs/heads/main
+    - if: $DISABLE_PIPELINE == "true"
       when: never
     - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
       changes: [che/**/*]
@@ -682,9 +646,7 @@ docs-che:
   extends: .pages-build
   stage: release
   rules:
-    - changes:
-        paths: [.repo/artifacts-produced.yml, .repo/artifacts-consumed.yml]
-        compare_to: refs/heads/main
+    - if: $DISABLE_PIPELINE == "true"
       when: never
     - if: $CI_COMMIT_TAG =~ /^che\/v/
   variables:
@@ -699,9 +661,7 @@ pages-preview:
   stage: verify
   needs: []
   rules:
-    - changes:
-        paths: [.repo/artifacts-produced.yml, .repo/artifacts-consumed.yml]
-        compare_to: refs/heads/main
+    - if: $DISABLE_PIPELINE == "true"
       when: never
     - if: $CI_PIPELINE_SOURCE == "merge_request_event"
   variables:
@@ -731,9 +691,7 @@ goreleaser-darwin-che:
   image: $CI_IMAGE
   needs: []
   rules:
-    - changes:
-        paths: [.repo/artifacts-produced.yml, .repo/artifacts-consumed.yml]
-        compare_to: refs/heads/main
+    - if: $DISABLE_PIPELINE == "true"
       when: never
     - if: $CI_COMMIT_TAG =~ /^che\/v/
   cache:
@@ -756,9 +714,7 @@ goreleaser-linux-che:
   image: $CI_IMAGE
   needs: []
   rules:
-    - changes:
-        paths: [.repo/artifacts-produced.yml, .repo/artifacts-consumed.yml]
-        compare_to: refs/heads/main
+    - if: $DISABLE_PIPELINE == "true"
       when: never
     - if: $CI_COMMIT_TAG =~ /^che\/v/
   parallel:
@@ -805,9 +761,7 @@ prerelease-darwin-che:
   #[why] the publish path itself is in scope: a change to the prerelease script, the Makefile target
   #   or this file must publish a prerelease, or it can never be tested before merging
   rules:
-    - changes:
-        paths: [.repo/artifacts-produced.yml, .repo/artifacts-consumed.yml]
-        compare_to: refs/heads/main
+    - if: $DISABLE_PIPELINE == "true"
       when: never
     - if: $CI_PIPELINE_SOURCE == "merge_request_event"
       changes: [che/**/*, lib/**/*, ci/publish-prerelease.zsh, Makefile, .gitlab-ci.yml]
@@ -854,9 +808,7 @@ prerelease-linux-che:
   #[why] the publish path itself is in scope: a change to the prerelease script, the Makefile target
   #   or this file must publish a prerelease, or it can never be tested before merging
   rules:
-    - changes:
-        paths: [.repo/artifacts-produced.yml, .repo/artifacts-consumed.yml]
-        compare_to: refs/heads/main
+    - if: $DISABLE_PIPELINE == "true"
       when: never
     - if: $CI_PIPELINE_SOURCE == "merge_request_event"
       changes: [che/**/*, lib/**/*, ci/publish-prerelease.zsh, Makefile, .gitlab-ci.yml]
@@ -899,9 +851,7 @@ publish-schema-prerelease:
       optional: true
       artifacts: false
   rules:
-    - changes:
-        paths: [.repo/artifacts-produced.yml, .repo/artifacts-consumed.yml]
-        compare_to: refs/heads/main
+    - if: $DISABLE_PIPELINE == "true"
       when: never
     - if: $CI_PIPELINE_SOURCE == "merge_request_event"
       changes: [che/**/*, ci/publish-schema-prerelease.zsh, Makefile, .gitlab-ci.yml]
@@ -922,9 +872,7 @@ publish-che:
     - goreleaser-linux-che
     - docs-che
   rules:
-    - changes:
-        paths: [.repo/artifacts-produced.yml, .repo/artifacts-consumed.yml]
-        compare_to: refs/heads/main
+    - if: $DISABLE_PIPELINE == "true"
       when: never
     - if: $CI_COMMIT_TAG =~ /^che\/v/
   variables:
@@ -945,9 +893,7 @@ publish-apt-che:
     - job: publish-che
       optional: true
   rules:
-    - changes:
-        paths: [.repo/artifacts-produced.yml, .repo/artifacts-consumed.yml]
-        compare_to: refs/heads/main
+    - if: $DISABLE_PIPELINE == "true"
       when: never
     - if: $CI_COMMIT_TAG =~ /^che\/v/
   variables:
@@ -969,9 +915,7 @@ publish-pages-tag:
   needs:
     - publish-apt-che
   rules:
-    - changes:
-        paths: [.repo/artifacts-produced.yml, .repo/artifacts-consumed.yml]
-        compare_to: refs/heads/main
+    - if: $DISABLE_PIPELINE == "true"
       when: never
     - if: $CI_COMMIT_TAG =~ /^che\/v/
 
@@ -986,9 +930,7 @@ publish-brew-che:
     - goreleaser-darwin-che
     - goreleaser-linux-che
   rules:
-    - changes:
-        paths: [.repo/artifacts-produced.yml, .repo/artifacts-consumed.yml]
-        compare_to: refs/heads/main
+    - if: $DISABLE_PIPELINE == "true"
       when: never
     - if: $CI_COMMIT_TAG =~ /^che\/v/
   variables:
@@ -1002,9 +944,7 @@ publish-ci-image:
   stage: trigger-downstream
   needs: [publish-che]
   rules:
-    - changes:
-        paths: [.repo/artifacts-produced.yml, .repo/artifacts-consumed.yml]
-        compare_to: refs/heads/main
+    - if: $DISABLE_PIPELINE == "true"
       when: never
     - if: $CI_COMMIT_TAG =~ /^che\/v/
   inherit:
@@ -1026,9 +966,7 @@ publish-get-os-open-files-with:
   stage: publish
   image: $CI_IMAGE
   rules:
-    - changes:
-        paths: [.repo/artifacts-produced.yml, .repo/artifacts-consumed.yml]
-        compare_to: refs/heads/main
+    - if: $DISABLE_PIPELINE == "true"
       when: never
     - if: $CI_COMMIT_TAG =~ /^get-os-open-files-with\/v/
   script:
@@ -1041,11 +979,12 @@ publish-get-term-open-files-with:
   stage: publish
   image: $CI_IMAGE
   rules:
-    - changes:
-        paths: [.repo/artifacts-produced.yml, .repo/artifacts-consumed.yml]
-        compare_to: refs/heads/main
+    - if: $DISABLE_PIPELINE == "true"
       when: never
     - if: $CI_COMMIT_TAG =~ /^get-term-open-files-with\/v/
   script:
     - make publish
+pipeline-gate:
+  extends: .pipeline-gate
+
 ##[<] 🤖🤖
