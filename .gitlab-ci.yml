@@ -76,7 +76,9 @@ warm-go:
   extends: .vendors-packages
   stage: warm
   image: $CI_IMAGE
-  needs: []
+  needs:
+    - job: pipeline-gate
+      optional: true
   rules:
     - if: $DISABLE_PIPELINE == "true"
       when: never
@@ -105,7 +107,9 @@ warm-go-linux-arm64:
   extends: .vendors-packages
   stage: warm
   image: $CI_IMAGE
-  needs: []
+  needs:
+    - job: pipeline-gate
+      optional: true
   #[why] only feeds the manual arm64 install-e2e matrix: stays manual with it, never auto
   rules:
     - if: $DISABLE_PIPELINE == "true"
@@ -133,7 +137,9 @@ warm-go-linux-amd64:
   extends: .vendors-packages
   stage: warm
   image: $CI_IMAGE
-  needs: []
+  needs:
+    - job: pipeline-gate
+      optional: true
   rules:
     - if: $DISABLE_PIPELINE == "true"
       when: never
@@ -276,7 +282,9 @@ warm-e2e-pkg-installs-image:
   services:
     - name: $ARTIFACT_REGISTRY_PROXY_DOCKERHUB/library/docker:dind
       alias: docker
-  needs: []
+  needs:
+    - job: pipeline-gate
+      optional: true
   variables:
     DOCKER_HOST: tcp://docker:2376
     DOCKER_TLS_CERTDIR: "/certs"
@@ -309,7 +317,9 @@ warm-go-darwin:
   tags:
     - saas-macos-medium-m1
   image: macos-26-xcode-26
-  needs: []
+  needs:
+    - job: pipeline-gate
+      optional: true
   cache:
     - key: mr-go-build-che-darwin
       paths:
@@ -475,7 +485,9 @@ che-next-version:
   interruptible: false
   stage: release
   image: $CI_IMAGE
-  needs: []
+  needs:
+    - job: pipeline-gate
+      optional: true
   variables:
     GIT_DEPTH: "0"
   rules:
@@ -659,7 +671,9 @@ docs-che:
 pages-preview:
   extends: .pages-build
   stage: verify
-  needs: []
+  needs:
+    - job: pipeline-gate
+      optional: true
   rules:
     - if: $DISABLE_PIPELINE == "true"
       when: never
@@ -689,7 +703,9 @@ goreleaser-darwin-che:
   extends: .goreleaser-build
   stage: release
   image: $CI_IMAGE
-  needs: []
+  needs:
+    - job: pipeline-gate
+      optional: true
   rules:
     - if: $DISABLE_PIPELINE == "true"
       when: never
@@ -712,7 +728,9 @@ goreleaser-linux-che:
   extends: .goreleaser-build
   stage: release
   image: $CI_IMAGE
-  needs: []
+  needs:
+    - job: pipeline-gate
+      optional: true
   rules:
     - if: $DISABLE_PIPELINE == "true"
       when: never
