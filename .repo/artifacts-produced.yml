@@ -5,7 +5,7 @@ produces:
     versionEnvVar: GO_MODULES_CHE_REF
     version: che/v0.0.95
   - uri: gitlab.com/konradodwrot/go-modules/che-schema
-    type: gitRepository
+    type: file
     versionEnvVar: CHE_SCHEMA_REF
     version: v0.0.1-che-min-v0.0.96
   - uri: gitlab.com/konradodwrot/go-modules/get-os-open-files-with
@@ -21,7 +21,7 @@ produces:
     versionEnvVar: GO_MODULES_LIB_REF
     version: lib/v0.0.15
   - uri: gitlab.com/konradodwrot/go-modules/che-packages-schema
-    type: gitRepository
+    type: file
     versionEnvVar: CHE_PACKAGES_SCHEMA_REF
     version: v0.0.1-che-min-v0.0.96
 ##[<] 🤖
