@@ -38,15 +38,17 @@ stages:
 variables:
   ARTIFACT_REGISTRY: $GRP_KO_VAR_ARTIFACT_REGISTRY
   ARTIFACT_REGISTRY_PROXY_DOCKERHUB: $GRP_KO_VAR_ARTIFACT_REGISTRY_PROXY_DOCKERHUB
-  CI_IMAGES_REF: $GRP_KO_VAR_CI_IMAGES_REF
+  OCI_IMAGES_CI_LINUX_REF: $GRP_KO_VAR_OCI_IMAGES_CI_LINUX_REF
+  CHE_SCHEMA_REF: $GRP_KO_VAR_CHE_SCHEMA_REF
+  CHE_PACKAGES_SCHEMA_REF: $GRP_KO_VAR_CHE_PACKAGES_SCHEMA_REF
   CHE_PACKAGES_REF: $GRP_KO_VAR_CHE_PACKAGES_REF
   ENABLE_DARWIN_CI: $GRP_KO_VAR_ENABLE_DARWIN_CI
   PROSE_ASSETS_REF: $GRP_KO_VAR_PROSE_ASSETS_REF
-  CONFIGS_REF: $GRP_KO_VAR_CONFIGS_REF
-  CI_IMAGE: $ARTIFACT_REGISTRY/ci-linux:$CI_IMAGES_REF
-  CI_IMAGE_ARM64: $ARTIFACT_REGISTRY/ci-linux:$CI_IMAGES_REF-arm64
-  CI_IMAGE_DIND: $ARTIFACT_REGISTRY/ci-linux-dind:$CI_IMAGES_REF
-  CI_IMAGE_DIND_ARM64: $ARTIFACT_REGISTRY/ci-linux-dind:$CI_IMAGES_REF-arm64
+  AI_CONFIGS_REF: $GRP_KO_VAR_AI_CONFIGS_REF
+  CI_IMAGE: $ARTIFACT_REGISTRY/ci-linux:$OCI_IMAGES_CI_LINUX_REF
+  CI_IMAGE_ARM64: $ARTIFACT_REGISTRY/ci-linux:$OCI_IMAGES_CI_LINUX_REF-arm64
+  CI_IMAGE_DIND: $ARTIFACT_REGISTRY/ci-linux-dind:$OCI_IMAGES_CI_LINUX_DIND_REF
+  CI_IMAGE_DIND_ARM64: $ARTIFACT_REGISTRY/ci-linux-dind:$OCI_IMAGES_CI_LINUX_DIND_REF-arm64
   #[why] set but never cached: it holds dependencies, and cache: here carries intermediates only.
   #   it stays to keep downloads in the project dir, off the pod's root fs
   GOMODCACHE: $CI_PROJECT_DIR/.cache/go-mod
@@ -70,6 +72,10 @@ warm-go:
   image: $CI_IMAGE
   needs: []
   rules:
+    - changes:
+        paths: [.repo/artifacts-produced.yml, .repo/artifacts-consumed.yml]
+        compare_to: refs/heads/main
+      when: never
     - if: $CI_PIPELINE_SOURCE == "merge_request_event"
     - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
       changes: [che/**/*, lib/**/*, go.work, .gitlab-ci.yml]
@@ -98,6 +104,10 @@ warm-go-linux-arm64:
   needs: []
   #[why] only feeds the manual arm64 install-e2e matrix: stays manual with it, never auto
   rules:
+    - changes:
+        paths: [.repo/artifacts-produced.yml, .repo/artifacts-consumed.yml]
+        compare_to: refs/heads/main
+      when: never
     - if: $CI_PIPELINE_SOURCE == "merge_request_event" || $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
       when: manual
       allow_failure: true
@@ -123,6 +133,10 @@ warm-go-linux-amd64:
   image: $CI_IMAGE
   needs: []
   rules:
+    - changes:
+        paths: [.repo/artifacts-produced.yml, .repo/artifacts-consumed.yml]
+        compare_to: refs/heads/main
+      when: never
     - if: $CI_PIPELINE_SOURCE == "merge_request_event" || $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
       when: manual
       allow_failure: true
@@ -147,6 +161,10 @@ verify-precommit-all:
   needs:
     - warm-go
   rules:
+    - changes:
+        paths: [.repo/artifacts-produced.yml, .repo/artifacts-consumed.yml]
+        compare_to: refs/heads/main
+      when: never
     - if: $CI_PIPELINE_SOURCE == "merge_request_event"
   variables:
     LEFTHOOK_OUTPUT: meta,summary,execution,execution_info,execution_out
@@ -194,6 +212,10 @@ test-unit-che:
     paths:
       - che/cover-unit/
   rules:
+    - changes:
+        paths: [.repo/artifacts-produced.yml, .repo/artifacts-consumed.yml]
+        compare_to: refs/heads/main
+      when: never
     - if: $CI_PIPELINE_SOURCE == "merge_request_event"
       changes: [che/**/*, lib/**/*, go.work, .gitlab-ci.yml]
     - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
@@ -209,6 +231,10 @@ test-unit-che:
   needs:
     - warm-go
   rules:
+    - changes:
+        paths: [.repo/artifacts-produced.yml, .repo/artifacts-consumed.yml]
+        compare_to: refs/heads/main
+      when: never
     - if: $CI_PIPELINE_SOURCE == "merge_request_event"
       changes: [che/**/*, lib/**/*, go.work, .gitlab-ci.yml]
     - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
@@ -264,6 +290,10 @@ warm-e2e-pkg-installs-image:
     DOCKER_CERT_PATH: "$DOCKER_TLS_CERTDIR/client"
   #[why] only feeds the manual install-e2e matrices: stays manual with them, never auto
   rules:
+    - changes:
+        paths: [.repo/artifacts-produced.yml, .repo/artifacts-consumed.yml]
+        compare_to: refs/heads/main
+      when: never
     - if: $CI_PIPELINE_SOURCE == "merge_request_event" || $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
       when: manual
       allow_failure: true
@@ -295,6 +325,10 @@ warm-go-darwin:
       policy: pull-push
   #[why] only feeds the manual darwin install-e2e matrix: stays manual with it, never auto
   rules:
+    - changes:
+        paths: [.repo/artifacts-produced.yml, .repo/artifacts-consumed.yml]
+        compare_to: refs/heads/main
+      when: never
     - if: $ENABLE_DARWIN_CI != "true"
       when: never
     - if: $CI_PIPELINE_SOURCE == "merge_request_event" || $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
@@ -340,6 +374,10 @@ test-e2e-install-methods:
       - METHOD: [apt, binariesRemoteArchive, script, pyenv, nvm, npm, go, nix, buildFromSource]
   #[why] never automatic: these dind matrix jobs flood the runner queue and starve every other repo's pipeline. manual, optional, always
   rules:
+    - changes:
+        paths: [.repo/artifacts-produced.yml, .repo/artifacts-consumed.yml]
+        compare_to: refs/heads/main
+      when: never
     - if: $CI_PIPELINE_SOURCE == "merge_request_event" || $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
       when: manual
       allow_failure: true
@@ -384,6 +422,10 @@ coverage-che:
         coverage_format: cobertura
         path: che/coverage.xml
   rules:
+    - changes:
+        paths: [.repo/artifacts-produced.yml, .repo/artifacts-consumed.yml]
+        compare_to: refs/heads/main
+      when: never
     - if: $CI_PIPELINE_SOURCE == "merge_request_event"
       changes: [che/**/*, lib/**/*, go.work, .gitlab-ci.yml]
     - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
@@ -394,6 +436,10 @@ test-unit-get-os-open-files-with:
   variables:
     MODULE: get-os-open-files-with
   rules:
+    - changes:
+        paths: [.repo/artifacts-produced.yml, .repo/artifacts-consumed.yml]
+        compare_to: refs/heads/main
+      when: never
     - if: $CI_PIPELINE_SOURCE == "merge_request_event"
       changes: [get-os-open-files-with/**/*, lib/**/*, go.work, .gitlab-ci.yml]
     - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
@@ -404,6 +450,10 @@ test-unit-get-term-open-files-with:
   variables:
     MODULE: get-term-open-files-with
   rules:
+    - changes:
+        paths: [.repo/artifacts-produced.yml, .repo/artifacts-consumed.yml]
+        compare_to: refs/heads/main
+      when: never
     - if: $CI_PIPELINE_SOURCE == "merge_request_event"
       changes: [get-term-open-files-with/**/*, lib/**/*, go.work, .gitlab-ci.yml]
     - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
@@ -414,6 +464,10 @@ test-unit-lib:
   variables:
     MODULE: lib
   rules:
+    - changes:
+        paths: [.repo/artifacts-produced.yml, .repo/artifacts-consumed.yml]
+        compare_to: refs/heads/main
+      when: never
     - if: $CI_PIPELINE_SOURCE == "merge_request_event"
       changes: [lib/**/*, go.work, .gitlab-ci.yml]
     - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
@@ -431,8 +485,73 @@ test-unit-lib:
   script:
     - make create-tag MODULE=$MODULE BRANCH="$CI_COMMIT_BRANCH" REF="$CI_COMMIT_SHA" DEFAULT_BRANCH="$CI_DEFAULT_BRANCH"
 
+#[what] che's next tag, computed once and handed to every job that needs to name it
+#[why] the -che-min floor on a schema version and the che release actually cut must be the same
+#   string. next-tag.zsh reads the tag list live, so a second call after another tag lands would
+#   answer differently: compute once here, pass it forward as a dotenv artifact, never recompute
+che-next-version:
+  tags:
+    - gke-linux-amd64-small
+  interruptible: false
+  stage: release
+  image: $CI_IMAGE
+  needs: []
+  variables:
+    GIT_DEPTH: "0"
+  rules:
+    - changes:
+        paths: [.repo/artifacts-produced.yml, .repo/artifacts-consumed.yml]
+        compare_to: refs/heads/main
+      when: never
+    - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
+      changes: [che/**/*, ci/publish-brew-formula.zsh, ci/publish.zsh, ci/publish-schema.zsh, ci/release-schemas.zsh, ci/schema-version.zsh]
+  script:
+    - TAG=$(ci/next-tag.zsh che "$CI_COMMIT_BRANCH" "$CI_DEFAULT_BRANCH")
+    - echo "CHE_NEXT_TAG=$TAG" > che-version.env
+    - echo "CHE_MIN_VERSION=${TAG#che/}" >> che-version.env
+    - cat che-version.env
+  artifacts:
+    reports:
+      dotenv: che-version.env
+
+#[what] mint and publish a release for each schema whose generated bytes changed
+#[why] before release-che, never after: a che release records the schema versions it ships, so the
+#   schemas must already exist. an unchanged schema mints nothing and reports the standing version
+release-schemas:
+  tags:
+    - gke-linux-amd64-small
+  interruptible: false
+  stage: release
+  image: $CI_IMAGE
+  extends: .vendors-packages
+  needs:
+    - job: che-next-version
+      artifacts: true
+  variables:
+    GITLAB_TOKEN: $CI_JOB_TOKEN
+    GIT_DEPTH: "0"
+    SCHEMA_VERSIONS_ENV: schema-versions.env
+  rules:
+    - changes:
+        paths: [.repo/artifacts-produced.yml, .repo/artifacts-consumed.yml]
+        compare_to: refs/heads/main
+      when: never
+    - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
+      changes: [che/**/*, ci/publish-schema.zsh, ci/release-schemas.zsh, ci/schema-version.zsh]
+  #[why] render-docs first: the comparison is against freshly generated bytes, and a stale checkout
+  #   copy would either mint nothing on a real change or mint on no change at all
+  script:
+    - make render-docs
+    - make release-schemas REF="$CI_COMMIT_SHA"
+  artifacts:
+    reports:
+      dotenv: schema-versions.env
+
 release-che:
   extends: .release-module
+  needs:
+    - job: release-schemas
+      artifacts: true
   variables:
     MODULE: che
   #[why] the catalog lives in konradodwrot/che-packages now, pinned by the $CHE_PACKAGES_REF group
@@ -442,6 +561,10 @@ release-che:
   #   by them and only republished by a tag, so a fix to either sat unreleased on main while
   #   `brew install che` kept failing on binaries the tarball no longer ships
   rules:
+    - changes:
+        paths: [.repo/artifacts-produced.yml, .repo/artifacts-consumed.yml]
+        compare_to: refs/heads/main
+      when: never
     - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
       changes: [che/**/*, ci/publish-brew-formula.zsh, ci/publish.zsh]
 
@@ -450,6 +573,10 @@ release-get-os-open-files-with:
   variables:
     MODULE: get-os-open-files-with
   rules:
+    - changes:
+        paths: [.repo/artifacts-produced.yml, .repo/artifacts-consumed.yml]
+        compare_to: refs/heads/main
+      when: never
     - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
       changes: [get-os-open-files-with/**/*]
 
@@ -458,6 +585,10 @@ release-get-term-open-files-with:
   variables:
     MODULE: get-term-open-files-with
   rules:
+    - changes:
+        paths: [.repo/artifacts-produced.yml, .repo/artifacts-consumed.yml]
+        compare_to: refs/heads/main
+      when: never
     - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
       changes: [get-term-open-files-with/**/*]
 
@@ -466,6 +597,10 @@ release-lib:
   variables:
     MODULE: lib
   rules:
+    - changes:
+        paths: [.repo/artifacts-produced.yml, .repo/artifacts-consumed.yml]
+        compare_to: refs/heads/main
+      when: never
     - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
       changes: [lib/**/*]
 
@@ -536,6 +671,10 @@ publish-pages:
   variables:
     CARRY_APT: "1"
   rules:
+    - changes:
+        paths: [.repo/artifacts-produced.yml, .repo/artifacts-consumed.yml]
+        compare_to: refs/heads/main
+      when: never
     - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
       changes: [che/**/*]
 
@@ -543,6 +682,10 @@ docs-che:
   extends: .pages-build
   stage: release
   rules:
+    - changes:
+        paths: [.repo/artifacts-produced.yml, .repo/artifacts-consumed.yml]
+        compare_to: refs/heads/main
+      when: never
     - if: $CI_COMMIT_TAG =~ /^che\/v/
   variables:
     DOCS_DIR_URLS: "false"
@@ -556,6 +699,10 @@ pages-preview:
   stage: verify
   needs: []
   rules:
+    - changes:
+        paths: [.repo/artifacts-produced.yml, .repo/artifacts-consumed.yml]
+        compare_to: refs/heads/main
+      when: never
     - if: $CI_PIPELINE_SOURCE == "merge_request_event"
   variables:
     DOCS_DIR_URLS: "false"
@@ -584,6 +731,10 @@ goreleaser-darwin-che:
   image: $CI_IMAGE
   needs: []
   rules:
+    - changes:
+        paths: [.repo/artifacts-produced.yml, .repo/artifacts-consumed.yml]
+        compare_to: refs/heads/main
+      when: never
     - if: $CI_COMMIT_TAG =~ /^che\/v/
   cache:
     - key: go-build-che-darwin
@@ -605,6 +756,10 @@ goreleaser-linux-che:
   image: $CI_IMAGE
   needs: []
   rules:
+    - changes:
+        paths: [.repo/artifacts-produced.yml, .repo/artifacts-consumed.yml]
+        compare_to: refs/heads/main
+      when: never
     - if: $CI_COMMIT_TAG =~ /^che\/v/
   parallel:
     matrix:
@@ -650,6 +805,10 @@ prerelease-darwin-che:
   #[why] the publish path itself is in scope: a change to the prerelease script, the Makefile target
   #   or this file must publish a prerelease, or it can never be tested before merging
   rules:
+    - changes:
+        paths: [.repo/artifacts-produced.yml, .repo/artifacts-consumed.yml]
+        compare_to: refs/heads/main
+      when: never
     - if: $CI_PIPELINE_SOURCE == "merge_request_event"
       changes: [che/**/*, lib/**/*, ci/publish-prerelease.zsh, Makefile, .gitlab-ci.yml]
       when: manual
@@ -695,6 +854,10 @@ prerelease-linux-che:
   #[why] the publish path itself is in scope: a change to the prerelease script, the Makefile target
   #   or this file must publish a prerelease, or it can never be tested before merging
   rules:
+    - changes:
+        paths: [.repo/artifacts-produced.yml, .repo/artifacts-consumed.yml]
+        compare_to: refs/heads/main
+      when: never
     - if: $CI_PIPELINE_SOURCE == "merge_request_event"
       changes: [che/**/*, lib/**/*, ci/publish-prerelease.zsh, Makefile, .gitlab-ci.yml]
       when: manual
@@ -718,6 +881,36 @@ prerelease-linux-che:
       - che/dist/
     expire_in: 1 week
 
+#[what] publish both generated schemas as one per-MR prerelease, so che-packages can validate an
+#   unmerged vocabulary change against it
+#[why] its own job, never a step of prerelease-{linux,darwin}-che: a schema is arch-independent and
+#   must upload exactly once, while those two run per os/arch and would race on the same path
+#[why] manual, matching the che prereleases: resolve-che-version.zsh pairs a binary with the schema
+#   its vocabulary comes from, so publishing one without the other pairs a version with nothing
+publish-schema-prerelease:
+  tags:
+    - gke-linux-amd64-small
+  interruptible: false
+  extends: .vendors-packages
+  stage: release
+  image: $CI_IMAGE
+  needs:
+    - job: test-unit-che
+      optional: true
+      artifacts: false
+  rules:
+    - changes:
+        paths: [.repo/artifacts-produced.yml, .repo/artifacts-consumed.yml]
+        compare_to: refs/heads/main
+      when: never
+    - if: $CI_PIPELINE_SOURCE == "merge_request_event"
+      changes: [che/**/*, ci/publish-schema-prerelease.zsh, Makefile, .gitlab-ci.yml]
+      when: manual
+      allow_failure: true
+  script:
+    - make render-docs
+    - make publish-schema-prerelease
+
 publish-che:
   tags:
     - gke-linux-amd64-small
@@ -729,6 +922,10 @@ publish-che:
     - goreleaser-linux-che
     - docs-che
   rules:
+    - changes:
+        paths: [.repo/artifacts-produced.yml, .repo/artifacts-consumed.yml]
+        compare_to: refs/heads/main
+      when: never
     - if: $CI_COMMIT_TAG =~ /^che\/v/
   variables:
     PUBLISH_PREBUILT: "1"
@@ -748,6 +945,10 @@ publish-apt-che:
     - job: publish-che
       optional: true
   rules:
+    - changes:
+        paths: [.repo/artifacts-produced.yml, .repo/artifacts-consumed.yml]
+        compare_to: refs/heads/main
+      when: never
     - if: $CI_COMMIT_TAG =~ /^che\/v/
   variables:
     APT_GPG_PRIVATE_KEY: $REPO_VAR_APT_GPG_PRIVATE_KEY
@@ -768,6 +969,10 @@ publish-pages-tag:
   needs:
     - publish-apt-che
   rules:
+    - changes:
+        paths: [.repo/artifacts-produced.yml, .repo/artifacts-consumed.yml]
+        compare_to: refs/heads/main
+      when: never
     - if: $CI_COMMIT_TAG =~ /^che\/v/
 
 publish-brew-che:
@@ -781,6 +986,10 @@ publish-brew-che:
     - goreleaser-darwin-che
     - goreleaser-linux-che
   rules:
+    - changes:
+        paths: [.repo/artifacts-produced.yml, .repo/artifacts-consumed.yml]
+        compare_to: refs/heads/main
+      when: never
     - if: $CI_COMMIT_TAG =~ /^che\/v/
   variables:
     HOMEBREW_TAP_TOKEN: $REPO_VAR_HOMEBREW_TAP_TOKEN
@@ -793,6 +1002,10 @@ publish-ci-image:
   stage: trigger-downstream
   needs: [publish-che]
   rules:
+    - changes:
+        paths: [.repo/artifacts-produced.yml, .repo/artifacts-consumed.yml]
+        compare_to: refs/heads/main
+      when: never
     - if: $CI_COMMIT_TAG =~ /^che\/v/
   inherit:
     variables: false
@@ -813,6 +1026,10 @@ publish-get-os-open-files-with:
   stage: publish
   image: $CI_IMAGE
   rules:
+    - changes:
+        paths: [.repo/artifacts-produced.yml, .repo/artifacts-consumed.yml]
+        compare_to: refs/heads/main
+      when: never
     - if: $CI_COMMIT_TAG =~ /^get-os-open-files-with\/v/
   script:
     - make publish
@@ -824,6 +1041,10 @@ publish-get-term-open-files-with:
   stage: publish
   image: $CI_IMAGE
   rules:
+    - changes:
+        paths: [.repo/artifacts-produced.yml, .repo/artifacts-consumed.yml]
+        compare_to: refs/heads/main
+      when: never
     - if: $CI_COMMIT_TAG =~ /^get-term-open-files-with\/v/
   script:
     - make publish

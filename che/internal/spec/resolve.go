@@ -344,7 +344,7 @@ func splitTemplateLeaf(node templateNode, down templateInherited, globs *globSet
 	default:
 		*explicit = append(*explicit, FileItem{
 			Rel:   leaf.Source,
-			Dests: mergeDestOptions(down.options, prefixDests(down.destPrefix, leaf.Dest)),
+			Dests: mergeDestOptions(down.options, prefixDests(down.destPrefix, node.Source, leaf.Dest)),
 			Ctx:   down.ctx,
 			Perms: down.perms,
 		})
@@ -353,9 +353,12 @@ func splitTemplateLeaf(node templateNode, down templateInherited, globs *globSet
 }
 
 // [why] host dests ($HOME, ~, absolute) anchor themselves: only repo-relative dests take the prefix
-func prefixDests(prefix string, dests []DestSpec) []DestSpec {
+func prefixDests(prefix, childSource string, dests []DestSpec) []DestSpec {
 	if prefix == "" {
 		return dests
+	}
+	if len(dests) == 0 {
+		return []DestSpec{{Path: path.Join(prefix, TrimTemplateExt(childSource))}}
 	}
 	out := slices.Clone(dests)
 	for i := range out {

@@ -23,4 +23,13 @@ cases:
     notExpected:
       stdOut:
         - ${HOME}/.config/zsh/t
+  - name: ShouldRenderGroupChildIntoInheritedRepoDest
+    context:
+      command: che render-templates --profile ontoRepo
+    expected:
+      stdOut: |
+        created ${REPO}/shared/ci/ruby/artifact.rb
+    notExpected:
+      stdOut:
+        - " /shared/ci/ruby"
 # [<] 🤖

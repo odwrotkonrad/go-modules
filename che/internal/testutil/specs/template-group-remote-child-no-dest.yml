@@ -1,0 +1,14 @@
+##[>] 🤖🤖
+base:
+  include:
+    renderTemplates:
+      - source: "git::gitlab.com/acme/tools@v1.0.0"
+        dest: shared/ci/ruby
+        <<<:
+          - source: //snippets/artifact.rb
+
+cli/macos:
+  options: {autoDiscover: true}
+  include:
+    profiles: [base]
+##[<] 🤖🤖
