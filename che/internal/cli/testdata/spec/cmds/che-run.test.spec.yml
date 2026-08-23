@@ -155,7 +155,8 @@ cases:
         ran ${REPO}/install/setup
         # Run profile ontoRepo
         ## backup
-          backup delta render-templates (1 change)
+          backup delta render-templates (2 changes)
         ## render-templates
           created ${REPO}/docs/r.md
+          created ${REPO}/shared/ci/ruby/artifact.rb
 # [<] 🤖

@@ -11,7 +11,12 @@ import (
 	sj "github.com/santhosh-tekuri/jsonschema/v6"
 )
 
-const schemaID = "https://gitlab.com/konradodwrot/go-modules/-/raw/main/che/assets/data/packages.schema.json"
+// [why] the artifact's own package path, never raw/main: this document is published as the
+// che-packages-schema artifact, and its $id should name where that artifact lives.
+// [why] the version-less latest alias, not a pinned version: the version is decided after
+// generation by comparing these bytes with the last published ones, so stamping it in here would
+// make every generation differ from the last and mint a version on every release.
+const schemaID = "https://gitlab.com/api/v4/projects/konradodwrot%2Fgo-modules/packages/generic/che-packages-schema/latest/che-packages.schema.json"
 
 const checksumPattern = "^sha256:.+"
 

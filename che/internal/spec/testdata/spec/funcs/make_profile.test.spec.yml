@@ -140,6 +140,44 @@ cases:
         - [assets/data/a.md]
         - [assets/data/deep/b.md]
         - [$HOME/.config/c.md]
+  - name: ShouldInheritGroupDestWhenChildOmitsIt
+    context: {pwd: testdata/fixture/resolve/tree-empty}
+    input:
+      args: [spec: template-group-inherited-dest, profile: cli/macos]
+    expected:
+      templates:
+        - templates/ruby/artifact.rb
+        - templates/ruby/declaration.rb
+        - templates/ruby/nested/event.rb
+        - templates/ruby/nested/gitlab.rb
+      templateDests:
+        - [shared/ci/ruby/artifact.rb]
+        - [shared/ci/ruby/declaration.rb]
+        - [shared/ci/ruby/deep/event.rb]
+        - [$HOME/.config/gitlab.rb]
+  - name: ShouldAccumulateInheritedDestAcrossNestedGroups
+    context: {pwd: testdata/fixture/resolve/tree-empty}
+    input:
+      args: [spec: template-group-inherited-dest, profile: cli/macos]
+    expected:
+      templateDests:
+        - [shared/ci/ruby/artifact.rb]
+        - [shared/ci/ruby/declaration.rb]
+        - [shared/ci/ruby/deep/event.rb]
+        - [$HOME/.config/gitlab.rb]
+  - name: ShouldKeepHostAnchoredChildDestUnderGroupPrefix
+    context: {pwd: testdata/fixture/resolve/tree-empty}
+    input:
+      args: [spec: template-group-inherited-dest, profile: cli/macos]
+    expected:
+      dests:
+        templates/ruby/nested/gitlab.rb: [$HOME/.config/gitlab.rb]
+  - name: ShouldStillErrorOnRemoteChildWithoutDest
+    context: {pwd: testdata/fixture/resolve/tree-empty}
+    input:
+      args: [spec: template-group-remote-child-no-dest, profile: cli/macos]
+    expected:
+      errorOutput: [renderTemplates remote source requires explicit dest]
   - name: ShouldCascadeCtxPermsAndOptionsThroughNestedGroups
     context: {pwd: testdata/fixture/resolve/tree-empty}
     input:

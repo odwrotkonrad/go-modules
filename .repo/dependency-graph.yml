@@ -1,0 +1,36 @@
+##[>] 🤖
+dependsOn:
+  #[why] che dependsOn both schemas, never the reverse: a che release ships the versions they were
+  #   minted at. the schemas depend on nothing, which is what keeps the graph acyclic once
+  #   che-packages depends on che-packages-schema while che still embeds the catalog
+  gitlab.com/konradodwrot/go-modules/che:
+    - uri: gitlab.com/konradodwrot/che-packages
+      type: gitRepository
+    - uri: gitlab.com/konradodwrot/cross-repo/prose/assets
+      type: gitRepository
+    - uri: gitlab.com/konradodwrot/cross-repo/prose/spec
+      type: gitRepository
+    - uri: gitlab.com/konradodwrot/go-modules/che-schema
+      type: gitRepository
+    - uri: gitlab.com/konradodwrot/go-modules/lib
+      type: goModule
+    - uri: gitlab.com/konradodwrot/go-modules/che-packages-schema
+      type: gitRepository
+  gitlab.com/konradodwrot/go-modules/che-schema: []
+  gitlab.com/konradodwrot/go-modules/che-packages-schema: []
+  gitlab.com/konradodwrot/go-modules/get-os-open-files-with:
+    - uri: gitlab.com/konradodwrot/go-modules/lib
+      type: goModule
+  gitlab.com/konradodwrot/go-modules/get-term-open-files-with:
+    - uri: gitlab.com/konradodwrot/go-modules/lib
+      type: goModule
+  gitlab.com/konradodwrot/go-modules/lib: []
+  ciEnv:
+    - uri: us-central1-docker.pkg.dev/staging-499418/ci/ci-linux
+      type: ociImage
+    - uri: us-central1-docker.pkg.dev/staging-499418/ci/ci-linux-dind
+      type: ociImage
+  devEnv:
+    - uri: gitlab.com/konradodwrot/ai-harness/configs
+      type: gitRepository
+##[<] 🤖
