@@ -10,7 +10,7 @@ Every other key is a profile block. Schema:
 First line of `che.yml`:
 
 ```yaml
-# yaml-language-server: $schema=https://gitlab.com/konradodwrot/go-modules/-/raw/main/che/assets/data/che.schema.json
+# yaml-language-server: $schema=https://gitlab.com/api/v4/projects/konradodwrot%2Fgo-modules/packages/generic/che-schema/v0.0.1-che-min-v0.0.96/che.schema.json
 ```
 
 Pin `main` to the tag of the installed che. Each tag snapshots the schema,
@@ -27,7 +27,7 @@ specs, sourced-ref checkouts. Violations warn. `--validate-spec error` (env
 Every construct, schema-validated by the test suite:
 
 ```yaml
-# yaml-language-server: $schema=https://gitlab.com/konradodwrot/go-modules/-/raw/main/che/assets/data/che.schema.json
+# yaml-language-server: $schema=https://gitlab.com/api/v4/projects/konradodwrot%2Fgo-modules/packages/generic/che-schema/v0.0.1-che-min-v0.0.96/che.schema.json
 options:
   profileWorkingDirectory: root
   runIf: ['env:CHE_ENABLED']
