@@ -204,10 +204,13 @@ func (p *ProfileReady) skipReason(item spec.FileItem, skips renderSkips) string 
 	if !ok {
 		return ""
 	}
+	//[why] a template pulling another in with localFile hides that file's secret and shell calls from
+	//   a scan of its own body, so the skip must see the included bodies too
+	bodies := append([][]byte{body}, render.LocalFileBodies(p.templateAnchor(item), body)...)
 	switch {
-	case skips.Secrets && render.IsSecretRefPresent(body):
+	case skips.Secrets && slices.ContainsFunc(bodies, render.IsSecretRefPresent):
 		return "options.renderTemplates.skipSecrets"
-	case skips.Variables && render.IsShellCallPresent(body):
+	case skips.Variables && slices.ContainsFunc(bodies, render.IsShellCallPresent):
 		return "options.renderTemplates.skipVariables"
 	}
 	return ""

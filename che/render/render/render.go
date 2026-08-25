@@ -10,6 +10,7 @@ import (
 	"net/url"
 	"os"
 	"path/filepath"
+	"regexp"
 	"text/template"
 
 	"github.com/hairyhenderson/gomplate/v4"
@@ -76,6 +77,21 @@ func execWithCtx(name string, body []byte, repoRoot string, itemCtx map[string]s
 
 func MakefileDoc(path string) (string, error) {
 	return lib.Generate(path)
+}
+
+var localFilePattern = regexp.MustCompile(`\{\{-?[^{}]*\blocalFile\s+"([^"]+)"`)
+
+// LocalFileBodies returns the content of every file body pulls in with localFile, skipping unreadable ones.
+func LocalFileBodies(repoRoot string, body []byte) [][]byte {
+	bodies := [][]byte{}
+	for _, m := range localFilePattern.FindAllSubmatch(body, -1) {
+		included, err := readLocalFile(repoRoot, string(m[1]))
+		if err != nil {
+			continue
+		}
+		bodies = append(bodies, []byte(included))
+	}
+	return bodies
 }
 
 func readLocalFile(repoRoot, path string) (string, error) {

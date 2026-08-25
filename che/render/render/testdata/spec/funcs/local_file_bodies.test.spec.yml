@@ -1,0 +1,46 @@
+# [>] 🤖🤖
+context:
+  function: render.LocalFileBodies
+cases:
+  - name: ShouldReadEveryIncludedBody
+    input:
+      args:
+        - files:
+            a.env: "A=1\n"
+            b.tpl: "B=2\n"
+        - body: "{{ localFile \"a.env\" }}\n{{ localFile \"b.tpl\" }}\n"
+    expected:
+      output: ["A=1\n", "B=2\n"]
+  - name: ShouldReadThroughAPipedInclude
+    input:
+      args:
+        - files:
+            a.env: "A=1\n"
+        - body: "{{ localFile \"a.env\" | alwaysUpdate }}\n"
+    expected:
+      output: ["A=1\n"]
+  - name: ShouldReadThroughAWrappedInclude
+    input:
+      args:
+        - files:
+            a.tpl: "A={{ shell \"true\" }}\n"
+        - body: "{{ tmpl.Inline (localFile \"a.tpl\") }}\n"
+    expected:
+      output: ["A={{ shell \"true\" }}\n"]
+  - name: ShouldSkipAnUnreadableInclude
+    input:
+      args:
+        - files:
+            a.env: "A=1\n"
+        - body: "{{ localFile \"absent.env\" }}\n{{ localFile \"a.env\" }}\n"
+    expected:
+      output: ["A=1\n"]
+  - name: ShouldReportNothingWithoutAnInclude
+    input:
+      args:
+        - files:
+            a.env: "A=1\n"
+        - body: "A={{ shell \"true\" }}\n"
+    expected:
+      output: []
+# [<] 🤖🤖
