@@ -43,6 +43,18 @@ func TestUnresolvedIncludes(t *testing.T) {
 	})
 }
 
+func TestLocalFileBodies(t *testing.T) {
+	testyml.Eq(t, td, "testdata/spec/funcs/local_file_bodies.test.spec.yml", func(t *testing.T, c testyml.Case[[]string]) ([]string, error) {
+		var files map[string]string
+		c.Input.Args.To(t, 0, &files)
+		out := []string{}
+		for _, b := range LocalFileBodies(testutil.Tree(t, files), []byte(c.Input.Args.String(t, 1))) {
+			out = append(out, string(b))
+		}
+		return out, nil
+	})
+}
+
 func TestIsAtInclude(t *testing.T) {
 	testyml.Eq(t, td, "testdata/spec/funcs/is_at_include_line.test.spec.yml", func(t *testing.T, c testyml.Case[bool]) (bool, error) {
 		return isAtIncludeLine(c.Input.Args.String(t, 0)), nil

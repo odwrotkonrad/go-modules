@@ -67,6 +67,24 @@ cases:
         - body: '{{ "lit" | alwaysUpdate }}'
     expected:
       output: "\x1ealwaysUpdate\x1flit"
+  - name: ShouldTagEveryLineOfBlockWithAlwaysUpdate
+    input:
+      args:
+        - body: "{{ \"A=1\\nB=2\\n\" | alwaysUpdate }}"
+    expected:
+      output: "A=\x1ealwaysUpdate\x1f1\nB=\x1ealwaysUpdate\x1f2\n"
+  - name: ShouldTagEveryLineOfBlockWithKeepIfExisting
+    input:
+      args:
+        - body: "{{ \"A=1\\nB=2\\n\" | keepIfExisting }}"
+    expected:
+      output: "A=\x1ekeepIfExisting\x1f1\nB=\x1ekeepIfExisting\x1f2\n"
+  - name: ShouldSkipBlanksAndCommentsWhenTaggingBlock
+    input:
+      args:
+        - body: "{{ \"# c\\n\\nA=1\\n\" | alwaysUpdate }}"
+    expected:
+      output: "# c\n\nA=\x1ealwaysUpdate\x1f1\n"
   - name: ShouldLeaveUnpipedLiteralUntagged
     input:
       args:

@@ -287,7 +287,8 @@ and gcp:// (GCP Secret Manager) secret refs, shell command output, remoteFile
 cross-repo inclusion, frontmatter and markdown transforms. Under a mergeUpsert
 dest a secret or shell value overwrites the existing key and a plain value
 keeps it; "| alwaysUpdate" and "| keepIfExisting" after any value decide per
-line.
+line, and piping a whole multi-line block through one marks every KEY=VALUE
+line in it.
 
 Every subcommand writes to stdout and reads paths relative to the cwd. The
 generating subcommands take --check <file> instead, regenerating and diffing

@@ -5,6 +5,7 @@ package render
 import (
 	"fmt"
 	"regexp"
+	"strings"
 )
 
 const (
@@ -48,7 +49,32 @@ func withMergeAction(action string, resolve func(string) (string, error)) func(s
 }
 
 func mergeActionFunc(action string) func(any) string {
-	return func(value any) string { return markMergeAction(action, value) }
+	return func(value any) string { return markMergeActionBlock(action, value) }
+}
+
+func markMergeActionBlock(action string, value any) string {
+	text := fmt.Sprint(value)
+	if !strings.Contains(strings.TrimRight(text, "\n"), "\n") {
+		return markMergeAction(action, text)
+	}
+	var out strings.Builder
+	for line := range strings.Lines(text) {
+		out.WriteString(markMergeActionLine(action, line))
+	}
+	return out.String()
+}
+
+func markMergeActionLine(action, line string) string {
+	body := strings.TrimSuffix(line, "\n")
+	eol := strings.TrimPrefix(line, body)
+	if trimmed := strings.TrimSpace(body); trimmed == "" || strings.HasPrefix(trimmed, "#") {
+		return line
+	}
+	key, val, ok := strings.Cut(body, "=")
+	if !ok {
+		return line
+	}
+	return key + "=" + markMergeAction(action, val) + eol
 }
 
 // [<] 🤖🤖

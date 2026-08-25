@@ -1,27 +1,27 @@
 ##[>] 🤖
-produces:
+downstream:
   - uri: gitlab.com/konradodwrot/go-modules/che
     type: goModule
     versionEnvVar: GO_MODULES_CHE_REF
-    version: che/v0.0.95
+    version: {{ env.Getenv "GO_MODULES_CHE_REF" }}
   - uri: gitlab.com/konradodwrot/go-modules/che-schema
     type: file
     versionEnvVar: CHE_SCHEMA_REF
-    version: v0.0.1-che-min-v0.0.96
+    version: {{ env.Getenv "CHE_SCHEMA_REF" }}
   - uri: gitlab.com/konradodwrot/go-modules/get-os-open-files-with
     type: goModule
     versionEnvVar: GO_MODULES_GET_OS_OPEN_FILES_WITH_REF
-    version: get-os-open-files-with/v0.0.26
+    version: {{ env.Getenv "GO_MODULES_GET_OS_OPEN_FILES_WITH_REF" }}
   - uri: gitlab.com/konradodwrot/go-modules/get-term-open-files-with
     type: goModule
     versionEnvVar: GO_MODULES_GET_TERM_OPEN_FILES_WITH_REF
-    version: get-term-open-files-with/v0.0.26
+    version: {{ env.Getenv "GO_MODULES_GET_TERM_OPEN_FILES_WITH_REF" }}
   - uri: gitlab.com/konradodwrot/go-modules/lib
     type: goModule
     versionEnvVar: GO_MODULES_LIB_REF
-    version: lib/v0.0.15
+    version: {{ env.Getenv "GO_MODULES_LIB_REF" }}
   - uri: gitlab.com/konradodwrot/go-modules/che-packages-schema
     type: file
     versionEnvVar: CHE_PACKAGES_SCHEMA_REF
-    version: v0.0.1-che-min-v0.0.96
+    version: {{ env.Getenv "CHE_PACKAGES_SCHEMA_REF" }}
 ##[<] 🤖
