@@ -164,6 +164,8 @@ verify-precommit-all:
   #   pipeline. the cover binary renders identically, it only writes covdata under GOCOVERDIR
   needs:
     - warm-go
+  #[why] the .repo/ declarations and .env.tpl are on the list so a commit touching only them still
+  #   runs a job: a pipeline that creates none is reported as failed, not as nothing to do
   rules:
     - if: $CI_PIPELINE_SOURCE == "merge_request_event"
       changes:
@@ -171,6 +173,11 @@ verify-precommit-all:
         - lib/**/*
         - go.work
         - .gitlab-ci.yml
+        - .env.tpl
+        - .repo/*.tpl
+        - .repo/deps-graph.yml
+        - .repo/upstream.yml
+        - .repo/upstream.env
   variables:
     LEFTHOOK_OUTPUT: meta,summary,execution,execution_info,execution_out
   #[why] cache still pulled: `make lint` and `render-docs` compile the tree, no artifact replaces that
