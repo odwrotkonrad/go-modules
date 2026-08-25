@@ -6,6 +6,9 @@ upstream:
   - uri: gitlab.com/konradodwrot/che-packages
     type: gitRepository
     versionEnvVar: CHE_PACKAGES_REF
+  - uri: gitlab.com/konradodwrot/cross-repo/misc
+    type: gitRepository
+    versionEnvVar: MISC_REF
   - uri: gitlab.com/konradodwrot/cross-repo/prose/assets
     type: gitRepository
     versionEnvVar: PROSE_ASSETS_REF

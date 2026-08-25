@@ -26,6 +26,8 @@ dependsOn:
       type: goModule
   gitlab.com/konradodwrot/go-modules/lib: []
   ciEnv:
+    - uri: gitlab.com/konradodwrot/cross-repo/misc
+      type: gitRepository
     - uri: us-central1-docker.pkg.dev/staging-499418/ci/ci-linux
       type: ociImage
     - uri: us-central1-docker.pkg.dev/staging-499418/ci/ci-linux-dind
