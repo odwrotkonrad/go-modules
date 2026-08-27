@@ -33,6 +33,6 @@ dependsOn:
     - uri: us-central1-docker.pkg.dev/staging-499418/ci/ci-linux-dind
       type: ociImage
   devEnv:
-    - uri: gitlab.com/konradodwrot/ai-harness/configs
+    - uri: gitlab.com/konradodwrot/ai-harness/ai-tools-configs
       type: gitRepository
 ##[<] 🤖
