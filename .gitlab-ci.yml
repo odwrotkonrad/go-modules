@@ -176,6 +176,7 @@ verify-precommit-all:
         - lib/**/*
         - go.work
         - .gitlab-ci.yml
+        - ci/**/*
         - .env.tpl
         - .repo/*.tpl
         - .repo/deps-graph.yml
