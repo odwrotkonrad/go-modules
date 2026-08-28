@@ -608,7 +608,6 @@ release-lib:
       else
         wget -q -O ../public/che-install.sh https://konradodwrot.gitlab.io/go-modules/che-install.sh || cp che-install.sh ../public/che-install.sh;
       fi
-    - cp ../public/che-install.sh ../public/install.sh
     #[why] a Pages deploy replaces the whole site: without this, a build that has no apt tree drops
     #   apt/ from the live site and breaks `apt-get update` until the next che tag. from the site,
     #   not the job artifact: that expires in a day
