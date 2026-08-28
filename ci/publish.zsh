@@ -67,7 +67,7 @@ done
 
 if [[ "$MODULE" != che ]] exit 0
 
-if ../ci/che-install-changed.sh che-install.sh {
+if { ../ci/che-install-changed.sh che-install.sh } {
   for dest in "${PKG}/che-install.sh" "${ALIAS}/che-install.sh"; do
     echo "uploading che-install.sh -> ${dest}"
     curl -fsSL --connect-timeout 30 --retry 10 --retry-delay 30 --header "JOB-TOKEN: ${CI_JOB_TOKEN}" --upload-file che-install.sh "$dest"
