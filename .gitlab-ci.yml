@@ -166,7 +166,8 @@ verify-precommit-all:
   #[why] takes warm-go's che/dist: render-templates reuses it instead of compiling a fourth che per
   #   pipeline. the cover binary renders identically, it only writes covdata under GOCOVERDIR
   needs:
-    - warm-go
+    - job: warm-go
+      optional: true
   #[why] the .repo/ declarations and .env.tpl are on the list so a commit touching only them still
   #   runs a job: a pipeline that creates none is reported as failed, not as nothing to do
   rules:
