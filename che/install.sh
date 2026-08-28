@@ -7,13 +7,57 @@ err() {
   exit 1
 }
 
-for tool in uname tar mktemp; do
+usage() {
+  cat <<'EOF'
+usage: install.sh [options]
+
+Installs the che binary for this platform (darwin/arm64, linux/amd64, linux/arm64)
+from the GitLab generic package registry. Every option has an environment variable
+twin, the option wins when both are set.
+
+  option                        env                              meaning
+  --version <ver>               CHE_VERSION=<ver>                version to install (default: latest)
+  --install-dir <dir>           CHE_INSTALL_DIR=<dir>            target dir, must be on PATH (default: ~/.local/bin, then ~/bin)
+  --skip-if-present             CHE_SKIP_IF_PRESENT=1            exit 0 when any che is on PATH, no network
+  --skip-if-present-is-newer    CHE_SKIP_IF_PRESENT_IS_NEWER=1   exit 0 when the che on PATH is newer than the wanted version
+  -h, --help                                                     print this help
+
+Exit 0 always prints one outcome line:
+  installed che <ver> into <dir>
+  skip (present)
+  skip (<installed> installed, wanted <ver>)
+
+Examples:
+  curl -fsSL https://konradodwrot.gitlab.io/go-modules/install.sh | sh
+  curl -fsSL https://konradodwrot.gitlab.io/go-modules/install.sh | CHE_VERSION=0.0.99 sh -s -- --skip-if-present-is-newer
+EOF
+}
+
+version_opt=""
+install_dir_opt=""
+skip_if_present="${CHE_SKIP_IF_PRESENT:-0}"
+skip_if_present_is_newer="${CHE_SKIP_IF_PRESENT_IS_NEWER:-0}"
+while [ $# -gt 0 ]; do
+  case "$1" in
+    --version) [ $# -ge 2 ] || err "--version needs a value"; version_opt="$2"; shift ;;
+    --version=*) version_opt="${1#--version=}" ;;
+    --install-dir) [ $# -ge 2 ] || err "--install-dir needs a value"; install_dir_opt="$2"; shift ;;
+    --install-dir=*) install_dir_opt="${1#--install-dir=}" ;;
+    --skip-if-present) skip_if_present=1 ;;
+    --skip-if-present-is-newer) skip_if_present_is_newer=1 ;;
+    -h | --help) usage; exit 0 ;;
+    *) err "unknown argument: $1 (see --help)" ;;
+  esac
+  shift
+done
+
+ref="${version_opt:-${CHE_VERSION:-latest}}"
+install_dir="${install_dir_opt:-${CHE_INSTALL_DIR:-}}"
+
+for tool in uname tar mktemp install sort; do
   command -v "$tool" >/dev/null 2>&1 || err "missing required tool: $tool"
 done
 
-#[why] no --retry-all-errors: a missing asset (404) is not transient, and retrying it stalls the
-#   caller for retry * retry-delay before the inevitable failure. curl's default retry set already
-#   covers the transient cases (timeouts, 408, 429, 5xx)
 if command -v curl >/dev/null 2>&1; then
   fetch() { curl -fsSL --connect-timeout 30 --retry 10 --retry-delay 30 -o "$1" "$2"; }
 elif command -v wget >/dev/null 2>&1; then
@@ -37,8 +81,41 @@ case "${os}_${arch}" in
   *) err "unsupported platform: ${os}/${arch}" ;;
 esac
 
-version="${CHE_VERSION:-latest}"
-url="https://gitlab.com/api/v4/projects/konradodwrot%2Fgo-modules/packages/generic/che/${version}/che_${version}_${os}_${arch}.tar.gz"
+installed="$(che --version 2>/dev/null | awk '{print $3}' || true)"
+
+if [ "$skip_if_present" = 1 ] && [ -n "$installed" ]; then
+  printf 'skip (present)\n'
+  exit 0
+fi
+
+pkg="https://gitlab.com/api/v4/projects/konradodwrot%2Fgo-modules/packages/generic/che/${ref}"
+tmp="$(mktemp -d)"
+trap 'rm -rf "$tmp"' EXIT
+
+if [ "$ref" = latest ]; then
+  fetch "${tmp}/version.txt" "${pkg}/che_latest_version.txt" || err "cannot resolve latest version"
+  wanted="$(tr -d '[:space:]' < "${tmp}/version.txt")"
+  [ -n "$wanted" ] || err "cannot resolve latest version"
+  archive="che_latest_${os}_${arch}.tar.gz"
+else
+  wanted="$ref"
+  archive="che_${wanted}_${os}_${arch}.tar.gz"
+fi
+
+is_installed_newer() {
+  [ -n "$installed" ] || return 1
+  [ "$installed" != dev ] || return 1
+  [ "$(printf '%s\n%s\n' "$wanted" "$installed" | sort -V | tail -n 1)" = "$installed" ]
+}
+
+if [ "$wanted" = "$installed" ]; then
+  printf 'skip (%s installed, wanted %s)\n' "$installed" "$wanted"
+  exit 0
+fi
+if [ "$skip_if_present_is_newer" = 1 ] && is_installed_newer; then
+  printf 'skip (%s installed, wanted %s)\n' "$installed" "$wanted"
+  exit 0
+fi
 
 use_sudo=""
 usable() {
@@ -59,8 +136,8 @@ usable() {
   return 1
 }
 
-if [ -n "${CHE_INSTALL_DIR:-}" ]; then
-  set -- "$CHE_INSTALL_DIR"
+if [ -n "$install_dir" ]; then
+  set -- "$install_dir"
 else
   set -- "${HOME}/.local/bin" "${HOME}/bin"
 fi
@@ -73,9 +150,7 @@ for candidate in "$@"; do
 done
 [ -n "$dir" ] || err "no writable install dir on PATH (candidates: $*) PATH=${PATH}"
 
-tmp="$(mktemp -d)"
-trap 'rm -rf "$tmp"' EXIT
-fetch "${tmp}/che.tar.gz" "$url"
+fetch "${tmp}/che.tar.gz" "${pkg}/${archive}"
 tar -xzf "${tmp}/che.tar.gz" -C "$tmp" che
 
 if [ -n "$use_sudo" ]; then
@@ -84,6 +159,5 @@ else
   install -m 0755 "${tmp}/che" "${dir}/che"
 fi
 
-"${dir}/che" --version
-printf 'installed che %s into %s\n' "$version" "$dir"
+printf 'installed che %s into %s\n' "$wanted" "$dir"
 ##[<] 🤖🤖
