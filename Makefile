@@ -5,7 +5,7 @@ SHELL := zsh
 MODULES := che get-os-open-files-with get-term-open-files-with lib
 
 WRAPPERS := repo-prepare-dev-env
-COMMANDS := render-templates repo-render-env repo-prepare-deps render-docs repo-ci-prepare-hooks repo-ci-precommit-all test test-cover build vet lint install create-tag publish publish-prerelease release-schemas publish-schema-prerelease publish-brew publish-apt vendor-packages-defs release-check release-snapshot
+COMMANDS := render-templates repo-render-env repo-prepare-deps render-docs repo-ci-prepare-hooks repo-ci-precommit-all test test-cover build vet lint install che-install-test create-tag publish publish-prerelease release-schemas publish-schema-prerelease publish-brew publish-apt vendor-packages-defs release-check release-snapshot
 
 .PHONY: $(WRAPPERS) $(COMMANDS)
 
@@ -79,6 +79,13 @@ lint:
 install:
 	@for m in $(MODULES); do $(MAKE) -C $$m install || exit 1; done
 ##[<] Go
+
+##[>] Install Script [genai-include]
+#[args] OLD NEW (default: the two newest che releases from the packages API)
+#[what] run che/che-install.sh through every install/skip scenario against two published versions, into a throwaway dir
+che-install-test:
+	@ci/che-install-test.sh $(OLD) $(NEW)
+##[<] Install Script
 
 ##[>] Release [genai-include]
 #[what] create the MODULE release + dir-prefixed git tag from BRANCH at REF via glab

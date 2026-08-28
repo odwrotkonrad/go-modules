@@ -2,7 +2,7 @@
 ##[>] 🤖🤖
 # MR-pipeline prerelease publish for che. Uploads this job's che archives to the
 # generic package registry at packages/generic/che/0.0.0-mr<iid>/<file>, so an
-# unmerged che change installs through the published install.sh with
+# unmerged che change installs through the published che-install.sh with
 # CHE_VERSION=0.0.0-mr<iid>. Runs as a final step of prerelease-{linux,darwin}-che:
 # each job passes its own dist dir and uploads only its own os/arch archives, so
 # the two never collide on a filename. Keyed on the MR iid, never the commit: a
