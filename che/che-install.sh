@@ -9,7 +9,7 @@ err() {
 
 usage() {
   cat <<'EOF'
-usage: install.sh [options]
+usage: che-install.sh [options]
 
 Installs the che binary for this platform (darwin/arm64, linux/amd64, linux/arm64)
 from the GitLab generic package registry. Every option has an environment variable
@@ -28,8 +28,8 @@ Exit 0 always prints one outcome line:
   skip (<installed> installed, wanted <ver>)
 
 Examples:
-  curl -fsSL https://konradodwrot.gitlab.io/go-modules/install.sh | sh
-  curl -fsSL https://konradodwrot.gitlab.io/go-modules/install.sh | CHE_VERSION=0.0.99 sh -s -- --skip-if-present-is-newer
+  curl -fsSL https://konradodwrot.gitlab.io/go-modules/che-install.sh | sh
+  curl -fsSL https://konradodwrot.gitlab.io/go-modules/che-install.sh | CHE_VERSION=0.0.99 sh -s -- --skip-if-present-is-newer
 EOF
 }
 

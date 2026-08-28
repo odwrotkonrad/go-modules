@@ -2,8 +2,8 @@
 ##[>] 🤖🤖
 set -eu
 
-local_file="${1:-che/install.sh}"
-published_url="https://gitlab.com/api/v4/projects/konradodwrot%2Fgo-modules/packages/generic/che/latest/install.sh"
+local_file="${1:-che/che-install.sh}"
+published_url="https://gitlab.com/api/v4/projects/konradodwrot%2Fgo-modules/packages/generic/che/latest/che-install.sh"
 
 tmp="$(mktemp)"
 trap 'rm -f "$tmp"' EXIT

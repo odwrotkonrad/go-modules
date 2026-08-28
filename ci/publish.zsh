@@ -67,20 +67,20 @@ done
 
 if [[ "$MODULE" != che ]] exit 0
 
-if ../ci/install-sh-changed.sh install.sh {
-  for dest in "${PKG}/install.sh" "${ALIAS}/install.sh"; do
-    echo "uploading install.sh -> ${dest}"
-    curl -fsSL --connect-timeout 30 --retry 10 --retry-delay 30 --header "JOB-TOKEN: ${CI_JOB_TOKEN}" --upload-file install.sh "$dest"
+if ../ci/che-install-changed.sh che-install.sh {
+  for dest in "${PKG}/che-install.sh" "${ALIAS}/che-install.sh"; do
+    echo "uploading che-install.sh -> ${dest}"
+    curl -fsSL --connect-timeout 30 --retry 10 --retry-delay 30 --header "JOB-TOKEN: ${CI_JOB_TOKEN}" --upload-file che-install.sh "$dest"
     echo
   done
   curl -fsSL --connect-timeout 30 --retry 10 --retry-delay 30 --request POST --header "JOB-TOKEN: ${CI_JOB_TOKEN}" \
-    --data-urlencode "name=install.sh" \
-    --data-urlencode "url=${PKG}/install.sh" \
+    --data-urlencode "name=che-install.sh" \
+    --data-urlencode "url=${PKG}/che-install.sh" \
     --data-urlencode "link_type=other" \
     "${CI_API_V4_URL}/projects/${CI_PROJECT_ID}/releases/${TAG_ENC}/assets/links"
   echo
 } else {
-  echo "install.sh unchanged, not republished"
+  echo "che-install.sh unchanged, not republished"
 }
 
 echo "marking latest = ${MODULE_VERSION}"

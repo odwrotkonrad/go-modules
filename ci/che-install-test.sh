@@ -2,7 +2,7 @@
 ##[>] 🤖🤖
 set -eu
 
-SCRIPT="$(dirname "$0")/../che/install.sh"
+SCRIPT="$(dirname "$0")/../che/che-install.sh"
 RELEASES_API='https://gitlab.com/api/v4/projects/konradodwrot%2Fgo-modules/packages?package_name=che&package_type=generic&order_by=created_at&sort=desc&per_page=20'
 
 if command -v curl >/dev/null 2>&1; then
@@ -63,12 +63,12 @@ for shell in $SHELLS; do
   step "skip (present)" env CHE_VERSION="$OLD" CHE_SKIP_IF_PRESENT=1 "$shell" "$SCRIPT"
   step "skip ($NEW installed, wanted $OLD)" env CHE_VERSION="$OLD" CHE_SKIP_IF_PRESENT_IS_NEWER=1 "$shell" "$SCRIPT"
   step "installed che $OLD" env -u CHE_INSTALL_DIR "$shell" "$SCRIPT" --version "$OLD" --install-dir "$CHE_INSTALL_DIR"
-  step "usage: install.sh" "$shell" "$SCRIPT" --help
+  step "usage: che-install.sh" "$shell" "$SCRIPT" --help
   [ "$("$CHE_INSTALL_DIR/che" --version | awk '{print $3}')" = "$OLD" ]
   if "$shell" "$SCRIPT" --bogus 2>/dev/null; then
     echo "FAIL: unknown argument accepted" >&2
     exit 1
   fi
 done
-echo "install.sh: all scenarios passed"
+echo "che-install.sh: all scenarios passed"
 ##[<] 🤖🤖
