@@ -15,8 +15,6 @@ che-install-test-che:
       changes: [che/che-install.sh, ci/che-install-test.sh, ci/che-install-changed.sh, ci/che-install.gitlab-ci.yml]
     - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
       changes: [che/che-install.sh, ci/che-install-test.sh, ci/che-install-changed.sh, ci/che-install.gitlab-ci.yml]
-  variables:
-    LATEST_FALLBACK: "1"
   script:
     - sh ci/che-install-test.sh
 ##[<] 🤖🤖
