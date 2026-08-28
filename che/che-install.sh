@@ -15,13 +15,12 @@ Installs the che binary for this platform (darwin/arm64, linux/amd64, linux/arm6
 from the GitLab generic package registry. Every option has an environment variable
 twin, the option wins when both are set.
 
-  option                        env                              meaning
-  --version <ver>               CHE_VERSION=<ver>                version to install (default: latest)
-  --install-dir <dir>           CHE_INSTALL_DIR=<dir>            target dir, must be on PATH (default: ~/.local/bin, then ~/bin)
-  --skip-if-present             CHE_SKIP_IF_PRESENT=1            exit 0 when any che is on PATH, no network
-  --skip-if-present-is-newer    CHE_SKIP_IF_PRESENT_IS_NEWER=1   exit 0 when the che on PATH is newer than the wanted version
-  -h, --help                                                     print this help
-
+  option                      env                                      meaning
+  --version <ver>             INSTALL_CHE_VERSION=<ver>                version to install (default: latest)
+  --install-dir <dir>         INSTALL_CHE_DIR=<dir>                    target dir, must be on PATH (default: ~/.local/bin, then ~/bin)
+  --skip-if-present           INSTALL_CHE_SKIP_IF_PRESENT=1            exit 0 when any che is on PATH, no network
+  --skip-if-present-is-newer  INSTALL_CHE_SKIP_IF_PRESENT_IS_NEWER=1   exit 0 when the che on PATH is newer than the wanted version
+  -h, --help                                                           print this help
 Exit 0 always prints one outcome line:
   installed che <ver> into <dir>
   skip (present)
@@ -29,14 +28,14 @@ Exit 0 always prints one outcome line:
 
 Examples:
   curl -fsSL https://konradodwrot.gitlab.io/go-modules/che-install.sh | sh
-  curl -fsSL https://konradodwrot.gitlab.io/go-modules/che-install.sh | CHE_VERSION=0.0.99 sh -s -- --skip-if-present-is-newer
+  curl -fsSL https://konradodwrot.gitlab.io/go-modules/che-install.sh | INSTALL_CHE_VERSION=0.0.99 sh -s -- --skip-if-present-is-newer
 EOF
 }
 
 version_opt=""
 install_dir_opt=""
-skip_if_present="${CHE_SKIP_IF_PRESENT:-0}"
-skip_if_present_is_newer="${CHE_SKIP_IF_PRESENT_IS_NEWER:-0}"
+skip_if_present="${INSTALL_CHE_SKIP_IF_PRESENT:-0}"
+skip_if_present_is_newer="${INSTALL_CHE_SKIP_IF_PRESENT_IS_NEWER:-0}"
 while [ $# -gt 0 ]; do
   case "$1" in
     --version) [ $# -ge 2 ] || err "--version needs a value"; version_opt="$2"; shift ;;
@@ -51,8 +50,8 @@ while [ $# -gt 0 ]; do
   shift
 done
 
-ref="${version_opt:-${CHE_VERSION:-latest}}"
-install_dir="${install_dir_opt:-${CHE_INSTALL_DIR:-}}"
+ref="${version_opt:-${INSTALL_CHE_VERSION:-latest}}"
+install_dir="${install_dir_opt:-${INSTALL_CHE_DIR:-}}"
 
 for tool in uname tar mktemp install sort; do
   command -v "$tool" >/dev/null 2>&1 || err "missing required tool: $tool"

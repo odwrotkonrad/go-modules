@@ -594,7 +594,7 @@ release-lib:
     - rm che/docs/purpose-src.md
     - printf '\n## Install\n\n' >> che/docs/index.md
     - printf '```sh\ncurl -fsSL https://konradodwrot.gitlab.io/go-modules/che-install.sh | sh\n```\n\n' >> che/docs/index.md
-    - "printf 'Every option has an env twin: `--version <ver>` / `CHE_VERSION`, `--install-dir <dir>` / `CHE_INSTALL_DIR`, `--skip-if-present` / `CHE_SKIP_IF_PRESENT=1`, `--skip-if-present-is-newer` / `CHE_SKIP_IF_PRESENT_IS_NEWER=1`. `sh -s -- --help` lists them.\\n' >> che/docs/index.md"
+    - "printf 'Every option has an env twin: `--version <ver>` / `INSTALL_CHE_VERSION`, `--install-dir <dir>` / `INSTALL_CHE_DIR`, `--skip-if-present` / `INSTALL_CHE_SKIP_IF_PRESENT=1`, `--skip-if-present-is-newer` / `INSTALL_CHE_SKIP_IF_PRESENT_IS_NEWER=1`. `sh -s -- --help` lists them.\\n' >> che/docs/index.md"
     ##[<] 🤖🤖
     - printf '# License\n\n```\n' > che/docs/license.md
     - cat LICENSE >> che/docs/license.md
