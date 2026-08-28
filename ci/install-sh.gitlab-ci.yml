@@ -1,0 +1,22 @@
+##[>] 🤖🤖
+install-sh-test-che:
+  stage: verify
+  needs: []
+  parallel:
+    matrix:
+      - ARCH: [amd64, arm64]
+  tags:
+    - gke-linux-$ARCH-small
+  image:
+    name: $ARTIFACT_REGISTRY_PROXY_DOCKERHUB/library/alpine:3
+    entrypoint: [""]
+  rules:
+    - if: $CI_PIPELINE_SOURCE == "merge_request_event"
+      changes: [che/install.sh, ci/install-sh-test.sh, ci/install-sh-changed.sh, ci/install-sh.gitlab-ci.yml]
+    - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
+      changes: [che/install.sh, ci/install-sh-test.sh, ci/install-sh-changed.sh, ci/install-sh.gitlab-ci.yml]
+  variables:
+    LATEST_FALLBACK: "1"
+  script:
+    - sh ci/install-sh-test.sh
+##[<] 🤖🤖

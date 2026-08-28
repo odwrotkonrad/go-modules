@@ -1,4 +1,7 @@
 ##[>] 🤖🤖
+include:
+  - local: ci/install-sh.gitlab-ci.yml
+
 workflow:
   rules:
     - if: $CI_COMMIT_TAG
@@ -189,29 +192,6 @@ verify-precommit-all:
   script:
     - make repo-ci-precommit-all
     - git diff --exit-code HEAD
-
-##[>] 🤖🤖
-install-sh-test-che:
-  stage: verify
-  needs: []
-  parallel:
-    matrix:
-      - ARCH: [amd64, arm64]
-  tags:
-    - gke-linux-$ARCH-small
-  image:
-    name: $ARTIFACT_REGISTRY_PROXY_DOCKERHUB/library/alpine:3
-    entrypoint: [""]
-  rules:
-    - if: $CI_PIPELINE_SOURCE == "merge_request_event"
-      changes: [che/install.sh, ci/install-sh-test.sh, ci/install-sh-changed.sh]
-    - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
-      changes: [che/install.sh, ci/install-sh-test.sh, ci/install-sh-changed.sh]
-  variables:
-    LATEST_FALLBACK: "1"
-  script:
-    - sh ci/install-sh-test.sh
-##[<] 🤖🤖
 
 .test-module:
   image: $CI_IMAGE
