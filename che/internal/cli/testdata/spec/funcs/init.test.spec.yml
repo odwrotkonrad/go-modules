@@ -24,6 +24,7 @@ cases:
         - validateSpecMode: ""
         - appendSpec: |
             bogusProfile:
+              options: {autoDiscover: false}
               includes:
                 makeLinks: [_home/**]
     expected:

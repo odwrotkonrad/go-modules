@@ -13,5 +13,6 @@ other:
         dest:
           - {path: .env2, options: {writeType: mergeUpsert}}
 both:
+  options: {autoDiscover: false}
   include:
     profiles: [repo, other]

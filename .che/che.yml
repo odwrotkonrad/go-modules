@@ -6,6 +6,8 @@ include:
 #[why] the repo declares the toolchain it builds and tests with, so no host or image has to carry go
 #   in advance for this repo to prepare
 devEnv:
+  options:
+    autoDiscover: false
   include:
     installPackages:
       - go

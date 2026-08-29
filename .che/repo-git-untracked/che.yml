@@ -8,6 +8,8 @@ bootstrapCrossRepoCI:
         profile: bootstrapCrossRepoCITagging
 
 envSeed:
+  options:
+    autoDiscover: false
   include:
     renderTemplates:
       - source: templates/env.tpl
