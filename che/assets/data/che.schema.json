@@ -643,7 +643,7 @@
           "properties": {
             "source": {
               "type": "string",
-              "description": "*.ontoHost.cp source path, workingDirectory-relative, or remote ref git::\u003crepo\u003e[@\u003cref\u003e]//\u003cpath\u003e (explicit dest required); joined onto every enclosing group's source prefix"
+              "description": "source path, any file, workingDirectory-relative, or remote ref git::\u003crepo\u003e[@\u003cref\u003e]//\u003cpath\u003e (explicit dest required); joined onto every enclosing group's source prefix"
             },
             "dest": {
               "oneOf": [
@@ -663,14 +663,14 @@
                     ]
                   },
                   "type": "string",
-                  "description": "host dest path (~/ or absolute); omitted -\u003e derived from the workingDirectory-relative source path, .ontoHost.cp stripped"
+                  "description": "dest path: relative -\u003e the invoking spec's git root, ~/ or absolute -\u003e host; omitted -\u003e derived from the workingDirectory-relative source path, .ontoHost.cp stripped, host"
                 },
                 {
                   "items": {
                     "$ref": "#/$defs/DestSpec"
                   },
                   "type": "array",
-                  "description": "host dest paths (~/ or absolute); omitted -\u003e derived from the workingDirectory-relative source path, .ontoHost.cp stripped"
+                  "description": "dest paths: relative -\u003e the invoking spec's git root, ~/ or absolute -\u003e host; omitted -\u003e derived from the workingDirectory-relative source path, .ontoHost.cp stripped, host"
                 },
                 {
                   "oneOf": [
@@ -894,7 +894,7 @@
             "$ref": "#/$defs/copyNode"
           },
           "type": "array",
-          "description": "copy-op tree: a leaf copies one source verbatim to its dests, a node carrying nested \u003c\u003c\u003c is a group whose source and dest prefixes and perms cascade onto its descendants (innermost wins); local *.ontoHost.cp sources workingDirectory-relative, or remote (git::\u003crepo\u003e[@\u003cref\u003e]//\u003cpath\u003e, explicit dest required, a group prefix carrying the ref concatenates with each leaf path); a glob source may carry a {source, dest} dest rewrite (sed-style s:^_home:$HOME: or prefix-swap sugar _home/** -\u003e $HOME/**)"
+          "description": "copy-op tree: a leaf copies one source verbatim to its dests, a node carrying nested \u003c\u003c\u003c is a group whose source and dest prefixes and perms cascade onto its descendants (innermost wins); local sources workingDirectory-relative (any file in a {source, dest} leaf, *.ontoHost.cp for globs), or remote (git::\u003crepo\u003e[@\u003cref\u003e]//\u003cpath\u003e, explicit dest required, a group prefix carrying the ref concatenates with each leaf path); an explicit dest picks the target: relative -\u003e the invoking spec's git root, ~/ or absolute -\u003e host; a glob source may carry a {source, dest} dest rewrite (sed-style s:^_home:$HOME: or prefix-swap sugar _home/** -\u003e $HOME/**)"
         },
         "renderTemplates": {
           "items": {
