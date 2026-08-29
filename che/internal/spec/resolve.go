@@ -45,7 +45,7 @@ func EligibleRecipes(recipes []ProfileRecipe, forced []string, forceAll bool, ev
 	}
 	var out []string
 	for _, rec := range recipes {
-		if rec.Options.AutoDiscover == nil || !*rec.Options.AutoDiscover {
+		if rec.Options.AutoDiscover != nil && !*rec.Options.AutoDiscover {
 			continue
 		}
 		name := rec.Source.GetProfileName()
