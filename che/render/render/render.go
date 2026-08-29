@@ -37,13 +37,29 @@ func environMap() map[string]string {
 	return out
 }
 
-// ExecWithData renders body with data as the template root: .env and .var.
+// ExecWithData renders body with data as the template root: .env and .var. Shell calls run eagerly.
 func ExecWithData(name string, body []byte, repoRoot string, data Data) ([]byte, error) {
 	ctx := context.Background()
+	return execTemplate(ctx, name, body, repoRoot, data, withMergeAction(MergeActionShell, newShellFunc(ctx, repoRoot)))
+}
+
+// ExecDeferShell renders like ExecWithData, but a shell call yields a marker carrying its command:
+// a mergeUpsert Compose runs it only for keys it writes.
+func ExecDeferShell(name string, body []byte, repoRoot string, data Data) ([]byte, error) {
+	return execTemplate(context.Background(), name, body, repoRoot, data, deferredShellFunc)
+}
+
+// ShellRunner returns the runner a mergeUpsert Compose uses for deferred shell values.
+func ShellRunner(repoRoot string) func(string) (string, error) {
+	return newShellFunc(context.Background(), repoRoot)
+}
+
+func execTemplate(ctx context.Context, name string, body []byte, repoRoot string, data Data, shell func(string) (string, error)) ([]byte, error) {
 	funcs := template.FuncMap{
-		"shell":          withMergeAction(MergeActionAlwaysUpdate, newShellFunc(ctx, repoRoot)),
+		"shell":          shell,
 		"alwaysUpdate":   mergeActionFunc(MergeActionAlwaysUpdate),
 		"keepIfExisting": mergeActionFunc(MergeActionKeepIfExisting),
+		"dependency":     mergeActionFunc(MergeActionDependency),
 		"renderDirsTree": func(rel ...string) (string, error) {
 			if len(rel) > 0 {
 				return DirsTree(filepath.Join(repoRoot, rel[0]))

@@ -248,19 +248,27 @@ func (p *ProfileReady) resolveTemplateDests(item spec.FileItem) []templateDest {
 	}
 	out := make([]templateDest, len(item.Dests))
 	for i, d := range item.Dests {
+		opts := p.destOptions(d.Options)
 		if rest, ok := strings.CutPrefix(d.Path, "${invokingSpecGitRoot}/"); ok {
-			out[i] = templateDest{path: filepath.Join(p.expandEnv("${invokingSpecGitRoot}"), rest), opts: d.Options, header: rest}
+			out[i] = templateDest{path: filepath.Join(p.expandEnv("${invokingSpecGitRoot}"), rest), opts: opts, header: rest}
 			continue
 		}
 		// [why] expand env / ~ before the host-vs-repo decision so $HOME/... and ~/... land on the host
 		path := p.expandHome(d.Path)
 		if strings.HasPrefix(path, "/") {
-			out[i] = templateDest{path: path, host: true, opts: d.Options, header: path}
+			out[i] = templateDest{path: path, host: true, opts: opts, header: path}
 		} else {
-			out[i] = templateDest{path: filepath.Join(p.templateAnchor(item), path), opts: d.Options, header: d.Path}
+			out[i] = templateDest{path: filepath.Join(p.templateAnchor(item), path), opts: opts, header: d.Path}
 		}
 	}
 	return out
+}
+
+func (p *ProfileReady) destOptions(opts render.Options) render.Options {
+	if p.opts.RenderMergeUpdate != "" {
+		opts.MergeUpdate = p.opts.RenderMergeUpdate
+	}
+	return opts
 }
 
 func (p *ProfileReady) readTemplateSrc(item spec.FileItem) ([]byte, string, error) {
@@ -276,12 +284,24 @@ func (p *ProfileReady) readTemplateSrc(item spec.FileItem) ([]byte, string, erro
 	return src, templatePath, err
 }
 
-func (p *ProfileReady) renderTemplate(item spec.FileItem, dests []templateDest) error {
+func allMergeUpsert(dests []templateDest) bool {
+	return len(dests) > 0 && !slices.ContainsFunc(dests, func(d templateDest) bool { return d.opts.WriteType != render.WriteTypeMergeUpsert })
+}
+
+func (p *ProfileReady) execTemplate(item spec.FileItem, dests []templateDest) ([]byte, error) {
 	src, templatePath, err := p.readTemplateSrc(item)
 	if err != nil {
-		return err
+		return nil, err
 	}
-	body, err := render.ExecWithData(templatePath, src, p.templateAnchor(item), p.templateData(item))
+	exec := render.ExecWithData
+	if allMergeUpsert(dests) && !item.Derived {
+		exec = render.ExecDeferShell
+	}
+	return exec(templatePath, src, p.templateAnchor(item), p.templateData(item))
+}
+
+func (p *ProfileReady) renderTemplate(item spec.FileItem, dests []templateDest) error {
+	body, err := p.execTemplate(item, dests)
 	if err != nil {
 		return err
 	}
@@ -347,6 +367,7 @@ func (p *ProfileReady) composeDest(item spec.FileItem, d templateDest, body []by
 		TmplName:   p.headerName(item),
 		Existing:   existing,
 		RepoRoot:   p.templateAnchor(item),
+		Shell:      render.ShellRunner(p.templateAnchor(item)),
 	})
 }
 

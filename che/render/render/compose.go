@@ -17,7 +17,7 @@ import (
 func Compose(c Composition) ([]byte, error) {
 	switch c.Opts.WriteType {
 	case WriteTypeMergeUpsert:
-		return mergeUpsertEnv(c.Existing, c.Body), nil
+		return mergeUpsertEnv(c.Existing, c.Body, c.Opts.MergeUpdate, c.Shell)
 	case WriteTypePartial:
 		if c.Opts.CommentPrefix == "" {
 			return nil, fmt.Errorf("render %s: writeType partial requires commentPrefix", c.TmplName)
@@ -50,20 +50,67 @@ func Compose(c Composition) ([]byte, error) {
 	return out.Bytes(), nil
 }
 
-func mergeUpsertEnv(existing, rendered []byte) []byte {
+func mergeUpsertEnv(existing, rendered []byte, mode string, shell func(string) (string, error)) ([]byte, error) {
+	if mode == "" {
+		mode = MergeUpdateNone
+	}
+	if !slices.Contains(MergeUpdateModes, mode) {
+		return nil, fmt.Errorf("mergeUpsert: unknown mergeUpdate %q: want %s", mode, strings.Join(MergeUpdateModes, " | "))
+	}
 	merged := envLines(existing)
-	for key, val := range envLines(rendered) {
-		action, bare := splitMergeAction(val)
-		if _, ok := merged[key]; ok && action != MergeActionAlwaysUpdate {
+	renderedLines := envLines(rendered)
+	for _, key := range slices.Sorted(maps.Keys(renderedLines)) {
+		mark, bare := splitMergeAction(renderedLines[key])
+		_, exists := merged[key]
+		if !mergeWrites(mode, mark, exists) {
 			continue
 		}
-		merged[key] = bare
+		val, err := mergeValue(key, mark, bare, shell)
+		if err != nil {
+			return nil, err
+		}
+		merged[key] = val
 	}
 	var out bytes.Buffer
 	for _, k := range slices.Sorted(maps.Keys(merged)) {
 		fmt.Fprintf(&out, "%s=%s\n", k, merged[k])
 	}
-	return out.Bytes()
+	return out.Bytes(), nil
+}
+
+func mergeWrites(mode string, mark mergeMark, exists bool) bool {
+	if !exists {
+		return true
+	}
+	switch mark.action {
+	case MergeActionAlwaysUpdate:
+		return true
+	case MergeActionKeepIfExisting:
+		return false
+	}
+	switch mode {
+	case MergeUpdateAll:
+		return true
+	case MergeUpdateDependencies:
+		return mark.action == MergeActionDependency
+	case MergeUpdateShell:
+		return mark.isShell()
+	}
+	return false
+}
+
+func mergeValue(key string, mark mergeMark, bare string, shell func(string) (string, error)) (string, error) {
+	if mark.shellCmd == "" {
+		return bare, nil
+	}
+	if shell == nil {
+		return "", fmt.Errorf("mergeUpsert %s: deferred shell value with no runner", key)
+	}
+	out, err := shell(mark.shellCmd)
+	if err != nil {
+		return "", fmt.Errorf("mergeUpsert %s: %w", key, err)
+	}
+	return out, nil
 }
 
 func envLines(b []byte) map[string]string {
@@ -154,8 +201,12 @@ func (Options) JSONSchema() *jsonschema.Schema {
 		Properties:           jsonschema.NewProperties(),
 	}
 	s.Properties.Set("writeType", &jsonschema.Schema{
-		Description: "how the rendered body lands: overwrite (default: header + body) | mergeUpsert (env KEY=VALUE union under the existing dest: a shell value overwrites an existing key, a plain value keeps it, `| alwaysUpdate` / `| keepIfExisting` after the expression decide per line, and marking a multi-line block marks every KEY=VALUE line in it) | partial (each `[>] <name>` .. `[<] <name>` section of the rendered body replaces the same-named section of the existing dest, the rest of the dest untouched, no header; requires commentPrefix)",
+		Description: "how the rendered body lands: overwrite (default: header + body) | mergeUpsert (env KEY=VALUE union under the existing dest: a missing key is written, an existing key is kept unless mergeUpdate or a per-line mark says otherwise: `| alwaysUpdate` overwrites, `| keepIfExisting` keeps, `| dependency` tags a key for mergeUpdate dependencies, a `shell` value runs only when the key is written, and marking a multi-line block marks every KEY=VALUE line in it) | partial (each `[>] <name>` .. `[<] <name>` section of the rendered body replaces the same-named section of the existing dest, the rest of the dest untouched, no header; requires commentPrefix)",
 		Enum:        []any{"", WriteTypeMergeUpsert, WriteTypePartial},
+	})
+	s.Properties.Set("mergeUpdate", &jsonschema.Schema{
+		Description: "which existing keys a mergeUpsert dest overwrites: none (default: only missing keys) | dependencies (plus `| dependency` keys) | shell (plus shell-valued keys, their commands re-run) | all (every template key, dest-only keys kept); alwaysUpdate / keepIfExisting marks win in every mode; overridden by --merge-update / CHE_RENDER_TEMPLATES_MERGE_UPDATE",
+		Enum:        []any{"", MergeUpdateNone, MergeUpdateDependencies, MergeUpdateShell, MergeUpdateAll},
 	})
 	s.Properties.Set("commentPrefix", &jsonschema.Schema{
 		Description: "line-comment prefix the section markers sit behind under writeType partial (e.g. #, //, --, <!--); required with partial, rejected otherwise",

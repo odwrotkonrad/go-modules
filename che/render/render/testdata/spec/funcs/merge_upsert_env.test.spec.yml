@@ -8,40 +8,112 @@ cases:
         - existing: "B=kept\nC=extra\n"
         - rendered: "A=default\nB=default\n# comment\n\n"
     expected:
-      output: "A=default\nB=kept\nC=extra\n"
+      output: "A=default\nB=kept\nC=extra\n|runs=0"
   - name: ShouldSortRenderedWithoutExisting
     input:
       args:
         - existing: ""
         - rendered: "B=y\nA=x\n"
     expected:
-      output: "A=x\nB=y\n"
+      output: "A=x\nB=y\n|runs=0"
   - name: ShouldOverwriteExistingOnAlwaysUpdate
     input:
       args:
         - existing: "REF=old\n"
         - rendered: "REF=\x1ealwaysUpdate\x1fnew\n"
     expected:
-      output: "REF=new\n"
+      output: "REF=new\n|runs=0"
   - name: ShouldKeepExistingOnKeepIfExisting
     input:
       args:
         - existing: "REF=old\n"
         - rendered: "REF=\x1ekeepIfExisting\x1fnew\n"
     expected:
-      output: "REF=old\n"
+      output: "REF=old\n|runs=0"
   - name: ShouldWriteAbsentKeyWhateverTheAction
     input:
       args:
         - existing: "OTHER=1\n"
         - rendered: "REF=\x1ekeepIfExisting\x1fnew\n"
     expected:
-      output: "OTHER=1\nREF=new\n"
+      output: "OTHER=1\nREF=new\n|runs=0"
   - name: ShouldKeepUserAddedKeys
     input:
       args:
         - existing: "MINE=1\nREF=old\n"
         - rendered: "REF=\x1ealwaysUpdate\x1fnew\n"
     expected:
-      output: "MINE=1\nREF=new\n"
+      output: "MINE=1\nREF=new\n|runs=0"
+  - name: ShouldKeepDependencyUnderModeNone
+    input:
+      args:
+        - existing: "REF=old\n"
+        - rendered: "REF=\x1edependency\x1fnew\n"
+        - mode: none
+    expected:
+      output: "REF=old\n|runs=0"
+  - name: ShouldOverwriteDependencyUnderModeDependencies
+    input:
+      args:
+        - existing: "PLAIN=old\nREF=old\nTOK=old\n"
+        - rendered: "PLAIN=new\nREF=\x1edependency\x1fnew\nTOK=\x1eshell:ZWNobyB0\x1f\n"
+        - mode: dependencies
+    expected:
+      output: "PLAIN=old\nREF=new\nTOK=old\n|runs=0"
+  - name: ShouldRunShellOnlyForWrittenKeysUnderModeNone
+    input:
+      args:
+        - existing: "TOK=old\n"
+        - rendered: "NEW=\x1eshell:ZWNobyBu\x1f\nTOK=\x1eshell:ZWNobyB0\x1f\n"
+        - mode: none
+    expected:
+      output: "NEW=ran:echo n\nTOK=old\n|runs=1"
+  - name: ShouldRerunShellUnderModeShell
+    input:
+      args:
+        - existing: "REF=old\nTOK=old\n"
+        - rendered: "REF=\x1edependency\x1fnew\nTOK=\x1eshell:ZWNobyB0\x1f\n"
+        - mode: shell
+    expected:
+      output: "REF=old\nTOK=ran:echo t\n|runs=1"
+  - name: ShouldOverwriteEveryTemplateKeyUnderModeAll
+    input:
+      args:
+        - existing: "MINE=1\nPLAIN=old\nREF=old\nTOK=old\n"
+        - rendered: "PLAIN=new\nREF=\x1edependency\x1fnew\nTOK=\x1eshell:ZWNobyB0\x1f\n"
+        - mode: all
+    expected:
+      output: "MINE=1\nPLAIN=new\nREF=new\nTOK=ran:echo t\n|runs=1"
+  - name: ShouldHonorKeepIfExistingUnderModeAll
+    input:
+      args:
+        - existing: "REF=old\n"
+        - rendered: "REF=\x1ekeepIfExisting\x1fnew\n"
+        - mode: all
+    expected:
+      output: "REF=old\n|runs=0"
+  - name: ShouldCarryShellCommandThroughAlwaysUpdate
+    input:
+      args:
+        - existing: "TOK=old\n"
+        - rendered: "TOK=\x1ealwaysUpdate:ZWNobyB0\x1f\n"
+        - mode: none
+    expected:
+      output: "TOK=ran:echo t\n|runs=1"
+  - name: ShouldTreatEagerShellValueAsShellKey
+    input:
+      args:
+        - existing: "TOK=old\n"
+        - rendered: "TOK=\x1eshell\x1fran-eagerly\n"
+        - mode: shell
+    expected:
+      output: "TOK=ran-eagerly\n|runs=0"
+  - name: ShouldRejectUnknownMode
+    input:
+      args:
+        - existing: ""
+        - rendered: "A=1\n"
+        - mode: sometimes
+    expected:
+      errorOutput: ['unknown mergeUpdate "sometimes"']
 # [<] 🤖🤖

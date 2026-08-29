@@ -114,7 +114,17 @@
                     "mergeUpsert",
                     "partial"
                   ],
-                  "description": "how the rendered body lands: overwrite (default: header + body) | mergeUpsert (env KEY=VALUE union under the existing dest: a shell value overwrites an existing key, a plain value keeps it, `| alwaysUpdate` / `| keepIfExisting` after the expression decide per line, and marking a multi-line block marks every KEY=VALUE line in it) | partial (each `[\u003e] \u003cname\u003e` .. `[\u003c] \u003cname\u003e` section of the rendered body replaces the same-named section of the existing dest, the rest of the dest untouched, no header; requires commentPrefix)"
+                  "description": "how the rendered body lands: overwrite (default: header + body) | mergeUpsert (env KEY=VALUE union under the existing dest: a missing key is written, an existing key is kept unless mergeUpdate or a per-line mark says otherwise: `| alwaysUpdate` overwrites, `| keepIfExisting` keeps, `| dependency` tags a key for mergeUpdate dependencies, a `shell` value runs only when the key is written, and marking a multi-line block marks every KEY=VALUE line in it) | partial (each `[\u003e] \u003cname\u003e` .. `[\u003c] \u003cname\u003e` section of the rendered body replaces the same-named section of the existing dest, the rest of the dest untouched, no header; requires commentPrefix)"
+                },
+                "mergeUpdate": {
+                  "enum": [
+                    "",
+                    "none",
+                    "dependencies",
+                    "shell",
+                    "all"
+                  ],
+                  "description": "which existing keys a mergeUpsert dest overwrites: none (default: only missing keys) | dependencies (plus `| dependency` keys) | shell (plus shell-valued keys, their commands re-run) | all (every template key, dest-only keys kept); alwaysUpdate / keepIfExisting marks win in every mode; overridden by --merge-update / CHE_RENDER_TEMPLATES_MERGE_UPDATE"
                 },
                 "commentPrefix": {
                   "type": "string",
@@ -1065,7 +1075,17 @@
                     "mergeUpsert",
                     "partial"
                   ],
-                  "description": "how the rendered body lands: overwrite (default: header + body) | mergeUpsert (env KEY=VALUE union under the existing dest: a shell value overwrites an existing key, a plain value keeps it, `| alwaysUpdate` / `| keepIfExisting` after the expression decide per line, and marking a multi-line block marks every KEY=VALUE line in it) | partial (each `[\u003e] \u003cname\u003e` .. `[\u003c] \u003cname\u003e` section of the rendered body replaces the same-named section of the existing dest, the rest of the dest untouched, no header; requires commentPrefix)"
+                  "description": "how the rendered body lands: overwrite (default: header + body) | mergeUpsert (env KEY=VALUE union under the existing dest: a missing key is written, an existing key is kept unless mergeUpdate or a per-line mark says otherwise: `| alwaysUpdate` overwrites, `| keepIfExisting` keeps, `| dependency` tags a key for mergeUpdate dependencies, a `shell` value runs only when the key is written, and marking a multi-line block marks every KEY=VALUE line in it) | partial (each `[\u003e] \u003cname\u003e` .. `[\u003c] \u003cname\u003e` section of the rendered body replaces the same-named section of the existing dest, the rest of the dest untouched, no header; requires commentPrefix)"
+                },
+                "mergeUpdate": {
+                  "enum": [
+                    "",
+                    "none",
+                    "dependencies",
+                    "shell",
+                    "all"
+                  ],
+                  "description": "which existing keys a mergeUpsert dest overwrites: none (default: only missing keys) | dependencies (plus `| dependency` keys) | shell (plus shell-valued keys, their commands re-run) | all (every template key, dest-only keys kept); alwaysUpdate / keepIfExisting marks win in every mode; overridden by --merge-update / CHE_RENDER_TEMPLATES_MERGE_UPDATE"
                 },
                 "commentPrefix": {
                   "type": "string",
@@ -1150,7 +1170,17 @@
                     "mergeUpsert",
                     "partial"
                   ],
-                  "description": "how the rendered body lands: overwrite (default: header + body) | mergeUpsert (env KEY=VALUE union under the existing dest: a shell value overwrites an existing key, a plain value keeps it, `| alwaysUpdate` / `| keepIfExisting` after the expression decide per line, and marking a multi-line block marks every KEY=VALUE line in it) | partial (each `[\u003e] \u003cname\u003e` .. `[\u003c] \u003cname\u003e` section of the rendered body replaces the same-named section of the existing dest, the rest of the dest untouched, no header; requires commentPrefix)"
+                  "description": "how the rendered body lands: overwrite (default: header + body) | mergeUpsert (env KEY=VALUE union under the existing dest: a missing key is written, an existing key is kept unless mergeUpdate or a per-line mark says otherwise: `| alwaysUpdate` overwrites, `| keepIfExisting` keeps, `| dependency` tags a key for mergeUpdate dependencies, a `shell` value runs only when the key is written, and marking a multi-line block marks every KEY=VALUE line in it) | partial (each `[\u003e] \u003cname\u003e` .. `[\u003c] \u003cname\u003e` section of the rendered body replaces the same-named section of the existing dest, the rest of the dest untouched, no header; requires commentPrefix)"
+                },
+                "mergeUpdate": {
+                  "enum": [
+                    "",
+                    "none",
+                    "dependencies",
+                    "shell",
+                    "all"
+                  ],
+                  "description": "which existing keys a mergeUpsert dest overwrites: none (default: only missing keys) | dependencies (plus `| dependency` keys) | shell (plus shell-valued keys, their commands re-run) | all (every template key, dest-only keys kept); alwaysUpdate / keepIfExisting marks win in every mode; overridden by --merge-update / CHE_RENDER_TEMPLATES_MERGE_UPDATE"
                 },
                 "commentPrefix": {
                   "type": "string",

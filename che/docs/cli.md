@@ -284,10 +284,11 @@ render templates and generated docs with the shared engine.
 
 render drives che's shared render engine: gomplate built-ins, shell command
 output, remoteFile cross-repo inclusion, frontmatter and markdown transforms.
-Under a mergeUpsert dest a shell value overwrites the existing key and a plain value
-keeps it; "| alwaysUpdate" and "| keepIfExisting" after any value decide per
-line, and piping a whole multi-line block through one marks every KEY=VALUE
-line in it.
+Under a mergeUpsert dest a missing key is written and an existing key kept unless
+the dest's mergeUpdate (none | dependencies | shell | all) or a mark says otherwise:
+"| alwaysUpdate" overwrites, "| keepIfExisting" keeps, "| dependency" tags the key
+for mergeUpdate dependencies, a shell value runs only when its key is written.
+Piping a whole multi-line block through one mark marks every KEY=VALUE line in it.
 
 Every subcommand writes to stdout and reads paths relative to the cwd. The
 generating subcommands take --check <file> instead, regenerating and diffing
@@ -354,6 +355,7 @@ render *.tpl sources; each dest path decides target (relative -> repo, ~/ or abs
 
 | Option | Env | Values | Default | Description |
 | --- | --- | --- | --- | --- |
+| `--merge-update` | `CHE_RENDER_TEMPLATES_MERGE_UPDATE` | `string` |  | override every mergeUpsert dest's mergeUpdate: none | dependencies | shell | all |
 | `--skip-variables` | `CHE_RENDER_TEMPLATES_SKIP_VARIABLES` | `bool` | `false` | skip sources carrying a shell call (logged, dests untouched) |
 
 ### `$ che run`

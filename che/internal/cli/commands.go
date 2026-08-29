@@ -43,6 +43,8 @@ func (a *app) makeOpCmd(o op) *cobra.Command {
 	if o.name == "render-templates" {
 		cmd.Flags().BoolVar(&a.flags.RenderSkipVariables, "skip-variables", false,
 			"skip sources carrying a shell call (logged, dests untouched); env: CHE_RENDER_TEMPLATES_SKIP_VARIABLES")
+		cmd.Flags().StringVar(&a.flags.RenderMergeUpdate, "merge-update", "",
+			"override every mergeUpsert dest's mergeUpdate: none | dependencies | shell | all; env: CHE_RENDER_TEMPLATES_MERGE_UPDATE")
 	}
 	return cmd
 }
