@@ -67,14 +67,14 @@ cases:
         - body: |-
             v={{ shell "echo $CHE_TEST_SHELL_VAR" }}
     expected:
-      output: "v=\x1ealwaysUpdate\x1ffromenv"
+      output: "v=\x1eshell\x1ffromenv"
   - name: ShouldRunShellInRepoRoot
     input:
       args:
         - body: |-
             {{ shell "cat x" }}
     expected:
-      output: "\x1ealwaysUpdate\x1fx"
+      output: "\x1eshell\x1fx"
   - name: ShouldRetagShellWithKeepIfExisting
     input:
       args:

@@ -34,6 +34,7 @@ type Options struct {
 	Errexit                                            bool
 	LogLevel                                           string
 	RenderSkipVariables                                bool
+	RenderMergeUpdate                                  string
 	PackagesFile                                       string
 	PackagesOverride                                   string
 	PackagesUpdate                                     bool

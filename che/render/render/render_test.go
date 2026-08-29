@@ -4,6 +4,7 @@ package render
 
 import (
 	"embed"
+	"fmt"
 	"os"
 	"path/filepath"
 	"testing"
@@ -88,7 +89,15 @@ func TestCompose(t *testing.T) {
 
 func TestMergeUpsertEnv(t *testing.T) {
 	testyml.Eq(t, td, "testdata/spec/funcs/merge_upsert_env.test.spec.yml", func(t *testing.T, c testyml.Case[string]) (string, error) {
-		return string(mergeUpsertEnv([]byte(c.Input.Args.String(t, 0)), []byte(c.Input.Args.String(t, 1)))), nil
+		a := c.Input.Args
+		var mode string
+		if len(a) > 2 {
+			mode = a.String(t, 2)
+		}
+		runs := 0
+		shell := func(cmd string) (string, error) { runs++; return "ran:" + cmd, nil }
+		out, err := mergeUpsertEnv([]byte(a.String(t, 0)), []byte(a.String(t, 1)), mode, shell)
+		return fmt.Sprintf("%s|runs=%d", out, runs), err
 	})
 }
 

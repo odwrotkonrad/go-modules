@@ -85,3 +85,19 @@ func TestRunIfGate(t *testing.T) {
 }
 
 // [<] 🤖🤖
+
+// [>] 🤖🤖 optional sources
+func TestSpecSourceOptionalAbsentLocalDir(t *testing.T) {
+	root := t.TempDir()
+	require.NoError(t, os.MkdirAll(filepath.Join(root, "present"), 0o755))
+	var present, absent, remote SpecSourceRecipe
+	require.NoError(t, yaml.Unmarshal([]byte("{source: present, optional: true}"), &present))
+	require.NoError(t, yaml.Unmarshal([]byte("{source: absent, optional: true}"), &absent))
+	require.NoError(t, yaml.Unmarshal([]byte("{source: 'git::gitlab.com/org/repo@v1', optional: true}"), &remote))
+	assert.False(t, present.IsAbsentLocalDir(root, root))
+	assert.True(t, absent.IsAbsentLocalDir(root, root))
+	assert.True(t, absent.Optional)
+	assert.False(t, remote.IsAbsentLocalDir(root, root))
+}
+
+// [<] 🤖🤖 optional sources

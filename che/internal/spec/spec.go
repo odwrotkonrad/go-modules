@@ -127,6 +127,9 @@ func (o optionsSpec) over(base render.Options) render.Options {
 	if o.RenderReferencedFiles != nil {
 		base.RenderReferencedFiles = *o.RenderReferencedFiles
 	}
+	if o.MergeUpdate != nil {
+		base.MergeUpdate = *o.MergeUpdate
+	}
 	return base
 }
 

@@ -13,6 +13,7 @@ import (
 	"gitlab.com/konradodwrot/go-modules/che/internal/log"
 	"gitlab.com/konradodwrot/go-modules/che/internal/packages"
 	"gitlab.com/konradodwrot/go-modules/che/internal/spec/envinterp"
+	"gitlab.com/konradodwrot/go-modules/che/render/render"
 )
 
 type LookupEnv func(string) string
@@ -262,6 +263,11 @@ func (o *Options) Resolve(env LookupEnv, user, spec Layer) error {
 	}
 	o.RenderSkipVariables = o.resolveBool("renderTemplates.skipVariables", o.RenderSkipVariables, env("CHE_RENDER_TEMPLATES_SKIP_VARIABLES"), false,
 		boolCandidate{user.RenderTemplates.SkipVariables, "config-file"}, boolCandidate{spec.RenderTemplates.SkipVariables, "specFile"})
+	o.RenderMergeUpdate = o.resolveStr("renderTemplates.mergeUpdate", "",
+		fromFlag(o.RenderMergeUpdate), fromEnv(env("CHE_RENDER_TEMPLATES_MERGE_UPDATE")))
+	if o.RenderMergeUpdate != "" && !slices.Contains(render.MergeUpdateModes, o.RenderMergeUpdate) {
+		return fmt.Errorf("invalid --merge-update %q: want %s", o.RenderMergeUpdate, strings.Join(render.MergeUpdateModes, " | "))
+	}
 	o.PackagesFile = o.resolveStr("packages.file", "",
 		fromFlag(o.PackagesFile), fromEnv(env("CHE_PACKAGES_FILE")), fromLayer(user.Packages.File, "config-file"), fromLayer(spec.Packages.File, "specFile"))
 	o.fillDefault("packages.file", packages.BuiltinSentinel)

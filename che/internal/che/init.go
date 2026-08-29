@@ -53,6 +53,10 @@ func (w *initWalker) walkSpec(src spec.SpecSourceRecipe, anchor, name string, ov
 		return fmt.Errorf("init-remote-sources %s: %w", name, err)
 	}
 	for _, inc := range doc.Include {
+		if inc.Optional && inc.IsAbsentLocalDir(ready.DirectoryPath, w.home) {
+			log.EmitSkip(log.Levels.Warn, "init-remote-sources", "prepare", inc.URI, "optional source dir absent")
+			continue
+		}
 		if err := w.walkSpec(inc, ready.DirectoryPath, "spec", overlay{inherited: doc.Lookup, env: inc.Env, vars: inc.Variables}, false); err != nil {
 			return err
 		}

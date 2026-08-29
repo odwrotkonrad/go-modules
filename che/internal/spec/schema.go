@@ -65,8 +65,12 @@ func topIncludeSchema() *jsonschema.Schema {
 	entry.Properties.Set("spec", &jsonschema.Schema{Description: "where the spec sits under source: a dir (che.export.yml first) or, not recommended, a spec file path; default the source root", Type: "string"})
 	entry.Properties.Set("env", envSchema("env overlaid on the included spec's load and run"))
 	entry.Properties.Set("variables", envSchema("variables overriding the included spec's own"))
+	entry.Properties.Set("optional", &jsonschema.Schema{
+		Description: "local dir sources only: an absent dir is skipped with a warning instead of failing the load (a dir another profile renders first)",
+		Type:        "boolean",
+	})
 	o.Properties.Set("sources", &jsonschema.Schema{
-		Description: "spec sources, each a <dir> (absolute, relative, ~/, $VAR) or git::<giturl>[@<git-ref>] (@<ref> pins a tag or branch), scalar or {source, spec, env, variables}; a dir offers its che.export.yml first, then a plain che.yml",
+		Description: "spec sources, each a <dir> (absolute, relative, ~/, $VAR) or git::<giturl>[@<git-ref>] (@<ref> pins a tag or branch), scalar or {source, spec, env, variables, optional}; a dir offers its che.export.yml first, then a plain che.yml",
 		Type:        "array",
 		Items:       scalarOr("spec source", entry),
 	})
