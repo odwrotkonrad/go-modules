@@ -25,19 +25,21 @@ var SourceTypes = struct{ Remote, Filesystem SourceType }{"remote", "filesystem"
 
 type SourceRecipe struct {
 	URI           string `yaml:"-"`
-	SpecFile      string `yaml:"-"`
+	Spec          string `yaml:"-"`
 	DirectoryPath string `yaml:"-"`
 	Ref           string `yaml:"-"`
 }
 
 type SourceReady struct {
 	DefinitionURI string
+	Candidates    []string
 	DirectoryPath string
 }
 
 type SpecSourceRecipe struct {
 	SourceRecipe `yaml:"-"`
 	Src          string            `yaml:"source"`
+	SpecPath     string            `yaml:"spec"`
 	Env          map[string]string `yaml:"env"`
 	Variables    map[string]string `yaml:"variables"`
 }
@@ -50,9 +52,17 @@ type ProfileSourceRecipe struct {
 	SourceRecipe `yaml:"-"`
 	ProfileName  string            `yaml:"-"`
 	Src          string            `yaml:"source"`
+	SpecPath     string            `yaml:"spec"`
+	Profile      string            `yaml:"profile"`
+	Profiles     []profileListItem `yaml:"profiles"`
 	Options      ProfileOptions    `yaml:"options"`
 	Env          map[string]string `yaml:"env"`
 	Variables    map[string]string `yaml:"variables"`
+}
+
+type profileListItem struct {
+	Spec    string `yaml:"spec"`
+	Profile string `yaml:"profile"`
 }
 
 type ProfileSourceReady struct {

@@ -6,6 +6,8 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"slices"
+	"strings"
 
 	"github.com/joho/godotenv"
 	"gopkg.in/yaml.v3"
@@ -40,28 +42,47 @@ func CheFile(dir, name string) (string, bool) {
 	return "", false
 }
 
-// SpecFile resolves the spec of a source dir: an explicit file as given (che.yml still root-first
-// then .che/), none given: che.export.yml first, then che.yml root-first then .che/.
-func SpecFile(dir, specFile string) (string, bool) {
-	switch specFile {
-	case "":
-		if path, ok := CheFile(dir, ExportFileName); ok {
-			return path, true
+// SpecCandidates lists the spec files a source dir offers, search order first: che.export.yml at the
+// dir, then .che/che.export.yml (warned: hidden dir), else che.yml at the dir or .che/che.yml.
+// Several plain che.yml and no export errors. remote adds the not-for-reuse warning on a plain che.yml.
+func SpecCandidates(dir string, remote bool) ([]string, error) {
+	exportRoot := filepath.Join(dir, ExportFileName)
+	exportNested := filepath.Join(dir, CheDir, ExportFileName)
+	var exports []string
+	for _, path := range []string{exportRoot, exportNested} {
+		if _, err := os.Stat(path); err == nil {
+			exports = append(exports, path)
 		}
-		return CheFile(dir, SpecFileName)
-	case SpecFileName:
-		return CheFile(dir, specFile)
 	}
-	path := filepath.Join(dir, specFile)
-	if _, err := os.Stat(path); err != nil {
-		return "", false
+	if len(exports) > 0 {
+		if slices.Contains(exports, exportNested) {
+			log.EmitWarn("load-spec", "not-recommended", exportNested+": "+ExportFileName+" sits in a hidden dir, keep it at the config root")
+		}
+		return exports, nil
 	}
-	return path, true
+	plainRoot := filepath.Join(dir, SpecFileName)
+	plainNested := filepath.Join(dir, CheDir, SpecFileName)
+	var plains []string
+	for _, path := range []string{plainRoot, plainNested} {
+		if _, err := os.Stat(path); err == nil {
+			plains = append(plains, path)
+		}
+	}
+	switch len(plains) {
+	case 0:
+		return nil, fmt.Errorf("no spec at %s: want %s, or %s", dir, ExportFileName, CheFileCandidates(dir, SpecFileName))
+	case 1:
+		if remote {
+			log.EmitWarn("load-spec", "not-recommended", plains[0]+": a spec not designed for reuse, consume a "+ExportFileName)
+		}
+		return plains, nil
+	}
+	return nil, fmt.Errorf("%s holds several %s and no %s: export the reusable one", dir, SpecFileName, ExportFileName)
 }
 
-// IsExportSpec reports whether path is a spec designed for reuse, che.export.yml.
-func IsExportSpec(path string) bool {
-	return filepath.Base(path) == ExportFileName
+// IsSpecFile reports whether path names a spec file rather than a dir.
+func IsSpecFile(path string) bool {
+	return strings.HasSuffix(path, ".yml") || strings.HasSuffix(path, ".yaml")
 }
 
 // CheFileCandidates lists both lookup paths of a che file, for error text.

@@ -99,5 +99,6 @@ remote-empty:
     autoDiscover: true
   include:
     profiles:
-      - source: "git::file://__REMOTE_DIR__/che.export.yml::ops-remote"
+      - source: "git::file://__REMOTE_DIR__"
+        profile: ops-remote
 ##[<] 🤖🤖

@@ -49,6 +49,23 @@ func (r ProfileRecipe) SourcedRefs() []ProfileSourceRecipe {
 	return out
 }
 
+// ProfilePathSep joins the profile names of a ref's path: a::b names b as included by top-level a.
+const ProfilePathSep = "::"
+
+// SplitProfilePath cuts the first profile name off a ref's profile path.
+func SplitProfilePath(path string) (head, rest string) {
+	head, rest, _ = strings.Cut(path, ProfilePathSep)
+	return head, rest
+}
+
+func expandProfileRefs(refs []ProfileSourceRecipe) []ProfileSourceRecipe {
+	var out []ProfileSourceRecipe
+	for _, ref := range refs {
+		out = append(out, ref.Expand()...)
+	}
+	return out
+}
+
 func RemoteSrcRef(source string) string {
 	rest, _ := render.CutGitMarker(source)
 	return rest
@@ -264,6 +281,7 @@ func (d *Doc) decodeKey(key string, node *yaml.Node) error {
 		if err := node.Decode(&ps); err != nil {
 			return fmt.Errorf("parse profile %q: %w", key, err)
 		}
+		ps.Include.Profiles = expandProfileRefs(ps.Include.Profiles)
 		ps.Source.ProfileName = key
 		d.ProfileRecipes = append(d.ProfileRecipes, ps)
 		return nil

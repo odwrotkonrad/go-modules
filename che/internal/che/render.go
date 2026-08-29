@@ -165,9 +165,18 @@ func (p *ProfileReady) templateData(item spec.FileItem) render.Data {
 	return render.Data{Env: p.env, Var: fsutil.MergeMap(fsutil.MergeMap(p.vars, item.Vars), p.refVars)}
 }
 
+// [why] a repo-doc template's dest, @-includes and localFile paths anchor at the git root: a sub-spec
+// under .che/ renders onto the repo, not into its own dir. The source stays spec-dir-relative
 func (p *ProfileReady) templateAnchor(item spec.FileItem) string {
 	if p.isHostTemplate(item) {
 		return p.resolveRepoRoot()
+	}
+	return p.repoDocRoot()
+}
+
+func (p *ProfileReady) repoDocRoot() string {
+	if p.gitRoot != "" {
+		return p.gitRoot
 	}
 	return p.resolveRoot()
 }

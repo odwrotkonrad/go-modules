@@ -1,0 +1,18 @@
+# yaml-language-server: $schema=https://gitlab.com/api/v4/projects/konradodwrot%2Fgo-modules/packages/generic/che-schema/v0.0.1-che-min-v0.0.96/che.schema.json
+##[>] 🤖🤖
+#[what] the shared CI payload the emit-events job runs
+bootstrapCrossRepoCI:
+  include:
+    profiles:
+      - source: "git::https://gitlab.com/konradodwrot/cross-repo/misc@${{ var.MISC_REF }}"
+        profile: bootstrapCrossRepoCITagging
+
+envSeed:
+  include:
+    renderTemplates:
+      - source: templates/env.tpl
+        dest:
+          - path: .env
+            options:
+              writeType: mergeUpsert
+##[<] 🤖🤖

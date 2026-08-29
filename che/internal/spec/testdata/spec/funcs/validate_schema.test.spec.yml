@@ -130,7 +130,8 @@ cases:
               include:
                 profiles:
                   - base
-                  - source: "git::https://gitlab.com/g/r.git/che.yml::gitlabGroup"
+                  - source: "git::https://gitlab.com/g/r.git"
+                    profile: gitlabGroup
                     env: {GITLAB_GROUP: konradodwrot}
     expected:
       output: ""

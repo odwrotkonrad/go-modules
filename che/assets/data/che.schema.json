@@ -369,7 +369,7 @@
       },
       "additionalProperties": false,
       "type": "object",
-      "description": "one profile block: options self-describe eligibility, include.profiles compose refs in order (local scalars, sourced {source, options, env, variables}), include adds, exclude filters last and wins"
+      "description": "one profile block: options self-describe eligibility, include.profiles compose refs in order (local scalars, sourced {source, spec, profile, options, env, variables}), include adds, exclude filters last and wins"
     },
     "ProfileSourceRecipe": {
       "oneOf": [
@@ -381,7 +381,45 @@
           "properties": {
             "source": {
               "type": "string",
-              "description": "\u003csource\u003e/\u003cspec-file\u003e.yml::\u003cprofile\u003e: source git::\u003cgiturl\u003e[@\u003cref\u003e] (remote, @\u003cref\u003e pins a tag or branch) or \u003cdir\u003e (local, no ref); bare \u003cprofile\u003e for the local spec"
+              "description": "the repo or dir holding the spec: git::\u003cgiturl\u003e[@\u003cref\u003e] (remote, @\u003cref\u003e pins a tag or branch) or \u003cdir\u003e (local: $VAR and ~ expand, relative to this spec's checkout, . for this repo's own exported spec); never a file, never //\u003cpath\u003e"
+            },
+            "spec": {
+              "type": "string",
+              "description": "where the spec sits under source: a dir (its che.export.yml, then .che/che.export.yml, then a plain che.yml) or, not recommended, a spec file path used as is; default the source root"
+            },
+            "profile": {
+              "type": "string",
+              "description": "a top-level profile of that spec, or a path a::b::c walking include.profiles from top-level a down to the nested profile c (nested profiles are never searched by default); exclusive with profiles"
+            },
+            "profiles": {
+              "items": {
+                "oneOf": [
+                  {
+                    "type": "string",
+                    "description": "profile name or a::b path"
+                  },
+                  {
+                    "properties": {
+                      "spec": {
+                        "type": "string",
+                        "description": "dir or spec file under source for this profile; default the entry's spec"
+                      },
+                      "profile": {
+                        "type": "string",
+                        "description": "profile name or a::b path"
+                      }
+                    },
+                    "additionalProperties": false,
+                    "type": "object",
+                    "required": [
+                      "profile"
+                    ],
+                    "description": "one profile of the shared source, its own spec when it differs from the entry's"
+                  }
+                ]
+              },
+              "type": "array",
+              "description": "several profiles of the same source and ref, written once: names or a::b paths, or {spec, profile} when a profile sits under another spec; options, env and variables apply to each; exclusive with profile"
             },
             "options": {
               "$ref": "#/$defs/ProfileOptions"
@@ -414,7 +452,7 @@
           "required": [
             "source"
           ],
-          "description": "sourced profile ref: source is git::\u003crepo\u003e[@\u003cref\u003e][//\u003csubdir\u003e]/\u003cspec-file\u003e.yml::\u003cprofile\u003e, options override its options, env overlays its run, variables override its variables"
+          "description": "sourced profile ref: a profile of another spec, options override its options, env overlays its run, variables override its variables"
         }
       ]
     },
@@ -1193,7 +1231,11 @@
                 "properties": {
                   "source": {
                     "type": "string",
-                    "description": "\u003cdir\u003e (absolute, relative, ~/, $VAR) or git::\u003cgiturl\u003e[@\u003cgit-ref\u003e] (@\u003cref\u003e pins a tag or branch)"
+                    "description": "\u003cdir\u003e (absolute, relative, ~/, $VAR) or git::\u003cgiturl\u003e[@\u003cgit-ref\u003e] (@\u003cref\u003e pins a tag or branch); never a file, never //\u003cpath\u003e"
+                  },
+                  "spec": {
+                    "type": "string",
+                    "description": "where the spec sits under source: a dir (che.export.yml first) or, not recommended, a spec file path; default the source root"
                   },
                   "env": {
                     "additionalProperties": {
@@ -1220,7 +1262,7 @@
             ]
           },
           "type": "array",
-          "description": "spec sources, each a \u003cdir\u003e (absolute, relative, ~/, $VAR) or git::\u003cgiturl\u003e[@\u003cgit-ref\u003e] (@\u003cref\u003e pins a tag or branch), scalar or {source, env, variables}"
+          "description": "spec sources, each a \u003cdir\u003e (absolute, relative, ~/, $VAR) or git::\u003cgiturl\u003e[@\u003cgit-ref\u003e] (@\u003cref\u003e pins a tag or branch), scalar or {source, spec, env, variables}; a dir offers its che.export.yml first, then a plain che.yml"
         }
       },
       "additionalProperties": false,

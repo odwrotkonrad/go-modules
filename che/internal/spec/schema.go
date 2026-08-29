@@ -35,7 +35,7 @@ func Schema() *jsonschema.Schema {
 	defs["templateNode"] = templateNode{}.JSONSchema()
 	defs["copyNode"] = copyNode{}.JSONSchema()
 
-	defs["ProfileRecipe"].Description = "one profile block: options self-describe eligibility, include.profiles compose refs in order (local scalars, sourced {source, options, env, variables}), include adds, exclude filters last and wins"
+	defs["ProfileRecipe"].Description = "one profile block: options self-describe eligibility, include.profiles compose refs in order (local scalars, sourced {source, spec, profile, options, env, variables}), include adds, exclude filters last and wins"
 	defs["includeSet"].Description = "additive payload: profile refs, makeLinks globs, makeCopies/renderTemplates trees, makeDirs perm-groups, runScripts globs"
 	defs["excludeSet"].Description = "subtractive glob filter, applied last, wins over every include (rich entries too)"
 	defs["SpecOptions"].Description = "reserved top-level options: block: spec-wide defaults (runIf gate, autoDiscover/logLevel/workingDirectory) + che knobs (validateSpec/dryRun/profiles/skipRemoteRefs/renderTemplates.skipVariables); same shape as the user-config file"
@@ -61,11 +61,12 @@ func Schema() *jsonschema.Schema {
 func topIncludeSchema() *jsonschema.Schema {
 	o := obj("other specs composed into this one", nil)
 	entry := obj("spec source with overlays applied to every profile of the included spec", []string{"source"})
-	entry.Properties.Set("source", &jsonschema.Schema{Description: "<dir> (absolute, relative, ~/, $VAR) or git::<giturl>[@<git-ref>] (@<ref> pins a tag or branch)", Type: "string"})
+	entry.Properties.Set("source", &jsonschema.Schema{Description: "<dir> (absolute, relative, ~/, $VAR) or git::<giturl>[@<git-ref>] (@<ref> pins a tag or branch); never a file, never //<path>", Type: "string"})
+	entry.Properties.Set("spec", &jsonschema.Schema{Description: "where the spec sits under source: a dir (che.export.yml first) or, not recommended, a spec file path; default the source root", Type: "string"})
 	entry.Properties.Set("env", envSchema("env overlaid on the included spec's load and run"))
 	entry.Properties.Set("variables", envSchema("variables overriding the included spec's own"))
 	o.Properties.Set("sources", &jsonschema.Schema{
-		Description: "spec sources, each a <dir> (absolute, relative, ~/, $VAR) or git::<giturl>[@<git-ref>] (@<ref> pins a tag or branch), scalar or {source, env, variables}",
+		Description: "spec sources, each a <dir> (absolute, relative, ~/, $VAR) or git::<giturl>[@<git-ref>] (@<ref> pins a tag or branch), scalar or {source, spec, env, variables}; a dir offers its che.export.yml first, then a plain che.yml",
 		Type:        "array",
 		Items:       scalarOr("spec source", entry),
 	})
@@ -276,10 +277,26 @@ func (DestSpec) JSONSchema() *jsonschema.Schema {
 }
 
 func (ProfileSourceRecipe) JSONSchema() *jsonschema.Schema {
-	o := obj("sourced profile ref: source is git::<repo>[@<ref>][//<subdir>]/<spec-file>.yml::<profile>, options override its options, env overlays its run, variables override its variables", []string{"source"})
+	o := obj("sourced profile ref: a profile of another spec, options override its options, env overlays its run, variables override its variables", []string{"source"})
 	o.Properties.Set("source", &jsonschema.Schema{
-		Description: "<source>/<spec-file>.yml::<profile>: source git::<giturl>[@<ref>] (remote, @<ref> pins a tag or branch) or <dir> (local, no ref); bare <profile> for the local spec",
+		Description: "the repo or dir holding the spec: git::<giturl>[@<ref>] (remote, @<ref> pins a tag or branch) or <dir> (local: $VAR and ~ expand, relative to this spec's checkout, . for this repo's own exported spec); never a file, never //<path>",
 		Type:        "string",
+	})
+	o.Properties.Set("spec", &jsonschema.Schema{
+		Description: "where the spec sits under source: a dir (its che.export.yml, then .che/che.export.yml, then a plain che.yml) or, not recommended, a spec file path used as is; default the source root",
+		Type:        "string",
+	})
+	o.Properties.Set("profile", &jsonschema.Schema{
+		Description: "a top-level profile of that spec, or a path a::b::c walking include.profiles from top-level a down to the nested profile c (nested profiles are never searched by default); exclusive with profiles",
+		Type:        "string",
+	})
+	item := obj("one profile of the shared source, its own spec when it differs from the entry's", []string{"profile"})
+	item.Properties.Set("spec", &jsonschema.Schema{Description: "dir or spec file under source for this profile; default the entry's spec", Type: "string"})
+	item.Properties.Set("profile", &jsonschema.Schema{Description: "profile name or a::b path", Type: "string"})
+	o.Properties.Set("profiles", &jsonschema.Schema{
+		Description: "several profiles of the same source and ref, written once: names or a::b paths, or {spec, profile} when a profile sits under another spec; options, env and variables apply to each; exclusive with profile",
+		Type:        "array",
+		Items:       scalarOr("profile name or a::b path", item),
 	})
 	o.Properties.Set("options", &jsonschema.Schema{Ref: "#/$defs/ProfileOptions"})
 	o.Properties.Set("env", envSchema("envs exported around everything done for the referenced profile (sourced entries only)"))
