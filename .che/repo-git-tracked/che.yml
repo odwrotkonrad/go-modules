@@ -1,8 +1,6 @@
 # yaml-language-server: $schema=https://gitlab.com/api/v4/projects/konradodwrot%2Fgo-modules/packages/generic/che-schema/v0.0.1-che-min-v0.0.96/che.schema.json
 ##[>] 🤖🤖
 ontoRepo:
-  options:
-    autoDiscover: true
   include:
     renderTemplates:
       - source: "git::gitlab.com/konradodwrot/cross-repo/prose/assets@${{ var.PROSE_ASSETS_REF }}"

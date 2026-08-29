@@ -2,6 +2,7 @@
 options:
   profileWorkingDirectory: root
 base:
+  options: {autoDiscover: false}
   include:
     makeLinks:
       - source: _home/.config/zsh/**
@@ -53,6 +54,7 @@ desktop/macos:
 
 ontoRepo:
   options:
+    autoDiscover: false
     profileWorkingDirectory: .
   include:
     renderTemplates:
