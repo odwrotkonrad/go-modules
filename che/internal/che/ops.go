@@ -7,6 +7,7 @@ import (
 	"errors"
 	"fmt"
 	"os"
+	"path/filepath"
 	"strings"
 
 	"gitlab.com/konradodwrot/go-modules/che/internal/database"
@@ -258,6 +259,9 @@ func (p *ProfileReady) makeCopies(copies []spec.FileItem, dirRelativePaths []str
 }
 
 func (p *ProfileReady) makeCopy(item spec.FileItem, dest string) error {
+	if p.isRepoCopyDest(item, dest) {
+		return p.makeRepoCopy(item, dest)
+	}
 	if spec.IsRemoteSrc(item.Rel) {
 		return p.makeRemoteCopy(item, dest)
 	}
@@ -296,6 +300,75 @@ func (p *ProfileReady) makeRemoteCopy(item spec.FileItem, dest string) error {
 	})
 }
 
+func (p *ProfileReady) makeRepoCopy(item spec.FileItem, dest string) error {
+	body, err := p.readCopySrc(item)
+	if err != nil {
+		return err
+	}
+	current, readErr := os.ReadFile(dest)
+	if readErr == nil && bytes.Equal(current, body) {
+		if p.isDryRunAll() {
+			p.emit(log.Levels.Info, "make-copies", p.wouldAction(dest), dest, "same content")
+		}
+		return nil
+	}
+	if p.isDryRun() {
+		p.emitDryRun("make-copies", resolveDryRunAction(readErr == nil), dest)
+		return nil
+	}
+	mode := os.FileMode(repoFileMode)
+	if parsed, ok := fsutil.ParseMode(item.Chmod); ok {
+		mode = parsed
+	} else if item.Chmod != "" {
+		return fmt.Errorf("copy %s: malformed chmod %q: want an octal string", dest, item.Chmod)
+	}
+	if err := os.MkdirAll(filepath.Dir(dest), 0o755); err != nil {
+		return err
+	}
+	if err := os.WriteFile(dest, body, mode); err != nil {
+		return err
+	}
+	if err := os.Chmod(dest, mode); err != nil {
+		return err
+	}
+	p.emit(log.Levels.Info, "make-copies", resolvePastAction("create", readErr == nil), dest)
+	return nil
+}
+
+func resolveDryRunAction(existed bool) string {
+	if existed {
+		return "overwrite"
+	}
+	return "create"
+}
+
+func (p *ProfileReady) readCopySrc(item spec.FileItem) ([]byte, error) {
+	if !spec.IsRemoteSrc(item.Rel) {
+		return os.ReadFile(p.resolveSrc(item.Rel))
+	}
+	if p.isDryRun() {
+		return nil, nil
+	}
+	content, err := p.fetchRemote(item.Rel)
+	if err != nil {
+		return nil, err
+	}
+	return []byte(content), nil
+}
+
+func (p *ProfileReady) isRepoCopyDest(item spec.FileItem, dest string) bool {
+	if len(item.Dests) == 0 || item.Derived {
+		return false
+	}
+	for _, d := range item.Dests {
+		if p.resolveCopyDest(d.Path) != dest {
+			continue
+		}
+		return isGitRootDest(d.Path) || !strings.HasPrefix(p.expandHome(d.Path), "/")
+	}
+	return false
+}
+
 func (p *ProfileReady) resolveCopyDests(item spec.FileItem) []string {
 	if len(item.Dests) == 0 {
 		return []string{p.toDest(strings.TrimSuffix(item.Rel, spec.CpExt))}
@@ -305,9 +378,20 @@ func (p *ProfileReady) resolveCopyDests(item spec.FileItem) []string {
 	}
 	out := make([]string, len(item.Dests))
 	for i, d := range item.Dests {
-		out[i] = p.expandHome(d.Path)
+		out[i] = p.resolveCopyDest(d.Path)
 	}
 	return out
+}
+
+func (p *ProfileReady) resolveCopyDest(dest string) string {
+	if rest, ok := strings.CutPrefix(dest, "${invokingSpecGitRoot}/"); ok {
+		return filepath.Join(p.expandEnv("${invokingSpecGitRoot}"), rest)
+	}
+	path := p.expandHome(dest)
+	if strings.HasPrefix(path, "/") {
+		return path
+	}
+	return filepath.Join(p.repoDocRoot(), path)
 }
 
 func formatOwnerSpec(item spec.FileItem) string {

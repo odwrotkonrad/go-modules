@@ -32,7 +32,7 @@ render-templates:
 	@che_bin=che/dist/che; \
 	if [[ ! -x $$che_bin ]] che_bin=$$(command -v che || true); \
 	if [[ -z $$che_bin ]] { $(MAKE) -C che build; che_bin=che/dist/che }; \
-	$$che_bin render-templates --profiles ontoRepo
+	$$che_bin run --profiles ontoRepo
 
 #[what] render .che/repo-git-untracked/templates/env.tpl to .env: upstream refs and CI variables via glab, secrets via op
 repo-render-env:

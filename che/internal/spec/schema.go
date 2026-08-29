@@ -143,17 +143,17 @@ func (linkEntry) JSONSchema() *jsonschema.Schema {
 func (copyNode) JSONSchema() *jsonschema.Schema {
 	leaf := obj("one copy source fanned out to dests, bytes copied verbatim", []string{"source"})
 	leaf.Properties.Set("source", &jsonschema.Schema{
-		Description: "*.ontoHost.cp source path, workingDirectory-relative, or remote ref git::<repo>[@<ref>]//<path> (explicit dest required); joined onto every enclosing group's source prefix",
+		Description: "source path, any file, workingDirectory-relative, or remote ref git::<repo>[@<ref>]//<path> (explicit dest required); joined onto every enclosing group's source prefix",
 		Type:        "string",
 	})
 	leaf.Properties.Set("dest", &jsonschema.Schema{OneOf: []*jsonschema.Schema{
 		{
-			Description: "host dest path (~/ or absolute); omitted -> derived from the workingDirectory-relative source path, .ontoHost.cp stripped",
+			Description: "dest path: relative -> the invoking spec's git root, ~/ or absolute -> host; omitted -> derived from the workingDirectory-relative source path, .ontoHost.cp stripped, host",
 			Type:        "string",
 			Not:         destRuleSchema(),
 		},
 		{
-			Description: "host dest paths (~/ or absolute); omitted -> derived from the workingDirectory-relative source path, .ontoHost.cp stripped",
+			Description: "dest paths: relative -> the invoking spec's git root, ~/ or absolute -> host; omitted -> derived from the workingDirectory-relative source path, .ontoHost.cp stripped, host",
 			Type:        "array",
 			Items:       &jsonschema.Schema{Ref: "#/$defs/DestSpec"},
 		},

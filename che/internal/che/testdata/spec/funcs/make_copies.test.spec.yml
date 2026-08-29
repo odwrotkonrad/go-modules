@@ -45,4 +45,78 @@ cases:
       errorOutput: 'RemoteMockFetcher: no fixture for "git::gitlab.com/acme/tools//prompts/absent.md.tpl"'
       output:
         absent: [home/prompts/absent.md.tpl]
+  - name: ShouldCopyRemoteSourceOntoRepoRootForRelativeDest
+    input:
+      args:
+        - fetch:
+            git::gitlab.com/acme/prose@v1.0.0//shared/license/LICENSE: |
+              MIT License
+        - items:
+            - {rel: "git::gitlab.com/acme/prose@v1.0.0//shared/license/LICENSE", dests: [LICENSE]}
+    expected:
+      stdOut: "created ${ROOT}/root/LICENSE"
+      output:
+        files:
+          root/LICENSE: |
+            MIT License
+        rerun: true
+        notRerunStdOut: ["created ${ROOT}/root/LICENSE"]
+  - name: ShouldCopyPlainLocalFileOntoRepoRootForRelativeDest
+    input:
+      args:
+        - tree:
+            root/shared/license/LICENSE: |
+              MIT License
+        - items:
+            - {rel: shared/license/LICENSE, dests: [LICENSE]}
+    expected:
+      stdOut: "created ${ROOT}/root/LICENSE"
+      output:
+        files:
+          root/LICENSE: |
+            MIT License
+        rerun: true
+        notRerunStdOut: ["created ${ROOT}/root/LICENSE"]
+  - name: ShouldAnchorSubSpecRelativeDestAtGitRoot
+    input:
+      args:
+        - tree:
+            shared/license/LICENSE: |
+              MIT License
+            .che/tracked/che.yml: ""
+        - subSpec: .che/tracked
+        - items:
+            - {rel: ../../shared/license/LICENSE, dests: [LICENSE]}
+    expected:
+      stdOut: "created ${ROOT}/LICENSE"
+      output:
+        files:
+          LICENSE: |
+            MIT License
+        absent: [.che/tracked/LICENSE]
+  - name: ShouldKeepHomeAndAbsoluteDestsOnHost
+    input:
+      args:
+        - tree:
+            root/a.txt: "a\n"
+        - items:
+            - {rel: a.txt, dests: [~/prompts/a.txt, $HOME/prompts/b.txt]}
+    expected:
+      stdOut: "created ${HOME}/prompts/a.txt"
+      output:
+        files:
+          home/prompts/a.txt: "a\n"
+          home/prompts/b.txt: "a\n"
+        absent: [prompts/a.txt]
+  - name: ShouldReportRepoPathOnDryRun
+    input:
+      args:
+        - fetch: {}
+        - items:
+            - {rel: "git::gitlab.com/acme/prose@v1.0.0//shared/license/LICENSE", dests: [LICENSE]}
+        - dryRun: all
+    expected:
+      stdOut: "create ${ROOT}/root/LICENSE (dry run)"
+      output:
+        absent: [root/LICENSE]
 # [<] 🤖🤖

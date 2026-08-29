@@ -29,26 +29,37 @@ type copiesWant struct {
 func TestMakeCopies(t *testing.T) {
 	testyml.Run(t, td, "testdata/spec/funcs/make_copies.test.spec.yml", func(t *testing.T, c testyml.Case[copiesWant]) {
 		testutil.RequireRegistered(t, c.Context.MockedInterfaces)
-		var fetch map[string]string
+		var tree, fetch map[string]string
 		var items []spec.FileItem
 		var opts options.Options
+		var subSpec string
 		a := c.Input.Args
 		for i := range a {
 			switch name := a.Name(i); name {
+			case "tree":
+				a.To(t, i, &tree)
 			case "fetch":
 				a.To(t, i, &fetch)
 			case "items":
 				a.To(t, i, &items)
 			case "dryRun":
 				opts.DryRun = options.DryRunMode(a.String(t, i))
+			case "subSpec":
+				subSpec = a.String(t, i)
 			default:
 				t.Fatalf("unknown arg %q", name)
 			}
 		}
-		root := testutil.Tree(t, map[string]string{})
+		root := testutil.Tree(t, tree)
 		home := filepath.Join(root, "home")
 		require.NoError(t, os.MkdirAll(filepath.Join(home, "prompts"), 0o755))
 		p := newProfile(root, home, opts).withDir(root)
+		if subSpec != "" {
+			testutil.GitRepo(t, root)
+			p.workingDir = filepath.Join(root, subSpec)
+			p.Source.DirectoryPath = p.workingDir
+			p.gitRoot = root
+		}
 		p.Fetcher = testutil.RemoteMockFetcher(fetch)
 		copyOnce := func() (string, error) {
 			return testutil.CaptureStdout(t, func() error { return p.makeCopies(items, nil) })
@@ -58,7 +69,7 @@ func TestMakeCopies(t *testing.T) {
 		out, err := copyOnce()
 		c.Expected.Check(t, err)
 		stripped := testutil.StripANSI(out)
-		vars := map[string]string{"HOME": home}
+		vars := map[string]string{"HOME": home, "ROOT": root}
 		for _, f := range c.Expected.StdOut {
 			testyml.MustMatch(t, stripped, testyml.Expand(f, vars))
 		}
