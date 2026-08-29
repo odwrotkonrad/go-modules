@@ -53,7 +53,7 @@ func (p *ProfileReady) orderByIncludes(keep []templateItem) ([]templateItem, err
 		if err != nil {
 			continue
 		}
-		body, err := render.ExecWithCtx(templatePath, src, p.templateAnchor(tpl.item), p.mergedCtx(tpl.item.Ctx))
+		body, err := render.ExecWithData(templatePath, src, p.templateAnchor(tpl.item), p.templateData(tpl.item))
 		if err != nil {
 			continue
 		}
@@ -127,7 +127,7 @@ func (p *ProfileReady) renderTemplates(templates []spec.FileItem, skips renderSk
 	}
 	keep = ordered
 	var errs []error
-	if p.isDryRun() { // [why] dry-run predicts via the mock-render cache: no real render, no secret resolve
+	if p.isDryRun() { // [why] dry-run predicts via the mock-render cache: no real render
 		for _, tpl := range keep {
 			settledMap := p.renderSettled(tpl.item)
 			for _, d := range tpl.dests {
@@ -161,13 +161,22 @@ func (p *ProfileReady) templateSrcPath(item spec.FileItem) string {
 	return filepath.Join(p.resolveRoot(), item.Rel)
 }
 
-func (p *ProfileReady) mergedCtx(ctx map[string]string) map[string]string {
-	return fsutil.MergeMap(ctx, p.refCtx)
+func (p *ProfileReady) templateData(item spec.FileItem) render.Data {
+	return render.Data{Env: p.env, Var: fsutil.MergeMap(fsutil.MergeMap(p.vars, item.Vars), p.refVars)}
 }
 
+// [why] a repo-doc template's dest, @-includes and localFile paths anchor at the git root: a sub-spec
+// under .che/ renders onto the repo, not into its own dir. The source stays spec-dir-relative
 func (p *ProfileReady) templateAnchor(item spec.FileItem) string {
 	if p.isHostTemplate(item) {
 		return p.resolveRepoRoot()
+	}
+	return p.repoDocRoot()
+}
+
+func (p *ProfileReady) repoDocRoot() string {
+	if p.gitRoot != "" {
+		return p.gitRoot
 	}
 	return p.resolveRoot()
 }
@@ -192,25 +201,21 @@ func isGitRootDest(path string) bool {
 }
 
 type renderSkips struct {
-	Secrets   bool
 	Variables bool
 }
 
 func (p *ProfileReady) skipReason(item spec.FileItem, skips renderSkips) string {
-	if !skips.Secrets && !skips.Variables {
+	if !skips.Variables {
 		return ""
 	}
 	body, ok := p.templateBody(item)
 	if !ok {
 		return ""
 	}
-	//[why] a template pulling another in with localFile hides that file's secret and shell calls from
+	//[why] a template pulling another in with localFile hides that file's shell calls from
 	//   a scan of its own body, so the skip must see the included bodies too
 	bodies := append([][]byte{body}, render.LocalFileBodies(p.templateAnchor(item), body)...)
-	switch {
-	case skips.Secrets && slices.ContainsFunc(bodies, render.IsSecretRefPresent):
-		return "options.renderTemplates.skipSecrets"
-	case skips.Variables && slices.ContainsFunc(bodies, render.IsShellCallPresent):
+	if slices.ContainsFunc(bodies, render.IsShellCallPresent) {
 		return "options.renderTemplates.skipVariables"
 	}
 	return ""
@@ -276,11 +281,10 @@ func (p *ProfileReady) renderTemplate(item spec.FileItem, dests []templateDest) 
 	if err != nil {
 		return err
 	}
-	body, err := render.ExecWithCtx(templatePath, src, p.templateAnchor(item), p.mergedCtx(item.Ctx))
+	body, err := render.ExecWithData(templatePath, src, p.templateAnchor(item), p.templateData(item))
 	if err != nil {
 		return err
 	}
-	p.storeRenderHashes(item, dests, templatePath, src, body)
 	if len(item.Dests) == 0 || item.Derived {
 		return p.placeFile(dests[0].path, render.StripMergeActions(body), item)
 	}

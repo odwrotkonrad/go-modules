@@ -4,7 +4,6 @@ package che
 
 import (
 	"os"
-	"path/filepath"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -25,22 +24,48 @@ func TestExportEnvRestoresPriorState(t *testing.T) {
 	assert.False(t, set)
 }
 
-func TestWithDotEnvKeepsProcessOnTop(t *testing.T) {
-	dir := testutil.Tree(t, map[string]string{".env": "A=file\nexport B=file\n"})
+func TestWithRepoFilesReadsBothFilesBeneathProcess(t *testing.T) {
+	dir := testutil.Tree(t, map[string]string{
+		".che/che.env":           "A=file\nexport B=file\nC=${{ env.B }}-${{ env.D || d }}\n",
+		".che/che.variables.yml": "REF: v1\nFROM_ENV: '${{ env.B }}'\n",
+	})
 	ctx := Context{Env: map[string]string{"B": "process"}}
-	got, err := ctx.withDotEnv(filepath.Join(dir, ".env"))
+	got, err := ctx.withRepoFiles(dir)
 	require.NoError(t, err)
-	assert.Equal(t, map[string]string{"A": "file", "B": "process"}, got.Env)
-	assert.Equal(t, map[string]string{"A": "file", "B": "file"}, got.DotEnv)
+	assert.Equal(t, map[string]string{"A": "file", "B": "process", "C": "process-d"}, got.Env)
+	assert.Equal(t, map[string]string{"A": "file", "B": "file", "C": "process-d"}, got.RepoFiles.Env)
+	assert.Equal(t, map[string]string{"REF": "v1", "FROM_ENV": "process"}, got.RepoFiles.Variables)
 	assert.Equal(t, map[string]string{"B": "process"}, got.ProcessEnv)
 }
 
-func TestWithDotEnvToleratesMissingFile(t *testing.T) {
+func TestWithRepoFilesRejectsVarRefsInRepoFiles(t *testing.T) {
+	dir := testutil.Tree(t, map[string]string{".che/che.env": "PIN=${{ var.REF }}\n", ".che/che.variables.yml": "REF: v1\n"})
+	_, err := ctx0().withRepoFiles(dir)
+	require.ErrorContains(t, err, "not available in repo files")
+}
+
+func TestWithRepoFilesPrefersRootOverDotChe(t *testing.T) {
+	dir := testutil.Tree(t, map[string]string{"che.env": "A=root\n", ".che/che.env": "A=nested\n"})
+	got, err := ctx0().withRepoFiles(dir)
+	require.NoError(t, err)
+	assert.Equal(t, "root", got.Env["A"])
+}
+
+func TestWithRepoFilesToleratesMissingFiles(t *testing.T) {
 	ctx := Context{Env: map[string]string{"B": "process"}}
-	got, err := ctx.withDotEnv(filepath.Join(t.TempDir(), ".env"))
+	got, err := ctx.withRepoFiles(t.TempDir())
 	require.NoError(t, err)
 	assert.Equal(t, ctx.Env, got.Env)
-	assert.Nil(t, got.DotEnv)
+	assert.Nil(t, got.RepoFiles.Env)
 }
+
+func TestWithRepoFilesIgnoresDotEnv(t *testing.T) {
+	dir := testutil.Tree(t, map[string]string{".env": "A=dotenv\n"})
+	got, err := ctx0().withRepoFiles(dir)
+	require.NoError(t, err)
+	assert.Empty(t, got.Env["A"])
+}
+
+func ctx0() Context { return Context{Env: map[string]string{}} }
 
 // [<] 🤖🤖

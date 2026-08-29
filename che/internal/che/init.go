@@ -4,7 +4,6 @@ package che
 
 import (
 	"fmt"
-	"path/filepath"
 
 	"gitlab.com/konradodwrot/go-modules/che/internal/log"
 	"gitlab.com/konradodwrot/go-modules/che/internal/options"
@@ -16,40 +15,45 @@ func InitSources(ctx Context, opts options.Options) error {
 	if err != nil {
 		return err
 	}
-	log.EmitInfo("discover-profiles", "using-spec", filepath.Join(repoRoot, "che.yml"))
+	log.EmitInfo("discover-profiles", "using-spec", specPathOf(repoRoot))
 	home, err := resolveInvokingHome(ctx)
 	if err != nil {
 		return err
 	}
-	w := &initWalker{ctx: ctx, home: home, opts: opts, seen: map[string]bool{}}
-	return w.walkSpec(spec.SpecSourceRecipe{}, repoRoot, "spec", nil)
+	w := &initWalker{ctx: ctx, home: home, opts: opts, repoFiles: newRepoFilesCache(ctx), seen: map[string]bool{}}
+	return w.walkSpec(spec.SpecSourceRecipe{}, repoRoot, "spec", overlay{}, true)
 }
 
 type initWalker struct {
-	ctx  Context
-	home string
-	opts options.Options
-	seen map[string]bool
+	ctx       Context
+	home      string
+	opts      options.Options
+	repoFiles *repoFilesCache
+	seen      map[string]bool
 }
 
-func (w *initWalker) walkSpec(src spec.SpecSourceRecipe, anchor, name string, refEnv map[string]string) error {
+func (w *initWalker) walkSpec(src spec.SpecSourceRecipe, anchor, name string, over overlay, root bool) error {
 	if w.opts.SkipRemoteRefs && src.GetSourceType() == spec.SourceTypes.Remote {
 		return nil
 	}
-	ready, err := src.PrepareSource(anchor, w.home)
+	ready, err := src.PrepareSource(anchor, w.home, root)
 	if err != nil {
 		return fmt.Errorf("init-remote-sources %s: %w", name, err)
 	}
-	if w.seen[ready.DirectoryPath] {
+	if w.seen[ready.DefinitionURI] {
 		return nil
 	}
-	w.seen[ready.DirectoryPath] = true
-	doc, err := spec.Load(ready.DefinitionURI, w.ctx.interp(refEnv, w.opts.EnvUnset))
+	w.seen[ready.DefinitionURI] = true
+	in, err := w.repoFiles.interp(ready.DirectoryPath, root, over, w.opts.EnvUnset)
+	if err != nil {
+		return fmt.Errorf("init-remote-sources %s: %w", name, err)
+	}
+	doc, err := spec.Load(ready.DefinitionURI, in)
 	if err != nil {
 		return fmt.Errorf("init-remote-sources %s: %w", name, err)
 	}
 	for _, inc := range doc.Include {
-		if err := w.walkSpec(inc, ready.DirectoryPath, "spec", nil); err != nil {
+		if err := w.walkSpec(inc, ready.DirectoryPath, "spec", overlay{inherited: doc.Lookup, env: inc.Env, vars: inc.Variables}, false); err != nil {
 			return err
 		}
 	}
@@ -60,9 +64,7 @@ func (w *initWalker) walkSpec(src spec.SpecSourceRecipe, anchor, name string, re
 		}
 		for _, ref := range rec.SourcedRefs() {
 			log.EmitTrace("init-remote-sources", "detected-remote-ref", "profile "+ref.ProfileName+": "+ref.String())
-			err := w.walkSpec(
-				spec.SpecSourceRecipe{SourceRecipe: spec.SourceRecipe{URI: ref.URI, SpecFile: ref.SpecFile, Ref: ref.Ref}},
-				ready.DirectoryPath, ref.ProfileName, ref.Env)
+			err := w.walkSpec(ref.AsSpecSource(), ready.DirectoryPath, ref.ProfileName, overlay{inherited: doc.Lookup, env: ref.Env, vars: ref.Variables}, false)
 			if err != nil {
 				return err
 			}

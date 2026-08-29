@@ -7,11 +7,12 @@ cases:
       args: [entry: base]
     expected:
       output: {source: "", profile: base, sourceType: filesystem, string: base}
-  - name: ShouldDecodeRemoteSourceRef
+  - name: ShouldDecodeRemoteSourceWithProfile
     input:
       args:
         - entry: |
-            source: "git::https://gitlab.com/konradodwrot/workspace.git/che.yml::gitlabGroup"
+            source: "git::https://gitlab.com/konradodwrot/workspace.git"
+            profile: gitlabGroup
             env: {GITLAB_GROUP: konradodwrot}
     expected:
       output:
@@ -19,73 +20,121 @@ cases:
         profile: gitlabGroup
         sourceType: remote
         env: {GITLAB_GROUP: konradodwrot}
-        string: "git::https://gitlab.com/konradodwrot/workspace.git/che.yml::gitlabGroup"
-  - name: ShouldDecodeRemoteSourceRefWithNestedSpecFile
+        string: "git::https://gitlab.com/konradodwrot/workspace.git profile gitlabGroup"
+  - name: ShouldDecodeSpecDirUnderSource
     input:
       args:
         - entry: |
-            source: "git::https://gitlab.com/g/r.git/sub/che.yml::p"
+            source: "git::https://gitlab.com/g/r.git"
+            spec: profiles/claude
+            profile: claude/virt
     expected:
       output:
-        source: "git::https://gitlab.com/g/r.git/sub"
-        profile: p
+        source: "git::https://gitlab.com/g/r.git"
+        spec: profiles/claude
+        profile: claude/virt
         sourceType: remote
-        string: "git::https://gitlab.com/g/r.git/sub/che.yml::p"
-  - name: ShouldDecodeDirSourceRefAsFilesystem
+        string: "git::https://gitlab.com/g/r.git spec profiles/claude profile claude/virt"
+  - name: ShouldDecodeSpecFileUnderSource
     input:
       args:
         - entry: |
-            source: ./sub/che.yml::p
+            source: ./sub
+            spec: other/che.export.yml
+            profile: p
     expected:
-      output: {source: ./sub, profile: p, sourceType: filesystem, string: ./sub/che.yml::p}
-  - name: ShouldDecodeNestedDirSourceRef
+      output: {source: ./sub, spec: other/che.export.yml, profile: p, sourceType: filesystem, string: "./sub spec other/che.export.yml profile p"}
+  - name: ShouldDecodeProfilePath
     input:
       args:
         - entry: |
-            source: ./a/b/che.yml::cli
+            source: "git::https://gitlab.com/g/r.git"
+            profile: ai/base/macos::ai/claude
     expected:
-      output: {source: ./a/b, profile: cli, sourceType: filesystem, string: ./a/b/che.yml::cli}
+      output:
+        source: "git::https://gitlab.com/g/r.git"
+        profile: ai/base/macos::ai/claude
+        sourceType: remote
+        string: "git::https://gitlab.com/g/r.git profile ai/base/macos::ai/claude"
   - name: ShouldDecodeRemoteSourceRefWithRefSuffix
     input:
       args:
         - entry: |
-            source: "git::https://gitlab.com/g/r.git@v1.2.3//che.yml::p"
+            source: "git::https://gitlab.com/g/r.git@v1.2.3"
+            profile: p
     expected:
       output:
         source: "git::https://gitlab.com/g/r.git"
         profile: p
         sourceType: remote
         ref: v1.2.3
-        string: "git::https://gitlab.com/g/r.git@v1.2.3/che.yml::p"
+        string: "git::https://gitlab.com/g/r.git@v1.2.3 profile p"
   - name: ShouldErrorOnRefQuerySyntax
     input:
       args:
         - entry: |
-            source: "./sub/che.yml::p?ref=v1.2.3"
+            source: "./sub?ref=v1.2.3"
+            profile: p
     expected:
       errorOutput: ['?ref= is gone', 'git::<repo>@<ref>']
   - name: ShouldDecodeAtInLocalDirNameLiterally
     input:
       args:
         - entry: |
-            source: "./sub@v1.2.3/che.yml::p"
+            source: "./sub@v1.2.3"
+            profile: p
     expected:
-      output: {source: "./sub@v1.2.3", profile: p, sourceType: filesystem, string: "./sub@v1.2.3/che.yml::p"}
+      output: {source: "./sub@v1.2.3", profile: p, sourceType: filesystem, string: "./sub@v1.2.3 profile p"}
   - name: ShouldErrorOnBareTrailingAt
     input:
       args:
         - entry: |
-            source: "git::https://gitlab.com/g/r.git@//che.yml::p"
+            source: "git::https://gitlab.com/g/r.git@"
+            profile: p
     expected:
       errorOutput: ['bare "@"']
-  - name: ShouldErrorOnEnvWithoutSource
+  - name: ShouldDecodeDeprecatedUrlFormWithSubdir
     input:
       args:
         - entry: |
-            source: p
-            env: {A: b}
+            source: "git::https://gitlab.com/g/r.git@v1//profiles/claude/che.yml::claude/virt"
     expected:
-      errorOutput: ['env requires a source']
+      output:
+        source: "git::https://gitlab.com/g/r.git"
+        spec: profiles/claude
+        profile: claude/virt
+        sourceType: remote
+        ref: v1
+        string: "git::https://gitlab.com/g/r.git@v1 spec profiles/claude profile claude/virt"
+  - name: ShouldDecodeDeprecatedUrlFormAsScalar
+    input:
+      args:
+        - entry: "./sub/che.yml::p"
+    expected:
+      output: {source: ./sub, profile: p, sourceType: filesystem, string: "./sub profile p"}
+  - name: ShouldErrorOnSubdirInRemoteURL
+    input:
+      args:
+        - entry: |
+            source: "git::https://gitlab.com/g/r.git//profiles/claude"
+            profile: p
+    expected:
+      errorOutput: ['//<path> is gone', 'spec key']
+  - name: ShouldErrorOnSpecFileInLocalSource
+    input:
+      args:
+        - entry: |
+            source: ./sub/che.yml
+            profile: p
+    expected:
+      errorOutput: ['names a spec file', 'spec key']
+  - name: ShouldErrorOnMissingProfile
+    input:
+      args:
+        - entry: |
+            source: "git::https://gitlab.com/g/r.git"
+    expected:
+      errorOutput: ['missing profile']
   - name: ShouldErrorOnMissingSource
     input:
       args:
@@ -93,25 +142,50 @@ cases:
             env: {A: b}
     expected:
       errorOutput: ['include.profiles entry missing source']
-  - name: ShouldErrorOnMissingProfileName
+  - name: ShouldDecodeLegacyCtxAsVariables
     input:
       args:
         - entry: |
-            source: "git::https://gitlab.com/g/r.git/che.yml::"
+            source: "git::https://gitlab.com/g/r.git"
+            profile: p
+            ctx: {repo: X}
     expected:
-      errorOutput: ['missing profile name']
-  - name: ShouldErrorOnSourceWithoutSpecFileSegment
+      output:
+        source: "git::https://gitlab.com/g/r.git"
+        profile: p
+        sourceType: remote
+        variables: {repo: X}
+        string: "git::https://gitlab.com/g/r.git profile p"
+  - name: ShouldDecodeVariables
     input:
       args:
         - entry: |
-            source: "git::https://gitlab.com/g/r.git::p"
+            source: "git::https://gitlab.com/g/r.git"
+            profile: p
+            variables: {repo: X}
     expected:
-      errorOutput: ['needs a <source>/<spec-file>.yml::<profile> path']
-  - name: ShouldErrorOnBareDirSourceWithoutSpecFile
+      output:
+        source: "git::https://gitlab.com/g/r.git"
+        profile: p
+        sourceType: remote
+        variables: {repo: X}
+        string: "git::https://gitlab.com/g/r.git profile p"
+  - name: ShouldErrorOnInvalidVariableKey
     input:
       args:
         - entry: |
-            source: "sibling::cli"
+            source: "git::https://gitlab.com/g/r.git"
+            profile: p
+            variables: {bad-key: b}
     expected:
-      errorOutput: ['needs a <source>/<spec-file>.yml::<profile> path']
+      errorOutput: ['key "bad-key" must match']
+  - name: ShouldErrorOnProfileAndProfilesTogether
+    input:
+      args:
+        - entry: |
+            source: "git::https://gitlab.com/g/r.git"
+            profile: a
+            profiles: [b]
+    expected:
+      errorOutput: ['profile and profiles are exclusive']
 # [<] 🤖🤖

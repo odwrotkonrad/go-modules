@@ -19,10 +19,15 @@ type expandWant struct {
 
 func TestExpand(t *testing.T) {
 	testyml.Eq(t, td, "testdata/spec/funcs/expand.test.spec.yml", func(t *testing.T, c testyml.Case[expandWant]) (expandWant, error) {
-		var env map[string]string
+		var env, vars map[string]string
 		c.Input.Args.To(t, 1, &env)
-		value, unset := Expand(c.Input.Args.String(t, 0), func(k string) string { return env[k] })
-		return expandWant{Value: value, Unset: unset}, nil
+		c.Input.Args.To(t, 2, &vars)
+		value, unset := Expand(c.Input.Args.String(t, 0), MapLookup(env, vars))
+		var names []string
+		for _, ref := range unset {
+			names = append(names, string(ref.Namespace)+"."+ref.Name)
+		}
+		return expandWant{Value: value, Unset: names}, nil
 	})
 }
 

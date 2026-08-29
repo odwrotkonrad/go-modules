@@ -4,9 +4,8 @@ package cli
 
 const renderTplUsage = `usage: che render tpl -f <template>
 
-Render <template> with the shared engine (gomplate built-ins + op:// (1Password)
-and gcp:// (GCP Secret Manager) secrets + frontmatter/readBody + native
-generators), env vars visible via env.Getenv, to
+Render <template> with the shared engine (gomplate built-ins + frontmatter/readBody +
+native generators), env vars visible via env.Getenv, to
 stdout. Drop-in for 'gomplate -f'. Paths in frontmatter/readBody/renderDirsTree
 resolve against the cwd.
 `

@@ -12,6 +12,7 @@ import (
 	"gopkg.in/yaml.v3"
 
 	"gitlab.com/konradodwrot/go-modules/che/internal/fsutil"
+	"gitlab.com/konradodwrot/go-modules/che/internal/log"
 	"gitlab.com/konradodwrot/go-modules/che/internal/source"
 	"gitlab.com/konradodwrot/go-modules/che/render/render"
 )
@@ -28,39 +29,59 @@ func (r SourceRecipe) IsValid() error {
 		if r.Ref != "" {
 			return fmt.Errorf("source %q: ref %s needs a remote %q source", r.URI, r.Ref, RemoteSrcPrefix)
 		}
+		if IsSpecFile(r.URI) {
+			return fmt.Errorf("source %q names a spec file: name the dir, put a file path under the spec key", r.URI)
+		}
 		return nil
 	}
-	if RemoteSrcRef(r.URI) == "" {
+	rest := RemoteSrcRef(r.URI)
+	if rest == "" {
 		return fmt.Errorf("source %q: empty git url after %q", r.URI, RemoteSrcPrefix)
+	}
+	if _, sub := splitRepoSubdir(rest); sub != "" {
+		return fmt.Errorf("source %q: //<path> is gone, put the dir or spec file path under the spec key", r.URI)
 	}
 	return nil
 }
 
-func (r SourceRecipe) prepare(repoRoot, home string) (SourceReady, error) {
+// [why] a source resolves to a dir and the ordered spec candidates it offers: an explicit spec file
+// is the one candidate, a dir (the source itself, or its spec: subdir) offers che.export.yml first
+func (r SourceRecipe) prepare(repoRoot, home string, invoked bool) (SourceReady, error) {
 	if err := r.IsValid(); err != nil {
 		return SourceReady{}, err
 	}
-	dir, err := r.resolveDir(repoRoot, home)
+	root, err := r.resolveDir(repoRoot, home)
 	if err != nil {
 		return SourceReady{}, err
 	}
-	specFile := cmp.Or(r.SpecFile, "che.yml")
-	def := filepath.Join(dir, specFile)
-	if _, err := os.Stat(def); err != nil {
-		return SourceReady{}, fmt.Errorf("%s not found at %s (source %q)", specFile, dir, r.URI)
+	if invoked {
+		def, ok := CheFile(root, SpecFileName)
+		if !ok {
+			return SourceReady{}, fmt.Errorf("spec not found: want %s", CheFileCandidates(root, SpecFileName))
+		}
+		return SourceReady{DefinitionURI: def, Candidates: []string{def}, DirectoryPath: root}, nil
 	}
-	return SourceReady{DefinitionURI: def, DirectoryPath: dir}, nil
+	if IsSpecFile(r.Spec) {
+		def := filepath.Join(root, r.Spec)
+		if _, err := os.Stat(def); err != nil {
+			return SourceReady{}, fmt.Errorf("spec %s not found at %s (source %q)", r.Spec, root, r.URI)
+		}
+		return SourceReady{DefinitionURI: def, Candidates: []string{def}, DirectoryPath: filepath.Dir(def)}, nil
+	}
+	dir := filepath.Join(root, r.Spec)
+	if !fsutil.IsDir(dir) {
+		return SourceReady{}, fmt.Errorf("spec dir %s not found at %s (source %q)", r.Spec, root, r.URI)
+	}
+	candidates, err := SpecCandidates(dir, r.GetSourceType() == SourceTypes.Remote)
+	if err != nil {
+		return SourceReady{}, fmt.Errorf("source %q: %w", r.URI, err)
+	}
+	return SourceReady{DefinitionURI: candidates[0], Candidates: candidates, DirectoryPath: dir}, nil
 }
 
 func (r SourceRecipe) resolveDir(repoRoot, home string) (string, error) {
 	if r.GetSourceType() == SourceTypes.Remote {
-		// [why] @<repo>//<subdir> targets a spec nested in the remote checkout
-		repo, sub := splitRepoSubdir(RemoteSrcRef(r.URI))
-		dir, err := source.EnsureCheckout(home, repo, r.Ref)
-		if err != nil || sub == "" {
-			return dir, err
-		}
-		return filepath.Join(dir, sub), nil
+		return source.EnsureCheckout(home, RemoteSrcRef(r.URI), r.Ref)
 	}
 	if r.URI == "" {
 		if r.DirectoryPath != "" {
@@ -97,13 +118,14 @@ func expandDir(ref, repoRoot, home string) string {
 	return dir
 }
 
-func (r SpecSourceRecipe) PrepareSource(repoRoot, home string) (SpecSourceReady, error) {
-	ready, err := r.prepare(repoRoot, home)
+// PrepareSource resolves an included or invoked spec source. invoked: the spec che runs, che.yml only.
+func (r SpecSourceRecipe) PrepareSource(repoRoot, home string, invoked bool) (SpecSourceReady, error) {
+	ready, err := r.prepare(repoRoot, home, invoked)
 	return SpecSourceReady{ready}, err
 }
 
 func (r ProfileSourceRecipe) PrepareSource(repoRoot, home string) (ProfileSourceReady, error) {
-	ready, err := r.prepare(repoRoot, home)
+	ready, err := r.prepare(repoRoot, home, false)
 	return ProfileSourceReady{SourceReady: ready, ProfileName: r.ProfileName}, err
 }
 
@@ -111,30 +133,23 @@ func (r ProfileSourceRecipe) GetProfileName() string { return r.ProfileName }
 
 func (r ProfileSourceReady) GetProfileName() string { return r.ProfileName }
 
+// AsSpecSource turns a profile ref into the spec source it targets.
+func (r ProfileSourceRecipe) AsSpecSource() SpecSourceRecipe {
+	return SpecSourceRecipe{SourceRecipe: r.SourceRecipe, Env: r.Env, Variables: r.Variables}
+}
+
 func (r ProfileSourceRecipe) String() string {
 	if r.URI == "" {
 		return r.ProfileName
 	}
-	return withRefSuffix(r.URI, r.refSuffix()) + "/" + cmp.Or(r.SpecFile, "che.yml") + "::" + r.ProfileName
-}
-
-// [why] the ref sits in the repo position: before the //, after any scp user
-func withRefSuffix(uri, suffix string) string {
-	if suffix == "" {
-		return uri
+	out := r.URI
+	if r.Ref != "" {
+		out += "@" + r.Ref
 	}
-	repo, sub := splitRepoSubdir(uri)
-	if sub == "" {
-		return repo + suffix
+	if r.Spec != "" {
+		out += " spec " + r.Spec
 	}
-	return repo + suffix + "//" + sub
-}
-
-func (r ProfileSourceRecipe) refSuffix() string {
-	if r.Ref == "" {
-		return ""
-	}
-	return "@" + r.Ref
+	return out + " profile " + r.ProfileName
 }
 
 func (r ProfileSourceRecipe) DisplayRef() string {
@@ -148,7 +163,7 @@ func (r ProfileSourceRecipe) DisplayRef() string {
 		}
 		return "remote:" + repoName(RemoteSrcRef(r.URI)) + at + ":" + r.ProfileName
 	}
-	return r.String()
+	return strings.TrimSuffix(r.URI+"/"+r.Spec, "/") + "::" + r.ProfileName
 }
 
 func repoName(url string) string {
@@ -159,56 +174,141 @@ func repoName(url string) string {
 	return s
 }
 
+func (i *profileListItem) UnmarshalYAML(value *yaml.Node) error {
+	type alias profileListItem
+	if err := decodeScalarOr(value, &i.Profile, (*alias)(i)); err != nil {
+		return err
+	}
+	if i.Profile == "" {
+		return fmt.Errorf("include.profiles entry profiles item: missing profile")
+	}
+	return nil
+}
+
+// Expand turns a multi-profile entry into one ref per listed profile, source, ref, options, env
+// and variables shared; a single-profile entry returns itself.
+func (r ProfileSourceRecipe) Expand() []ProfileSourceRecipe {
+	if len(r.Profiles) == 0 {
+		return []ProfileSourceRecipe{r}
+	}
+	out := make([]ProfileSourceRecipe, 0, len(r.Profiles))
+	for _, item := range r.Profiles {
+		one := r
+		one.Profiles = nil
+		one.ProfileName = item.Profile
+		one.Spec = cmp.Or(item.Spec, r.Spec)
+		out = append(out, one)
+	}
+	return out
+}
+
+func (r *SpecSourceRecipe) UnmarshalYAML(value *yaml.Node) error {
+	var scalar string
+	type alias SpecSourceRecipe
+	if err := decodeScalarOr(value, &scalar, (*alias)(r)); err != nil {
+		return err
+	}
+	src := cmp.Or(scalar, r.Src)
+	if src == "" {
+		return fmt.Errorf("include.sources entry missing source")
+	}
+	uri, gitRef, err := cutSourceRef(src)
+	if err != nil {
+		return err
+	}
+	r.URI, r.Ref, r.Spec, r.Src, r.SpecPath = uri, gitRef, r.SpecPath, "", ""
+	if err := validateKeys("include.sources "+src+" variables", r.Variables); err != nil {
+		return err
+	}
+	return r.IsValid()
+}
+
 func (r *ProfileSourceRecipe) UnmarshalYAML(value *yaml.Node) error {
 	var scalar string
 	type alias ProfileSourceRecipe
 	if err := decodeScalarOr(value, &scalar, (*alias)(r)); err != nil {
 		return err
 	}
+	if legacy := ctxAlias(value, "include.profiles entry"); legacy != nil {
+		r.Variables = mergeEnv(legacy, r.Variables)
+	}
+	if scalar != "" && !isOldRefForm(scalar) {
+		r.ProfileName = scalar
+		return nil
+	}
 	src := cmp.Or(scalar, r.Src)
 	if src == "" {
 		return fmt.Errorf("include.profiles entry missing source")
 	}
-	uri, specFile, profile, gitRef, err := splitSourceRef(src)
+	if isOldRefForm(src) {
+		// [why] pinned upstream tags still carry the URL form: refusing it refuses every consumer until each
+		// upstream re-tags, so it decodes to the keyed form and warns until every pin has moved
+		uri, specPath, profile, err := splitOldRefForm(src)
+		if err != nil {
+			return err
+		}
+		log.EmitWarn("load-spec", "deprecated", fmt.Sprintf("include.profiles entry %q: <source>/<spec-file>::<profile> is gone, write {source: %q, spec: %q, profile: %q}", src, uri, specPath, profile))
+		r.Src, r.SpecPath, r.Profile = uri, specPath, profile
+	}
+	if r.Profile == "" && len(r.Profiles) == 0 {
+		return fmt.Errorf("include.profiles entry %q: missing profile (or profiles)", r.Src)
+	}
+	if r.Profile != "" && len(r.Profiles) > 0 {
+		return fmt.Errorf("include.profiles entry %q: profile and profiles are exclusive", r.Src)
+	}
+	uri, gitRef, err := cutSourceRef(r.Src)
 	if err != nil {
 		return err
 	}
-	r.URI, r.SpecFile, r.ProfileName, r.Ref = uri, specFile, profile, gitRef
-	r.Src = ""
+	r.URI, r.Ref, r.Spec, r.ProfileName, r.Src, r.SpecPath, r.Profile = uri, gitRef, r.SpecPath, r.Profile, "", "", ""
 	if err := r.IsValid(); err != nil {
 		return err
 	}
-	if r.URI == "" && len(r.Env) > 0 {
-		return fmt.Errorf("include.profiles entry %q: env requires a source", r.ProfileName)
-	}
-	return nil
+	return validateKeys("include.profiles "+r.String()+" variables", r.Variables)
 }
 
-func splitSourceRef(src string) (uri, specFile, profile, gitRef string, err error) {
-	// [why] the ref rides the repo, never the profile name: cut it before the :: split
-	src, gitRef, err = cutSourceRef(src)
-	if err != nil {
-		return "", "", "", "", err
+func isOldRefForm(src string) bool {
+	return strings.Contains(strings.TrimPrefix(src, RemoteSrcPrefix), "::")
+}
+
+func splitOldRefForm(src string) (uri, specPath, profile string, err error) {
+	ref, profile, _ := strings.Cut(strings.TrimPrefix(src, RemoteSrcPrefix), "::")
+	if strings.HasPrefix(src, RemoteSrcPrefix) {
+		ref = RemoteSrcPrefix + ref
 	}
-	i := strings.LastIndex(src, "::")
-	if i < 0 {
-		return "", "", src, gitRef, nil
-	}
-	ref, profile := src[:i], src[i+2:]
 	if profile == "" {
-		return "", "", "", "", fmt.Errorf("include.profiles source %q: missing profile name", src)
+		return "", "", "", fmt.Errorf("include.profiles entry %q: missing profile name", src)
 	}
-	// [why] split on the last '/' by hand: path.Dir collapses the // in remote refs
 	slash := strings.LastIndex(ref, "/")
-	if slash <= 0 {
-		return "", "", "", "", fmt.Errorf("include.profiles source %q: needs a <source>/<spec-file>.yml::<profile> path", src)
+	if slash <= 0 || !IsSpecFile(ref[slash+1:]) {
+		return "", "", "", fmt.Errorf("include.profiles entry %q: needs {source, spec, profile}", src)
 	}
-	// [why] a spec file directly under the repo leaves the '//' separator's second slash on the dir
-	dir, file := strings.TrimSuffix(ref[:slash], "/"), ref[slash+1:]
-	if !strings.HasSuffix(file, ".yml") {
-		return "", "", "", "", fmt.Errorf("include.profiles source %q: needs a <source>/<spec-file>.yml::<profile> path", src)
+	dir := strings.TrimSuffix(ref[:slash], "/")
+	if strings.HasPrefix(dir, RemoteSrcPrefix) {
+		repo, sub := splitRepoSubdir(RemoteSrcRef(dir))
+		return RemoteSrcPrefix + repo, sub, profile, nil
 	}
-	return dir, file, profile, gitRef, nil
+	return dir, "", profile, nil
+}
+
+// [why] pinned remote specs still carry ctx: a hard error would refuse every consumer until each
+// upstream re-tags, so the old key decodes as variables and warns
+func ctxAlias(value *yaml.Node, where string) map[string]string {
+	if value.Kind != yaml.MappingNode {
+		return nil
+	}
+	for i := 0; i+1 < len(value.Content); i += 2 {
+		if value.Content[i].Value != "ctx" {
+			continue
+		}
+		var legacy map[string]string
+		if err := value.Content[i+1].Decode(&legacy); err != nil {
+			return nil
+		}
+		log.EmitWarn("load-spec", "deprecated", where+": ctx is renamed to variables, decoded as variables")
+		return legacy
+	}
+	return nil
 }
 
 func cutSourceRef(src string) (rest, gitRef string, err error) {

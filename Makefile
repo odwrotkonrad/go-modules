@@ -23,7 +23,6 @@ repo-prepare-deps:
 ##[<] Dev Environment
 
 ##[>] Docs [genai-include]
-#[why] ontoRepo only: claude-agents renders untracked .claude/ from prose-generated snippets absent in a clone
 #[why] this checkout's build wins: an MR may change che's own rendering, so a release che from PATH
 #   would render the wrong output. CI supplies it as warm-go's artifact, skipping a rebuild
 #[why] PATH che is the fallback, building the last resort: a fresh clone (repo-prepare-dev-env)
@@ -35,7 +34,7 @@ render-templates:
 	if [[ -z $$che_bin ]] { $(MAKE) -C che build; che_bin=che/dist/che }; \
 	$$che_bin render-templates --profiles ontoRepo
 
-#[what] render .env.tpl to .env: upstream refs and CI variables via glab, secrets via op
+#[what] render .che/repo-git-untracked/templates/env.tpl to .env: upstream refs and CI variables via glab, secrets via op
 repo-render-env:
 	@CHE_ENV_UNSET=empty che render-templates --profiles=envSeed
 

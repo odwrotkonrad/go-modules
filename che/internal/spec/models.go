@@ -25,18 +25,23 @@ var SourceTypes = struct{ Remote, Filesystem SourceType }{"remote", "filesystem"
 
 type SourceRecipe struct {
 	URI           string `yaml:"-"`
-	SpecFile      string `yaml:"-"`
+	Spec          string `yaml:"-"`
 	DirectoryPath string `yaml:"-"`
 	Ref           string `yaml:"-"`
 }
 
 type SourceReady struct {
 	DefinitionURI string
+	Candidates    []string
 	DirectoryPath string
 }
 
 type SpecSourceRecipe struct {
 	SourceRecipe `yaml:"-"`
+	Src          string            `yaml:"source"`
+	SpecPath     string            `yaml:"spec"`
+	Env          map[string]string `yaml:"env"`
+	Variables    map[string]string `yaml:"variables"`
 }
 
 type SpecSourceReady struct {
@@ -47,9 +52,17 @@ type ProfileSourceRecipe struct {
 	SourceRecipe `yaml:"-"`
 	ProfileName  string            `yaml:"-"`
 	Src          string            `yaml:"source"`
+	SpecPath     string            `yaml:"spec"`
+	Profile      string            `yaml:"profile"`
+	Profiles     []profileListItem `yaml:"profiles"`
 	Options      ProfileOptions    `yaml:"options"`
 	Env          map[string]string `yaml:"env"`
-	Ctx          map[string]string `yaml:"ctx"`
+	Variables    map[string]string `yaml:"variables"`
+}
+
+type profileListItem struct {
+	Spec    string `yaml:"spec"`
+	Profile string `yaml:"profile"`
 }
 
 type ProfileSourceReady struct {
@@ -64,6 +77,8 @@ type ProfileSourceReady struct {
 type Doc struct {
 	Options        Options
 	Env            map[string]string
+	Lookup         map[string]string
+	Variables      map[string]string
 	Include        []SpecSourceRecipe
 	ProfileRecipes []ProfileRecipe
 	EnvUnset       map[string][]EnvUnset
@@ -258,7 +273,6 @@ func (StringOrList) JSONSchema() *jsonschema.Schema {
 }
 
 type RenderTemplates struct {
-	SkipSecrets   *bool `yaml:"skipSecrets" jsonschema_description:"skip templates carrying op:// (1Password) or gcp:// (GCP Secret Manager) secret refs; overridden by the flag and env var"`
 	SkipVariables *bool `yaml:"skipVariables" jsonschema_description:"skip templates carrying a shell call; overridden by the flag and env var"`
 }
 
@@ -290,7 +304,7 @@ type includeSet struct {
 	Profiles            []ProfileSourceRecipe       `yaml:"profiles" jsonschema_description:"profile refs composed depth-first before this profile's own payload: local profile name scalar, or {source, options, env} where source is git::<repo>[@<ref>][//<subdir>]/<spec-file>.yml::<profile> locating a profile in another spec (its own checkout anchor, @<ref> pins a remote source to a tag or branch)"`
 	MakeLinks           []linkEntry                 `yaml:"makeLinks" jsonschema_description:"symlink-op entries, workingDirectory-relative: glob string (dest derived 1:1), {source, dest: [paths]} explicit per-file dests, or {source, dest} dest rewrite (sed-style s:^_home:$HOME: or prefix-swap sugar {source: _home/**, dest: $HOME/**} to target home)"`
 	MakeCopies          []copyNode                  `yaml:"makeCopies" jsonschema_description:"copy-op tree: a leaf copies one source verbatim to its dests, a node carrying nested <<< is a group whose source and dest prefixes and perms cascade onto its descendants (innermost wins); local *.ontoHost.cp sources workingDirectory-relative, or remote (git::<repo>[@<ref>]//<path>, explicit dest required, a group prefix carrying the ref concatenates with each leaf path); a glob source may carry a {source, dest} dest rewrite (sed-style s:^_home:$HOME: or prefix-swap sugar _home/** -> $HOME/**)"`
-	RenderTemplates     []templateNode              `yaml:"renderTemplates" jsonschema_description:"*.tpl render-op tree: a leaf renders one source to its dests, a node carrying nested <<< is a group whose source prefixes, perms, ctx and options cascade onto its descendants (innermost wins, dest options win last); local host sources workingDirectory-relative, repo-doc sources (repo dest) workingDirectory-relative, or remote (git::<repo>[@<ref>]//<path>, explicit dest required, a group prefix carrying the ref concatenates with each leaf path); glob and derived-dest forms are host sources; a glob source may carry a {source, dest} dest rewrite (sed-style s:^_home:$HOME: or prefix-swap sugar _home/** -> $HOME/**); dests expand env vars incl ${invokingSpecGitRoot}, the top-level spec's checkout"`
+	RenderTemplates     []templateNode              `yaml:"renderTemplates" jsonschema_description:"*.tpl render-op tree: a leaf renders one source to its dests, a node carrying nested <<< is a group whose source prefixes, perms, variables and options cascade onto its descendants (innermost wins, dest options win last); local host sources workingDirectory-relative, repo-doc sources (repo dest) workingDirectory-relative, or remote (git::<repo>[@<ref>]//<path>, explicit dest required, a group prefix carrying the ref concatenates with each leaf path); glob and derived-dest forms are host sources; a glob source may carry a {source, dest} dest rewrite (sed-style s:^_home:$HOME: or prefix-swap sugar _home/** -> $HOME/**); dests expand env vars incl ${invokingSpecGitRoot}, the top-level spec's checkout"`
 	MakeDirs            []dirGroup                  `yaml:"makeDirs" jsonschema_description:"extra-dir perm-groups; each item one dir path (brace-expanded)"`
 	InstallPackages     []PackageRef                `yaml:"installPackages" jsonschema_description:"packages installed from the packages file (default $XDG_CONFIG_HOME/packages/packages.yml): canonical name scalar, or {name, version} to install a specific version (exact or wildcard), overriding the entry's default version; runs before runScripts"`
 	InstallToolPackages map[string][]ToolPackageRef `yaml:"installToolPackages" jsonschema_description:"tool-scoped packages installed from the packages file's toolPackages section, per host tool: name scalar, or {name, version} overriding the entry's pin; runs with installPackages"`
@@ -324,14 +338,14 @@ type copyNode struct {
 }
 
 type templateNode struct {
-	Perms    `yaml:",inline"`
-	glob     string
-	DestRule string
-	Source   string            `yaml:"source"`
-	Dest     []DestSpec        `yaml:"dest"`
-	Ctx      map[string]string `yaml:"ctx" jsonschema_description:"template context, merged under each descendant's ctx (innermost keys win)"`
-	Options  optionsSpec       `yaml:"options" jsonschema_description:"render options, merged under each descendant's options and each explicit dest's options (innermost set field wins, an explicit false overriding an inherited true)"`
-	Children []templateNode    `yaml:"<<<" jsonschema_description:"nested nodes, inheriting this node's source and dest prefixes, perms, ctx and options"`
+	Perms     `yaml:",inline"`
+	glob      string
+	DestRule  string
+	Source    string            `yaml:"source"`
+	Dest      []DestSpec        `yaml:"dest"`
+	Variables map[string]string `yaml:"variables" jsonschema_description:"template variables exposed as .var.<key>, merged under each descendant's variables (innermost keys win)"`
+	Options   optionsSpec       `yaml:"options" jsonschema_description:"render options, merged under each descendant's options and each explicit dest's options (innermost set field wins, an explicit false overriding an inherited true)"`
+	Children  []templateNode    `yaml:"<<<" jsonschema_description:"nested nodes, inheriting this node's source and dest prefixes, perms, variables and options"`
 }
 
 type dirGroup struct {
@@ -352,6 +366,7 @@ type DestSpec struct {
 
 type optionsSpec struct {
 	WriteType               *string `yaml:"writeType"`
+	CommentPrefix           *string `yaml:"commentPrefix"`
 	SkipAutoGeneratedHeader *bool   `yaml:"skipAutoGeneratedHeader"`
 	RenderReferencedFiles   *bool   `yaml:"renderReferencedFiles"`
 }
@@ -365,7 +380,7 @@ type Perms struct {
 type FileItem struct {
 	Rel     string
 	Dests   []DestSpec
-	Ctx     map[string]string
+	Vars    map[string]string
 	Derived bool
 	Perms
 }
@@ -374,13 +389,7 @@ type FileItem struct {
 
 // [>] 🤖🤖 operation recipes
 
-type OperationOptions struct {
-	SkipSecrets bool
-}
-
-type OperationRecipe struct {
-	Options OperationOptions
-}
+type OperationRecipe struct{}
 
 type (
 	PruneLinksOperationRecipe struct {
@@ -458,7 +467,7 @@ type templateInherited struct {
 	prefix     string
 	destPrefix string
 	perms      Perms
-	ctx        map[string]string
+	vars       map[string]string
 	options    optionsSpec
 }
 

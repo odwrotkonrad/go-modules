@@ -17,11 +17,12 @@ cases:
                 options: {autoDiscover: true}
                 include:
                   profiles:
-                    - source: "git::file://${REF_DIR}/che.yml::gitlabGroup"
+                    - source: "git::file://${REF_DIR}"
+                      profile: gitlabGroup
         - flags: {prepareAfter: true}
     expected:
       stdOut:
-        - 'detected remote ref profile gitlabGroup: git::file://${REF_DIR}/che.yml::gitlabGroup'
+        - 'detected remote ref profile gitlabGroup: git::file://${REF_DIR} profile gitlabGroup'
         - 'cloned remote file://${REF_DIR}'
   - name: ShouldFetchRefEvenWhenItsConditionFails
     input:
@@ -37,7 +38,8 @@ cases:
                 options: {autoDiscover: true}
                 include:
                   profiles:
-                    - source: "git::file://${REF_DIR}/che.yml::gitlabGroup"
+                    - source: "git::file://${REF_DIR}"
+                      profile: gitlabGroup
     expected:
       stdOut:
         - 'cloned remote file://${REF_DIR}'
@@ -56,7 +58,8 @@ cases:
                 options: {autoDiscover: true}
                 include:
                   profiles:
-                    - source: "git::file://${REF_DIR}/che.yml::gitlabGroup"
+                    - source: "git::file://${REF_DIR}"
+                      profile: gitlabGroup
         - flags: {skipRemoteRefs: true}
     notExpected:
       stdOut:
@@ -73,7 +76,8 @@ cases:
                 options: {autoDiscover: true}
                 include:
                   profiles:
-                    - source: "git::file:///nonexistent-che-src/che.yml::gitlabGroup"
+                    - source: "git::file:///nonexistent-che-src"
+                      profile: gitlabGroup
     expected:
       errorOutput: 'init-remote-sources gitlabGroup: '
 # [<] 🤖🤖

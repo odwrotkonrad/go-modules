@@ -51,16 +51,19 @@ func newContext(env map[string]string, cwd string) Context {
 }
 
 type prepWant struct {
-	Profiles      []string            `yaml:"profiles"`
-	Rejected      map[string]string   `yaml:"rejected"`
-	RepoRoot      string              `yaml:"repoRoot"`
-	RepoRootUnder string              `yaml:"repoRootUnder"`
-	Script        string              `yaml:"script"`
-	Env           map[string]string   `yaml:"env"`
-	SampleEnv     string              `yaml:"sampleEnv"`
-	EnvInOverlay  string              `yaml:"envInOverlay"`
-	LinkDests     map[string][]string `yaml:"linkDests"`
-	WorkingDirs   map[string]string   `yaml:"workingDirs"`
+	Profiles      []string                     `yaml:"profiles"`
+	Rejected      map[string]string            `yaml:"rejected"`
+	RepoRoot      string                       `yaml:"repoRoot"`
+	RepoRootUnder string                       `yaml:"repoRootUnder"`
+	Script        string                       `yaml:"script"`
+	Env           map[string]string            `yaml:"env"`
+	SampleEnv     string                       `yaml:"sampleEnv"`
+	EnvInOverlay  string                       `yaml:"envInOverlay"`
+	LinkDests     map[string][]string          `yaml:"linkDests"`
+	WorkingDirs   map[string]string            `yaml:"workingDirs"`
+	EnvOf         map[string]map[string]string `yaml:"envOf"`
+	VarsOf        map[string]map[string]string `yaml:"varsOf"`
+	SpecPath      string                       `yaml:"specPath"`
 }
 
 func profileByName(ps []*ProfileReady) map[string]*ProfileReady {
@@ -276,17 +279,38 @@ func TestPrepareSpecs(t *testing.T) {
 				// [why] the profile captured the launch env overlaid with its spec env
 				assert.Equal(t, w.EnvInOverlay, sp.env[w.SampleEnv], w.SampleEnv+" in the captured env")
 			}
+			by := profileByName(profiles)
+			for name, want := range w.EnvOf {
+				pr := by[name]
+				require.NotNilf(t, pr, "profile %q not prepared\n%s", name, out)
+				for k, v := range want {
+					assert.Equalf(t, v, pr.env[k], "profile %q env %s", name, k)
+				}
+			}
+			for name, want := range w.VarsOf {
+				pr := by[name]
+				require.NotNilf(t, pr, "profile %q not prepared\n%s", name, out)
+				got := pr.templateData(spec.FileItem{}).Var
+				for k, v := range want {
+					assert.Equalf(t, v, got[k], "profile %q var %s", name, k)
+				}
+			}
+			if w.SpecPath != "" {
+				wantPath, _ := filepath.EvalSymlinks(testyml.Expand(w.SpecPath, vars))
+				gotPath, _ := filepath.EvalSymlinks(root.Source.DefinitionURI)
+				assert.Equal(t, wantPath, gotPath, "spec path")
+			}
 		})
 }
 
 type prepareOptsGot struct {
-	ValidateSpec      string   `yaml:"validateSpec,omitempty"`
-	LogLevel          string   `yaml:"logLevel,omitempty"`
-	DryRun            string   `yaml:"dryRun,omitempty"`
-	SkipRemoteRefs    bool     `yaml:"skipRemoteRefs,omitempty"`
-	RenderSkipSecrets bool     `yaml:"renderSkipSecrets,omitempty"`
-	AutoDiscover      bool     `yaml:"autoDiscover,omitempty"`
-	Profiles          []string `yaml:"profiles,omitempty"`
+	ValidateSpec        string   `yaml:"validateSpec,omitempty"`
+	LogLevel            string   `yaml:"logLevel,omitempty"`
+	DryRun              string   `yaml:"dryRun,omitempty"`
+	SkipRemoteRefs      bool     `yaml:"skipRemoteRefs,omitempty"`
+	RenderSkipVariables bool     `yaml:"renderSkipVariables,omitempty"`
+	AutoDiscover        bool     `yaml:"autoDiscover,omitempty"`
+	Profiles            []string `yaml:"profiles,omitempty"`
 }
 
 func TestPrepareOptions(t *testing.T) {
@@ -318,13 +342,13 @@ func TestPrepareOptions(t *testing.T) {
 			return prepareOptsGot{}, err
 		}
 		return prepareOptsGot{
-			ValidateSpec:      string(opts.ValidateSpec),
-			LogLevel:          opts.LogLevel,
-			DryRun:            string(opts.DryRun),
-			SkipRemoteRefs:    opts.SkipRemoteRefs,
-			RenderSkipSecrets: opts.RenderSkipSecrets,
-			AutoDiscover:      opts.AutoDiscover,
-			Profiles:          opts.Profiles,
+			ValidateSpec:        string(opts.ValidateSpec),
+			LogLevel:            opts.LogLevel,
+			DryRun:              string(opts.DryRun),
+			SkipRemoteRefs:      opts.SkipRemoteRefs,
+			RenderSkipVariables: opts.RenderSkipVariables,
+			AutoDiscover:        opts.AutoDiscover,
+			Profiles:            opts.Profiles,
 		}, nil
 	})
 }

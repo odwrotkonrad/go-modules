@@ -20,7 +20,9 @@ type sourceWant struct {
 	Source     string            `yaml:"source"`
 	Profile    string            `yaml:"profile"`
 	SourceType string            `yaml:"sourceType"`
+	Spec       string            `yaml:"spec"`
 	Env        map[string]string `yaml:"env"`
+	Variables  map[string]string `yaml:"variables"`
 	String     string            `yaml:"string"`
 	Ref        string            `yaml:"ref"`
 }
@@ -38,7 +40,9 @@ func TestProfileSourceDecode(t *testing.T) {
 			Source:     ref.URI,
 			Profile:    ref.GetProfileName(),
 			SourceType: string(ref.GetSourceType()),
+			Spec:       ref.Spec,
 			Env:        ref.Env,
+			Variables:  ref.Variables,
 			String:     ref.String(),
 			Ref:        ref.Ref,
 		}, nil

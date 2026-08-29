@@ -18,14 +18,15 @@ cases:
                 options: {autoDiscover: true}
                 include:
                   profiles:
-                    - source: "${REF_DIR}/che.yml::p"
+                    - source: "${REF_DIR}"
+                      profile: p
         - flags: {}
     expected:
       stdOut:
         - "warning /p:"
         - includes
       output:
-        profiles: [main, "${REF_DIR}/che.yml::p"]
+        profiles: [main, "${REF_DIR}::p"]
   - name: ShouldFailOnRefSpecViolationInErrorMode
     input:
       args:
@@ -40,7 +41,8 @@ cases:
                 options: {autoDiscover: true}
                 include:
                   profiles:
-                    - source: "${REF_DIR}/che.yml::p"
+                    - source: "${REF_DIR}"
+                      profile: p
         - flags: {validateSpec: error}
     expected:
       errorOutput: includes
@@ -63,7 +65,8 @@ cases:
                 options: {autoDiscover: true}
                 include:
                   profiles:
-                    - source: "git::file://${REF_DIR}/che.yml::gitlabGroup"
+                    - source: "git::file://${REF_DIR}"
+                      profile: gitlabGroup
                   runScripts: [scripts/local.zsh]
             scripts/local.zsh: "#!/bin/zsh\n"
         - flags: {logLevel: trace}
@@ -96,14 +99,15 @@ cases:
                 options: {autoDiscover: true}
                 include:
                   profiles:
-                    - source: "${REF_DIR}/che.yml::gitlabGroup"
+                    - source: "${REF_DIR}"
+                      profile: gitlabGroup
         - flags:
             unsetEnv: [REF_GATE]
             logLevel: debug
     expected:
       output:
         profiles: [main]
-        rejected: {"${REF_DIR}/che.yml::gitlabGroup": "env:REF_GATE"}
+        rejected: {"${REF_DIR}::gitlabGroup": "env:REF_GATE"}
   - name: ShouldGateRefExecIfWithEntryEnvWithoutLeaking
     input:
       args:
@@ -121,14 +125,15 @@ cases:
                 options: {autoDiscover: true}
                 include:
                   profiles:
-                    - source: "${REF_DIR}/che.yml::gitlabGroup"
+                    - source: "${REF_DIR}"
+                      profile: gitlabGroup
                       env:
                         REF_GATE: "1"
         - flags:
             unsetEnv: [REF_GATE]
     expected:
       output:
-        profiles: [main, "${REF_DIR}/che.yml::gitlabGroup"]
+        profiles: [main, "${REF_DIR}::gitlabGroup"]
         env: {REF_GATE: "1"}
         sampleEnv: REF_GATE
         envInOverlay: "1"
@@ -151,13 +156,14 @@ cases:
                 options: {autoDiscover: true}
                 include:
                   profiles:
-                    - source: "${REF_DIR}/che.yml::gitlabGroup"
+                    - source: "${REF_DIR}"
+                      profile: gitlabGroup
                       env:
                         SHADOWED: entry
         - flags: {}
     expected:
       output:
-        profiles: [main, "${REF_DIR}/che.yml::gitlabGroup"]
+        profiles: [main, "${REF_DIR}::gitlabGroup"]
         env: {FROM_SPEC: spec, SHADOWED: entry}
   - name: ShouldSkipRemoteRefsWithKnob
     input:
@@ -169,7 +175,8 @@ cases:
                 options: {autoDiscover: true}
                 include:
                   profiles:
-                    - source: "/nonexistent/che.yml::p"
+                    - source: "/nonexistent"
+                      profile: p
                   runScripts: [scripts/local.zsh]
             scripts/local.zsh: "#!/bin/zsh\n"
         - flags:
@@ -189,7 +196,8 @@ cases:
                 options: {autoDiscover: true}
                 include:
                   profiles:
-                    - source: "./ref/che.yml::gitlabGroup"
+                    - source: "./ref"
+                      profile: gitlabGroup
             ref/che.yml: |
               gitlabGroup:
                 include:
@@ -198,7 +206,7 @@ cases:
         - flags: {}
     expected:
       output:
-        profiles: [main, ./ref/che.yml::gitlabGroup]
+        profiles: [main, ./ref::gitlabGroup]
         repoRoot: ${HOST_REPO}/ref
         script: scripts/bootstrap.zsh
   - name: ShouldAnchorDirRefAtEnvVarDir
@@ -216,11 +224,12 @@ cases:
                 options: {autoDiscover: true}
                 include:
                   profiles:
-                    - source: "$REF_DIR_VAR/che.yml::gitlabGroup"
+                    - source: "$REF_DIR_VAR"
+                      profile: gitlabGroup
         - flags: {}
     expected:
       output:
-        profiles: [main, $REF_DIR_VAR/che.yml::gitlabGroup]
+        profiles: [main, $REF_DIR_VAR::gitlabGroup]
         repoRoot: ${REF_DIR}
     notExpected:
       stdOut: [clone, pull]
@@ -239,16 +248,18 @@ cases:
                 options: {autoDiscover: true}
                 include:
                   profiles:
-                    - source: "${REF_DIR}/che.yml::p"
+                    - source: "${REF_DIR}"
+                      profile: p
               b:
                 options: {autoDiscover: true}
                 include:
                   profiles:
-                    - source: "${REF_DIR}/che.yml::p"
+                    - source: "${REF_DIR}"
+                      profile: p
         - flags: {}
     expected:
       output:
-        profiles: [a, b, "${REF_DIR}/che.yml::p"]
+        profiles: [a, b, "${REF_DIR}::p"]
   - name: ShouldResolveRefsRecursivelyWithCycleGuard
     input:
       args:
@@ -259,21 +270,24 @@ cases:
                 options: {autoDiscover: true}
                 include:
                   profiles:
-                    - source: "./a/che.yml::p1"
+                    - source: "./a"
+                      profile: p1
             a/che.yml: |
               p1:
                 include:
                   profiles:
-                    - source: "../b/che.yml::p2"
+                    - source: "../b"
+                      profile: p2
             b/che.yml: |
               p2:
                 include:
                   profiles:
-                    - source: "../a/che.yml::p1"
+                    - source: "../a"
+                      profile: p1
         - flags: {}
     expected:
       output:
-        profiles: [main, ./a/che.yml::p1, ../b/che.yml::p2]
+        profiles: [main, ./a::p1, ../b::p2]
   - name: ShouldComposeIncludeSourcesSpecs
     input:
       args:
@@ -299,7 +313,7 @@ cases:
         - flags: {}
     expected:
       output:
-        profiles: [main, ./sibling/che.yml::sib]
+        profiles: [main, ./sibling::sib]
   - name: ShouldErrorOnCrossSpecProfileNameCollision
     input:
       args:
@@ -422,7 +436,7 @@ cases:
         - flags: {}
     expected:
       output:
-        profiles: [main, ./one/che.yml::alpha, ./two/che.yml::beta]
+        profiles: [main, ./one::alpha, ./two::beta]
         linkDests:
           alpha: ['${HOME}/.config/keep-a']
           beta: ['${HOME}/.config/keep-b']
@@ -466,7 +480,7 @@ cases:
         - flags: {}
     expected:
       output:
-        profiles: [main, ./sub/che.yml::s]
+        profiles: [main, ./sub::s]
         linkDests:
           s: ['${HOME}/.config/x']
   - name: ShouldOverrideRemoteRefEntryWorkingDirectory
@@ -486,7 +500,8 @@ cases:
                 options: {autoDiscover: true}
                 include:
                   profiles:
-                    - source: "git::file://${REF_DIR}/che.yml::gitlabGroup"
+                    - source: "git::file://${REF_DIR}"
+                      profile: gitlabGroup
                       options: {profileWorkingDirectory: override-tree}
         - flags: {}
     expected:
@@ -608,11 +623,385 @@ cases:
                 options: {autoDiscover: true}
                 include:
                   profiles:
-                    - source: "${REF_DIR}/che.yml::s"
+                    - source: "${REF_DIR}"
+                      profile: s
             roottree/_home/.config/c: "c\n"
         - flags: {profileWorkingDirectory: roottree}
     expected:
       output:
         workingDirs:
           s: "${REF_DIR}"
+  - name: ShouldDiscoverSpecUnderDotChe
+    input:
+      args:
+        - refFiles: {}
+        - hostFiles:
+            .che/che.yml: |
+              main:
+                options: {autoDiscover: true}
+        - flags: {}
+    expected:
+      output:
+        profiles: [main]
+        specPath: ${HOST_REPO}/.che/che.yml
+  - name: ShouldPreferRootSpecOverDotChe
+    input:
+      args:
+        - refFiles: {}
+        - hostFiles:
+            che.yml: |
+              atRoot:
+                options: {autoDiscover: true}
+            .che/che.yml: |
+              nested:
+                options: {autoDiscover: true}
+        - flags: {logLevel: debug}
+    expected:
+      stdOut: ['che.yml wins over']
+      output:
+        profiles: [atRoot]
+        specPath: ${HOST_REPO}/che.yml
+  - name: ShouldReadRepoVariablesAndCheEnvIntoTheSpec
+    context:
+      env: {FILE: process}
+    input:
+      args:
+        - refFiles: {}
+        - hostFiles:
+            .che/che.variables.yml: "PIN: v1\nDECLARED: file\n"
+            .che/che.env: "REPO=fromfile\nFILE=fromfile\nDECLARED=env\n"
+            .che/che.yml: |
+              env: {SPEC: '${{ env.REPO }}-${{ var.PIN }}-${{ var.DECLARED }}-${{ var.FILE }}'}
+              variables: {LOCAL: '${{ env.FILE }}'}
+              main:
+                options: {autoDiscover: true}
+        - flags: {}
+    expected:
+      output:
+        profiles: [main]
+        envOf:
+          main: {REPO: fromfile, FILE: process, SPEC: fromfile-v1-file-process}
+        varsOf:
+          main: {PIN: v1, LOCAL: process}
+  - name: ShouldSetIncludedVariablesImplicitlyFromInvokingEnvUnderRefVariables
+    input:
+      args:
+        - refFiles:
+            .che/che.env: "A=remote\nB=remote\nIMPLICIT=remote\n"
+            .che/che.variables.yml: "RPIN: r1\nKEEP: kept\n"
+            che.yml: |
+              env: {C: '${{ env.A }}', E: '${{ env.HOSTONLY }}'}
+              p:
+                options: {profileWorkingDirectory: '${{ var.RPIN }}'}
+                include:
+                  makeDirs:
+                    - directories: ['$HOME/${{ var.KEEP }}/${{ var.IMPLICIT }}']
+            r1/.gitkeep: ""
+            over/.gitkeep: ""
+        - hostFiles:
+            .che/che.env: "IMPLICIT=host-che-env\n"
+            che.yml: |
+              env: {B: host, HOSTONLY: host}
+              main:
+                options: {autoDiscover: true}
+                include:
+                  profiles:
+                    - source: "${REF_DIR}"
+                      profile: p
+                      env: {D: entry}
+                      variables: {RPIN: over}
+        - flags: {}
+    expected:
+      output:
+        profiles: [main, "${REF_DIR}::p"]
+        envOf:
+          p: {A: remote, B: host, C: remote, D: entry, E: host, IMPLICIT: host-che-env}
+        varsOf:
+          p: {RPIN: over, KEEP: kept, IMPLICIT: host-che-env}
+        workingDirs: {p: "${REF_DIR}/over"}
+  - name: ShouldOverlayIncludeSourcesEntryEnvAndVariables
+    input:
+      args:
+        - refFiles:
+            che.yml: |
+              env: {X: included}
+              inc:
+                options: {autoDiscover: true, runIf: ['env:X == entry']}
+        - hostFiles:
+            che.yml: |
+              include:
+                sources:
+                  - source: "${REF_DIR}"
+                    env: {X: entry}
+                    variables: {V: entry}
+              main:
+                options: {autoDiscover: true}
+        - flags: {}
+    expected:
+      output:
+        profiles: [main, "${REF_DIR}::inc"]
+        envOf:
+          inc: {X: entry}
+        varsOf:
+          inc: {V: entry}
+  - name: ShouldFailOnUnsetVarNamingSpecAndPath
+    input:
+      args:
+        - refFiles: {}
+        - hostFiles:
+            che.yml: |
+              main:
+                options: {autoDiscover: true, profileWorkingDirectory: '${{ var.NOPE }}'}
+        - flags: {}
+    expected:
+      errorOutput: ['che.yml: unset vars:', 'NOPE at /main/options/profileWorkingDirectory']
+  - name: ShouldIgnoreDotEnv
+    input:
+      args:
+        - refFiles: {}
+        - hostFiles:
+            .env: "FROM_DOTENV=yes\n"
+            che.yml: |
+              main:
+                options: {autoDiscover: true}
+        - flags: {}
+    expected:
+      output:
+        profiles: [main]
+        envOf:
+          main: {FROM_DOTENV: ""}
+  - name: ShouldPreferExportSpecForIncludedSourcesWithoutSpecFile
+    input:
+      args:
+        - refFiles:
+            che.export.yml: |
+              exported:
+                options: {autoDiscover: true}
+            .che/che.yml: |
+              local:
+                options: {autoDiscover: true}
+        - hostFiles:
+            che.yml: |
+              include:
+                sources: ["git::file://${REF_DIR}"]
+              main:
+                options: {autoDiscover: true}
+        - flags: {}
+    expected:
+      output:
+        profiles: [main, "remote:${REF_NAME}:exported"]
+    notExpected:
+      stdOut: ['not designed for reuse']
+  - name: ShouldWarnWhenRemoteRefTargetsPlainCheYml
+    input:
+      args:
+        - refFiles:
+            che.yml: |
+              p:
+                options: {autoDiscover: true}
+        - hostFiles:
+            che.yml: |
+              main:
+                options: {autoDiscover: true}
+                include:
+                  profiles:
+                    - source: "git::file://${REF_DIR}"
+                      profile: p
+        - flags: {}
+    expected:
+      stdOut: ['che.yml: a spec not designed for reuse, consume a che.export.yml']
+      output:
+        profiles: [main, "remote:${REF_NAME}:p"]
+  - name: ShouldResolveExplicitExportSpecOnRemoteRef
+    input:
+      args:
+        - refFiles:
+            che.export.yml: |
+              p:
+                options: {autoDiscover: true}
+        - hostFiles:
+            che.yml: |
+              main:
+                options: {autoDiscover: true}
+                include:
+                  profiles:
+                    - source: "git::file://${REF_DIR}"
+                      profile: p
+        - flags: {}
+    expected:
+      output:
+        profiles: [main, "remote:${REF_NAME}:p"]
+    notExpected:
+      stdOut: ['not designed for reuse']
+  - name: ShouldWalkProfilePathThroughIncludedProfiles
+    input:
+      args:
+        - refFiles:
+            che.export.yml: |
+              top:
+                include:
+                  profiles:
+                    - mid
+                    - {source: ./sub, profile: leaf}
+              mid:
+                include:
+                  makeDirs:
+                    - directories: ['$HOME/mid']
+            sub/che.export.yml: |
+              leaf:
+                include:
+                  makeDirs:
+                    - directories: ['$HOME/leaf']
+              hidden:
+                include:
+                  makeDirs:
+                    - directories: ['$HOME/hidden']
+        - hostFiles:
+            che.yml: |
+              main:
+                options: {autoDiscover: true}
+                include:
+                  profiles:
+                    - {source: "${REF_DIR}", profile: "top::mid"}
+                    - {source: "${REF_DIR}", profile: "top::leaf"}
+                    - {source: "${REF_DIR}", profile: "leaf"}
+                    - {source: "${REF_DIR}", profile: "top::hidden"}
+        - flags: {}
+    expected:
+      stdOut:
+        - 'profile leaf not found at top level'
+        - 'profile hidden is not included by top'
+        - 'Unresolved profile refs'
+      output:
+        profiles: [main, "${REF_DIR}::mid", "./sub::leaf"]
+  - name: ShouldTakeSpecFilePathAsIs
+    input:
+      args:
+        - refFiles:
+            other/custom.yml: |
+              p:
+                options: {autoDiscover: true}
+        - hostFiles:
+            che.yml: |
+              main:
+                options: {autoDiscover: true}
+                include:
+                  profiles:
+                    - {source: "${REF_DIR}", spec: other/custom.yml, profile: p}
+        - flags: {}
+    expected:
+      output:
+        profiles: [main, "${REF_DIR}/other/custom.yml::p"]
+  - name: ShouldSearchBothExportFilesAndWarnOnHiddenOne
+    input:
+      args:
+        - refFiles:
+            che.export.yml: |
+              a:
+                options: {autoDiscover: true}
+            .che/che.export.yml: |
+              b:
+                options: {autoDiscover: true}
+        - hostFiles:
+            che.yml: |
+              main:
+                options: {autoDiscover: true}
+                include:
+                  profiles:
+                    - {source: "${REF_DIR}", profile: b}
+        - flags: {}
+    expected:
+      stdOut: ['che.export.yml sits in a hidden dir']
+      output:
+        profiles: [main, "${REF_DIR}::b"]
+  - name: ShouldErrorOnSeveralPlainSpecsWithoutExport
+    input:
+      args:
+        - refFiles:
+            che.yml: "a: {}\n"
+            .che/che.yml: "b: {}\n"
+        - hostFiles:
+            che.yml: |
+              main:
+                options: {autoDiscover: true}
+                include:
+                  profiles:
+                    - {source: "${REF_DIR}", profile: a}
+        - flags: {}
+    expected:
+      errorOutput: ['holds several che.yml and no che.export.yml']
+  - name: ShouldComposeOwnExportedSpecFromDotSource
+    input:
+      args:
+        - refFiles: {}
+        - hostFiles:
+            che.export.yml: |
+              host:
+                options: {autoDiscover: true}
+            .che/che.yml: |
+              include:
+                sources: ["."]
+              own: {}
+        - flags: {}
+    expected:
+      output:
+        profiles: [".::host"]
+  - name: ShouldExpandProfilesListOverOneSource
+    input:
+      args:
+        - refFiles:
+            che.export.yml: |
+              a: {}
+              b: {}
+            sub/che.export.yml: |
+              c: {}
+              d: {}
+        - hostFiles:
+            che.yml: |
+              main:
+                options: {autoDiscover: true}
+                include:
+                  profiles:
+                    - source: "${REF_DIR}"
+                      profiles: [a, b, {spec: sub, profile: c}]
+                      env: {SHARED: yes}
+                    - source: "${REF_DIR}"
+                      spec: sub
+                      profiles: [d]
+        - flags: {}
+    expected:
+      output:
+        profiles: [main, "${REF_DIR}::a", "${REF_DIR}::b", "${REF_DIR}/sub::c", "${REF_DIR}/sub::d"]
+        envOf:
+          c: {SHARED: "yes"}
+  - name: ShouldForceProfilesDefinedInComposedLocalSpec
+    input:
+      args:
+        - refFiles: {}
+        - hostFiles:
+            .che/che.yml: |
+              include:
+                sources: [.che/repo-git-tracked, .che/repo-git-untracked]
+            .che/repo-git-tracked/che.yml: |
+              ontoRepo: {}
+            .che/repo-git-untracked/che.yml: |
+              envSeed: {}
+              other: {}
+        - flags: {profiles: [ontoRepo, envSeed]}
+    expected:
+      output:
+        profiles: [".che/repo-git-tracked::ontoRepo", ".che/repo-git-untracked::envSeed"]
+  - name: ShouldErrorOnForcedProfileNoLocalSpecDefines
+    input:
+      args:
+        - refFiles: {}
+        - hostFiles:
+            .che/che.yml: |
+              include:
+                sources: [.che/repo-git-tracked]
+            .che/repo-git-tracked/che.yml: |
+              ontoRepo: {}
+        - flags: {profiles: [nope]}
+    expected:
+      errorOutput: ['--profiles [nope] not defined']
 # [<] 🤖🤖

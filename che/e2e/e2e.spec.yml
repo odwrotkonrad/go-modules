@@ -157,7 +157,7 @@ testCases:
         command: che discover-profiles
         expected:
           stdOutFull: |
-            using spec ${LOCAL}/che.yml
+            using spec ${LOCAL}/.che/che.yml
             cloned remote file://${REMOTE} into ~/.cache/che/remote-sources/{{/[A-Za-z0-9.-]+/}}
             ## Profile plain  (profile workdir: ${LOCAL}/root)
               make-dirs: 2 changes

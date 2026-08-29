@@ -1,0 +1,66 @@
+# [>] 🤖🤖
+context:
+  function: render.sectionsParse
+cases:
+  - name: ShouldListOneSection
+    input:
+      args:
+        - body: "a\n# [>] one\nx\n# [<] one\nb\n"
+        - prefix: "#"
+    expected:
+      output:
+        - {name: one, open: 2, close: 4, depth: 0}
+  - name: ShouldListNestedSectionsOutermostFirst
+    input:
+      args:
+        - body: "// [>] outer\n// [>] inner\nx\n// [<] inner\n// [<] outer\n"
+        - prefix: "//"
+    expected:
+      output:
+        - {name: outer, open: 1, close: 5, depth: 0}
+        - {name: inner, open: 2, close: 4, depth: 1}
+  - name: ShouldMatchHtmlCommentPrefixWithTrailingText
+    input:
+      args:
+        - body: "<!-- [>] docs -->\nx\n<!-- [<] docs -->\n"
+        - prefix: "<!--"
+    expected:
+      output:
+        - {name: docs, open: 1, close: 3, depth: 0}
+  - name: ShouldMatchSqlPrefixWithIndentation
+    input:
+      args:
+        - body: "  -- [>] s\n  -- [<] s\n"
+        - prefix: "--"
+    expected:
+      output:
+        - {name: s, open: 1, close: 2, depth: 0}
+  - name: ShouldIgnoreOtherPrefixes
+    input:
+      args:
+        - body: "// [>] one\n// [<] one\n"
+        - prefix: "#"
+    expected:
+      output: ~
+  - name: ShouldErrorOnMismatchedClose
+    input:
+      args:
+        - body: "# [>] one\n# [<] two\n"
+        - prefix: "#"
+    expected:
+      errorOutput: ['line 2', 'close of section "two" while "one" is open']
+  - name: ShouldErrorOnCloseWithoutOpen
+    input:
+      args:
+        - body: "# [<] one\n"
+        - prefix: "#"
+    expected:
+      errorOutput: ['line 1', 'close of section "one" without an open']
+  - name: ShouldErrorOnUnclosedSection
+    input:
+      args:
+        - body: "# [>] one\nx\n"
+        - prefix: "#"
+    expected:
+      errorOutput: ['section "one" opened at line 1 never closes']
+# [<] 🤖🤖

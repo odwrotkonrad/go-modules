@@ -12,27 +12,46 @@ import (
 )
 
 type loadInterpWant struct {
-	Env     map[string]string   `yaml:"env"`
-	Include []string            `yaml:"include"`
-	Workdir map[string]string   `yaml:"workdir"`
-	Unset   map[string][]string `yaml:"unset"`
-	Sources map[string]string   `yaml:"sources"`
+	Env       map[string]string   `yaml:"env"`
+	Variables map[string]string   `yaml:"variables"`
+	Lookup    map[string]string   `yaml:"lookup"`
+	Include   []string            `yaml:"include"`
+	Workdir   map[string]string   `yaml:"workdir"`
+	Unset     map[string][]string `yaml:"unset"`
+	Sources   map[string]string   `yaml:"sources"`
+}
+
+type loadInterpLayers struct {
+	Below    []EnvLayer        `yaml:"below"`
+	Above    []EnvLayer        `yaml:"above"`
+	VarsBase map[string]string `yaml:"varsBase"`
+	VarsOver map[string]string `yaml:"varsOver"`
 }
 
 func TestLoadInterpolates(t *testing.T) {
 	testyml.Eq(t, td, "testdata/spec/funcs/load_interp.test.spec.yml", func(t *testing.T, c testyml.Case[loadInterpWant]) (loadInterpWant, error) {
 		a := c.Input.Args
-		var in Interp
-		a.To(t, 1, &in.Process)
-		a.To(t, 2, &in.DotEnv)
-		a.To(t, 3, &in.Ref)
-		in.Policy = envinterp.Policy(a.String(t, 4))
+		var layers loadInterpLayers
+		a.To(t, 1, &layers)
+		in := Interp{Below: layers.Below, Above: layers.Above, VarsBase: layers.VarsBase, VarsOver: layers.VarsOver, Policy: envinterp.Policy(a.String(t, 2))}
 		dir := testutil.Tree(t, map[string]string{"che.yml": a.String(t, 0)})
 		d, err := Load(filepath.Join(dir, "che.yml"), in)
 		if err != nil {
 			return loadInterpWant{}, err
 		}
 		got := loadInterpWant{Env: d.Env, Unset: map[string][]string{}, Sources: map[string]string{}}
+		if c.Expected.Output.Variables != nil {
+			got.Variables = map[string]string{}
+			for k := range c.Expected.Output.Variables {
+				got.Variables[k] = d.Variables[k]
+			}
+		}
+		if c.Expected.Output.Lookup != nil {
+			got.Lookup = map[string]string{}
+			for k := range c.Expected.Output.Lookup {
+				got.Lookup[k] = d.Lookup[k]
+			}
+		}
 		for _, inc := range d.Include {
 			got.Include = append(got.Include, inc.URI)
 		}

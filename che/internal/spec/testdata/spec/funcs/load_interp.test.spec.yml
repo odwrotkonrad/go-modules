@@ -10,9 +10,8 @@ cases:
             include: {sources: ['${{ env.BASE }}/other']}
             web:
               options: {profileWorkingDirectory: '${{ env.TREE }}/${{ env.APP || app }}'}
-        - process: {BASE: /b}
-        - dotenv: {}
-        - ref: {}
+        - layers:
+            below: [{name: process env, env: {BASE: /b}}]
         - policy: error
     expected:
       output:
@@ -28,9 +27,9 @@ cases:
             env: {A: spec, B: spec}
             web:
               options: {profileWorkingDirectory: '${{ env.A }}-${{ env.B }}'}
-        - process: {A: process, B: process}
-        - dotenv: {}
-        - ref: {B: ref}
+        - layers:
+            below: [{name: process env, env: {A: process, B: process}}]
+            above: [{name: ref env, env: {B: ref}}]
         - policy: error
     expected:
       output:
@@ -43,39 +42,72 @@ cases:
       args:
         - spec: |
             env: {A: one, B: '${{ env.A || none }}'}
-        - process: {A: process}
-        - dotenv: {}
-        - ref: {}
+        - layers:
+            below: [{name: process env, env: {A: process}}]
         - policy: error
     expected:
       output:
         env: {A: one, B: process}
         unset: {}
         sources: {A: process env}
-  - name: ShouldReadDotEnvBeneathProcess
+  - name: ShouldReadCheEnvBeneathProcess
     input:
       args:
         - spec: |
             web:
               options: {profileWorkingDirectory: '${{ env.A }}-${{ env.B }}'}
-        - process: {B: process}
-        - dotenv: {A: file, B: file}
-        - ref: {}
+        - layers:
+            below:
+              - {name: che.env, env: {A: file, B: file}}
+              - {name: process env, env: {B: process}}
         - policy: error
     expected:
       output:
         workdir: {web: file-process}
         unset: {}
-        sources: {A: .env, B: process env}
+        sources: {A: che.env, B: process env}
+  - name: ShouldSetVariablesImplicitlyFromEnvOnlyWhereNothingDeclaresThem
+    input:
+      args:
+        - spec: |
+            variables: {A: spec, C: spec}
+            web:
+              options: {profileWorkingDirectory: '${{ var.A }}-${{ var.B }}-${{ var.C }}-${{ var.D }}'}
+        - layers:
+            below: [{name: process env, env: {A: env, B: env, C: env, D: env}}]
+            varsBase: {B: repo}
+            varsOver: {C: ref}
+        - policy: error
+    expected:
+      output:
+        workdir: {web: spec-repo-ref-env}
+        unset: {}
+        sources: {}
+  - name: ShouldPlaceIncludedSpecEnvBeneathInheritedEnv
+    input:
+      args:
+        - spec: |
+            env: {A: included, B: included}
+            web:
+              options: {profileWorkingDirectory: '${{ env.A }}-${{ env.B }}-${{ env.C }}'}
+        - layers:
+            below: [{name: included che.env, env: {C: included-file}}]
+            above: [{name: inherited env, env: {B: parent}}]
+        - policy: error
+    expected:
+      output:
+        env: {A: included, B: included}
+        workdir: {web: included-parent-included-file}
+        lookup: {A: included, B: parent, C: included-file}
+        unset: {}
+        sources: {A: spec env, B: inherited env, C: included che.env}
   - name: ShouldFailOnUnsetTopLevelRefsListingEveryGap
     input:
       args:
         - spec: |
             env: {X: '${{ env.A }}'}
             include: {sources: ['${{ env.B }}/other']}
-        - process: {}
-        - dotenv: {}
-        - ref: {}
+        - layers: {}
         - policy: error
     expected:
       errorOutput: ['che.yml: unset env vars:', 'A at /env/X', 'B at /include/sources/0', 'options.envUnset: empty']
@@ -87,9 +119,8 @@ cases:
               options: {profileWorkingDirectory: '${{ env.A }}'}
             b:
               options: {profileWorkingDirectory: '${{ env.B }}/x'}
-        - process: {A: set}
-        - dotenv: {}
-        - ref: {}
+        - layers:
+            below: [{name: process env, env: {A: set}}]
         - policy: error
     expected:
       output:
@@ -101,9 +132,7 @@ cases:
       args:
         - spec: |
             env: {X: '${{ env.A }}'}
-        - process: {}
-        - dotenv: {}
-        - ref: {}
+        - layers: {}
         - policy: empty
     expected:
       output:
@@ -116,13 +145,63 @@ cases:
         - spec: |
             '${{ env.NAME }}':
               options: {profileWorkingDirectory: x}
-        - process: {NAME: web}
-        - dotenv: {}
-        - ref: {}
+        - layers:
+            below: [{name: process env, env: {NAME: web}}]
         - policy: error
     expected:
       output:
         workdir: {'${{ env.NAME }}': x}
         unset: {}
         sources: {}
+  - name: ShouldLayerVariablesRepoUnderSpecUnderRef
+    input:
+      args:
+        - spec: |
+            variables: {A: spec, B: spec}
+            web:
+              options: {profileWorkingDirectory: '${{ var.A }}-${{ var.B }}-${{ var.C }}'}
+        - layers:
+            varsBase: {A: repo, B: repo, C: repo}
+            varsOver: {B: ref}
+        - policy: error
+    expected:
+      output:
+        variables: {A: spec, B: ref, C: repo}
+        workdir: {web: spec-ref-repo}
+        unset: {}
+        sources: {}
+  - name: ShouldExpandEnvRefsInsideVariablesBlockNeverSiblings
+    input:
+      args:
+        - spec: |
+            variables: {A: '${{ env.X }}', B: '${{ var.A || none }}'}
+            env: {PIN: '${{ var.A }}'}
+        - layers:
+            below: [{name: process env, env: {X: from-env}}]
+        - policy: error
+    expected:
+      output:
+        variables: {A: from-env, B: none}
+        env: {PIN: from-env}
+        unset: {}
+        sources: {X: process env}
+  - name: ShouldFailOnUnsetVarListingEveryGap
+    input:
+      args:
+        - spec: |
+            web:
+              options: {profileWorkingDirectory: '${{ var.A }}/${{ var.B }}'}
+        - layers: {}
+        - policy: empty
+    expected:
+      errorOutput: ['che.yml: unset vars:', 'A at /web/options/profileWorkingDirectory', 'B at /web/options/profileWorkingDirectory', 'che.variables.yml']
+  - name: ShouldRejectInvalidVariableKey
+    input:
+      args:
+        - spec: |
+            variables: {bad-key: x}
+        - layers: {}
+        - policy: error
+    expected:
+      errorOutput: ['variables: key "bad-key" must match']
 # [<] 🤖🤖

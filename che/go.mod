@@ -3,7 +3,6 @@ module gitlab.com/konradodwrot/go-modules/che
 go 1.26.3
 
 require (
-	cloud.google.com/go/secretmanager v1.20.0
 	github.com/bmatcuk/doublestar/v4 v4.10.0
 	github.com/dsnet/compress v0.0.1
 	github.com/fatih/color v1.18.0

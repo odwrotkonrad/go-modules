@@ -57,14 +57,14 @@ cases:
             autoDiscover: true
             profiles: [cfg/a, cfg/b]
             renderTemplates:
-              skipSecrets: true
+              skipVariables: true
     expected:
       output:
         validateSpec: error
         logLevel: debug
         dryRun: delta
         skipRemoteRefs: true
-        renderSkipSecrets: true
+        renderSkipVariables: true
         autoDiscover: true
         profiles: [cfg/a, cfg/b]
   - name: ShouldLayerEnvOverUserConfig

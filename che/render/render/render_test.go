@@ -4,11 +4,9 @@ package render
 
 import (
 	"embed"
-	"errors"
 	"os"
 	"path/filepath"
 	"testing"
-	"time"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -61,23 +59,6 @@ func TestIsAtInclude(t *testing.T) {
 	})
 }
 
-func TestIsSecretRefPresent(t *testing.T) {
-	testyml.Eq(t, td, "testdata/spec/funcs/is_secret_ref_present.test.spec.yml", func(t *testing.T, c testyml.Case[bool]) (bool, error) {
-		return IsSecretRefPresent([]byte(c.Input.Args.String(t, 0))), nil
-	})
-}
-
-func TestParseGCPRef(t *testing.T) {
-	testyml.Run(t, td, "testdata/spec/funcs/parse_gcp_ref.test.spec.yml", func(t *testing.T, c testyml.Case[parseGCPWant]) {
-		project, secret, version, err := parseGCPRef(c.Input.Args.String(t, 0))
-		if !c.Expected.Check(t, err) {
-			assert.Equal(t, c.Expected.Output.Project, project, "project")
-			assert.Equal(t, c.Expected.Output.Secret, secret, "secret")
-			assert.Equal(t, c.Expected.Output.Version, version, "version")
-		}
-	})
-}
-
 func TestCompose(t *testing.T) {
 	testyml.Eq(t, td, "testdata/spec/funcs/compose.test.spec.yml", func(t *testing.T, c testyml.Case[string]) (string, error) {
 		a := c.Input.Args
@@ -114,12 +95,6 @@ func TestMergeUpsertEnv(t *testing.T) {
 type splitWant struct {
 	FrontFile string `yaml:"frontFile"`
 	BodyFile  string `yaml:"bodyFile"`
-}
-
-type parseGCPWant struct {
-	Project string `yaml:"project"`
-	Secret  string `yaml:"secret"`
-	Version string `yaml:"version"`
 }
 
 func TestSplitFrontmatter(t *testing.T) {
@@ -164,45 +139,6 @@ func TestRenderMarkdown(t *testing.T) {
 	})
 }
 
-func TestIsRateLimitErr(t *testing.T) {
-	testyml.Eq(t, td, "testdata/spec/funcs/is_rate_limit_err.test.spec.yml", func(t *testing.T, c testyml.Case[bool]) (bool, error) {
-		var err error
-		if msg := c.Input.Args.String(t, 0); msg != "" {
-			err = errors.New(msg)
-		}
-		return isRateLimitErr(err), nil
-	})
-}
-
-type retryWant struct {
-	Value string `yaml:"value"`
-	Calls int    `yaml:"calls"`
-	Slept int    `yaml:"slept"`
-}
-
-func TestRetry(t *testing.T) {
-	testyml.Run(t, td, "testdata/spec/funcs/retry.test.spec.yml", func(t *testing.T, c testyml.Case[retryWant]) {
-		a := c.Input.Args
-		failLeft, failErr := a.Int(t, 0), errors.New(a.String(t, 1))
-		slept, calls := 0, 0
-		v, err := retry([]time.Duration{1, 1, 1}, func(time.Duration) { slept++ }, isRateLimitErr,
-			func() (string, error) {
-				calls++
-				if calls <= failLeft {
-					return "", failErr
-				}
-				return "ok", nil
-			})
-		if c.Expected.Check(t, err) {
-			assert.ErrorIs(t, err, failErr)
-		} else {
-			assert.Equal(t, c.Expected.Output.Value, v)
-		}
-		assert.Equal(t, c.Expected.Output.Calls, calls, "op calls")
-		assert.Equal(t, c.Expected.Output.Slept, slept, "sleeps")
-	})
-}
-
 func TestDirsTree(t *testing.T) {
 	testyml.Run(t, td, "testdata/spec/funcs/dirs_tree.test.spec.yml", func(t *testing.T, c testyml.Case[struct{}]) {
 		var files map[string]string
@@ -236,13 +172,45 @@ func TestMakefileDoc(t *testing.T) {
 	})
 }
 
-func TestExecWithCtx(t *testing.T) {
-	testyml.Eq(t, td, "testdata/spec/funcs/exec_with_ctx.test.spec.yml", func(t *testing.T, c testyml.Case[string]) (string, error) {
-		var itemCtx map[string]string
-		c.Input.Args.To(t, 1, &itemCtx)
+func TestExecWithData(t *testing.T) {
+	testyml.Eq(t, td, "testdata/spec/funcs/exec_with_data.test.spec.yml", func(t *testing.T, c testyml.Case[string]) (string, error) {
+		var data Data
+		c.Input.Args.To(t, 1, &data)
 		repoRoot := testutil.Repo(t, map[string]string{"x": "x"})
-		got, err := ExecWithCtx("t.tpl", []byte(c.Input.Args.String(t, 0)), repoRoot, itemCtx)
+		got, err := ExecWithData("t.tpl", []byte(c.Input.Args.String(t, 0)), repoRoot, data)
 		return string(got), err
+	})
+}
+
+type sectionWant struct {
+	Name  string `yaml:"name"`
+	Open  int    `yaml:"open"`
+	Close int    `yaml:"close"`
+	Depth int    `yaml:"depth"`
+}
+
+func TestSectionsParse(t *testing.T) {
+	testyml.Eq(t, td, "testdata/spec/funcs/sections_parse.test.spec.yml", func(t *testing.T, c testyml.Case[[]sectionWant]) ([]sectionWant, error) {
+		sections, err := sectionsParse(c.Input.Args.String(t, 0), c.Input.Args.String(t, 1))
+		if err != nil {
+			return nil, err
+		}
+		var out []sectionWant
+		for _, s := range sections {
+			out = append(out, sectionWant{Name: s.name, Open: s.open + 1, Close: s.close + 1, Depth: s.depth})
+		}
+		return out, nil
+	})
+}
+
+func TestSectionsInject(t *testing.T) {
+	testyml.Eq(t, td, "testdata/spec/funcs/sections_inject.test.spec.yml", func(t *testing.T, c testyml.Case[string]) (string, error) {
+		a := c.Input.Args
+		out, err := sectionsInject(a.String(t, 0), a.String(t, 1), a.String(t, 2))
+		if err != nil || !a.Bool(t, 3) {
+			return out, err
+		}
+		return sectionsInject(out, a.String(t, 1), a.String(t, 2))
 	})
 }
 
@@ -253,7 +221,7 @@ func TestLocalFileRelativeInclude(t *testing.T) {
 	dir := t.TempDir()
 	require.NoError(t, os.WriteFile(filepath.Join(dir, "pwd.md"), []byte("LOCAL"), 0o644))
 	body := []byte(`{{ localFile "pwd.md" }}`)
-	got, err := ExecWithCtx("t.tpl", body, dir, nil)
+	got, err := ExecWithData("t.tpl", body, dir, Data{})
 	require.NoError(t, err)
 	assert.Equal(t, "LOCAL", string(got))
 }
