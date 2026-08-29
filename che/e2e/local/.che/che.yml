@@ -6,6 +6,8 @@ env:
   E2E_PIN_CHECK: '${{ var.E2E_PIN }}'
 
 ops-plain:
+  options:
+    autoDiscover: false
   include:
     makeLinks:
       - source: plain/link.txt
@@ -32,6 +34,8 @@ ops-plain:
       - scripts/plain-script
 
 ops-conditional:
+  options:
+    autoDiscover: false
   include:
     makeLinks:
       - source: conditional/link.txt
@@ -51,6 +55,8 @@ ops-conditional:
       - scripts/conditional-script
 
 ops-dropped:
+  options:
+    autoDiscover: false
   include:
     makeLinks:
       - source: dropped/link.txt
