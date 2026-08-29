@@ -23,7 +23,7 @@ BASE="${CHE_PACKAGES_URL:-https://gitlab.com/api/v4/projects/${PROJECT}/packages
 
 #[why] unset resolves the newest published catalog rather than failing: a local build wants
 #   current definitions, and only CI, where the variable is set, needs an exact one
-VERSION="${CHE_PACKAGES_REF:-}"
+VERSION="${CHE_PACKAGES_REF#v}"
 if [[ -z "$VERSION" && -z "${CHE_PACKAGES_DIR:-}" ]] {
   print -r -- "CHE_PACKAGES_REF unset, resolving latest"
   VERSION="$(curl -fsSL --connect-timeout 30 --retry 5 --retry-delay 5 "${BASE}/latest/version.txt" | tr -d '[:space:]')"
