@@ -329,7 +329,7 @@
         },
         "autoDiscover": {
           "type": "boolean",
-          "description": "run on bare che (nil: inherit spec options, then false: runs only via --profiles or include.profiles)"
+          "description": "run on bare che (nil: inherit spec options, then true); false: runs only via --profiles or include.profiles"
         },
         "logLevel": {
           "type": "string",
@@ -517,7 +517,7 @@
         },
         "autoDiscover": {
           "type": "boolean",
-          "description": "spec block: default for profiles that don't set it; user config: auto-discovery master switch (default true, false: only --profiles and include.profiles refs run); overridden by CHE_AUTO_DISCOVER"
+          "description": "spec block: default for profiles that don't set it (unset: true); user config: auto-discovery master switch (default true, false: only --profiles and include.profiles refs run); overridden by CHE_AUTO_DISCOVER"
         },
         "logLevel": {
           "type": "string",
