@@ -260,8 +260,6 @@ func (o *Options) Resolve(env LookupEnv, user, spec Layer) error {
 	default:
 		return fmt.Errorf("invalid --silence-install-stdout %q: want true or false", o.PackagesSilenceInstallStdout)
 	}
-	o.RenderSkipSecrets = o.resolveBool("renderTemplates.skipSecrets", o.RenderSkipSecrets, env("CHE_RENDER_TEMPLATES_SKIP_SECRETS"), false,
-		boolCandidate{user.RenderTemplates.SkipSecrets, "config-file"}, boolCandidate{spec.RenderTemplates.SkipSecrets, "specFile"})
 	o.RenderSkipVariables = o.resolveBool("renderTemplates.skipVariables", o.RenderSkipVariables, env("CHE_RENDER_TEMPLATES_SKIP_VARIABLES"), false,
 		boolCandidate{user.RenderTemplates.SkipVariables, "config-file"}, boolCandidate{spec.RenderTemplates.SkipVariables, "specFile"})
 	o.PackagesFile = o.resolveStr("packages.file", "",

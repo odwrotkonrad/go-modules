@@ -1,0 +1,94 @@
+# [>] 🤖🤖
+context:
+  function: render.sectionsInject
+cases:
+  - name: ShouldReplaceOneSectionAndKeepTheRest
+    input:
+      args:
+        - target: "head\n# [>] one\nold\n# [<] one\ntail\n"
+        - rendered: "# [>] one\nnew\n# [<] one\n"
+        - prefix: "#"
+    expected:
+      output: "head\n# [>] one\nnew\n# [<] one\ntail\n"
+  - name: ShouldReplaceThreeSectionsInTargetOrder
+    input:
+      args:
+        - target: "# [>] a\n1\n# [<] a\nmid\n# [>] b\n2\n# [<] b\n# [>] c\n3\n# [<] c\n"
+        - rendered: "# [>] c\nC\n# [<] c\n# [>] a\nA\n# [<] a\n# [>] b\nB\n# [<] b\n"
+        - prefix: "#"
+    expected:
+      output: "# [>] a\nA\n# [<] a\nmid\n# [>] b\nB\n# [<] b\n# [>] c\nC\n# [<] c\n"
+  - name: ShouldErrorNamingMissingSection
+    input:
+      args:
+        - target: "# [>] one\nold\n# [<] one\n"
+        - rendered: "# [>] two\nnew\n# [<] two\n"
+        - prefix: "#"
+    expected:
+      errorOutput: ['existing dest lacks section(s) two']
+  - name: ShouldErrorWhenOneOfThreeIsMissing
+    input:
+      args:
+        - target: "# [>] a\n1\n# [<] a\n# [>] b\n2\n# [<] b\n"
+        - rendered: "# [>] a\nA\n# [<] a\n# [>] b\nB\n# [<] b\n# [>] c\nC\n# [<] c\n"
+        - prefix: "#"
+    expected:
+      errorOutput: ['existing dest lacks section(s) c']
+  - name: ShouldReplaceOuterSectionWhole
+    input:
+      args:
+        - target: "// [>] outer\nx\n// [>] inner\ny\n// [<] inner\nz\n// [<] outer\n"
+        - rendered: "// [>] outer\nflat\n// [<] outer\n"
+        - prefix: "//"
+    expected:
+      output: "// [>] outer\nflat\n// [<] outer\n"
+  - name: ShouldReplaceOnlyInnerSection
+    input:
+      args:
+        - target: "// [>] outer\nx\n// [>] inner\ny\n// [<] inner\nz\n// [<] outer\n"
+        - rendered: "// [>] inner\nY\n// [<] inner\n"
+        - prefix: "//"
+    expected:
+      output: "// [>] outer\nx\n// [>] inner\nY\n// [<] inner\nz\n// [<] outer\n"
+  - name: ShouldInjectWithHtmlPrefix
+    input:
+      args:
+        - target: "# T\n<!-- [>] gen -->\nold\n<!-- [<] gen -->\n"
+        - rendered: "<!-- [>] gen -->\nnew\n<!-- [<] gen -->\n"
+        - prefix: "<!--"
+    expected:
+      output: "# T\n<!-- [>] gen -->\nnew\n<!-- [<] gen -->\n"
+  - name: ShouldInjectWithSqlPrefix
+    input:
+      args:
+        - target: "-- [>] gen\nold\n-- [<] gen\n"
+        - rendered: "-- [>] gen\nnew\n-- [<] gen\n"
+        - prefix: "--"
+    expected:
+      output: "-- [>] gen\nnew\n-- [<] gen\n"
+  - name: ShouldBeIdempotent
+    input:
+      args:
+        - target: "head\n# [>] one\nold\n# [<] one\ntail\n"
+        - rendered: "# [>] one\nnew\n# [<] one\n"
+        - prefix: "#"
+        - twice: true
+    expected:
+      output: "head\n# [>] one\nnew\n# [<] one\ntail\n"
+  - name: ShouldWriteRenderedWholeWhenTargetAbsent
+    input:
+      args:
+        - target: ""
+        - rendered: "# [>] one\nnew\n# [<] one\n"
+        - prefix: "#"
+    expected:
+      output: "# [>] one\nnew\n# [<] one\n"
+  - name: ShouldErrorWhenRenderedCarriesNoSection
+    input:
+      args:
+        - target: "x\n"
+        - rendered: "plain\n"
+        - prefix: "#"
+    expected:
+      errorOutput: ['rendered body carries no # [>] <name> section']
+# [<] 🤖🤖

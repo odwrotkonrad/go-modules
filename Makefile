@@ -35,7 +35,7 @@ render-templates:
 	if [[ -z $$che_bin ]] { $(MAKE) -C che build; che_bin=che/dist/che }; \
 	$$che_bin render-templates --profiles ontoRepo
 
-#[what] render .env.tpl to .env: upstream refs and CI variables via glab, secrets via op
+#[what] render .che/tpl/repo-git-untracked/env.tpl to .env: upstream refs and CI variables via glab, secrets via op
 repo-render-env:
 	@CHE_ENV_UNSET=empty che render-templates --profiles=envSeed
 

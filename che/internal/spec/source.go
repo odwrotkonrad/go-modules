@@ -12,6 +12,7 @@ import (
 	"gopkg.in/yaml.v3"
 
 	"gitlab.com/konradodwrot/go-modules/che/internal/fsutil"
+	"gitlab.com/konradodwrot/go-modules/che/internal/log"
 	"gitlab.com/konradodwrot/go-modules/che/internal/source"
 	"gitlab.com/konradodwrot/go-modules/che/render/render"
 )
@@ -44,10 +45,13 @@ func (r SourceRecipe) prepare(repoRoot, home string) (SourceReady, error) {
 	if err != nil {
 		return SourceReady{}, err
 	}
-	specFile := cmp.Or(r.SpecFile, "che.yml")
-	def := filepath.Join(dir, specFile)
-	if _, err := os.Stat(def); err != nil {
-		return SourceReady{}, fmt.Errorf("%s not found at %s (source %q)", specFile, dir, r.URI)
+	def, ok := SpecFile(dir, r.SpecFile)
+	if !ok {
+		return SourceReady{}, fmt.Errorf("%s not found at %s (source %q)", cmp.Or(r.SpecFile, ExportFileName+" or "+SpecFileName), dir, r.URI)
+	}
+	// [why] a che.yml is a repo's own config: a remote consumer may target it, its author never promised it stays
+	if r.GetSourceType() == SourceTypes.Remote && !IsExportSpec(def) {
+		log.EmitWarn("load-spec", "not-recommended", fmt.Sprintf("source %q targets %s, a spec not designed for reuse: consume a %s", r.URI, filepath.Base(def), ExportFileName))
 	}
 	return SourceReady{DefinitionURI: def, DirectoryPath: dir}, nil
 }
@@ -115,7 +119,7 @@ func (r ProfileSourceRecipe) String() string {
 	if r.URI == "" {
 		return r.ProfileName
 	}
-	return withRefSuffix(r.URI, r.refSuffix()) + "/" + cmp.Or(r.SpecFile, "che.yml") + "::" + r.ProfileName
+	return withRefSuffix(r.URI, r.refSuffix()) + "/" + cmp.Or(r.SpecFile, SpecFileName) + "::" + r.ProfileName
 }
 
 // [why] the ref sits in the repo position: before the //, after any scp user
@@ -159,11 +163,35 @@ func repoName(url string) string {
 	return s
 }
 
+func (r *SpecSourceRecipe) UnmarshalYAML(value *yaml.Node) error {
+	var scalar string
+	type alias SpecSourceRecipe
+	if err := decodeScalarOr(value, &scalar, (*alias)(r)); err != nil {
+		return err
+	}
+	src := cmp.Or(scalar, r.Src)
+	if src == "" {
+		return fmt.Errorf("include.sources entry missing source")
+	}
+	uri, gitRef, err := cutSourceRef(src)
+	if err != nil {
+		return err
+	}
+	r.URI, r.Ref, r.Src = uri, gitRef, ""
+	if err := validateKeys("include.sources "+src+" variables", r.Variables); err != nil {
+		return err
+	}
+	return r.IsValid()
+}
+
 func (r *ProfileSourceRecipe) UnmarshalYAML(value *yaml.Node) error {
 	var scalar string
 	type alias ProfileSourceRecipe
 	if err := decodeScalarOr(value, &scalar, (*alias)(r)); err != nil {
 		return err
+	}
+	if legacy := ctxAlias(value, "include.profiles entry"); legacy != nil {
+		r.Variables = mergeEnv(legacy, r.Variables)
 	}
 	src := cmp.Or(scalar, r.Src)
 	if src == "" {
@@ -180,6 +208,29 @@ func (r *ProfileSourceRecipe) UnmarshalYAML(value *yaml.Node) error {
 	}
 	if r.URI == "" && len(r.Env) > 0 {
 		return fmt.Errorf("include.profiles entry %q: env requires a source", r.ProfileName)
+	}
+	if r.URI == "" && len(r.Variables) > 0 {
+		return fmt.Errorf("include.profiles entry %q: variables requires a source", r.ProfileName)
+	}
+	return validateKeys("include.profiles "+r.String()+" variables", r.Variables)
+}
+
+// [why] pinned remote specs still carry ctx: a hard error would refuse every consumer until each
+// upstream re-tags, so the old key decodes as variables and warns
+func ctxAlias(value *yaml.Node, where string) map[string]string {
+	if value.Kind != yaml.MappingNode {
+		return nil
+	}
+	for i := 0; i+1 < len(value.Content); i += 2 {
+		if value.Content[i].Value != "ctx" {
+			continue
+		}
+		var legacy map[string]string
+		if err := value.Content[i+1].Decode(&legacy); err != nil {
+			return nil
+		}
+		log.EmitWarn("load-spec", "deprecated", where+": ctx is renamed to variables, decoded as variables")
+		return legacy
 	}
 	return nil
 }

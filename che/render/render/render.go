@@ -11,6 +11,7 @@ import (
 	"os"
 	"path/filepath"
 	"regexp"
+	"strings"
 	"text/template"
 
 	"github.com/hairyhenderson/gomplate/v4"
@@ -18,29 +19,28 @@ import (
 	"gitlab.com/konradodwrot/go-modules/che/render/lib"
 )
 
+// Exec renders body with the process env as .env and no variables, merge actions stripped.
 func Exec(name string, body []byte, repoRoot string) ([]byte, error) {
-	out, err := ExecWithCtx(name, body, repoRoot, nil)
+	out, err := ExecWithData(name, body, repoRoot, Data{Env: environMap()})
 	if err != nil {
 		return nil, err
 	}
 	return StripMergeActions(out), nil
 }
 
-func ExecWithCtx(name string, body []byte, repoRoot string, itemCtx map[string]string) ([]byte, error) {
-	return execWithCtx(name, body, repoRoot, itemCtx, nil)
-}
-
-func ExecWithCtxMockSecrets(name string, body []byte, repoRoot string, itemCtx map[string]string) ([]byte, error) {
-	return execWithCtx(name, body, repoRoot, itemCtx, func(ref string) (string, error) { return "mock:" + ref, nil })
-}
-
-func execWithCtx(name string, body []byte, repoRoot string, itemCtx map[string]string, secret func(string) (string, error)) ([]byte, error) {
-	ctx := context.Background()
-	if secret == nil {
-		secret = newSecretFunc(ctx)
+func environMap() map[string]string {
+	out := map[string]string{}
+	for _, kv := range os.Environ() {
+		k, v, _ := strings.Cut(kv, "=")
+		out[k] = v
 	}
+	return out
+}
+
+// ExecWithData renders body with data as the template root: .env and .var.
+func ExecWithData(name string, body []byte, repoRoot string, data Data) ([]byte, error) {
+	ctx := context.Background()
 	funcs := template.FuncMap{
-		"secret":         withMergeAction(MergeActionAlwaysUpdate, secret),
 		"shell":          withMergeAction(MergeActionAlwaysUpdate, newShellFunc(ctx, repoRoot)),
 		"alwaysUpdate":   mergeActionFunc(MergeActionAlwaysUpdate),
 		"keepIfExisting": mergeActionFunc(MergeActionKeepIfExisting),
@@ -58,15 +58,12 @@ func execWithCtx(name string, body []byte, repoRoot string, itemCtx map[string]s
 		"remoteFile":           NewRemoteFetcher(),
 		"localFile":            func(path string) (string, error) { return readLocalFile(repoRoot, path) },
 	}
-	opts := gomplate.RenderOptions{Funcs: funcs, MissingKey: "error"}
-	if len(itemCtx) > 0 {
-		ctxURL, cleanup, err := writeCtxFile(itemCtx)
-		if err != nil {
-			return nil, fmt.Errorf("render template %s: %w", name, err)
-		}
-		defer cleanup()
-		opts.Context = map[string]gomplate.DataSource{".": {URL: ctxURL}}
+	dataURL, cleanup, err := writeDataFile(data)
+	if err != nil {
+		return nil, fmt.Errorf("render template %s: %w", name, err)
 	}
+	defer cleanup()
+	opts := gomplate.RenderOptions{Funcs: funcs, MissingKey: "error", Context: map[string]gomplate.DataSource{".": {URL: dataURL}}}
 	r := gomplate.NewRenderer(opts)
 	var buf bytes.Buffer
 	if err := r.Render(ctx, filepath.Base(name), string(body), &buf); err != nil {
@@ -105,12 +102,18 @@ func readLocalFile(repoRoot, path string) (string, error) {
 	return string(b), nil
 }
 
-func writeCtxFile(itemCtx map[string]string) (*url.URL, func(), error) {
-	b, err := json.Marshal(itemCtx)
+func writeDataFile(data Data) (*url.URL, func(), error) {
+	if data.Env == nil {
+		data.Env = map[string]string{}
+	}
+	if data.Var == nil {
+		data.Var = map[string]string{}
+	}
+	b, err := json.Marshal(data)
 	if err != nil {
 		return nil, nil, err
 	}
-	f, err := os.CreateTemp("", "che-tpl-ctx-*.json")
+	f, err := os.CreateTemp("", "che-tpl-data-*.json")
 	if err != nil {
 		return nil, nil, err
 	}

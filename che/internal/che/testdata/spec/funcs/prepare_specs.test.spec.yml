@@ -615,4 +615,203 @@ cases:
       output:
         workingDirs:
           s: "${REF_DIR}"
+  - name: ShouldDiscoverSpecUnderDotChe
+    input:
+      args:
+        - refFiles: {}
+        - hostFiles:
+            .che/che.yml: |
+              main:
+                options: {autoDiscover: true}
+        - flags: {}
+    expected:
+      output:
+        profiles: [main]
+        specPath: ${HOST_REPO}/.che/che.yml
+  - name: ShouldPreferRootSpecOverDotChe
+    input:
+      args:
+        - refFiles: {}
+        - hostFiles:
+            che.yml: |
+              atRoot:
+                options: {autoDiscover: true}
+            .che/che.yml: |
+              nested:
+                options: {autoDiscover: true}
+        - flags: {logLevel: debug}
+    expected:
+      stdOut: ['che.yml wins over']
+      output:
+        profiles: [atRoot]
+        specPath: ${HOST_REPO}/che.yml
+  - name: ShouldReadRepoVariablesAndCheEnvIntoTheSpec
+    context:
+      env: {FILE: process}
+    input:
+      args:
+        - refFiles: {}
+        - hostFiles:
+            .che/che.variables.yml: "PIN: v1\nDECLARED: file\n"
+            .che/che.env: "REPO=fromfile\nFILE=fromfile\nDECLARED=env\n"
+            .che/che.yml: |
+              env: {SPEC: '${{ env.REPO }}-${{ var.PIN }}-${{ var.DECLARED }}-${{ var.FILE }}'}
+              variables: {LOCAL: '${{ env.FILE }}'}
+              main:
+                options: {autoDiscover: true}
+        - flags: {}
+    expected:
+      output:
+        profiles: [main]
+        envOf:
+          main: {REPO: fromfile, FILE: process, SPEC: fromfile-v1-file-process}
+        varsOf:
+          main: {PIN: v1, LOCAL: process}
+  - name: ShouldSetIncludedVariablesImplicitlyFromInvokingEnvUnderRefVariables
+    input:
+      args:
+        - refFiles:
+            .che/che.env: "A=remote\nB=remote\nIMPLICIT=remote\n"
+            .che/che.variables.yml: "RPIN: r1\nKEEP: kept\n"
+            che.yml: |
+              env: {C: '${{ env.A }}', E: '${{ env.HOSTONLY }}'}
+              p:
+                options: {profileWorkingDirectory: '${{ var.RPIN }}'}
+                include:
+                  makeDirs:
+                    - directories: ['$HOME/${{ var.KEEP }}/${{ var.IMPLICIT }}']
+            r1/.gitkeep: ""
+            over/.gitkeep: ""
+        - hostFiles:
+            .che/che.env: "IMPLICIT=host-che-env\n"
+            che.yml: |
+              env: {B: host, HOSTONLY: host}
+              main:
+                options: {autoDiscover: true}
+                include:
+                  profiles:
+                    - source: "${REF_DIR}/che.yml::p"
+                      env: {D: entry}
+                      variables: {RPIN: over}
+        - flags: {}
+    expected:
+      output:
+        profiles: [main, "${REF_DIR}/che.yml::p"]
+        envOf:
+          p: {A: remote, B: host, C: remote, D: entry, E: host, IMPLICIT: host-che-env}
+        varsOf:
+          p: {RPIN: over, KEEP: kept, IMPLICIT: host-che-env}
+        workingDirs: {p: "${REF_DIR}/over"}
+  - name: ShouldOverlayIncludeSourcesEntryEnvAndVariables
+    input:
+      args:
+        - refFiles:
+            che.yml: |
+              env: {X: included}
+              inc:
+                options: {autoDiscover: true, runIf: ['env:X == entry']}
+        - hostFiles:
+            che.yml: |
+              include:
+                sources:
+                  - source: "${REF_DIR}"
+                    env: {X: entry}
+                    variables: {V: entry}
+              main:
+                options: {autoDiscover: true}
+        - flags: {}
+    expected:
+      output:
+        profiles: [main, "${REF_DIR}/che.yml::inc"]
+        envOf:
+          inc: {X: entry}
+        varsOf:
+          inc: {V: entry}
+  - name: ShouldFailOnUnsetVarNamingSpecAndPath
+    input:
+      args:
+        - refFiles: {}
+        - hostFiles:
+            che.yml: |
+              main:
+                options: {autoDiscover: true, profileWorkingDirectory: '${{ var.NOPE }}'}
+        - flags: {}
+    expected:
+      errorOutput: ['che.yml: unset vars:', 'NOPE at /main/options/profileWorkingDirectory']
+  - name: ShouldIgnoreDotEnv
+    input:
+      args:
+        - refFiles: {}
+        - hostFiles:
+            .env: "FROM_DOTENV=yes\n"
+            che.yml: |
+              main:
+                options: {autoDiscover: true}
+        - flags: {}
+    expected:
+      output:
+        profiles: [main]
+        envOf:
+          main: {FROM_DOTENV: ""}
+  - name: ShouldPreferExportSpecForIncludedSourcesWithoutSpecFile
+    input:
+      args:
+        - refFiles:
+            che.export.yml: |
+              exported:
+                options: {autoDiscover: true}
+            .che/che.yml: |
+              local:
+                options: {autoDiscover: true}
+        - hostFiles:
+            che.yml: |
+              include:
+                sources: ["git::file://${REF_DIR}"]
+              main:
+                options: {autoDiscover: true}
+        - flags: {}
+    expected:
+      output:
+        profiles: [main, "remote:${REF_NAME}:exported"]
+    notExpected:
+      stdOut: ['not designed for reuse']
+  - name: ShouldWarnWhenRemoteRefTargetsPlainCheYml
+    input:
+      args:
+        - refFiles:
+            che.yml: |
+              p:
+                options: {autoDiscover: true}
+        - hostFiles:
+            che.yml: |
+              main:
+                options: {autoDiscover: true}
+                include:
+                  profiles:
+                    - source: "git::file://${REF_DIR}/che.yml::p"
+        - flags: {}
+    expected:
+      stdOut: ['targets che.yml, a spec not designed for reuse: consume a che.export.yml']
+      output:
+        profiles: [main, "remote:${REF_NAME}:p"]
+  - name: ShouldResolveExplicitExportSpecOnRemoteRef
+    input:
+      args:
+        - refFiles:
+            che.export.yml: |
+              p:
+                options: {autoDiscover: true}
+        - hostFiles:
+            che.yml: |
+              main:
+                options: {autoDiscover: true}
+                include:
+                  profiles:
+                    - source: "git::file://${REF_DIR}/che.export.yml::p"
+        - flags: {}
+    expected:
+      output:
+        profiles: [main, "remote:${REF_NAME}:p"]
+    notExpected:
+      stdOut: ['not designed for reuse']
 # [<] 🤖🤖

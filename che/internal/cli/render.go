@@ -67,10 +67,9 @@ func (a *app) makeRenderCmd() *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "render",
 		Short: "render templates and generated docs with the shared engine",
-		Long: `render drives che's shared render engine: gomplate built-ins, op:// (1Password)
-and gcp:// (GCP Secret Manager) secret refs, shell command output, remoteFile
-cross-repo inclusion, frontmatter and markdown transforms. Under a mergeUpsert
-dest a secret or shell value overwrites the existing key and a plain value
+		Long: `render drives che's shared render engine: gomplate built-ins, shell command
+output, remoteFile cross-repo inclusion, frontmatter and markdown transforms.
+Under a mergeUpsert dest a shell value overwrites the existing key and a plain value
 keeps it; "| alwaysUpdate" and "| keepIfExisting" after any value decide per
 line, and piping a whole multi-line block through one marks every KEY=VALUE
 line in it.

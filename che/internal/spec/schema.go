@@ -35,34 +35,39 @@ func Schema() *jsonschema.Schema {
 	defs["templateNode"] = templateNode{}.JSONSchema()
 	defs["copyNode"] = copyNode{}.JSONSchema()
 
-	defs["ProfileRecipe"].Description = "one profile block: options self-describe eligibility, include.profiles compose refs in order (local scalars, sourced {source, options, env}), include adds, exclude filters last and wins"
+	defs["ProfileRecipe"].Description = "one profile block: options self-describe eligibility, include.profiles compose refs in order (local scalars, sourced {source, options, env, variables}), include adds, exclude filters last and wins"
 	defs["includeSet"].Description = "additive payload: profile refs, makeLinks globs, makeCopies/renderTemplates trees, makeDirs perm-groups, runScripts globs"
 	defs["excludeSet"].Description = "subtractive glob filter, applied last, wins over every include (rich entries too)"
-	defs["SpecOptions"].Description = "reserved top-level options: block: spec-wide defaults (runIf gate, autoDiscover/logLevel/workingDirectory) + che knobs (validateSpec/dryRun/profiles/skipRemoteRefs/renderTemplates.skipSecrets); same shape as the user-config file"
+	defs["SpecOptions"].Description = "reserved top-level options: block: spec-wide defaults (runIf gate, autoDiscover/logLevel/workingDirectory) + che knobs (validateSpec/dryRun/profiles/skipRemoteRefs/renderTemplates.skipVariables); same shape as the user-config file"
 	prop(defs["ProfileOptions"], "runIf").Description = "predicate expressions `<source>` or `<source> == <literal>`, sources builtin:*/env:*/cmd:<argv> (exit 0 passes, run on every evaluation, argv split on whitespace, no shell); empty: always"
 
 	root := &jsonschema.Schema{
 		Version:              jsonschema.Version,
 		ID:                   schemaID,
 		Title:                "che.yml",
-		Description:          "che spec: reserved keys options/env/include, every other top-level key defines a profile block",
+		Description:          "che spec: reserved keys options/env/variables/include, every other top-level key defines a profile block",
 		Type:                 "object",
 		AdditionalProperties: &jsonschema.Schema{Ref: "#/$defs/ProfileRecipe"},
 		Definitions:          defs,
 		Properties:           jsonschema.NewProperties(),
 	}
 	root.Properties.Set("options", &jsonschema.Schema{Ref: "#/$defs/SpecOptions"})
-	root.Properties.Set("env", envSchema("environment exported around this spec's preparation and execution"))
+	root.Properties.Set("env", envSchema("environment exported around this spec's preparation and execution; values may interpolate ${{ env.X }} and ${{ var.X }}"))
+	root.Properties.Set("variables", envSchema("spec variables, ${{ var.X }} in this spec and .var.X in its templates, over the repo's che.variables.yml and under a ref's variables:; values may interpolate ${{ env.X }}"))
 	root.Properties.Set("include", topIncludeSchema())
 	return root
 }
 
 func topIncludeSchema() *jsonschema.Schema {
 	o := obj("other specs composed into this one", nil)
+	entry := obj("spec source with overlays applied to every profile of the included spec", []string{"source"})
+	entry.Properties.Set("source", &jsonschema.Schema{Description: "<dir> (absolute, relative, ~/, $VAR) or git::<giturl>[@<git-ref>] (@<ref> pins a tag or branch)", Type: "string"})
+	entry.Properties.Set("env", envSchema("env overlaid on the included spec's load and run"))
+	entry.Properties.Set("variables", envSchema("variables overriding the included spec's own"))
 	o.Properties.Set("sources", &jsonschema.Schema{
-		Description: "spec sources, each a <dir> (absolute, relative, ~/, $VAR) or git::<giturl>[@<git-ref>] (@<ref> pins a tag or branch)",
+		Description: "spec sources, each a <dir> (absolute, relative, ~/, $VAR) or git::<giturl>[@<git-ref>] (@<ref> pins a tag or branch), scalar or {source, env, variables}",
 		Type:        "array",
-		Items:       &jsonschema.Schema{Type: "string"},
+		Items:       scalarOr("spec source", entry),
 	})
 	return o
 }
@@ -198,11 +203,12 @@ func (templateNode) JSONSchema() *jsonschema.Schema {
 		},
 		destRuleSchema(),
 	}})
-	leaf.Properties.Set("ctx", ctxSchema())
+	leaf.Properties.Set("variables", ctxSchema())
+	leaf.Properties.Set("ctx", deprecatedCtxSchema())
 	leaf.Properties.Set("options", render.Options{}.JSONSchema())
 	addPerms(leaf)
 
-	group := obj("a source and/or dest prefix plus shared perms, ctx and options cascading onto nested nodes (innermost wins); at least one prefix required", []string{"<<<"})
+	group := obj("a source and/or dest prefix plus shared perms, variables and options cascading onto nested nodes (innermost wins); at least one prefix required", []string{"<<<"})
 	group.AnyOf = []*jsonschema.Schema{{Required: []string{"source"}}, {Required: []string{"dest"}}}
 	group.Properties.Set("source", &jsonschema.Schema{
 		Description: "source prefix joined onto every nested node's source; a remote prefix git::<repo>[@<ref>][//<path>] concatenates with each leaf path",
@@ -212,7 +218,8 @@ func (templateNode) JSONSchema() *jsonschema.Schema {
 		Description: "dest prefix joined onto every nested repo-relative dest (host dests: ~/, absolute, $VAR anchor themselves and are left alone)",
 		Type:        "string",
 	})
-	group.Properties.Set("ctx", ctxSchema())
+	group.Properties.Set("variables", ctxSchema())
+	group.Properties.Set("ctx", deprecatedCtxSchema())
 	group.Properties.Set("options", render.Options{}.JSONSchema())
 	group.Properties.Set("<<<", &jsonschema.Schema{
 		Description: "nested nodes, each a leaf or a further group",
@@ -230,9 +237,18 @@ func (templateNode) JSONSchema() *jsonschema.Schema {
 
 func ctxSchema() *jsonschema.Schema {
 	return &jsonschema.Schema{
-		Description:          "values exposed as the template's root context (.key), merged under each nested node's ctx",
+		Description:          "values exposed as the template's .var.<key>, over the spec's variables and under each nested node's variables",
 		Type:                 "object",
 		AdditionalProperties: &jsonschema.Schema{Type: "string"},
+	}
+}
+
+func deprecatedCtxSchema() *jsonschema.Schema {
+	return &jsonschema.Schema{
+		Description:          "deprecated: the old name of variables, decoded as variables with a warning",
+		Type:                 "object",
+		AdditionalProperties: &jsonschema.Schema{Type: "string"},
+		Deprecated:           true,
 	}
 }
 
@@ -260,14 +276,15 @@ func (DestSpec) JSONSchema() *jsonschema.Schema {
 }
 
 func (ProfileSourceRecipe) JSONSchema() *jsonschema.Schema {
-	o := obj("sourced profile ref: source is git::<repo>[@<ref>][//<subdir>]/<spec-file>.yml::<profile>, options override its options, env overlays its run", []string{"source"})
+	o := obj("sourced profile ref: source is git::<repo>[@<ref>][//<subdir>]/<spec-file>.yml::<profile>, options override its options, env overlays its run, variables override its variables", []string{"source"})
 	o.Properties.Set("source", &jsonschema.Schema{
 		Description: "<source>/<spec-file>.yml::<profile>: source git::<giturl>[@<ref>] (remote, @<ref> pins a tag or branch) or <dir> (local, no ref); bare <profile> for the local spec",
 		Type:        "string",
 	})
 	o.Properties.Set("options", &jsonschema.Schema{Ref: "#/$defs/ProfileOptions"})
 	o.Properties.Set("env", envSchema("envs exported around everything done for the referenced profile (sourced entries only)"))
-	o.Properties.Set("ctx", envSchema("ctx overlay merged over the referenced profile's renderTemplates ctx (entry wins), parameterizing a shared profile per consumer (sourced entries only)"))
+	o.Properties.Set("variables", envSchema("variables overriding the referenced spec's own (che.variables.yml and its variables: block), parameterizing a shared profile per consumer (sourced entries only)"))
+	o.Properties.Set("ctx", deprecatedCtxSchema())
 	return scalarOr("local profile name, composed depth-first", o)
 }
 

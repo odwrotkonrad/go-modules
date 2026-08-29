@@ -2,6 +2,8 @@
 ##[>] 🤖🤖
 options:
   profileWorkingDirectory: root
+env:
+  E2E_PIN_CHECK: '${{ var.E2E_PIN }}'
 
 ops-plain:
   include:
@@ -97,5 +99,5 @@ remote-empty:
     autoDiscover: true
   include:
     profiles:
-      - source: "git::file://__REMOTE_DIR__/che.yml::ops-remote"
+      - source: "git::file://__REMOTE_DIR__/che.export.yml::ops-remote"
 ##[<] 🤖🤖

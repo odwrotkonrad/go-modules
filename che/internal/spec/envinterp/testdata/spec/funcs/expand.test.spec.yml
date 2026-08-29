@@ -15,14 +15,14 @@ cases:
         - s: '${{ env.A }}'
         - env: {}
     expected:
-      output: {value: "", unset: [A]}
+      output: {value: "", unset: [env.A]}
   - name: ShouldTreatEmptyAsUnset
     input:
       args:
         - s: '${{ env.A }}'
         - env: {A: ""}
     expected:
-      output: {value: "", unset: [A]}
+      output: {value: "", unset: [env.A]}
   - name: ShouldUseDefaultWhenUnset
     input:
       args:
@@ -57,7 +57,7 @@ cases:
         - s: '${{ env.A }}:${{ env.B || b }}:${{ env.C }}'
         - env: {A: a}
     expected:
-      output: {value: 'a:b:', unset: [C]}
+      output: {value: 'a:b:', unset: [env.C]}
   - name: ShouldLeaveDollarVarAlone
     input:
       args:
@@ -65,6 +65,14 @@ cases:
         - env: {HOME: h}
     expected:
       output: {value: '$HOME/${HOME}/${{ HOME }}/${{ env. }}/${{ env.1A }}'}
+  - name: ShouldSubstituteVarRefFromVars
+    input:
+      args:
+        - s: 'pin ${{ var.REF }} ${{ var.MISSING || main }} ${{ var.GONE }}'
+        - env: {REF: from-env}
+        - vars: {REF: v1}
+    expected:
+      output: {value: 'pin v1 main ', unset: [var.GONE]}
   - name: ShouldLeavePlainTextAlone
     input:
       args:

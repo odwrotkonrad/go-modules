@@ -119,7 +119,7 @@ func setupWorld(t *testing.T, specEnv map[string]string) *world {
 	}
 	require.NoError(t, os.CopyFS(w.local, os.DirFS("local")))
 	require.NoError(t, os.CopyFS(w.remote, os.DirFS("remote")))
-	cheYml := filepath.Join(w.local, "che.yml")
+	cheYml := filepath.Join(w.local, ".che", "che.yml")
 	raw, err := os.ReadFile(cheYml)
 	require.NoError(t, err)
 	require.NoError(t, os.WriteFile(cheYml, bytes.ReplaceAll(raw, []byte("__REMOTE_DIR__"), []byte(w.remote)), 0o644))

@@ -8,15 +8,23 @@ cases:
         - s: '${{ env.A }}/${{ env.B || two }}'
     expected:
       output:
-        - {name: A, default: "", hasdefault: false}
-        - {name: B, default: two, hasdefault: true}
+        - {namespace: env, name: A, default: "", hasdefault: false}
+        - {namespace: env, name: B, default: two, hasdefault: true}
   - name: ShouldReportEmptyDefaultAsDefault
     input:
       args:
         - s: '${{ env.A || }}'
     expected:
       output:
-        - {name: A, default: "", hasdefault: true}
+        - {namespace: env, name: A, default: "", hasdefault: true}
+  - name: ShouldListVarRefs
+    input:
+      args:
+        - s: '${{ var.PIN }}@${{ var.OTHER || main }}'
+    expected:
+      output:
+        - {namespace: var, name: PIN, default: "", hasdefault: false}
+        - {namespace: var, name: OTHER, default: main, hasdefault: true}
   - name: ShouldReturnNothingForPlainText
     input:
       args:

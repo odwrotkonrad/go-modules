@@ -42,6 +42,7 @@ variables:
   ARTIFACT_REGISTRY: $GRP_KO_VAR_ARTIFACT_REGISTRY
   ARTIFACT_REGISTRY_PROXY_DOCKERHUB: $GRP_KO_VAR_ARTIFACT_REGISTRY_PROXY_DOCKERHUB
   OCI_IMAGES_CI_LINUX_REF: $GRP_KO_VAR_OCI_IMAGES_CI_LINUX_REF
+  OCI_IMAGES_CI_LINUX_DIND_REF: $GRP_KO_VAR_OCI_IMAGES_CI_LINUX_DIND_REF
   CHE_SCHEMA_REF: $GRP_KO_VAR_CHE_SCHEMA_REF
   CHE_PACKAGES_SCHEMA_REF: $GRP_KO_VAR_CHE_PACKAGES_SCHEMA_REF
   CHE_PACKAGES_REF: $GRP_KO_VAR_CHE_PACKAGES_REF
@@ -168,7 +169,7 @@ verify-precommit-all:
   needs:
     - job: warm-go
       optional: true
-  #[why] the .repo/ declarations and .env.tpl are on the list so a commit touching only them still
+  #[why] the .repo/ declarations and .che/ are on the list so a commit touching only them still
   #   runs a job: a pipeline that creates none is reported as failed, not as nothing to do
   rules:
     - if: $CI_PIPELINE_SOURCE == "merge_request_event"
@@ -178,7 +179,7 @@ verify-precommit-all:
         - go.work
         - .gitlab-ci.yml
         - ci/**/*
-        - .env.tpl
+        - .che/**/*
         - .repo/*.tpl
         - .repo/deps-graph.yml
         - .repo/upstream.yml

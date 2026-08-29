@@ -2,13 +2,13 @@ base:
   include:
     renderTemplates:
       - source: "git::gitlab.com/acme/tools"
-        ctx: {repo: Workspace, model: fable}
+        variables: {repo: Workspace, model: fable}
         <<<:
           - source: //snippets/ro.md
             dest:
               - {path: .claude/agents/ro.md}
           - source: //snippets/rw.md
-            ctx: {model: sonnet}
+            variables: {model: sonnet}
             dest:
               - {path: .claude/agents/rw.md}
 

@@ -1,4 +1,4 @@
-// Package envinterp substitutes ${{ env.NAME }} and ${{ env.NAME || default }} in che.yml scalars.
+// Package envinterp substitutes ${{ env.NAME }}, ${{ var.NAME }} and their ${{ ... || default }} forms in che.yml scalars.
 package envinterp
 
 // [>] 🤖🤖
@@ -14,33 +14,66 @@ type Policy string
 // Policies enumerates every Policy value.
 var Policies = struct{ Error, Empty Policy }{"error", "empty"}
 
-// Ref is one parsed ${{ env.* }} occurrence.
+// Namespace is the ref prefix: env or var.
+type Namespace string
+
+// Namespaces enumerates every Namespace value.
+var Namespaces = struct{ Env, Var Namespace }{"env", "var"}
+
+// Ref is one parsed ${{ <namespace>.<name> }} occurrence.
 type Ref struct {
+	Namespace  Namespace
 	Name       string
 	Default    string
 	HasDefault bool
 }
 
-var refPattern = regexp.MustCompile(`\$\{\{\s*env\.([A-Za-z_][A-Za-z0-9_]*)\s*(?:\|\|(.*?))?\s*\}\}`)
+// Lookup resolves one ref to its value, "" meaning unset.
+type Lookup func(Ref) string
 
-// Expand substitutes every ref in s, returning the names of unset refs that had no default.
-func Expand(s string, lookup func(string) string) (string, []string) {
+var refPattern = regexp.MustCompile(`\$\{\{\s*(env|var)\.([A-Za-z_][A-Za-z0-9_]*)\s*(?:\|\|(.*?))?\s*\}\}`)
+
+// KeyPattern is the shape every var and env name must take.
+var KeyPattern = regexp.MustCompile(`^[A-Za-z_][A-Za-z0-9_]*$`)
+
+// Expand substitutes every ref in s, returning the refs that were unset and had no default.
+func Expand(s string, lookup Lookup) (string, []Ref) {
 	if !strings.Contains(s, "${{") {
 		return s, nil
 	}
-	var unset []string
+	var unset []Ref
 	out := refPattern.ReplaceAllStringFunc(s, func(m string) string {
 		ref := parseRef(refPattern.FindStringSubmatch(m))
-		if v := lookup(ref.Name); v != "" {
+		if v := lookup(ref); v != "" {
 			return v
 		}
 		if ref.HasDefault {
 			return ref.Default
 		}
-		unset = append(unset, ref.Name)
+		unset = append(unset, ref)
 		return ""
 	})
 	return out, unset
+}
+
+// EnvLookup adapts a name lookup to env refs only, var refs read as unset.
+func EnvLookup(lookup func(string) string) Lookup {
+	return func(ref Ref) string {
+		if ref.Namespace != Namespaces.Env {
+			return ""
+		}
+		return lookup(ref.Name)
+	}
+}
+
+// MapLookup resolves env refs from env and var refs from vars.
+func MapLookup(env, vars map[string]string) Lookup {
+	return func(ref Ref) string {
+		if ref.Namespace == Namespaces.Var {
+			return vars[ref.Name]
+		}
+		return env[ref.Name]
+	}
 }
 
 // Refs reports every ref in s, in order.
@@ -61,10 +94,10 @@ func ValidPolicy(p Policy) bool {
 }
 
 func parseRef(m []string) Ref {
-	ref := Ref{Name: m[1]}
+	ref := Ref{Namespace: Namespace(m[1]), Name: m[2]}
 	if strings.Contains(m[0], "||") {
 		ref.HasDefault = true
-		ref.Default = strings.TrimSpace(m[2])
+		ref.Default = strings.TrimSpace(m[3])
 	}
 	return ref
 }

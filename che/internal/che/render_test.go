@@ -53,8 +53,6 @@ func TestRenderTemplates(t *testing.T) {
 				a.To(t, i, &dirs)
 			case "items":
 				a.To(t, i, &items)
-			case "skipSecrets":
-				skips.Secrets = a.Bool(t, i)
 			case "skipVariables":
 				skips.Variables = a.Bool(t, i)
 			case "fetch":

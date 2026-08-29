@@ -33,7 +33,6 @@ type Options struct {
 	SkipRemoteRefs                                     bool
 	Errexit                                            bool
 	LogLevel                                           string
-	RenderSkipSecrets                                  bool
 	RenderSkipVariables                                bool
 	PackagesFile                                       string
 	PackagesOverride                                   string

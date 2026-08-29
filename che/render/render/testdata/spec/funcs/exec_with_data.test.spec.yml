@@ -1,14 +1,34 @@
 # [>] 🤖🤖
 context:
-  function: render.ExecWithCtx
+  function: render.ExecWithData
 cases:
-  - name: ShouldExposeItemCtxAsRoot
+  - name: ShouldExposeVarsUnderDotVar
     input:
       args:
-        - body: "name: RO-{{ .repo }} rw: RW-{{ .repo }}"
-        - itemCtx: {repo: Notes}
+        - body: "name: RO-{{ .var.repo }} rw: RW-{{ .var.repo }}"
+        - data: {var: {repo: Notes}}
     expected:
       output: "name: RO-Notes rw: RW-Notes"
+  - name: ShouldExposeEnvUnderDotEnv
+    input:
+      args:
+        - body: "ref={{ .env.PROSE_REF }} pin={{ .var.PROSE_REF }}"
+        - data: {env: {PROSE_REF: v2}, var: {PROSE_REF: v1}}
+    expected:
+      output: "ref=v2 pin=v1"
+  - name: ShouldFailOnMissingVar
+    input:
+      args:
+        - body: "{{ .var.absent }}"
+        - data: {var: {repo: Notes}}
+    expected:
+      errorOutput: ['render template t.tpl', 'absent']
+  - name: ShouldExposeEmptyMapsWithoutData
+    input:
+      args:
+        - body: "{{ len .var }}{{ len .env }}"
+    expected:
+      output: "00"
   - name: ShouldKeepPlainExecWithoutCtx
     input:
       args:

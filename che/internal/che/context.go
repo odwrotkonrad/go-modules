@@ -10,13 +10,14 @@ import (
 	"time"
 
 	"gitlab.com/konradodwrot/go-modules/che/internal/fsutil"
+	"gitlab.com/konradodwrot/go-modules/che/internal/spec"
 	"gitlab.com/konradodwrot/go-modules/che/internal/telemetry"
 )
 
 type Context struct {
 	Env        map[string]string
 	ProcessEnv map[string]string
-	DotEnv     map[string]string
+	RepoFiles  spec.RepoFiles
 	Cwd        string
 	Euid       int
 	RunID      string

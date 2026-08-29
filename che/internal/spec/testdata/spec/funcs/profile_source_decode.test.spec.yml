@@ -86,6 +86,48 @@ cases:
             env: {A: b}
     expected:
       errorOutput: ['env requires a source']
+  - name: ShouldDecodeLegacyCtxAsVariables
+    input:
+      args:
+        - entry: |
+            source: "git::https://gitlab.com/g/r.git/che.yml::p"
+            ctx: {repo: X}
+    expected:
+      output:
+        source: "git::https://gitlab.com/g/r.git"
+        profile: p
+        sourceType: remote
+        variables: {repo: X}
+        string: "git::https://gitlab.com/g/r.git/che.yml::p"
+  - name: ShouldDecodeVariables
+    input:
+      args:
+        - entry: |
+            source: "git::https://gitlab.com/g/r.git/che.yml::p"
+            variables: {repo: X}
+    expected:
+      output:
+        source: "git::https://gitlab.com/g/r.git"
+        profile: p
+        sourceType: remote
+        variables: {repo: X}
+        string: "git::https://gitlab.com/g/r.git/che.yml::p"
+  - name: ShouldErrorOnVariablesWithoutSource
+    input:
+      args:
+        - entry: |
+            source: p
+            variables: {A: b}
+    expected:
+      errorOutput: ['variables requires a source']
+  - name: ShouldErrorOnInvalidVariableKey
+    input:
+      args:
+        - entry: |
+            source: "git::https://gitlab.com/g/r.git/che.yml::p"
+            variables: {bad-key: b}
+    expected:
+      errorOutput: ['key "bad-key" must match']
   - name: ShouldErrorOnMissingSource
     input:
       args:

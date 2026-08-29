@@ -282,10 +282,9 @@ delete broken symlinks.
 
 render templates and generated docs with the shared engine.
 
-render drives che's shared render engine: gomplate built-ins, op:// (1Password)
-and gcp:// (GCP Secret Manager) secret refs, shell command output, remoteFile
-cross-repo inclusion, frontmatter and markdown transforms. Under a mergeUpsert
-dest a secret or shell value overwrites the existing key and a plain value
+render drives che's shared render engine: gomplate built-ins, shell command
+output, remoteFile cross-repo inclusion, frontmatter and markdown transforms.
+Under a mergeUpsert dest a shell value overwrites the existing key and a plain value
 keeps it; "| alwaysUpdate" and "| keepIfExisting" after any value decide per
 line, and piping a whole multi-line block through one marks every KEY=VALUE
 line in it.
@@ -343,9 +342,8 @@ render a template with the shared engine, to stdout.
 
 usage: che render tpl -f <template>
 
-Render <template> with the shared engine (gomplate built-ins + op:// (1Password)
-and gcp:// (GCP Secret Manager) secrets + frontmatter/readBody + native
-generators), env vars visible via env.Getenv, to
+Render <template> with the shared engine (gomplate built-ins + frontmatter/readBody +
+native generators), env vars visible via env.Getenv, to
 stdout. Drop-in for 'gomplate -f'. Paths in frontmatter/readBody/renderDirsTree
 resolve against the cwd.
 
@@ -356,7 +354,6 @@ render *.tpl sources; each dest path decides target (relative -> repo, ~/ or abs
 
 | Option | Env | Values | Default | Description |
 | --- | --- | --- | --- | --- |
-| `--skip-secrets` | `CHE_RENDER_TEMPLATES_SKIP_SECRETS` | `bool` | `false` | skip sources carrying op:// or gcp:// secret refs (logged, dests untouched) |
 | `--skip-variables` | `CHE_RENDER_TEMPLATES_SKIP_VARIABLES` | `bool` | `false` | skip sources carrying a shell call (logged, dests untouched) |
 
 ### `$ che run`
