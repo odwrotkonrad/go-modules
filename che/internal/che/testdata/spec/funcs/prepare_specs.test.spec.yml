@@ -307,6 +307,7 @@ cases:
                   makeDirs:
                     - directories: [_home/.cache/sib]
               sharedBase:
+                options: {autoDiscover: false}
                 include:
                   makeDirs:
                     - directories: [_home/.cache/shared]
@@ -945,7 +946,7 @@ cases:
         - flags: {}
     expected:
       output:
-        profiles: [".::host"]
+        profiles: [own, ".::host"]
   - name: ShouldExpandProfilesListOverOneSource
     input:
       args:
