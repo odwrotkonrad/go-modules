@@ -344,10 +344,22 @@ func (p *ProfileReady) composeDest(item spec.FileItem, d templateDest, body []by
 		Body:       body,
 		Opts:       d.opts,
 		HeaderDest: d.header,
-		TmplName:   item.Rel,
+		TmplName:   p.headerName(item),
 		Existing:   existing,
 		RepoRoot:   p.templateAnchor(item),
 	})
+}
+
+// [why] the header names the template as the repo sees it: a sub-spec's ../../x source reads as x
+func (p *ProfileReady) headerName(item spec.FileItem) string {
+	if spec.IsRemoteSrc(item.Rel) || p.isHostTemplate(item) {
+		return item.Rel
+	}
+	rel, err := filepath.Rel(p.repoDocRoot(), p.templateSrcPath(item))
+	if err != nil || strings.HasPrefix(rel, "..") {
+		return item.Rel
+	}
+	return rel
 }
 
 func (p *ProfileReady) readExistingDest(d templateDest) ([]byte, error) {

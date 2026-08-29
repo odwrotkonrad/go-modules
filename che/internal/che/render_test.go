@@ -44,6 +44,7 @@ func TestRenderTemplates(t *testing.T) {
 		var items []spec.FileItem
 		var skips renderSkips
 		var remote bool
+		var subSpec string
 		a := c.Input.Args
 		for i := range a {
 			switch name := a.Name(i); name {
@@ -58,6 +59,8 @@ func TestRenderTemplates(t *testing.T) {
 			case "fetch":
 				a.To(t, i, &fetch)
 				remote = true
+			case "subSpec":
+				subSpec = a.String(t, i)
 			default:
 				t.Fatalf("unknown arg %q", name)
 			}
@@ -67,6 +70,12 @@ func TestRenderTemplates(t *testing.T) {
 			require.NoError(t, os.MkdirAll(filepath.Join(root, d), 0o755))
 		}
 		p := newProfile(root, filepath.Join(root, "home"), options.Options{}).withDir(root)
+		if subSpec != "" {
+			testutil.GitRepo(t, root)
+			p.workingDir = filepath.Join(root, subSpec)
+			p.Source.DirectoryPath = p.workingDir
+			p.gitRoot = root
+		}
 		if remote {
 			p.Fetcher = testutil.RemoteMockFetcher(fetch)
 		}
