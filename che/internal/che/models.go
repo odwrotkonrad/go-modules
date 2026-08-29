@@ -481,7 +481,7 @@ func (r *SpecRecipe) candidateSummary() (all, autoDiscoverable string) {
 			name += "[" + strings.Join(included, ",") + "]"
 		}
 		names = append(names, name)
-		if rec.Options.AutoDiscover != nil && *rec.Options.AutoDiscover {
+		if rec.Options.AutoDiscover == nil || *rec.Options.AutoDiscover {
 			autoNames = append(autoNames, rec.Source.GetProfileName())
 		}
 	}

@@ -90,7 +90,7 @@ func (d *Doc) ProfileEnvUnset(name string) []EnvUnset { return d.EnvUnset[name] 
 
 type Options struct {
 	RunIf                   []string        `yaml:"runIf" jsonschema_description:"spec-level predicates: gate every profile of this spec (ANDed with each profile's own); spec-only"`
-	AutoDiscover            *bool           `yaml:"autoDiscover" jsonschema_description:"spec block: default for profiles that don't set it; user config: auto-discovery master switch (default true, false: only --profiles and include.profiles refs run); overridden by CHE_AUTO_DISCOVER"`
+	AutoDiscover            *bool           `yaml:"autoDiscover" jsonschema_description:"spec block: default for profiles that don't set it (unset: true); user config: auto-discovery master switch (default true, false: only --profiles and include.profiles refs run); overridden by CHE_AUTO_DISCOVER"`
 	LogLevel                string          `yaml:"logLevel" jsonschema:"enum=error,enum=warn,enum=info,enum=debug,enum=trace" jsonschema_description:"human-log level default for profiles that don't set it; overridden by --log-level and CHE_LOG_LEVEL"`
 	ProfileWorkingDirectory string          `yaml:"profileWorkingDirectory" jsonschema_description:"the load-ops source tree (absolute, relative to the checkout, ~/, $VAR, env vars expanded); default the checkout itself; makeLinks/makeCopies/renderTemplates host sources resolve against it; home targeting is explicit via a $HOME dest rewrite; spec-only"`
 	ValidateSpec            string          `yaml:"validateSpec" jsonschema:"enum=warn,enum=error" jsonschema_description:"how this spec's schema violations report (per-spec: each included spec honors its own); overridden by the flag and env var"`
@@ -294,7 +294,7 @@ type ProfileRecipe struct {
 
 type ProfileOptions struct {
 	RunIf                   []string `yaml:"runIf" jsonschema_description:"predicates that must ALL pass for the profile to run"`
-	AutoDiscover            *bool    `yaml:"autoDiscover" jsonschema_description:"run on bare che (nil: inherit spec options, then false: runs only via --profiles or include.profiles)"`
+	AutoDiscover            *bool    `yaml:"autoDiscover" jsonschema_description:"run on bare che (nil: inherit spec options, then true); false: runs only via --profiles or include.profiles"`
 	LogLevel                string   `yaml:"logLevel" jsonschema:"enum=error,enum=warn,enum=info,enum=debug,enum=trace" jsonschema_description:"log level around this profile's ops (empty: inherit spec options, then che level)"`
 	ProfileWorkingDirectory string   `yaml:"profileWorkingDirectory" jsonschema_description:"the profile's load-ops source tree (empty: inherit spec options, then che level, then the checkout)"`
 	Packages                Packages `yaml:"packages" jsonschema_description:"installPackages options for this profile (empty fields: inherit spec options, then user config)"`
