@@ -565,6 +565,10 @@ func evalWith(env map[string]string) func(string) (bool, error) {
 func (r *SpecRecipe) composeIncludes(p *specPreparer, ready *SpecReady) ([]spec.ProfileRecipe, error) {
 	lookup := slices.Clone(r.ProfileRecipes)
 	for _, included := range r.Include {
+		if included.Optional && included.IsAbsentLocalDir(r.sourceReady.DirectoryPath, p.home) {
+			log.EmitSkip(log.Levels.Warn, "init-remote-sources", "prepare", included.URI, "optional source dir absent")
+			continue
+		}
 		child, err := p.prepare(included, r.sourceReady.DirectoryPath, overlay{inherited: r.lookup, env: included.Env, vars: included.Variables}, nil, false)
 		if err != nil {
 			return nil, fmt.Errorf("include.sources %q: %w", included.URI, err)

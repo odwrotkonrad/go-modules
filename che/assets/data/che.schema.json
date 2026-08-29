@@ -1280,6 +1280,10 @@
                     },
                     "type": "object",
                     "description": "variables overriding the included spec's own"
+                  },
+                  "optional": {
+                    "type": "boolean",
+                    "description": "local dir sources only: an absent dir is skipped with a warning instead of failing the load (a dir another profile renders first)"
                   }
                 },
                 "additionalProperties": false,
@@ -1292,7 +1296,7 @@
             ]
           },
           "type": "array",
-          "description": "spec sources, each a \u003cdir\u003e (absolute, relative, ~/, $VAR) or git::\u003cgiturl\u003e[@\u003cgit-ref\u003e] (@\u003cref\u003e pins a tag or branch), scalar or {source, spec, env, variables}; a dir offers its che.export.yml first, then a plain che.yml"
+          "description": "spec sources, each a \u003cdir\u003e (absolute, relative, ~/, $VAR) or git::\u003cgiturl\u003e[@\u003cgit-ref\u003e] (@\u003cref\u003e pins a tag or branch), scalar or {source, spec, env, variables, optional}; a dir offers its che.export.yml first, then a plain che.yml"
         }
       },
       "additionalProperties": false,

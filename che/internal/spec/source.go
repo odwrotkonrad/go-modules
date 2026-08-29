@@ -96,6 +96,14 @@ func (r SourceRecipe) resolveDir(repoRoot, home string) (string, error) {
 	return dir, nil
 }
 
+// IsAbsentLocalDir reports a local dir source whose dir does not exist under anchor.
+func (r SourceRecipe) IsAbsentLocalDir(anchor, home string) bool {
+	if r.GetSourceType() == SourceTypes.Remote || r.URI == "" {
+		return false
+	}
+	return !fsutil.IsDir(expandDir(r.URI, anchor, home))
+}
+
 func splitRepoSubdir(ref string) (string, string) {
 	start := 0
 	if i := strings.Index(ref, "://"); i >= 0 {

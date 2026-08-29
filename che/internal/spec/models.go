@@ -42,6 +42,7 @@ type SpecSourceRecipe struct {
 	SpecPath     string            `yaml:"spec"`
 	Env          map[string]string `yaml:"env"`
 	Variables    map[string]string `yaml:"variables"`
+	Optional     bool              `yaml:"optional" jsonschema_description:"local dir sources only: an absent dir is skipped with a warning instead of failing the load (a dir another profile renders first)"`
 }
 
 type SpecSourceReady struct {
