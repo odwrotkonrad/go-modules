@@ -30,7 +30,9 @@ profilesDefinitions:
         - go
 
 variablesDefinitions:
-  all: {scope: recursiveSpecsAndProfiles, required: true}
+  all:
+    scope: recursiveSpecsAndProfiles
+    required: true
   specVariablesDefinitions:
     AI_TOOLS_CONFIGS_REF: null
     CENTRALIZED_ASSETS_GENERIC_REF: null
