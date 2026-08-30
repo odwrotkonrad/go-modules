@@ -47,6 +47,7 @@ func Schema() *jsonschema.Schema {
 	defs["VarDef"] = varDefs["VarDef"]
 	defs["VarDefs"] = varDefs["VarDefs"]
 	defs["SpecVarDefs"] = varDefs["SpecVarDefs"]
+	defs["VarDefaults"] = varDefs["VarDefaults"]
 	defs["VarDef"].Description = "one variable declaration: never a value, values live in cheVariables.defaults.yml, cheVariables.yml, cheVariables.local.yml or an explicit pass"
 
 	root := &jsonschema.Schema{

@@ -776,4 +776,54 @@ cases:
         - flags: {}
     expected:
       errorOutput: ['unknown top-level key "include"']
+  - name: ShouldApplyAllDefaultsAcrossSpecAndProfileDefinitions
+    input:
+      args:
+        - refFiles:
+            che.yml: |
+              env: {SEEN_EMB: '${{ var.X || none }}'}
+              profilesDefinitions:
+                p:
+                  type: host
+                  options: {autoDiscover: true}
+              variablesDefinitions:
+                specVariablesDefinitions: {X: {}}
+                profilesVariablesDefinitions: {p: {X: {}}}
+        - hostFiles:
+            .che/cheVariables.yml: "X: root\nY: root\n"
+            .che/che.yml: |
+              specsInclude: ['${REF_DIR}']
+              profilesDefinitions:
+                main:
+                  type: host
+                  variablesDefinitions: {Y: {scope: invokingSpecDefinedProfiles}}
+                  options: {autoDiscover: true}
+              variablesDefinitions:
+                all: {scope: recursiveSpecsAndProfiles, required: true}
+                specVariablesDefinitions: {X: {}}
+        - flags: {}
+    expected:
+      output:
+        profiles: [main, "${REF_DIR}::p"]
+        envOf:
+          p: {SEEN_EMB: root}
+        varsOf:
+          main: {X: root, Y: root}
+          p: {X: root, Y: ""}
+  - name: ShouldFailOnAllRequiredWithoutAValue
+    input:
+      args:
+        - refFiles: {}
+        - hostFiles:
+            .che/che.yml: |
+              profilesDefinitions:
+                main:
+                  type: host
+                  options: {autoDiscover: true}
+              variablesDefinitions:
+                all: {required: true}
+                profilesVariablesDefinitions: {main: {MISSING: {}}}
+        - flags: {}
+    expected:
+      errorOutput: ['required variables without a value: MISSING']
 # [<] 🤖🤖

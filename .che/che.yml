@@ -13,8 +13,6 @@ specsInclude:
 profilesDefinitions:
   devEnv:
     type: repo-git-untracked
-    options:
-      autoDiscover: false
     include:
       installPackages:
         - go
