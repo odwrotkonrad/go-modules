@@ -1,5 +1,6 @@
 profilesDefinitions:
   base:
+    type: host
     include:
       makeLinks:
         - _home/.config/zsh/**
@@ -15,11 +16,13 @@ profilesDefinitions:
         - _home/.config/zsh/**
 
   'cli/macos':
+    type: host
     options: {autoDiscover: true}
     include:
       profiles: [base]
 
   'desktop/macos':
+    type: host
     options: {autoDiscover: true}
     include:
       profiles: [base]

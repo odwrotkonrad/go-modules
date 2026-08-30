@@ -1,17 +1,20 @@
 ##[>] 🤖🤖
 profilesDefinitions:
   base:
+    type: host
     include:
       makeLinks:
         - etc/zshrc
         - {source: _home/.config/foo/**, dest: s/foo/bar/}
 
   'cli/macos':
+    type: host
     options: {autoDiscover: true}
     include:
       profiles: [base]
 
   exclude-rewritten:
+    type: host
     include:
       profiles: [base]
     exclude:

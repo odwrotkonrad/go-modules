@@ -392,6 +392,9 @@
       },
       "additionalProperties": false,
       "type": "object",
+      "required": [
+        "type"
+      ],
       "description": "one profile block: options self-describe eligibility, variablesDefinitions declare what it reads, include.profiles compose refs in order (local scalars, sourced {url, ref, specDirPath, profileName, options, env, variables}), include adds, exclude filters last and wins"
     },
     "ProfileSourceRecipe": {
@@ -405,11 +408,6 @@
             {
               "required": [
                 "specDirPath"
-              ]
-            },
-            {
-              "required": [
-                "source"
               ]
             }
           ],
@@ -425,11 +423,6 @@
             "specDirPath": {
               "type": "string",
               "description": "required: with url the dir under the repo holding the spec (. for the repo root); without url a local dir (./sub, /abs, ~/, $VAR, relative to this spec's checkout, . this repo's own exported spec); the dir offers its che.export.yml, then .che/che.export.yml, then a plain che.yml"
-            },
-            "source": {
-              "type": "string",
-              "description": "deprecated: the old url key, git::\u003cgiturl\u003e[@\u003cref\u003e] or \u003cdir\u003e, decoded with a warning",
-              "deprecated": true
             },
             "spec": {
               "type": "string",
@@ -457,11 +450,6 @@
                         "type": "string",
                         "description": "profile name"
                       },
-                      "spec": {
-                        "type": "string",
-                        "description": "deprecated: the old specDirPath key",
-                        "deprecated": true
-                      },
                       "profile": {
                         "type": "string",
                         "description": "deprecated: the old profileName key",
@@ -480,11 +468,6 @@
               "type": "array",
               "description": "several profiles of the same url and ref, written once: names, or {specDirPath, profileName} when a profile sits under another spec dir; options, env and variables apply to each; exclusive with profileName"
             },
-            "profile": {
-              "type": "string",
-              "description": "deprecated: the old profileName key, decoded with a warning",
-              "deprecated": true
-            },
             "profiles": {
               "items": {
                 "oneOf": [
@@ -501,11 +484,6 @@
                       "profileName": {
                         "type": "string",
                         "description": "profile name"
-                      },
-                      "spec": {
-                        "type": "string",
-                        "description": "deprecated: the old specDirPath key",
-                        "deprecated": true
                       },
                       "profile": {
                         "type": "string",
@@ -823,7 +801,15 @@
     },
     "VarDefs": {
       "additionalProperties": {
-        "$ref": "#/$defs/VarDef"
+        "oneOf": [
+          {
+            "type": "null",
+            "description": "a name needing nothing of its own: scope and required from variablesDefinitions.all"
+          },
+          {
+            "$ref": "#/$defs/VarDef"
+          }
+        ]
       },
       "type": "object"
     },
@@ -1628,11 +1614,6 @@
                 "required": [
                   "specDirPath"
                 ]
-              },
-              {
-                "required": [
-                  "source"
-                ]
               }
             ],
             "properties": {
@@ -1647,11 +1628,6 @@
               "specDirPath": {
                 "type": "string",
                 "description": "required: with url the dir under the repo holding the spec (. for the repo root); without url a local dir (./sub, /abs, ~/, $VAR, relative to this spec's checkout, . this repo's own exported spec); the dir offers its che.export.yml, then .che/che.export.yml, then a plain che.yml"
-              },
-              "source": {
-                "type": "string",
-                "description": "deprecated: the old url key, git::\u003cgiturl\u003e[@\u003cref\u003e] or \u003cdir\u003e, decoded with a warning",
-                "deprecated": true
               },
               "spec": {
                 "type": "string",

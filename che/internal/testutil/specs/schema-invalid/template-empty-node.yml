@@ -1,11 +1,13 @@
 ##[>] 🤖🤖
 profilesDefinitions:
   base:
+    type: host
     include:
       renderTemplates:
         - ctx: {repo: Workspace}
 
   'cli/macos':
+    type: host
     options: {autoDiscover: true}
     include:
       profiles: [base]

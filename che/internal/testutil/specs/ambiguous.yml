@@ -1,5 +1,6 @@
 profilesDefinitions:
   repo:
+    type: host
     options: {autoDiscover: true}
     include:
       renderTemplates:
@@ -7,6 +8,7 @@ profilesDefinitions:
           dest:
             - {path: .env, options: {writeType: mergeUpsert}}
   other:
+    type: host
     options: {autoDiscover: true}
     include:
       renderTemplates:
@@ -14,6 +16,7 @@ profilesDefinitions:
           dest:
             - {path: .env2, options: {writeType: mergeUpsert}}
   both:
+    type: host
     options: {autoDiscover: false}
     include:
       profiles: [repo, other]

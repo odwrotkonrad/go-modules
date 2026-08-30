@@ -1,20 +1,25 @@
 #[>] 🤖🤖
 profilesDefinitions:
   base:
+    type: host
     include:
       profiles: []
   main:
+    type: host
     include:
       profiles:
         - base
-        - source: "git::git@gitlab.com:g/r.git"
-          profile: p
-        - source: "git::https://gitlab.com/g/r2.git"
-          profile: q
+        - url: "git@gitlab.com:g/r.git"
+          specDirPath: .
+          profileName: p
+        - url: "https://gitlab.com/g/r2.git"
+          specDirPath: .
+          profileName: q
           env:
             GITLAB_GROUP: konradodwrot
-        - source: "git::git@gitlab.com:g/r.git"
-          profile: p
+        - url: "git@gitlab.com:g/r.git"
+          specDirPath: .
+          profileName: p
           env:
             IGNORED: dup
 

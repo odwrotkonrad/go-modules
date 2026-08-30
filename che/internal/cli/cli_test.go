@@ -171,7 +171,7 @@ func TestDiscoverReportsUnsetEnvRefs(t *testing.T) {
 	t.Setenv("CHE_VALIDATE_SPEC", "")
 	f, err := os.OpenFile(filepath.Join(a.flags.CheWorkingDirectory, "che.yml"), os.O_APPEND|os.O_WRONLY, 0o644)
 	require.NoError(t, err)
-	_, err = f.WriteString(indentProfiles("envB:\n  include:\n    makeLinks: ['_home/${{ env.CHE_TEST_B_UNSET }}/**']\n"))
+	_, err = f.WriteString(indentProfiles("envB:\n  type: host\n  include:\n    makeLinks: ['_home/${{ env.CHE_TEST_B_UNSET }}/**']\n"))
 	require.NoError(t, err)
 	require.NoError(t, f.Close())
 	a.flags.Profiles = []string{"envB"}

@@ -1,6 +1,7 @@
 ##[>] 🤖🤖
 profilesDefinitions:
   base:
+    type: host
     include:
       renderTemplates:
         - source: "git::gitlab.com/acme/tools@v1.0.0"
@@ -8,6 +9,7 @@ profilesDefinitions:
             - {source: snippets/ro.md, dest: .claude/agents/ro.md}
 
   'cli/macos':
+    type: host
     options: {autoDiscover: true}
     include:
       profiles: [base]

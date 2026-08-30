@@ -8,11 +8,9 @@ import (
 	"os"
 	"slices"
 	"strings"
-	"sync"
 
 	"gopkg.in/yaml.v3"
 
-	"gitlab.com/konradodwrot/go-modules/che/internal/log"
 	"gitlab.com/konradodwrot/go-modules/che/internal/spec/envinterp"
 	"gitlab.com/konradodwrot/go-modules/che/render/render"
 )
@@ -54,12 +52,6 @@ func (r ProfileRecipe) SourcedRefs() []ProfileSourceRecipe {
 
 // ProfilePathSep joins the profile names of a ref's path: a::b names b as included by top-level a.
 const ProfilePathSep = "::"
-
-// SplitProfilePath cuts the first profile name off a ref's profile path.
-func SplitProfilePath(path string) (head, rest string) {
-	head, rest, _ = strings.Cut(path, ProfilePathSep)
-	return head, rest
-}
 
 func expandProfileRefs(refs []ProfileSourceRecipe) []ProfileSourceRecipe {
 	var out []ProfileSourceRecipe
@@ -540,22 +532,11 @@ func specVarDefsOf(m *yaml.Node, profiles []ProfileRecipe) (SpecVarDefs, error) 
 	return defs, nil
 }
 
-var deprecationsSeen sync.Map
-
-// [why] a spec loads more than once per run (source init, then discovery): one line per distinct
-// deprecation keeps the warning readable
-func warnDeprecated(msg string) {
-	if _, seen := deprecationsSeen.LoadOrStore(msg, true); !seen {
-		log.EmitWarn("load-spec", "deprecated", msg)
-	}
-}
-
 // [why] a missing type warns, not errors: consumers pull upstream specs at pinned tags, so the
 // requirement bites only once every upstream has re-tagged with a type on each profile
 func checkProfileType(name string, t ProfileType) error {
 	if t == "" {
-		warnDeprecated(fmt.Sprintf("profile %q: type is missing, set type: %s (required in a coming release)", name, strings.Join(ProfileTypeNames, " | ")))
-		return nil
+		return fmt.Errorf("profile %q: type is required: %s", name, strings.Join(ProfileTypeNames, " | "))
 	}
 	if err := ValidateProfileType(string(t)); err != nil {
 		return fmt.Errorf("profile %q: %w", name, err)

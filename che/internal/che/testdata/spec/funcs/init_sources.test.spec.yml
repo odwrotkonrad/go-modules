@@ -9,6 +9,7 @@ cases:
             che.yml: |
               profilesDefinitions:
                 gitlabGroup:
+                  type: host
                   include:
                     runScripts: [scripts/bootstrap.zsh]
             scripts/bootstrap.zsh: "#!/bin/zsh\n"
@@ -16,11 +17,13 @@ cases:
             che.yml: |
               profilesDefinitions:
                 main:
+                  type: host
                   options: {autoDiscover: true}
                   include:
                     profiles:
-                      - source: "git::file://${REF_DIR}"
-                        profile: gitlabGroup
+                      - url: "file://${REF_DIR}"
+                        specDirPath: .
+                        profileName: gitlabGroup
         - flags: {prepareAfter: true}
     expected:
       stdOut:
@@ -33,17 +36,20 @@ cases:
             che.yml: |
               profilesDefinitions:
                 gitlabGroup:
+                  type: host
                   options:
                     runIf: ['env:REF_GATE']
         - hostFiles:
             che.yml: |
               profilesDefinitions:
                 main:
+                  type: host
                   options: {autoDiscover: true}
                   include:
                     profiles:
-                      - source: "git::file://${REF_DIR}"
-                        profile: gitlabGroup
+                      - url: "file://${REF_DIR}"
+                        specDirPath: .
+                        profileName: gitlabGroup
     expected:
       stdOut:
         - 'cloned remote file://${REF_DIR}'
@@ -56,16 +62,18 @@ cases:
         - refFiles:
             che.yml: |
               profilesDefinitions:
-                gitlabGroup: {}
+                gitlabGroup: {type: host}
         - hostFiles:
             che.yml: |
               profilesDefinitions:
                 main:
+                  type: host
                   options: {autoDiscover: true}
                   include:
                     profiles:
-                      - source: "git::file://${REF_DIR}"
-                        profile: gitlabGroup
+                      - url: "file://${REF_DIR}"
+                        specDirPath: .
+                        profileName: gitlabGroup
         - flags: {skipRemoteRefs: true}
     notExpected:
       stdOut:
@@ -76,16 +84,18 @@ cases:
         - refFiles:
             che.yml: |
               profilesDefinitions:
-                gitlabGroup: {}
+                gitlabGroup: {type: host}
         - hostFiles:
             che.yml: |
               profilesDefinitions:
                 main:
+                  type: host
                   options: {autoDiscover: true}
                   include:
                     profiles:
-                      - source: "git::file:///nonexistent-che-src"
-                        profile: gitlabGroup
+                      - url: "file:///nonexistent-che-src"
+                        specDirPath: .
+                        profileName: gitlabGroup
     expected:
       errorOutput: 'init-remote-sources gitlabGroup: '
 # [<] 🤖🤖

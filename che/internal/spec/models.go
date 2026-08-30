@@ -378,7 +378,7 @@ func ValidateProfileType(value string) error {
 
 type ProfileRecipe struct {
 	Source  ProfileSourceRecipe `yaml:"-" jsonschema:"-"`
-	Type    ProfileType         `yaml:"type" jsonschema:"enum=repo-git-tracked,enum=repo-git-untracked,enum=host" jsonschema_description:"where the profile's dests land: repo-git-tracked (files git tracks in the invoking repo), repo-git-untracked (gitignored files in the invoking repo), host (the machine); che run selects by type (--target-profile-types, the prompt on a TTY, everything otherwise)"`
+	Type    ProfileType         `yaml:"type" jsonschema:"required,enum=repo-git-tracked,enum=repo-git-untracked,enum=host" jsonschema_description:"where the profile's dests land: repo-git-tracked (files git tracks in the invoking repo), repo-git-untracked (gitignored files in the invoking repo), host (the machine); che run selects by type (--target-profile-types, the prompt on a TTY, everything otherwise)"`
 	Options ProfileOptions      `yaml:"options" jsonschema_description:"when the profile runs: autoDiscover opts in to bare-che runs, runIf predicates must ALL pass; logLevel/profileWorkingDirectory cascade (most nested wins)"`
 	VarDefs VarDefs             `yaml:"variablesDefinitions" jsonschema_description:"variables this profile reads, keyed by name; exclusive with the spec's profilesVariablesDefinitions entry for this profile"`
 	Include includeSet          `yaml:"include"`

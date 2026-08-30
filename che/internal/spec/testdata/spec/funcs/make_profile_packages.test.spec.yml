@@ -8,9 +8,11 @@ cases:
         - doc: |
             profilesDefinitions:
               base:
+                type: host
                 include:
                   installPackages: [git, jq]
               main:
+                type: host
                 include:
                   profiles: [base]
                   installPackages: [{name: jq, versions: "1.7.*"}, tmux, kind]

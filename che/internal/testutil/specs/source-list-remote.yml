@@ -1,11 +1,13 @@
 ##[>] 🤖🤖
 profilesDefinitions:
   base:
+    type: host
     include:
       renderTemplates:
         - source: [a.tpl, "git::gitlab.com/acme/tools//b.tpl"]
 
   'cli/macos':
+    type: host
     options: {autoDiscover: true}
     include:
       profiles: [base]

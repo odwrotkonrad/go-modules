@@ -2,9 +2,10 @@
 #[>] 🤖🤖
 profilesDefinitions:
   main:
+    type: host
     include:
       profiles:
-        - source: nourl
+        - specDirPath: ./nourl
           env:
             A: b
 

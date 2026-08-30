@@ -8,10 +8,12 @@ cases:
         - doc: |
             profilesDefinitions:
               base:
+                type: host
                 include:
                   installToolPackages:
                     vscode: [golang.go, redhat.vscode-yaml]
               main:
+                type: host
                 include:
                   profiles: [base]
                   installToolPackages:
@@ -31,6 +33,7 @@ cases:
         - doc: |
             profilesDefinitions:
               main:
+                type: host
                 include:
                   installToolPackages:
                     vscode: [golang.go]

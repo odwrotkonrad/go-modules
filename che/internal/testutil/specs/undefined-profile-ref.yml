@@ -1,6 +1,7 @@
 #[>] 🤖🤖
 profilesDefinitions:
   main:
+    type: host
     include:
       profiles: [nonexistent-ref]
 

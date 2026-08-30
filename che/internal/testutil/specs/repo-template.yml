@@ -1,5 +1,6 @@
 profilesDefinitions:
   base:
+    type: host
     include:
       renderTemplates:
         - source: templates/1-env/local.env.ontoRepo.tpl
@@ -11,6 +12,7 @@ profilesDefinitions:
             - {path: AGENTS.md, options: {renderReferencedFiles: true}}
 
   'cli/macos':
+    type: host
     options: {autoDiscover: true}
     include:
       profiles: [base]

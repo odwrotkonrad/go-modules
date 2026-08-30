@@ -1,6 +1,7 @@
 ##[>] 🤖🤖
 profilesDefinitions:
   base:
+    type: host
     include:
       makeCopies:
         - source: "git::gitlab.com/acme/tools@v1.0.0"
@@ -25,6 +26,7 @@ profilesDefinitions:
             - {source: x.ontoHost.cp, dest: [$HOME/.config/foo/x]}
 
   'cli/macos':
+    type: host
     options: {autoDiscover: true}
     include:
       profiles: [base]

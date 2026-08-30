@@ -1,6 +1,7 @@
 ##[>] 🤖🤖
 profilesDefinitions:
   base:
+    type: host
     include:
       makeLinks:
         - etc/zshrc
@@ -8,11 +9,13 @@ profilesDefinitions:
         - {source: _home/.config/foo/a, dest: [$HOME/.config/bar/a, /etc/bar/a]}
 
   'cli/macos':
+    type: host
     options: {autoDiscover: true}
     include:
       profiles: [base]
 
   exclude-explicit:
+    type: host
     include:
       profiles: [base]
     exclude:

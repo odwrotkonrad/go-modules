@@ -24,6 +24,7 @@ cases:
         - validateSpecMode: ""
         - appendSpec: |
             bogusProfile:
+              type: host
               options: {autoDiscover: false}
               includes:
                 makeLinks: [_home/**]
@@ -38,6 +39,7 @@ cases:
         - validateSpecMode: error
         - appendSpec: |
             bogusProfile:
+              type: host
               includes:
                 makeLinks: [_home/**]
     expected:
@@ -53,6 +55,7 @@ cases:
         - validateSpecMode: ""
         - appendSpec: |
             bogusProfile:
+              type: host
               includes:
                 makeLinks: [_home/**]
     expected:
@@ -82,9 +85,11 @@ cases:
         - validateSpecMode: ""
         - appendSpec: |
             envA:
+              type: host
               include:
                 makeLinks: ['_home/${{ env.CHE_TEST_A }}/**']
             envB:
+              type: host
               include:
                 makeLinks: ['_home/${{ env.CHE_TEST_B_UNSET }}/**']
     expected:
@@ -98,6 +103,7 @@ cases:
         - validateSpecMode: ""
         - appendSpec: |
             envB:
+              type: host
               include:
                 makeLinks: ['_home/${{ env.CHE_TEST_B_UNSET }}/**']
     expected:
@@ -111,6 +117,7 @@ cases:
         - validateSpecMode: ""
         - appendSpec: |
             envB:
+              type: host
               include:
                 makeLinks: ['_home/${{ env.CHE_TEST_B_UNSET }}/**']
     expected:

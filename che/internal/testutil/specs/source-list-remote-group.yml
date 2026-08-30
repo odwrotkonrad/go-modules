@@ -1,6 +1,7 @@
 ##[>] 🤖🤖
 profilesDefinitions:
   base:
+    type: host
     include:
       renderTemplates:
         - source:
@@ -20,6 +21,7 @@ profilesDefinitions:
                 - //snippets/ro.md
 
   'cli/macos':
+    type: host
     options: {autoDiscover: true}
     include:
       profiles: [base]

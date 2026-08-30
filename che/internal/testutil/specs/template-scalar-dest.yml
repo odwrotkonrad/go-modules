@@ -1,6 +1,7 @@
 ##[>] 🤖🤖
 profilesDefinitions:
   base:
+    type: host
     include:
       renderTemplates:
         - {source: templates/1-env/local.env.ontoRepo.tpl, dest: assets/docs/local.env}
@@ -8,6 +9,7 @@ profilesDefinitions:
         - {source: _home/.config/bar/**, dest: 's:^_home:$HOME:'}
 
   'cli/macos':
+    type: host
     options: {autoDiscover: true}
     include:
       profiles: [base]

@@ -102,7 +102,7 @@ func VariablesFileSchema() *jsonschema.Schema {
 
 func specsIncludeEntrySchema() *jsonschema.Schema {
 	entry := obj("embedded spec source with overlays applied to every profile of the embedded spec", nil)
-	entry.AnyOf = []*jsonschema.Schema{{Required: []string{"specDirPath"}}, {Required: []string{"source"}}}
+	entry.AnyOf = []*jsonschema.Schema{{Required: []string{"specDirPath"}}}
 	addSpecSourceKeys(entry)
 	entry.Properties.Set("env", envSchema("env overlaid on the embedded spec's load and run"))
 	entry.Properties.Set("variables", envSchema("explicit pass: values for variables the embedded spec declares, over its own files"))
@@ -123,7 +123,6 @@ func addSpecSourceKeys(o *jsonschema.Schema) {
 		Description: "required: with url the dir under the repo holding the spec (. for the repo root); without url a local dir (./sub, /abs, ~/, $VAR, relative to this spec's checkout, . this repo's own exported spec); the dir offers its che.export.yml, then .che/che.export.yml, then a plain che.yml",
 		Type:        "string",
 	})
-	o.Properties.Set("source", &jsonschema.Schema{Description: "deprecated: the old url key, git::<giturl>[@<ref>] or <dir>, decoded with a warning", Type: "string", Deprecated: true})
 	o.Properties.Set("spec", &jsonschema.Schema{Description: "deprecated: the old specDirPath key, decoded with a warning", Type: "string", Deprecated: true})
 }
 
@@ -341,7 +340,7 @@ func (DestSpec) JSONSchema() *jsonschema.Schema {
 
 func (ProfileSourceRecipe) JSONSchema() *jsonschema.Schema {
 	o := obj("sourced profile ref: a profile of another spec, options override its options, env overlays its run, variables override its variables", nil)
-	o.AnyOf = []*jsonschema.Schema{{Required: []string{"specDirPath"}}, {Required: []string{"source"}}}
+	o.AnyOf = []*jsonschema.Schema{{Required: []string{"specDirPath"}}}
 	addSpecSourceKeys(o)
 	o.Properties.Set("profileName", &jsonschema.Schema{
 		Description: "a top-level profile of that spec (nested profiles are never searched: reference them by their own url, ref, specDirPath, profileName); exclusive with profileNames",
@@ -350,14 +349,12 @@ func (ProfileSourceRecipe) JSONSchema() *jsonschema.Schema {
 	item := obj("one profile of the shared source, its own spec dir when it differs from the entry's", []string{"profileName"})
 	item.Properties.Set("specDirPath", &jsonschema.Schema{Description: "spec dir under url for this profile; default the entry's specDirPath", Type: "string"})
 	item.Properties.Set("profileName", &jsonschema.Schema{Description: "profile name", Type: "string"})
-	item.Properties.Set("spec", &jsonschema.Schema{Description: "deprecated: the old specDirPath key", Type: "string", Deprecated: true})
 	item.Properties.Set("profile", &jsonschema.Schema{Description: "deprecated: the old profileName key", Type: "string", Deprecated: true})
 	o.Properties.Set("profileNames", &jsonschema.Schema{
 		Description: "several profiles of the same url and ref, written once: names, or {specDirPath, profileName} when a profile sits under another spec dir; options, env and variables apply to each; exclusive with profileName",
 		Type:        "array",
 		Items:       scalarOr("profile name", item),
 	})
-	o.Properties.Set("profile", &jsonschema.Schema{Description: "deprecated: the old profileName key, decoded with a warning", Type: "string", Deprecated: true})
 	o.Properties.Set("profiles", &jsonschema.Schema{Description: "deprecated: the old profileNames key, decoded with a warning", Type: "array", Items: scalarOr("profile name", item), Deprecated: true})
 	o.Properties.Set("options", &jsonschema.Schema{Ref: "#/$defs/ProfileOptions"})
 	o.Properties.Set("env", envSchema("envs exported around everything done for the referenced profile (sourced entries only)"))

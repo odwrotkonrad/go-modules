@@ -1,6 +1,7 @@
 ##[>] 🤖🤖
 profilesDefinitions:
   remote-one-level:
+    type: host
     include:
       makeCopies:
         - source: "git::gitlab.com/acme/tools@v1.0.0//prompts"
@@ -10,6 +11,7 @@ profilesDefinitions:
             - {source: /mr.md.tpl, dest: mr.md.tpl}
 
   local-one-level:
+    type: host
     include:
       makeCopies:
         - source: etc/daemons
@@ -19,6 +21,7 @@ profilesDefinitions:
             - {source: b.plist.ontoHost.cp, dest: b.plist}
 
   remote-two-levels:
+    type: host
     include:
       makeCopies:
         - source: "git::gitlab.com/acme/tools@v1.0.0"
@@ -34,6 +37,7 @@ profilesDefinitions:
                 - {source: /ro.md, dest: ro.md}
 
   local-two-levels:
+    type: host
     include:
       makeCopies:
         - source: etc

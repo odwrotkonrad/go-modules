@@ -1,6 +1,7 @@
 ##[>] 🤖🤖
 profilesDefinitions:
   'cli/macos':
+    type: host
     options: {autoDiscover: true}
     include:
       makeLinks:
