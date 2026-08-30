@@ -26,6 +26,7 @@ type Options struct {
 	EnvUnset                                           envinterp.Policy
 	EnvUnsetReport                                     bool
 	Profiles                                           []string
+	TargetProfileTypes                                 []string
 	RunSkipOps                                         []string
 	BackupAutoCreateFlag                               *bool
 	BackupAutoCreateDisabled                           bool

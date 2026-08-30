@@ -6,6 +6,7 @@ env:
   E2E_PIN_CHECK: '${{ var.E2E_PIN }}'
 
 ops-plain:
+  type: host
   options:
     autoDiscover: false
   include:
@@ -34,6 +35,7 @@ ops-plain:
       - scripts/plain-script
 
 ops-conditional:
+  type: host
   options:
     autoDiscover: false
   include:
@@ -55,6 +57,7 @@ ops-conditional:
       - scripts/conditional-script
 
 ops-dropped:
+  type: host
   options:
     autoDiscover: false
   include:
@@ -76,6 +79,7 @@ ops-dropped:
       - scripts/dropped-script
 
 dropped:
+  type: host
   options:
     autoDiscover: true
     runIf:
@@ -85,6 +89,7 @@ dropped:
       - ops-dropped
 
 plain:
+  type: host
   options:
     autoDiscover: true
   include:
@@ -92,6 +97,7 @@ plain:
       - ops-plain
 
 conditional:
+  type: host
   options:
     autoDiscover: true
     runIf:
@@ -101,10 +107,12 @@ conditional:
       - ops-conditional
 
 remote-empty:
+  type: host
   options:
     autoDiscover: true
   include:
     profiles:
-      - source: "git::file://__REMOTE_DIR__"
-        profile: ops-remote
+      - url: "file://__REMOTE_DIR__"
+        specDirPath: .
+        profileName: ops-remote
 ##[<] 🤖🤖

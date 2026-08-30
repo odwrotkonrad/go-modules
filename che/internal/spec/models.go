@@ -23,6 +23,13 @@ type SourceType string
 
 var SourceTypes = struct{ Remote, Filesystem SourceType }{"remote", "filesystem"}
 
+type SourceSpec struct {
+	URL      string `yaml:"url"`
+	Ref      string `yaml:"ref"`
+	FilePath string `yaml:"filepath"`
+	raw      string
+}
+
 type SourceRecipe struct {
 	URI           string `yaml:"-"`
 	Spec          string `yaml:"-"`
@@ -36,10 +43,17 @@ type SourceReady struct {
 	DirectoryPath string
 }
 
+type sourceKeys struct {
+	URL         string `yaml:"url"`
+	GitRef      string `yaml:"ref"`
+	SpecDirPath string `yaml:"specDirPath"`
+	Src         string `yaml:"source"`
+	SpecPath    string `yaml:"spec"`
+}
+
 type SpecSourceRecipe struct {
 	SourceRecipe `yaml:"-"`
-	Src          string            `yaml:"source"`
-	SpecPath     string            `yaml:"spec"`
+	sourceKeys   `yaml:",inline"`
 	Env          map[string]string `yaml:"env"`
 	Variables    map[string]string `yaml:"variables"`
 	Optional     bool              `yaml:"optional" jsonschema_description:"local dir sources only: an absent dir is skipped with a warning instead of failing the load (a dir another profile renders first)"`
@@ -51,9 +65,10 @@ type SpecSourceReady struct {
 
 type ProfileSourceRecipe struct {
 	SourceRecipe `yaml:"-"`
+	sourceKeys   `yaml:",inline"`
 	ProfileName  string            `yaml:"-"`
-	Src          string            `yaml:"source"`
-	SpecPath     string            `yaml:"spec"`
+	Name         string            `yaml:"profileName"`
+	Names        []profileListItem `yaml:"profileNames"`
 	Profile      string            `yaml:"profile"`
 	Profiles     []profileListItem `yaml:"profiles"`
 	Options      ProfileOptions    `yaml:"options"`
@@ -62,8 +77,10 @@ type ProfileSourceRecipe struct {
 }
 
 type profileListItem struct {
-	Spec    string `yaml:"spec"`
-	Profile string `yaml:"profile"`
+	SpecDirPath string `yaml:"specDirPath"`
+	Name        string `yaml:"profileName"`
+	Spec        string `yaml:"spec"`
+	Profile     string `yaml:"profile"`
 }
 
 type ProfileSourceReady struct {
@@ -98,6 +115,7 @@ type Options struct {
 	EnvUnset                string          `yaml:"envUnset" jsonschema:"enum=error,enum=empty" jsonschema_description:"what a bare ${{ env.NAME }} does when NAME is unset or empty: error (default, profiles selected to run only) | empty (reads as \"\"); a || default never errors; literal only, read before interpolation; overridden by --env-unset and CHE_ENV_UNSET"`
 	DryRun                  Scalar          `yaml:"dryRun" jsonschema:"enum=delta,enum=all,enum=true,enum=false" jsonschema_description:"default dry-run mode: delta (changed dests) | all (every dest) | true (alias for delta) | false (off, the default); overridden by the flag and env var"`
 	Profiles                []string        `yaml:"profiles" jsonschema_description:"profiles to run (autoDiscover skipped, runIf still enforced); overridden by --profiles and CHE_PROFILE"`
+	TargetProfileTypes      []string        `yaml:"targetProfileTypes" jsonschema:"enum=repo-git-tracked,enum=repo-git-untracked,enum=host" jsonschema_description:"profile types auto-discovery keeps (--profiles names and include.profiles refs run whatever their type); empty: every type (a TTY che run prompts); root spec only, an included spec's value is ignored; overridden by CHE_TARGET_PROFILE_TYPES and --target-profile-types"`
 	SkipRemoteRefs          *bool           `yaml:"skipRemoteRefs" jsonschema_description:"skip sourced include.profiles refs; overridden by the flag and env var"`
 	Run                     Run             `yaml:"run" jsonschema_description:"run-command options"`
 	Backup                  Backup          `yaml:"backup" jsonschema_description:"backup op defaults"`
@@ -286,8 +304,22 @@ type Otel struct {
 	Traces   *bool  `yaml:"traces" jsonschema_description:"export spans for command/spec/profile/operation runs and external calls; default on when enabled; overridden by CHE_OTEL_TRACES"`
 }
 
+type ProfileType string
+
+var ProfileTypes = struct{ RepoGitTracked, RepoGitUntracked, Host ProfileType }{"repo-git-tracked", "repo-git-untracked", "host"}
+
+var ProfileTypeNames = []string{string(ProfileTypes.RepoGitTracked), string(ProfileTypes.RepoGitUntracked), string(ProfileTypes.Host)}
+
+func ValidateProfileType(value string) error {
+	if !slices.Contains(ProfileTypeNames, value) {
+		return fmt.Errorf("type %q: want %s", value, strings.Join(ProfileTypeNames, " | "))
+	}
+	return nil
+}
+
 type ProfileRecipe struct {
 	Source  ProfileSourceRecipe `yaml:"-" jsonschema:"-"`
+	Type    ProfileType         `yaml:"type" jsonschema:"enum=repo-git-tracked,enum=repo-git-untracked,enum=host" jsonschema_description:"where the profile's dests land: repo-git-tracked (files git tracks in the invoking repo), repo-git-untracked (gitignored files in the invoking repo), host (the machine); che run selects by type (--target-profile-types, the prompt on a TTY, everything otherwise)"`
 	Options ProfileOptions      `yaml:"options" jsonschema_description:"when the profile runs: autoDiscover opts in to bare-che runs, runIf predicates must ALL pass; logLevel/profileWorkingDirectory cascade (most nested wins)"`
 	Include includeSet          `yaml:"include"`
 	Exclude excludeSet          `yaml:"exclude"`

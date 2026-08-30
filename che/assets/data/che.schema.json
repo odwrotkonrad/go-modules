@@ -366,6 +366,15 @@
     },
     "ProfileRecipe": {
       "properties": {
+        "type": {
+          "type": "string",
+          "enum": [
+            "repo-git-tracked",
+            "repo-git-untracked",
+            "host"
+          ],
+          "description": "where the profile's dests land: repo-git-tracked (files git tracks in the invoking repo), repo-git-untracked (gitignored files in the invoking repo), host (the machine); che run selects by type (--target-profile-types, the prompt on a TTY, everything otherwise)"
+        },
         "options": {
           "$ref": "#/$defs/ProfileOptions",
           "description": "when the profile runs: autoDiscover opts in to bare-che runs, runIf predicates must ALL pass; logLevel/profileWorkingDirectory cascade (most nested wins)"
@@ -379,7 +388,7 @@
       },
       "additionalProperties": false,
       "type": "object",
-      "description": "one profile block: options self-describe eligibility, include.profiles compose refs in order (local scalars, sourced {source, spec, profile, options, env, variables}), include adds, exclude filters last and wins"
+      "description": "one profile block: options self-describe eligibility, include.profiles compose refs in order (local scalars, sourced {url, ref, specDirPath, profileName, options, env, variables}), include adds, exclude filters last and wins"
     },
     "ProfileSourceRecipe": {
       "oneOf": [
@@ -388,48 +397,131 @@
           "description": "local profile name, composed depth-first"
         },
         {
+          "anyOf": [
+            {
+              "required": [
+                "url",
+                "specDirPath"
+              ]
+            },
+            {
+              "required": [
+                "source"
+              ]
+            }
+          ],
           "properties": {
+            "url": {
+              "type": "string",
+              "description": "the repo or dir holding the spec: a git url (host/path, scheme optional: gitlab.com/g/r, https://gitlab.com/g/r.git, git@gitlab.com:g/r.git) or a local dir (., ./sub, /abs, ~/, $VAR, relative to this spec's checkout)"
+            },
+            "ref": {
+              "type": "string",
+              "description": "git ref pinning a remote url: tag, branch or commit; never on a local dir"
+            },
+            "specDirPath": {
+              "type": "string",
+              "description": "required with url: the dir under url holding the spec (its che.export.yml, then .che/che.export.yml, then a plain che.yml), . for the source root"
+            },
             "source": {
               "type": "string",
-              "description": "the repo or dir holding the spec: git::\u003cgiturl\u003e[@\u003cref\u003e] (remote, @\u003cref\u003e pins a tag or branch) or \u003cdir\u003e (local: $VAR and ~ expand, relative to this spec's checkout, . for this repo's own exported spec); never a file, never //\u003cpath\u003e"
+              "description": "deprecated: the old url key, git::\u003cgiturl\u003e[@\u003cref\u003e] or \u003cdir\u003e, decoded with a warning",
+              "deprecated": true
             },
             "spec": {
               "type": "string",
-              "description": "where the spec sits under source: a dir (its che.export.yml, then .che/che.export.yml, then a plain che.yml) or, not recommended, a spec file path used as is; default the source root"
+              "description": "deprecated: the old specDirPath key, decoded with a warning",
+              "deprecated": true
+            },
+            "profileName": {
+              "type": "string",
+              "description": "a top-level profile of that spec (nested profiles are never searched: reference them by their own url, ref, specDirPath, profileName); exclusive with profileNames"
+            },
+            "profileNames": {
+              "items": {
+                "oneOf": [
+                  {
+                    "type": "string",
+                    "description": "profile name"
+                  },
+                  {
+                    "properties": {
+                      "specDirPath": {
+                        "type": "string",
+                        "description": "spec dir under url for this profile; default the entry's specDirPath"
+                      },
+                      "profileName": {
+                        "type": "string",
+                        "description": "profile name"
+                      },
+                      "spec": {
+                        "type": "string",
+                        "description": "deprecated: the old specDirPath key",
+                        "deprecated": true
+                      },
+                      "profile": {
+                        "type": "string",
+                        "description": "deprecated: the old profileName key",
+                        "deprecated": true
+                      }
+                    },
+                    "additionalProperties": false,
+                    "type": "object",
+                    "required": [
+                      "profileName"
+                    ],
+                    "description": "one profile of the shared source, its own spec dir when it differs from the entry's"
+                  }
+                ]
+              },
+              "type": "array",
+              "description": "several profiles of the same url and ref, written once: names, or {specDirPath, profileName} when a profile sits under another spec dir; options, env and variables apply to each; exclusive with profileName"
             },
             "profile": {
               "type": "string",
-              "description": "a top-level profile of that spec, or a path a::b::c walking include.profiles from top-level a down to the nested profile c (nested profiles are never searched by default); exclusive with profiles"
+              "description": "deprecated: the old profileName key, decoded with a warning",
+              "deprecated": true
             },
             "profiles": {
               "items": {
                 "oneOf": [
                   {
                     "type": "string",
-                    "description": "profile name or a::b path"
+                    "description": "profile name"
                   },
                   {
                     "properties": {
+                      "specDirPath": {
+                        "type": "string",
+                        "description": "spec dir under url for this profile; default the entry's specDirPath"
+                      },
+                      "profileName": {
+                        "type": "string",
+                        "description": "profile name"
+                      },
                       "spec": {
                         "type": "string",
-                        "description": "dir or spec file under source for this profile; default the entry's spec"
+                        "description": "deprecated: the old specDirPath key",
+                        "deprecated": true
                       },
                       "profile": {
                         "type": "string",
-                        "description": "profile name or a::b path"
+                        "description": "deprecated: the old profileName key",
+                        "deprecated": true
                       }
                     },
                     "additionalProperties": false,
                     "type": "object",
                     "required": [
-                      "profile"
+                      "profileName"
                     ],
-                    "description": "one profile of the shared source, its own spec when it differs from the entry's"
+                    "description": "one profile of the shared source, its own spec dir when it differs from the entry's"
                   }
                 ]
               },
               "type": "array",
-              "description": "several profiles of the same source and ref, written once: names or a::b paths, or {spec, profile} when a profile sits under another spec; options, env and variables apply to each; exclusive with profile"
+              "description": "deprecated: the old profileNames key, decoded with a warning",
+              "deprecated": true
             },
             "options": {
               "$ref": "#/$defs/ProfileOptions"
@@ -459,9 +551,6 @@
           },
           "additionalProperties": false,
           "type": "object",
-          "required": [
-            "source"
-          ],
           "description": "sourced profile ref: a profile of another spec, options override its options, env overlays its run, variables override its variables"
         }
       ]
@@ -577,6 +666,18 @@
           "type": "array",
           "description": "profiles to run (autoDiscover skipped, runIf still enforced); overridden by --profiles and CHE_PROFILE"
         },
+        "targetProfileTypes": {
+          "items": {
+            "type": "string",
+            "enum": [
+              "repo-git-tracked",
+              "repo-git-untracked",
+              "host"
+            ]
+          },
+          "type": "array",
+          "description": "profile types auto-discovery keeps (--profiles names and include.profiles refs run whatever their type); empty: every type (a TTY che run prompts); root spec only, an included spec's value is ignored; overridden by CHE_TARGET_PROFILE_TYPES and --target-profile-types"
+        },
         "skipRemoteRefs": {
           "type": "boolean",
           "description": "skip sourced include.profiles refs; overridden by the flag and env var"
@@ -652,8 +753,34 @@
         {
           "properties": {
             "source": {
-              "type": "string",
-              "description": "source path, any file, workingDirectory-relative, or remote ref git::\u003crepo\u003e[@\u003cref\u003e]//\u003cpath\u003e (explicit dest required); joined onto every enclosing group's source prefix"
+              "oneOf": [
+                {
+                  "type": "string",
+                  "description": "source path, any file, workingDirectory-relative, or remote ref git::\u003crepo\u003e[@\u003cref\u003e]//\u003cpath\u003e (explicit dest required); joined onto every enclosing group's source prefix"
+                },
+                {
+                  "properties": {
+                    "url": {
+                      "type": "string",
+                      "description": "git url, host/path with an optional scheme (gitlab.com/g/r, https://gitlab.com/g/r.git)"
+                    },
+                    "ref": {
+                      "type": "string",
+                      "description": "git ref: tag, branch or commit"
+                    },
+                    "filepath": {
+                      "type": "string",
+                      "description": "path inside the repo; omitted on a group prefix, the nested string sources join onto it"
+                    }
+                  },
+                  "additionalProperties": false,
+                  "type": "object",
+                  "required": [
+                    "url"
+                  ],
+                  "description": "remote source object, rendered as git::\u003curl\u003e[@\u003cref\u003e][//\u003cfilepath\u003e]"
+                }
+              ]
             },
             "dest": {
               "oneOf": [
@@ -734,8 +861,34 @@
           ],
           "properties": {
             "source": {
-              "type": "string",
-              "description": "source prefix joined onto every nested node's source; a remote prefix git::\u003crepo\u003e[@\u003cref\u003e][//\u003cpath\u003e] concatenates with each leaf path"
+              "oneOf": [
+                {
+                  "type": "string",
+                  "description": "source prefix joined onto every nested node's source; a remote prefix git::\u003crepo\u003e[@\u003cref\u003e][//\u003cpath\u003e] concatenates with each leaf path"
+                },
+                {
+                  "properties": {
+                    "url": {
+                      "type": "string",
+                      "description": "git url, host/path with an optional scheme (gitlab.com/g/r, https://gitlab.com/g/r.git)"
+                    },
+                    "ref": {
+                      "type": "string",
+                      "description": "git ref: tag, branch or commit"
+                    },
+                    "filepath": {
+                      "type": "string",
+                      "description": "path inside the repo; omitted on a group prefix, the nested string sources join onto it"
+                    }
+                  },
+                  "additionalProperties": false,
+                  "type": "object",
+                  "required": [
+                    "url"
+                  ],
+                  "description": "remote source object, rendered as git::\u003curl\u003e[@\u003cref\u003e][//\u003cfilepath\u003e]"
+                }
+              ]
             },
             "dest": {
               "type": "string",
@@ -958,8 +1111,34 @@
         {
           "properties": {
             "source": {
-              "type": "string",
-              "description": "file or glob, workingDirectory-relative"
+              "oneOf": [
+                {
+                  "type": "string",
+                  "description": "file or glob, workingDirectory-relative"
+                },
+                {
+                  "properties": {
+                    "url": {
+                      "type": "string",
+                      "description": "git url, host/path with an optional scheme (gitlab.com/g/r, https://gitlab.com/g/r.git)"
+                    },
+                    "ref": {
+                      "type": "string",
+                      "description": "git ref: tag, branch or commit"
+                    },
+                    "filepath": {
+                      "type": "string",
+                      "description": "path inside the repo; omitted on a group prefix, the nested string sources join onto it"
+                    }
+                  },
+                  "additionalProperties": false,
+                  "type": "object",
+                  "required": [
+                    "url"
+                  ],
+                  "description": "remote source object, rendered as git::\u003curl\u003e[@\u003cref\u003e][//\u003cfilepath\u003e]"
+                }
+              ]
             },
             "dest": {
               "oneOf": [
@@ -1006,8 +1185,34 @@
         {
           "properties": {
             "source": {
-              "type": "string",
-              "description": "source path (host sources workingDirectory-relative, repo-doc sources checkout-relative), or remote ref git::\u003crepo\u003e[@\u003cref\u003e]//\u003cpath\u003e (explicit dest required); joined onto every enclosing group's source prefix"
+              "oneOf": [
+                {
+                  "type": "string",
+                  "description": "source path (host sources workingDirectory-relative, repo-doc sources checkout-relative), or remote ref git::\u003crepo\u003e[@\u003cref\u003e]//\u003cpath\u003e (explicit dest required); joined onto every enclosing group's source prefix"
+                },
+                {
+                  "properties": {
+                    "url": {
+                      "type": "string",
+                      "description": "git url, host/path with an optional scheme (gitlab.com/g/r, https://gitlab.com/g/r.git)"
+                    },
+                    "ref": {
+                      "type": "string",
+                      "description": "git ref: tag, branch or commit"
+                    },
+                    "filepath": {
+                      "type": "string",
+                      "description": "path inside the repo; omitted on a group prefix, the nested string sources join onto it"
+                    }
+                  },
+                  "additionalProperties": false,
+                  "type": "object",
+                  "required": [
+                    "url"
+                  ],
+                  "description": "remote source object, rendered as git::\u003curl\u003e[@\u003cref\u003e][//\u003cfilepath\u003e]"
+                }
+              ]
             },
             "dest": {
               "oneOf": [
@@ -1140,8 +1345,34 @@
           ],
           "properties": {
             "source": {
-              "type": "string",
-              "description": "source prefix joined onto every nested node's source; a remote prefix git::\u003crepo\u003e[@\u003cref\u003e][//\u003cpath\u003e] concatenates with each leaf path"
+              "oneOf": [
+                {
+                  "type": "string",
+                  "description": "source prefix joined onto every nested node's source; a remote prefix git::\u003crepo\u003e[@\u003cref\u003e][//\u003cpath\u003e] concatenates with each leaf path"
+                },
+                {
+                  "properties": {
+                    "url": {
+                      "type": "string",
+                      "description": "git url, host/path with an optional scheme (gitlab.com/g/r, https://gitlab.com/g/r.git)"
+                    },
+                    "ref": {
+                      "type": "string",
+                      "description": "git ref: tag, branch or commit"
+                    },
+                    "filepath": {
+                      "type": "string",
+                      "description": "path inside the repo; omitted on a group prefix, the nested string sources join onto it"
+                    }
+                  },
+                  "additionalProperties": false,
+                  "type": "object",
+                  "required": [
+                    "url"
+                  ],
+                  "description": "remote source object, rendered as git::\u003curl\u003e[@\u003cref\u003e][//\u003cfilepath\u003e]"
+                }
+              ]
             },
             "dest": {
               "type": "string",
@@ -1255,17 +1486,44 @@
             "oneOf": [
               {
                 "type": "string",
-                "description": "spec source"
+                "description": "local spec dir"
               },
               {
+                "anyOf": [
+                  {
+                    "required": [
+                      "url",
+                      "specDirPath"
+                    ]
+                  },
+                  {
+                    "required": [
+                      "source"
+                    ]
+                  }
+                ],
                 "properties": {
+                  "url": {
+                    "type": "string",
+                    "description": "the repo or dir holding the spec: a git url (host/path, scheme optional: gitlab.com/g/r, https://gitlab.com/g/r.git, git@gitlab.com:g/r.git) or a local dir (., ./sub, /abs, ~/, $VAR, relative to this spec's checkout)"
+                  },
+                  "ref": {
+                    "type": "string",
+                    "description": "git ref pinning a remote url: tag, branch or commit; never on a local dir"
+                  },
+                  "specDirPath": {
+                    "type": "string",
+                    "description": "required with url: the dir under url holding the spec (its che.export.yml, then .che/che.export.yml, then a plain che.yml), . for the source root"
+                  },
                   "source": {
                     "type": "string",
-                    "description": "\u003cdir\u003e (absolute, relative, ~/, $VAR) or git::\u003cgiturl\u003e[@\u003cgit-ref\u003e] (@\u003cref\u003e pins a tag or branch); never a file, never //\u003cpath\u003e"
+                    "description": "deprecated: the old url key, git::\u003cgiturl\u003e[@\u003cref\u003e] or \u003cdir\u003e, decoded with a warning",
+                    "deprecated": true
                   },
                   "spec": {
                     "type": "string",
-                    "description": "where the spec sits under source: a dir (che.export.yml first) or, not recommended, a spec file path; default the source root"
+                    "description": "deprecated: the old specDirPath key, decoded with a warning",
+                    "deprecated": true
                   },
                   "env": {
                     "additionalProperties": {
@@ -1288,15 +1546,12 @@
                 },
                 "additionalProperties": false,
                 "type": "object",
-                "required": [
-                  "source"
-                ],
                 "description": "spec source with overlays applied to every profile of the included spec"
               }
             ]
           },
           "type": "array",
-          "description": "spec sources, each a \u003cdir\u003e (absolute, relative, ~/, $VAR) or git::\u003cgiturl\u003e[@\u003cgit-ref\u003e] (@\u003cref\u003e pins a tag or branch), scalar or {source, spec, env, variables, optional}; a dir offers its che.export.yml first, then a plain che.yml"
+          "description": "spec sources: a local \u003cdir\u003e scalar (absolute, relative, ~/, $VAR), or {url, ref, specDirPath, env, variables, optional}; a dir offers its che.export.yml first, then a plain che.yml"
         }
       },
       "additionalProperties": false,

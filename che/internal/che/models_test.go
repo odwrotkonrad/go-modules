@@ -106,6 +106,7 @@ type prepFlags struct {
 	UnsetEnv                []string `yaml:"unsetEnv"`
 	AutoDiscover            *bool    `yaml:"autoDiscover"`
 	Profiles                []string `yaml:"profiles"`
+	TargetProfileTypes      []string `yaml:"targetProfileTypes"`
 	ProfileWorkingDirectory string   `yaml:"profileWorkingDirectory"`
 }
 
@@ -161,6 +162,7 @@ func TestPrepareSpecs(t *testing.T) {
 			opts := options.Options{
 				AutoDiscover:            flags.AutoDiscover == nil || *flags.AutoDiscover,
 				Profiles:                flags.Profiles,
+				TargetProfileTypes:      flags.TargetProfileTypes,
 				ProfileWorkingDirectory: flags.ProfileWorkingDirectory,
 				SkipRemoteRefs:          flags.SkipRemoteRefs,
 				ValidateSpec:            vs,

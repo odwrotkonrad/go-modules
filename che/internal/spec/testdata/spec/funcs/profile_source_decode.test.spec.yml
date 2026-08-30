@@ -141,7 +141,7 @@ cases:
         - entry: |
             env: {A: b}
     expected:
-      errorOutput: ['include.profiles entry missing source']
+      errorOutput: ['include.profiles entry missing url']
   - name: ShouldDecodeLegacyCtxAsVariables
     input:
       args:
@@ -187,5 +187,94 @@ cases:
             profile: a
             profiles: [b]
     expected:
-      errorOutput: ['profile and profiles are exclusive']
+      errorOutput: ['profileName and profileNames are exclusive']
+  - name: ShouldDecodeObjectRefRemote
+    input:
+      args:
+        - entry: |
+            url: gitlab.com/g/r
+            ref: v1.2.3
+            specDirPath: profiles/claude
+            profileName: claude/virt
+    expected:
+      output:
+        source: "git::gitlab.com/g/r"
+        spec: profiles/claude
+        profile: claude/virt
+        sourceType: remote
+        ref: v1.2.3
+        string: "git::gitlab.com/g/r@v1.2.3 spec profiles/claude profile claude/virt"
+  - name: ShouldDecodeObjectRefWithSchemeUrl
+    input:
+      args:
+        - entry: |
+            url: https://gitlab.com/g/r.git
+            specDirPath: .
+            profileName: p
+    expected:
+      output: {source: "git::https://gitlab.com/g/r.git", profile: p, sourceType: remote, string: "git::https://gitlab.com/g/r.git profile p"}
+  - name: ShouldDecodeObjectRefLocal
+    input:
+      args:
+        - entry: |
+            url: .
+            specDirPath: profiles/git
+            profileName: git/host/macos
+    expected:
+      output: {source: ., spec: profiles/git, profile: git/host/macos, sourceType: filesystem, string: ". spec profiles/git profile git/host/macos"}
+  - name: ShouldErrorOnMissingSpecDirPath
+    input:
+      args:
+        - entry: |
+            url: gitlab.com/g/r
+            profileName: p
+    expected:
+      errorOutput: ['specDirPath is required']
+  - name: ShouldErrorOnProfilePathInProfileName
+    input:
+      args:
+        - entry: |
+            url: gitlab.com/g/r
+            specDirPath: .
+            profileName: a::b
+    expected:
+      errorOutput: ['profile paths are gone']
+  - name: ShouldErrorOnRefOnLocalUrl
+    input:
+      args:
+        - entry: |
+            url: ./sub
+            ref: v1
+            specDirPath: .
+            profileName: p
+    expected:
+      errorOutput: ['needs a remote']
+  - name: ShouldErrorOnRefGivenTwice
+    input:
+      args:
+        - entry: |
+            url: gitlab.com/g/r@v1
+            ref: v2
+            specDirPath: .
+            profileName: p
+    expected:
+      errorOutput: ['ref given twice']
+  - name: ShouldDecodeDeprecatedKeysAsNew
+    input:
+      args:
+        - entry: |
+            source: "git::gitlab.com/g/r@v1"
+            spec: sub
+            profile: p
+    expected:
+      output: {source: "git::gitlab.com/g/r", spec: sub, profile: p, sourceType: remote, ref: v1, string: "git::gitlab.com/g/r@v1 spec sub profile p"}
+  - name: ShouldExpandProfileNames
+    input:
+      args:
+        - entry: |
+            url: gitlab.com/g/r
+            specDirPath: .
+            profileNames: [a, {specDirPath: sub, profileName: b}]
+    expected:
+      output: {source: "git::gitlab.com/g/r", sourceType: remote, string: "git::gitlab.com/g/r profile ", expanded: ["git::gitlab.com/g/r profile a", "git::gitlab.com/g/r spec sub profile b"]}
 # [<] 🤖🤖

@@ -244,12 +244,12 @@ cases:
       args: [spec: schema-invalid/template-empty-node, profile: cli/macos]
     expected:
       errorOutput: ['renderTemplates node needs a source, a glob or nested <<<']
-  - name: ShouldErrorOnMalformedGroupSourcePrefix
+  - name: ShouldJoinLeafPathOntoRefOnlyGroupPrefix
     context: {pwd: testdata/fixture/resolve/tree-empty}
     input:
-      args: [spec: template-group-prefix-malformed, profile: cli/macos]
+      args: [spec: template-group-prefix-ref-only, profile: cli/macos]
     expected:
-      errorOutput: ['joins to a malformed remote ref']
+      templates: ["git::gitlab.com/acme/tools@v1.0.0//snippets/ro.md"]
   - name: ShouldErrorOnRemoteTemplateWithoutDest
     context: {pwd: testdata/fixture/resolve/tree-empty}
     input:
