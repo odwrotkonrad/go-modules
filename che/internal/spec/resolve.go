@@ -75,6 +75,34 @@ func FindRecipe(recipes []ProfileRecipe, name string) (ProfileRecipe, error) {
 	return rec, nil
 }
 
+//[>] 🤖🤖
+// SelectsOnlyLocal reports whether every name, and every bare include.profiles ref reached from
+// it, is defined in recipes: such a selection needs no specsInclude composition.
+func SelectsOnlyLocal(recipes []ProfileRecipe, names []string) bool {
+	visited := map[string]bool{}
+	pending := slices.Clone(names)
+	for len(pending) > 0 {
+		name := pending[len(pending)-1]
+		pending = pending[:len(pending)-1]
+		if visited[name] {
+			continue
+		}
+		visited[name] = true
+		rec, ok := findRecipe(recipes, name)
+		if !ok {
+			return false
+		}
+		for _, ref := range rec.Include.Profiles {
+			if ref.URI == "" {
+				pending = append(pending, ref.ProfileName)
+			}
+		}
+	}
+	return true
+}
+
+//[<] 🤖🤖
+
 func findRecipe(recipes []ProfileRecipe, name string) (ProfileRecipe, bool) {
 	for _, rec := range recipes {
 		if rec.Source.GetProfileName() == name {

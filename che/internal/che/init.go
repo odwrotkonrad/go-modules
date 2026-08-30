@@ -53,6 +53,12 @@ func (w *initWalker) walkSpec(src spec.SpecSourceRecipe, anchor, name string, ov
 	if err != nil {
 		return fmt.Errorf("init-remote-sources %s: %w", name, err)
 	}
+	//[>] 🤖🤖
+	if skipsComposition(root, w.opts.Profiles, doc.SpecsInclude, doc.ProfileRecipes) {
+		log.EmitSkip(log.Levels.Debug, "init-remote-sources", "prepare", ready.DefinitionURI, "specsInclude not walked: --profiles names only this spec's profiles")
+		doc.SpecsInclude = nil
+	}
+	//[<] 🤖🤖
 	for _, inc := range doc.SpecsInclude {
 		if inc.Optional && inc.IsAbsentLocalDir(ready.DirectoryPath, w.home) {
 			log.EmitSkip(log.Levels.Warn, "init-remote-sources", "prepare", inc.URI, "optional source dir absent")

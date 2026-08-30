@@ -1114,6 +1114,39 @@ cases:
     expected:
       output:
         profiles: [".che/repo-git-tracked::ontoRepo", ".che/repo-git-untracked::envSeed"]
+  ##[>] 🤖🤖
+  - name: ShouldNotComposeSpecsWhenForcedProfilesAreLocal
+    input:
+      args:
+        - refFiles: {}
+        - hostFiles:
+            .che/che.yml: |
+              specsInclude: [./absent]
+              profilesDefinitions:
+                local: {type: host}
+        - flags: {profiles: [local]}
+    expected:
+      output:
+        profiles: [local]
+  - name: ShouldComposeSpecsWhenLocalProfileIncludesComposedOne
+    input:
+      args:
+        - refFiles: {}
+        - hostFiles:
+            .che/che.yml: |
+              specsInclude: [.che/sub]
+              profilesDefinitions:
+                wrapper:
+                  type: host
+                  include: {profiles: [composed]}
+            .che/sub/che.yml: |
+              profilesDefinitions:
+                composed: {type: host}
+        - flags: {profiles: [wrapper]}
+    expected:
+      output:
+        profiles: [wrapper]
+  ##[<] 🤖🤖
   - name: ShouldForceProfilesDefinedInComposedRemoteSpec
     input:
       args:
