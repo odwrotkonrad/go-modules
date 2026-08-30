@@ -1,21 +1,10 @@
-##[>] 🤖
+# [>] generic
+# [<] generic
 /public/
 /.cache/
-/.env
 /shared/
-/lefthook.yml
-##[<] 🤖
-!.repo/
-!.che/
-##[>] 🤖
-/AGENTS.md
-/CLAUDE.md
-/assets/data/makefile.agents.md
-/assets/data/repo-structure.md
-/assets/docs-agents/purpose.md
 /che/assets/docs-agents/purpose.md
 /lib/assets/docs-agents/purpose.md
 /get-os-open-files-with/assets/docs-agents/purpose.md
 /get-term-open-files-with/assets/docs-agents/purpose.md
-##[<] 🤖
 /.che/cheVariables.local.yml
