@@ -6,8 +6,6 @@ dependsOn:
   gitlab.com/konradodwrot/go-modules/che:
     - uri: gitlab.com/konradodwrot/che-packages
       type: gitRepository
-    - uri: gitlab.com/konradodwrot/cross-repo/prose/spec
-      type: gitRepository
     - uri: gitlab.com/konradodwrot/go-modules/che-schema
       type: file
     - uri: gitlab.com/konradodwrot/go-modules/lib
