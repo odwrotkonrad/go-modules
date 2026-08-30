@@ -90,7 +90,8 @@ Every construct, schema-validated by the test suite:
 # yaml-language-server: $schema=https://gitlab.com/api/v4/projects/konradodwrot%2Fgo-modules/packages/generic/che-schema/v0.0.1-che-min-v0.0.96/che.schema.json
 options:
   profileWorkingDirectory: root
-  runIf: ['env:CHE_ENABLED']
+  runIf:
+    - 'env:CHE_ENABLED'
   autoDiscover: false
   logLevel: info
   validateSpec: warn
@@ -98,51 +99,71 @@ env:
   SOME_VAR: value
 variablesDefinitions:
   specVariablesDefinitions:
-    SHARED_REF: {required: true, scope: recursiveSpecs, description: shared specs tag, type: string}
-    LOG_LINES: {type: integer, enum: ["10", "100"]}
+    SHARED_REF:
+      required: true
+      scope: recursiveSpecs
+      description: shared specs tag
+      type: string
+    LOG_LINES:
+      type: integer
+      enum:
+        - "10"
+        - "100"
   profilesVariablesDefinitions:
     ontoRepo:
-      PROSE_ASSETS_REF: {required: true, description: prose assets tag}
+      PROSE_ASSETS_REF:
+        required: true
+        description: prose assets tag
 specsInclude:
   - ./sibling-spec
   - "git::git@gitlab.com:group/specs.git"
   - url: git@gitlab.com:group/shared.git
     ref: "${{ var.SHARED_REF }}"
     specDirPath: profiles/shared
-    env: {SOME_VAR: other}
-    variables: {repo: Example}
+    env:
+      SOME_VAR: other
+    variables:
+      repo: Example
 profilesDefinitions:
   base:
     type: host
     include:
       makeLinks:
-        - {source: _home/**, dest: $HOME/**}
+        - source: _home/**
+          dest: $HOME/**
         - etc/{grafana,prometheus}/**
       makeCopies:
-        - {source: _home/**, dest: $HOME/**}
+        - source: _home/**
+          dest: $HOME/**
         - owner: root
           ownerGroup: "0"
           chmod: "0644"
           source: Library/LaunchDaemons/otelcol.plist.ontoHost.cp
-          dest: [/Library/LaunchDaemons/otelcol.plist]
+          dest:
+            - /Library/LaunchDaemons/otelcol.plist
         - source: "git::gitlab.com/org/prompts@v1.2.0"
           dest: /usr/local/share/prompts
           <<<:
-            - {source: //commit.md.tpl, dest: commit.md.tpl}
-            - {source: //mr.md.tpl, dest: mr.md.tpl}
+            - source: //commit.md.tpl
+              dest: commit.md.tpl
+            - source: //mr.md.tpl
+              dest: mr.md.tpl
       renderTemplates:
-        - {source: _home/**, dest: $HOME/**}
+        - source: _home/**
+          dest: $HOME/**
         - owner: root
           ownerGroup: "0"
           chmod: "0440"
           source: etc/sudoers.d/configs.ontoHost.tpl
-          dest: [/etc/sudoers.d/configs]
+          dest:
+            - /etc/sudoers.d/configs
       makeDirs:
         - directories:
             - $HOME/.local/{bin,share}
         - chmod: "2775"
           directories:
-            - {dest: ["/var/log/{grafana,prometheus}"]}
+            - dest:
+                - "/var/log/{grafana,prometheus}"
       runScripts:
         - ci/zsh/scripts/installs/*.zsh
 
@@ -162,9 +183,17 @@ profilesDefinitions:
 
   desktop/macos:
     type: host
-    options: {autoDiscover: true, runIf: ['builtin:isOs == macos', 'builtin:isVirt == false']}
+    options:
+      autoDiscover: true
+      runIf:
+        - 'builtin:isOs == macos'
+        - 'builtin:isVirt == false'
     variablesDefinitions:
-      EDITOR_THEME: {enum: [light, dark], description: theme the desktop renders with}
+      EDITOR_THEME:
+        enum:
+          - light
+          - dark
+        description: theme the desktop renders with
     include:
       profiles:
         - base
@@ -181,13 +210,19 @@ profilesDefinitions:
 
   cli/linux:
     type: host
-    options: {autoDiscover: true, runIf: ['builtin:isOs == linux']}
+    options:
+      autoDiscover: true
+      runIf:
+        - 'builtin:isOs == linux'
     include:
-      profiles: [base, base-exclude-cli]
+      profiles:
+        - base
+        - base-exclude-cli
 
   ontoRepo:
     type: repo-git-tracked
-    options: {autoDiscover: true}
+    options:
+      autoDiscover: true
     include:
       makeCopies:
         - source: "git::gitlab.com/konradodwrot/cross-repo/prose/assets@${{ var.PROSE_ASSETS_REF }}//shared/license/LICENSE"
@@ -195,14 +230,21 @@ profilesDefinitions:
       renderTemplates:
         - source: templates/local.env.ontoRepo.tpl
           dest:
-            - {path: .env, options: {writeType: mergeUpsert}}
+            - path: .env
+              options:
+                writeType: mergeUpsert
         - source: templates/AGENTS.md.ontoRepo.tpl
           dest:
             - CLAUDE.md
-            - {path: AGENTS.md, options: {renderReferencedFiles: true}}
+            - path: AGENTS.md
+              options:
+                renderReferencedFiles: true
         - source: templates/Makefile.docs.tpl
           dest:
-            - {path: Makefile, options: {writeType: partial, commentPrefix: "#"}}
+            - path: Makefile
+              options:
+                writeType: partial
+                commentPrefix: "#"
 ```
 
 ## Reserved Top-Level Keys
@@ -285,10 +327,14 @@ with a value. Two sibling keys:
 ```yaml
 variablesDefinitions:
   specVariablesDefinitions:            # names the top level reads (specsInclude, options, env)
-    SHARED_REF: {required: true, scope: recursiveSpecs, description: shared specs tag}
+    SHARED_REF:
+      required: true
+      scope: recursiveSpecs
+      description: shared specs tag
   profilesVariablesDefinitions:        # names each defined profile reads, keyed by profile name
     ontoRepo:
-      PROSE_ASSETS_REF: {required: true}
+      PROSE_ASSETS_REF:
+        required: true
 ```
 
 A profile may carry its own `variablesDefinitions` (same shape as one
@@ -323,8 +369,9 @@ collisions error). Duplicates and cycles load once. Recursive.
 ## Interpolation
 
 Any string value in any che.yml (local, included, sourced) may carry
-`${{ env.NAME }}`, `${{ var.NAME }}` or either with `|| default`.
-Mapping keys (profile names) stay literal. Substituted values stay strings.
+`${{ env.NAME }}`, `${{ var.NAME }}`, a built-in `${{ repoRoot }}`, or
+any of them with `|| default`. Mapping keys (profile names) stay literal.
+Substituted values stay strings.
 
 ```yaml
 env:
@@ -332,7 +379,8 @@ env:
 variablesDefinitions:
   profilesVariablesDefinitions:
     web:
-      SHARED_REF: {required: true}
+      SHARED_REF:
+        required: true
 profilesDefinitions:
   web:
     options: {profileWorkingDirectory: '${{ env.TREE }}'}
@@ -342,8 +390,10 @@ profilesDefinitions:
           ref: '${{ var.SHARED_REF }}'
           specDirPath: .
           profileName: app
-          env: {APP_NAME: web}
-          variables: {repo: Web}
+          env:
+            APP_NAME: web
+          variables:
+            repo: Web
 ```
 
 - `NAME` matches `[A-Za-z_][A-Za-z0-9_]*`, whitespace inside `${{ }}` is
@@ -362,6 +412,12 @@ profilesDefinitions:
 - A bare `var.` ref on a variable with no value, or one whose scope does not
   reach the reading place, always fails the load, naming the spec file and
   every gap with its YAML path.
+- A ref with no namespace is a built-in. `repoRoot`: the git root of the
+  repo holding the spec file (a sourced spec: its cache checkout, a sub-spec
+  under `.che/`: the repo it sits in), the spec dir itself outside git.
+  Always set, so `|| default` is never needed. Any other bare name fails the
+  load, naming every occurrence with its YAML path. Built-ins expand in
+  che.yml only, never in `che.env` or `cheVariables.yml`.
 - `che discover-profiles` never fails on unset env refs. It lists every ref
   per spec, its default if any, whether it is set and from which source, and
   skips profiles with unset refs.
@@ -413,7 +469,9 @@ invoker never configures the embedded spec's own files.
 ```yaml
 # .che/cheVariables.yml
 PROSE_ASSETS_REF: v0.0.67
-MISC_REF: {value: v0.0.38, scope: recursiveSpecsAndProfiles}
+MISC_REF:
+  value: v0.0.38
+  scope: recursiveSpecsAndProfiles
 ```
 
 `che discover-profiles` lists every resolved variable per spec with its
@@ -451,7 +509,10 @@ never merges with a plain spec.
 profilesDefinitions:
   <profile-name>:
     type: host
-    options: {autoDiscover: true, runIf: ['builtin:isOs == macos']}
+    options:
+      autoDiscover: true
+      runIf:
+        - 'builtin:isOs == macos'
     variablesDefinitions: {...}
     include: {...}
     exclude: {...}
@@ -501,13 +562,20 @@ glob prefix-swap, or as a glob sed rewrite:
 
 ```yaml
 makeLinks:
-  - {source: _home/**, dest: $HOME/**}              # prefix-swap sugar
+  - source: _home/**  # prefix-swap sugar
+    dest: $HOME/**
 makeCopies:
-  - {source: _home/**, dest: 's:^_home:$HOME:'}  # glob + sed rewrite
-  - {source: _home/foo.ontoHost.cp, dest: [$HOME/.config/foo]}  # explicit
+  - source: _home/**  # glob + sed rewrite
+    dest: 's:^_home:$HOME:'
+  - source: _home/foo.ontoHost.cp  # explicit
+    dest:
+      - $HOME/.config/foo
 renderTemplates:
-  - {source: _home/**, dest: $HOME/**}
-  - {source: _home/x.tpl, dest: [$HOME/.config/x]}
+  - source: _home/**
+    dest: $HOME/**
+  - source: _home/x.tpl
+    dest:
+      - $HOME/.config/x
 makeDirs:
   - directories: [$HOME/.local/{bin,share}]
 ```
@@ -562,7 +630,9 @@ logLevel: debug
 validateSpec: error
 dryRun: delta
 autoDiscover: true
-profiles: [cli/macos, work]
+profiles:
+  - cli/macos
+  - work
 skipRemoteRefs: true
 renderTemplates:
   skipVariables: true
@@ -608,12 +678,14 @@ include:
     - base
     - source: "git::https://gitlab.com/konradodwrot/ai-harness/ai-tools-configs@${{ var.AI_TOOLS_CONFIGS_REF }}"
       profile: claude/virt
-      variables: {repo: Notes}
+      variables:
+        repo: Notes
     - source: "git::https://gitlab.com/konradodwrot/tools-configs@${{ var.TOOLS_CONFIGS_REF }}"
       profiles:
         - base/packages
         - cli/macos::shell/host/macos
-        - {spec: profiles/dev, profile: dev/host/macos}
+        - spec: profiles/dev
+          profile: dev/host/macos
     - source: ./profiles/git
       profile: git/host/macos
 ```
@@ -672,7 +744,8 @@ and file selection falls back to a filesystem walk. Symlinks point at the
 derived host path (`etc/x` -> `/etc/x`, home via a `$HOME` dest rewrite).
 Templates, `*.ontoHost.cp` and `.gitkeep` never link.
 
-Items: glob string (brace-expanded, dest derived 1:1),
+Items: glob string (brace-expanded, dest derived 1:1), `{source: [globs]}`
+(a list of globs, dest derived 1:1, no `dest` allowed),
 `{source, dest: [paths]}` (one source file, explicit dests, `~/` or absolute ->
 host), or `{source, dest: <rule>}` where `source` is a file or glob and `dest`
 a sed-style rewrite `s<delim><pattern><delim><replacement><delim>[g]` (any
@@ -683,10 +756,17 @@ to the repo-relative dest before host mapping.
 ```yaml
 include:
   makeLinks:
-    - {source: _home/**, dest: $HOME/**}
+    - source: _home/**
+      dest: $HOME/**
     - etc/{grafana,prometheus}/**
-    - {source: _home/.config/foo/**, dest: 's:^_home/.config/foo:$HOME/.config/bar:'}
-    - {source: files/config, dest: [$HOME/.config/mypy/config]}
+    - source: _home/.config/foo/**
+      dest: 's:^_home/.config/foo:$HOME/.config/bar:'
+    - source: files/config
+      dest:
+        - $HOME/.config/mypy/config
+    - source:
+        - usr/**
+        - opt/**
 ```
 
 First entry: `_home/.config/x` -> `~/.config/x`. Rewrite entry:
@@ -707,7 +787,10 @@ the repo, not into its own dir), `~/` or absolute lands on the host. A derived
 dest (glob source) is always host.
 
 Local sources are profileWorkingDirectory-relative: any file in a
-`{source, dest}` leaf, `*.ontoHost.cp` for globs. A source may be remote,
+`{source, dest}` leaf, `*.ontoHost.cp` for globs. A path outside the
+profileWorkingDirectory anchors at `${{ repoRoot }}/<path>` (the git root of
+the spec's repo), never at `../`: a sub-spec under `.che/<dir>/` then reads
+`${{ repoRoot }}/templates/x` whatever its depth. A source may be remote,
 `git::<repo>[@<ref>]//<path>`, explicit dest required; a group prefix carrying
 the ref concatenates with each leaf path so the pin is typed once. Remote
 globs and remote dest rewrites are rejected at load.
@@ -725,25 +808,31 @@ ontoRepo:
 
 ```yaml
 makeCopies:
-  - {source: _home/**, dest: 's:^_home:$HOME:'}
+  - source: _home/**
+    dest: 's:^_home:$HOME:'
   - owner: root
     ownerGroup: "0"
     chmod: "0644"
     source: Library/LaunchDaemons/otelcol.plist.ontoHost.cp
-    dest: [/Library/LaunchDaemons/otelcol.plist]
+    dest:
+      - /Library/LaunchDaemons/otelcol.plist
   - source: "git::gitlab.com/org/prompts@v1.2.0"
     dest: /usr/local/share/prompts
     chmod: "0644"
     <<<:
-      - {source: //commit.md.tpl, dest: commit.md.tpl}
-      - {source: //mr.md.tpl, dest: mr.md.tpl}
+      - source: //commit.md.tpl
+        dest: commit.md.tpl
+      - source: //mr.md.tpl
+        dest: mr.md.tpl
 ```
 
 Leaves: glob string (derived dest, `.ontoHost.cp` stripped),
-`{source, dest: [paths]}` (one source, explicit repo or host dests), or
+`{source, dest: [paths]}` (one source, explicit repo or host dests),
 `{source, dest: <rule>}` (glob source + sed-style dest rewrite, `.ontoHost.cp`
-stripped first). Perms sit on the leaf itself, or on a group when several
-leaves share them. A group `dest` is one path, prefixed onto each nested
+stripped first), or `{source: [paths]}` (one leaf per path, no `dest`
+allowed: each lands at its own path under the enclosing group's `dest`
+prefix, a derived host dest at the top level; remote paths rejected). Perms
+sit on the leaf itself, or on a group when several leaves share them. A group `dest` is one path, prefixed onto each nested
 relative dest; `~/`, absolute and `$VAR` dests anchor themselves.
 
 ### renderTemplates
@@ -763,23 +852,33 @@ derived dest, or any `~/`/absolute dest) and repo-doc sources (repo dest) are
 both profileWorkingDirectory-relative. Glob and dest-omitted forms derive a
 host dest.
 
+A source outside the profileWorkingDirectory anchors at
+`${{ repoRoot }}/<path>` (the git root of the spec's repo), never at `../`.
 A source may be remote, `git::<repo>[@<ref>]//<path>`, explicit dest required.
 Dests expand env vars, including `${invokingSpecGitRoot}`, the top-level
 spec's checkout.
 
-Each item is a node: a leaf (glob string, or `{source, dest}`) or a group (a
-node with its own nested `renderTemplates`).
+Each item is a node: a leaf (glob string, `{source, dest}`, or
+`{source: [paths]}`: one leaf per path, no `dest` allowed, each landing at
+its template-suffix-stripped path under the enclosing group's `dest` prefix,
+a derived host dest at the top level, remote paths rejected) or a group (a
+node with nested `<<<`).
 
 ```yaml
 renderTemplates:
-  - {source: _home/**, dest: 's:^_home:$HOME:'}
+  - source: _home/**
+    dest: 's:^_home:$HOME:'
   - source: templates/1-env/local.env.ontoRepo.tpl
     dest:
-      - {path: .env, options: {writeType: mergeUpsert}}
+      - path: .env
+        options:
+          writeType: mergeUpsert
   - source: templates/3-audience/AGENTS.md.ontoRepo.tpl
     dest:
       - CLAUDE.md
-      - {path: AGENTS.md, options: {renderReferencedFiles: true}}
+      - path: AGENTS.md
+        options:
+          renderReferencedFiles: true
 ```
 
 A glob source may also carry `{source, dest: <rule>}`: sed-style dest rewrite,
@@ -828,7 +927,10 @@ whole. Rendering twice yields the same file.
 renderTemplates:
   - source: templates/Makefile.docs.tpl
     dest:
-      - {path: Makefile, options: {writeType: partial, commentPrefix: "#"}}
+      - path: Makefile
+        options:
+          writeType: partial
+          commentPrefix: "#"
 ```
 
 ```makefile
@@ -851,15 +953,22 @@ perms for everything nested under it, at any depth.
 ```yaml
 renderTemplates:
   - source: "git::gitlab.com/konradodwrot/cross-repo/prose/assets@v0.0.38"
-    options: {skipAutoGeneratedHeader: true}
+    options:
+      skipAutoGeneratedHeader: true
     <<<:
-      - {source: //repos/configs/purpose.md, dest: assets/docs-agents/purpose.md}
+      - source: //repos/configs/purpose.md
+        dest: assets/docs-agents/purpose.md
       - source: //repos/configs/ai/claude-rules
         dest: root/_home/.config/claude/rules
         <<<:
-          - {source: /code/code.md, dest: code/code.md}
-          - {source: /docs/prose.md, dest: docs/prose.md}
+          - source:
+              - code/code.md
+              - docs/prose.md
 ```
+
+A `source` list under a group is the short form of one leaf per path whose
+dest equals its source path: the two leaves above land at
+`root/_home/.config/claude/rules/code/code.md` and `.../docs/prose.md`.
 
 Cascade, outermost first, innermost wins:
 
@@ -898,7 +1007,8 @@ makeDirs:
       - $HOME/.local/{bin,share}
   - chmod: "2775"
     directories:
-      - {dest: ["/var/log/{grafana,prometheus}"]}
+      - dest:
+          - "/var/log/{grafana,prometheus}"
 ```
 
 ### installPackages
@@ -915,7 +1025,8 @@ entry's default. Composed profiles' lists concatenate and dedupe.
 include:
   installPackages:
     - ripgrep
-    - {name: terraform, version: "1.10"}
+    - name: terraform
+      version: "1.10"
 ```
 <!-- [<] 🤖 -->
 
@@ -933,7 +1044,8 @@ include:
   installToolPackages:
     vscode:
       - golang.go
-      - {name: ms-python.python, version: "2024.14.0"}
+      - name: ms-python.python
+        version: "2024.14.0"
 ```
 <!-- [<] 🤖 -->
 
@@ -957,14 +1069,21 @@ names.
 
 ```yaml
 exclude:
-  makeLinks: [_home/Library/**]
-  makeCopies: [Library/LaunchDaemons/grafana.plist*]
-  renderTemplates: [_home/.gitlab-runner/**]
-  makeDirs: [/var/log/grafana]
-  installPackages: [terraform]
+  makeLinks:
+    - _home/Library/**
+  makeCopies:
+    - Library/LaunchDaemons/grafana.plist*
+  renderTemplates:
+    - _home/.gitlab-runner/**
+  makeDirs:
+    - /var/log/grafana
+  installPackages:
+    - terraform
   installToolPackages:
-    vscode: [ms-python.python]
-  runScripts: [ci/zsh/scripts/installs/80-go-host-tools.zsh]
+    vscode:
+      - ms-python.python
+  runScripts:
+    - ci/zsh/scripts/installs/80-go-host-tools.zsh
 ```
 
 ## Perms Cascade
