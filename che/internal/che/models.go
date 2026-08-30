@@ -527,7 +527,7 @@ func (r *SpecRecipe) composeOrSkip(p *specPreparer, ready *SpecReady, root bool)
 	if !skipsComposition(root, p.opts.Profiles, r.SpecsInclude, r.ProfileRecipes) {
 		return r.composeIncludes(p, ready)
 	}
-	log.EmitSkip(log.Levels.Debug, "init-remote-sources", "prepare", r.sourceReady.DefinitionURI, "specsInclude not composed: --profiles names only this spec's profiles")
+	log.EmitSkip(log.Levels.Debug, "init-remote-sources", "prepare", r.sourceReady.DefinitionURI, "specsInclude lazy-loaded, not composed: --profiles names only this spec's profiles")
 	return slices.Clone(r.ProfileRecipes), nil
 }
 

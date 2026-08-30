@@ -55,7 +55,7 @@ func (w *initWalker) walkSpec(src spec.SpecSourceRecipe, anchor, name string, ov
 	}
 	//[>] 🤖🤖
 	if skipsComposition(root, w.opts.Profiles, doc.SpecsInclude, doc.ProfileRecipes) {
-		log.EmitSkip(log.Levels.Debug, "init-remote-sources", "prepare", ready.DefinitionURI, "specsInclude not walked: --profiles names only this spec's profiles")
+		log.EmitSkip(log.Levels.Debug, "init-remote-sources", "prepare", ready.DefinitionURI, "specsInclude lazy-loaded, not walked: --profiles names only this spec's profiles")
 		doc.SpecsInclude = nil
 	}
 	//[<] 🤖🤖
