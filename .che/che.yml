@@ -2,14 +2,30 @@
 ##[>] 🤖🤖
 variablesDefinitions:
   specVariablesDefinitions:
-    AI_TOOLS_CONFIGS_REF: {required: true, scope: recursiveSpecsAndProfiles}
-    CENTRALIZED_ASSETS_GENERIC_REF: {required: true, scope: recursiveSpecsAndProfiles}
-    CENTRALIZED_ASSETS_PROSE_COMMON_REF: {required: true, scope: recursiveSpecsAndProfiles}
-    CENTRALIZED_ASSETS_PROSE_HUMAN_REF: {required: true, scope: recursiveSpecsAndProfiles}
-    CHE_PACKAGES_REF: {required: true, scope: recursiveSpecsAndProfiles}
-    OCI_IMAGES_CI_LINUX_DIND_REF: {required: true, scope: recursiveSpecsAndProfiles}
-    OCI_IMAGES_CI_LINUX_REF: {required: true, scope: recursiveSpecsAndProfiles}
-    PROSE_SPEC_REF: {required: true, scope: recursiveSpecsAndProfiles}
+    AI_TOOLS_CONFIGS_REF:
+      required: true
+      scope: recursiveSpecsAndProfiles
+    CENTRALIZED_ASSETS_GENERIC_REF:
+      required: true
+      scope: recursiveSpecsAndProfiles
+    CENTRALIZED_ASSETS_PROSE_COMMON_REF:
+      required: true
+      scope: recursiveSpecsAndProfiles
+    CENTRALIZED_ASSETS_PROSE_HUMAN_REF:
+      required: true
+      scope: recursiveSpecsAndProfiles
+    CHE_PACKAGES_REF:
+      required: true
+      scope: recursiveSpecsAndProfiles
+    OCI_IMAGES_CI_LINUX_DIND_REF:
+      required: true
+      scope: recursiveSpecsAndProfiles
+    OCI_IMAGES_CI_LINUX_REF:
+      required: true
+      scope: recursiveSpecsAndProfiles
+    PROSE_SPEC_REF:
+      required: true
+      scope: recursiveSpecsAndProfiles
 specsInclude:
   - .che/repo-git-tracked
   - specDirPath: ./shared/generic/che
