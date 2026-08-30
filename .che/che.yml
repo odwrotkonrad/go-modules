@@ -1,7 +1,9 @@
 # yaml-language-server: $schema=https://gitlab.com/api/v4/projects/konradodwrot%2Fgo-modules/packages/generic/che-schema/v0.0.1-che-min-v0.0.96/che.schema.json
 ##[>] 🤖🤖
 include:
-  sources: [.che/repo-git-tracked, .che/repo-git-untracked]
+  sources:
+    - .che/repo-git-tracked
+    - {source: shared/generic/che, optional: true}
 
 #[why] the repo declares the toolchain it builds and tests with, so no host or image has to carry go
 #   in advance for this repo to prepare
@@ -11,4 +13,15 @@ devEnv:
   include:
     installPackages:
       - go
+
+genericSetup:
+  options:
+    autoDiscover: false
+  include:
+    profiles:
+      - source: "git::https://gitlab.com/konradodwrot/centralized/assets/generic@${{ var.CENTRALIZED_ASSETS_GENERIC_REF }}"
+        spec: consumer-repo-config
+        profile: setup
+        variables:
+          repo: go-modules
 ##[<] 🤖🤖

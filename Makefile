@@ -4,54 +4,40 @@ SHELL := zsh
 .SHELLFLAGS := -c
 MODULES := che get-os-open-files-with get-term-open-files-with lib
 
-WRAPPERS := repo-prepare-dev-env
-COMMANDS := render-templates repo-render-env repo-prepare-deps render-docs repo-ci-prepare-hooks repo-ci-precommit-all test test-cover build vet lint install che-install-test create-tag publish publish-prerelease release-schemas publish-schema-prerelease publish-brew publish-apt vendor-packages-defs release-check release-snapshot
+COMMANDS := che-install generic-setup repo-prepare-deps render-docs test test-cover build vet lint install che-install-test create-tag publish publish-prerelease release-schemas publish-schema-prerelease publish-brew publish-apt vendor-packages-defs release-check release-snapshot
 
-.PHONY: $(WRAPPERS) $(COMMANDS)
+.PHONY: $(COMMANDS)
+
+#[why] this checkout's build wins: an MR may change che's own rendering, so a release che from PATH
+#   would render the wrong output. CI supplies it as warm-go's artifact, skipping a rebuild
+GENERIC_CHE ?= $(if $(wildcard che/dist/che),che/dist/che,che)
+GENERIC_FILES_TRACKED_PROFILES := generic/filesTracked,repo/filesTracked
+GENERIC_FILES_UNTRACKED_PROFILES := generic/filesUntracked,repo/filesUntracked
+-include shared/generic/make/generic.mk
 
 ##[>] Dev Environment [genai-include]
-#[why] render precedes hooks: the docsgen pre-commit hook runs render-templates and fails on drift,
-#   so a fresh clone whose generated files were never rendered would fail its first commit
+#[what] install the latest released che into ~/.local/bin, only when the one on PATH is older
+che-install:
+	@curl -fsSL https://konradodwrot.gitlab.io/go-modules/che-install.sh | sh -s -- --skip-if-present-is-newer
+
+#[what] render the generic consumer payload (generic.mk, lefthook.yml, shared/generic/) at the pinned CENTRALIZED_ASSETS_GENERIC_REF
+generic-setup:
+	@$(GENERIC_CHE) render-templates --profiles=genericSetup
+
+shared/generic/make/generic.mk: generic-setup
+
 #[why] deps installs the toolchain only, never `install`: that builds each module's binaries into
 #   GOPATH, an output rather than a prerequisite, so preparing an environment must not run it
-#[what] make a fresh clone a working checkout: generated docs, toolchain, git hooks
-repo-prepare-dev-env: repo-render-env render-templates repo-prepare-deps repo-ci-prepare-hooks
-
 #[what] install this repo's toolchain
 repo-prepare-deps:
 	@che run --profiles=devEnv
 ##[<] Dev Environment
 
 ##[>] Docs [genai-include]
-#[why] this checkout's build wins: an MR may change che's own rendering, so a release che from PATH
-#   would render the wrong output. CI supplies it as warm-go's artifact, skipping a rebuild
-#[why] PATH che is the fallback, building the last resort: a fresh clone (repo-prepare-dev-env)
-#   should not need a go toolchain to render its docs
-#[what] render *.ontoRepo.tpl onto the repo with this checkout's che build
-render-templates:
-	@che_bin=che/dist/che; \
-	if [[ ! -x $$che_bin ]] che_bin=$$(command -v che || true); \
-	if [[ -z $$che_bin ]] { $(MAKE) -C che build; che_bin=che/dist/che }; \
-	$$che_bin run --profiles ontoRepo
-
-#[what] render .che/repo-git-untracked/templates/env.tpl to .env: upstream refs and CI variables via glab, secrets via op
-repo-render-env:
-	@CHE_ENV_UNSET=empty che render-templates --profiles=envSeed
-
 #[what] generate che docs (docs/cli.md, che.schema.json, cli-usage.md) from the Go source
 render-docs:
 	@$(MAKE) -C che render-docs
 ##[<] Docs
-
-##[>] CI [genai-include]
-#[what] install lefthook git hooks
-repo-ci-prepare-hooks:
-	@lefthook install --force
-
-#[what] run pre-commit hooks over all files
-repo-ci-precommit-all: repo-ci-prepare-hooks
-	@lefthook run pre-commit --all-files --force
-##[<] CI
 
 ##[>] Go [genai-include]
 #[what] run all tests in every module

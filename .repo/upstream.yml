@@ -1,17 +1,26 @@
 ##[>] 🤖
 upstream:
+  - uri: gitlab.com/konradodwrot/centralized/assets/prose/human
+    type: gitRepository
+    versionEnvVar: CENTRALIZED_ASSETS_PROSE_HUMAN_REF
+  - uri: gitlab.com/konradodwrot/centralized/assets/prose/common
+    type: gitRepository
+    versionEnvVar: CENTRALIZED_ASSETS_PROSE_COMMON_REF
+  - uri: gitlab.com/konradodwrot/centralized/assets/prose/human
+    type: gitRepository
+    versionEnvVar: CENTRALIZED_ASSETS_PROSE_HUMAN_REF
+  - uri: gitlab.com/konradodwrot/centralized/assets/prose/common
+    type: gitRepository
+    versionEnvVar: CENTRALIZED_ASSETS_PROSE_COMMON_REF
+  - uri: gitlab.com/konradodwrot/centralized/assets/generic
+    type: gitRepository
+    versionEnvVar: CENTRALIZED_ASSETS_GENERIC_REF
   - uri: gitlab.com/konradodwrot/ai-harness/ai-tools-configs
     type: gitRepository
     versionEnvVar: AI_TOOLS_CONFIGS_REF
   - uri: gitlab.com/konradodwrot/che-packages
     type: gitRepository
     versionEnvVar: CHE_PACKAGES_REF
-  - uri: gitlab.com/konradodwrot/cross-repo/misc
-    type: gitRepository
-    versionEnvVar: MISC_REF
-  - uri: gitlab.com/konradodwrot/cross-repo/prose/assets
-    type: gitRepository
-    versionEnvVar: PROSE_ASSETS_REF
   - uri: gitlab.com/konradodwrot/cross-repo/prose/spec
     type: gitRepository
     versionEnvVar: PROSE_SPEC_REF
