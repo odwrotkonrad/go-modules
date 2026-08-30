@@ -4,6 +4,7 @@ options:
   profileWorkingDirectory: root
 
 ops-remote:
+  type: host
   include:
     makeLinks:
       - source: remote/link.txt
