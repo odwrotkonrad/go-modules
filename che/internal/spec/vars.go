@@ -17,8 +17,11 @@ import (
 // [>] 🤖🤖 definitions
 
 func (d *VarDef) UnmarshalYAML(node *yaml.Node) error {
+	if node.Kind == yaml.ScalarNode && node.Tag == "!!null" {
+		return nil
+	}
 	if node.Kind != yaml.MappingNode {
-		return fmt.Errorf("want a mapping of required | scope | description | type | enum")
+		return fmt.Errorf("want a mapping of required | scope | description | type | enum, or nothing")
 	}
 	allowed := []string{"required", "scope", "description", "type", "enum"}
 	for i := 0; i+1 < len(node.Content); i += 2 {

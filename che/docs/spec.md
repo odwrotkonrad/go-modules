@@ -349,7 +349,7 @@ the key itself wins (`required: false` opts one name out):
 variablesDefinitions:
   all: {scope: recursiveSpecsAndProfiles, required: true}
   specVariablesDefinitions:
-    PROSE_ASSETS_REF: {}
+    PROSE_ASSETS_REF:
     MISC_REF: {}
     OPTIONAL_REF: {required: false}
 ```

@@ -342,4 +342,34 @@ cases:
         - policy: error
     expected:
       errorOutput: ['scope "everywhere": want invokingSpec | invokingSpecDefinedProfiles | recursiveSpecs | recursiveSpecsAndProfiles']
+  - name: ShouldAcceptNullAsAnEmptyDefinition
+    input:
+      args:
+        - spec: |
+            env: {PIN: '${{ var.A }}-${{ var.B }}'}
+            variablesDefinitions:
+              specVariablesDefinitions:
+                A:
+                B: ~
+        - layers:
+            vars:
+              A: {value: a}
+              B: {value: b}
+        - policy: error
+    expected:
+      output:
+        env: {PIN: a-b}
+        unset: {}
+        sources: {}
+  - name: ShouldRejectAScalarDefinition
+    input:
+      args:
+        - spec: |
+            variablesDefinitions:
+              specVariablesDefinitions:
+                A: ""
+        - layers: {}
+        - policy: error
+    expected:
+      errorOutput: ['want a mapping of required | scope | description | type | enum, or nothing']
 # [<] 🤖🤖
