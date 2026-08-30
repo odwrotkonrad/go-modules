@@ -343,7 +343,8 @@ A profile may carry its own `variablesDefinitions` (same shape as one
 `profilesVariablesDefinitions` entry) instead. Both for one profile: error.
 A third sibling, `all`, sets `scope` and `required` once for every
 definition of the spec, spec and profile level alike; a definition setting
-the key itself wins (`required: false` opts one name out):
+the key itself wins (`required: false` opts one name out). A name needing
+nothing of its own is `NAME: null`:
 
 ```yaml
 variablesDefinitions:
