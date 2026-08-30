@@ -217,11 +217,19 @@ cases:
     input:
       args:
         - entry: |
-            url: .
-            specDirPath: profiles/git
+            specDirPath: ./profiles/git
             profileName: git/host/macos
     expected:
-      output: {source: ., spec: profiles/git, profile: git/host/macos, sourceType: filesystem, string: ". spec profiles/git profile git/host/macos"}
+      output: {source: ./profiles/git, profile: git/host/macos, sourceType: filesystem, string: "./profiles/git profile git/host/macos"}
+  - name: ShouldErrorOnLocalUrl
+    input:
+      args:
+        - entry: |
+            url: ./profiles/git
+            specDirPath: .
+            profileName: p
+    expected:
+      errorOutput: ['url names a git repo only']
   - name: ShouldErrorOnMissingSpecDirPath
     input:
       args:
@@ -243,12 +251,11 @@ cases:
     input:
       args:
         - entry: |
-            url: ./sub
+            specDirPath: ./sub
             ref: v1
-            specDirPath: .
             profileName: p
     expected:
-      errorOutput: ['needs a remote']
+      errorOutput: ['ref needs a url']
   - name: ShouldErrorOnRefGivenTwice
     input:
       args:

@@ -61,7 +61,7 @@ func Schema() *jsonschema.Schema {
 func topIncludeSchema() *jsonschema.Schema {
 	o := obj("other specs composed into this one", nil)
 	entry := obj("spec source with overlays applied to every profile of the included spec", nil)
-	entry.AnyOf = []*jsonschema.Schema{{Required: []string{"url", "specDirPath"}}, {Required: []string{"source"}}}
+	entry.AnyOf = []*jsonschema.Schema{{Required: []string{"specDirPath"}}, {Required: []string{"source"}}}
 	addSpecSourceKeys(entry)
 	entry.Properties.Set("env", envSchema("env overlaid on the included spec's load and run"))
 	entry.Properties.Set("variables", envSchema("variables overriding the included spec's own"))
@@ -79,12 +79,12 @@ func topIncludeSchema() *jsonschema.Schema {
 
 func addSpecSourceKeys(o *jsonschema.Schema) {
 	o.Properties.Set("url", &jsonschema.Schema{
-		Description: "the repo or dir holding the spec: a git url (host/path, scheme optional: gitlab.com/g/r, https://gitlab.com/g/r.git, git@gitlab.com:g/r.git) or a local dir (., ./sub, /abs, ~/, $VAR, relative to this spec's checkout)",
+		Description: "the git repo holding the spec, cloned/pulled into a managed cache checkout: host/path, scheme optional (gitlab.com/g/r, https://gitlab.com/g/r.git, git@gitlab.com:g/r.git); never a local path, a local spec is specDirPath alone",
 		Type:        "string",
 	})
 	o.Properties.Set("ref", &jsonschema.Schema{Description: "git ref pinning a remote url: tag, branch or commit; never on a local dir", Type: "string"})
 	o.Properties.Set("specDirPath", &jsonschema.Schema{
-		Description: "required with url: the dir under url holding the spec (its che.export.yml, then .che/che.export.yml, then a plain che.yml), . for the source root",
+		Description: "required: with url the dir under the repo holding the spec (. for the repo root); without url a local dir (./sub, /abs, ~/, $VAR, relative to this spec's checkout, . this repo's own exported spec); the dir offers its che.export.yml, then .che/che.export.yml, then a plain che.yml",
 		Type:        "string",
 	})
 	o.Properties.Set("source", &jsonschema.Schema{Description: "deprecated: the old url key, git::<giturl>[@<ref>] or <dir>, decoded with a warning", Type: "string", Deprecated: true})
@@ -289,7 +289,7 @@ func (DestSpec) JSONSchema() *jsonschema.Schema {
 
 func (ProfileSourceRecipe) JSONSchema() *jsonschema.Schema {
 	o := obj("sourced profile ref: a profile of another spec, options override its options, env overlays its run, variables override its variables", nil)
-	o.AnyOf = []*jsonschema.Schema{{Required: []string{"url", "specDirPath"}}, {Required: []string{"source"}}}
+	o.AnyOf = []*jsonschema.Schema{{Required: []string{"specDirPath"}}, {Required: []string{"source"}}}
 	addSpecSourceKeys(o)
 	o.Properties.Set("profileName", &jsonschema.Schema{
 		Description: "a top-level profile of that spec (nested profiles are never searched: reference them by their own url, ref, specDirPath, profileName); exclusive with profileNames",
