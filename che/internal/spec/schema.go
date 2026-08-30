@@ -48,6 +48,10 @@ func Schema() *jsonschema.Schema {
 	defs["VarDefs"] = varDefs["VarDefs"]
 	defs["SpecVarDefs"] = varDefs["SpecVarDefs"]
 	defs["VarDefaults"] = varDefs["VarDefaults"]
+	defs["VarDefs"].AdditionalProperties = &jsonschema.Schema{OneOf: []*jsonschema.Schema{
+		{Type: "null", Description: "a name needing nothing of its own: scope and required from variablesDefinitions.all"},
+		{Ref: "#/$defs/VarDef"},
+	}}
 	defs["VarDef"].Description = "one variable declaration: never a value, values live in cheVariables.defaults.yml, cheVariables.yml, cheVariables.local.yml or an explicit pass"
 
 	root := &jsonschema.Schema{
