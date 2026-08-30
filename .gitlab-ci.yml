@@ -105,7 +105,7 @@ warm-go:
         - lib/**/*
         - go.work
         - .gitlab-ci.yml
-        - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
+    - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
       changes:
         - che/**/*
         - lib/**/*
@@ -253,7 +253,7 @@ test-unit-che:
         - lib/**/*
         - go.work
         - .gitlab-ci.yml
-        - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
+    - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
       changes:
         - che/**/*
         - lib/**/*
@@ -276,7 +276,7 @@ test-unit-che:
         - lib/**/*
         - go.work
         - .gitlab-ci.yml
-        - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
+    - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
       changes:
         - che/**/*
         - lib/**/*
@@ -483,7 +483,7 @@ coverage-che:
         - lib/**/*
         - go.work
         - .gitlab-ci.yml
-        - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
+    - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
       changes:
         - che/**/*
         - lib/**/*
@@ -501,7 +501,7 @@ test-unit-get-os-open-files-with:
         - lib/**/*
         - go.work
         - .gitlab-ci.yml
-        - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
+    - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
       changes:
         - get-os-open-files-with/**/*
         - lib/**/*
@@ -519,7 +519,7 @@ test-unit-get-term-open-files-with:
         - lib/**/*
         - go.work
         - .gitlab-ci.yml
-        - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
+    - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
       changes:
         - get-term-open-files-with/**/*
         - lib/**/*
@@ -536,7 +536,7 @@ test-unit-lib:
         - lib/**/*
         - go.work
         - .gitlab-ci.yml
-        - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
+    - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
       changes:
         - lib/**/*
         - go.work
