@@ -4,7 +4,9 @@ include:
   - project: konradodwrot/centralized/assets/generic
     ref: $GRP_KO_VAR_CENTRALIZED_ASSETS_GENERIC_REF
     file:
+      - consumer-repo-config/ci/templates/EmitEvents.gitlab-ci.yml
       - consumer-repo-config/files-generation/templates/FilesTrackedVerify.gitlab-ci.yml
+      - consumer-repo-config/ci/templates/UpstreamEnvDrift.gitlab-ci.yml
       - consumer-repo-config/precommit-lefthook/templates/PrecommitChanged.gitlab-ci.yml
       - consumer-repo-config/precommit-lefthook/templates/PrecommitAll.gitlab-ci.yml
     inputs:
@@ -53,6 +55,7 @@ stages:
   - release
   - publish
   - trigger-downstream
+  - notify
 
 variables:
   ARTIFACT_REGISTRY: $GRP_KO_VAR_ARTIFACT_REGISTRY
@@ -101,7 +104,11 @@ warm-go:
           - go.work
           - .gitlab-ci.yml
     - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
-      changes: [che/**/*, lib/**/*, go.work, .gitlab-ci.yml]
+      changes:
+        - che/**/*
+        - lib/**/*
+        - go.work
+        - .gitlab-ci.yml
   #[why] one go-build key per (compiler target × trust boundary): host-native, zig-amd64, zig-arm64,
   #   darwin share no compiled package. the mr- prefix keeps what an MR writes out of what a tag
   #   release restores, since the cache is trusted unverified
@@ -239,9 +246,17 @@ test-unit-che:
       - che/cover-unit/
   rules:
     - if: $CI_PIPELINE_SOURCE == "merge_request_event"
-      changes: [che/**/*, lib/**/*, go.work, .gitlab-ci.yml]
+      changes:
+        - che/**/*
+        - lib/**/*
+        - go.work
+        - .gitlab-ci.yml
     - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
-      changes: [che/**/*, lib/**/*, go.work, .gitlab-ci.yml]
+      changes:
+        - che/**/*
+        - lib/**/*
+        - go.work
+        - .gitlab-ci.yml
 
 .test-e2e-che:
   extends: .vendors-packages
@@ -254,9 +269,17 @@ test-unit-che:
     - warm-go
   rules:
     - if: $CI_PIPELINE_SOURCE == "merge_request_event"
-      changes: [che/**/*, lib/**/*, go.work, .gitlab-ci.yml]
+      changes:
+        - che/**/*
+        - lib/**/*
+        - go.work
+        - .gitlab-ci.yml
     - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
-      changes: [che/**/*, lib/**/*, go.work, .gitlab-ci.yml]
+      changes:
+        - che/**/*
+        - lib/**/*
+        - go.work
+        - .gitlab-ci.yml
 
 test-e2e-che-dryrun:
   extends: .test-e2e-che
@@ -444,9 +467,17 @@ coverage-che:
         path: che/coverage.xml
   rules:
     - if: $CI_PIPELINE_SOURCE == "merge_request_event"
-      changes: [che/**/*, lib/**/*, go.work, .gitlab-ci.yml]
+      changes:
+        - che/**/*
+        - lib/**/*
+        - go.work
+        - .gitlab-ci.yml
     - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
-      changes: [che/**/*, lib/**/*, go.work, .gitlab-ci.yml]
+      changes:
+        - che/**/*
+        - lib/**/*
+        - go.work
+        - .gitlab-ci.yml
 
 test-unit-get-os-open-files-with:
   extends: .test-module
@@ -454,9 +485,17 @@ test-unit-get-os-open-files-with:
     MODULE: get-os-open-files-with
   rules:
     - if: $CI_PIPELINE_SOURCE == "merge_request_event"
-      changes: [get-os-open-files-with/**/*, lib/**/*, go.work, .gitlab-ci.yml]
+      changes:
+        - get-os-open-files-with/**/*
+        - lib/**/*
+        - go.work
+        - .gitlab-ci.yml
     - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
-      changes: [get-os-open-files-with/**/*, lib/**/*, go.work, .gitlab-ci.yml]
+      changes:
+        - get-os-open-files-with/**/*
+        - lib/**/*
+        - go.work
+        - .gitlab-ci.yml
 
 test-unit-get-term-open-files-with:
   extends: .test-module
@@ -464,9 +503,17 @@ test-unit-get-term-open-files-with:
     MODULE: get-term-open-files-with
   rules:
     - if: $CI_PIPELINE_SOURCE == "merge_request_event"
-      changes: [get-term-open-files-with/**/*, lib/**/*, go.work, .gitlab-ci.yml]
+      changes:
+        - get-term-open-files-with/**/*
+        - lib/**/*
+        - go.work
+        - .gitlab-ci.yml
     - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
-      changes: [get-term-open-files-with/**/*, lib/**/*, go.work, .gitlab-ci.yml]
+      changes:
+        - get-term-open-files-with/**/*
+        - lib/**/*
+        - go.work
+        - .gitlab-ci.yml
 
 test-unit-lib:
   extends: .test-module
@@ -474,9 +521,15 @@ test-unit-lib:
     MODULE: lib
   rules:
     - if: $CI_PIPELINE_SOURCE == "merge_request_event"
-      changes: [lib/**/*, go.work, .gitlab-ci.yml]
+      changes:
+        - lib/**/*
+        - go.work
+        - .gitlab-ci.yml
     - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
-      changes: [lib/**/*, go.work, .gitlab-ci.yml]
+      changes:
+        - lib/**/*
+        - go.work
+        - .gitlab-ci.yml
 
 .release-module:
   tags:
@@ -505,7 +558,14 @@ che-next-version:
     GIT_DEPTH: "0"
   rules:
     - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
-      changes: [.gitlab-ci.yml, che/**/*, ci/publish-brew-formula.zsh, ci/publish.zsh, ci/publish-schema.zsh, ci/release-schemas.zsh, ci/schema-version.zsh]
+      changes:
+        - .gitlab-ci.yml
+        - che/**/*
+        - ci/publish-brew-formula.zsh
+        - ci/publish.zsh
+        - ci/publish-schema.zsh
+        - ci/release-schemas.zsh
+        - ci/schema-version.zsh
   script:
     - TAG=$(ci/next-tag.zsh che "$CI_COMMIT_BRANCH" "$CI_DEFAULT_BRANCH")
     - echo "CHE_NEXT_TAG=$TAG" > che-version.env
@@ -532,7 +592,14 @@ release-schemas:
     SCHEMA_VERSIONS_ENV: schema-versions.env
   rules:
     - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
-      changes: [.gitlab-ci.yml, che/**/*, ci/publish-brew-formula.zsh, ci/publish.zsh, ci/publish-schema.zsh, ci/release-schemas.zsh, ci/schema-version.zsh]
+      changes:
+        - .gitlab-ci.yml
+        - che/**/*
+        - ci/publish-brew-formula.zsh
+        - ci/publish.zsh
+        - ci/publish-schema.zsh
+        - ci/release-schemas.zsh
+        - ci/schema-version.zsh
   #[why] render-docs first: the comparison is against freshly generated bytes, and a stale checkout
   #   copy would either mint nothing on a real change or mint on no change at all
   script:
@@ -557,7 +624,11 @@ release-che:
   #   `brew install che` kept failing on binaries the tarball no longer ships
   rules:
     - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
-      changes: [.gitlab-ci.yml, che/**/*, ci/publish-brew-formula.zsh, ci/publish.zsh]
+      changes:
+        - .gitlab-ci.yml
+        - che/**/*
+        - ci/publish-brew-formula.zsh
+        - ci/publish.zsh
 
 release-get-os-open-files-with:
   extends: .release-module
@@ -565,7 +636,8 @@ release-get-os-open-files-with:
     MODULE: get-os-open-files-with
   rules:
     - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
-      changes: [get-os-open-files-with/**/*]
+      changes:
+        - get-os-open-files-with/**/*
 
 release-get-term-open-files-with:
   extends: .release-module
@@ -573,7 +645,8 @@ release-get-term-open-files-with:
     MODULE: get-term-open-files-with
   rules:
     - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
-      changes: [get-term-open-files-with/**/*]
+      changes:
+        - get-term-open-files-with/**/*
 
 release-lib:
   extends: .release-module
@@ -581,14 +654,16 @@ release-lib:
     MODULE: lib
   rules:
     - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
-      changes: [lib/**/*]
+      changes:
+        - lib/**/*
 
 .pages-build:
   tags:
     - gke-linux-amd64-small
   image:
     name: $ARTIFACT_REGISTRY_PROXY_DOCKERHUB/squidfunk/mkdocs-material:9
-    entrypoint: [""]
+    entrypoint:
+      - ""
   needs: []
   #[why] off by default: only the job publishing the live site needs the carry
   variables:
@@ -656,7 +731,8 @@ publish-pages:
     CARRY_APT: "1"
   rules:
     - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
-      changes: [che/**/*]
+      changes:
+        - che/**/*
 
 docs-che:
   extends: .pages-build
@@ -775,7 +851,12 @@ prerelease-darwin-che:
   #   or this file must publish a prerelease, or it can never be tested before merging
   rules:
     - if: $CI_PIPELINE_SOURCE == "merge_request_event"
-      changes: [che/**/*, lib/**/*, ci/publish-prerelease.zsh, Makefile, .gitlab-ci.yml]
+      changes:
+        - che/**/*
+        - lib/**/*
+        - ci/publish-prerelease.zsh
+        - Makefile
+        - .gitlab-ci.yml
       when: manual
       allow_failure: true
   variables:
@@ -820,7 +901,12 @@ prerelease-linux-che:
   #   or this file must publish a prerelease, or it can never be tested before merging
   rules:
     - if: $CI_PIPELINE_SOURCE == "merge_request_event"
-      changes: [che/**/*, lib/**/*, ci/publish-prerelease.zsh, Makefile, .gitlab-ci.yml]
+      changes:
+        - che/**/*
+        - lib/**/*
+        - ci/publish-prerelease.zsh
+        - Makefile
+        - .gitlab-ci.yml
       when: manual
       allow_failure: true
   variables:
@@ -861,7 +947,11 @@ publish-schema-prerelease:
       artifacts: false
   rules:
     - if: $CI_PIPELINE_SOURCE == "merge_request_event"
-      changes: [che/**/*, ci/publish-schema-prerelease.zsh, Makefile, .gitlab-ci.yml]
+      changes:
+        - che/**/*
+        - ci/publish-schema-prerelease.zsh
+        - Makefile
+        - .gitlab-ci.yml
       when: manual
       allow_failure: true
   script:
@@ -941,7 +1031,8 @@ publish-brew-che:
 publish-ci-image:
   interruptible: false
   stage: trigger-downstream
-  needs: [publish-che]
+  needs:
+    - publish-che
   rules:
     - if: $CI_COMMIT_TAG =~ /^che\/v/
   inherit:
@@ -978,4 +1069,7 @@ publish-get-term-open-files-with:
   script:
     - make publish
 
+emit-events:
+  extends: .emit-events
+  stage: notify
 ##[<] 🤖🤖

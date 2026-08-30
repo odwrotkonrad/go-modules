@@ -7,6 +7,8 @@ pre-push:
   jobs:
     - name: generic-files-tracked-verify
       run: make generic-files-tracked-verify
+      skip:
+        - run: '[ -n "${CI:-}" ]'
     - name: generic-verify
       group:
         parallel: true
@@ -16,7 +18,9 @@ pre-push:
             run: '[ -n "${CI:-}" ] || glab ci lint'
           - name: generic-yml-verify
             glob: "*.{yml,yaml}"
-            run: yq -e '.' {push_files} >/dev/null
+            env:
+              YAMLLINT_CONFIG_FILE: shared/generic/ci/yamllint.yml
+            run: yamllint {push_files}
           - name: generic-eof-newline-verify
             run: shared/generic/ci/eof-newline-verify.zsh {push_files}
 ##[<] 🤖🤖
