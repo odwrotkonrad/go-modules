@@ -8,6 +8,9 @@ variablesDefinitions:
     CENTRALIZED_ASSETS_GENERIC_REF:
       required: true
       scope: recursiveSpecsAndProfiles
+    CENTRALIZED_ASSETS_PROSE_AI_REF:
+      required: true
+      scope: recursiveSpecsAndProfiles
     CENTRALIZED_ASSETS_PROSE_COMMON_REF:
       required: true
       scope: recursiveSpecsAndProfiles
