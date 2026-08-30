@@ -22,7 +22,7 @@ che-install:
 
 #[what] render the generic consumer payload (generic.mk, lefthook.yml, shared/generic/) at the pinned CENTRALIZED_ASSETS_GENERIC_REF
 generic-setup:
-	@$(BIN_CHE) render-templates --profiles=genericSetup
+	@$(BIN_CHE) render-templates --profiles=generic/setup
 
 shared/generic/make/generic.mk: generic-setup
 

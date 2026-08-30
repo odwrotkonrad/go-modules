@@ -2,8 +2,11 @@
 ##[>] 🤖🤖
 specsInclude:
   - .che/repo-git-tracked
-  - specDirPath: ./shared/generic/che
-    optional: true
+  - url: gitlab.com/konradodwrot/centralized/assets/generic
+    ref: "${{ var.CENTRALIZED_ASSETS_GENERIC_REF }}"
+    specDirPath: consumer-repo-config
+    variables:
+      repo: go-modules
 
 #[why] the repo declares the toolchain it builds and tests with, so no host or image has to carry go
 #   in advance for this repo to prepare
@@ -16,18 +19,15 @@ profilesDefinitions:
       installPackages:
         - go
 
-  genericSetup:
+  generic/env:
     type: repo-git-untracked
-    options:
-      autoDiscover: false
     include:
-      profiles:
-        - url: "https://gitlab.com/konradodwrot/centralized/assets/generic"
-          ref: "${{ var.CENTRALIZED_ASSETS_GENERIC_REF }}"
-          specDirPath: consumer-repo-config
-          profileName: setup
-          variables:
-            repo: go-modules
+      renderTemplates:
+        - source: tpl/repo-git-tracked/env.tpl
+          dest:
+            - path: .env
+              options:
+                writeType: mergeUpsert
 
 variablesDefinitions:
   specVariablesDefinitions:
