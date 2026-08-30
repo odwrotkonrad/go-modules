@@ -3,8 +3,10 @@ include:
   - local: ci/che-install.gitlab-ci.yml
   - project: konradodwrot/centralized/assets/generic
     ref: $GRP_KO_VAR_CENTRALIZED_ASSETS_GENERIC_REF
+    file: consumer-repo-config/ci/templates/EmitEvents.gitlab-ci.yml
+  - project: konradodwrot/centralized/assets/generic
+    ref: $GRP_KO_VAR_CENTRALIZED_ASSETS_GENERIC_REF
     file:
-      - consumer-repo-config/ci/templates/EmitEvents.gitlab-ci.yml
       - consumer-repo-config/files-generation/templates/FilesTrackedVerify.gitlab-ci.yml
       - consumer-repo-config/ci/templates/UpstreamEnvDrift.gitlab-ci.yml
       - consumer-repo-config/precommit-lefthook/templates/PrecommitChanged.gitlab-ci.yml
