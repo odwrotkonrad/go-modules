@@ -3,6 +3,7 @@ package source
 // [>] 🤖🤖
 
 import (
+	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -55,6 +56,32 @@ func EnsureCheckout(home, url, ref string) (string, error) {
 	return dir, err
 }
 
+// CloneURLs lists the clone URLs to try for a source, in order: a scheme or scp form as written,
+// a schemeless host/path as ssh (git@host:path) then https, so whichever auth the host holds wins.
+func CloneURLs(url string) []string {
+	if strings.Contains(url, "://") {
+		return []string{url}
+	}
+	host, path, _ := strings.Cut(url, "/")
+	if strings.Contains(host, ":") || strings.Contains(host, "@") {
+		return []string{url}
+	}
+	return []string{"git@" + host + ":" + path, "https://" + url}
+}
+
+func cloneAny(argv []string, url, dir string) error {
+	var errs []error
+	for _, candidate := range CloneURLs(url) {
+		err := git(append(argv, candidate, dir)...)
+		if err == nil {
+			return nil
+		}
+		errs = append(errs, fmt.Errorf("%s: %w", candidate, err))
+		_ = os.RemoveAll(dir)
+	}
+	return errors.Join(errs...)
+}
+
 func cloneOrUpdate(home, url, ref string) (string, error) {
 	dir := ResolveDir(home, url, ref)
 	msg := "remote " + url + refSuffix(ref) + " into " + fsutil.AbbreviateHome(dir, home)
@@ -69,7 +96,7 @@ func cloneOrUpdate(home, url, ref string) (string, error) {
 		if ref != "" {
 			argv = append(argv, "--branch", ref)
 		}
-		if err := git(append(argv, url, dir)...); err != nil {
+		if err := cloneAny(argv, url, dir); err != nil {
 			return "", fmt.Errorf("source clone %s%s: %w", url, refSuffix(ref), err)
 		}
 		emitAction("cloned")
