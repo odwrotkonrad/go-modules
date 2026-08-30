@@ -3,6 +3,7 @@ package source
 // [>] 🤖🤖
 
 import (
+	"bytes"
 	"errors"
 	"fmt"
 	"os"
@@ -91,7 +92,7 @@ func cloneOrUpdate(home, url, ref string) (string, error) {
 			Msg: msg, Attrs: map[string]string{"url": url, "ref": ref, "checkout": dir},
 		})
 	}
-	if _, err := os.Stat(filepath.Join(dir, ".git")); err != nil {
+	clone := func() (string, error) {
 		argv := []string{"clone", "--quiet", "--depth", "1", "--single-branch"}
 		if ref != "" {
 			argv = append(argv, "--branch", ref)
@@ -102,6 +103,9 @@ func cloneOrUpdate(home, url, ref string) (string, error) {
 		emitAction("cloned")
 		return dir, nil
 	}
+	if _, err := os.Stat(filepath.Join(dir, ".git")); err != nil {
+		return clone()
+	}
 	headBefore, _ := gitOutput("-C", dir, "rev-parse", "HEAD")
 	fetch := []string{"-C", dir, "fetch", "--quiet", "--depth", "1"}
 	if ref != "" {
@@ -111,7 +115,8 @@ func cloneOrUpdate(home, url, ref string) (string, error) {
 	if err := git(fetch...); err != nil {
 		// [why] a pin names one immutable commit: serving a different cached one is a silent lie
 		if ref != "" {
-			return "", fmt.Errorf("source fetch %s%s: %w", url, refSuffix(ref), err)
+			_ = os.RemoveAll(dir)
+			return clone()
 		}
 		return dir, nil
 	}
@@ -130,12 +135,22 @@ func cloneOrUpdate(home, url, ref string) (string, error) {
 }
 
 func git(args ...string) error {
-	return execx.Default.Exec(execx.Cmd{Argv: append([]string{"git"}, args...), Stderr: os.Stderr})
+	var stderr bytes.Buffer
+	err := execx.Default.Exec(execx.Cmd{Argv: append([]string{"git"}, args...), Stderr: &stderr})
+	return withStderr(err, stderr)
 }
 
 func gitOutput(args ...string) (string, error) {
-	out, err := execx.Default.Output(execx.Cmd{Argv: append([]string{"git"}, args...), Stderr: os.Stderr})
-	return strings.TrimSpace(string(out)), err
+	var stderr bytes.Buffer
+	out, err := execx.Default.Output(execx.Cmd{Argv: append([]string{"git"}, args...), Stderr: &stderr})
+	return strings.TrimSpace(string(out)), withStderr(err, stderr)
+}
+
+func withStderr(err error, stderr bytes.Buffer) error {
+	if err == nil || stderr.Len() == 0 {
+		return err
+	}
+	return fmt.Errorf("%w: %s", err, strings.TrimSpace(stderr.String()))
 }
 
 // [<] 🤖🤖
