@@ -60,7 +60,9 @@ scripts and `profileWorkingDirectory` against the spec's checkout; a
 repo-relative dest, an `@`-include and a `localFile` path resolve against the
 git root of the spec, so a sub-spec under `.che/` renders onto the repo.
 `--profiles` names a profile of the invoked spec or of any spec it composes,
-remote ones included.
+remote ones included. `specsInclude` is lazy-loaded: with `--profiles` naming
+only profiles the invoked spec defines (none of them including a composed
+profile by bare name), the embedded specs are never loaded.
 Outside a git repo the root is the nearest ancestor holding `che.yml` or
 `.che/che.yml`. The same lookup applies to every included spec
 (`specsInclude` dirs, `git::` clones, `specDirPath` dirs). `.env` is not
@@ -275,6 +277,10 @@ Spec-wide defaults and che knobs:
   aliases `delta`, `false` the default), flag and env override.
 - `profiles` (string list): profiles to run (autoDiscover skipped, runIf still
   enforced), `--profiles` and `CHE_PROFILE` override.
+- `targetProfileTypes` (type list): profile types auto-discovery keeps, see
+  [Profile Types](#profile-types). Root spec only: an included or referenced
+  spec's value is ignored. `CHE_TARGET_PROFILE_TYPES` and
+  `--target-profile-types` override.
 - `skipRemoteRefs` (bool): skip sourced `include.profiles` refs, flag and env
   override.
 - `renderTemplates.skipVariables` (bool): skip templates carrying a `shell`
@@ -381,6 +387,12 @@ embedded spec, `variables` is an explicit pass (see [scope](#scope)). A
 composed spec keeps its own anchor, files and profile eligibility. Its profile
 names become referenceable from this spec's `include.profiles` (bare-name
 collisions error). Duplicates and cycles load once. Recursive.
+When a che spec includes another spec, and a che profile is specified and
+located at the top-level spec, the included spec's absence MUST NOT block
+executing the selected profile. Lazy loading: with `--profiles` naming only
+profiles the invoked spec defines (none of them including a composed profile
+by bare name), the embedded specs are never loaded. `optional` governs
+discovery and any run that composes.
 
 ## Interpolation
 
@@ -539,6 +551,33 @@ Names are free-form (`base`, `cli/macos`, `ontoRepo`). Bare `$ che` runs every
 eligible profile's full op sequence, profile by profile.
 `$ che --profiles <name>[,<name>...]` runs only those.
 
+### Profile Types
+
+`type` names where the profile's dests land, one of:
+
+- `repo-git-tracked`: files git tracks in the invoking repo (README, LICENSE,
+  tracked renders).
+- `repo-git-untracked`: gitignored files in the invoking repo (agent docs,
+  `.env`, rendered generic payloads).
+- `host`: the machine (dotfiles, packages, scripts).
+
+Required on every profile, no default: a profile without `type` fails the
+load, naming the profile.
+
+`che run` selects by type, auto-discovered profiles only. `--profiles` names
+and `include.profiles` refs run whatever their type.
+
+- `--target-profile-types=<type>[,<type>]` (`CHE_TARGET_PROFILE_TYPES`, user
+  config and root spec `targetProfileTypes`): keep only these types. A
+  discovered profile of another type is skipped (logged at debug). None left:
+  error.
+- No types set, stdin and stdout terminals, no `--profiles`, discovered
+  profiles spanning more than one type: `che run` prompts, one line per type
+  with what it would do (`host: 3 profiles, 12 links, 4 renders, 2 packages`).
+  Pick numbers, comma-separated, or `all`. Empty input aborts.
+- Otherwise every type runs. In CI pass one type explicitly:
+  `$ che run --target-profile-types=repo-git-tracked`.
+
 ### options
 
 - `autoDiscover` (bool): run on bare `$ che`. Unset: inherit spec
@@ -694,50 +733,50 @@ references a profile in another spec, loaded and anchored at its own checkout.
 include:
   profiles:
     - base
-    - source: "git::https://gitlab.com/konradodwrot/ai-harness/ai-tools-configs@${{ var.AI_TOOLS_CONFIGS_REF }}"
-      profile: claude/virt
+    - url: gitlab.com/konradodwrot/ai-harness/ai-tools-configs
+      ref: "${{ var.AI_TOOLS_CONFIGS_REF }}"
+      specDirPath: profiles/claude
+      profileName: claude/virt
       variables:
         repo: Notes
-    - source: "git::https://gitlab.com/konradodwrot/tools-configs@${{ var.TOOLS_CONFIGS_REF }}"
-      profiles:
+    - url: gitlab.com/konradodwrot/tools-configs
+      ref: "${{ var.TOOLS_CONFIGS_REF }}"
+      specDirPath: .
+      profileNames:
         - base/packages
-        - cli/macos::shell/host/macos
-        - spec: profiles/dev
-          profile: dev/host/macos
-    - source: ./profiles/git
-      profile: git/host/macos
+        - {specDirPath: profiles/dev, profileName: dev/host/macos}
+    - specDirPath: ./profiles/git
+      profileName: git/host/macos
 ```
 
-- `source`: where the spec lives. `git::<giturl>[@<ref>]` (remote, cloned/pulled
-  into a managed cache checkout) or `<dir>` (local, used in place, no git:
-  `$VAR` and `~` expand, a relative path resolves against the referencing
-  spec's checkout, `.` is this repo's own exported spec). Never a file, never
-  `//<path>`: both are rejected at load, naming the keys to use.
-- `@<git-ref>` pins a remote source to a tag or branch, its own cache
-  checkout per ref, unset means the default branch HEAD. Anchored to the last
-  `@` after the URL, so an SCP user (`git@host:group/repo.git`) is never
-  mistaken for it. Remote only: a local dir keeps any `@` as a literal name.
-  The same suffix pins `specsInclude` entries. `?ref=` is rejected.
-- `spec`: where the spec sits under `source`, default the source root. A
-  dir: the standard search, `che.export.yml` at the dir, then
+- `url`: the git repo holding the spec, cloned/pulled into a managed cache
+  checkout: host and path, scheme optional (`gitlab.com/g/r`,
+  `https://gitlab.com/g/r.git`, `git@gitlab.com:g/r.git`). A schemeless url
+  clones over ssh (`git@host:path`) first, then https. Never a local path
+  (rejected at load), never a file, never `//<path>`.
+- `ref`: pins `url` to a tag, branch or commit, its own cache checkout per
+  ref, unset means the default branch HEAD. Without `url` it is rejected. The
+  same key pins `specsInclude` entries.
+- `specDirPath`: required. With `url`: the dir under the repo holding the
+  spec, `.` for the repo root. Without `url`: a local dir, used in place, no
+  git: `./sub`, an absolute path, `~/`, `$VAR`, a relative path resolving
+  against the referencing spec's checkout, `.` this repo's own exported
+  spec. The standard search: `che.export.yml` at the dir, then
   `.che/che.export.yml` (warned: hidden dir), else a plain `che.yml` at the
   dir or `.che/che.yml` (warned on a remote source: not designed for reuse;
   two plain ones and no export: error). Two `che.export.yml` present: both
   load, the profile is searched root-first. A spec file path (any `.yml`) is
-  taken as is, profiles resolved relative to that file. Not recommended: the
-  top-level `che.export.yml` with a profile path is the way to a nested
-  profile.
-- `profile`: a top-level profile of that spec, or a path `a::b::c`: `a` is
-  top-level, `b` a profile `a` includes (a local name or a sourced entry,
-  the walk follows it into its own source), `c` one `b` includes. Nested
-  profiles are never searched by default: `profile: c` alone does not find
-  it. A profile no spec defines is not an error: che warns at load, skips
-  the ref, and repeats every unresolved ref after the run.
-- `profiles`: several profiles of one source and ref, the URL and the pin
-  written once, the entry's `spec` shared by every item so a spec location is
-  written once too. Items are profile names or `a::b` paths, or
-  `{spec, profile}` for a profile under another spec of the same source.
-  `options`, `env` and `variables` apply to each. Exclusive with `profile`.
+  taken as is, profiles resolved relative to that file. Not recommended.
+- `profileName`: a top-level profile of that spec. Nested profiles are never
+  searched: reference them by their own `url`, `ref`, `specDirPath`,
+  `profileName`. A profile no spec defines is not an error: che warns at
+  load, skips the ref, and repeats every unresolved ref after the run.
+- `profileNames`: several profiles of one source, the url and the pin
+  written once, the entry's `specDirPath` shared by every item so a spec
+  location is written once too. Items are profile names, or
+  `{specDirPath, profileName}` for a profile under another spec dir of the
+  same source. `options`, `env` and `variables` apply to each. Exclusive with
+  `profileName`.
 - `options`: override the referenced profile's own. One more cascade level, most
   nested wins.
 - `env`: exported around everything done for the referenced profile,
@@ -809,8 +848,9 @@ Local sources are profileWorkingDirectory-relative: any file in a
 profileWorkingDirectory anchors at `${{ repoRoot }}/<path>` (the git root of
 the spec's repo), never at `../`: a sub-spec under `.che/<dir>/` then reads
 `${{ repoRoot }}/templates/x` whatever its depth. A source may be remote,
-`git::<repo>[@<ref>]//<path>`, explicit dest required; a group prefix carrying
-the ref concatenates with each leaf path so the pin is typed once. Remote
+`{url, ref, filepath}`, explicit dest required; a group prefix carrying `url`
+and `ref` and no `filepath` joins each nested string source onto it so the
+pin is typed once. The string form `git::<repo>[@<ref>]//<path>` stays valid. Remote
 globs and remote dest rewrites are rejected at load.
 
 A file that must stay verbatim, the MIT `LICENSE` say, is a copy, not a
@@ -872,8 +912,9 @@ host dest.
 
 A source outside the profileWorkingDirectory anchors at
 `${{ repoRoot }}/<path>` (the git root of the spec's repo), never at `../`.
-A source may be remote, `git::<repo>[@<ref>]//<path>`, explicit dest required.
-Dests expand env vars, including `${invokingSpecGitRoot}`, the top-level
+A source may be remote, `{url, ref, filepath}` (string form
+`git::<repo>[@<ref>]//<path>` still valid), explicit dest required. Dests
+expand env vars, including `${invokingSpecGitRoot}`, the top-level
 spec's checkout.
 
 Each item is a node: a leaf (glob string, `{source, dest}`, or
