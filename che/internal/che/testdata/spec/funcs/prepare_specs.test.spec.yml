@@ -1081,7 +1081,24 @@ cases:
     expected:
       output:
         profiles: [".che/repo-git-tracked::ontoRepo", ".che/repo-git-untracked::envSeed"]
-  - name: ShouldErrorOnForcedProfileNoLocalSpecDefines
+  - name: ShouldForceProfilesDefinedInComposedRemoteSpec
+    input:
+      args:
+        - refFiles:
+            che.export.yml: |
+              profilesDefinitions:
+                exported: {}
+                other: {}
+        - hostFiles:
+            .che/che.yml: |
+              specsInclude: ["git::file://${REF_DIR}"]
+              profilesDefinitions:
+                local: {}
+        - flags: {profiles: [local, exported]}
+    expected:
+      output:
+        profiles: [local, "remote:${REF_NAME}:exported"]
+  - name: ShouldErrorOnForcedProfileNoSpecDefines
     input:
       args:
         - refFiles: {}

@@ -17,4 +17,6 @@ pre-push:
           - name: generic-yml-verify
             glob: "*.{yml,yaml}"
             run: yq -e '.' {push_files} >/dev/null
+          - name: generic-eof-newline-verify
+            run: shared/generic/ci/eof-newline-verify.zsh {push_files}
 ##[<] 🤖🤖
