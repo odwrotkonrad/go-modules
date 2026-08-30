@@ -1,5 +1,7 @@
 ##[>] 🤖🤖
-{{ localFile ".repo/upstream.env" | alwaysUpdate }}
+##[>] dependencies
+{{ localFile ".repo/upstream.env" | dependency }}
+##[<] dependencies
 ARTIFACT_REGISTRY={{ shell "glab variable get -g konradodwrot GRP_KO_VAR_ARTIFACT_REGISTRY" }}
 ARTIFACT_REGISTRY_PROXY_DOCKERHUB={{ shell "glab variable get -g konradodwrot GRP_KO_VAR_ARTIFACT_REGISTRY_PROXY_DOCKERHUB" }}
 CHE_SCHEMA_REF={{ shell "glab variable get -g konradodwrot GRP_KO_VAR_CHE_SCHEMA_REF" }}

@@ -2,6 +2,8 @@
 /public/
 /.cache/
 /.env
+/shared/
+/lefthook.yml
 ##[<] 🤖
 !.repo/
 !.che/

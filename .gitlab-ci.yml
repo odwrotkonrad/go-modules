@@ -1,6 +1,22 @@
 ##[>] 🤖🤖
 include:
   - local: ci/che-install.gitlab-ci.yml
+  - project: konradodwrot/centralized/assets/generic
+    ref: $GRP_KO_VAR_CENTRALIZED_ASSETS_GENERIC_REF
+    file:
+      - consumer-repo-config/files-generation/templates/FilesTrackedVerify.gitlab-ci.yml
+      - consumer-repo-config/precommit-lefthook/templates/PrecommitChanged.gitlab-ci.yml
+      - consumer-repo-config/precommit-lefthook/templates/PrecommitAll.gitlab-ci.yml
+    inputs:
+      stage: verify
+  - project: konradodwrot/centralized/assets/generic
+    ref: $GRP_KO_VAR_CENTRALIZED_ASSETS_GENERIC_REF
+    file:
+      - consumer-repo-config/files-generation/templates/FilesTrackedVerify.gitlab-ci.yml
+      - consumer-repo-config/precommit-lefthook/templates/PrecommitChanged.gitlab-ci.yml
+      - consumer-repo-config/precommit-lefthook/templates/PrecommitAll.gitlab-ci.yml
+    inputs:
+      stage: verify
 
 workflow:
   rules:
@@ -46,9 +62,10 @@ variables:
   CHE_SCHEMA_REF: $GRP_KO_VAR_CHE_SCHEMA_REF
   CHE_PACKAGES_SCHEMA_REF: $GRP_KO_VAR_CHE_PACKAGES_SCHEMA_REF
   CHE_PACKAGES_REF: $GRP_KO_VAR_CHE_PACKAGES_REF
-  MISC_REF: $GRP_KO_VAR_MISC_REF
+  CENTRALIZED_ASSETS_GENERIC_REF: $GRP_KO_VAR_CENTRALIZED_ASSETS_GENERIC_REF
   ENABLE_DARWIN_CI: $GRP_KO_VAR_ENABLE_DARWIN_CI
-  PROSE_ASSETS_REF: $GRP_KO_VAR_PROSE_ASSETS_REF
+  CENTRALIZED_ASSETS_PROSE_HUMAN_REF: $GRP_KO_VAR_CENTRALIZED_ASSETS_PROSE_HUMAN_REF
+  CENTRALIZED_ASSETS_PROSE_COMMON_REF: $GRP_KO_VAR_CENTRALIZED_ASSETS_PROSE_COMMON_REF
   AI_TOOLS_CONFIGS_REF: $GRP_KO_VAR_AI_TOOLS_CONFIGS_REF
   CI_IMAGE: $ARTIFACT_REGISTRY/ci-linux:$OCI_IMAGES_CI_LINUX_REF
   CI_IMAGE_ARM64: $ARTIFACT_REGISTRY/ci-linux:$OCI_IMAGES_CI_LINUX_REF-arm64
@@ -160,41 +177,32 @@ warm-go-linux-amd64:
       - che/dist/che-linux-amd64
 ##[<] 🤖🤖
 
-verify-precommit-all:
+#[why] takes warm-go's che/dist when it ran: the verify renders with this checkout's che instead of
+#   compiling a fourth one per pipeline; otherwise the image's release che stands in
+.generic-verify:
   extends: .vendors-packages
-  stage: verify
-  image: $CI_IMAGE
-  #[why] takes warm-go's che/dist: render-templates reuses it instead of compiling a fourth che per
-  #   pipeline. the cover binary renders identically, it only writes covdata under GOCOVERDIR
   needs:
     - job: warm-go
       optional: true
-  #[why] the .repo/ declarations and .che/ are on the list so a commit touching only them still
-  #   runs a job: a pipeline that creates none is reported as failed, not as nothing to do
-  rules:
-    - if: $CI_PIPELINE_SOURCE == "merge_request_event"
-      changes:
-        - che/**/*
-        - lib/**/*
-        - go.work
-        - .gitlab-ci.yml
-        - ci/**/*
-        - .che/**/*
-        - .repo/*.tpl
-        - .repo/deps-graph.yml
-        - .repo/upstream.yml
-        - .repo/upstream.env
   variables:
+    GENERIC_CHE: che/dist/che-linux-amd64
     LEFTHOOK_OUTPUT: meta,summary,execution,execution_info,execution_out
-  #[why] cache still pulled: `make lint` and `render-docs` compile the tree, no artifact replaces that
   cache:
     - key: go-build
       paths:
         - .cache/go-build
       policy: pull
-  script:
-    - make repo-ci-precommit-all
-    - git diff --exit-code HEAD
+  before_script:
+    - '[ -x che/dist/che-linux-amd64 ] || { mkdir -p che/dist && ln -s "$(command -v che)" che/dist/che-linux-amd64; }'
+
+generic:files-tracked-verify:
+  extends: .generic-verify
+
+generic:precommit-changed:
+  extends: .generic-verify
+
+generic:precommit-all:
+  extends: .generic-verify
 
 .test-module:
   image: $CI_IMAGE
@@ -592,7 +600,7 @@ release-lib:
     - sed -i 's|(\.\./assets/data/che.schema.json)|(assets/data/che.schema.json)|g' che/docs/spec.md
     - printf '# che\n' > che/docs/index.md
     ##[>] 🤖🤖
-    - wget -qO che/docs/purpose-src.md "https://gitlab.com/konradodwrot/cross-repo/prose/assets/-/raw/$PROSE_ASSETS_REF/repos/go-modules/che-purpose.md"
+    - wget -qO che/docs/purpose-src.md "https://gitlab.com/konradodwrot/centralized/assets/prose/common/-/raw/$CENTRALIZED_ASSETS_PROSE_COMMON_REF/prose/repos/go-modules/che-purpose.md"
     - tail -n +2 che/docs/purpose-src.md >> che/docs/index.md
     - rm che/docs/purpose-src.md
     - printf '\n## Install\n\n' >> che/docs/index.md
