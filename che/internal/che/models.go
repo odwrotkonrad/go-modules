@@ -466,7 +466,7 @@ func (r *SpecRecipe) PrepareProfiles(p *specPreparer, forced *spec.ProfileSource
 		ready.gatedOff = true
 		return ready, nil
 	}
-	lookup, err := r.composeIncludes(p, ready)
+	lookup, err := r.composeOrSkip(p, ready, root)
 	if err != nil {
 		return nil, err
 	}
@@ -521,6 +521,21 @@ func envUnsetNames(unset []spec.EnvUnset) []string {
 func evalWith(env map[string]string) func(string) (bool, error) {
 	return spec.NewEvaluator(func(k string) string { return env[k] }).EvalRunIf
 }
+
+//[>] 🤖🤖
+func (r *SpecRecipe) composeOrSkip(p *specPreparer, ready *SpecReady, root bool) ([]spec.ProfileRecipe, error) {
+	if !skipsComposition(root, p.opts.Profiles, r.SpecsInclude, r.ProfileRecipes) {
+		return r.composeIncludes(p, ready)
+	}
+	log.EmitSkip(log.Levels.Debug, "init-remote-sources", "prepare", r.sourceReady.DefinitionURI, "specsInclude lazy-loaded, not composed: --profiles names only this spec's profiles")
+	return slices.Clone(r.ProfileRecipes), nil
+}
+
+func skipsComposition(root bool, forced []string, includes []spec.SpecSourceRecipe, recipes []spec.ProfileRecipe) bool {
+	return root && len(forced) > 0 && len(includes) > 0 && spec.SelectsOnlyLocal(recipes, forced)
+}
+
+//[<] 🤖🤖
 
 func (r *SpecRecipe) composeIncludes(p *specPreparer, ready *SpecReady) ([]spec.ProfileRecipe, error) {
 	lookup := slices.Clone(r.ProfileRecipes)

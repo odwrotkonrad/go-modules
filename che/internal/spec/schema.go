@@ -107,7 +107,7 @@ func specsIncludeEntrySchema() *jsonschema.Schema {
 	entry.Properties.Set("env", envSchema("env overlaid on the embedded spec's load and run"))
 	entry.Properties.Set("variables", envSchema("explicit pass: values for variables the embedded spec declares, over its own files"))
 	entry.Properties.Set("optional", &jsonschema.Schema{
-		Description: "local dir sources only: an absent dir is skipped with a warning instead of failing the load (a dir another profile renders first)",
+		Description: "local dir sources only: an absent dir is skipped with a warning instead of failing the load (a dir another profile renders first); lazy-loaded: never loaded when --profiles selects only this spec's profiles",
 		Type:        "boolean",
 	})
 	return entry

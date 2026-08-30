@@ -1650,7 +1650,7 @@
               },
               "optional": {
                 "type": "boolean",
-                "description": "local dir sources only: an absent dir is skipped with a warning instead of failing the load (a dir another profile renders first)"
+                "description": "local dir sources only: an absent dir is skipped with a warning instead of failing the load (a dir another profile renders first); lazy-loaded: never loaded when --profiles selects only this spec's profiles"
               }
             },
             "additionalProperties": false,
