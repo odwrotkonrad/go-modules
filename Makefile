@@ -10,7 +10,7 @@ COMMANDS := che-install generic-setup repo-prepare-deps render-docs test test-co
 
 #[why] this checkout's build wins: an MR may change che's own rendering, so a release che from PATH
 #   would render the wrong output. CI supplies it as warm-go's artifact, skipping a rebuild
-GENERIC_CHE ?= $(if $(wildcard che/dist/che),che/dist/che,che)
+BIN_CHE ?= $(if $(wildcard che/dist/che),che/dist/che,che)
 GENERIC_FILES_TRACKED_PROFILES := generic/filesTracked,repo/filesTracked
 GENERIC_FILES_UNTRACKED_PROFILES := generic/filesUntracked,repo/filesUntracked
 -include shared/generic/make/generic.mk
@@ -22,7 +22,7 @@ che-install:
 
 #[what] render the generic consumer payload (generic.mk, lefthook.yml, shared/generic/) at the pinned CENTRALIZED_ASSETS_GENERIC_REF
 generic-setup:
-	@$(GENERIC_CHE) render-templates --profiles=genericSetup
+	@$(BIN_CHE) render-templates --profiles=genericSetup
 
 shared/generic/make/generic.mk: generic-setup
 
