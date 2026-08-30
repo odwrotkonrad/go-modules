@@ -305,7 +305,7 @@ func splitTemplates(nodes []templateNode, globs *globSet, explicit *[]FileItem) 
 func splitTemplateNodes(nodes []templateNode, up templateInherited, globs *globSet, explicit *[]FileItem) error {
 	for _, node := range nodes {
 		if len(node.Sources) > 0 {
-			if err := splitTemplateNodes(sourceListLeaves(node), up, globs, explicit); err != nil {
+			if err := splitTemplateNodes(sourceListLeaves(node, IsRemoteSrc(up.prefix)), up, globs, explicit); err != nil {
 				return err
 			}
 			continue
@@ -337,11 +337,14 @@ func splitTemplateNodes(nodes []templateNode, up templateInherited, globs *globS
 	return nil
 }
 
-func sourceListLeaves(node templateNode) []templateNode {
+func sourceListLeaves(node templateNode, remotePrefix bool) []templateNode {
 	out := make([]templateNode, len(node.Sources))
 	for i, src := range node.Sources {
 		leaf := node
 		leaf.Source, leaf.Sources = src, nil
+		if remotePrefix {
+			leaf.Dest = []DestSpec{{Path: TrimTemplateExt(strings.TrimLeft(src, "/"))}}
+		}
 		out[i] = leaf
 	}
 	return out
