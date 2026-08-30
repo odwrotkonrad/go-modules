@@ -3,6 +3,7 @@ options:
   profileWorkingDirectory: root
 profilesDefinitions:
   base:
+    type: host
     options: {autoDiscover: false}
     include:
       makeLinks:
@@ -34,6 +35,7 @@ profilesDefinitions:
         - install/setup
 
   'cli/macos':
+    type: host
     options:
       autoDiscover: true
       runIf:
@@ -44,6 +46,7 @@ profilesDefinitions:
         - base
 
   'desktop/macos':
+    type: host
     options:
       autoDiscover: true
       runIf:
@@ -54,6 +57,7 @@ profilesDefinitions:
         - base
 
   ontoRepo:
+    type: host
     options:
       autoDiscover: false
       profileWorkingDirectory: .

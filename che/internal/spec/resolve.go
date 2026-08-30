@@ -427,7 +427,7 @@ func joinTemplateSource(op, prefix, src string) (string, error) {
 		return "", fmt.Errorf("%s group %q: nested source %q names its own repo, one ref per group", op, prefix, src)
 	}
 	sep := "/"
-	if _, sub := splitRepoSubdir(RemoteSrcRef(prefix)); sub == "" {
+	if repoSubdir(RemoteSrcRef(prefix)) == "" {
 		sep = "//"
 	}
 	joined := strings.TrimSuffix(prefix, "/") + sep + strings.TrimLeft(src, "/")

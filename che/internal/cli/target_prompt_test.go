@@ -42,8 +42,10 @@ func TestSelectTargetTypes(t *testing.T) {
 				out:        &out,
 				isTerminal: func() bool { return c.Input.Args.Bool(t, 4) },
 			}
-			require.NoError(t, a.init("run"))
-			err := a.selectTargetTypes()
+			err := a.init("run")
+			if err == nil {
+				err = a.selectTargetTypes()
+			}
 			if c.Expected.Check(t, err) {
 				return
 			}

@@ -1,6 +1,7 @@
 ##[>] 🤖🤖
 profilesDefinitions:
   base:
+    type: host
     include:
       makeLinks:
         - source: [_home/.config/foo/**, etc/**]
@@ -18,6 +19,7 @@ profilesDefinitions:
         - source: [templates/top.tpl, templates/other.tpl]
 
   'cli/macos':
+    type: host
     options: {autoDiscover: true}
     include:
       profiles: [base]

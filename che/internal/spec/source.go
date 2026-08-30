@@ -37,7 +37,7 @@ func (r SourceRecipe) IsValid() error {
 	if rest == "" {
 		return fmt.Errorf("source %q: empty git url after %q", r.URI, RemoteSrcPrefix)
 	}
-	if _, sub := splitRepoSubdir(rest); sub != "" {
+	if repoSubdir(rest) != "" {
 		return fmt.Errorf("source %q: //<path> is gone, put the dir or spec file path under the spec key", r.URI)
 	}
 	return nil
@@ -111,15 +111,15 @@ func (r SourceRecipe) IsAbsentLocalDir(anchor, home string) bool {
 	return !fsutil.IsDir(filepath.Join(dir, r.Spec))
 }
 
-func splitRepoSubdir(ref string) (string, string) {
+func repoSubdir(ref string) string {
 	start := 0
 	if i := strings.Index(ref, "://"); i >= 0 {
 		start = i + 3
 	}
 	if j := strings.Index(ref[start:], "//"); j >= 0 {
-		return ref[:start+j], ref[start+j+2:]
+		return ref[start+j+2:]
 	}
-	return ref, ""
+	return ""
 }
 
 func expandDir(ref, repoRoot, home string) string {
@@ -195,8 +195,7 @@ func (i *profileListItem) UnmarshalYAML(value *yaml.Node) error {
 		return err
 	}
 	if i.Profile != "" || i.Spec != "" {
-		warnDeprecated(fmt.Sprintf("include.profiles list item %q: spec/profile are renamed to specDirPath/profileName", cmp.Or(i.Profile, i.Spec)))
-		i.Name, i.SpecDirPath, i.Profile, i.Spec = cmp.Or(i.Name, i.Profile), cmp.Or(i.SpecDirPath, i.Spec), "", ""
+		return fmt.Errorf("include.profiles list item %q: spec/profile are gone, write specDirPath/profileName", cmp.Or(i.Profile, i.Spec))
 	}
 	if i.Name == "" {
 		return fmt.Errorf("include.profiles list item: missing profileName")
@@ -256,28 +255,18 @@ func (r *ProfileSourceRecipe) UnmarshalYAML(value *yaml.Node) error {
 	if err := decodeScalarOr(value, &scalar, (*alias)(r)); err != nil {
 		return err
 	}
-	if scalar != "" && !isOldRefForm(scalar) {
+	if scalar != "" {
+		if strings.Contains(scalar, ProfilePathSep) {
+			return fmt.Errorf("include.profiles entry %q: the <source>/<spec-file>::<profile> form is gone, write {url, ref, specDirPath, profileName}", scalar)
+		}
 		r.ProfileName = scalar
 		return nil
 	}
-	if scalar == "" {
-		if err := r.normalizeRefKeys(); err != nil {
-			return err
-		}
+	if err := r.normalizeRefKeys(); err != nil {
+		return err
 	}
-	src := cmp.Or(scalar, r.Src)
-	if src == "" {
-		return fmt.Errorf("include.profiles entry missing url")
-	}
-	if isOldRefForm(src) {
-		// [why] pinned upstream tags still carry the URL form: refusing it refuses every consumer until each
-		// upstream re-tags, so it decodes to the keyed form and warns until every pin has moved
-		uri, specPath, profile, err := splitOldRefForm(src)
-		if err != nil {
-			return err
-		}
-		warnDeprecated(fmt.Sprintf("include.profiles entry %q: <source>/<spec-file>::<profile> is gone, write {url, ref, specDirPath: %q, profileName: %q}", src, cmp.Or(specPath, "."), profile))
-		r.Src, r.SpecPath, r.Profile = uri, specPath, profile
+	if r.Src == "" {
+		return fmt.Errorf("include.profiles entry missing url or specDirPath")
 	}
 	if r.Profile == "" && len(r.Names) == 0 {
 		return fmt.Errorf("include.profiles entry %q: missing profileName (or profileNames)", r.Src)
@@ -306,8 +295,7 @@ func (r *ProfileSourceRecipe) normalizeRefKeys() error {
 		return fmt.Errorf("include.profiles entry %q: profile paths are gone: reference the profile by url, ref, specDirPath, profileName", r.Name)
 	}
 	if r.Profile != "" || len(r.Profiles) > 0 {
-		warnDeprecated(fmt.Sprintf("include.profiles entry %q: profile/profiles are renamed to profileName/profileNames", cmp.Or(r.Src, r.URL)))
-		r.Name, r.Names, r.Profile, r.Profiles = cmp.Or(r.Name, r.Profile), append(r.Names, r.Profiles...), "", nil
+		return fmt.Errorf("include.profiles entry %q: profile/profiles are gone, write profileName/profileNames", cmp.Or(r.URL, r.SpecDirPath))
 	}
 	if err := r.normalize("include.profiles entry"); err != nil {
 		return err
@@ -319,9 +307,7 @@ func (r *ProfileSourceRecipe) normalizeRefKeys() error {
 
 func (k *sourceKeys) normalize(where string) error {
 	if k.Src != "" || k.SpecPath != "" {
-		warnDeprecated(fmt.Sprintf("%s %q: source/spec are renamed to url/specDirPath (a local spec: specDirPath alone, ./dir)", where, cmp.Or(k.Src, k.SpecPath)))
-		k.Src, k.SpecPath = cmp.Or(k.URL, k.Src), cmp.Or(k.SpecDirPath, k.SpecPath)
-		return nil
+		return fmt.Errorf("%s %q: source/spec are gone, write url/specDirPath (a local spec: specDirPath alone, ./dir)", where, cmp.Or(k.Src, k.SpecPath))
 	}
 	if k.URL == "" && k.SpecDirPath == "" {
 		return nil
@@ -337,6 +323,9 @@ func (k *sourceKeys) normalize(where string) error {
 			return fmt.Errorf("%s %q: ref needs a url", where, k.SpecDirPath)
 		}
 		k.Src, k.SpecPath = k.SpecDirPath, ""
+		if IsSpecFile(k.SpecDirPath) {
+			k.Src, k.SpecPath = filepath.Dir(k.SpecDirPath), filepath.Base(k.SpecDirPath)
+		}
 		return nil
 	}
 	k.Src, k.SpecPath = sourceStringOf(k.URL), strings.TrimSuffix(k.SpecDirPath, "/")
@@ -355,30 +344,6 @@ func sourceStringOf(url string) string {
 		return url
 	}
 	return RemoteSrcPrefix + url
-}
-
-func isOldRefForm(src string) bool {
-	return strings.Contains(strings.TrimPrefix(src, RemoteSrcPrefix), "::")
-}
-
-func splitOldRefForm(src string) (uri, specPath, profile string, err error) {
-	ref, profile, _ := strings.Cut(strings.TrimPrefix(src, RemoteSrcPrefix), "::")
-	if strings.HasPrefix(src, RemoteSrcPrefix) {
-		ref = RemoteSrcPrefix + ref
-	}
-	if profile == "" {
-		return "", "", "", fmt.Errorf("include.profiles entry %q: missing profile name", src)
-	}
-	slash := strings.LastIndex(ref, "/")
-	if slash <= 0 || !IsSpecFile(ref[slash+1:]) {
-		return "", "", "", fmt.Errorf("include.profiles entry %q: needs {url, ref, specDirPath, profileName}", src)
-	}
-	dir := strings.TrimSuffix(ref[:slash], "/")
-	if strings.HasPrefix(dir, RemoteSrcPrefix) {
-		repo, sub := splitRepoSubdir(RemoteSrcRef(dir))
-		return RemoteSrcPrefix + repo, sub, profile, nil
-	}
-	return dir, "", profile, nil
 }
 
 func cutSourceRef(src string) (rest, gitRef string, err error) {

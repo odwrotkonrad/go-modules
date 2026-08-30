@@ -1,5 +1,6 @@
 profilesDefinitions:
   base:
+    type: host
     include:
       makeLinks:
         - etc/zshrc
@@ -19,6 +20,7 @@ profilesDefinitions:
         - ci/zsh/scripts/installs/20-kitty.zsh
 
   base-exclude-desktop:
+    type: host
     exclude:
       makeLinks:
         - etc/grafana/**
@@ -28,11 +30,13 @@ profilesDefinitions:
         - ci/zsh/scripts/installs/20-kitty.zsh
 
   'desktop/macos':
+    type: host
     options: {autoDiscover: true}
     include:
       profiles: [base]
 
   'cli/macos':
+    type: host
     options: {autoDiscover: true}
     include:
       profiles: [base, base-exclude-desktop]

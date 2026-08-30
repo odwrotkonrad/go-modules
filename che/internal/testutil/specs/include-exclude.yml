@@ -1,5 +1,6 @@
 profilesDefinitions:
   base:
+    type: host
     include:
       makeLinks:
         - etc/zshrc
@@ -13,6 +14,7 @@ profilesDefinitions:
         - ci/zsh/scripts/installs/20-foo.zsh
 
   'cli/macos':
+    type: host
     options: {autoDiscover: true}
     include:
       profiles: [base]

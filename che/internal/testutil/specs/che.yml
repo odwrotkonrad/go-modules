@@ -1,6 +1,7 @@
 # yaml-language-server: $schema=https://gitlab.com/api/v4/projects/konradodwrot%2Fgo-modules/packages/generic/che-schema/v0.0.1-che-min-v0.0.96/che.schema.json
 profilesDefinitions:
   base:
+    type: host
     options: {autoDiscover: false}
     include:
       makeLinks:
@@ -30,6 +31,7 @@ profilesDefinitions:
         - install/setup
 
   'cli/macos':
+    type: host
     options:
       autoDiscover: true
       runIf:
@@ -40,6 +42,7 @@ profilesDefinitions:
         - base
 
   'desktop/macos':
+    type: host
     options:
       autoDiscover: true
       runIf:
@@ -50,6 +53,7 @@ profilesDefinitions:
         - base
 
   ontoRepo:
+    type: host
     options: {autoDiscover: false}
     include:
       renderTemplates:

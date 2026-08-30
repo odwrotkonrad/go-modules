@@ -1,6 +1,7 @@
 ##[>] 🤖🤖
 profilesDefinitions:
   base:
+    type: host
     include:
       makeCopies:
         - source: [a, b]
@@ -8,6 +9,7 @@ profilesDefinitions:
             - source: c
 
   'cli/macos':
+    type: host
     options: {autoDiscover: true}
     include:
       profiles: [base]

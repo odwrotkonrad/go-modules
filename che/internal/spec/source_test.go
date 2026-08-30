@@ -93,7 +93,7 @@ func TestRunIfGate(t *testing.T) {
 		if c.Input.Args.Bool(t, 1) {
 			t.Cleanup(log.SwapLevel(log.Levels.Trace))
 		}
-		dir := testutil.Tree(t, map[string]string{"che.yml": "profilesDefinitions:\n  p:\n    options:\n      runIf: ['env:X']\n"})
+		dir := testutil.Tree(t, map[string]string{"che.yml": "profilesDefinitions:\n  p:\n    type: host\n    options:\n      runIf: ['env:X']\n"})
 		d, err := Load(filepath.Join(dir, "che.yml"), Interp{})
 		require.NoError(t, err)
 		var ok bool
@@ -127,9 +127,9 @@ func TestSpecSourceOptionalAbsentLocalDir(t *testing.T) {
 	root := t.TempDir()
 	require.NoError(t, os.MkdirAll(filepath.Join(root, "present"), 0o755))
 	var present, absent, remote SpecSourceRecipe
-	require.NoError(t, yaml.Unmarshal([]byte("{source: present, optional: true}"), &present))
-	require.NoError(t, yaml.Unmarshal([]byte("{source: absent, optional: true}"), &absent))
-	require.NoError(t, yaml.Unmarshal([]byte("{source: 'git::gitlab.com/org/repo@v1', optional: true}"), &remote))
+	require.NoError(t, yaml.Unmarshal([]byte("{specDirPath: ./present, optional: true}"), &present))
+	require.NoError(t, yaml.Unmarshal([]byte("{specDirPath: ./absent, optional: true}"), &absent))
+	require.NoError(t, yaml.Unmarshal([]byte("{url: gitlab.com/org/repo, ref: v1, specDirPath: ., optional: true}"), &remote))
 	assert.False(t, present.IsAbsentLocalDir(root, root))
 	assert.True(t, absent.IsAbsentLocalDir(root, root))
 	assert.True(t, absent.Optional)

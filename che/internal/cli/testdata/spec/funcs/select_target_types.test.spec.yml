@@ -130,20 +130,17 @@ cases:
         - tty: true
     expected:
       output: {profiles: "a,b"}
-  - name: ShouldListUntypedProfilesAsUnselectable
+  - name: ShouldErrorOnUntypedProfile
     input:
       args:
         - spec: |
             profilesDefinitions:
               tracked: {type: repo-git-tracked}
-              machine: {type: host}
               legacy: {}
-        - answer: "2\n"
+        - answer: ""
         - types: []
         - profile: ""
         - tty: true
     expected:
-      output:
-        profiles: machine
-        prompt: ["-  : 1 profile  (no type"]
+      errorOutput: ['profile "legacy": type is required']
 # [<] 🤖🤖

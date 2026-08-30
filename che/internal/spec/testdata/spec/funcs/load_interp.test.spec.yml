@@ -10,6 +10,7 @@ cases:
             specsInclude: ['${{ env.BASE }}/other']
             profilesDefinitions:
               web:
+                type: host
                 options: {profileWorkingDirectory: '${{ env.TREE }}/${{ env.APP || app }}'}
         - layers:
             below: [{name: process env, env: {BASE: /b}}]
@@ -28,6 +29,7 @@ cases:
             env: {A: spec, B: spec}
             profilesDefinitions:
               web:
+                type: host
                 options: {profileWorkingDirectory: '${{ env.A }}-${{ env.B }}'}
         - layers:
             below: [{name: process env, env: {A: process, B: process}}]
@@ -58,6 +60,7 @@ cases:
         - spec: |
             profilesDefinitions:
               web:
+                type: host
                 options: {profileWorkingDirectory: '${{ env.A }}-${{ env.B }}'}
         - layers:
             below:
@@ -76,6 +79,7 @@ cases:
             env: {A: included, B: included}
             profilesDefinitions:
               web:
+                type: host
                 options: {profileWorkingDirectory: '${{ env.A }}-${{ env.B }}-${{ env.C }}'}
         - layers:
             below: [{name: included che.env, env: {C: included-file}}]
@@ -104,8 +108,10 @@ cases:
         - spec: |
             profilesDefinitions:
               a:
+                type: host
                 options: {profileWorkingDirectory: '${{ env.A }}'}
               b:
+                type: host
                 options: {profileWorkingDirectory: '${{ env.B }}/x'}
         - layers:
             below: [{name: process env, env: {A: set}}]
@@ -133,6 +139,7 @@ cases:
         - spec: |
             profilesDefinitions:
               ${{ env.NAME }}:
+                type: host
                 options: {profileWorkingDirectory: x}
         - layers:
             below: [{name: process env, env: {NAME: web}}]
@@ -153,6 +160,7 @@ cases:
                   B: {required: true}
             profilesDefinitions:
               web:
+                type: host
                 options: {profileWorkingDirectory: '${{ var.A }}/${{ var.B }}'}
         - layers: {}
         - policy: empty
@@ -183,6 +191,7 @@ cases:
         - spec: |
             profilesDefinitions:
               web:
+                type: host
                 options: {profileWorkingDirectory: '${{ var.B }}-${{ var.D }}-${{ var.A || none }}-${{ var.C || none }}'}
         - layers:
             vars:
@@ -202,6 +211,7 @@ cases:
         - spec: |
             profilesDefinitions:
               web:
+                type: host
                 options: {profileWorkingDirectory: '${{ var.C }}'}
         - layers:
             vars:
@@ -231,6 +241,7 @@ cases:
                 A: {description: 'reads ${{ env.NOPE }}'}
             profilesDefinitions:
               web:
+                type: host
                 variablesDefinitions:
                   B: {description: 'reads ${{ env.NOPE }}'}
                 options: {profileWorkingDirectory: x}
@@ -288,6 +299,7 @@ cases:
             specsInclude: ['${{ repoRoot }}/.che/sub']
             profilesDefinitions:
               web:
+                type: host
                 options: {profileWorkingDirectory: '${{ repoRoot }}/root'}
                 include:
                   renderTemplates:
@@ -311,6 +323,7 @@ cases:
         - spec: |
             profilesDefinitions:
               web:
+                type: host
                 options: {profileWorkingDirectory: '${{ gitRoot }}/root'}
         - layers:
             builtins: {repoRoot: /repo}
@@ -326,6 +339,7 @@ cases:
                 web: {A: {}}
             profilesDefinitions:
               web:
+                type: host
                 variablesDefinitions: {A: {}}
         - layers: {}
         - policy: error

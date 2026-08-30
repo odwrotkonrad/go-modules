@@ -1,5 +1,6 @@
 profilesDefinitions:
   base:
+    type: host
     include:
       renderTemplates:
         - source: "git::gitlab.com/acme/tools/snippets/agent.md"
@@ -7,6 +8,7 @@ profilesDefinitions:
             - {path: .claude/agents/ro.md}
 
   'cli/macos':
+    type: host
     options: {autoDiscover: true}
     include:
       profiles: [base]

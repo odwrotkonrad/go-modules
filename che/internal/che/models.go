@@ -250,8 +250,7 @@ func (p *specPreparer) prepare(src spec.SpecSourceRecipe, anchor string, over ov
 		return recipe.PrepareProfiles(p, nil, root)
 	}
 	// [why] a ref names a top-level profile of the source's exported spec, root che.export.yml first: each
-	// candidate loads until one defines it; a path a::b walks a's include.profiles, never the composed set
-	head, rest := spec.SplitProfilePath(forced.ProfileName)
+	// candidate loads until one defines it
 	for _, def := range recipe.sourceReady.Candidates {
 		recipe.sourceReady.DefinitionURI = def
 		in, err := p.repoFiles.interp([]string{def}, recipe.sourceReady.DirectoryPath, root, over, p.opts.EnvUnset)
@@ -261,51 +260,13 @@ func (p *specPreparer) prepare(src spec.SpecSourceRecipe, anchor string, over ov
 		if err := recipe.PrepareProfileRecipes(p.opts, root, in); err != nil {
 			return nil, err
 		}
-		rec, err := spec.FindRecipe(recipe.ProfileRecipes, head)
-		if err != nil {
+		if _, err := spec.FindRecipe(recipe.ProfileRecipes, forced.ProfileName); err != nil {
 			continue
 		}
-		if rest == "" {
-			target := *forced
-			target.ProfileName = head
-			return recipe.PrepareProfiles(p, &target, root)
-		}
-		return p.descend(recipe, rec, rest, forced, in)
+		return recipe.PrepareProfiles(p, forced, root)
 	}
 	p.unresolved = append(p.unresolved, forced.String())
 	log.EmitWarn("discover-profiles", "unresolved-ref", "profile "+forced.ProfileName+" not found at top level of "+strings.Join(recipe.sourceReady.Candidates, ", ")+" (ref "+forced.String()+")")
-	return nil, nil
-}
-
-// [why] the next path element is a profile the current one includes: a local name stays in this
-// spec, a sourced entry carries the walk into its own source, the consumer's overlays riding along
-func (p *specPreparer) descend(recipe *SpecRecipe, rec spec.ProfileRecipe, rest string, forced *spec.ProfileSourceRecipe, in spec.Interp) (*SpecReady, error) {
-	next, tail := spec.SplitProfilePath(rest)
-	for _, entry := range rec.Include.Profiles {
-		if entry.ProfileName != next {
-			continue
-		}
-		if entry.URI == "" {
-			local, err := spec.FindRecipe(recipe.ProfileRecipes, next)
-			if err != nil {
-				break
-			}
-			if tail == "" {
-				target := *forced
-				target.ProfileName = next
-				return recipe.PrepareProfiles(p, &target, false)
-			}
-			return p.descend(recipe, local, tail, forced, in)
-		}
-		child := entry
-		child.ProfileName = cmp.Or(tail, next)
-		child.Options = child.Options.OverRef(forced.Options)
-		child.Env = fsutil.MergeMap(entry.Env, forced.Env)
-		child.Variables = fsutil.MergeMap(entry.Variables, forced.Variables)
-		return p.prepare(child.AsSpecSource(), recipe.sourceReady.DirectoryPath, overlay{inherited: recipe.lookupOrLaunch(in), env: child.Env, passed: child.Variables, inheritedVars: recipe.Vars.ForEmbeddedProfiles()}, &child, false)
-	}
-	p.unresolved = append(p.unresolved, forced.String())
-	log.EmitWarn("discover-profiles", "unresolved-ref", "profile "+next+" is not included by "+rec.Source.GetProfileName()+" in "+recipe.sourceReady.DefinitionURI+" (ref "+forced.String()+")")
 	return nil, nil
 }
 
@@ -317,17 +278,6 @@ func (p *specPreparer) untakenForced() []string {
 		}
 	}
 	return missing
-}
-
-func (r *SpecRecipe) lookupOrLaunch(in spec.Interp) map[string]string {
-	if r.lookup != nil {
-		return r.lookup
-	}
-	out := map[string]string{}
-	for _, layer := range slices.Concat(in.Below, in.Above) {
-		maps.Copy(out, layer.Env)
-	}
-	return out
 }
 
 func findRepoRoot(ctx Context) (string, error) {

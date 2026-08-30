@@ -1,10 +1,12 @@
 profilesDefinitions:
   base:
+    type: host
     include:
       runScripts:
         - ci/zsh/scripts/installs/*.zsh
 
   'cli/macos':
+    type: host
     options: {autoDiscover: true}
     include:
       profiles: [base]

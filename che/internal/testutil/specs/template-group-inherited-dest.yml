@@ -1,6 +1,7 @@
 ##[>] 🤖🤖
 profilesDefinitions:
   base:
+    type: host
     include:
       renderTemplates:
         - source: templates/ruby
@@ -15,6 +16,7 @@ profilesDefinitions:
                 - {source: /gitlab.rb, dest: $HOME/.config/gitlab.rb}
 
   'cli/macos':
+    type: host
     options: {autoDiscover: true}
     include:
       profiles: [base]

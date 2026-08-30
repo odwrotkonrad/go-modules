@@ -1,11 +1,14 @@
 profilesDefinitions:
   a:
+    type: host
     include:
       profiles: [b]
   b:
+    type: host
     include:
       profiles: [a]
   'cli/macos':
+    type: host
     options: {autoDiscover: true}
     include:
       profiles: [a]
