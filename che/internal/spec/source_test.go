@@ -25,6 +25,7 @@ type sourceWant struct {
 	Variables  map[string]string `yaml:"variables"`
 	String     string            `yaml:"string"`
 	Ref        string            `yaml:"ref"`
+	Expanded   []string          `yaml:"expanded"`
 }
 
 func TestProfileSourceDecode(t *testing.T) {
@@ -36,7 +37,14 @@ func TestProfileSourceDecode(t *testing.T) {
 		if err := ref.IsValid(); err != nil {
 			return sourceWant{}, err
 		}
+		var expanded []string
+		if len(ref.Names) > 0 {
+			for _, one := range ref.Expand() {
+				expanded = append(expanded, one.String())
+			}
+		}
 		return sourceWant{
+			Expanded:   expanded,
 			Source:     ref.URI,
 			Profile:    ref.GetProfileName(),
 			SourceType: string(ref.GetSourceType()),
@@ -46,6 +54,34 @@ func TestProfileSourceDecode(t *testing.T) {
 			String:     ref.String(),
 			Ref:        ref.Ref,
 		}, nil
+	})
+}
+
+type sourceSpecWant struct {
+	Sources []string `yaml:"sources"`
+}
+
+func TestSourceSpecDecode(t *testing.T) {
+	testyml.Eq(t, td, "testdata/spec/funcs/source_spec_decode.test.spec.yml", func(t *testing.T, c testyml.Case[sourceSpecWant]) (sourceSpecWant, error) {
+		var inc includeSet
+		if err := yaml.Unmarshal([]byte(c.Input.Args.String(t, 0)), &inc); err != nil {
+			return sourceSpecWant{}, err
+		}
+		var merged mergedInclude
+		if err := splitCopies(inc.MakeCopies, &merged.copyGlobs, &merged.explicitCopies); err != nil {
+			return sourceSpecWant{}, err
+		}
+		if err := splitTemplates(inc.RenderTemplates, &merged.templateGlobs, &merged.explicitTemplates); err != nil {
+			return sourceSpecWant{}, err
+		}
+		var out sourceSpecWant
+		for _, it := range append(merged.explicitCopies, merged.explicitTemplates...) {
+			out.Sources = append(out.Sources, it.Rel)
+		}
+		for _, l := range inc.MakeLinks {
+			out.Sources = append(out.Sources, l.Source)
+		}
+		return out, nil
 	})
 }
 

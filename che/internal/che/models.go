@@ -184,6 +184,9 @@ func PrepareSpecs(ctx Context, opts options.Options, src spec.SpecSourceRecipe) 
 		}
 	}
 	if err == nil && root != nil && !root.gatedOff && len(root.AllProfiles()) == 0 && len(opts.Profiles) == 0 && opts.AutoDiscover {
+		if len(opts.TargetProfileTypes) > 0 {
+			return root, fmt.Errorf("%w: no auto-discovered profile of type %s in %s or the specs it composes", spec.ErrNoneEligible, strings.Join(opts.TargetProfileTypes, ", "), root.Source.DefinitionURI)
+		}
 		return root, fmt.Errorf("%w: no autoDiscover profile passed its runIf in %s or the specs it composes (use --profiles or CHE_SKIP_RUN_IF)", spec.ErrNoneEligible, root.Source.DefinitionURI)
 	}
 	return root, err
@@ -634,7 +637,23 @@ func (r *SpecRecipe) selectEligibleNames(p *specPreparer, forced *spec.ProfileSo
 		}
 		return nil, err
 	}
-	return names, nil
+	return r.keepTargetTypes(names, p.opts.TargetProfileTypes), nil
+}
+
+func (r *SpecRecipe) keepTargetTypes(names, types []string) []string {
+	if len(types) == 0 {
+		return names
+	}
+	var kept []string
+	for _, name := range names {
+		rec, _ := spec.FindRecipe(r.ProfileRecipes, name)
+		if slices.Contains(types, string(rec.Type)) {
+			kept = append(kept, name)
+			continue
+		}
+		log.EmitSkip(log.Levels.Debug, "discover-profiles", "load-spec", "profile "+name, "type "+cmp.Or(string(rec.Type), "unset")+" not in --target-profile-types")
+	}
+	return kept
 }
 
 func (r *SpecRecipe) ownForcedProfiles(p *specPreparer) []string {
@@ -710,6 +729,7 @@ func (r *SpecRecipe) makeProfileReady(p *specPreparer, rec spec.ProfileRecipe, l
 			SourceReady: spec.SourceReady{DefinitionURI: r.sourceReady.DefinitionURI, DirectoryPath: rec.Source.DirectoryPath},
 			ProfileName: name,
 		},
+		Type:        rec.Type,
 		Options:     rec.Options,
 		Env:         env,
 		env:         effectiveEnv,
@@ -877,6 +897,7 @@ func (s *SpecReady) ExecEach(ctx context.Context, opName string, fn func(context
 
 type ProfileReady struct {
 	Source          spec.ProfileSourceReady
+	Type            spec.ProfileType
 	Options         spec.ProfileOptions
 	Env             map[string]string
 	Profiles        []spec.ProfileSourceRecipe
@@ -1046,6 +1067,16 @@ func (p *ProfileReady) LogDiscovered() {
 	for _, line := range lines {
 		log.Emit(log.Event{Level: log.Levels.Info, Scope: "discover-profiles", Msg: line, Depth: 1})
 	}
+}
+
+// OpCounts reports the declared item count per run op, keyed by op name.
+func (p *ProfileReady) OpCounts() map[string]int {
+	out := map[string]int{}
+	for _, op := range p.commandOps("run") {
+		all, _ := op.counts(p)
+		out[op.Name()] = all
+	}
+	return out
 }
 
 func formatChanges(n int) string {

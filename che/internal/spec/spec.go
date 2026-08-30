@@ -7,9 +7,11 @@ import (
 	"os"
 	"slices"
 	"strings"
+	"sync"
 
 	"gopkg.in/yaml.v3"
 
+	"gitlab.com/konradodwrot/go-modules/che/internal/log"
 	"gitlab.com/konradodwrot/go-modules/che/internal/spec/envinterp"
 	"gitlab.com/konradodwrot/go-modules/che/render/render"
 )
@@ -80,9 +82,60 @@ func TrimTemplateExt(rel string) string {
 	return rel
 }
 
+func (s *SourceSpec) UnmarshalYAML(value *yaml.Node) error {
+	type alias SourceSpec
+	if err := decodeScalarOr(value, &s.raw, (*alias)(s)); err != nil {
+		return err
+	}
+	if s.raw == "" && s.URL == "" {
+		return fmt.Errorf("source object requires url")
+	}
+	return nil
+}
+
+// String renders the source in the loader's string form: the scalar verbatim, an object as git::<url>[@<ref>][//<filepath>].
+func (s SourceSpec) String() string {
+	if s.raw != "" || s.URL == "" {
+		return s.raw
+	}
+	out := RemoteSrcPrefix + s.URL
+	if s.Ref != "" {
+		out += "@" + s.Ref
+	}
+	if s.FilePath != "" {
+		out += "//" + strings.TrimPrefix(s.FilePath, "/")
+	}
+	return out
+}
+
+// [why] every reader of a node's source speaks the string form: an object source decodes once,
+// here, into the scalar the rest of the loader already understands
+func flattenObjectSource(value *yaml.Node) (*yaml.Node, error) {
+	if value.Kind != yaml.MappingNode {
+		return value, nil
+	}
+	for i := 0; i+1 < len(value.Content); i += 2 {
+		if value.Content[i].Value != "source" || value.Content[i+1].Kind != yaml.MappingNode {
+			continue
+		}
+		var src SourceSpec
+		if err := value.Content[i+1].Decode(&src); err != nil {
+			return nil, err
+		}
+		rest := *value
+		rest.Content = slices.Clone(value.Content)
+		rest.Content[i+1] = &yaml.Node{Kind: yaml.ScalarNode, Tag: "!!str", Value: src.String()}
+		return &rest, nil
+	}
+	return value, nil
+}
+
 func (l *linkEntry) UnmarshalYAML(value *yaml.Node) error {
-	node := value
-	if rule, rest, ok := takeScalarDest(value); ok {
+	node, err := flattenObjectSource(value)
+	if err != nil {
+		return err
+	}
+	if rule, rest, ok := takeScalarDest(node); ok {
 		l.DestRule = rule
 		node = rest
 	}
@@ -176,8 +229,11 @@ func (t *templateNode) UnmarshalYAML(value *yaml.Node) error {
 }
 
 func decodeTreeNode[T any](value *yaml.Node, glob, destRule *string, dest *[]DestSpec, obj *T) error {
-	node := value
-	scalarDest, rest, hasScalarDest := takeScalarDest(value)
+	node, err := flattenObjectSource(value)
+	if err != nil {
+		return err
+	}
+	scalarDest, rest, hasScalarDest := takeScalarDest(node)
 	if hasScalarDest {
 		node = rest
 	}
@@ -284,11 +340,37 @@ func (d *Doc) decodeKey(key string, node *yaml.Node) error {
 		if err := node.Decode(&ps); err != nil {
 			return fmt.Errorf("parse profile %q: %w", key, err)
 		}
+		if err := checkProfileType(key, ps.Type); err != nil {
+			return err
+		}
 		ps.Include.Profiles = expandProfileRefs(ps.Include.Profiles)
 		ps.Source.ProfileName = key
 		d.ProfileRecipes = append(d.ProfileRecipes, ps)
 		return nil
 	}
+}
+
+var deprecationsSeen sync.Map
+
+// [why] a spec loads more than once per run (source init, then discovery): one line per distinct
+// deprecation keeps the warning readable
+func warnDeprecated(msg string) {
+	if _, seen := deprecationsSeen.LoadOrStore(msg, true); !seen {
+		log.EmitWarn("load-spec", "deprecated", msg)
+	}
+}
+
+// [why] a missing type warns, not errors: consumers pull upstream specs at pinned tags, so the
+// requirement bites only once every upstream has re-tagged with a type on each profile
+func checkProfileType(name string, t ProfileType) error {
+	if t == "" {
+		warnDeprecated(fmt.Sprintf("profile %q: type is missing, set type: %s (required in a coming release)", name, strings.Join(ProfileTypeNames, " | ")))
+		return nil
+	}
+	if err := ValidateProfileType(string(t)); err != nil {
+		return fmt.Errorf("profile %q: %w", name, err)
+	}
+	return nil
 }
 
 // [<] 🤖🤖

@@ -12,7 +12,6 @@ import (
 	"gopkg.in/yaml.v3"
 
 	"gitlab.com/konradodwrot/go-modules/che/internal/fsutil"
-	"gitlab.com/konradodwrot/go-modules/che/internal/log"
 	"gitlab.com/konradodwrot/go-modules/che/internal/source"
 	"gitlab.com/konradodwrot/go-modules/che/render/render"
 )
@@ -101,7 +100,15 @@ func (r SourceRecipe) IsAbsentLocalDir(anchor, home string) bool {
 	if r.GetSourceType() == SourceTypes.Remote || r.URI == "" {
 		return false
 	}
-	return !fsutil.IsDir(expandDir(r.URI, anchor, home))
+	dir := expandDir(r.URI, anchor, home)
+	if !fsutil.IsDir(dir) {
+		return true
+	}
+	if IsSpecFile(r.Spec) {
+		_, err := os.Stat(filepath.Join(dir, r.Spec))
+		return err != nil
+	}
+	return !fsutil.IsDir(filepath.Join(dir, r.Spec))
 }
 
 func splitRepoSubdir(ref string) (string, string) {
@@ -184,11 +191,15 @@ func repoName(url string) string {
 
 func (i *profileListItem) UnmarshalYAML(value *yaml.Node) error {
 	type alias profileListItem
-	if err := decodeScalarOr(value, &i.Profile, (*alias)(i)); err != nil {
+	if err := decodeScalarOr(value, &i.Name, (*alias)(i)); err != nil {
 		return err
 	}
-	if i.Profile == "" {
-		return fmt.Errorf("include.profiles entry profiles item: missing profile")
+	if i.Profile != "" || i.Spec != "" {
+		warnDeprecated(fmt.Sprintf("include.profiles list item %q: spec/profile are renamed to specDirPath/profileName", cmp.Or(i.Profile, i.Spec)))
+		i.Name, i.SpecDirPath, i.Profile, i.Spec = cmp.Or(i.Name, i.Profile), cmp.Or(i.SpecDirPath, i.Spec), "", ""
+	}
+	if i.Name == "" {
+		return fmt.Errorf("include.profiles list item: missing profileName")
 	}
 	return nil
 }
@@ -196,15 +207,15 @@ func (i *profileListItem) UnmarshalYAML(value *yaml.Node) error {
 // Expand turns a multi-profile entry into one ref per listed profile, source, ref, options, env
 // and variables shared; a single-profile entry returns itself.
 func (r ProfileSourceRecipe) Expand() []ProfileSourceRecipe {
-	if len(r.Profiles) == 0 {
+	if len(r.Names) == 0 {
 		return []ProfileSourceRecipe{r}
 	}
-	out := make([]ProfileSourceRecipe, 0, len(r.Profiles))
-	for _, item := range r.Profiles {
+	out := make([]ProfileSourceRecipe, 0, len(r.Names))
+	for _, item := range r.Names {
 		one := r
-		one.Profiles = nil
-		one.ProfileName = item.Profile
-		one.Spec = cmp.Or(item.Spec, r.Spec)
+		one.Names = nil
+		one.ProfileName = item.Name
+		one.Spec = cmp.Or(item.SpecDirPath, r.Spec)
 		out = append(out, one)
 	}
 	return out
@@ -216,15 +227,23 @@ func (r *SpecSourceRecipe) UnmarshalYAML(value *yaml.Node) error {
 	if err := decodeScalarOr(value, &scalar, (*alias)(r)); err != nil {
 		return err
 	}
+	if scalar == "" {
+		if err := r.normalize("include.sources entry"); err != nil {
+			return err
+		}
+	}
 	src := cmp.Or(scalar, r.Src)
 	if src == "" {
-		return fmt.Errorf("include.sources entry missing source")
+		return fmt.Errorf("include.sources entry missing url")
 	}
 	uri, gitRef, err := cutSourceRef(src)
 	if err != nil {
 		return err
 	}
-	r.URI, r.Ref, r.Spec, r.Src, r.SpecPath = uri, gitRef, r.SpecPath, "", ""
+	if gitRef != "" && r.GitRef != "" {
+		return fmt.Errorf("source %q: ref given twice (@%s and ref: %s)", src, gitRef, r.GitRef)
+	}
+	r.URI, r.Ref, r.Spec, r.sourceKeys = uri, cmp.Or(gitRef, r.GitRef), r.SpecPath, sourceKeys{}
 	if err := validateKeys("include.sources "+src+" variables", r.Variables); err != nil {
 		return err
 	}
@@ -244,9 +263,14 @@ func (r *ProfileSourceRecipe) UnmarshalYAML(value *yaml.Node) error {
 		r.ProfileName = scalar
 		return nil
 	}
+	if scalar == "" {
+		if err := r.normalizeRefKeys(); err != nil {
+			return err
+		}
+	}
 	src := cmp.Or(scalar, r.Src)
 	if src == "" {
-		return fmt.Errorf("include.profiles entry missing source")
+		return fmt.Errorf("include.profiles entry missing url")
 	}
 	if isOldRefForm(src) {
 		// [why] pinned upstream tags still carry the URL form: refusing it refuses every consumer until each
@@ -255,24 +279,73 @@ func (r *ProfileSourceRecipe) UnmarshalYAML(value *yaml.Node) error {
 		if err != nil {
 			return err
 		}
-		log.EmitWarn("load-spec", "deprecated", fmt.Sprintf("include.profiles entry %q: <source>/<spec-file>::<profile> is gone, write {source: %q, spec: %q, profile: %q}", src, uri, specPath, profile))
+		warnDeprecated(fmt.Sprintf("include.profiles entry %q: <source>/<spec-file>::<profile> is gone, write {url, ref, specDirPath: %q, profileName: %q}", src, cmp.Or(specPath, "."), profile))
 		r.Src, r.SpecPath, r.Profile = uri, specPath, profile
 	}
-	if r.Profile == "" && len(r.Profiles) == 0 {
-		return fmt.Errorf("include.profiles entry %q: missing profile (or profiles)", r.Src)
+	if r.Profile == "" && len(r.Names) == 0 {
+		return fmt.Errorf("include.profiles entry %q: missing profileName (or profileNames)", r.Src)
 	}
-	if r.Profile != "" && len(r.Profiles) > 0 {
-		return fmt.Errorf("include.profiles entry %q: profile and profiles are exclusive", r.Src)
+	if r.Profile != "" && len(r.Names) > 0 {
+		return fmt.Errorf("include.profiles entry %q: profileName and profileNames are exclusive", r.Src)
 	}
 	uri, gitRef, err := cutSourceRef(r.Src)
 	if err != nil {
 		return err
 	}
-	r.URI, r.Ref, r.Spec, r.ProfileName, r.Src, r.SpecPath, r.Profile = uri, gitRef, r.SpecPath, r.Profile, "", "", ""
+	if gitRef != "" && r.GitRef != "" {
+		return fmt.Errorf("source %q: ref given twice (@%s and ref: %s)", r.Src, gitRef, r.GitRef)
+	}
+	r.URI, r.Ref, r.Spec, r.ProfileName, r.sourceKeys, r.Profile = uri, cmp.Or(gitRef, r.GitRef), r.SpecPath, r.Profile, sourceKeys{}, ""
 	if err := r.IsValid(); err != nil {
 		return err
 	}
 	return validateKeys("include.profiles "+r.String()+" variables", r.Variables)
+}
+
+// [why] the new keys fold into the old ones the rest of the decoder reads: one code path, the
+// old keys warning until every pinned upstream has moved
+func (r *ProfileSourceRecipe) normalizeRefKeys() error {
+	if strings.Contains(r.Name, ProfilePathSep) {
+		return fmt.Errorf("include.profiles entry %q: profile paths are gone: reference the profile by url, ref, specDirPath, profileName", r.Name)
+	}
+	if r.Profile != "" || len(r.Profiles) > 0 {
+		warnDeprecated(fmt.Sprintf("include.profiles entry %q: profile/profiles are renamed to profileName/profileNames", cmp.Or(r.Src, r.URL)))
+		r.Name, r.Names, r.Profile, r.Profiles = cmp.Or(r.Name, r.Profile), append(r.Names, r.Profiles...), "", nil
+	}
+	if err := r.normalize("include.profiles entry"); err != nil {
+		return err
+	}
+	r.Profile = r.Name
+	r.Name = ""
+	return nil
+}
+
+func (k *sourceKeys) normalize(where string) error {
+	if k.Src != "" || k.SpecPath != "" {
+		warnDeprecated(fmt.Sprintf("%s %q: source/spec are renamed to url/specDirPath (specDirPath: . for the source root)", where, cmp.Or(k.Src, k.SpecPath)))
+		k.Src, k.SpecPath = cmp.Or(k.URL, k.Src), cmp.Or(k.SpecDirPath, k.SpecPath)
+		return nil
+	}
+	if k.URL == "" {
+		return nil
+	}
+	if k.SpecDirPath == "" {
+		return fmt.Errorf("%s %q: specDirPath is required (\".\" for the source root)", where, k.URL)
+	}
+	k.Src, k.SpecPath = sourceStringOf(k.URL), strings.TrimSuffix(k.SpecDirPath, "/")
+	if k.SpecPath == "." {
+		k.SpecPath = ""
+	}
+	return nil
+}
+
+// [why] a path-looking url is a local dir, anything else names a git repo, scheme or not
+func sourceStringOf(url string) string {
+	switch {
+	case IsRemoteSrc(url), strings.HasPrefix(url, "."), strings.HasPrefix(url, "/"), strings.HasPrefix(url, "~"), strings.HasPrefix(url, "$"):
+		return url
+	}
+	return RemoteSrcPrefix + url
 }
 
 func isOldRefForm(src string) bool {
@@ -289,7 +362,7 @@ func splitOldRefForm(src string) (uri, specPath, profile string, err error) {
 	}
 	slash := strings.LastIndex(ref, "/")
 	if slash <= 0 || !IsSpecFile(ref[slash+1:]) {
-		return "", "", "", fmt.Errorf("include.profiles entry %q: needs {source, spec, profile}", src)
+		return "", "", "", fmt.Errorf("include.profiles entry %q: needs {url, ref, specDirPath, profileName}", src)
 	}
 	dir := strings.TrimSuffix(ref[:slash], "/")
 	if strings.HasPrefix(dir, RemoteSrcPrefix) {
@@ -313,7 +386,7 @@ func ctxAlias(value *yaml.Node, where string) map[string]string {
 		if err := value.Content[i+1].Decode(&legacy); err != nil {
 			return nil
 		}
-		log.EmitWarn("load-spec", "deprecated", where+": ctx is renamed to variables, decoded as variables")
+		warnDeprecated(where + ": ctx is renamed to variables, decoded as variables")
 		return legacy
 	}
 	return nil

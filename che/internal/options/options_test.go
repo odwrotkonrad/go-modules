@@ -50,6 +50,22 @@ func TestResolveSkipOps(t *testing.T) {
 	})
 }
 
+type targetTypesGot struct {
+	TargetProfileTypes []string `yaml:"targetProfileTypes"`
+}
+
+func TestResolveTargetProfileTypes(t *testing.T) {
+	testyml.Eq(t, td, "testdata/spec/funcs/resolve_target_profile_types.test.spec.yml", func(t *testing.T, c testyml.Case[targetTypesGot]) (targetTypesGot, error) {
+		env := func(k string) string { return c.Context.Env[k] }
+		o := Options{TargetProfileTypes: c.Input.Args.Strings(t, 0)}
+		var user, spec Layer
+		c.Input.Args.To(t, 1, &user)
+		c.Input.Args.To(t, 2, &spec)
+		err := o.Resolve(env, user, spec)
+		return targetTypesGot{TargetProfileTypes: o.TargetProfileTypes}, err
+	})
+}
+
 type settingsWant struct {
 	Delta       string   `yaml:"delta"`
 	AllContains []string `yaml:"allContains"`

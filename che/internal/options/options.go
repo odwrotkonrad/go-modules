@@ -12,6 +12,7 @@ import (
 
 	"gitlab.com/konradodwrot/go-modules/che/internal/log"
 	"gitlab.com/konradodwrot/go-modules/che/internal/packages"
+	spec_ "gitlab.com/konradodwrot/go-modules/che/internal/spec"
 	"gitlab.com/konradodwrot/go-modules/che/internal/spec/envinterp"
 	"gitlab.com/konradodwrot/go-modules/che/render/render"
 )
@@ -231,6 +232,13 @@ func (o *Options) Resolve(env LookupEnv, user, spec Layer) error {
 		fromFlag(o.ProfileWorkingDirectory), fromEnv(env("CHE_PROFILE_WORKING_DIRECTORY")), fromLayer(spec.ProfileWorkingDirectory, "specFile"))
 	o.Profiles = o.resolveList("profiles",
 		fromLayerList(o.Profiles, "cliFlag"), fromEnv(env("CHE_PROFILE")), fromLayerList(user.Profiles, "config-file"), fromLayerList(spec.Profiles, "specFile"))
+	o.TargetProfileTypes = o.resolveList("targetProfileTypes",
+		fromLayerList(o.TargetProfileTypes, "cliFlag"), fromEnv(env("CHE_TARGET_PROFILE_TYPES")), fromLayerList(user.TargetProfileTypes, "config-file"), fromLayerList(spec.TargetProfileTypes, "specFile"))
+	for _, name := range o.TargetProfileTypes {
+		if err := spec_.ValidateProfileType(name); err != nil {
+			return fmt.Errorf("invalid --target-profile-types: %w", err)
+		}
+	}
 	o.RunSkipOps = o.resolveList("run.skipOps",
 		fromLayerList(o.RunSkipOps, "cliFlag"), fromEnv(env("CHE_RUN_SKIP_OPS")), fromLayerList(user.Run.SkipOps, "config-file"), fromLayerList(spec.Run.SkipOps, "specFile"))
 	for _, name := range o.RunSkipOps {

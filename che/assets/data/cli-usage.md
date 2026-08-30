@@ -49,4 +49,5 @@ Flags:
       --profiles strings                   run only these profiles (comma-separated or repeated; autoDiscover skipped, runIf still enforced); env: CHE_PROFILE (comma-separated)
       --skip-remote-refs                   skip sourced include.profiles refs, load only the local repo's specs; env: CHE_SKIP_REMOTE_REFS
       --skip-run-if                        treat every runIf predicate as passing; env: CHE_SKIP_RUN_IF
+      --target-profile-types strings       keep only auto-discovered profiles of these types (comma-separated or repeated; --profiles names and include.profiles refs run whatever their type); values: repo-git-tracked | repo-git-untracked | host; default: every type, che run on a TTY prompts when the discovered profiles span several; env: CHE_TARGET_PROFILE_TYPES
       --validate-spec string               validate each loaded che.yml spec against the JSON Schema; values: warn (log violations) | error (abort on violations); default: warn; env: CHE_VALIDATE_SPEC

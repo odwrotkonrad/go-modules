@@ -399,7 +399,14 @@ func joinTemplateSource(op, prefix, src string) (string, error) {
 	if !IsRemoteSrc(prefix) {
 		return path.Join(prefix, src), nil
 	}
-	joined := strings.TrimSuffix(prefix, "/") + "/" + strings.TrimPrefix(src, "/")
+	if IsRemoteSrc(src) {
+		return "", fmt.Errorf("%s group %q: nested source %q names its own repo, one ref per group", op, prefix, src)
+	}
+	sep := "/"
+	if _, sub := splitRepoSubdir(RemoteSrcRef(prefix)); sub == "" {
+		sep = "//"
+	}
+	joined := strings.TrimSuffix(prefix, "/") + sep + strings.TrimLeft(src, "/")
 	if !render.IsRemoteRef(joined) {
 		return "", fmt.Errorf("%s group source %q joins to a malformed remote ref, want %s<repo>[@<ref>]//<path>: %q", op, prefix, RemoteSrcPrefix, joined)
 	}

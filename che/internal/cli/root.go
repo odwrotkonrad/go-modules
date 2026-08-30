@@ -29,9 +29,10 @@ type app struct {
 	tel          *telemetry.Telemetry
 	runCtx       context.Context
 	runSpan      trace.Span
+	prompt       targetPrompt
 }
 
-func New() *app { return &app{} }
+func New() *app { return &app{prompt: stdioPrompt()} }
 
 func (a *app) Root() *cobra.Command {
 	root := &cobra.Command{
@@ -75,6 +76,8 @@ sourced profile refs included).`,
 		"what a bare ${{ env.NAME }} in che.yml does when NAME is unset or empty; values: error (abort, profiles selected to run only) | empty (reads as \"\"); default: error; env: CHE_ENV_UNSET")
 	pf.StringSliceVar(&a.flags.Profiles, "profiles", nil,
 		"run only these profiles (comma-separated or repeated; autoDiscover skipped, runIf still enforced); env: CHE_PROFILE (comma-separated)")
+	pf.StringSliceVar(&a.flags.TargetProfileTypes, "target-profile-types", nil,
+		"keep only auto-discovered profiles of these types (comma-separated or repeated; --profiles names and include.profiles refs run whatever their type); values: repo-git-tracked | repo-git-untracked | host; default: every type, che run on a TTY prompts when the discovered profiles span several; env: CHE_TARGET_PROFILE_TYPES")
 	pf.Bool("backup-auto-create", true,
 		"archive every would-change dest before mutating it, in the run sequence and before a directly invoked op; false disables both, leaving che backup create untouched; env: CHE_BACKUP_AUTO_CREATE")
 	pf.BoolVar(&a.flags.SkipRunIf, "skip-run-if", false,
@@ -198,6 +201,9 @@ func (a *app) makeRunCmd() *cobra.Command {
 		Use:   "run",
 		Short: "run every op each profile selects, profile by profile",
 		RunE: func(cmd *cobra.Command, args []string) error {
+			if err := a.selectTargetTypes(); err != nil {
+				return err
+			}
 			return a.specs.ExecEach(a.runCtx, "run", func(ctx context.Context, p *che.ProfileReady) error {
 				if !a.opts.BackupAutoCreateDisabled {
 					if err := p.ExecBackup(); err != nil {

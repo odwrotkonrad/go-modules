@@ -1,0 +1,35 @@
+# [>] 🤖🤖
+context:
+  function: options.Resolve
+cases:
+  - name: ShouldBeEmptyWhenUnset
+    expected:
+      output: {}
+  - name: ShouldResolveSpecLayer
+    input:
+      args: [flag: [], user: {}, spec: {targetProfileTypes: [host]}]
+    expected:
+      output: {targetProfileTypes: [host]}
+  - name: ShouldLetUserBeatSpec
+    input:
+      args: [flag: [], user: {targetProfileTypes: [repo-git-tracked]}, spec: {targetProfileTypes: [host]}]
+    expected:
+      output: {targetProfileTypes: [repo-git-tracked]}
+  - name: ShouldLetEnvBeatUserCommaSplit
+    context: {env: {CHE_TARGET_PROFILE_TYPES: "repo-git-tracked,repo-git-untracked"}}
+    input:
+      args: [flag: [], user: {targetProfileTypes: [host]}]
+    expected:
+      output: {targetProfileTypes: [repo-git-tracked, repo-git-untracked]}
+  - name: ShouldLetFlagBeatEnv
+    context: {env: {CHE_TARGET_PROFILE_TYPES: "host"}}
+    input:
+      args: [flag: [repo-git-untracked]]
+    expected:
+      output: {targetProfileTypes: [repo-git-untracked]}
+  - name: ShouldErrorOnUnknownType
+    input:
+      args: [flag: [foo]]
+    expected:
+      errorOutput: ['invalid --target-profile-types: type "foo": want repo-git-tracked | repo-git-untracked | host']
+# [<] 🤖🤖

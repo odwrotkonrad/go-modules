@@ -1,0 +1,63 @@
+# [>] 🤖🤖
+context:
+  function: spec.SourceSpec.UnmarshalYAML
+cases:
+  - name: ShouldKeepScalarSourceVerbatim
+    input:
+      args:
+        - |
+          makeCopies:
+            - {source: "git::gitlab.com/g/r@v1//a/b.txt", dest: out/b.txt}
+    expected:
+      output: {sources: ["git::gitlab.com/g/r@v1//a/b.txt"]}
+  - name: ShouldRenderObjectSourceAsRemoteString
+    input:
+      args:
+        - |
+          makeCopies:
+            - {source: {url: gitlab.com/g/r, ref: v1, filepath: a/b.txt}, dest: out/b.txt}
+          renderTemplates:
+            - {source: {url: https://gitlab.com/g/r.git, ref: v2, filepath: /t.tpl}, dest: out/t}
+    expected:
+      output: {sources: ["git::gitlab.com/g/r@v1//a/b.txt", "git::https://gitlab.com/g/r.git@v2//t.tpl"]}
+  - name: ShouldJoinStringChildOntoObjectGroup
+    input:
+      args:
+        - |
+          makeCopies:
+            - source: {url: gitlab.com/g/r, ref: v1}
+              <<<:
+                - {source: a/b.txt, dest: out/b.txt}
+          renderTemplates:
+            - source: {url: gitlab.com/g/r, ref: v1, filepath: docs}
+              <<<:
+                - {source: t.tpl, dest: out/t}
+    expected:
+      output: {sources: ["git::gitlab.com/g/r@v1//a/b.txt", "git::gitlab.com/g/r@v1//docs/t.tpl"]}
+  - name: ShouldErrorOnObjectChildUnderRemoteGroup
+    input:
+      args:
+        - |
+          makeCopies:
+            - source: {url: gitlab.com/g/r, ref: v1}
+              <<<:
+                - {source: {url: gitlab.com/g/other, ref: v2, filepath: x.txt}, dest: out/x.txt}
+    expected:
+      errorOutput: ['names its own repo, one ref per group']
+  - name: ShouldErrorOnObjectSourceWithoutUrl
+    input:
+      args:
+        - |
+          makeCopies:
+            - {source: {ref: v1, filepath: a.txt}, dest: out/a.txt}
+    expected:
+      errorOutput: ['source object requires url']
+  - name: ShouldDecodeObjectSourceOnMakeLinks
+    input:
+      args:
+        - |
+          makeLinks:
+            - {source: {url: gitlab.com/g/r, ref: v1, filepath: a.txt}, dest: [~/a.txt]}
+    expected:
+      output: {sources: ["git::gitlab.com/g/r@v1//a.txt"]}
+# [<] 🤖🤖

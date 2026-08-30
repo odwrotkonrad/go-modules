@@ -19,6 +19,7 @@ sourced profile refs included).
 | `--profiles` | `CHE_PROFILE (comma-separated)` | `stringSlice` | `[]` | run only these profiles (comma-separated or repeated; autoDiscover skipped, runIf still enforced) |
 | `--skip-remote-refs` | `CHE_SKIP_REMOTE_REFS` | `bool` | `false` | skip sourced include.profiles refs, load only the local repo's specs |
 | `--skip-run-if` | `CHE_SKIP_RUN_IF` | `bool` | `false` | treat every runIf predicate as passing |
+| `--target-profile-types` | `CHE_TARGET_PROFILE_TYPES` | `repo-git-tracked` \| `repo-git-untracked` \| `host` | `every type, che run on a TTY prompts when the discovered profiles span several` | keep only auto-discovered profiles of these types (comma-separated or repeated; --profiles names and include.profiles refs run whatever their type) |
 | `--validate-spec` | `CHE_VALIDATE_SPEC` | `warn (log violations)` \| `error (abort on violations)` | `warn` | validate each loaded che.yml spec against the JSON Schema |
 
 ## Commands

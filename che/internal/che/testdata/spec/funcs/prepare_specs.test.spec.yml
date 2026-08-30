@@ -1005,4 +1005,73 @@ cases:
         - flags: {profiles: [nope]}
     expected:
       errorOutput: ['--profiles [nope] not defined']
+  - name: ShouldKeepOnlyTargetProfileTypesOnAutoDiscovery
+    input:
+      args:
+        - refFiles: {}
+        - hostFiles:
+            che.yml: |
+              tracked:
+                type: repo-git-tracked
+                options: {autoDiscover: true}
+              untracked:
+                type: repo-git-untracked
+                options: {autoDiscover: true}
+              machine:
+                type: host
+                options: {autoDiscover: true}
+        - flags: {targetProfileTypes: [repo-git-tracked, host], logLevel: debug}
+    expected:
+      stdOut: ["profile untracked", "type repo-git-untracked not in --target-profile-types"]
+      output:
+        profiles: [tracked, machine]
+  - name: ShouldRunProfilesFlagRegardlessOfTargetProfileTypes
+    input:
+      args:
+        - refFiles: {}
+        - hostFiles:
+            che.yml: |
+              tracked:
+                type: repo-git-tracked
+                options: {autoDiscover: true}
+              untracked:
+                type: repo-git-untracked
+                options: {autoDiscover: true}
+        - flags: {targetProfileTypes: [repo-git-tracked], profiles: [untracked]}
+    expected:
+      output:
+        profiles: [untracked]
+  - name: ShouldRunIncludedRefsRegardlessOfTargetProfileTypes
+    input:
+      args:
+        - refFiles:
+            che.yml: |
+              p:
+                type: host
+        - hostFiles:
+            che.yml: |
+              main:
+                type: repo-git-tracked
+                options: {autoDiscover: true}
+                include:
+                  profiles:
+                    - url: "${REF_DIR}"
+                      specDirPath: .
+                      profileName: p
+        - flags: {targetProfileTypes: [repo-git-tracked]}
+    expected:
+      output:
+        profiles: [main, "${REF_DIR}::p"]
+  - name: ShouldErrorWhenNoAutoDiscoveredProfileMatchesTargetTypes
+    input:
+      args:
+        - refFiles: {}
+        - hostFiles:
+            che.yml: |
+              machine:
+                type: host
+                options: {autoDiscover: true}
+        - flags: {targetProfileTypes: [repo-git-tracked]}
+    expected:
+      errorOutput: ['no auto-discovered profile of type repo-git-tracked']
 # [<] 🤖🤖
