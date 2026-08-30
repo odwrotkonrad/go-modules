@@ -20,7 +20,7 @@ type Namespace string
 // Namespaces enumerates every Namespace value.
 var Namespaces = struct{ Env, Var, Builtin Namespace }{"env", "var", ""}
 
-// BuiltinNames lists every ${{ builtin.NAME }} che defines.
+// BuiltinNames lists every bare ${{ NAME }} che defines.
 var BuiltinNames = []string{"repoRoot"}
 
 // Ref is one parsed ${{ <namespace>.<name> }} occurrence.
