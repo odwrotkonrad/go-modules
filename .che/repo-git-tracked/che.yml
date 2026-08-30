@@ -1,8 +1,6 @@
 # yaml-language-server: $schema=https://gitlab.com/api/v4/projects/konradodwrot%2Fgo-modules/packages/generic/che-schema/v0.0.1-che-min-v0.0.96/che.schema.json
 ##[>] 🤖🤖
 repo/filesTracked:
-  options:
-    autoDiscover: false
   include:
     renderTemplates:
       - source: "git::gitlab.com/konradodwrot/centralized/assets/prose/human@${{ var.CENTRALIZED_ASSETS_PROSE_HUMAN_REF }}//prose/repos/go-modules/docs"
@@ -16,8 +14,6 @@ repo/filesTracked:
             dest: observability.md
 
 repo/filesUntracked:
-  options:
-    autoDiscover: false
   include:
     renderTemplates:
       - source: "git::gitlab.com/konradodwrot/centralized/assets/prose/common@${{ var.CENTRALIZED_ASSETS_PROSE_COMMON_REF }}//prose/repos/go-modules"
