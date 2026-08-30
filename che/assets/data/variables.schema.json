@@ -1,0 +1,42 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://gitlab.com/api/v4/projects/konradodwrot%2Fgo-modules/packages/generic/che-variables-schema/latest/che-variables.schema.json",
+  "additionalProperties": {
+    "oneOf": [
+      {
+        "type": "string",
+        "description": "the literal; ${{ env.X }} expands from the process env and che.env"
+      },
+      {
+        "properties": {
+          "value": {
+            "type": "string",
+            "description": "the literal; ${{ env.X }} expands from the process env and che.env"
+          },
+          "scope": {
+            "type": "string",
+            "enum": [
+              "invokingSpec",
+              "invokingSpecDefinedProfiles",
+              "recursiveSpecs",
+              "recursiveSpecsAndProfiles"
+            ],
+            "description": "how far the value propagates, over the definition's scope: invokingSpec | invokingSpecDefinedProfiles | recursiveSpecs | recursiveSpecsAndProfiles"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "value"
+        ],
+        "description": "value with an explicit scope"
+      }
+    ]
+  },
+  "propertyNames": {
+    "pattern": "^[A-Za-z_][A-Za-z0-9_]*$"
+  },
+  "type": "object",
+  "title": "cheVariables.yml",
+  "description": "variable values for one spec, keyed by name: a scalar, or {value, scope}; every name must be declared by the spec's variablesDefinitions"
+}

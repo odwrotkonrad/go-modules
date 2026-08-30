@@ -1,9 +1,11 @@
 ##[>] 🤖🤖
-cli/macos:
-  options: {autoDiscover: true}
-  include:
-    makeCopies:
-      - {source: _home/.config/foo/**, dest: 's:^_home:$HOME:'}
-    renderTemplates:
-      - {source: _home/.config/foo/**, dest: $HOME/.config/foo/**}
+profilesDefinitions:
+  'cli/macos':
+    options: {autoDiscover: true}
+    include:
+      makeCopies:
+        - {source: _home/.config/foo/**, dest: 's:^_home:$HOME:'}
+      renderTemplates:
+        - {source: _home/.config/foo/**, dest: $HOME/.config/foo/**}
+
 ##[<] 🤖🤖

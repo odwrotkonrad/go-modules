@@ -1,7 +1,7 @@
 #!/usr/bin/env zsh
 ##[>] 🤖🤖
 # Compute the version a schema should publish at, and whether it changed.
-# Args: $1 schema (che|che-packages), $2 the che version this release cuts at
+# Args: $1 schema (che|che-packages|che-variables), $2 the che version this release cuts at
 # (v<major>.<minor>.<patch>, the che-min floor; unused on a merge request).
 #
 # On a merge-request pipeline prints 0.0.0-mr<iid> and exits 2: a prerelease
@@ -16,7 +16,7 @@
 # Exit code is the answer, stdout is the version: 0 mint, 1 unchanged, 2 prerelease.
 set -eu
 
-SCHEMA="${1:?schema (che|che-packages)}"
+SCHEMA="${1:?schema (che|che-packages|che-variables)}"
 CHE_VERSION="${2:-}"
 
 NAME="${SCHEMA}-schema"

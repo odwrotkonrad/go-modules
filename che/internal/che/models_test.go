@@ -111,7 +111,15 @@ type prepFlags struct {
 }
 
 func TestPrepareSpecs(t *testing.T) {
-	testyml.Run(t, td, "testdata/spec/funcs/prepare_specs.test.spec.yml",
+	runPrepareSpecs(t, "testdata/spec/funcs/prepare_specs.test.spec.yml")
+}
+
+func TestPrepareSpecsVariables(t *testing.T) {
+	runPrepareSpecs(t, "testdata/spec/funcs/prepare_specs_vars.test.spec.yml")
+}
+
+func runPrepareSpecs(t *testing.T, specFile string) {
+	testyml.Run(t, td, specFile,
 		func(t *testing.T, c testyml.Case[prepWant]) {
 			var refFiles, hostFiles map[string]string
 			var flags prepFlags

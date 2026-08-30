@@ -1,7 +1,8 @@
-repo:
-  options: {autoDiscover: true}
-  include:
-    renderTemplates:
-      - source: templates/1-env/local.env.ontoRepo.tpl
-        dest:
-          - {path: .env, options: {writeType: mergeUpsert}}
+profilesDefinitions:
+  repo:
+    options: {autoDiscover: true}
+    include:
+      renderTemplates:
+        - source: templates/1-env/local.env.ontoRepo.tpl
+          dest:
+            - {path: .env, options: {writeType: mergeUpsert}}

@@ -1,37 +1,38 @@
-base:
-  include:
-    makeLinks:
-      - etc/zshrc
-      - _home/.config/zsh/**
-      - etc/grafana/**
-    makeCopies:
-      - chmod: "0600"
-        source: Library/LaunchDaemons/**
-        dest: /Library/LaunchDaemons/**
-    makeDirs:
-      - directories: [_home/.cache/zsh]
-      - chmod: "2775"
-        directories:
-          - {dest: [/var/log/grafana]}
-    runScripts:
-      - ci/zsh/scripts/installs/10-brew.zsh
-      - ci/zsh/scripts/installs/20-kitty.zsh
+profilesDefinitions:
+  base:
+    include:
+      makeLinks:
+        - etc/zshrc
+        - _home/.config/zsh/**
+        - etc/grafana/**
+      makeCopies:
+        - chmod: "0600"
+          source: Library/LaunchDaemons/**
+          dest: /Library/LaunchDaemons/**
+      makeDirs:
+        - directories: [_home/.cache/zsh]
+        - chmod: "2775"
+          directories:
+            - {dest: [/var/log/grafana]}
+      runScripts:
+        - ci/zsh/scripts/installs/10-brew.zsh
+        - ci/zsh/scripts/installs/20-kitty.zsh
 
-base-exclude-desktop:
-  exclude:
-    makeLinks:
-      - etc/grafana/**
-    makeDirs:
-      - /var/log/grafana
-    runScripts:
-      - ci/zsh/scripts/installs/20-kitty.zsh
+  base-exclude-desktop:
+    exclude:
+      makeLinks:
+        - etc/grafana/**
+      makeDirs:
+        - /var/log/grafana
+      runScripts:
+        - ci/zsh/scripts/installs/20-kitty.zsh
 
-desktop/macos:
-  options: {autoDiscover: true}
-  include:
-    profiles: [base]
+  'desktop/macos':
+    options: {autoDiscover: true}
+    include:
+      profiles: [base]
 
-cli/macos:
-  options: {autoDiscover: true}
-  include:
-    profiles: [base, base-exclude-desktop]
+  'cli/macos':
+    options: {autoDiscover: true}
+    include:
+      profiles: [base, base-exclude-desktop]

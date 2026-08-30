@@ -6,18 +6,19 @@ cases:
     input:
       args:
         - doc: |
-            base:
-              include:
-                installToolPackages:
-                  vscode: [golang.go, redhat.vscode-yaml]
-            main:
-              include:
-                profiles: [base]
-                installToolPackages:
-                  vscode: [{name: golang.go, version: 0.44.0}, tamasfe.even-better-toml]
-              exclude:
-                installToolPackages:
-                  vscode: [tamasfe.even-better-toml]
+            profilesDefinitions:
+              base:
+                include:
+                  installToolPackages:
+                    vscode: [golang.go, redhat.vscode-yaml]
+              main:
+                include:
+                  profiles: [base]
+                  installToolPackages:
+                    vscode: [{name: golang.go, version: 0.44.0}, tamasfe.even-better-toml]
+                exclude:
+                  installToolPackages:
+                    vscode: [tamasfe.even-better-toml]
         - profile: main
     expected:
       output:
@@ -28,10 +29,11 @@ cases:
     input:
       args:
         - doc: |
-            main:
-              include:
-                installToolPackages:
-                  vscode: [golang.go]
+            profilesDefinitions:
+              main:
+                include:
+                  installToolPackages:
+                    vscode: [golang.go]
         - profile: main
     expected:
       output:

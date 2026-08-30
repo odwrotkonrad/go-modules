@@ -379,6 +379,10 @@
           "$ref": "#/$defs/ProfileOptions",
           "description": "when the profile runs: autoDiscover opts in to bare-che runs, runIf predicates must ALL pass; logLevel/profileWorkingDirectory cascade (most nested wins)"
         },
+        "variablesDefinitions": {
+          "$ref": "#/$defs/VarDefs",
+          "description": "variables this profile reads, keyed by name; exclusive with the spec's profilesVariablesDefinitions entry for this profile"
+        },
         "include": {
           "$ref": "#/$defs/includeSet"
         },
@@ -388,7 +392,7 @@
       },
       "additionalProperties": false,
       "type": "object",
-      "description": "one profile block: options self-describe eligibility, include.profiles compose refs in order (local scalars, sourced {url, ref, specDirPath, profileName, options, env, variables}), include adds, exclude filters last and wins"
+      "description": "one profile block: options self-describe eligibility, variablesDefinitions declare what it reads, include.profiles compose refs in order (local scalars, sourced {url, ref, specDirPath, profileName, options, env, variables}), include adds, exclude filters last and wins"
     },
     "ProfileSourceRecipe": {
       "oneOf": [
@@ -537,15 +541,7 @@
                 "type": "string"
               },
               "type": "object",
-              "description": "variables overriding the referenced spec's own (che.variables.yml and its variables: block), parameterizing a shared profile per consumer (sourced entries only)"
-            },
-            "ctx": {
-              "additionalProperties": {
-                "type": "string"
-              },
-              "type": "object",
-              "description": "deprecated: the old name of variables, decoded as variables with a warning",
-              "deprecated": true
+              "description": "explicit pass: values for variables the referenced spec declares, over its own cheVariables files, parameterizing a shared profile per consumer (sourced entries only)"
             }
           },
           "additionalProperties": false,
@@ -706,6 +702,23 @@
       "type": "object",
       "description": "reserved top-level options: block: spec-wide defaults (runIf gate, autoDiscover/logLevel/workingDirectory) + che knobs (validateSpec/dryRun/profiles/skipRemoteRefs/renderTemplates.skipVariables); same shape as the user-config file"
     },
+    "SpecVarDefs": {
+      "properties": {
+        "specVariablesDefinitions": {
+          "$ref": "#/$defs/VarDefs",
+          "description": "variables this spec's top level reads, keyed by name"
+        },
+        "profilesVariablesDefinitions": {
+          "additionalProperties": {
+            "$ref": "#/$defs/VarDefs"
+          },
+          "type": "object",
+          "description": "variables each defined profile reads, keyed by profile name then variable name; exclusive with that profile's own variablesDefinitions"
+        }
+      },
+      "additionalProperties": false,
+      "type": "object"
+    },
     "StringOrList": {
       "oneOf": [
         {
@@ -743,6 +756,53 @@
         }
       ]
     },
+    "VarDef": {
+      "properties": {
+        "required": {
+          "type": "boolean",
+          "description": "a value must come from cheVariables.defaults.yml, env, cheVariables.yml, cheVariables.local.yml or an explicit pass; none is a hard error"
+        },
+        "scope": {
+          "type": "string",
+          "enum": [
+            "invokingSpec",
+            "invokingSpecDefinedProfiles",
+            "recursiveSpecs",
+            "recursiveSpecsAndProfiles"
+          ],
+          "description": "how far the value propagates: invokingSpec (this spec only) | invokingSpecDefinedProfiles (default: plus the profiles this spec defines) | recursiveSpecs (plus embedded specs, never their profiles) | recursiveSpecsAndProfiles (plus embedded specs and their profiles)"
+        },
+        "description": {
+          "type": "string",
+          "description": "what the variable configures, for the consumer"
+        },
+        "type": {
+          "type": "string",
+          "enum": [
+            "string",
+            "integer",
+            "boolean"
+          ],
+          "description": "literal shape the value must have (values stay strings at interpolation); default string"
+        },
+        "enum": {
+          "items": {
+            "type": "string"
+          },
+          "type": "array",
+          "description": "allowed literals, checked after type"
+        }
+      },
+      "additionalProperties": false,
+      "type": "object",
+      "description": "one variable declaration: never a value, values live in cheVariables.defaults.yml, cheVariables.yml, cheVariables.local.yml or an explicit pass"
+    },
+    "VarDefs": {
+      "additionalProperties": {
+        "$ref": "#/$defs/VarDef"
+      },
+      "type": "object"
+    },
     "copyNode": {
       "oneOf": [
         {
@@ -750,12 +810,27 @@
           "description": "glob over git-tracked *.ontoHost.cp files (brace-expanded)"
         },
         {
+          "allOf": [
+            {
+              "not": {
+                "properties": {
+                  "source": {
+                    "type": "array"
+                  }
+                },
+                "required": [
+                  "source",
+                  "dest"
+                ]
+              }
+            }
+          ],
           "properties": {
             "source": {
               "oneOf": [
                 {
                   "type": "string",
-                  "description": "source path, any file, workingDirectory-relative, or remote ref git::\u003crepo\u003e[@\u003cref\u003e]//\u003cpath\u003e (explicit dest required); joined onto every enclosing group's source prefix"
+                  "description": "source path, any file, workingDirectory-relative (${{ repoRoot }}/\u003cpath\u003e anchors at the git root of the spec's repo), or remote ref git::\u003crepo\u003e[@\u003cref\u003e]//\u003cpath\u003e (explicit dest required); joined onto every enclosing group's source prefix"
                 },
                 {
                   "properties": {
@@ -778,6 +853,14 @@
                     "url"
                   ],
                   "description": "remote source object, rendered as git::\u003curl\u003e[@\u003cref\u003e][//\u003cfilepath\u003e]"
+                },
+                {
+                  "items": {
+                    "type": "string"
+                  },
+                  "type": "array",
+                  "minItems": 1,
+                  "description": "source paths, one leaf each, no dest allowed: each lands at its path under the enclosing group's dest prefix (top level: derived host dest)"
                 }
               ]
             },
@@ -1049,21 +1132,21 @@
             "$ref": "#/$defs/linkEntry"
           },
           "type": "array",
-          "description": "symlink-op entries, workingDirectory-relative: glob string (dest derived 1:1), {source, dest: [paths]} explicit per-file dests, or {source, dest} dest rewrite (sed-style s:^_home:$HOME: or prefix-swap sugar {source: _home/**, dest: $HOME/**} to target home)"
+          "description": "symlink-op entries, workingDirectory-relative (anchor a path outside the spec dir with ${{ repoRoot }}, the git root of the spec's repo, over ../): glob string (dest derived 1:1), {source: [globs]} a list of globs, {source, dest: [paths]} explicit per-file dests, or {source, dest} dest rewrite (sed-style s:^_home:$HOME: or prefix-swap sugar {source: _home/**, dest: $HOME/**} to target home)"
         },
         "makeCopies": {
           "items": {
             "$ref": "#/$defs/copyNode"
           },
           "type": "array",
-          "description": "copy-op tree: a leaf copies one source verbatim to its dests, a node carrying nested \u003c\u003c\u003c is a group whose source and dest prefixes and perms cascade onto its descendants (innermost wins); local sources workingDirectory-relative (any file in a {source, dest} leaf, *.ontoHost.cp for globs), or remote (git::\u003crepo\u003e[@\u003cref\u003e]//\u003cpath\u003e, explicit dest required, a group prefix carrying the ref concatenates with each leaf path); an explicit dest picks the target: relative -\u003e the invoking spec's git root, ~/ or absolute -\u003e host; a glob source may carry a {source, dest} dest rewrite (sed-style s:^_home:$HOME: or prefix-swap sugar _home/** -\u003e $HOME/**)"
+          "description": "copy-op tree: a leaf copies one source verbatim to its dests (or {source: [paths]}: one leaf per path, no dest, each landing at its path under the enclosing dest prefix), a node carrying nested \u003c\u003c\u003c is a group whose source and dest prefixes and perms cascade onto its descendants (innermost wins); local sources workingDirectory-relative, ${{ repoRoot }}/\u003cpath\u003e reaching the repo from a sub-spec (any file in a {source, dest} leaf, *.ontoHost.cp for globs), or remote (git::\u003crepo\u003e[@\u003cref\u003e]//\u003cpath\u003e, explicit dest required, a group prefix carrying the ref concatenates with each leaf path); an explicit dest picks the target: relative -\u003e the invoking spec's git root, ~/ or absolute -\u003e host; a glob source may carry a {source, dest} dest rewrite (sed-style s:^_home:$HOME: or prefix-swap sugar _home/** -\u003e $HOME/**)"
         },
         "renderTemplates": {
           "items": {
             "$ref": "#/$defs/templateNode"
           },
           "type": "array",
-          "description": "*.tpl render-op tree: a leaf renders one source to its dests, a node carrying nested \u003c\u003c\u003c is a group whose source prefixes, perms, variables and options cascade onto its descendants (innermost wins, dest options win last); local host sources workingDirectory-relative, repo-doc sources (repo dest) workingDirectory-relative, or remote (git::\u003crepo\u003e[@\u003cref\u003e]//\u003cpath\u003e, explicit dest required, a group prefix carrying the ref concatenates with each leaf path); glob and derived-dest forms are host sources; a glob source may carry a {source, dest} dest rewrite (sed-style s:^_home:$HOME: or prefix-swap sugar _home/** -\u003e $HOME/**); dests expand env vars incl ${invokingSpecGitRoot}, the top-level spec's checkout"
+          "description": "*.tpl render-op tree: a leaf renders one source to its dests (or {source: [paths]}: one leaf per path, no dest, each landing at its path under the enclosing dest prefix), a node carrying nested \u003c\u003c\u003c is a group whose source prefixes, perms, variables and options cascade onto its descendants (innermost wins, dest options win last); local host sources workingDirectory-relative, repo-doc sources (repo dest) workingDirectory-relative, ${{ repoRoot }}/\u003cpath\u003e reaching the repo from a sub-spec, or remote (git::\u003crepo\u003e[@\u003cref\u003e]//\u003cpath\u003e, explicit dest required, a group prefix carrying the ref concatenates with each leaf path); glob and derived-dest forms are host sources; a glob source may carry a {source, dest} dest rewrite (sed-style s:^_home:$HOME: or prefix-swap sugar _home/** -\u003e $HOME/**); dests expand env vars incl ${invokingSpecGitRoot}, the top-level spec's checkout"
         },
         "makeDirs": {
           "items": {
@@ -1108,12 +1191,35 @@
           "description": "glob over git-tracked files (brace-expanded), workingDirectory-relative, dest derived 1:1"
         },
         {
+          "anyOf": [
+            {
+              "required": [
+                "source",
+                "dest"
+              ]
+            },
+            {
+              "not": {
+                "required": [
+                  "dest"
+                ]
+              },
+              "properties": {
+                "source": {
+                  "type": "array"
+                }
+              },
+              "required": [
+                "source"
+              ]
+            }
+          ],
           "properties": {
             "source": {
               "oneOf": [
                 {
                   "type": "string",
-                  "description": "file or glob, workingDirectory-relative"
+                  "description": "file or glob, workingDirectory-relative (${{ repoRoot }}/\u003cpath\u003e anchors at the git root of the spec's repo)"
                 },
                 {
                   "properties": {
@@ -1136,6 +1242,14 @@
                     "url"
                   ],
                   "description": "remote source object, rendered as git::\u003curl\u003e[@\u003cref\u003e][//\u003cfilepath\u003e]"
+                },
+                {
+                  "items": {
+                    "type": "string"
+                  },
+                  "type": "array",
+                  "minItems": 1,
+                  "description": "globs over git-tracked files, workingDirectory-relative, dest derived 1:1, no dest allowed"
                 }
               ]
             },
@@ -1167,11 +1281,7 @@
           },
           "additionalProperties": false,
           "type": "object",
-          "required": [
-            "source",
-            "dest"
-          ],
-          "description": "source file with explicit dests, or source glob with a sed-style dest rewrite"
+          "description": "source file with explicit dests, source glob with a sed-style dest rewrite, or a list of globs"
         }
       ]
     },
@@ -1182,12 +1292,27 @@
           "description": "glob over git-tracked files (brace-expanded)"
         },
         {
+          "allOf": [
+            {
+              "not": {
+                "properties": {
+                  "source": {
+                    "type": "array"
+                  }
+                },
+                "required": [
+                  "source",
+                  "dest"
+                ]
+              }
+            }
+          ],
           "properties": {
             "source": {
               "oneOf": [
                 {
                   "type": "string",
-                  "description": "source path (host sources workingDirectory-relative, repo-doc sources checkout-relative), or remote ref git::\u003crepo\u003e[@\u003cref\u003e]//\u003cpath\u003e (explicit dest required); joined onto every enclosing group's source prefix"
+                  "description": "source path (host sources workingDirectory-relative, repo-doc sources checkout-relative, ${{ repoRoot }}/\u003cpath\u003e anchors at the git root of the spec's repo), or remote ref git::\u003crepo\u003e[@\u003cref\u003e]//\u003cpath\u003e (explicit dest required); joined onto every enclosing group's source prefix"
                 },
                 {
                   "properties": {
@@ -1210,6 +1335,14 @@
                     "url"
                   ],
                   "description": "remote source object, rendered as git::\u003curl\u003e[@\u003cref\u003e][//\u003cfilepath\u003e]"
+                },
+                {
+                  "items": {
+                    "type": "string"
+                  },
+                  "type": "array",
+                  "minItems": 1,
+                  "description": "source paths, one leaf each, no dest allowed: each lands at its .tpl-stripped path under the enclosing group's dest prefix (top level: derived host dest)"
                 }
               ]
             },
@@ -1261,15 +1394,7 @@
                 "type": "string"
               },
               "type": "object",
-              "description": "values exposed as the template's .var.\u003ckey\u003e, over the spec's variables and under each nested node's variables"
-            },
-            "ctx": {
-              "additionalProperties": {
-                "type": "string"
-              },
-              "type": "object",
-              "description": "deprecated: the old name of variables, decoded as variables with a warning",
-              "deprecated": true
+              "description": "values exposed as the template's .var.\u003ckey\u003e, over the profile's variables and under each nested node's variables"
             },
             "options": {
               "properties": {
@@ -1382,15 +1507,7 @@
                 "type": "string"
               },
               "type": "object",
-              "description": "values exposed as the template's .var.\u003ckey\u003e, over the spec's variables and under each nested node's variables"
-            },
-            "ctx": {
-              "additionalProperties": {
-                "type": "string"
-              },
-              "type": "object",
-              "description": "deprecated: the old name of variables, decoded as variables with a warning",
-              "deprecated": true
+              "description": "values exposed as the template's .var.\u003ckey\u003e, over the profile's variables and under each nested node's variables"
             },
             "options": {
               "properties": {
@@ -1469,98 +1586,92 @@
         "type": "string"
       },
       "type": "object",
-      "description": "environment exported around this spec's preparation and execution; values may interpolate ${{ env.X }} and ${{ var.X }}"
+      "description": "environment exported around this spec's preparation and execution, to template renders and scripts; values may interpolate ${{ env.X }} and ${{ var.X }}; env never creates a variable"
     },
-    "variables": {
-      "additionalProperties": {
-        "type": "string"
-      },
-      "type": "object",
-      "description": "spec variables, ${{ var.X }} in this spec and .var.X in its templates, over the repo's che.variables.yml and under a ref's variables:; values may interpolate ${{ env.X }}"
+    "variablesDefinitions": {
+      "$ref": "#/$defs/SpecVarDefs"
     },
-    "include": {
-      "properties": {
-        "sources": {
-          "items": {
-            "oneOf": [
+    "specsInclude": {
+      "items": {
+        "oneOf": [
+          {
+            "type": "string",
+            "description": "local spec dir"
+          },
+          {
+            "anyOf": [
               {
-                "type": "string",
-                "description": "local spec dir"
+                "required": [
+                  "specDirPath"
+                ]
               },
               {
-                "anyOf": [
-                  {
-                    "required": [
-                      "specDirPath"
-                    ]
-                  },
-                  {
-                    "required": [
-                      "source"
-                    ]
-                  }
-                ],
-                "properties": {
-                  "url": {
-                    "type": "string",
-                    "description": "the git repo holding the spec, cloned/pulled into a managed cache checkout: host/path, scheme optional (gitlab.com/g/r, https://gitlab.com/g/r.git, git@gitlab.com:g/r.git); never a local path, a local spec is specDirPath alone"
-                  },
-                  "ref": {
-                    "type": "string",
-                    "description": "git ref pinning a remote url: tag, branch or commit; never on a local dir"
-                  },
-                  "specDirPath": {
-                    "type": "string",
-                    "description": "required: with url the dir under the repo holding the spec (. for the repo root); without url a local dir (./sub, /abs, ~/, $VAR, relative to this spec's checkout, . this repo's own exported spec); the dir offers its che.export.yml, then .che/che.export.yml, then a plain che.yml"
-                  },
-                  "source": {
-                    "type": "string",
-                    "description": "deprecated: the old url key, git::\u003cgiturl\u003e[@\u003cref\u003e] or \u003cdir\u003e, decoded with a warning",
-                    "deprecated": true
-                  },
-                  "spec": {
-                    "type": "string",
-                    "description": "deprecated: the old specDirPath key, decoded with a warning",
-                    "deprecated": true
-                  },
-                  "env": {
-                    "additionalProperties": {
-                      "type": "string"
-                    },
-                    "type": "object",
-                    "description": "env overlaid on the included spec's load and run"
-                  },
-                  "variables": {
-                    "additionalProperties": {
-                      "type": "string"
-                    },
-                    "type": "object",
-                    "description": "variables overriding the included spec's own"
-                  },
-                  "optional": {
-                    "type": "boolean",
-                    "description": "local dir sources only: an absent dir is skipped with a warning instead of failing the load (a dir another profile renders first)"
-                  }
-                },
-                "additionalProperties": false,
-                "type": "object",
-                "description": "spec source with overlays applied to every profile of the included spec"
+                "required": [
+                  "source"
+                ]
               }
-            ]
-          },
-          "type": "array",
-          "description": "spec sources: a local \u003cdir\u003e scalar (absolute, relative, ~/, $VAR), or {url, ref, specDirPath, env, variables, optional}; a dir offers its che.export.yml first, then a plain che.yml"
-        }
+            ],
+            "properties": {
+              "url": {
+                "type": "string",
+                "description": "the git repo holding the spec, cloned/pulled into a managed cache checkout: host/path, scheme optional (gitlab.com/g/r, https://gitlab.com/g/r.git, git@gitlab.com:g/r.git); never a local path, a local spec is specDirPath alone"
+              },
+              "ref": {
+                "type": "string",
+                "description": "git ref pinning a remote url: tag, branch or commit; never on a local dir"
+              },
+              "specDirPath": {
+                "type": "string",
+                "description": "required: with url the dir under the repo holding the spec (. for the repo root); without url a local dir (./sub, /abs, ~/, $VAR, relative to this spec's checkout, . this repo's own exported spec); the dir offers its che.export.yml, then .che/che.export.yml, then a plain che.yml"
+              },
+              "source": {
+                "type": "string",
+                "description": "deprecated: the old url key, git::\u003cgiturl\u003e[@\u003cref\u003e] or \u003cdir\u003e, decoded with a warning",
+                "deprecated": true
+              },
+              "spec": {
+                "type": "string",
+                "description": "deprecated: the old specDirPath key, decoded with a warning",
+                "deprecated": true
+              },
+              "env": {
+                "additionalProperties": {
+                  "type": "string"
+                },
+                "type": "object",
+                "description": "env overlaid on the embedded spec's load and run"
+              },
+              "variables": {
+                "additionalProperties": {
+                  "type": "string"
+                },
+                "type": "object",
+                "description": "explicit pass: values for variables the embedded spec declares, over its own files"
+              },
+              "optional": {
+                "type": "boolean",
+                "description": "local dir sources only: an absent dir is skipped with a warning instead of failing the load (a dir another profile renders first)"
+              }
+            },
+            "additionalProperties": false,
+            "type": "object",
+            "description": "embedded spec source with overlays applied to every profile of the embedded spec"
+          }
+        ]
       },
-      "additionalProperties": false,
+      "type": "array",
+      "description": "embedded specs: a local \u003cdir\u003e scalar (absolute, relative, ~/, $VAR), or {url, ref, specDirPath, env, variables, optional}; a dir offers its che.export.yml first, then a plain che.yml"
+    },
+    "profilesDefinitions": {
+      "additionalProperties": {
+        "$ref": "#/$defs/ProfileRecipe"
+      },
       "type": "object",
-      "description": "other specs composed into this one"
+      "description": "profiles keyed by name"
     }
   },
-  "additionalProperties": {
-    "$ref": "#/$defs/ProfileRecipe"
-  },
+  "additionalProperties": false,
   "type": "object",
   "title": "che.yml",
-  "description": "che spec: reserved keys options/env/variables/include, every other top-level key defines a profile block"
+  "description": "che spec: options, env, variablesDefinitions, specsInclude (embedded specs), profilesDefinitions (profiles keyed by name); no other top-level key"
 }

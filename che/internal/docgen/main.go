@@ -20,10 +20,11 @@ import (
 )
 
 const (
-	schemaPath         = "assets/data/che.schema.json"
-	packagesSchemaPath = "assets/data/packages.schema.json"
-	cliDocPath         = "docs/cli.md"
-	cliUsagePath       = "assets/data/cli-usage.md"
+	schemaPath          = "assets/data/che.schema.json"
+	packagesSchemaPath  = "assets/data/packages.schema.json"
+	variablesSchemaPath = "assets/data/variables.schema.json"
+	cliDocPath          = "docs/cli.md"
+	cliUsagePath        = "assets/data/cli-usage.md"
 )
 
 func main() {
@@ -32,9 +33,10 @@ func main() {
 	root.InitDefaultCompletionCmd()
 	must(os.WriteFile(schemaPath, schemaJSON(spec.Schema()), 0o644))
 	must(os.WriteFile(packagesSchemaPath, schemaJSON(packages.Schema()), 0o644))
+	must(os.WriteFile(variablesSchemaPath, schemaJSON(spec.VariablesFileSchema()), 0o644))
 	must(os.WriteFile(cliDocPath, []byte(cliDoc(root)), 0o644))
 	must(os.WriteFile(cliUsagePath, []byte(cliUsage(root)), 0o644))
-	for _, p := range []string{schemaPath, packagesSchemaPath, cliDocPath, cliUsagePath} {
+	for _, p := range []string{schemaPath, packagesSchemaPath, variablesSchemaPath, cliDocPath, cliUsagePath} {
 		fmt.Println("wrote", p)
 	}
 }

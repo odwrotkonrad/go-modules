@@ -9,23 +9,24 @@ cases:
       args:
         - spec: |
             options: {profileWorkingDirectory: root}
-            tracked:
-              type: repo-git-tracked
-              include:
-                renderTemplates:
-                  - {source: _home/.config/zsh/y.ontoHost.tpl, dest: out/y}
-            untracked:
-              type: repo-git-untracked
-              include:
-                makeCopies:
-                  - source: _home/.config/zsh/**
-                    dest: 's:^_home:$HOME:'
-            machine:
-              type: host
-              include:
-                makeLinks: [etc/zshrc]
-                makeDirs:
-                  - directories: [$HOME/.cache/zsh]
+            profilesDefinitions:
+              tracked:
+                type: repo-git-tracked
+                include:
+                  renderTemplates:
+                    - {source: _home/.config/zsh/y.ontoHost.tpl, dest: out/y}
+              untracked:
+                type: repo-git-untracked
+                include:
+                  makeCopies:
+                    - source: _home/.config/zsh/**
+                      dest: 's:^_home:$HOME:'
+              machine:
+                type: host
+                include:
+                  makeLinks: [etc/zshrc]
+                  makeDirs:
+                    - directories: [$HOME/.cache/zsh]
         - answer: "1,3\n"
         - types: []
         - profile: ""
@@ -42,8 +43,9 @@ cases:
     input:
       args:
         - spec: |
-            tracked: {type: repo-git-tracked}
-            machine: {type: host}
+            profilesDefinitions:
+              tracked: {type: repo-git-tracked}
+              machine: {type: host}
         - answer: "all\n"
         - types: []
         - profile: ""
@@ -54,8 +56,9 @@ cases:
     input:
       args:
         - spec: |
-            tracked: {type: repo-git-tracked}
-            machine: {type: host}
+            profilesDefinitions:
+              tracked: {type: repo-git-tracked}
+              machine: {type: host}
         - answer: "\n"
         - types: []
         - profile: ""
@@ -66,8 +69,9 @@ cases:
     input:
       args:
         - spec: |
-            tracked: {type: repo-git-tracked}
-            machine: {type: host}
+            profilesDefinitions:
+              tracked: {type: repo-git-tracked}
+              machine: {type: host}
         - answer: "7\n"
         - types: []
         - profile: ""
@@ -78,8 +82,9 @@ cases:
     input:
       args:
         - spec: |
-            tracked: {type: repo-git-tracked}
-            machine: {type: host}
+            profilesDefinitions:
+              tracked: {type: repo-git-tracked}
+              machine: {type: host}
         - answer: ""
         - types: []
         - profile: ""
@@ -90,8 +95,9 @@ cases:
     input:
       args:
         - spec: |
-            tracked: {type: repo-git-tracked}
-            machine: {type: host}
+            profilesDefinitions:
+              tracked: {type: repo-git-tracked}
+              machine: {type: host}
         - answer: ""
         - types: [host]
         - profile: ""
@@ -102,8 +108,9 @@ cases:
     input:
       args:
         - spec: |
-            tracked: {type: repo-git-tracked}
-            machine: {type: host}
+            profilesDefinitions:
+              tracked: {type: repo-git-tracked}
+              machine: {type: host}
         - answer: ""
         - types: []
         - profile: tracked
@@ -114,8 +121,9 @@ cases:
     input:
       args:
         - spec: |
-            a: {type: host}
-            b: {type: host}
+            profilesDefinitions:
+              a: {type: host}
+              b: {type: host}
         - answer: ""
         - types: []
         - profile: ""
@@ -126,9 +134,10 @@ cases:
     input:
       args:
         - spec: |
-            tracked: {type: repo-git-tracked}
-            machine: {type: host}
-            legacy: {}
+            profilesDefinitions:
+              tracked: {type: repo-git-tracked}
+              machine: {type: host}
+              legacy: {}
         - answer: "2\n"
         - types: []
         - profile: ""

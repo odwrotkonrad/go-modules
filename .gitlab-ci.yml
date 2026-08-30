@@ -185,7 +185,7 @@ warm-go-linux-amd64:
     - job: warm-go
       optional: true
   variables:
-    GENERIC_CHE: che/dist/che-linux-amd64
+    GENERIC_CHE: che/dist/che
     LEFTHOOK_OUTPUT: meta,summary,execution,execution_info,execution_out
   cache:
     - key: go-build
@@ -193,7 +193,7 @@ warm-go-linux-amd64:
         - .cache/go-build
       policy: pull
   before_script:
-    - '[ -x che/dist/che-linux-amd64 ] || { mkdir -p che/dist && ln -s "$(command -v che)" che/dist/che-linux-amd64; }'
+    - '[ -x che/dist/che ] || { mkdir -p che/dist && ln -s "$(command -v che)" che/dist/che; }'
 
 generic:files-tracked-verify:
   extends: .generic-verify

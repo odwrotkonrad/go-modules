@@ -21,87 +21,96 @@ cases:
     input:
       args:
         - doc: |
-            p:
-              includes:
-                makeLinks: [_home/**]
+            profilesDefinitions:
+              p:
+                includes:
+                  makeLinks: [_home/**]
     expected:
       output: includes
   - name: ShouldFlagLinkEntryWithoutDest
     input:
       args:
         - doc: |
-            p:
-              include:
-                makeLinks: [{source: _home/.config/foo/a}]
+            profilesDefinitions:
+              p:
+                include:
+                  makeLinks: [{source: _home/.config/foo/a}]
     expected:
       output: dest
   - name: ShouldAcceptLinkEntryWithExplicitDests
     input:
       args:
         - doc: |
-            p:
-              include:
-                makeLinks: [{source: _home/.config/foo/a, dest: [$HOME/.config/bar/a, /etc/bar/a]}]
+            profilesDefinitions:
+              p:
+                include:
+                  makeLinks: [{source: _home/.config/foo/a, dest: [$HOME/.config/bar/a, /etc/bar/a]}]
     expected:
       output: ""
   - name: ShouldFlagBogusWriteTypeEnum
     input:
       args:
         - doc: |
-            p:
-              include:
-                renderTemplates:
-                  - source: templates/a.tpl
-                    dest:
-                      - {path: a.md, options: {writeType: bogus}}
+            profilesDefinitions:
+              p:
+                include:
+                  renderTemplates:
+                    - source: templates/a.tpl
+                      dest:
+                        - {path: a.md, options: {writeType: bogus}}
     expected:
       output: writeType
   - name: ShouldFlagNonOctalChmod
     input:
       args:
         - doc: |
-            p:
-              include:
-                makeDirs:
-                  - chmod: rwxr-xr-x
-                    directories: [_home/.cache]
+            profilesDefinitions:
+              p:
+                include:
+                  makeDirs:
+                    - chmod: rwxr-xr-x
+                      directories: [_home/.cache]
     expected:
       output: chmod
   - name: ShouldFlagCopyNodeWithoutSourceOrChildren
     input:
       args:
         - doc: |
-            p:
-              include:
-                makeCopies:
-                  - chmod: "0644"
+            profilesDefinitions:
+              p:
+                include:
+                  makeCopies:
+                    - chmod: "0644"
     expected:
       output: makeCopies
   - name: ShouldFlagDroppedCopyFilesKey
     input:
       args:
         - doc: |
-            p:
-              include:
-                makeCopies:
-                  - files: [_home/**]
+            profilesDefinitions:
+              p:
+                include:
+                  makeCopies:
+                    - files: [_home/**]
     expected:
       output: files
   - name: ShouldFlagDroppedPluginsKey
     input:
       args:
         - doc: |
-            p:
-              plugins:
-                - ./sub::p
+            profilesDefinitions:
+              p:
+                plugins:
+                  - ./sub::p
     expected:
       output: plugins
   - name: ShouldFlagDroppedMixinProfilesKey
     input:
       args:
         - doc: |
-            p:
-              mixinProfiles: [base]
+            profilesDefinitions:
+              p:
+                mixinProfiles: [base]
     expected:
       output: mixinProfiles
   - name: ShouldAcceptTopLevelOptionsEnvInclude
@@ -115,26 +124,57 @@ cases:
               validateSpec: warn
             env:
               GITLAB_GROUP: konradodwrot
-            include:
-              sources: ["git::https://gitlab.com/g/r.git", ./sibling]
-            p:
-              include:
-                makeLinks: [_home/**]
+            specsInclude: ["git::https://gitlab.com/g/r.git", ./sibling]
+            profilesDefinitions:
+              p:
+                include:
+                  makeLinks: [_home/**]
     expected:
       output: ""
   - name: ShouldAcceptIncludeProfilesUnionForms
     input:
       args:
         - doc: |
-            p:
-              include:
-                profiles:
-                  - base
-                  - source: "git::https://gitlab.com/g/r.git"
-                    profile: gitlabGroup
-                    env: {GITLAB_GROUP: konradodwrot}
+            profilesDefinitions:
+              p:
+                include:
+                  profiles:
+                    - base
+                    - source: "git::https://gitlab.com/g/r.git"
+                      profile: gitlabGroup
+                      env: {GITLAB_GROUP: konradodwrot}
     expected:
       output: ""
+  - name: ShouldAcceptSourceListForms
+    input:
+      args:
+        - doc: |
+            profilesDefinitions:
+              p:
+                include:
+                  makeLinks:
+                    - source: [_home/**, etc/**]
+                  makeCopies:
+                    - source: etc
+                      dest: /etc
+                      <<<:
+                        - source: [a, b]
+                  renderTemplates:
+                    - source: [a.tpl, b.tpl]
+    expected:
+      output: ""
+  - name: ShouldFlagSourceListWithDest
+    input:
+      args:
+        - doc: |
+            profilesDefinitions:
+              p:
+                include:
+                  renderTemplates:
+                    - source: [a.tpl, b.tpl]
+                      dest: docs
+    expected:
+      output: source
   - name: ShouldFlagBogusValidateSpecEnum
     input:
       args:

@@ -159,6 +159,8 @@ testCases:
           stdOutFull: |
             using spec ${LOCAL}/.che/che.yml
             cloned remote file://${REMOTE} into ~/.cache/che/remote-sources/{{/[A-Za-z0-9.-]+/}}
+            ## Variables ${LOCAL}/.che/che.yml
+              E2E_PIN  cheVariables.yml  [invokingSpecDefinedProfiles]
             ## Profile plain  (profile workdir: ${LOCAL}/root)
               make-dirs: 2 changes
               make-links: 3 changes

@@ -223,6 +223,10 @@ func mergeRecipe(recipes []ProfileRecipe, merged *mergedInclude, rec ProfileReci
 		switch {
 		case entry.glob != "":
 			merged.linkGlobs.add(entry.glob, Perms{})
+		case len(entry.Sources) > 0:
+			for _, glob := range entry.Sources {
+				merged.linkGlobs.add(glob, Perms{})
+			}
 		case entry.Source == "":
 			return fmt.Errorf("profile %q: link entry missing source", name)
 		case entry.DestRule != "":
@@ -285,6 +289,7 @@ func copyTreeAsTemplates(nodes []copyNode) []templateNode {
 			Perms:    node.Perms,
 			glob:     node.glob,
 			DestRule: node.DestRule,
+			Sources:  node.Sources,
 			Source:   node.Source,
 			Dest:     node.Dest,
 			Children: copyTreeAsTemplates(node.Children),
@@ -299,6 +304,12 @@ func splitTemplates(nodes []templateNode, globs *globSet, explicit *[]FileItem) 
 
 func splitTemplateNodes(nodes []templateNode, up templateInherited, globs *globSet, explicit *[]FileItem) error {
 	for _, node := range nodes {
+		if len(node.Sources) > 0 {
+			if err := splitTemplateNodes(sourceListLeaves(node), up, globs, explicit); err != nil {
+				return err
+			}
+			continue
+		}
 		down := templateInherited{
 			op:         up.op,
 			destPrefix: path.Join(up.destPrefix, groupDestPrefix(node)),
@@ -324,6 +335,16 @@ func splitTemplateNodes(nodes []templateNode, up templateInherited, globs *globS
 		}
 	}
 	return nil
+}
+
+func sourceListLeaves(node templateNode) []templateNode {
+	out := make([]templateNode, len(node.Sources))
+	for i, src := range node.Sources {
+		leaf := node
+		leaf.Source, leaf.Sources = src, nil
+		out[i] = leaf
+	}
+	return out
 }
 
 func splitTemplateLeaf(node templateNode, down templateInherited, globs *globSet, explicit *[]FileItem) error {

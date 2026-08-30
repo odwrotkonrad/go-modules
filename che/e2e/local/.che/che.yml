@@ -5,114 +5,119 @@ options:
 env:
   E2E_PIN_CHECK: '${{ var.E2E_PIN }}'
 
-ops-plain:
-  type: host
-  options:
-    autoDiscover: false
-  include:
-    makeLinks:
-      - source: plain/link.txt
-        dest: 's:^plain:$HOME/plain:'
-      - source: plain/link-explicit.txt
-        dest:
-          - $HOME/plain/link-explicit-a.txt
-          - $HOME/plain/link-explicit-b.txt
-    makeCopies:
-      - source: plain/copy.ontoHost.cp
-        dest: 's:^plain:$HOME/plain:'
-    renderTemplates:
-      - source: plain/tpl.ontoHost.tpl
-        dest: 's:^plain:$HOME/plain:'
-    makeDirs:
-      - directories:
-          - $HOME/plain/made-dir
-    installPackages:
-      - e2e-plain
-    installToolPackages:
-      vscode:
-        - e2e.fake-ext
-    runScripts:
-      - scripts/plain-script
+variablesDefinitions:
+  specVariablesDefinitions:
+    E2E_PIN: {required: true}
+profilesDefinitions:
+  ops-plain:
+    type: host
+    options:
+      autoDiscover: false
+    include:
+      makeLinks:
+        - source: plain/link.txt
+          dest: 's:^plain:$HOME/plain:'
+        - source: plain/link-explicit.txt
+          dest:
+            - $HOME/plain/link-explicit-a.txt
+            - $HOME/plain/link-explicit-b.txt
+      makeCopies:
+        - source: plain/copy.ontoHost.cp
+          dest: 's:^plain:$HOME/plain:'
+      renderTemplates:
+        - source: plain/tpl.ontoHost.tpl
+          dest: 's:^plain:$HOME/plain:'
+      makeDirs:
+        - directories:
+            - $HOME/plain/made-dir
+      installPackages:
+        - e2e-plain
+      installToolPackages:
+        vscode:
+          - e2e.fake-ext
+      runScripts:
+        - scripts/plain-script
 
-ops-conditional:
-  type: host
-  options:
-    autoDiscover: false
-  include:
-    makeLinks:
-      - source: conditional/link.txt
-        dest: 's:^conditional:$HOME/conditional:'
-    makeCopies:
-      - source: conditional/copy.ontoHost.cp
-        dest: 's:^conditional:$HOME/conditional:'
-    renderTemplates:
-      - source: conditional/tpl.ontoHost.tpl
-        dest: 's:^conditional:$HOME/conditional:'
-    makeDirs:
-      - directories:
-          - $HOME/conditional/made-dir
-    installPackages:
-      - e2e-conditional
-    runScripts:
-      - scripts/conditional-script
+  ops-conditional:
+    type: host
+    options:
+      autoDiscover: false
+    include:
+      makeLinks:
+        - source: conditional/link.txt
+          dest: 's:^conditional:$HOME/conditional:'
+      makeCopies:
+        - source: conditional/copy.ontoHost.cp
+          dest: 's:^conditional:$HOME/conditional:'
+      renderTemplates:
+        - source: conditional/tpl.ontoHost.tpl
+          dest: 's:^conditional:$HOME/conditional:'
+      makeDirs:
+        - directories:
+            - $HOME/conditional/made-dir
+      installPackages:
+        - e2e-conditional
+      runScripts:
+        - scripts/conditional-script
 
-ops-dropped:
-  type: host
-  options:
-    autoDiscover: false
-  include:
-    makeLinks:
-      - source: dropped/link.txt
-        dest: 's:^dropped:$HOME/dropped:'
-    makeCopies:
-      - source: dropped/copy.ontoHost.cp
-        dest: 's:^dropped:$HOME/dropped:'
-    renderTemplates:
-      - source: dropped/tpl.ontoHost.tpl
-        dest: 's:^dropped:$HOME/dropped:'
-    makeDirs:
-      - directories:
-          - $HOME/dropped/made-dir
-    installPackages:
-      - e2e-dropped
-    runScripts:
-      - scripts/dropped-script
+  ops-dropped:
+    type: host
+    options:
+      autoDiscover: false
+    include:
+      makeLinks:
+        - source: dropped/link.txt
+          dest: 's:^dropped:$HOME/dropped:'
+      makeCopies:
+        - source: dropped/copy.ontoHost.cp
+          dest: 's:^dropped:$HOME/dropped:'
+      renderTemplates:
+        - source: dropped/tpl.ontoHost.tpl
+          dest: 's:^dropped:$HOME/dropped:'
+      makeDirs:
+        - directories:
+            - $HOME/dropped/made-dir
+      installPackages:
+        - e2e-dropped
+      runScripts:
+        - scripts/dropped-script
 
-dropped:
-  type: host
-  options:
-    autoDiscover: true
-    runIf:
-      - env:CHE_E2E_DROPPED
-  include:
-    profiles:
-      - ops-dropped
+  dropped:
+    type: host
+    options:
+      autoDiscover: true
+      runIf:
+        - env:CHE_E2E_DROPPED
+    include:
+      profiles:
+        - ops-dropped
 
-plain:
-  type: host
-  options:
-    autoDiscover: true
-  include:
-    profiles:
-      - ops-plain
+  plain:
+    type: host
+    options:
+      autoDiscover: true
+    include:
+      profiles:
+        - ops-plain
 
-conditional:
-  type: host
-  options:
-    autoDiscover: true
-    runIf:
-      - env:CHE_E2E == 1
-  include:
-    profiles:
-      - ops-conditional
+  conditional:
+    type: host
+    options:
+      autoDiscover: true
+      runIf:
+        - env:CHE_E2E == 1
+    include:
+      profiles:
+        - ops-conditional
 
-remote-empty:
-  type: host
-  options:
-    autoDiscover: true
-  include:
-    profiles:
-      - url: "file://__REMOTE_DIR__"
-        specDirPath: .
-        profileName: ops-remote
+  remote-empty:
+    type: host
+    options:
+      autoDiscover: true
+    include:
+      profiles:
+        - url: "file://__REMOTE_DIR__"
+          specDirPath: .
+          profileName: ops-remote
+
 ##[<] 🤖🤖

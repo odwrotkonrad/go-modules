@@ -3,23 +3,25 @@
 options:
   profileWorkingDirectory: root
 
-ops-remote:
-  type: host
-  include:
-    makeLinks:
-      - source: remote/link.txt
-        dest: 's:^remote:$HOME/remote:'
-    makeCopies:
-      - source: remote/copy.ontoHost.cp
-        dest: 's:^remote:$HOME/remote:'
-    renderTemplates:
-      - source: remote/tpl.ontoHost.tpl
-        dest: 's:^remote:$HOME/remote:'
-    makeDirs:
-      - directories:
-          - $HOME/remote/made-dir
-    installPackages:
-      - e2e-remote
-    runScripts:
-      - scripts/remote-script
+profilesDefinitions:
+  ops-remote:
+    type: host
+    include:
+      makeLinks:
+        - source: remote/link.txt
+          dest: 's:^remote:$HOME/remote:'
+      makeCopies:
+        - source: remote/copy.ontoHost.cp
+          dest: 's:^remote:$HOME/remote:'
+      renderTemplates:
+        - source: remote/tpl.ontoHost.tpl
+          dest: 's:^remote:$HOME/remote:'
+      makeDirs:
+        - directories:
+            - $HOME/remote/made-dir
+      installPackages:
+        - e2e-remote
+      runScripts:
+        - scripts/remote-script
+
 ##[<] 🤖🤖

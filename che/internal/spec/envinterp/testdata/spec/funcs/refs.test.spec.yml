@@ -25,6 +25,14 @@ cases:
       output:
         - {namespace: var, name: PIN, default: "", hasdefault: false}
         - {namespace: var, name: OTHER, default: main, hasdefault: true}
+  - name: ShouldListBareRefsWithEmptyNamespace
+    input:
+      args:
+        - s: '${{ repoRoot }}/x/${{ other || y }}'
+    expected:
+      output:
+        - {namespace: "", name: repoRoot, default: "", hasdefault: false}
+        - {namespace: "", name: other, default: y, hasdefault: true}
   - name: ShouldReturnNothingForPlainText
     input:
       args:

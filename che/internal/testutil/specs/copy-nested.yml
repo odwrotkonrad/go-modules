@@ -1,30 +1,32 @@
 ##[>] 🤖🤖
-base:
-  include:
-    makeCopies:
-      - source: "git::gitlab.com/acme/tools@v1.0.0"
-        dest: /usr/local/share/acme
-        owner: root
-        chmod: "0644"
-        <<<:
-          - {source: //prompts/a.md.tpl, dest: a.md.tpl}
-          - source: //prompts/nested
-            chmod: "0600"
-            <<<:
-              - {source: /b.md.tpl, dest: b.md.tpl}
-              - {source: /c.md.tpl, dest: $HOME/.config/acme/c.md.tpl}
-      - source: "git::gitlab.com/acme/tools@v2.0.0"
-        dest: /usr/local/share/acme
-        owner: root
-        chmod: "0644"
-        <<<:
-          - {source: //prompts/pinned.md.tpl, dest: pinned.md.tpl}
-      - source: _home/.config/foo
-        <<<:
-          - {source: x.ontoHost.cp, dest: [$HOME/.config/foo/x]}
+profilesDefinitions:
+  base:
+    include:
+      makeCopies:
+        - source: "git::gitlab.com/acme/tools@v1.0.0"
+          dest: /usr/local/share/acme
+          owner: root
+          chmod: "0644"
+          <<<:
+            - {source: //prompts/a.md.tpl, dest: a.md.tpl}
+            - source: //prompts/nested
+              chmod: "0600"
+              <<<:
+                - {source: /b.md.tpl, dest: b.md.tpl}
+                - {source: /c.md.tpl, dest: $HOME/.config/acme/c.md.tpl}
+        - source: "git::gitlab.com/acme/tools@v2.0.0"
+          dest: /usr/local/share/acme
+          owner: root
+          chmod: "0644"
+          <<<:
+            - {source: //prompts/pinned.md.tpl, dest: pinned.md.tpl}
+        - source: _home/.config/foo
+          <<<:
+            - {source: x.ontoHost.cp, dest: [$HOME/.config/foo/x]}
 
-cli/macos:
-  options: {autoDiscover: true}
-  include:
-    profiles: [base]
+  'cli/macos':
+    options: {autoDiscover: true}
+    include:
+      profiles: [base]
+
 ##[<] 🤖🤖

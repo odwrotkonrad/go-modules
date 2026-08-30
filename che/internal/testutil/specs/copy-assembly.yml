@@ -1,49 +1,51 @@
 ##[>] 🤖🤖
-remote-one-level:
-  include:
-    makeCopies:
-      - source: "git::gitlab.com/acme/tools@v1.0.0//prompts"
-        dest: /usr/local/share/prompts
-        <<<:
-          - {source: /commit.md.tpl, dest: commit.md.tpl}
-          - {source: /mr.md.tpl, dest: mr.md.tpl}
+profilesDefinitions:
+  remote-one-level:
+    include:
+      makeCopies:
+        - source: "git::gitlab.com/acme/tools@v1.0.0//prompts"
+          dest: /usr/local/share/prompts
+          <<<:
+            - {source: /commit.md.tpl, dest: commit.md.tpl}
+            - {source: /mr.md.tpl, dest: mr.md.tpl}
 
-local-one-level:
-  include:
-    makeCopies:
-      - source: etc/daemons
-        dest: /Library/LaunchDaemons
-        <<<:
-          - {source: a.plist.ontoHost.cp, dest: a.plist}
-          - {source: b.plist.ontoHost.cp, dest: b.plist}
+  local-one-level:
+    include:
+      makeCopies:
+        - source: etc/daemons
+          dest: /Library/LaunchDaemons
+          <<<:
+            - {source: a.plist.ontoHost.cp, dest: a.plist}
+            - {source: b.plist.ontoHost.cp, dest: b.plist}
 
-remote-two-levels:
-  include:
-    makeCopies:
-      - source: "git::gitlab.com/acme/tools@v1.0.0"
-        dest: /usr/local/share
-        <<<:
-          - source: //prompts
-            dest: prompts
-            <<<:
-              - {source: /commit.md.tpl, dest: commit.md.tpl}
-          - source: //snippets
-            dest: snippets
-            <<<:
-              - {source: /ro.md, dest: ro.md}
+  remote-two-levels:
+    include:
+      makeCopies:
+        - source: "git::gitlab.com/acme/tools@v1.0.0"
+          dest: /usr/local/share
+          <<<:
+            - source: //prompts
+              dest: prompts
+              <<<:
+                - {source: /commit.md.tpl, dest: commit.md.tpl}
+            - source: //snippets
+              dest: snippets
+              <<<:
+                - {source: /ro.md, dest: ro.md}
 
-local-two-levels:
-  include:
-    makeCopies:
-      - source: etc
-        dest: /etc
-        <<<:
-          - source: daemons
-            dest: daemons
-            <<<:
-              - {source: a.plist.ontoHost.cp, dest: a.plist}
-          - source: cron
-            dest: cron.d
-            <<<:
-              - {source: nightly.ontoHost.cp, dest: nightly}
+  local-two-levels:
+    include:
+      makeCopies:
+        - source: etc
+          dest: /etc
+          <<<:
+            - source: daemons
+              dest: daemons
+              <<<:
+                - {source: a.plist.ontoHost.cp, dest: a.plist}
+            - source: cron
+              dest: cron.d
+              <<<:
+                - {source: nightly.ontoHost.cp, dest: nightly}
+
 ##[<] 🤖🤖

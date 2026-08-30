@@ -1,9 +1,10 @@
-base:
-  include:
-    renderTemplates:
-      - "git::gitlab.com/acme/tools//snippets/*.md"
+profilesDefinitions:
+  base:
+    include:
+      renderTemplates:
+        - "git::gitlab.com/acme/tools//snippets/*.md"
 
-cli/macos:
-  options: {autoDiscover: true}
-  include:
-    profiles: [base]
+  'cli/macos':
+    options: {autoDiscover: true}
+    include:
+      profiles: [base]

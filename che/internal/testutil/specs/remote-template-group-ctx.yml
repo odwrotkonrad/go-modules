@@ -1,18 +1,19 @@
-base:
-  include:
-    renderTemplates:
-      - source: "git::gitlab.com/acme/tools"
-        variables: {repo: Workspace, model: fable}
-        <<<:
-          - source: //snippets/ro.md
-            dest:
-              - {path: .claude/agents/ro.md}
-          - source: //snippets/rw.md
-            variables: {model: sonnet}
-            dest:
-              - {path: .claude/agents/rw.md}
+profilesDefinitions:
+  base:
+    include:
+      renderTemplates:
+        - source: "git::gitlab.com/acme/tools"
+          variables: {repo: Workspace, model: fable}
+          <<<:
+            - source: //snippets/ro.md
+              dest:
+                - {path: .claude/agents/ro.md}
+            - source: //snippets/rw.md
+              variables: {model: sonnet}
+              dest:
+                - {path: .claude/agents/rw.md}
 
-cli/macos:
-  options: {autoDiscover: true}
-  include:
-    profiles: [base]
+  'cli/macos':
+    options: {autoDiscover: true}
+    include:
+      profiles: [base]

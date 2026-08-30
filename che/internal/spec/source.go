@@ -54,11 +54,11 @@ func (r SourceRecipe) prepare(repoRoot, home string, invoked bool) (SourceReady,
 		return SourceReady{}, err
 	}
 	if invoked {
-		def, ok := CheFile(root, SpecFileName)
-		if !ok {
+		paths := RootSpecPaths(root)
+		if len(paths) == 0 {
 			return SourceReady{}, fmt.Errorf("spec not found: want %s", CheFileCandidates(root, SpecFileName))
 		}
-		return SourceReady{DefinitionURI: def, Candidates: []string{def}, DirectoryPath: root}, nil
+		return SourceReady{DefinitionURI: paths[0], Candidates: paths, DirectoryPath: root}, nil
 	}
 	if IsSpecFile(r.Spec) {
 		def := filepath.Join(root, r.Spec)
@@ -228,13 +228,13 @@ func (r *SpecSourceRecipe) UnmarshalYAML(value *yaml.Node) error {
 		return err
 	}
 	if scalar == "" {
-		if err := r.normalize("include.sources entry"); err != nil {
+		if err := r.normalize("specsInclude entry"); err != nil {
 			return err
 		}
 	}
 	src := cmp.Or(scalar, r.Src)
 	if src == "" {
-		return fmt.Errorf("include.sources entry missing url")
+		return fmt.Errorf("specsInclude entry missing url")
 	}
 	uri, gitRef, err := cutSourceRef(src)
 	if err != nil {
@@ -244,7 +244,7 @@ func (r *SpecSourceRecipe) UnmarshalYAML(value *yaml.Node) error {
 		return fmt.Errorf("source %q: ref given twice (@%s and ref: %s)", src, gitRef, r.GitRef)
 	}
 	r.URI, r.Ref, r.Spec, r.sourceKeys = uri, cmp.Or(gitRef, r.GitRef), r.SpecPath, sourceKeys{}
-	if err := validateKeys("include.sources "+src+" variables", r.Variables); err != nil {
+	if err := validateKeys("specsInclude "+src+" variables", r.Variables); err != nil {
 		return err
 	}
 	return r.IsValid()
@@ -255,9 +255,6 @@ func (r *ProfileSourceRecipe) UnmarshalYAML(value *yaml.Node) error {
 	type alias ProfileSourceRecipe
 	if err := decodeScalarOr(value, &scalar, (*alias)(r)); err != nil {
 		return err
-	}
-	if legacy := ctxAlias(value, "include.profiles entry"); legacy != nil {
-		r.Variables = mergeEnv(legacy, r.Variables)
 	}
 	if scalar != "" && !isOldRefForm(scalar) {
 		r.ProfileName = scalar
@@ -382,26 +379,6 @@ func splitOldRefForm(src string) (uri, specPath, profile string, err error) {
 		return RemoteSrcPrefix + repo, sub, profile, nil
 	}
 	return dir, "", profile, nil
-}
-
-// [why] pinned remote specs still carry ctx: a hard error would refuse every consumer until each
-// upstream re-tags, so the old key decodes as variables and warns
-func ctxAlias(value *yaml.Node, where string) map[string]string {
-	if value.Kind != yaml.MappingNode {
-		return nil
-	}
-	for i := 0; i+1 < len(value.Content); i += 2 {
-		if value.Content[i].Value != "ctx" {
-			continue
-		}
-		var legacy map[string]string
-		if err := value.Content[i+1].Decode(&legacy); err != nil {
-			return nil
-		}
-		warnDeprecated(where + ": ctx is renamed to variables, decoded as variables")
-		return legacy
-	}
-	return nil
 }
 
 func cutSourceRef(src string) (rest, gitRef string, err error) {

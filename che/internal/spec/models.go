@@ -90,14 +90,66 @@ type ProfileSourceReady struct {
 
 // [<] 🤖🤖
 
+// [>] 🤖🤖 variables
+
+type VarScope string
+
+var VarScopes = struct{ InvokingSpec, InvokingSpecDefinedProfiles, RecursiveSpecs, RecursiveSpecsAndProfiles VarScope }{
+	"invokingSpec", "invokingSpecDefinedProfiles", "recursiveSpecs", "recursiveSpecsAndProfiles",
+}
+
+var VarScopeNames = []string{
+	string(VarScopes.InvokingSpec), string(VarScopes.InvokingSpecDefinedProfiles),
+	string(VarScopes.RecursiveSpecs), string(VarScopes.RecursiveSpecsAndProfiles),
+}
+
+type VarType string
+
+var VarTypes = struct{ String, Integer, Boolean VarType }{"string", "integer", "boolean"}
+
+var VarTypeNames = []string{string(VarTypes.String), string(VarTypes.Integer), string(VarTypes.Boolean)}
+
+type VarDef struct {
+	Required    bool     `yaml:"required" jsonschema_description:"a value must come from cheVariables.defaults.yml, env, cheVariables.yml, cheVariables.local.yml or an explicit pass; none is a hard error"`
+	Scope       VarScope `yaml:"scope" jsonschema:"enum=invokingSpec,enum=invokingSpecDefinedProfiles,enum=recursiveSpecs,enum=recursiveSpecsAndProfiles" jsonschema_description:"how far the value propagates: invokingSpec (this spec only) | invokingSpecDefinedProfiles (default: plus the profiles this spec defines) | recursiveSpecs (plus embedded specs, never their profiles) | recursiveSpecsAndProfiles (plus embedded specs and their profiles)"`
+	Description string   `yaml:"description" jsonschema_description:"what the variable configures, for the consumer"`
+	Type        VarType  `yaml:"type" jsonschema:"enum=string,enum=integer,enum=boolean" jsonschema_description:"literal shape the value must have (values stay strings at interpolation); default string"`
+	Enum        []string `yaml:"enum" jsonschema_description:"allowed literals, checked after type"`
+}
+
+type VarDefs map[string]VarDef
+
+type SpecVarDefs struct {
+	Spec     VarDefs            `yaml:"specVariablesDefinitions" jsonschema_description:"variables this spec's top level reads, keyed by name"`
+	Profiles map[string]VarDefs `yaml:"profilesVariablesDefinitions" jsonschema_description:"variables each defined profile reads, keyed by profile name then variable name; exclusive with that profile's own variablesDefinitions"`
+}
+
+// VarValue is one resolved variable: its value, effective scope and where the value came from.
+type VarValue struct {
+	Value     string
+	Scope     VarScope
+	Source    string
+	inherited bool
+}
+
+type VarSet map[string]VarValue
+
+// VarSources names where a resolved value came from, for discover-profiles.
+var VarSources = struct{ Defaults, Env, Shared, Local, Passed, Inherited string }{
+	"cheVariables.defaults.yml", "env", "cheVariables.yml", "cheVariables.local.yml", "explicit pass", "inherited",
+}
+
+// [<] 🤖🤖
+
 // [>] 🤖🤖 doc + profiles
 
 type Doc struct {
 	Options        Options
 	Env            map[string]string
 	Lookup         map[string]string
-	Variables      map[string]string
-	Include        []SpecSourceRecipe
+	Vars           VarSet
+	VarDefs        SpecVarDefs
+	SpecsInclude   []SpecSourceRecipe
 	ProfileRecipes []ProfileRecipe
 	EnvUnset       map[string][]EnvUnset
 	EnvRefs        []EnvRef
@@ -321,6 +373,7 @@ type ProfileRecipe struct {
 	Source  ProfileSourceRecipe `yaml:"-" jsonschema:"-"`
 	Type    ProfileType         `yaml:"type" jsonschema:"enum=repo-git-tracked,enum=repo-git-untracked,enum=host" jsonschema_description:"where the profile's dests land: repo-git-tracked (files git tracks in the invoking repo), repo-git-untracked (gitignored files in the invoking repo), host (the machine); che run selects by type (--target-profile-types, the prompt on a TTY, everything otherwise)"`
 	Options ProfileOptions      `yaml:"options" jsonschema_description:"when the profile runs: autoDiscover opts in to bare-che runs, runIf predicates must ALL pass; logLevel/profileWorkingDirectory cascade (most nested wins)"`
+	VarDefs VarDefs             `yaml:"variablesDefinitions" jsonschema_description:"variables this profile reads, keyed by name; exclusive with the spec's profilesVariablesDefinitions entry for this profile"`
 	Include includeSet          `yaml:"include"`
 	Exclude excludeSet          `yaml:"exclude"`
 }
@@ -335,9 +388,9 @@ type ProfileOptions struct {
 
 type includeSet struct {
 	Profiles            []ProfileSourceRecipe       `yaml:"profiles" jsonschema_description:"profile refs composed depth-first before this profile's own payload: local profile name scalar, or {source, options, env} where source is git::<repo>[@<ref>][//<subdir>]/<spec-file>.yml::<profile> locating a profile in another spec (its own checkout anchor, @<ref> pins a remote source to a tag or branch)"`
-	MakeLinks           []linkEntry                 `yaml:"makeLinks" jsonschema_description:"symlink-op entries, workingDirectory-relative: glob string (dest derived 1:1), {source, dest: [paths]} explicit per-file dests, or {source, dest} dest rewrite (sed-style s:^_home:$HOME: or prefix-swap sugar {source: _home/**, dest: $HOME/**} to target home)"`
-	MakeCopies          []copyNode                  `yaml:"makeCopies" jsonschema_description:"copy-op tree: a leaf copies one source verbatim to its dests, a node carrying nested <<< is a group whose source and dest prefixes and perms cascade onto its descendants (innermost wins); local sources workingDirectory-relative (any file in a {source, dest} leaf, *.ontoHost.cp for globs), or remote (git::<repo>[@<ref>]//<path>, explicit dest required, a group prefix carrying the ref concatenates with each leaf path); an explicit dest picks the target: relative -> the invoking spec's git root, ~/ or absolute -> host; a glob source may carry a {source, dest} dest rewrite (sed-style s:^_home:$HOME: or prefix-swap sugar _home/** -> $HOME/**)"`
-	RenderTemplates     []templateNode              `yaml:"renderTemplates" jsonschema_description:"*.tpl render-op tree: a leaf renders one source to its dests, a node carrying nested <<< is a group whose source prefixes, perms, variables and options cascade onto its descendants (innermost wins, dest options win last); local host sources workingDirectory-relative, repo-doc sources (repo dest) workingDirectory-relative, or remote (git::<repo>[@<ref>]//<path>, explicit dest required, a group prefix carrying the ref concatenates with each leaf path); glob and derived-dest forms are host sources; a glob source may carry a {source, dest} dest rewrite (sed-style s:^_home:$HOME: or prefix-swap sugar _home/** -> $HOME/**); dests expand env vars incl ${invokingSpecGitRoot}, the top-level spec's checkout"`
+	MakeLinks           []linkEntry                 `yaml:"makeLinks" jsonschema_description:"symlink-op entries, workingDirectory-relative (anchor a path outside the spec dir with ${{ repoRoot }}, the git root of the spec's repo, over ../): glob string (dest derived 1:1), {source: [globs]} a list of globs, {source, dest: [paths]} explicit per-file dests, or {source, dest} dest rewrite (sed-style s:^_home:$HOME: or prefix-swap sugar {source: _home/**, dest: $HOME/**} to target home)"`
+	MakeCopies          []copyNode                  `yaml:"makeCopies" jsonschema_description:"copy-op tree: a leaf copies one source verbatim to its dests (or {source: [paths]}: one leaf per path, no dest, each landing at its path under the enclosing dest prefix), a node carrying nested <<< is a group whose source and dest prefixes and perms cascade onto its descendants (innermost wins); local sources workingDirectory-relative, ${{ repoRoot }}/<path> reaching the repo from a sub-spec (any file in a {source, dest} leaf, *.ontoHost.cp for globs), or remote (git::<repo>[@<ref>]//<path>, explicit dest required, a group prefix carrying the ref concatenates with each leaf path); an explicit dest picks the target: relative -> the invoking spec's git root, ~/ or absolute -> host; a glob source may carry a {source, dest} dest rewrite (sed-style s:^_home:$HOME: or prefix-swap sugar _home/** -> $HOME/**)"`
+	RenderTemplates     []templateNode              `yaml:"renderTemplates" jsonschema_description:"*.tpl render-op tree: a leaf renders one source to its dests (or {source: [paths]}: one leaf per path, no dest, each landing at its path under the enclosing dest prefix), a node carrying nested <<< is a group whose source prefixes, perms, variables and options cascade onto its descendants (innermost wins, dest options win last); local host sources workingDirectory-relative, repo-doc sources (repo dest) workingDirectory-relative, ${{ repoRoot }}/<path> reaching the repo from a sub-spec, or remote (git::<repo>[@<ref>]//<path>, explicit dest required, a group prefix carrying the ref concatenates with each leaf path); glob and derived-dest forms are host sources; a glob source may carry a {source, dest} dest rewrite (sed-style s:^_home:$HOME: or prefix-swap sugar _home/** -> $HOME/**); dests expand env vars incl ${invokingSpecGitRoot}, the top-level spec's checkout"`
 	MakeDirs            []dirGroup                  `yaml:"makeDirs" jsonschema_description:"extra-dir perm-groups; each item one dir path (brace-expanded)"`
 	InstallPackages     []PackageRef                `yaml:"installPackages" jsonschema_description:"packages installed from the packages file (default $XDG_CONFIG_HOME/packages/packages.yml): canonical name scalar, or {name, version} to install a specific version (exact or wildcard), overriding the entry's default version; runs before runScripts"`
 	InstallToolPackages map[string][]ToolPackageRef `yaml:"installToolPackages" jsonschema_description:"tool-scoped packages installed from the packages file's toolPackages section, per host tool: name scalar, or {name, version} overriding the entry's pin; runs with installPackages"`
@@ -357,6 +410,7 @@ type excludeSet struct {
 type linkEntry struct {
 	glob     string
 	DestRule string
+	Sources  []string   `yaml:"-" json:"-"`
 	Source   string     `yaml:"source"`
 	Dest     []DestSpec `yaml:"dest"`
 }
@@ -365,6 +419,7 @@ type copyNode struct {
 	Perms    `yaml:",inline"`
 	glob     string
 	DestRule string
+	Sources  []string   `yaml:"-" json:"-"`
 	Source   string     `yaml:"source"`
 	Dest     []DestSpec `yaml:"dest"`
 	Children []copyNode `yaml:"<<<" jsonschema_description:"nested nodes, inheriting this node's source and dest prefixes and perms"`
@@ -374,6 +429,7 @@ type templateNode struct {
 	Perms     `yaml:",inline"`
 	glob      string
 	DestRule  string
+	Sources   []string          `yaml:"-" json:"-"`
 	Source    string            `yaml:"source"`
 	Dest      []DestSpec        `yaml:"dest"`
 	Variables map[string]string `yaml:"variables" jsonschema_description:"template variables exposed as .var.<key>, merged under each descendant's variables (innermost keys win)"`

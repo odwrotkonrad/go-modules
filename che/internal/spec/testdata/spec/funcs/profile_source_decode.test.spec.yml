@@ -142,20 +142,6 @@ cases:
             env: {A: b}
     expected:
       errorOutput: ['include.profiles entry missing url']
-  - name: ShouldDecodeLegacyCtxAsVariables
-    input:
-      args:
-        - entry: |
-            source: "git::https://gitlab.com/g/r.git"
-            profile: p
-            ctx: {repo: X}
-    expected:
-      output:
-        source: "git::https://gitlab.com/g/r.git"
-        profile: p
-        sourceType: remote
-        variables: {repo: X}
-        string: "git::https://gitlab.com/g/r.git profile p"
   - name: ShouldDecodeVariables
     input:
       args:

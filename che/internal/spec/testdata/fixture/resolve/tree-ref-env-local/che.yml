@@ -1,9 +1,11 @@
 # yaml-language-server: $schema=https://gitlab.com/api/v4/projects/konradodwrot%2Fgo-modules/packages/generic/che-schema/v0.0.1-che-min-v0.0.96/che.schema.json
 #[>] 🤖🤖
-main:
-  include:
-    profiles:
-      - source: nourl
-        env:
-          A: b
+profilesDefinitions:
+  main:
+    include:
+      profiles:
+        - source: nourl
+          env:
+            A: b
+
 #[<] 🤖🤖

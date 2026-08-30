@@ -14,11 +14,14 @@ type Policy string
 // Policies enumerates every Policy value.
 var Policies = struct{ Error, Empty Policy }{"error", "empty"}
 
-// Namespace is the ref prefix: env or var.
+// Namespace is the ref prefix: env, var, or none for a che built-in.
 type Namespace string
 
 // Namespaces enumerates every Namespace value.
-var Namespaces = struct{ Env, Var Namespace }{"env", "var"}
+var Namespaces = struct{ Env, Var, Builtin Namespace }{"env", "var", ""}
+
+// BuiltinNames lists every bare ${{ NAME }} che defines.
+var BuiltinNames = []string{"repoRoot"}
 
 // Ref is one parsed ${{ <namespace>.<name> }} occurrence.
 type Ref struct {
@@ -31,7 +34,7 @@ type Ref struct {
 // Lookup resolves one ref to its value, "" meaning unset.
 type Lookup func(Ref) string
 
-var refPattern = regexp.MustCompile(`\$\{\{\s*(env|var)\.([A-Za-z_][A-Za-z0-9_]*)\s*(?:\|\|(.*?))?\s*\}\}`)
+var refPattern = regexp.MustCompile(`\$\{\{\s*(?:(env|var)\.)?([A-Za-z_][A-Za-z0-9_]*)\s*(?:\|\|(.*?))?\s*\}\}`)
 
 // KeyPattern is the shape every var and env name must take.
 var KeyPattern = regexp.MustCompile(`^[A-Za-z_][A-Za-z0-9_]*$`)
@@ -67,10 +70,13 @@ func EnvLookup(lookup func(string) string) Lookup {
 }
 
 // MapLookup resolves env refs from env and var refs from vars.
-func MapLookup(env, vars map[string]string) Lookup {
+func MapLookup(env, vars, builtins map[string]string) Lookup {
 	return func(ref Ref) string {
-		if ref.Namespace == Namespaces.Var {
+		switch ref.Namespace {
+		case Namespaces.Var:
 			return vars[ref.Name]
+		case Namespaces.Builtin:
+			return builtins[ref.Name]
 		}
 		return env[ref.Name]
 	}

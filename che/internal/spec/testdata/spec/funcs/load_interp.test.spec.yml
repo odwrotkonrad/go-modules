@@ -7,9 +7,10 @@ cases:
       args:
         - spec: |
             env: {TREE: '${{ env.BASE }}/tree'}
-            include: {sources: ['${{ env.BASE }}/other']}
-            web:
-              options: {profileWorkingDirectory: '${{ env.TREE }}/${{ env.APP || app }}'}
+            specsInclude: ['${{ env.BASE }}/other']
+            profilesDefinitions:
+              web:
+                options: {profileWorkingDirectory: '${{ env.TREE }}/${{ env.APP || app }}'}
         - layers:
             below: [{name: process env, env: {BASE: /b}}]
         - policy: error
@@ -25,8 +26,9 @@ cases:
       args:
         - spec: |
             env: {A: spec, B: spec}
-            web:
-              options: {profileWorkingDirectory: '${{ env.A }}-${{ env.B }}'}
+            profilesDefinitions:
+              web:
+                options: {profileWorkingDirectory: '${{ env.A }}-${{ env.B }}'}
         - layers:
             below: [{name: process env, env: {A: process, B: process}}]
             above: [{name: ref env, env: {B: ref}}]
@@ -54,8 +56,9 @@ cases:
     input:
       args:
         - spec: |
-            web:
-              options: {profileWorkingDirectory: '${{ env.A }}-${{ env.B }}'}
+            profilesDefinitions:
+              web:
+                options: {profileWorkingDirectory: '${{ env.A }}-${{ env.B }}'}
         - layers:
             below:
               - {name: che.env, env: {A: file, B: file}}
@@ -66,30 +69,14 @@ cases:
         workdir: {web: file-process}
         unset: {}
         sources: {A: che.env, B: process env}
-  - name: ShouldSetVariablesImplicitlyFromEnvOnlyWhereNothingDeclaresThem
-    input:
-      args:
-        - spec: |
-            variables: {A: spec, C: spec}
-            web:
-              options: {profileWorkingDirectory: '${{ var.A }}-${{ var.B }}-${{ var.C }}-${{ var.D }}'}
-        - layers:
-            below: [{name: process env, env: {A: env, B: env, C: env, D: env}}]
-            varsBase: {B: repo}
-            varsOver: {C: ref}
-        - policy: error
-    expected:
-      output:
-        workdir: {web: spec-repo-ref-env}
-        unset: {}
-        sources: {}
   - name: ShouldPlaceIncludedSpecEnvBeneathInheritedEnv
     input:
       args:
         - spec: |
             env: {A: included, B: included}
-            web:
-              options: {profileWorkingDirectory: '${{ env.A }}-${{ env.B }}-${{ env.C }}'}
+            profilesDefinitions:
+              web:
+                options: {profileWorkingDirectory: '${{ env.A }}-${{ env.B }}-${{ env.C }}'}
         - layers:
             below: [{name: included che.env, env: {C: included-file}}]
             above: [{name: inherited env, env: {B: parent}}]
@@ -106,26 +93,27 @@ cases:
       args:
         - spec: |
             env: {X: '${{ env.A }}'}
-            include: {sources: ['${{ env.B }}/other']}
+            specsInclude: ['${{ env.B }}/other']
         - layers: {}
         - policy: error
     expected:
-      errorOutput: ['che.yml: unset env vars:', 'A at /env/X', 'B at /include/sources/0', 'options.envUnset: empty']
+      errorOutput: ['che.yml: unset env vars:', 'A at /env/X', 'B at /specsInclude/0', 'options.envUnset: empty']
   - name: ShouldRecordProfileRefsWithoutFailing
     input:
       args:
         - spec: |
-            a:
-              options: {profileWorkingDirectory: '${{ env.A }}'}
-            b:
-              options: {profileWorkingDirectory: '${{ env.B }}/x'}
+            profilesDefinitions:
+              a:
+                options: {profileWorkingDirectory: '${{ env.A }}'}
+              b:
+                options: {profileWorkingDirectory: '${{ env.B }}/x'}
         - layers:
             below: [{name: process env, env: {A: set}}]
         - policy: error
     expected:
       output:
         workdir: {a: set, b: /x}
-        unset: {b: ['B@/b/options/profileWorkingDirectory']}
+        unset: {b: ['B@/profilesDefinitions/b/options/profileWorkingDirectory']}
         sources: {A: process env}
   - name: ShouldReadUnsetAsEmptyUnderEmptyPolicy
     input:
@@ -143,8 +131,9 @@ cases:
     input:
       args:
         - spec: |
-            '${{ env.NAME }}':
-              options: {profileWorkingDirectory: x}
+            profilesDefinitions:
+              ${{ env.NAME }}:
+                options: {profileWorkingDirectory: x}
         - layers:
             below: [{name: process env, env: {NAME: web}}]
         - policy: error
@@ -153,55 +142,204 @@ cases:
         workdir: {'${{ env.NAME }}': x}
         unset: {}
         sources: {}
-  - name: ShouldLayerVariablesRepoUnderSpecUnderRef
-    input:
-      args:
-        - spec: |
-            variables: {A: spec, B: spec}
-            web:
-              options: {profileWorkingDirectory: '${{ var.A }}-${{ var.B }}-${{ var.C }}'}
-        - layers:
-            varsBase: {A: repo, B: repo, C: repo}
-            varsOver: {B: ref}
-        - policy: error
-    expected:
-      output:
-        variables: {A: spec, B: ref, C: repo}
-        workdir: {web: spec-ref-repo}
-        unset: {}
-        sources: {}
-  - name: ShouldExpandEnvRefsInsideVariablesBlockNeverSiblings
-    input:
-      args:
-        - spec: |
-            variables: {A: '${{ env.X }}', B: '${{ var.A || none }}'}
-            env: {PIN: '${{ var.A }}'}
-        - layers:
-            below: [{name: process env, env: {X: from-env}}]
-        - policy: error
-    expected:
-      output:
-        variables: {A: from-env, B: none}
-        env: {PIN: from-env}
-        unset: {}
-        sources: {X: process env}
   - name: ShouldFailOnUnsetVarListingEveryGap
     input:
       args:
         - spec: |
-            web:
-              options: {profileWorkingDirectory: '${{ var.A }}/${{ var.B }}'}
+            variablesDefinitions:
+              profilesVariablesDefinitions:
+                web:
+                  A: {required: true}
+                  B: {required: true}
+            profilesDefinitions:
+              web:
+                options: {profileWorkingDirectory: '${{ var.A }}/${{ var.B }}'}
         - layers: {}
         - policy: empty
     expected:
-      errorOutput: ['che.yml: unset vars:', 'A at /web/options/profileWorkingDirectory', 'B at /web/options/profileWorkingDirectory', 'che.variables.yml']
-  - name: ShouldRejectInvalidVariableKey
+      errorOutput: ['che.yml: unset vars:', 'A at /profilesDefinitions/web/options/profileWorkingDirectory', 'B at /profilesDefinitions/web/options/profileWorkingDirectory', 'cheVariables.yml']
+  - name: ShouldInterpolateResolvedVarsAtSpecLevelWhateverTheirScope
     input:
       args:
         - spec: |
-            variables: {bad-key: x}
+            env: {PIN: '${{ var.A }}-${{ var.B }}-${{ var.C }}-${{ var.D }}'}
+            specsInclude: ['./${{ var.C }}']
+        - layers:
+            vars:
+              A: {value: a, scope: invokingSpec}
+              B: {value: b, scope: invokingSpecDefinedProfiles}
+              C: {value: c, scope: recursiveSpecs}
+              D: {value: d, scope: recursiveSpecsAndProfiles}
+        - policy: error
+    expected:
+      output:
+        env: {PIN: a-b-c-d}
+        include: [./c]
+        unset: {}
+        sources: {}
+  - name: ShouldHideSpecOnlyAndRecursiveSpecsVarsFromProfiles
+    input:
+      args:
+        - spec: |
+            profilesDefinitions:
+              web:
+                options: {profileWorkingDirectory: '${{ var.B }}-${{ var.D }}-${{ var.A || none }}-${{ var.C || none }}'}
+        - layers:
+            vars:
+              A: {value: a, scope: invokingSpec}
+              B: {value: b, scope: invokingSpecDefinedProfiles}
+              C: {value: c, scope: recursiveSpecs}
+              D: {value: d, scope: recursiveSpecsAndProfiles}
+        - policy: error
+    expected:
+      output:
+        workdir: {web: b-d-none-none}
+        unset: {}
+        sources: {}
+  - name: ShouldFailOnRecursiveSpecsVarInsideProfile
+    input:
+      args:
+        - spec: |
+            profilesDefinitions:
+              web:
+                options: {profileWorkingDirectory: '${{ var.C }}'}
+        - layers:
+            vars:
+              C: {value: c, scope: recursiveSpecs}
+        - policy: error
+    expected:
+      errorOutput: ['unset vars:', 'C at /profilesDefinitions/web/options/profileWorkingDirectory']
+  - name: ShouldNeverReadEnvAsVar
+    input:
+      args:
+        - spec: |
+            env: {PIN: '${{ var.A || none }}'}
+        - layers:
+            below: [{name: process env, env: {A: env}}]
+        - policy: error
+    expected:
+      output:
+        env: {PIN: none}
+        unset: {}
+        sources: {}
+  - name: ShouldLeaveDefinitionsUninterpolated
+    input:
+      args:
+        - spec: |
+            variablesDefinitions:
+              specVariablesDefinitions:
+                A: {description: 'reads ${{ env.NOPE }}'}
+            profilesDefinitions:
+              web:
+                variablesDefinitions:
+                  B: {description: 'reads ${{ env.NOPE }}'}
+                options: {profileWorkingDirectory: x}
         - layers: {}
         - policy: error
     expected:
-      errorOutput: ['variables: key "bad-key" must match']
+      output:
+        workdir: {web: x}
+        unset: {}
+        sources: {}
+  - name: ShouldRejectUnknownTopLevelKey
+    input:
+      args:
+        - spec: |
+            web:
+              options: {profileWorkingDirectory: x}
+        - layers: {}
+        - policy: error
+    expected:
+      errorOutput: ['unknown top-level key "web": want options | env | variablesDefinitions | specsInclude | profilesDefinitions']
+  - name: ShouldRejectOldIncludeKey
+    input:
+      args:
+        - spec: |
+            include: {sources: [./other]}
+        - layers: {}
+        - policy: error
+    expected:
+      errorOutput: ['unknown top-level key "include"']
+  - name: ShouldRejectOldVariablesKey
+    input:
+      args:
+        - spec: |
+            variables: {A: x}
+        - layers: {}
+        - policy: error
+    expected:
+      errorOutput: ['unknown top-level key "variables"']
+  - name: ShouldRejectDefaultInDefinition
+    input:
+      args:
+        - spec: |
+            variablesDefinitions:
+              specVariablesDefinitions:
+                A: {default: x}
+        - layers: {}
+        - policy: error
+    expected:
+      errorOutput: ['default is not allowed, put it in cheVariables.defaults.yml']
+  - name: ShouldSubstituteBuiltinRepoRootEverywhere
+    input:
+      args:
+        - spec: |
+            env: {TPL: '${{ repoRoot }}/templates'}
+            specsInclude: ['${{ repoRoot }}/.che/sub']
+            profilesDefinitions:
+              web:
+                options: {profileWorkingDirectory: '${{ repoRoot }}/root'}
+                include:
+                  renderTemplates:
+                    - source: '${{ repoRoot }}/templates/a.tpl'
+                      dest: docs/a.md
+        - layers:
+            below: [{name: process env, env: {repoRoot: /from-env}}]
+            builtins: {repoRoot: /repo}
+        - policy: error
+    expected:
+      output:
+        env: {TPL: /repo/templates}
+        include: [/repo/.che/sub]
+        workdir: {web: /repo/root}
+        templates: {web: [/repo/templates/a.tpl]}
+        unset: {}
+        sources: {}
+  - name: ShouldRejectUnknownBuiltin
+    input:
+      args:
+        - spec: |
+            profilesDefinitions:
+              web:
+                options: {profileWorkingDirectory: '${{ gitRoot }}/root'}
+        - layers:
+            builtins: {repoRoot: /repo}
+        - policy: error
+    expected:
+      errorOutput: ['unknown built-in ${{ gitRoot }} at /profilesDefinitions/web/options/profileWorkingDirectory', 'defined: repoRoot']
+  - name: ShouldRejectProfileDefinedInBothDefinitionPlaces
+    input:
+      args:
+        - spec: |
+            variablesDefinitions:
+              profilesVariablesDefinitions:
+                web: {A: {}}
+            profilesDefinitions:
+              web:
+                variablesDefinitions: {A: {}}
+        - layers: {}
+        - policy: error
+    expected:
+      errorOutput: ['profile "web": variablesDefinitions given both in variablesDefinitions.profilesVariablesDefinitions and in the profile']
+  - name: ShouldRejectBadScopeInDefinition
+    input:
+      args:
+        - spec: |
+            variablesDefinitions:
+              specVariablesDefinitions:
+                A: {scope: everywhere}
+        - layers: {}
+        - policy: error
+    expected:
+      errorOutput: ['scope "everywhere": want invokingSpec | invokingSpecDefinedProfiles | recursiveSpecs | recursiveSpecsAndProfiles']
 # [<] 🤖🤖

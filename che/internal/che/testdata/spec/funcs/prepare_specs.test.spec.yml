@@ -9,21 +9,23 @@ cases:
       args:
         - refFiles:
             che.yml: |
-              p:
-                includes:
-                  makeLinks: [_home/**]
+              profilesDefinitions:
+                p:
+                  includes:
+                    makeLinks: [_home/**]
         - hostFiles:
             che.yml: |
-              main:
-                options: {autoDiscover: true}
-                include:
-                  profiles:
-                    - source: "${REF_DIR}"
-                      profile: p
+              profilesDefinitions:
+                main:
+                  options: {autoDiscover: true}
+                  include:
+                    profiles:
+                      - source: "${REF_DIR}"
+                        profile: p
         - flags: {}
     expected:
       stdOut:
-        - "warning /p:"
+        - "warning /profilesDefinitions/p:"
         - includes
       output:
         profiles: [main, "${REF_DIR}::p"]
@@ -32,17 +34,19 @@ cases:
       args:
         - refFiles:
             che.yml: |
-              p:
-                includes:
-                  makeLinks: [_home/**]
+              profilesDefinitions:
+                p:
+                  includes:
+                    makeLinks: [_home/**]
         - hostFiles:
             che.yml: |
-              main:
-                options: {autoDiscover: true}
-                include:
-                  profiles:
-                    - source: "${REF_DIR}"
-                      profile: p
+              profilesDefinitions:
+                main:
+                  options: {autoDiscover: true}
+                  include:
+                    profiles:
+                      - source: "${REF_DIR}"
+                        profile: p
         - flags: {validateSpec: error}
     expected:
       errorOutput: includes
@@ -53,21 +57,23 @@ cases:
       args:
         - refFiles:
             che.yml: |
-              gitlabGroup:
-                options:
-                  runIf: ['env:REF_GATE']
-                include:
-                  runScripts: [scripts/bootstrap.zsh]
+              profilesDefinitions:
+                gitlabGroup:
+                  options:
+                    runIf: ['env:REF_GATE']
+                  include:
+                    runScripts: [scripts/bootstrap.zsh]
             scripts/bootstrap.zsh: "#!/bin/zsh\n"
         - hostFiles:
             che.yml: |
-              main:
-                options: {autoDiscover: true}
-                include:
-                  profiles:
-                    - source: "git::file://${REF_DIR}"
-                      profile: gitlabGroup
-                  runScripts: [scripts/local.zsh]
+              profilesDefinitions:
+                main:
+                  options: {autoDiscover: true}
+                  include:
+                    profiles:
+                      - source: "git::file://${REF_DIR}"
+                        profile: gitlabGroup
+                    runScripts: [scripts/local.zsh]
             scripts/local.zsh: "#!/bin/zsh\n"
         - flags: {logLevel: trace}
     expected:
@@ -87,20 +93,22 @@ cases:
       args:
         - refFiles:
             che.yml: |
-              gitlabGroup:
-                options:
-                  runIf: ['env:REF_GATE']
-                include:
-                  runScripts: [scripts/bootstrap.zsh]
+              profilesDefinitions:
+                gitlabGroup:
+                  options:
+                    runIf: ['env:REF_GATE']
+                  include:
+                    runScripts: [scripts/bootstrap.zsh]
             scripts/bootstrap.zsh: "#!/bin/zsh\n"
         - hostFiles:
             che.yml: |
-              main:
-                options: {autoDiscover: true}
-                include:
-                  profiles:
-                    - source: "${REF_DIR}"
-                      profile: gitlabGroup
+              profilesDefinitions:
+                main:
+                  options: {autoDiscover: true}
+                  include:
+                    profiles:
+                      - source: "${REF_DIR}"
+                        profile: gitlabGroup
         - flags:
             unsetEnv: [REF_GATE]
             logLevel: debug
@@ -113,22 +121,24 @@ cases:
       args:
         - refFiles:
             che.yml: |
-              gitlabGroup:
-                options:
-                  runIf: ['env:REF_GATE']
-                include:
-                  runScripts: [scripts/bootstrap.zsh]
+              profilesDefinitions:
+                gitlabGroup:
+                  options:
+                    runIf: ['env:REF_GATE']
+                  include:
+                    runScripts: [scripts/bootstrap.zsh]
             scripts/bootstrap.zsh: "#!/bin/zsh\n"
         - hostFiles:
             che.yml: |
-              main:
-                options: {autoDiscover: true}
-                include:
-                  profiles:
-                    - source: "${REF_DIR}"
-                      profile: gitlabGroup
-                      env:
-                        REF_GATE: "1"
+              profilesDefinitions:
+                main:
+                  options: {autoDiscover: true}
+                  include:
+                    profiles:
+                      - source: "${REF_DIR}"
+                        profile: gitlabGroup
+                        env:
+                          REF_GATE: "1"
         - flags:
             unsetEnv: [REF_GATE]
     expected:
@@ -146,20 +156,22 @@ cases:
               env:
                 FROM_SPEC: spec
                 SHADOWED: spec
-              gitlabGroup:
-                include:
-                  runScripts: [scripts/bootstrap.zsh]
+              profilesDefinitions:
+                gitlabGroup:
+                  include:
+                    runScripts: [scripts/bootstrap.zsh]
             scripts/bootstrap.zsh: "#!/bin/zsh\n"
         - hostFiles:
             che.yml: |
-              main:
-                options: {autoDiscover: true}
-                include:
-                  profiles:
-                    - source: "${REF_DIR}"
-                      profile: gitlabGroup
-                      env:
-                        SHADOWED: entry
+              profilesDefinitions:
+                main:
+                  options: {autoDiscover: true}
+                  include:
+                    profiles:
+                      - source: "${REF_DIR}"
+                        profile: gitlabGroup
+                        env:
+                          SHADOWED: entry
         - flags: {}
     expected:
       output:
@@ -171,13 +183,14 @@ cases:
         - refFiles: {}
         - hostFiles:
             che.yml: |
-              main:
-                options: {autoDiscover: true}
-                include:
-                  profiles:
-                    - source: "/nonexistent"
-                      profile: p
-                  runScripts: [scripts/local.zsh]
+              profilesDefinitions:
+                main:
+                  options: {autoDiscover: true}
+                  include:
+                    profiles:
+                      - source: "/nonexistent"
+                        profile: p
+                    runScripts: [scripts/local.zsh]
             scripts/local.zsh: "#!/bin/zsh\n"
         - flags:
             skipRemoteRefs: true
@@ -192,16 +205,18 @@ cases:
         - refFiles: {}
         - hostFiles:
             che.yml: |
-              main:
-                options: {autoDiscover: true}
-                include:
-                  profiles:
-                    - source: "./ref"
-                      profile: gitlabGroup
+              profilesDefinitions:
+                main:
+                  options: {autoDiscover: true}
+                  include:
+                    profiles:
+                      - source: "./ref"
+                        profile: gitlabGroup
             ref/che.yml: |
-              gitlabGroup:
-                include:
-                  runScripts: [scripts/bootstrap.zsh]
+              profilesDefinitions:
+                gitlabGroup:
+                  include:
+                    runScripts: [scripts/bootstrap.zsh]
             ref/scripts/bootstrap.zsh: "#!/bin/zsh\n"
         - flags: {}
     expected:
@@ -214,18 +229,20 @@ cases:
       args:
         - refFiles:
             che.yml: |
-              gitlabGroup:
-                include:
-                  runScripts: [scripts/bootstrap.zsh]
+              profilesDefinitions:
+                gitlabGroup:
+                  include:
+                    runScripts: [scripts/bootstrap.zsh]
             scripts/bootstrap.zsh: "#!/bin/zsh\n"
         - hostFiles:
             che.yml: |
-              main:
-                options: {autoDiscover: true}
-                include:
-                  profiles:
-                    - source: "$REF_DIR_VAR"
-                      profile: gitlabGroup
+              profilesDefinitions:
+                main:
+                  options: {autoDiscover: true}
+                  include:
+                    profiles:
+                      - source: "$REF_DIR_VAR"
+                        profile: gitlabGroup
         - flags: {}
     expected:
       output:
@@ -238,24 +255,26 @@ cases:
       args:
         - refFiles:
             che.yml: |
-              p:
-                include:
-                  runScripts: [scripts/bootstrap.zsh]
+              profilesDefinitions:
+                p:
+                  include:
+                    runScripts: [scripts/bootstrap.zsh]
             scripts/bootstrap.zsh: "#!/bin/zsh\n"
         - hostFiles:
             che.yml: |
-              a:
-                options: {autoDiscover: true}
-                include:
-                  profiles:
-                    - source: "${REF_DIR}"
-                      profile: p
-              b:
-                options: {autoDiscover: true}
-                include:
-                  profiles:
-                    - source: "${REF_DIR}"
-                      profile: p
+              profilesDefinitions:
+                a:
+                  options: {autoDiscover: true}
+                  include:
+                    profiles:
+                      - source: "${REF_DIR}"
+                        profile: p
+                b:
+                  options: {autoDiscover: true}
+                  include:
+                    profiles:
+                      - source: "${REF_DIR}"
+                        profile: p
         - flags: {}
     expected:
       output:
@@ -266,24 +285,27 @@ cases:
         - refFiles: {}
         - hostFiles:
             che.yml: |
-              main:
-                options: {autoDiscover: true}
-                include:
-                  profiles:
-                    - source: "./a"
-                      profile: p1
+              profilesDefinitions:
+                main:
+                  options: {autoDiscover: true}
+                  include:
+                    profiles:
+                      - source: "./a"
+                        profile: p1
             a/che.yml: |
-              p1:
-                include:
-                  profiles:
-                    - source: "../b"
-                      profile: p2
+              profilesDefinitions:
+                p1:
+                  include:
+                    profiles:
+                      - source: "../b"
+                        profile: p2
             b/che.yml: |
-              p2:
-                include:
-                  profiles:
-                    - source: "../a"
-                      profile: p1
+              profilesDefinitions:
+                p2:
+                  include:
+                    profiles:
+                      - source: "../a"
+                        profile: p1
         - flags: {}
     expected:
       output:
@@ -294,23 +316,24 @@ cases:
         - refFiles: {}
         - hostFiles:
             che.yml: |
-              include:
-                sources: [./sibling]
-              main:
-                options: {autoDiscover: true}
-                include:
-                  profiles: [sharedBase]
+              specsInclude: [./sibling]
+              profilesDefinitions:
+                main:
+                  options: {autoDiscover: true}
+                  include:
+                    profiles: [sharedBase]
             sibling/che.yml: |
-              sib:
-                options: {autoDiscover: true}
-                include:
-                  makeDirs:
-                    - directories: [_home/.cache/sib]
-              sharedBase:
-                options: {autoDiscover: false}
-                include:
-                  makeDirs:
-                    - directories: [_home/.cache/shared]
+              profilesDefinitions:
+                sib:
+                  options: {autoDiscover: true}
+                  include:
+                    makeDirs:
+                      - directories: [_home/.cache/sib]
+                sharedBase:
+                  options: {autoDiscover: false}
+                  include:
+                    makeDirs:
+                      - directories: [_home/.cache/shared]
         - flags: {}
     expected:
       output:
@@ -321,15 +344,16 @@ cases:
         - refFiles: {}
         - hostFiles:
             che.yml: |
-              include:
-                sources: [./sibling]
-              main:
-                options: {autoDiscover: true}
+              specsInclude: [./sibling]
+              profilesDefinitions:
+                main:
+                  options: {autoDiscover: true}
             sibling/che.yml: |
-              main:
-                include:
-                  makeDirs:
-                    - directories: [_home/.cache/sib]
+              profilesDefinitions:
+                main:
+                  include:
+                    makeDirs:
+                      - directories: [_home/.cache/sib]
         - flags: {}
     expected:
       errorOutput: ['profile "main" collides']
@@ -340,17 +364,18 @@ cases:
             che.yml: |
               options:
                 runIf: ['env:SPEC_GATE']
-              p:
-                options: {autoDiscover: true}
-                include:
-                  runScripts: [scripts/bootstrap.zsh]
+              profilesDefinitions:
+                p:
+                  options: {autoDiscover: true}
+                  include:
+                    runScripts: [scripts/bootstrap.zsh]
             scripts/bootstrap.zsh: "#!/bin/zsh\n"
         - hostFiles:
             che.yml: |
-              include:
-                sources: ["${REF_DIR}"]
-              main:
-                options: {autoDiscover: true}
+              specsInclude: ["${REF_DIR}"]
+              profilesDefinitions:
+                main:
+                  options: {autoDiscover: true}
         - flags:
             unsetEnv: [SPEC_GATE]
             logLevel: debug
@@ -366,9 +391,10 @@ cases:
             che.yml: |
               options:
                 autoDiscover: true
-              a: {}
-              b:
-                options: {autoDiscover: false}
+              profilesDefinitions:
+                a: {}
+                b:
+                  options: {autoDiscover: false}
         - flags: {}
     expected:
       output:
@@ -384,8 +410,9 @@ cases:
               options:
                 autoDiscover: true
                 runIf: ['env:SPEC_GATE']
-              a: {}
-              b: {}
+              profilesDefinitions:
+                a: {}
+                b: {}
         - flags: {}
     expected:
       output:
@@ -399,8 +426,9 @@ cases:
               options:
                 autoDiscover: true
                 runIf: ['env:SPEC_GATE']
-              a: {}
-              b: {}
+              profilesDefinitions:
+                a: {}
+                b: {}
         - flags:
             unsetEnv: [SPEC_GATE]
     expected:
@@ -412,26 +440,28 @@ cases:
         - refFiles: {}
         - hostFiles:
             che.yml: |
-              include:
-                sources: [./one, ./two]
-              main:
-                options: {autoDiscover: true}
+              specsInclude: [./one, ./two]
+              profilesDefinitions:
+                main:
+                  options: {autoDiscover: true}
             one/che.yml: |
-              alpha:
-                options: {autoDiscover: true}
-                include:
-                  makeLinks: [{source: _home/**, dest: 's:^_home:$HOME:'}]
-                exclude:
-                  makeLinks: [_home/.config/skip-a]
+              profilesDefinitions:
+                alpha:
+                  options: {autoDiscover: true}
+                  include:
+                    makeLinks: [{source: _home/**, dest: 's:^_home:$HOME:'}]
+                  exclude:
+                    makeLinks: [_home/.config/skip-a]
             one/_home/.config/keep-a: keep-a
             one/_home/.config/skip-a: skip-a
             two/che.yml: |
-              beta:
-                options: {autoDiscover: true}
-                include:
-                  makeLinks: [{source: _home/**, dest: 's:^_home:$HOME:'}]
-                exclude:
-                  makeLinks: [_home/.config/skip-b]
+              profilesDefinitions:
+                beta:
+                  options: {autoDiscover: true}
+                  include:
+                    makeLinks: [{source: _home/**, dest: 's:^_home:$HOME:'}]
+                  exclude:
+                    makeLinks: [_home/.config/skip-b]
             two/_home/.config/keep-b: keep-b
             two/_home/.config/skip-b: skip-b
         - flags: {}
@@ -448,15 +478,16 @@ cases:
             che.yml: |
               options:
                 validateSpec: error
-              p:
-                includes:
-                  makeLinks: [_home/**]
+              profilesDefinitions:
+                p:
+                  includes:
+                    makeLinks: [_home/**]
         - hostFiles:
             che.yml: |
-              include:
-                sources: ["${REF_DIR}"]
-              main:
-                options: {autoDiscover: true}
+              specsInclude: ["${REF_DIR}"]
+              profilesDefinitions:
+                main:
+                  options: {autoDiscover: true}
         - flags: {}
     expected:
       errorOutput: includes
@@ -466,17 +497,18 @@ cases:
         - refFiles: {}
         - hostFiles:
             che.yml: |
-              include:
-                sources: [./sub]
-              main:
-                options: {autoDiscover: true}
+              specsInclude: [./sub]
+              profilesDefinitions:
+                main:
+                  options: {autoDiscover: true}
             sub/che.yml: |
               options:
                 profileWorkingDirectory: tree
-              s:
-                options: {autoDiscover: true}
-                include:
-                  makeLinks: [{source: _home/**, dest: 's:^_home:$HOME:'}]
+              profilesDefinitions:
+                s:
+                  options: {autoDiscover: true}
+                  include:
+                    makeLinks: [{source: _home/**, dest: 's:^_home:$HOME:'}]
             sub/tree/_home/.config/x: x
         - flags: {}
     expected:
@@ -489,21 +521,23 @@ cases:
       args:
         - refFiles:
             che.yml: |
-              gitlabGroup:
-                options: {profileWorkingDirectory: default-tree}
-                include:
-                  makeLinks: [{source: _home/**, dest: 's:^_home:$HOME:'}]
+              profilesDefinitions:
+                gitlabGroup:
+                  options: {profileWorkingDirectory: default-tree}
+                  include:
+                    makeLinks: [{source: _home/**, dest: 's:^_home:$HOME:'}]
             default-tree/_home/.config/def: def
             override-tree/_home/.config/ovr: ovr
         - hostFiles:
             che.yml: |
-              main:
-                options: {autoDiscover: true}
-                include:
-                  profiles:
-                    - source: "git::file://${REF_DIR}"
-                      profile: gitlabGroup
-                      options: {profileWorkingDirectory: override-tree}
+              profilesDefinitions:
+                main:
+                  options: {autoDiscover: true}
+                  include:
+                    profiles:
+                      - source: "git::file://${REF_DIR}"
+                        profile: gitlabGroup
+                        options: {profileWorkingDirectory: override-tree}
         - flags: {}
     expected:
       output:
@@ -516,12 +550,13 @@ cases:
         - refFiles: {}
         - hostFiles:
             che.yml: |
-              main:
-                options: {autoDiscover: true}
-                include:
-                  makeLinks:
-                    - etc/**
-                    - Library/**
+              profilesDefinitions:
+                main:
+                  options: {autoDiscover: true}
+                  include:
+                    makeLinks:
+                      - etc/**
+                      - Library/**
             etc/zshenv: zshenv
             Library/LaunchDaemons/x.plist: plist
         - flags: {}
@@ -536,8 +571,9 @@ cases:
         - refFiles: {}
         - hostFiles:
             che.yml: |
-              marked:
-                options: {autoDiscover: true}
+              profilesDefinitions:
+                marked:
+                  options: {autoDiscover: true}
         - flags: {autoDiscover: false}
     expected:
       errorOutput: auto-discovery is disabled
@@ -547,8 +583,9 @@ cases:
         - refFiles: {}
         - hostFiles:
             che.yml: |
-              marked:
-                options: {autoDiscover: true}
+              profilesDefinitions:
+                marked:
+                  options: {autoDiscover: true}
         - flags: {}
     expected:
       output:
@@ -559,8 +596,9 @@ cases:
         - refFiles: {}
         - hostFiles:
             che.yml: |
-              marked:
-                options: {autoDiscover: true}
+              profilesDefinitions:
+                marked:
+                  options: {autoDiscover: true}
         - flags: {autoDiscover: false, profiles: [marked]}
     expected:
       output:
@@ -573,14 +611,15 @@ cases:
             che.yml: |
               options:
                 profileWorkingDirectory: spectree
-              p:
-                options: {autoDiscover: true}
-                include:
-                  makeLinks: [{source: _home/**, dest: 's:^_home:$HOME:'}]
-              q:
-                options: {autoDiscover: true, profileWorkingDirectory: proftree}
-                include:
-                  makeLinks: [{source: _home/**, dest: 's:^_home:$HOME:'}]
+              profilesDefinitions:
+                p:
+                  options: {autoDiscover: true}
+                  include:
+                    makeLinks: [{source: _home/**, dest: 's:^_home:$HOME:'}]
+                q:
+                  options: {autoDiscover: true, profileWorkingDirectory: proftree}
+                  include:
+                    makeLinks: [{source: _home/**, dest: 's:^_home:$HOME:'}]
             spectree/_home/.config/a: "a\n"
             proftree/_home/.config/b: "b\n"
         - flags: {}
@@ -598,10 +637,11 @@ cases:
         - refFiles: {}
         - hostFiles:
             che.yml: |
-              r:
-                options: {autoDiscover: true}
-                include:
-                  makeLinks: [_home/**]
+              profilesDefinitions:
+                r:
+                  options: {autoDiscover: true}
+                  include:
+                    makeLinks: [_home/**]
             chetree/_home/.config/c: "c\n"
         - flags: {profileWorkingDirectory: chetree}
     expected:
@@ -613,19 +653,21 @@ cases:
       args:
         - refFiles:
             che.yml: |
-              s:
-                options: {autoDiscover: true}
-                include:
-                  makeLinks: [_home/**]
+              profilesDefinitions:
+                s:
+                  options: {autoDiscover: true}
+                  include:
+                    makeLinks: [_home/**]
             _home/.config/x: "x\n"
         - hostFiles:
             che.yml: |
-              main:
-                options: {autoDiscover: true}
-                include:
-                  profiles:
-                    - source: "${REF_DIR}"
-                      profile: s
+              profilesDefinitions:
+                main:
+                  options: {autoDiscover: true}
+                  include:
+                    profiles:
+                      - source: "${REF_DIR}"
+                        profile: s
             roottree/_home/.config/c: "c\n"
         - flags: {profileWorkingDirectory: roottree}
     expected:
@@ -638,29 +680,31 @@ cases:
         - refFiles: {}
         - hostFiles:
             .che/che.yml: |
-              main:
-                options: {autoDiscover: true}
+              profilesDefinitions:
+                main:
+                  options: {autoDiscover: true}
         - flags: {}
     expected:
       output:
         profiles: [main]
         specPath: ${HOST_REPO}/.che/che.yml
-  - name: ShouldPreferRootSpecOverDotChe
+  - name: ShouldLoadRootAndDotCheSpecsAsOne
     input:
       args:
         - refFiles: {}
         - hostFiles:
             che.yml: |
-              atRoot:
-                options: {autoDiscover: true}
+              profilesDefinitions:
+                atRoot:
+                  options: {autoDiscover: true}
             .che/che.yml: |
-              nested:
-                options: {autoDiscover: true}
+              profilesDefinitions:
+                nested:
+                  options: {autoDiscover: true}
         - flags: {logLevel: debug}
     expected:
-      stdOut: ['che.yml wins over']
       output:
-        profiles: [atRoot]
+        profiles: [atRoot, nested]
         specPath: ${HOST_REPO}/che.yml
   - name: ShouldReadRepoVariablesAndCheEnvIntoTheSpec
     context:
@@ -669,13 +713,20 @@ cases:
       args:
         - refFiles: {}
         - hostFiles:
-            .che/che.variables.yml: "PIN: v1\nDECLARED: file\n"
+            .che/cheVariables.yml: "PIN: v1\nDECLARED: file\n"
+            .che/cheVariables.local.yml: "LOCAL: '${{ env.FILE }}'\n"
             .che/che.env: "REPO=fromfile\nFILE=fromfile\nDECLARED=env\n"
             .che/che.yml: |
               env: {SPEC: '${{ env.REPO }}-${{ var.PIN }}-${{ var.DECLARED }}-${{ var.FILE }}'}
-              variables: {LOCAL: '${{ env.FILE }}'}
-              main:
-                options: {autoDiscover: true}
+              variablesDefinitions:
+                specVariablesDefinitions:
+                  DECLARED: {required: true}
+                  FILE: {required: true}
+                  LOCAL: {required: true}
+                  PIN: {required: true}
+              profilesDefinitions:
+                main:
+                  options: {autoDiscover: true}
         - flags: {}
     expected:
       output:
@@ -689,28 +740,36 @@ cases:
       args:
         - refFiles:
             .che/che.env: "A=remote\nB=remote\nIMPLICIT=remote\n"
-            .che/che.variables.yml: "RPIN: r1\nKEEP: kept\n"
+            .che/cheVariables.yml: "RPIN: r1\nKEEP: kept\n"
             che.yml: |
               env: {C: '${{ env.A }}', E: '${{ env.HOSTONLY }}'}
-              p:
-                options: {profileWorkingDirectory: '${{ var.RPIN }}'}
-                include:
-                  makeDirs:
-                    - directories: ['$HOME/${{ var.KEEP }}/${{ var.IMPLICIT }}']
+              variablesDefinitions:
+                profilesVariablesDefinitions:
+                  p:
+                    IMPLICIT: {required: true}
+                    KEEP: {required: true}
+                    RPIN: {required: true}
+              profilesDefinitions:
+                p:
+                  options: {profileWorkingDirectory: '${{ var.RPIN }}'}
+                  include:
+                    makeDirs:
+                      - directories: ['$HOME/${{ var.KEEP }}/${{ var.IMPLICIT }}']
             r1/.gitkeep: ""
             over/.gitkeep: ""
         - hostFiles:
             .che/che.env: "IMPLICIT=host-che-env\n"
             che.yml: |
               env: {B: host, HOSTONLY: host}
-              main:
-                options: {autoDiscover: true}
-                include:
-                  profiles:
-                    - source: "${REF_DIR}"
-                      profile: p
-                      env: {D: entry}
-                      variables: {RPIN: over}
+              profilesDefinitions:
+                main:
+                  options: {autoDiscover: true}
+                  include:
+                    profiles:
+                      - source: "${REF_DIR}"
+                        profile: p
+                        env: {D: entry}
+                        variables: {RPIN: over}
         - flags: {}
     expected:
       output:
@@ -726,17 +785,21 @@ cases:
         - refFiles:
             che.yml: |
               env: {X: included}
-              inc:
-                options: {autoDiscover: true, runIf: ['env:X == entry']}
+              variablesDefinitions:
+                profilesVariablesDefinitions:
+                  inc: {V: {}}
+              profilesDefinitions:
+                inc:
+                  options: {autoDiscover: true, runIf: ['env:X == entry']}
         - hostFiles:
             che.yml: |
-              include:
-                sources:
-                  - source: "${REF_DIR}"
-                    env: {X: entry}
-                    variables: {V: entry}
-              main:
-                options: {autoDiscover: true}
+              specsInclude:
+                - source: "${REF_DIR}"
+                  env: {X: entry}
+                  variables: {V: entry}
+              profilesDefinitions:
+                main:
+                  options: {autoDiscover: true}
         - flags: {}
     expected:
       output:
@@ -751,11 +814,16 @@ cases:
         - refFiles: {}
         - hostFiles:
             che.yml: |
-              main:
-                options: {autoDiscover: true, profileWorkingDirectory: '${{ var.NOPE }}'}
+              variablesDefinitions:
+                profilesVariablesDefinitions:
+                  main:
+                    NOPE: {}
+              profilesDefinitions:
+                main:
+                  options: {autoDiscover: true, profileWorkingDirectory: '${{ var.NOPE }}'}
         - flags: {}
     expected:
-      errorOutput: ['che.yml: unset vars:', 'NOPE at /main/options/profileWorkingDirectory']
+      errorOutput: ['che.yml: unset vars:', 'NOPE at /profilesDefinitions/main/options/profileWorkingDirectory']
   - name: ShouldIgnoreDotEnv
     input:
       args:
@@ -763,8 +831,9 @@ cases:
         - hostFiles:
             .env: "FROM_DOTENV=yes\n"
             che.yml: |
-              main:
-                options: {autoDiscover: true}
+              profilesDefinitions:
+                main:
+                  options: {autoDiscover: true}
         - flags: {}
     expected:
       output:
@@ -776,17 +845,19 @@ cases:
       args:
         - refFiles:
             che.export.yml: |
-              exported:
-                options: {autoDiscover: true}
+              profilesDefinitions:
+                exported:
+                  options: {autoDiscover: true}
             .che/che.yml: |
-              local:
-                options: {autoDiscover: true}
+              profilesDefinitions:
+                local:
+                  options: {autoDiscover: true}
         - hostFiles:
             che.yml: |
-              include:
-                sources: ["git::file://${REF_DIR}"]
-              main:
-                options: {autoDiscover: true}
+              specsInclude: ["git::file://${REF_DIR}"]
+              profilesDefinitions:
+                main:
+                  options: {autoDiscover: true}
         - flags: {}
     expected:
       output:
@@ -798,16 +869,18 @@ cases:
       args:
         - refFiles:
             che.yml: |
-              p:
-                options: {autoDiscover: true}
+              profilesDefinitions:
+                p:
+                  options: {autoDiscover: true}
         - hostFiles:
             che.yml: |
-              main:
-                options: {autoDiscover: true}
-                include:
-                  profiles:
-                    - source: "git::file://${REF_DIR}"
-                      profile: p
+              profilesDefinitions:
+                main:
+                  options: {autoDiscover: true}
+                  include:
+                    profiles:
+                      - source: "git::file://${REF_DIR}"
+                        profile: p
         - flags: {}
     expected:
       stdOut: ['che.yml: a spec not designed for reuse, consume a che.export.yml']
@@ -818,16 +891,18 @@ cases:
       args:
         - refFiles:
             che.export.yml: |
-              p:
-                options: {autoDiscover: true}
+              profilesDefinitions:
+                p:
+                  options: {autoDiscover: true}
         - hostFiles:
             che.yml: |
-              main:
-                options: {autoDiscover: true}
-                include:
-                  profiles:
-                    - source: "git::file://${REF_DIR}"
-                      profile: p
+              profilesDefinitions:
+                main:
+                  options: {autoDiscover: true}
+                  include:
+                    profiles:
+                      - source: "git::file://${REF_DIR}"
+                        profile: p
         - flags: {}
     expected:
       output:
@@ -839,34 +914,37 @@ cases:
       args:
         - refFiles:
             che.export.yml: |
-              top:
-                include:
-                  profiles:
-                    - mid
-                    - {source: ./sub, profile: leaf}
-              mid:
-                include:
-                  makeDirs:
-                    - directories: ['$HOME/mid']
+              profilesDefinitions:
+                top:
+                  include:
+                    profiles:
+                      - mid
+                      - {source: ./sub, profile: leaf}
+                mid:
+                  include:
+                    makeDirs:
+                      - directories: ['$HOME/mid']
             sub/che.export.yml: |
-              leaf:
-                include:
-                  makeDirs:
-                    - directories: ['$HOME/leaf']
-              hidden:
-                include:
-                  makeDirs:
-                    - directories: ['$HOME/hidden']
+              profilesDefinitions:
+                leaf:
+                  include:
+                    makeDirs:
+                      - directories: ['$HOME/leaf']
+                hidden:
+                  include:
+                    makeDirs:
+                      - directories: ['$HOME/hidden']
         - hostFiles:
             che.yml: |
-              main:
-                options: {autoDiscover: true}
-                include:
-                  profiles:
-                    - {source: "${REF_DIR}", profile: "top::mid"}
-                    - {source: "${REF_DIR}", profile: "top::leaf"}
-                    - {source: "${REF_DIR}", profile: "leaf"}
-                    - {source: "${REF_DIR}", profile: "top::hidden"}
+              profilesDefinitions:
+                main:
+                  options: {autoDiscover: true}
+                  include:
+                    profiles:
+                      - {source: "${REF_DIR}", profile: "top::mid"}
+                      - {source: "${REF_DIR}", profile: "top::leaf"}
+                      - {source: "${REF_DIR}", profile: "leaf"}
+                      - {source: "${REF_DIR}", profile: "top::hidden"}
         - flags: {}
     expected:
       stdOut:
@@ -880,15 +958,17 @@ cases:
       args:
         - refFiles:
             other/custom.yml: |
-              p:
-                options: {autoDiscover: true}
+              profilesDefinitions:
+                p:
+                  options: {autoDiscover: true}
         - hostFiles:
             che.yml: |
-              main:
-                options: {autoDiscover: true}
-                include:
-                  profiles:
-                    - {source: "${REF_DIR}", spec: other/custom.yml, profile: p}
+              profilesDefinitions:
+                main:
+                  options: {autoDiscover: true}
+                  include:
+                    profiles:
+                      - {source: "${REF_DIR}", spec: other/custom.yml, profile: p}
         - flags: {}
     expected:
       output:
@@ -898,18 +978,21 @@ cases:
       args:
         - refFiles:
             che.export.yml: |
-              a:
-                options: {autoDiscover: true}
+              profilesDefinitions:
+                a:
+                  options: {autoDiscover: true}
             .che/che.export.yml: |
-              b:
-                options: {autoDiscover: true}
+              profilesDefinitions:
+                b:
+                  options: {autoDiscover: true}
         - hostFiles:
             che.yml: |
-              main:
-                options: {autoDiscover: true}
-                include:
-                  profiles:
-                    - {source: "${REF_DIR}", profile: b}
+              profilesDefinitions:
+                main:
+                  options: {autoDiscover: true}
+                  include:
+                    profiles:
+                      - {source: "${REF_DIR}", profile: b}
         - flags: {}
     expected:
       stdOut: ['che.export.yml sits in a hidden dir']
@@ -923,11 +1006,12 @@ cases:
             .che/che.yml: "b: {}\n"
         - hostFiles:
             che.yml: |
-              main:
-                options: {autoDiscover: true}
-                include:
-                  profiles:
-                    - {source: "${REF_DIR}", profile: a}
+              profilesDefinitions:
+                main:
+                  options: {autoDiscover: true}
+                  include:
+                    profiles:
+                      - {source: "${REF_DIR}", profile: a}
         - flags: {}
     expected:
       errorOutput: ['holds several che.yml and no che.export.yml']
@@ -937,12 +1021,13 @@ cases:
         - refFiles: {}
         - hostFiles:
             che.export.yml: |
-              host:
-                options: {autoDiscover: true}
+              profilesDefinitions:
+                host:
+                  options: {autoDiscover: true}
             .che/che.yml: |
-              include:
-                sources: ["."]
-              own: {}
+              specsInclude: ["."]
+              profilesDefinitions:
+                own: {}
         - flags: {}
     expected:
       output:
@@ -952,23 +1037,26 @@ cases:
       args:
         - refFiles:
             che.export.yml: |
-              a: {}
-              b: {}
+              profilesDefinitions:
+                a: {}
+                b: {}
             sub/che.export.yml: |
-              c: {}
-              d: {}
+              profilesDefinitions:
+                c: {}
+                d: {}
         - hostFiles:
             che.yml: |
-              main:
-                options: {autoDiscover: true}
-                include:
-                  profiles:
-                    - source: "${REF_DIR}"
-                      profiles: [a, b, {spec: sub, profile: c}]
-                      env: {SHARED: yes}
-                    - source: "${REF_DIR}"
-                      spec: sub
-                      profiles: [d]
+              profilesDefinitions:
+                main:
+                  options: {autoDiscover: true}
+                  include:
+                    profiles:
+                      - source: "${REF_DIR}"
+                        profiles: [a, b, {spec: sub, profile: c}]
+                        env: {SHARED: yes}
+                      - source: "${REF_DIR}"
+                        spec: sub
+                        profiles: [d]
         - flags: {}
     expected:
       output:
@@ -981,13 +1069,14 @@ cases:
         - refFiles: {}
         - hostFiles:
             .che/che.yml: |
-              include:
-                sources: [.che/repo-git-tracked, .che/repo-git-untracked]
+              specsInclude: [.che/repo-git-tracked, .che/repo-git-untracked]
             .che/repo-git-tracked/che.yml: |
-              ontoRepo: {}
+              profilesDefinitions:
+                ontoRepo: {}
             .che/repo-git-untracked/che.yml: |
-              envSeed: {}
-              other: {}
+              profilesDefinitions:
+                envSeed: {}
+                other: {}
         - flags: {profiles: [ontoRepo, envSeed]}
     expected:
       output:
@@ -998,10 +1087,10 @@ cases:
         - refFiles: {}
         - hostFiles:
             .che/che.yml: |
-              include:
-                sources: [.che/repo-git-tracked]
+              specsInclude: [.che/repo-git-tracked]
             .che/repo-git-tracked/che.yml: |
-              ontoRepo: {}
+              profilesDefinitions:
+                ontoRepo: {}
         - flags: {profiles: [nope]}
     expected:
       errorOutput: ['--profiles [nope] not defined']
@@ -1011,15 +1100,16 @@ cases:
         - refFiles: {}
         - hostFiles:
             che.yml: |
-              tracked:
-                type: repo-git-tracked
-                options: {autoDiscover: true}
-              untracked:
-                type: repo-git-untracked
-                options: {autoDiscover: true}
-              machine:
-                type: host
-                options: {autoDiscover: true}
+              profilesDefinitions:
+                tracked:
+                  type: repo-git-tracked
+                  options: {autoDiscover: true}
+                untracked:
+                  type: repo-git-untracked
+                  options: {autoDiscover: true}
+                machine:
+                  type: host
+                  options: {autoDiscover: true}
         - flags: {targetProfileTypes: [repo-git-tracked, host], logLevel: debug}
     expected:
       stdOut: ["profile untracked", "type repo-git-untracked not in --target-profile-types"]
@@ -1031,12 +1121,13 @@ cases:
         - refFiles: {}
         - hostFiles:
             che.yml: |
-              tracked:
-                type: repo-git-tracked
-                options: {autoDiscover: true}
-              untracked:
-                type: repo-git-untracked
-                options: {autoDiscover: true}
+              profilesDefinitions:
+                tracked:
+                  type: repo-git-tracked
+                  options: {autoDiscover: true}
+                untracked:
+                  type: repo-git-untracked
+                  options: {autoDiscover: true}
         - flags: {targetProfileTypes: [repo-git-tracked], profiles: [untracked]}
     expected:
       output:
@@ -1046,17 +1137,19 @@ cases:
       args:
         - refFiles:
             che.yml: |
-              p:
-                type: host
+              profilesDefinitions:
+                p:
+                  type: host
         - hostFiles:
             che.yml: |
-              main:
-                type: repo-git-tracked
-                options: {autoDiscover: true}
-                include:
-                  profiles:
-                    - specDirPath: "${REF_DIR}"
-                      profileName: p
+              profilesDefinitions:
+                main:
+                  type: repo-git-tracked
+                  options: {autoDiscover: true}
+                  include:
+                    profiles:
+                      - specDirPath: "${REF_DIR}"
+                        profileName: p
         - flags: {targetProfileTypes: [repo-git-tracked]}
     expected:
       output:
@@ -1067,9 +1160,10 @@ cases:
         - refFiles: {}
         - hostFiles:
             che.yml: |
-              machine:
-                type: host
-                options: {autoDiscover: true}
+              profilesDefinitions:
+                machine:
+                  type: host
+                  options: {autoDiscover: true}
         - flags: {targetProfileTypes: [repo-git-tracked]}
     expected:
       errorOutput: ['no auto-discovered profile of type repo-git-tracked']

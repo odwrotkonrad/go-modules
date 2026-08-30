@@ -1,67 +1,71 @@
 # yaml-language-server: $schema=https://gitlab.com/api/v4/projects/konradodwrot%2Fgo-modules/packages/generic/che-schema/v0.0.1-che-min-v0.0.96/che.schema.json
 options:
   profileWorkingDirectory: root
-base:
-  options: {autoDiscover: false}
-  include:
-    makeLinks:
-      - source: _home/.config/zsh/**
-        dest: 's:^_home:$HOME:'
-      - etc/zshrc
-      - source: _home/.config/foo/**
-        dest: 's:^_home/.config/foo:$HOME/.config/bar:'
-    makeCopies:
-      - source: _home/.config/zsh/**
-        dest: 's:^_home:$HOME:'
-      - owner: root
-        ownerGroup: wheel
-        chmod: "0644"
-        source: Library/LaunchDaemons/otelcol.plist.ontoHost.cp
-        dest:
-          - /Library/LaunchDaemons/otelcol.plist
-    renderTemplates:
-      - source: _home/.config/zsh/**
-        dest: 's:^_home:$HOME:'
-    makeDirs:
-      - directories:
-          - $HOME/.cache/zsh
-      - chmod: "2775"
-        directories:
-          - dest:
-              - /var/log/che-test-setgid
-    runScripts:
-      - install/setup
+profilesDefinitions:
+  base:
+    options: {autoDiscover: false}
+    include:
+      makeLinks:
+        - source: _home/.config/zsh/**
+          dest: 's:^_home:$HOME:'
+        - etc/zshrc
+        - source: _home/.config/foo/**
+          dest: 's:^_home/.config/foo:$HOME/.config/bar:'
+      makeCopies:
+        - source: _home/.config/zsh/**
+          dest: 's:^_home:$HOME:'
+        - owner: root
+          ownerGroup: wheel
+          chmod: "0644"
+          source: Library/LaunchDaemons/otelcol.plist.ontoHost.cp
+          dest:
+            - /Library/LaunchDaemons/otelcol.plist
+      renderTemplates:
+        - source: _home/.config/zsh/**
+          dest: 's:^_home:$HOME:'
+      makeDirs:
+        - directories:
+            - $HOME/.cache/zsh
+        - chmod: "2775"
+          directories:
+            - dest:
+                - /var/log/che-test-setgid
+      runScripts:
+        - install/setup
 
-cli/macos:
-  options:
-    autoDiscover: true
-    runIf:
-      - builtin:isOs == macos
-      - builtin:isVirt
-  include:
-    profiles:
-      - base
+  'cli/macos':
+    options:
+      autoDiscover: true
+      runIf:
+        - builtin:isOs == macos
+        - builtin:isVirt
+    include:
+      profiles:
+        - base
 
-desktop/macos:
-  options:
-    autoDiscover: true
-    runIf:
-      - builtin:isOs == macos
-      - builtin:isVirt == false
-  include:
-    profiles:
-      - base
+  'desktop/macos':
+    options:
+      autoDiscover: true
+      runIf:
+        - builtin:isOs == macos
+        - builtin:isVirt == false
+    include:
+      profiles:
+        - base
 
-ontoRepo:
-  options:
-    autoDiscover: false
-    profileWorkingDirectory: .
-  include:
-    renderTemplates:
-      - source: templates/r.ontoRepo.tpl
-        dest:
-          - docs/r.md
-      - source: templates/ruby
-        dest: ${invokingSpecGitRoot}/shared/ci/ruby
-        <<<:
-          - source: /artifact.rb
+  ontoRepo:
+    options:
+      autoDiscover: false
+      profileWorkingDirectory: .
+    include:
+      renderTemplates:
+        - source: templates/r.ontoRepo.tpl
+          dest:
+            - docs/r.md
+        - source: ${{ repoRoot }}/templates/r.ontoRepo.tpl
+          dest:
+            - docs/r-from-root.md
+        - source: templates/ruby
+          dest: ${invokingSpecGitRoot}/shared/ci/ruby
+          <<<:
+            - source: /artifact.rb

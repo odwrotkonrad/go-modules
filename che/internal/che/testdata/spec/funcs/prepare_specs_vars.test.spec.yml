@@ -1,0 +1,779 @@
+# [>] 🤖🤖
+context:
+  function: che.PrepareSpecs
+cases:
+  - name: ShouldKeepInvokingSpecScopeAtTheRootTopLevelOnly
+    input:
+      args:
+        - refFiles:
+            che.yml: |
+              env: {SEEN_EMB: '${{ var.X || none }}'}
+              variablesDefinitions:
+                specVariablesDefinitions: {X: {}}
+                profilesVariablesDefinitions: {p: {X: {}}}
+              profilesDefinitions:
+                p:
+                  type: host
+                  options: {autoDiscover: true}
+        - hostFiles:
+            .che/cheVariables.yml: "X: {value: root, scope: invokingSpec}\n"
+            .che/che.yml: |
+              env: {SEEN_ROOT: '${{ var.X || none }}'}
+              variablesDefinitions:
+                specVariablesDefinitions: {X: {}}
+              specsInclude: ['${REF_DIR}']
+              profilesDefinitions:
+                main:
+                  type: host
+                  options: {autoDiscover: true}
+        - flags: {}
+    expected:
+      output:
+        profiles: [main, "${REF_DIR}::p"]
+        envOf:
+          main: {SEEN_ROOT: root}
+          p: {SEEN_EMB: none}
+        varsOf:
+          main: {X: ""}
+          p: {X: ""}
+  - name: ShouldReachDefinedProfilesWithTheDefaultScopeAndNoEmbeddedSpec
+    input:
+      args:
+        - refFiles:
+            che.yml: |
+              env: {SEEN_EMB: '${{ var.X || none }}'}
+              variablesDefinitions:
+                specVariablesDefinitions: {X: {}}
+                profilesVariablesDefinitions: {p: {X: {}}}
+              profilesDefinitions:
+                p:
+                  type: host
+                  options: {autoDiscover: true}
+        - hostFiles:
+            .che/cheVariables.yml: "X: root\n"
+            .che/che.yml: |
+              env: {SEEN_ROOT: '${{ var.X || none }}'}
+              variablesDefinitions:
+                profilesVariablesDefinitions: {main: {X: {}}}
+              specsInclude: ['${REF_DIR}']
+              profilesDefinitions:
+                main:
+                  type: host
+                  options: {autoDiscover: true}
+        - flags: {}
+    expected:
+      output:
+        profiles: [main, "${REF_DIR}::p"]
+        envOf:
+          main: {SEEN_ROOT: root}
+          p: {SEEN_EMB: none}
+        varsOf:
+          main: {X: root}
+          p: {X: ""}
+  - name: ShouldReachEveryEmbeddedSpecTopLevelWithRecursiveSpecsNeverTheirProfiles
+    input:
+      args:
+        - refFiles:
+            che.yml: |
+              env: {SEEN_EMB: '${{ var.X || none }}'}
+              variablesDefinitions:
+                specVariablesDefinitions: {X: {}}
+                profilesVariablesDefinitions: {p: {X: {}}}
+              specsInclude: [./deep]
+              profilesDefinitions:
+                p:
+                  type: host
+                  options: {autoDiscover: true}
+            deep/che.yml: |
+              env: {SEEN_DEEP: '${{ var.X || none }}'}
+              variablesDefinitions:
+                specVariablesDefinitions: {X: {}}
+                profilesVariablesDefinitions: {d: {X: {}}}
+              profilesDefinitions:
+                d:
+                  type: host
+                  options: {autoDiscover: true}
+        - hostFiles:
+            .che/cheVariables.yml: "X: root\n"
+            .che/che.yml: |
+              variablesDefinitions:
+                specVariablesDefinitions: {X: {scope: recursiveSpecs}}
+              specsInclude: ['${REF_DIR}']
+              profilesDefinitions:
+                main:
+                  type: host
+                  options: {autoDiscover: true}
+        - flags: {}
+    expected:
+      output:
+        profiles: [main, "${REF_DIR}::p", "./deep::d"]
+        envOf:
+          p: {SEEN_EMB: root}
+          d: {SEEN_DEEP: root}
+        varsOf:
+          main: {X: ""}
+          p: {X: ""}
+          d: {X: ""}
+  - name: ShouldReachEmbeddedSpecsAndTheirProfilesWithRecursiveSpecsAndProfiles
+    input:
+      args:
+        - refFiles:
+            che.yml: |
+              env: {SEEN_EMB: '${{ var.X || none }}'}
+              variablesDefinitions:
+                specVariablesDefinitions: {X: {}}
+                profilesVariablesDefinitions: {p: {X: {}}}
+              specsInclude: [./deep]
+              profilesDefinitions:
+                p:
+                  type: host
+                  options: {autoDiscover: true}
+            deep/che.yml: |
+              variablesDefinitions:
+                profilesVariablesDefinitions: {d: {X: {}}}
+              profilesDefinitions:
+                d:
+                  type: host
+                  options: {autoDiscover: true}
+        - hostFiles:
+            .che/cheVariables.yml: "X: root\n"
+            .che/che.yml: |
+              variablesDefinitions:
+                specVariablesDefinitions: {X: {scope: recursiveSpecsAndProfiles}}
+              specsInclude: ['${REF_DIR}']
+              profilesDefinitions:
+                main:
+                  type: host
+                  options: {autoDiscover: true}
+        - flags: {}
+    expected:
+      output:
+        profiles: [main, "${REF_DIR}::p", "./deep::d"]
+        envOf:
+          p: {SEEN_EMB: root}
+        varsOf:
+          main: {X: root}
+          p: {X: root}
+          d: {X: root}
+  - name: ShouldHandOnlyRecursiveSpecsAndProfilesValuesToAProfileRef
+    input:
+      args:
+        - refFiles:
+            che.export.yml: |
+              env: {SEEN_R_EMB: '${{ var.R || none }}', SEEN_A_EMB: '${{ var.A || none }}'}
+              variablesDefinitions:
+                specVariablesDefinitions: {R: {}, A: {}}
+                profilesVariablesDefinitions: {p: {R: {}, A: {}}}
+              profilesDefinitions:
+                p:
+                  type: host
+        - hostFiles:
+            .che/cheVariables.yml: "R: root\nA: root\n"
+            .che/che.yml: |
+              variablesDefinitions:
+                specVariablesDefinitions:
+                  R: {scope: recursiveSpecs}
+                  A: {scope: recursiveSpecsAndProfiles}
+              profilesDefinitions:
+                main:
+                  type: host
+                  options: {autoDiscover: true}
+                  include:
+                    profiles:
+                      - {specDirPath: '${REF_DIR}', profileName: p}
+        - flags: {}
+    expected:
+      output:
+        profiles: [main, "${REF_DIR}::p"]
+        envOf:
+          p: {SEEN_R_EMB: none, SEEN_A_EMB: root}
+        varsOf:
+          p: {R: "", A: root}
+  - name: ShouldLetAFileEntryScopeOverrideTheDefinitionScope
+    input:
+      args:
+        - refFiles:
+            che.yml: |
+              env: {SEEN_EMB: '${{ var.X || none }}'}
+              variablesDefinitions:
+                specVariablesDefinitions: {X: {}}
+                profilesVariablesDefinitions: {p: {X: {}}}
+              profilesDefinitions:
+                p:
+                  type: host
+                  options: {autoDiscover: true}
+        - hostFiles:
+            .che/cheVariables.yml: "X: {value: root, scope: invokingSpec}\n"
+            .che/che.yml: |
+              variablesDefinitions:
+                specVariablesDefinitions: {X: {scope: recursiveSpecsAndProfiles}}
+              specsInclude: ['${REF_DIR}']
+              profilesDefinitions:
+                main:
+                  type: host
+                  options: {autoDiscover: true}
+        - flags: {}
+    expected:
+      output:
+        profiles: [main, "${REF_DIR}::p"]
+        envOf:
+          p: {SEEN_EMB: none}
+        varsOf:
+          main: {X: ""}
+          p: {X: ""}
+  - name: ShouldPropagateAPassedValueByTheEmbeddedDefinitionScope
+    input:
+      args:
+        - refFiles:
+            che.yml: |
+              variablesDefinitions:
+                specVariablesDefinitions: {X: {scope: recursiveSpecsAndProfiles}}
+              specsInclude: [./deep]
+              profilesDefinitions:
+                p:
+                  type: host
+                  options: {autoDiscover: true}
+            deep/che.yml: |
+              variablesDefinitions:
+                profilesVariablesDefinitions: {d: {X: {}}}
+              profilesDefinitions:
+                d:
+                  type: host
+                  options: {autoDiscover: true}
+        - hostFiles:
+            .che/che.yml: |
+              specsInclude:
+                - {specDirPath: '${REF_DIR}', variables: {X: passed}}
+              profilesDefinitions:
+                main:
+                  type: host
+                  options: {autoDiscover: true}
+        - flags: {}
+    expected:
+      output:
+        profiles: [main, "${REF_DIR}::p", "./deep::d"]
+        varsOf:
+          p: {X: passed}
+          d: {X: passed}
+  - name: ShouldLayerDefaultsUnderEnvUnderInheritedUnderSharedUnderLocalUnderPass
+    context:
+      env: {B: env, C: env, D: env, E: env, F: env}
+    input:
+      args:
+        - refFiles:
+            che.yml: |
+              env:
+                SEEN_A_EMB: '${{ var.A }}'
+                SEEN_B: '${{ var.B }}'
+                SEEN_C: '${{ var.C }}'
+                SEEN_D: '${{ var.D }}'
+                SEEN_E: '${{ var.E }}'
+                SEEN_F: '${{ var.F }}'
+              variablesDefinitions:
+                specVariablesDefinitions: {A: {}, B: {}, C: {}, D: {}, E: {}, F: {}}
+              profilesDefinitions:
+                p:
+                  type: host
+                  options: {autoDiscover: true}
+            cheVariables.defaults.yml: "A: defaults\nB: defaults\nC: defaults\nD: defaults\nE: defaults\nF: defaults\n"
+            cheVariables.yml: "D: shared\nE: shared\nF: shared\n"
+            cheVariables.local.yml: "E: local\nF: local\n"
+        - hostFiles:
+            .che/cheVariables.yml: "C: inherited\nD: inherited\nE: inherited\nF: inherited\n"
+            .che/che.yml: |
+              variablesDefinitions:
+                specVariablesDefinitions:
+                  C: {scope: recursiveSpecs}
+                  D: {scope: recursiveSpecs}
+                  E: {scope: recursiveSpecs}
+                  F: {scope: recursiveSpecs}
+              specsInclude:
+                - {specDirPath: '${REF_DIR}', variables: {F: passed}}
+              profilesDefinitions:
+                main:
+                  type: host
+                  options: {autoDiscover: true}
+        - flags: {}
+    expected:
+      output:
+        profiles: [main, "${REF_DIR}::p"]
+        envOf:
+          p: {SEEN_A_EMB: defaults, SEEN_B: env, SEEN_C: inherited, SEEN_D: shared, SEEN_E: local, SEEN_F: passed}
+  - name: ShouldAlwaysHandAProfileRefPassToTheReferencedProfile
+    input:
+      args:
+        - refFiles:
+            che.export.yml: |
+              variablesDefinitions:
+                profilesVariablesDefinitions: {p: {X: {scope: invokingSpec}}}
+              profilesDefinitions:
+                p:
+                  type: host
+        - hostFiles:
+            .che/che.yml: |
+              profilesDefinitions:
+                main:
+                  type: host
+                  options: {autoDiscover: true}
+                  include:
+                    profiles:
+                      - {specDirPath: '${REF_DIR}', profileName: p, variables: {X: passed}}
+        - flags: {}
+    expected:
+      output:
+        profiles: [main, "${REF_DIR}::p"]
+        varsOf:
+          p: {X: passed}
+  - name: ShouldFillDeclaredNamesFromEnvAndIgnoreUndeclaredEnv
+    context:
+      env: {DECLARED: env, UNDECLARED: env}
+    input:
+      args:
+        - refFiles: {}
+        - hostFiles:
+            .che/che.yml: |
+              env: {SEEN_ROOT: '${{ var.UNDECLARED || none }}'}
+              variablesDefinitions:
+                profilesVariablesDefinitions: {main: {DECLARED: {}}}
+              profilesDefinitions:
+                main:
+                  type: host
+                  options: {autoDiscover: true}
+        - flags: {}
+    expected:
+      output:
+        profiles: [main]
+        envOf:
+          main: {SEEN_ROOT: none}
+        varsOf:
+          main: {DECLARED: env, UNDECLARED: ""}
+  - name: ShouldAcceptAProfileOwnVariablesDefinitions
+    input:
+      args:
+        - refFiles: {}
+        - hostFiles:
+            .che/cheVariables.yml: "X: root\n"
+            .che/che.yml: |
+              profilesDefinitions:
+                main:
+                  type: host
+                  variablesDefinitions: {X: {required: true, description: read by main}}
+                  options: {autoDiscover: true, profileWorkingDirectory: '${{ var.X }}'}
+            root/.gitkeep: ""
+        - flags: {}
+    expected:
+      output:
+        profiles: [main]
+        varsOf:
+          main: {X: root}
+        workingDirs: {main: "${HOST_REPO}/root"}
+  - name: ShouldMergeDefinitionsOfTheTwoRootSpecFiles
+    input:
+      args:
+        - refFiles: {}
+        - hostFiles:
+            .che/cheVariables.yml: "A: a\nB: b\n"
+            che.yml: |
+              variablesDefinitions:
+                specVariablesDefinitions: {A: {}}
+              profilesDefinitions:
+                fromRoot:
+                  type: host
+                  options: {autoDiscover: true}
+            .che/che.yml: |
+              variablesDefinitions:
+                specVariablesDefinitions: {B: {}}
+              profilesDefinitions:
+                fromDotChe:
+                  type: host
+                  options: {autoDiscover: true}
+        - flags: {}
+    expected:
+      output:
+        profiles: [fromRoot, fromDotChe]
+        varsOf:
+          fromRoot: {A: a, B: b}
+          fromDotChe: {A: a, B: b}
+  - name: ShouldReadAnExportsFilesBesideItNeverTheRepoDotChe
+    input:
+      args:
+        - refFiles:
+            che.export.yml: |
+              variablesDefinitions:
+                profilesVariablesDefinitions: {p: {X: {}}}
+              profilesDefinitions:
+                p:
+                  type: host
+            cheVariables.defaults.yml: "X: beside\n"
+            .che/cheVariables.yml: "UNRELATED: value\n"
+        - hostFiles:
+            .che/che.yml: |
+              profilesDefinitions:
+                main:
+                  type: host
+                  options: {autoDiscover: true}
+                  include:
+                    profiles:
+                      - {specDirPath: '${REF_DIR}', profileName: p}
+        - flags: {}
+    expected:
+      output:
+        profiles: [main, "${REF_DIR}::p"]
+        varsOf:
+          p: {X: beside, UNRELATED: ""}
+  - name: ShouldAcceptTypedAndEnumeratedLiterals
+    input:
+      args:
+        - refFiles: {}
+        - hostFiles:
+            .che/cheVariables.yml: "N: \"42\"\nB: \"false\"\nE: blue\n"
+            .che/che.yml: |
+              variablesDefinitions:
+                profilesVariablesDefinitions:
+                  main:
+                    N: {type: integer}
+                    B: {type: boolean}
+                    E: {enum: [red, blue]}
+              profilesDefinitions:
+                main:
+                  type: host
+                  options: {autoDiscover: true}
+        - flags: {}
+    expected:
+      output:
+        profiles: [main]
+        varsOf:
+          main: {N: "42", B: "false", E: blue}
+  - name: ShouldFailOnARequiredEmbeddedVariableNothingSets
+    input:
+      args:
+        - refFiles:
+            che.yml: |
+              variablesDefinitions:
+                profilesVariablesDefinitions: {p: {X: {required: true}}}
+              profilesDefinitions:
+                p:
+                  type: host
+                  options: {autoDiscover: true}
+        - hostFiles:
+            .che/che.yml: |
+              specsInclude: ['${REF_DIR}']
+              profilesDefinitions:
+                main:
+                  type: host
+                  options: {autoDiscover: true}
+        - flags: {}
+    expected:
+      errorOutput: ['required variables without a value: X', 'specsInclude or profile entry']
+  - name: ShouldFailOnAFileValueNoDefinitionDeclares
+    input:
+      args:
+        - refFiles: {}
+        - hostFiles:
+            .che/cheVariables.yml: "X: root\nSTRAY: value\n"
+            .che/che.yml: |
+              variablesDefinitions:
+                specVariablesDefinitions: {X: {}}
+              profilesDefinitions:
+                main:
+                  type: host
+                  options: {autoDiscover: true}
+        - flags: {}
+    expected:
+      errorOutput: ['STRAY: set by cheVariables.yml but declared by no variablesDefinitions']
+  - name: ShouldFailOnAnUndeclaredPassAtASpecsIncludeEntry
+    input:
+      args:
+        - refFiles:
+            che.yml: |
+              profilesDefinitions:
+                p:
+                  type: host
+                  options: {autoDiscover: true}
+        - hostFiles:
+            .che/che.yml: |
+              specsInclude:
+                - {specDirPath: '${REF_DIR}', variables: {X: passed}}
+              profilesDefinitions:
+                main:
+                  type: host
+                  options: {autoDiscover: true}
+        - flags: {}
+    expected:
+      errorOutput: ['X: set by explicit pass but declared by no variablesDefinitions']
+  - name: ShouldFailOnAnUndeclaredPassAtAProfileRef
+    input:
+      args:
+        - refFiles:
+            che.export.yml: |
+              profilesDefinitions:
+                p:
+                  type: host
+        - hostFiles:
+            .che/che.yml: |
+              profilesDefinitions:
+                main:
+                  type: host
+                  options: {autoDiscover: true}
+                  include:
+                    profiles:
+                      - {specDirPath: '${REF_DIR}', profileName: p, variables: {X: passed}}
+        - flags: {}
+    expected:
+      errorOutput: ['X: set by explicit pass but declared by no variablesDefinitions']
+  - name: ShouldFailOnAnIntegerTypeMismatch
+    input:
+      args:
+        - refFiles: {}
+        - hostFiles:
+            .che/cheVariables.yml: "N: many\n"
+            .che/che.yml: |
+              variablesDefinitions:
+                profilesVariablesDefinitions: {main: {N: {type: integer}}}
+              profilesDefinitions:
+                main:
+                  type: host
+                  options: {autoDiscover: true}
+        - flags: {}
+    expected:
+      errorOutput: ['N (cheVariables.yml): want an integer, got "many"']
+  - name: ShouldFailOnABooleanTypeMismatch
+    context:
+      env: {B: yes}
+    input:
+      args:
+        - refFiles: {}
+        - hostFiles:
+            .che/che.yml: |
+              variablesDefinitions:
+                profilesVariablesDefinitions: {main: {B: {type: boolean}}}
+              profilesDefinitions:
+                main:
+                  type: host
+                  options: {autoDiscover: true}
+        - flags: {}
+    expected:
+      errorOutput: ['B (env): want true | false, got "yes"']
+  - name: ShouldFailOnAnEnumMismatchAtAPass
+    input:
+      args:
+        - refFiles:
+            che.yml: |
+              variablesDefinitions:
+                profilesVariablesDefinitions: {p: {E: {enum: [red, blue]}}}
+              profilesDefinitions:
+                p:
+                  type: host
+                  options: {autoDiscover: true}
+        - hostFiles:
+            .che/che.yml: |
+              specsInclude:
+                - {specDirPath: '${REF_DIR}', variables: {E: green}}
+              profilesDefinitions:
+                main:
+                  type: host
+                  options: {autoDiscover: true}
+        - flags: {}
+    expected:
+      errorOutput: ['E (explicit pass): want one of red | blue, got "green"']
+  - name: ShouldFailOnADefaultInsideADefinition
+    input:
+      args:
+        - refFiles: {}
+        - hostFiles:
+            .che/che.yml: |
+              variablesDefinitions:
+                specVariablesDefinitions: {X: {default: x}}
+              profilesDefinitions:
+                main:
+                  type: host
+                  options: {autoDiscover: true}
+        - flags: {}
+    expected:
+      errorOutput: ['default is not allowed, put it in cheVariables.defaults.yml']
+  - name: ShouldFailOnAProfileDefinedInBothDefinitionPlaces
+    input:
+      args:
+        - refFiles: {}
+        - hostFiles:
+            .che/che.yml: |
+              variablesDefinitions:
+                profilesVariablesDefinitions: {main: {X: {}}}
+              profilesDefinitions:
+                main:
+                  type: host
+                  variablesDefinitions: {X: {}}
+                  options: {autoDiscover: true}
+        - flags: {}
+    expected:
+      errorOutput: ['profile "main": variablesDefinitions given both in variablesDefinitions.profilesVariablesDefinitions and in the profile']
+  - name: ShouldFailWhenAnEmbeddedProfileReadsARecursiveSpecsVariable
+    input:
+      args:
+        - refFiles:
+            che.yml: |
+              variablesDefinitions:
+                profilesVariablesDefinitions: {p: {X: {}}}
+              profilesDefinitions:
+                p:
+                  type: host
+                  options: {autoDiscover: true, profileWorkingDirectory: '${{ var.X }}'}
+        - hostFiles:
+            .che/cheVariables.yml: "X: root\n"
+            .che/che.yml: |
+              variablesDefinitions:
+                specVariablesDefinitions: {X: {scope: recursiveSpecs}}
+              specsInclude: ['${REF_DIR}']
+              profilesDefinitions:
+                main:
+                  type: host
+                  options: {autoDiscover: true}
+        - flags: {}
+    expected:
+      errorOutput: ['unset vars:', 'X at /profilesDefinitions/p/options/profileWorkingDirectory']
+  - name: ShouldFailWhenARootProfileReadsAnInvokingSpecVariable
+    input:
+      args:
+        - refFiles: {}
+        - hostFiles:
+            .che/cheVariables.yml: "X: root\n"
+            .che/che.yml: |
+              variablesDefinitions:
+                specVariablesDefinitions: {X: {scope: invokingSpec}}
+              profilesDefinitions:
+                main:
+                  type: host
+                  options: {autoDiscover: true, profileWorkingDirectory: '${{ var.X }}'}
+        - flags: {}
+    expected:
+      errorOutput: ['unset vars:', 'X at /profilesDefinitions/main/options/profileWorkingDirectory']
+  - name: ShouldFailWhenAnEmbeddedSpecReadsADefinedProfilesScopeVariable
+    input:
+      args:
+        - refFiles:
+            che.yml: |
+              env: {SEEN_EMB: '${{ var.X }}'}
+              variablesDefinitions:
+                specVariablesDefinitions: {X: {}}
+              profilesDefinitions:
+                p:
+                  type: host
+                  options: {autoDiscover: true}
+        - hostFiles:
+            .che/cheVariables.yml: "X: root\n"
+            .che/che.yml: |
+              variablesDefinitions:
+                specVariablesDefinitions: {X: {}}
+              specsInclude: ['${REF_DIR}']
+              profilesDefinitions:
+                main:
+                  type: host
+                  options: {autoDiscover: true}
+        - flags: {}
+    expected:
+      errorOutput: ['unset vars:', 'X at /env/SEEN']
+  - name: ShouldRejectTheLegacyVariablesFile
+    input:
+      args:
+        - refFiles: {}
+        - hostFiles:
+            .che/che.variables.yml: "X: root\n"
+            .che/che.yml: |
+              profilesDefinitions:
+                main:
+                  type: host
+                  options: {autoDiscover: true}
+        - flags: {}
+    expected:
+      errorOutput: ['che.variables.yml is no longer read, rename to cheVariables.yml']
+  - name: ShouldRejectABadScopeInAFileEntry
+    input:
+      args:
+        - refFiles: {}
+        - hostFiles:
+            .che/cheVariables.yml: "X: {value: root, scope: everywhere}\n"
+            .che/che.yml: |
+              variablesDefinitions:
+                specVariablesDefinitions: {X: {}}
+              profilesDefinitions:
+                main:
+                  type: host
+                  options: {autoDiscover: true}
+        - flags: {}
+    expected:
+      errorOutput: ['scope "everywhere": want invokingSpec | invokingSpecDefinedProfiles | recursiveSpecs | recursiveSpecsAndProfiles']
+  - name: ShouldRejectABadKeyInAFile
+    input:
+      args:
+        - refFiles: {}
+        - hostFiles:
+            .che/cheVariables.yml: "bad-key: root\n"
+            .che/che.yml: |
+              profilesDefinitions:
+                main:
+                  type: host
+                  options: {autoDiscover: true}
+        - flags: {}
+    expected:
+      errorOutput: ['key "bad-key" must match']
+  - name: ShouldRejectAProfileDefinedByBothRootSpecFiles
+    input:
+      args:
+        - refFiles: {}
+        - hostFiles:
+            che.yml: |
+              profilesDefinitions:
+                main:
+                  type: host
+                  options: {autoDiscover: true}
+            .che/che.yml: |
+              profilesDefinitions:
+                main:
+                  type: host
+                  options: {autoDiscover: false}
+        - flags: {}
+    expected:
+      errorOutput: ['profile "main" defined in both files']
+  - name: ShouldRejectAnOptionSetByBothRootSpecFiles
+    input:
+      args:
+        - refFiles: {}
+        - hostFiles:
+            che.yml: |
+              options: {logLevel: info}
+            .che/che.yml: |
+              options: {logLevel: debug}
+              profilesDefinitions:
+                main:
+                  type: host
+                  options: {autoDiscover: true}
+        - flags: {}
+    expected:
+      errorOutput: ['/options/logLevel set in both files']
+  - name: ShouldRejectAnUnknownTopLevelKey
+    input:
+      args:
+        - refFiles: {}
+        - hostFiles:
+            .che/che.yml: |
+              main:
+                type: host
+                options: {autoDiscover: true}
+        - flags: {}
+    expected:
+      errorOutput: ['unknown top-level key "main": want options | env | variablesDefinitions | specsInclude | profilesDefinitions']
+  - name: ShouldRejectTheOldIncludeKey
+    input:
+      args:
+        - refFiles: {}
+        - hostFiles:
+            .che/che.yml: |
+              include: {sources: [./other]}
+              profilesDefinitions:
+                main:
+                  type: host
+                  options: {autoDiscover: true}
+        - flags: {}
+    expected:
+      errorOutput: ['unknown top-level key "include"']
+# [<] 🤖🤖

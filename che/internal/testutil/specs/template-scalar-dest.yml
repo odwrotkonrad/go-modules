@@ -1,13 +1,15 @@
 ##[>] 🤖🤖
-base:
-  include:
-    renderTemplates:
-      - {source: templates/1-env/local.env.ontoRepo.tpl, dest: assets/docs/local.env}
-      - {source: _home/.config/foo/**, dest: $HOME/.config/foo/**}
-      - {source: _home/.config/bar/**, dest: 's:^_home:$HOME:'}
+profilesDefinitions:
+  base:
+    include:
+      renderTemplates:
+        - {source: templates/1-env/local.env.ontoRepo.tpl, dest: assets/docs/local.env}
+        - {source: _home/.config/foo/**, dest: $HOME/.config/foo/**}
+        - {source: _home/.config/bar/**, dest: 's:^_home:$HOME:'}
 
-cli/macos:
-  options: {autoDiscover: true}
-  include:
-    profiles: [base]
+  'cli/macos':
+    options: {autoDiscover: true}
+    include:
+      profiles: [base]
+
 ##[<] 🤖🤖

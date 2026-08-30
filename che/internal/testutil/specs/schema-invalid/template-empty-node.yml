@@ -1,11 +1,13 @@
 ##[>] 🤖🤖
-base:
-  include:
-    renderTemplates:
-      - ctx: {repo: Workspace}
+profilesDefinitions:
+  base:
+    include:
+      renderTemplates:
+        - ctx: {repo: Workspace}
 
-cli/macos:
-  options: {autoDiscover: true}
-  include:
-    profiles: [base]
+  'cli/macos':
+    options: {autoDiscover: true}
+    include:
+      profiles: [base]
+
 ##[<] 🤖🤖

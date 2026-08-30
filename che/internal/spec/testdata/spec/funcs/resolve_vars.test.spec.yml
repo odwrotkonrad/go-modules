@@ -1,0 +1,182 @@
+# [>] 🤖🤖
+context:
+  function: spec.ResolveVars
+cases:
+  - name: ShouldLayerDefaultsUnderEnvUnderSharedUnderLocalUnderPassed
+    input:
+      args:
+        - defs: {spec: {A: {}, B: {}, C: {}, D: {}, E: {}}}
+        - files:
+            defaults: {A: d, B: d, C: d, D: d, E: d}
+            shared: {C: s, D: s, E: s}
+            local: {D: l, E: l}
+        - env: {B: e, C: e, D: e, E: e}
+        - passed: {E: p}
+        - inherited: {}
+    expected:
+      output:
+        values: {A: d, B: e, C: s, D: l, E: p}
+        sources: {A: cheVariables.defaults.yml, B: env, C: cheVariables.yml, D: cheVariables.local.yml, E: explicit pass}
+        scopes: {A: invokingSpecDefinedProfiles, B: invokingSpecDefinedProfiles, C: invokingSpecDefinedProfiles, D: invokingSpecDefinedProfiles, E: invokingSpecDefinedProfiles}
+  - name: ShouldReadEnvOnlyForDeclaredNames
+    input:
+      args:
+        - defs: {spec: {A: {}}}
+        - files: {}
+        - env: {A: e, UNDECLARED: e}
+        - passed: {}
+        - inherited: {}
+    expected:
+      output:
+        values: {A: e}
+        sources: {A: env}
+        scopes: {A: invokingSpecDefinedProfiles}
+  - name: ShouldTakeScopeFromFileOverDefinitionOverDefault
+    input:
+      args:
+        - defs: {spec: {A: {scope: recursiveSpecs}, B: {scope: recursiveSpecs}, C: {}}}
+        - files:
+            shared: {A: {value: a, scope: invokingSpec}, B: b, C: c}
+        - env: {}
+        - passed: {}
+        - inherited: {}
+    expected:
+      output:
+        values: {A: a, B: b, C: c}
+        sources: {A: cheVariables.yml, B: cheVariables.yml, C: cheVariables.yml}
+        scopes: {A: invokingSpec, B: recursiveSpecs, C: invokingSpecDefinedProfiles}
+  - name: ShouldKeepDefinitionScopeOnPassedValue
+    input:
+      args:
+        - defs: {spec: {A: {scope: recursiveSpecsAndProfiles}}}
+        - files: {}
+        - env: {}
+        - passed: {A: p}
+        - inherited: {}
+    expected:
+      output:
+        values: {A: p}
+        sources: {A: explicit pass}
+        scopes: {A: recursiveSpecsAndProfiles}
+  - name: ShouldPlaceInheritedOverEnvUnderOwnFiles
+    input:
+      args:
+        - defs: {spec: {A: {}, C: {}}}
+        - files:
+            shared: {A: own}
+        - env: {C: e}
+        - passed: {}
+        - inherited: {A: {value: up, scope: recursiveSpecs}, B: {value: up, scope: recursiveSpecsAndProfiles}, C: {value: up, scope: recursiveSpecs}}
+    expected:
+      output:
+        values: {A: own, B: up, C: up}
+        sources: {A: cheVariables.yml, B: inherited, C: inherited}
+        scopes: {A: invokingSpecDefinedProfiles, B: recursiveSpecsAndProfiles, C: recursiveSpecs}
+  - name: ShouldAcceptProfileDeclaredNames
+    input:
+      args:
+        - defs: {profiles: {web: {A: {}}}}
+        - files:
+            shared: {A: a}
+        - env: {}
+        - passed: {}
+        - inherited: {}
+    expected:
+      output:
+        values: {A: a}
+        sources: {A: cheVariables.yml}
+        scopes: {A: invokingSpecDefinedProfiles}
+  - name: ShouldFailOnRequiredWithoutValueListingEveryName
+    input:
+      args:
+        - defs: {spec: {A: {required: true}, B: {}}, profiles: {web: {C: {required: true}}}}
+        - files: {}
+        - env: {}
+        - passed: {}
+        - inherited: {}
+    expected:
+      errorOutput: ['required variables without a value: A, C', 'cheVariables.yml', 'cheVariables.local.yml', 'cheVariables.defaults.yml', 'specsInclude or profile entry']
+  - name: ShouldFailOnUndeclaredFileValue
+    input:
+      args:
+        - defs: {spec: {A: {}}}
+        - files:
+            shared: {A: a, B: b}
+        - env: {}
+        - passed: {}
+        - inherited: {}
+    expected:
+      errorOutput: ['B: set by cheVariables.yml but declared by no variablesDefinitions']
+  - name: ShouldFailOnUndeclaredPass
+    input:
+      args:
+        - defs: {spec: {A: {}}}
+        - files: {}
+        - env: {}
+        - passed: {X: p}
+        - inherited: {}
+    expected:
+      errorOutput: ['X: set by explicit pass but declared by no variablesDefinitions']
+  - name: ShouldFailOnIntegerTypeMismatch
+    input:
+      args:
+        - defs: {spec: {A: {type: integer}}}
+        - files:
+            shared: {A: ten}
+        - env: {}
+        - passed: {}
+        - inherited: {}
+    expected:
+      errorOutput: ['A (cheVariables.yml): want an integer, got "ten"']
+  - name: ShouldFailOnBooleanTypeMismatch
+    input:
+      args:
+        - defs: {spec: {A: {type: boolean}}}
+        - files: {}
+        - env: {A: yes}
+        - passed: {}
+        - inherited: {}
+    expected:
+      errorOutput: ['A (env): want true | false, got "yes"']
+  - name: ShouldFailOnEnumMismatchAfterType
+    input:
+      args:
+        - defs: {spec: {A: {type: integer, enum: ["1", "2"]}}}
+        - files: {}
+        - env: {}
+        - passed: {A: "3"}
+        - inherited: {}
+    expected:
+      errorOutput: ['A (explicit pass): want one of 1 | 2, got "3"']
+  - name: ShouldAcceptTypedLiterals
+    input:
+      args:
+        - defs: {spec: {A: {type: integer}, B: {type: boolean, enum: ["true"]}}}
+        - files:
+            shared: {A: "-3", B: "true"}
+        - env: {}
+        - passed: {}
+        - inherited: {}
+    expected:
+      output:
+        values: {A: "-3", B: "true"}
+        sources: {A: cheVariables.yml, B: cheVariables.yml}
+        scopes: {A: invokingSpecDefinedProfiles, B: invokingSpecDefinedProfiles}
+  - name: ShouldProjectByScope
+    input:
+      args:
+        - defs: {spec: {A: {scope: invokingSpec}, B: {scope: invokingSpecDefinedProfiles}, C: {scope: recursiveSpecs}, D: {scope: recursiveSpecsAndProfiles}}}
+        - files:
+            shared: {A: a, B: b, C: c, D: d}
+        - env: {}
+        - passed: {}
+        - inherited: {}
+    expected:
+      output:
+        values: {A: a, B: b, C: c, D: d}
+        sources: {A: cheVariables.yml, B: cheVariables.yml, C: cheVariables.yml, D: cheVariables.yml}
+        scopes: {A: invokingSpec, B: invokingSpecDefinedProfiles, C: recursiveSpecs, D: recursiveSpecsAndProfiles}
+        forProfiles: [B, D]
+        forEmbedded: [C, D]
+        forEmbeddedProfiles: [D]
+# [<] 🤖🤖

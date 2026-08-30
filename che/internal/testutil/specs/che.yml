@@ -1,57 +1,58 @@
 # yaml-language-server: $schema=https://gitlab.com/api/v4/projects/konradodwrot%2Fgo-modules/packages/generic/che-schema/v0.0.1-che-min-v0.0.96/che.schema.json
-base:
-  options: {autoDiscover: false}
-  include:
-    makeLinks:
-      - source: _home/.config/zsh/**
-        dest: 's:^_home:$HOME:'
-      - etc/zshrc
-    makeCopies:
-      - source: _home/.config/zsh/**
-        dest: 's:^_home:$HOME:'
-      - owner: root
-        ownerGroup: wheel
-        chmod: "0644"
-        source: Library/LaunchDaemons/otelcol.plist.ontoHost.cp
-        dest:
-          - /Library/LaunchDaemons/otelcol.plist
-    renderTemplates:
-      - source: _home/.config/zsh/**
-        dest: 's:^_home:$HOME:'
-    makeDirs:
-      - directories:
-          - $HOME/.cache/zsh
-      - chmod: "2775"
-        directories:
-          - dest:
-              - /var/log/che-test-setgid
-    runScripts:
-      - install/setup
+profilesDefinitions:
+  base:
+    options: {autoDiscover: false}
+    include:
+      makeLinks:
+        - source: _home/.config/zsh/**
+          dest: 's:^_home:$HOME:'
+        - etc/zshrc
+      makeCopies:
+        - source: _home/.config/zsh/**
+          dest: 's:^_home:$HOME:'
+        - owner: root
+          ownerGroup: wheel
+          chmod: "0644"
+          source: Library/LaunchDaemons/otelcol.plist.ontoHost.cp
+          dest:
+            - /Library/LaunchDaemons/otelcol.plist
+      renderTemplates:
+        - source: _home/.config/zsh/**
+          dest: 's:^_home:$HOME:'
+      makeDirs:
+        - directories:
+            - $HOME/.cache/zsh
+        - chmod: "2775"
+          directories:
+            - dest:
+                - /var/log/che-test-setgid
+      runScripts:
+        - install/setup
 
-cli/macos:
-  options:
-    autoDiscover: true
-    runIf:
-      - builtin:isOs == macos
-      - builtin:isVirt
-  include:
-    profiles:
-      - base
+  'cli/macos':
+    options:
+      autoDiscover: true
+      runIf:
+        - builtin:isOs == macos
+        - builtin:isVirt
+    include:
+      profiles:
+        - base
 
-desktop/macos:
-  options:
-    autoDiscover: true
-    runIf:
-      - builtin:isOs == macos
-      - builtin:isVirt == false
-  include:
-    profiles:
-      - base
+  'desktop/macos':
+    options:
+      autoDiscover: true
+      runIf:
+        - builtin:isOs == macos
+        - builtin:isVirt == false
+    include:
+      profiles:
+        - base
 
-ontoRepo:
-  options: {autoDiscover: false}
-  include:
-    renderTemplates:
-      - source: templates/r.ontoRepo.tpl
-        dest:
-          - docs/r.md
+  ontoRepo:
+    options: {autoDiscover: false}
+    include:
+      renderTemplates:
+        - source: templates/r.ontoRepo.tpl
+          dest:
+            - docs/r.md

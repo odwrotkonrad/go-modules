@@ -1,7 +1,7 @@
 #!/usr/bin/env zsh
 ##[>] 🤖🤖
 # Publish one schema document at a version, and link it to that version's
-# release. Args: $1 schema (che|che-packages), $2 version
+# release. Args: $1 schema (che|che-packages|che-variables), $2 version
 # (v<triple>-che-min-v<triple>).
 #
 # Uploads to packages/generic/<schema>-schema/<version>/<schema>.schema.json,
@@ -9,7 +9,7 @@
 # consumer pins; the alias is what a reader with no version reaches for.
 set -eu
 
-SCHEMA="${1:?schema (che|che-packages)}"
+SCHEMA="${1:?schema (che|che-packages|che-variables)}"
 VERSION="${2:?version}"
 
 NAME="${SCHEMA}-schema"

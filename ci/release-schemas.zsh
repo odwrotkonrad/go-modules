@@ -8,7 +8,7 @@
 # tag landing in between make the -che-min floor name a release other than the
 # one actually cut.
 #
-# Writes CHE_SCHEMA_REF and CHE_PACKAGES_SCHEMA_REF to $SCHEMA_VERSIONS_ENV as a
+# Writes CHE_SCHEMA_REF, CHE_PACKAGES_SCHEMA_REF and CHE_VARIABLES_SCHEMA_REF to $SCHEMA_VERSIONS_ENV as a
 # dotenv artifact, always: an unchanged schema reports the version already
 # published, so a consumer reading the dotenv sees the shipped version either way.
 set -eu
@@ -20,7 +20,7 @@ OUT="${SCHEMA_VERSIONS_ENV:-schema-versions.env}"
 ROOT=$(git rev-parse --show-toplevel)
 : > "$OUT"
 
-for schema in che che-packages; do
+for schema in che che-packages che-variables; do
   NAME="${schema}-schema"
   VAR="${${schema:u}//-/_}_SCHEMA_REF"
 
