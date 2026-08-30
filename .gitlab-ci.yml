@@ -185,8 +185,7 @@ warm-go-linux-amd64:
     - job: warm-go
       optional: true
   variables:
-    GENERIC_CHE: che/dist/che
-    CHE_BIN: che/dist/che
+    BIN_CHE: che/dist/che
     LEFTHOOK_OUTPUT: meta,summary,execution,execution_info,execution_out
   cache:
     - key: go-build
