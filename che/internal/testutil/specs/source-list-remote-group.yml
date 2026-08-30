@@ -1,0 +1,27 @@
+##[>] 🤖🤖
+profilesDefinitions:
+  base:
+    include:
+      renderTemplates:
+        - source:
+            url: gitlab.com/acme/tools
+            ref: v1.0.0
+            filepath: docs
+          dest: che/docs
+          <<<:
+            - source:
+                - spec.md
+                - nested/observability.md.tpl
+        - source:
+            url: gitlab.com/acme/tools
+            ref: v1.0.0
+          <<<:
+            - source:
+                - //snippets/ro.md
+
+  'cli/macos':
+    options: {autoDiscover: true}
+    include:
+      profiles: [base]
+
+##[<] 🤖🤖

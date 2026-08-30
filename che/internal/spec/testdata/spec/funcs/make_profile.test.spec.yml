@@ -262,6 +262,19 @@ cases:
       variables:
         templates/ruby/artifact.rb: {repo: Notes}
         templates/ruby/declaration.rb: {repo: Notes}
+  - name: ShouldGiveSourceListItemsUnderRemotePrefixTheirPathAsDest
+    context: {pwd: testdata/fixture/resolve/tree-empty}
+    input:
+      args: [spec: source-list-remote-group, profile: cli/macos]
+    expected:
+      templates:
+        - "git::gitlab.com/acme/tools@v1.0.0//docs/nested/observability.md.tpl"
+        - "git::gitlab.com/acme/tools@v1.0.0//docs/spec.md"
+        - "git::gitlab.com/acme/tools@v1.0.0//snippets/ro.md"
+      templateDests:
+        - [che/docs/nested/observability.md]
+        - [che/docs/spec.md]
+        - [snippets/ro.md]
   - name: ShouldErrorOnSourceListWithDest
     context: {pwd: testdata/fixture/resolve/tree-empty}
     input:
