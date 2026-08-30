@@ -3,15 +3,9 @@ upstream:
   - uri: gitlab.com/konradodwrot/centralized/assets/prose/human
     type: gitRepository
     versionEnvVar: CENTRALIZED_ASSETS_PROSE_HUMAN_REF
-  - uri: gitlab.com/konradodwrot/centralized/assets/prose/common
-    type: gitRepository
-    versionEnvVar: CENTRALIZED_ASSETS_PROSE_COMMON_REF
   - uri: gitlab.com/konradodwrot/centralized/assets/prose/human
     type: gitRepository
     versionEnvVar: CENTRALIZED_ASSETS_PROSE_HUMAN_REF
-  - uri: gitlab.com/konradodwrot/centralized/assets/prose/common
-    type: gitRepository
-    versionEnvVar: CENTRALIZED_ASSETS_PROSE_COMMON_REF
   - uri: gitlab.com/konradodwrot/centralized/assets/generic
     type: gitRepository
     versionEnvVar: CENTRALIZED_ASSETS_GENERIC_REF
@@ -27,4 +21,7 @@ upstream:
   - uri: us-central1-docker.pkg.dev/staging-499418/ci/ci-linux-dind
     type: ociImage
     versionEnvVar: OCI_IMAGES_CI_LINUX_DIND_REF
+  - uri: gitlab.com/konradodwrot/centralized/assets/prose/ai
+    type: gitRepository
+    versionEnvVar: CENTRALIZED_ASSETS_PROSE_AI_REF
 ##[<] 🤖
