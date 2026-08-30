@@ -21,9 +21,6 @@ upstream:
   - uri: gitlab.com/konradodwrot/che-packages
     type: gitRepository
     versionEnvVar: CHE_PACKAGES_REF
-  - uri: gitlab.com/konradodwrot/cross-repo/prose/spec
-    type: gitRepository
-    versionEnvVar: PROSE_SPEC_REF
   - uri: us-central1-docker.pkg.dev/staging-499418/ci/ci-linux
     type: ociImage
     versionEnvVar: OCI_IMAGES_CI_LINUX_REF
