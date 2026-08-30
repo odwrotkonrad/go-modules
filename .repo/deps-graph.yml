@@ -30,6 +30,11 @@ dependsOn:
       type: ociImage
     - uri: us-central1-docker.pkg.dev/staging-499418/ci/ci-linux-dind
       type: ociImage
+  repoContents:
+    - uri: gitlab.com/konradodwrot/centralized/assets/prose/human
+      type: gitRepository
+    - uri: gitlab.com/konradodwrot/centralized/assets/prose/common
+      type: gitRepository
   devEnv:
     - uri: gitlab.com/konradodwrot/ai-harness/ai-tools-configs
       type: gitRepository
