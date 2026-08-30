@@ -11,8 +11,8 @@ COMMANDS := che-install generic-setup repo-prepare-deps render-docs test test-co
 #[why] this checkout's build wins: an MR may change che's own rendering, so a release che from PATH
 #   would render the wrong output. CI supplies it as warm-go's artifact, skipping a rebuild
 BIN_CHE ?= $(if $(wildcard che/dist/che),che/dist/che,che)
-GENERIC_FILES_TRACKED_PROFILES := generic/filesTracked,repo/filesTracked
-GENERIC_FILES_UNTRACKED_PROFILES := generic/filesUntracked,repo/filesUntracked
+GENERIC_FILES_TRACKED_PROFILES := repo/filesTracked,generic/filesTracked
+GENERIC_FILES_UNTRACKED_PROFILES := repo/filesUntracked,generic/filesUntracked
 -include shared/generic/make/generic.mk
 
 ##[>] Dev Environment [genai-include]

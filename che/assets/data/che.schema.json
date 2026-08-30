@@ -704,6 +704,10 @@
     },
     "SpecVarDefs": {
       "properties": {
+        "all": {
+          "$ref": "#/$defs/VarDefaults",
+          "description": "defaults every definition below inherits, spec and profile level alike, unless it sets the key itself"
+        },
         "specVariablesDefinitions": {
           "$ref": "#/$defs/VarDefs",
           "description": "variables this spec's top level reads, keyed by name"
@@ -760,7 +764,7 @@
       "properties": {
         "required": {
           "type": "boolean",
-          "description": "a value must come from cheVariables.defaults.yml, env, cheVariables.yml, cheVariables.local.yml or an explicit pass; none is a hard error"
+          "description": "a value must come from cheVariables.defaults.yml, env, cheVariables.yml, cheVariables.local.yml or an explicit pass; none is a hard error; unset: variablesDefinitions.all.required"
         },
         "scope": {
           "type": "string",
@@ -796,6 +800,26 @@
       "additionalProperties": false,
       "type": "object",
       "description": "one variable declaration: never a value, values live in cheVariables.defaults.yml, cheVariables.yml, cheVariables.local.yml or an explicit pass"
+    },
+    "VarDefaults": {
+      "properties": {
+        "required": {
+          "type": "boolean",
+          "description": "required for every definition that does not set its own"
+        },
+        "scope": {
+          "type": "string",
+          "enum": [
+            "invokingSpec",
+            "invokingSpecDefinedProfiles",
+            "recursiveSpecs",
+            "recursiveSpecsAndProfiles"
+          ],
+          "description": "scope for every definition that does not set its own"
+        }
+      },
+      "additionalProperties": false,
+      "type": "object"
     },
     "VarDefs": {
       "additionalProperties": {

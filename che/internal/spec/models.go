@@ -110,7 +110,7 @@ var VarTypes = struct{ String, Integer, Boolean VarType }{"string", "integer", "
 var VarTypeNames = []string{string(VarTypes.String), string(VarTypes.Integer), string(VarTypes.Boolean)}
 
 type VarDef struct {
-	Required    bool     `yaml:"required" jsonschema_description:"a value must come from cheVariables.defaults.yml, env, cheVariables.yml, cheVariables.local.yml or an explicit pass; none is a hard error"`
+	Required    *bool    `yaml:"required" jsonschema_description:"a value must come from cheVariables.defaults.yml, env, cheVariables.yml, cheVariables.local.yml or an explicit pass; none is a hard error; unset: variablesDefinitions.all.required"`
 	Scope       VarScope `yaml:"scope" jsonschema:"enum=invokingSpec,enum=invokingSpecDefinedProfiles,enum=recursiveSpecs,enum=recursiveSpecsAndProfiles" jsonschema_description:"how far the value propagates: invokingSpec (this spec only) | invokingSpecDefinedProfiles (default: plus the profiles this spec defines) | recursiveSpecs (plus embedded specs, never their profiles) | recursiveSpecsAndProfiles (plus embedded specs and their profiles)"`
 	Description string   `yaml:"description" jsonschema_description:"what the variable configures, for the consumer"`
 	Type        VarType  `yaml:"type" jsonschema:"enum=string,enum=integer,enum=boolean" jsonschema_description:"literal shape the value must have (values stay strings at interpolation); default string"`
@@ -119,7 +119,14 @@ type VarDef struct {
 
 type VarDefs map[string]VarDef
 
+// VarDefaults is what every definition of a spec inherits where it sets nothing itself.
+type VarDefaults struct {
+	Required *bool    `yaml:"required" jsonschema_description:"required for every definition that does not set its own"`
+	Scope    VarScope `yaml:"scope" jsonschema:"enum=invokingSpec,enum=invokingSpecDefinedProfiles,enum=recursiveSpecs,enum=recursiveSpecsAndProfiles" jsonschema_description:"scope for every definition that does not set its own"`
+}
+
 type SpecVarDefs struct {
+	All      VarDefaults        `yaml:"all" jsonschema_description:"defaults every definition below inherits, spec and profile level alike, unless it sets the key itself"`
 	Spec     VarDefs            `yaml:"specVariablesDefinitions" jsonschema_description:"variables this spec's top level reads, keyed by name"`
 	Profiles map[string]VarDefs `yaml:"profilesVariablesDefinitions" jsonschema_description:"variables each defined profile reads, keyed by profile name then variable name; exclusive with that profile's own variablesDefinitions"`
 }

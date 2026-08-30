@@ -183,4 +183,20 @@ cases:
               validateSpec: bogus
     expected:
       output: validateSpec
+  - name: ShouldAcceptNullVariableDefinitions
+    input:
+      args:
+        - doc: |
+            profilesDefinitions:
+              p:
+                type: host
+            variablesDefinitions:
+              all: {scope: recursiveSpecs, required: true}
+              specVariablesDefinitions:
+                A: null
+                B: {type: integer}
+              profilesVariablesDefinitions:
+                p: {C: null}
+    expected:
+      output: ""
 # [<] 🤖🤖

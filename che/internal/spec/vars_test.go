@@ -18,6 +18,7 @@ type resolveVarsWant struct {
 }
 
 type resolveVarsDefs struct {
+	All      VarDefaults        `yaml:"all"`
 	Spec     VarDefs            `yaml:"spec"`
 	Profiles map[string]VarDefs `yaml:"profiles"`
 }

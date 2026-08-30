@@ -11,14 +11,6 @@ specsInclude:
 #[why] the repo declares the toolchain it builds and tests with, so no host or image has to carry go
 #   in advance for this repo to prepare
 profilesDefinitions:
-  devEnv:
-    type: repo-git-untracked
-    options:
-      autoDiscover: false
-    include:
-      installPackages:
-        - go
-
   generic/env:
     type: repo-git-untracked
     include:
@@ -29,33 +21,24 @@ profilesDefinitions:
               options:
                 writeType: mergeUpsert
 
+  devEnv:
+    type: repo-git-untracked
+    options:
+      autoDiscover: false
+    include:
+      installPackages:
+        - go
+
 variablesDefinitions:
+  all: {scope: recursiveSpecsAndProfiles, required: true}
   specVariablesDefinitions:
-    AI_TOOLS_CONFIGS_REF:
-      required: true
-      scope: recursiveSpecsAndProfiles
-    CENTRALIZED_ASSETS_GENERIC_REF:
-      required: true
-      scope: recursiveSpecsAndProfiles
-    CENTRALIZED_ASSETS_PROSE_AI_REF:
-      required: true
-      scope: recursiveSpecsAndProfiles
-    CENTRALIZED_ASSETS_PROSE_COMMON_REF:
-      required: true
-      scope: recursiveSpecsAndProfiles
-    CENTRALIZED_ASSETS_PROSE_HUMAN_REF:
-      required: true
-      scope: recursiveSpecsAndProfiles
-    CHE_PACKAGES_REF:
-      required: true
-      scope: recursiveSpecsAndProfiles
-    OCI_IMAGES_CI_LINUX_DIND_REF:
-      required: true
-      scope: recursiveSpecsAndProfiles
-    OCI_IMAGES_CI_LINUX_REF:
-      required: true
-      scope: recursiveSpecsAndProfiles
-    PROSE_SPEC_REF:
-      required: true
-      scope: recursiveSpecsAndProfiles
+    AI_TOOLS_CONFIGS_REF: null
+    CENTRALIZED_ASSETS_GENERIC_REF: null
+    CENTRALIZED_ASSETS_PROSE_AI_REF: null
+    CENTRALIZED_ASSETS_PROSE_COMMON_REF: null
+    CENTRALIZED_ASSETS_PROSE_HUMAN_REF: null
+    CHE_PACKAGES_REF: null
+    OCI_IMAGES_CI_LINUX_DIND_REF: null
+    OCI_IMAGES_CI_LINUX_REF: null
+    PROSE_SPEC_REF: null
 ##[<] 🤖🤖

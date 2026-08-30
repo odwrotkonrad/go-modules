@@ -174,7 +174,12 @@ func (p *ProfileReady) templateAnchor(item spec.FileItem) string {
 	return p.repoDocRoot()
 }
 
+// [why] an embedded spec's repo-relative dest lands in the invoking repo, never in its own
+// checkout: a remote export renders README/AGENTS onto the consumer, its @-includes read there too
 func (p *ProfileReady) repoDocRoot() string {
+	if root := p.env["invokingSpecGitRoot"]; root != "" && strings.HasPrefix(p.ref, "remote:") {
+		return root
+	}
 	if p.gitRoot != "" {
 		return p.gitRoot
 	}

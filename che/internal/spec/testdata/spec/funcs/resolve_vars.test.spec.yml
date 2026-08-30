@@ -179,4 +179,33 @@ cases:
         forProfiles: [B, D]
         forEmbedded: [C, D]
         forEmbeddedProfiles: [D]
+  - name: ShouldFillScopeAndRequiredFromAllUnlessTheDefinitionSetsThem
+    input:
+      args:
+        - defs:
+            all: {scope: recursiveSpecsAndProfiles, required: true}
+            spec: {A: {}, B: {scope: invokingSpec}, C: {required: false}}
+            profiles: {web: {D: {}}}
+        - files:
+            shared: {A: a, B: b, D: d}
+        - env: {}
+        - passed: {}
+        - inherited: {}
+    expected:
+      output:
+        values: {A: a, B: b, D: d}
+        sources: {A: cheVariables.yml, B: cheVariables.yml, D: cheVariables.yml}
+        scopes: {A: recursiveSpecsAndProfiles, B: invokingSpec, D: recursiveSpecsAndProfiles}
+  - name: ShouldRequireEveryNameUnderAllRequired
+    input:
+      args:
+        - defs:
+            all: {required: true}
+            spec: {A: {}, B: {required: false}}
+        - files: {}
+        - env: {}
+        - passed: {}
+        - inherited: {}
+    expected:
+      errorOutput: ['required variables without a value: A (']
 # [<] 🤖🤖

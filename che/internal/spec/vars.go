@@ -17,8 +17,11 @@ import (
 // [>] 🤖🤖 definitions
 
 func (d *VarDef) UnmarshalYAML(node *yaml.Node) error {
+	if node.Kind == yaml.ScalarNode && node.Tag == "!!null" {
+		return nil
+	}
 	if node.Kind != yaml.MappingNode {
-		return fmt.Errorf("want a mapping of required | scope | description | type | enum")
+		return fmt.Errorf("want a mapping of required | scope | description | type | enum, or nothing")
 	}
 	allowed := []string{"required", "scope", "description", "type", "enum"}
 	for i := 0; i+1 < len(node.Content); i += 2 {
@@ -56,17 +59,27 @@ func (d SpecVarDefs) Declared(name string) bool {
 	return false
 }
 
-// Def returns the definition of a name: the spec's, else the first profile's declaring it.
+// Def returns the effective definition of a name (the spec's, else the first profile's declaring
+// it), scope and required filled from all where the definition sets neither.
 func (d SpecVarDefs) Def(name string) (VarDef, bool) {
-	if def, ok := d.Spec[name]; ok {
-		return def, true
-	}
-	for _, profile := range slices.Sorted(maps.Keys(d.Profiles)) {
-		if def, ok := d.Profiles[profile][name]; ok {
-			return def, true
+	def, ok := d.Spec[name]
+	if !ok {
+		for _, profile := range slices.Sorted(maps.Keys(d.Profiles)) {
+			if def, ok = d.Profiles[profile][name]; ok {
+				break
+			}
 		}
 	}
-	return VarDef{}, false
+	if !ok {
+		return VarDef{}, false
+	}
+	if def.Scope == "" {
+		def.Scope = d.All.Scope
+	}
+	if def.Required == nil {
+		def.Required = d.All.Required
+	}
+	return def, true
 }
 
 func (d SpecVarDefs) names() []string {
@@ -142,7 +155,7 @@ func validateVars(defs SpecVarDefs, set VarSet, files RepoFiles) error {
 	var missing []string
 	for _, name := range defs.names() {
 		def, _ := defs.Def(name)
-		if _, ok := set[name]; def.Required && !ok {
+		if _, ok := set[name]; def.Required != nil && *def.Required && !ok {
 			missing = append(missing, name)
 		}
 	}

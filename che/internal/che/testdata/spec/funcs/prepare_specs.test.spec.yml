@@ -1184,4 +1184,24 @@ cases:
         - flags: {targetProfileTypes: [repo-git-tracked]}
     expected:
       errorOutput: ['no auto-discovered profile of type repo-git-tracked']
+  - name: ShouldForceAProfileOfARemoteEmbeddedSpec
+    input:
+      args:
+        - refFiles:
+            che.export.yml: |
+              profilesDefinitions:
+                remoteOnly:
+                  type: repo-git-untracked
+                  options: {autoDiscover: false}
+        - hostFiles:
+            .che/che.yml: |
+              specsInclude: ["git::file://${REF_DIR}"]
+              profilesDefinitions:
+                main:
+                  type: host
+                  options: {autoDiscover: true}
+        - flags: {profiles: [remoteOnly]}
+    expected:
+      output:
+        profiles: ["remote:${REF_NAME}:remoteOnly"]
 # [<] 🤖🤖
