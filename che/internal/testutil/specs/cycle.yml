@@ -1,10 +1,11 @@
-a:
-  include:
-    profiles: [b]
-b:
-  include:
-    profiles: [a]
-cli/macos:
-  options: {autoDiscover: true}
-  include:
-    profiles: [a]
+profilesDefinitions:
+  a:
+    include:
+      profiles: [b]
+  b:
+    include:
+      profiles: [a]
+  'cli/macos':
+    options: {autoDiscover: true}
+    include:
+      profiles: [a]

@@ -61,10 +61,37 @@ cases:
   - name: ShouldLeaveDollarVarAlone
     input:
       args:
-        - s: '$HOME/${HOME}/${{ HOME }}/${{ env. }}/${{ env.1A }}'
+        - s: '$HOME/${HOME}/${{ env. }}/${{ env.1A }}'
         - env: {HOME: h}
     expected:
-      output: {value: '$HOME/${HOME}/${{ HOME }}/${{ env. }}/${{ env.1A }}'}
+      output: {value: '$HOME/${HOME}/${{ env. }}/${{ env.1A }}'}
+  - name: ShouldSubstituteBareRefFromBuiltins
+    input:
+      args:
+        - s: '${{ repoRoot }}/templates/${{ env.A }}'
+        - env: {A: a, repoRoot: from-env}
+        - vars: {repoRoot: from-vars}
+        - builtins: {repoRoot: /repo}
+    expected:
+      output: {value: /repo/templates/a}
+  - name: ShouldUseDefaultForUnsetBareRef
+    input:
+      args:
+        - s: '${{ repoRoot || . }}'
+        - env: {}
+        - vars: {}
+        - builtins: {}
+    expected:
+      output: {value: .}
+  - name: ShouldReportUnknownBareRefAsUnset
+    input:
+      args:
+        - s: '${{ HOME }}'
+        - env: {HOME: h}
+        - vars: {}
+        - builtins: {repoRoot: /repo}
+    expected:
+      output: {value: "", unset: [HOME]}
   - name: ShouldSubstituteVarRefFromVars
     input:
       args:

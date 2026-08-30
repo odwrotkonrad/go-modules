@@ -1,27 +1,42 @@
 # yaml-language-server: $schema=https://gitlab.com/api/v4/projects/konradodwrot%2Fgo-modules/packages/generic/che-schema/v0.0.1-che-min-v0.0.96/che.schema.json
 ##[>] 🤖🤖
-include:
-  sources:
-    - .che/repo-git-tracked
-    - {source: shared/generic/che, optional: true}
+variablesDefinitions:
+  specVariablesDefinitions:
+    AI_TOOLS_CONFIGS_REF: {required: true, scope: recursiveSpecsAndProfiles}
+    CENTRALIZED_ASSETS_GENERIC_REF: {required: true, scope: recursiveSpecsAndProfiles}
+    CENTRALIZED_ASSETS_PROSE_COMMON_REF: {required: true, scope: recursiveSpecsAndProfiles}
+    CENTRALIZED_ASSETS_PROSE_HUMAN_REF: {required: true, scope: recursiveSpecsAndProfiles}
+    CHE_PACKAGES_REF: {required: true, scope: recursiveSpecsAndProfiles}
+    OCI_IMAGES_CI_LINUX_DIND_REF: {required: true, scope: recursiveSpecsAndProfiles}
+    OCI_IMAGES_CI_LINUX_REF: {required: true, scope: recursiveSpecsAndProfiles}
+    PROSE_SPEC_REF: {required: true, scope: recursiveSpecsAndProfiles}
+specsInclude:
+  - .che/repo-git-tracked
+  - specDirPath: ./shared/generic/che
+    optional: true
 
 #[why] the repo declares the toolchain it builds and tests with, so no host or image has to carry go
 #   in advance for this repo to prepare
-devEnv:
-  options:
-    autoDiscover: false
-  include:
-    installPackages:
-      - go
+profilesDefinitions:
+  devEnv:
+    type: repo-git-untracked
+    options:
+      autoDiscover: false
+    include:
+      installPackages:
+        - go
 
-genericSetup:
-  options:
-    autoDiscover: false
-  include:
-    profiles:
-      - source: "git::https://gitlab.com/konradodwrot/centralized/assets/generic@${{ var.CENTRALIZED_ASSETS_GENERIC_REF }}"
-        spec: consumer-repo-config
-        profile: setup
-        variables:
-          repo: go-modules
+  genericSetup:
+    type: repo-git-untracked
+    options:
+      autoDiscover: false
+    include:
+      profiles:
+        - url: "https://gitlab.com/konradodwrot/centralized/assets/generic"
+          ref: "${{ var.CENTRALIZED_ASSETS_GENERIC_REF }}"
+          specDirPath: consumer-repo-config
+          profileName: setup
+          variables:
+            repo: go-modules
+
 ##[<] 🤖🤖

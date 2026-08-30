@@ -20,12 +20,12 @@ type EnvLayer struct {
 }
 
 // Interp is the lookup context one spec file loads under: env layers beneath and over its env: block,
-// var layers beneath and over its variables: block, lowest first.
+// lowest first, and its resolved variables.
 type Interp struct {
 	Below    []EnvLayer
 	Above    []EnvLayer
-	VarsBase map[string]string
-	VarsOver map[string]string
+	Vars     VarSet
+	Builtins map[string]string
 	Policy   envinterp.Policy
 }
 
@@ -50,39 +50,26 @@ var EnvSources = struct{ Ref, Spec, CheEnv, Process, Inherited, IncludedCheEnv s
 }
 
 type interpolator struct {
-	in       Interp
-	envBlock map[string]string
-	varBlock map[string]string
-	layers   []EnvLayer
-	lookup   map[string]string
-	vars     map[string]string
-	unset    map[string][]EnvUnset
-	varUnset []EnvUnset
-	refs     []EnvRef
+	in             Interp
+	envBlock       map[string]string
+	layers         []EnvLayer
+	lookup         map[string]string
+	vars           map[string]string
+	profileVars    map[string]string
+	unset          map[string][]EnvUnset
+	varUnset       []EnvUnset
+	builtinUnknown []EnvUnset
+	refs           []EnvRef
 }
 
-func newInterpolator(in Interp, root *yaml.Node) (*interpolator, error) {
+func newInterpolator(in Interp, root *yaml.Node) *interpolator {
 	it := &interpolator{in: in, unset: map[string][]EnvUnset{}, layers: slices.Concat(in.Below, in.Above)}
 	blockEnv := flattenLayers(it.layers)
-	it.varBlock, it.varUnset = it.expandBlock(root, "variables", "/variables/", envinterp.MapLookup(blockEnv, nil))
-	if err := validateKeys("variables", it.varBlock); err != nil {
-		return nil, err
-	}
-	explicit := mergeEnv(in.VarsBase, it.varBlock)
-	it.envBlock, _ = it.expandBlock(root, "env", "/env/", envinterp.MapLookup(blockEnv, mergeEnv(mergeEnv(blockEnv, explicit), in.VarsOver)))
+	it.vars, it.profileVars = in.Vars.Values(), in.Vars.ForProfiles()
+	it.envBlock, it.varUnset = it.expandBlock(root, keyEnv, "/"+keyEnv+"/", envinterp.MapLookup(blockEnv, it.vars, in.Builtins))
 	it.layers = slices.Concat(in.Below, []EnvLayer{{Name: EnvSources.Spec, Env: it.envBlock}}, in.Above)
 	it.lookup = flattenLayers(it.layers)
-	// [why] env sets a variable implicitly, only while nothing declares it: a consumer's che.env or a CI
-	// job variable reaches every included spec with nothing on the refs, any explicit declaration wins
-	it.vars = mergeEnv(mergeEnv(it.lookup, explicit), in.VarsOver)
-	return it, nil
-}
-
-func mergeEnv(base, overlay map[string]string) map[string]string {
-	out := make(map[string]string, len(base)+len(overlay))
-	maps.Copy(out, base)
-	maps.Copy(out, overlay)
-	return out
+	return it
 }
 
 func flattenLayers(layers []EnvLayer) map[string]string {
@@ -117,18 +104,34 @@ func (it *interpolator) expandBlock(root *yaml.Node, key, pathPrefix string, loo
 	return out, varUnset
 }
 
+const (
+	keyOptions      = "options"
+	keyEnv          = "env"
+	keyVarDefs      = "variablesDefinitions"
+	keySpecsInclude = "specsInclude"
+	keyProfiles     = "profilesDefinitions"
+)
+
+var topLevelKeys = []string{keyOptions, keyEnv, keyVarDefs, keySpecsInclude, keyProfiles}
+
 func (it *interpolator) walkDoc(root *yaml.Node) {
-	lookup := envinterp.MapLookup(it.lookup, it.vars)
+	specLookup := envinterp.MapLookup(it.lookup, it.vars, it.in.Builtins)
+	profileLookup := envinterp.MapLookup(it.lookup, it.profileVars, it.in.Builtins)
 	for i := 0; i+1 < len(root.Content); i += 2 {
 		key, node := root.Content[i].Value, root.Content[i+1]
-		if key == "env" || key == "variables" {
-			continue
+		switch key {
+		case keyEnv, keyVarDefs:
+		case keyProfiles:
+			if node.Kind != yaml.MappingNode {
+				continue
+			}
+			for j := 0; j+1 < len(node.Content); j += 2 {
+				name := node.Content[j].Value
+				it.walk(node.Content[j+1], name, "/"+keyProfiles+"/"+name, profileLookup)
+			}
+		default:
+			it.walk(node, topLevelProfile, "/"+key, specLookup)
 		}
-		profile := key
-		if key == "options" || key == "include" {
-			profile = topLevelProfile
-		}
-		it.walk(node, profile, "/"+key, lookup)
 	}
 }
 
@@ -136,7 +139,11 @@ func (it *interpolator) walk(n *yaml.Node, profile, path string, lookup envinter
 	switch n.Kind {
 	case yaml.MappingNode:
 		for i := 0; i+1 < len(n.Content); i += 2 {
-			it.walk(n.Content[i+1], profile, path+"/"+n.Content[i].Value, lookup)
+			key := n.Content[i].Value
+			if key == keyVarDefs && profile != topLevelProfile && path == "/"+keyProfiles+"/"+profile {
+				continue
+			}
+			it.walk(n.Content[i+1], profile, path+"/"+key, lookup)
 		}
 	case yaml.SequenceNode:
 		for i, c := range n.Content {
@@ -153,20 +160,25 @@ func (it *interpolator) expandScalar(n *yaml.Node, profile, path string, lookup 
 		return nil
 	}
 	for _, ref := range refs {
-		if ref.Namespace != envinterp.Namespaces.Env {
-			continue
+		switch ref.Namespace {
+		case envinterp.Namespaces.Env:
+			set, source := it.provenance(ref, lookup)
+			it.refs = append(it.refs, EnvRef{Ref: ref, Profile: profile, Path: path, Set: set, Source: source})
+		case envinterp.Namespaces.Builtin:
+			if !slices.Contains(envinterp.BuiltinNames, ref.Name) {
+				it.builtinUnknown = append(it.builtinUnknown, EnvUnset{Name: ref.Name, Path: path})
+			}
 		}
-		set, source := it.provenance(ref, lookup)
-		it.refs = append(it.refs, EnvRef{Ref: ref, Profile: profile, Path: path, Set: set, Source: source})
 	}
 	value, unset := envinterp.Expand(n.Value, lookup)
 	var varUnset []EnvUnset
 	for _, ref := range unset {
-		if ref.Namespace == envinterp.Namespaces.Var {
+		switch ref.Namespace {
+		case envinterp.Namespaces.Var:
 			varUnset = append(varUnset, EnvUnset{Name: ref.Name, Path: path})
-			continue
+		case envinterp.Namespaces.Env:
+			it.unset[profile] = append(it.unset[profile], EnvUnset{Name: ref.Name, Path: path})
 		}
-		it.unset[profile] = append(it.unset[profile], EnvUnset{Name: ref.Name, Path: path})
 	}
 	n.Value, n.Tag, n.Style = value, "!!str", 0
 	return varUnset
@@ -204,14 +216,24 @@ func EnvUnsetError(specPath string, unset []EnvUnset) error {
 		specPath, strings.Join(lines, "\n"))
 }
 
+// BuiltinUnknownError formats bare refs naming no che built-in as a single actionable error.
+func BuiltinUnknownError(specPath string, unknown []EnvUnset) error {
+	lines := make([]string, 0, len(unknown))
+	for _, u := range unknown {
+		lines = append(lines, fmt.Sprintf("  unknown built-in ${{ %s }} at %s", u.Name, u.Path))
+	}
+	return fmt.Errorf("%s:\n%s\n(defined: %s. env vars are ${{ env.NAME }}, variables ${{ var.NAME }})",
+		specPath, strings.Join(lines, "\n"), strings.Join(envinterp.BuiltinNames, ", "))
+}
+
 // VarUnsetError formats unset var refs of one spec as a single actionable error.
 func VarUnsetError(specPath string, unset []EnvUnset) error {
 	lines := make([]string, 0, len(unset))
 	for _, u := range unset {
 		lines = append(lines, fmt.Sprintf("  %s at %s", u.Name, u.Path))
 	}
-	return fmt.Errorf("%s: unset vars:\n%s\n(declare them in che.variables.yml, the spec's variables: block, the ref's variables:, or add a || default)",
-		specPath, strings.Join(lines, "\n"))
+	return fmt.Errorf("%s: unset vars:\n%s\n(declare them in variablesDefinitions, set them in %s or %s, pass them at the specsInclude or profile entry, or add a || default)",
+		specPath, strings.Join(lines, "\n"), VariablesFileName, VariablesLocalFileName)
 }
 
 // [<] 🤖🤖

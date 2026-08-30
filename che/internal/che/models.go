@@ -239,11 +239,11 @@ func (p *specPreparer) prepare(src spec.SpecSourceRecipe, anchor string, over ov
 	}
 	// [why] keyed on the spec file: a repo's own .che/che.yml composes its che.export.yml from the same dir
 	p.seenSpecs[recipe.sourceReady.DefinitionURI] = true
-	in, err := p.repoFiles.interp(recipe.sourceReady.DirectoryPath, root, over, p.opts.EnvUnset)
-	if err != nil {
-		return nil, err
-	}
 	if forced == nil {
+		in, err := p.repoFiles.interp(specPaths(recipe.sourceReady.SourceReady, root), recipe.sourceReady.DirectoryPath, root, over, p.opts.EnvUnset)
+		if err != nil {
+			return nil, err
+		}
 		if err := recipe.PrepareProfileRecipes(p.opts, root, in); err != nil {
 			return nil, err
 		}
@@ -254,6 +254,10 @@ func (p *specPreparer) prepare(src spec.SpecSourceRecipe, anchor string, over ov
 	head, rest := spec.SplitProfilePath(forced.ProfileName)
 	for _, def := range recipe.sourceReady.Candidates {
 		recipe.sourceReady.DefinitionURI = def
+		in, err := p.repoFiles.interp([]string{def}, recipe.sourceReady.DirectoryPath, root, over, p.opts.EnvUnset)
+		if err != nil {
+			return nil, err
+		}
 		if err := recipe.PrepareProfileRecipes(p.opts, root, in); err != nil {
 			return nil, err
 		}
@@ -298,7 +302,7 @@ func (p *specPreparer) descend(recipe *SpecRecipe, rec spec.ProfileRecipe, rest 
 		child.Options = child.Options.OverRef(forced.Options)
 		child.Env = fsutil.MergeMap(entry.Env, forced.Env)
 		child.Variables = fsutil.MergeMap(entry.Variables, forced.Variables)
-		return p.prepare(child.AsSpecSource(), recipe.sourceReady.DirectoryPath, overlay{inherited: recipe.lookupOrLaunch(in), env: child.Env, vars: child.Variables}, &child, false)
+		return p.prepare(child.AsSpecSource(), recipe.sourceReady.DirectoryPath, overlay{inherited: recipe.lookupOrLaunch(in), env: child.Env, passed: child.Variables, inheritedVars: recipe.Vars.ForEmbeddedProfiles()}, &child, false)
 	}
 	p.unresolved = append(p.unresolved, forced.String())
 	log.EmitWarn("discover-profiles", "unresolved-ref", "profile "+next+" is not included by "+rec.Source.GetProfileName()+" in "+recipe.sourceReady.DefinitionURI+" (ref "+forced.String()+")")
@@ -390,10 +394,10 @@ func overlayEnv(base map[string]string, overlay map[string]string) map[string]st
 
 type SpecRecipe struct {
 	Source         spec.SpecSourceRecipe
-	Include        []spec.SpecSourceRecipe
+	SpecsInclude   []spec.SpecSourceRecipe
 	Options        spec.Options
 	Env            map[string]string
-	Variables      map[string]string
+	Vars           spec.VarSet
 	ProfileRecipes []spec.ProfileRecipe
 	lookup         map[string]string
 	EnvUnset       map[string][]spec.EnvUnset
@@ -413,14 +417,17 @@ func (r *SpecRecipe) PrepareSpec(anchor, home string, invoked bool) error {
 }
 
 func (r *SpecRecipe) PrepareProfileRecipes(opts options.Options, root bool, in spec.Interp) error {
-	if err := r.validateSchema(opts.ValidateSpecCLI); err != nil {
-		return err
+	paths := specPaths(r.sourceReady.SourceReady, root)
+	for _, path := range paths {
+		if err := r.validateSchema(path, opts.ValidateSpecCLI); err != nil {
+			return err
+		}
 	}
-	doc, err := spec.Load(r.sourceReady.DefinitionURI, in)
+	doc, err := spec.LoadMerged(paths, in)
 	if err != nil {
 		return err
 	}
-	r.Options, r.Env, r.Include, r.Variables, r.lookup = doc.Options, doc.Env, doc.Include, doc.Variables, doc.Lookup
+	r.Options, r.Env, r.SpecsInclude, r.Vars, r.lookup = doc.Options, doc.Env, doc.SpecsInclude, doc.Vars, doc.Lookup
 	r.EnvUnset, r.EnvRefs, r.envUnsetPolicy, r.envUnsetReport = doc.EnvUnset, doc.EnvRefs, in.Policy, opts.EnvUnsetReport
 	// [why] che-level (flag/env/user-config) seeds the spec default, cascading into every profile recipe
 	if root && r.Options.ProfileWorkingDirectory == "" {
@@ -452,10 +459,10 @@ func resolveWorkingDir(env map[string]string, anchor, directory string) (string,
 	return dir, nil
 }
 
-func (r *SpecRecipe) validateSchema(cli options.ValidateSpecMode) error {
-	data, err := os.ReadFile(r.sourceReady.DefinitionURI)
+func (r *SpecRecipe) validateSchema(path string, cli options.ValidateSpecMode) error {
+	data, err := os.ReadFile(path)
 	if err != nil {
-		return fmt.Errorf("spec not found: %s", r.sourceReady.DefinitionURI)
+		return fmt.Errorf("spec not found: %s", path)
 	}
 	violations := spec.ValidateSchema(data)
 	if len(violations) == 0 {
@@ -464,7 +471,7 @@ func (r *SpecRecipe) validateSchema(cli options.ValidateSpecMode) error {
 	// [why] flag/env wins over this spec's own options.validateSpec, then warn.
 	mode := options.ValidateSpecMode(cmp.Or(string(cli), peekSpecValidateMode(data), string(options.ValidateSpec.Warn)))
 	if mode == options.ValidateSpec.Error {
-		return fmt.Errorf("schema violations in %s:\n%s", r.sourceReady.DefinitionURI, strings.Join(violations, "\n"))
+		return fmt.Errorf("schema violations in %s:\n%s", path, strings.Join(violations, "\n"))
 	}
 	for _, violation := range violations {
 		log.EmitWarn("validate-spec", "warning", violation)
@@ -492,7 +499,7 @@ func (r *SpecRecipe) candidateSummary() (all, autoDiscoverable string) {
 }
 
 func (r *SpecRecipe) PrepareProfiles(p *specPreparer, forced *spec.ProfileSourceRecipe, root bool) (*SpecReady, error) {
-	ready := &SpecReady{Source: r.sourceReady, Options: r.Options, Env: r.Env, Variables: r.Variables, EnvRefs: r.EnvRefs, recipes: r.ProfileRecipes, tel: p.tel}
+	ready := &SpecReady{Source: r.sourceReady, Options: r.Options, Env: r.Env, Vars: r.Vars, EnvRefs: r.EnvRefs, recipes: r.ProfileRecipes, tel: p.tel}
 	if root { // [why] candidates log once, for the invoked spec only
 		all, auto := r.candidateSummary()
 		log.EmitTrace("discover-profiles", "listed-candidates", all)
@@ -567,14 +574,14 @@ func evalWith(env map[string]string) func(string) (bool, error) {
 
 func (r *SpecRecipe) composeIncludes(p *specPreparer, ready *SpecReady) ([]spec.ProfileRecipe, error) {
 	lookup := slices.Clone(r.ProfileRecipes)
-	for _, included := range r.Include {
+	for _, included := range r.SpecsInclude {
 		if included.Optional && included.IsAbsentLocalDir(r.sourceReady.DirectoryPath, p.home) {
 			log.EmitSkip(log.Levels.Warn, "init-remote-sources", "prepare", included.URI, "optional source dir absent")
 			continue
 		}
-		child, err := p.prepare(included, r.sourceReady.DirectoryPath, overlay{inherited: r.lookup, env: included.Env, vars: included.Variables}, nil, false)
+		child, err := p.prepare(included, r.sourceReady.DirectoryPath, overlay{inherited: r.lookup, env: included.Env, passed: included.Variables, inheritedVars: r.Vars.ForEmbedded()}, nil, false)
 		if err != nil {
-			return nil, fmt.Errorf("include.sources %q: %w", included.URI, err)
+			return nil, fmt.Errorf("specsInclude %q: %w", included.URI, err)
 		}
 		if child == nil {
 			continue
@@ -583,7 +590,7 @@ func (r *SpecRecipe) composeIncludes(p *specPreparer, ready *SpecReady) ([]spec.
 		for _, rec := range child.recipes {
 			name := rec.Source.GetProfileName()
 			if _, err := spec.FindRecipe(lookup, name); err == nil {
-				return nil, fmt.Errorf("include.sources %q: profile %q collides with an already-composed profile of the same name", included.URI, name)
+				return nil, fmt.Errorf("specsInclude %q: profile %q collides with an already-composed profile of the same name", included.URI, name)
 			}
 			lookup = append(lookup, rec)
 		}
@@ -690,7 +697,7 @@ func (r *SpecRecipe) assembleProfiles(p *specPreparer, ready *SpecReady, lookup 
 			continue
 		}
 		for _, ref := range refs {
-			child, err := p.prepare(ref.AsSpecSource(), r.sourceReady.DirectoryPath, overlay{inherited: r.lookup, env: ref.Env, vars: ref.Variables}, &ref, false)
+			child, err := p.prepare(ref.AsSpecSource(), r.sourceReady.DirectoryPath, overlay{inherited: r.lookup, env: ref.Env, passed: ref.Variables, inheritedVars: r.Vars.ForEmbeddedProfiles()}, &ref, false)
 			if err != nil {
 				return fmt.Errorf("ref %s: %w", ref, err)
 			}
@@ -733,7 +740,7 @@ func (r *SpecRecipe) makeProfileReady(p *specPreparer, rec spec.ProfileRecipe, l
 		Options:     rec.Options,
 		Env:         env,
 		env:         effectiveEnv,
-		vars:        r.Variables,
+		vars:        r.Vars.ForProfiles(),
 		Profiles:    sourced,
 		ref:         rec.Source.DisplayRef(),
 		workingDir:  workingDir,
@@ -764,7 +771,7 @@ type SpecReady struct {
 	Include    []*SpecReady
 	Options    spec.Options
 	Env        map[string]string
-	Variables  map[string]string
+	Vars       spec.VarSet
 	EnvRefs    []spec.EnvRef
 	Profiles   []*ProfileReady
 	Rejected   []spec.Rejection
@@ -811,6 +818,26 @@ func formatEnvRef(ref spec.EnvRef) string {
 	return fmt.Sprintf("%s  %s  %s  [%s]", ref.Name, need, state, scope)
 }
 
+// LogVariables lists every resolved variable of this spec and the specs it embeds: name, source, scope.
+func (s *SpecReady) LogVariables() {
+	if len(s.Vars) > 0 {
+		log.Emit(log.Event{
+			Level: log.Levels.Info, Scope: "discover-profiles", Action: "variables",
+			Msg: "Variables " + s.Source.DefinitionURI, Heading: 2,
+		})
+	}
+	for _, name := range s.Vars.Names() {
+		v := s.Vars[name]
+		log.Emit(log.Event{
+			Level: log.Levels.Info, Scope: "discover-profiles", Msg: fmt.Sprintf("%s  %s  [%s]", name, v.Source, v.Scope), Depth: 1,
+			Attrs: map[string]string{"name": name, "source": v.Source, "scope": string(v.Scope)},
+		})
+	}
+	for _, included := range s.Include {
+		included.LogVariables()
+	}
+}
+
 func (s *SpecReady) LogRejected() {
 	for _, rejection := range s.Rejected {
 		log.Emit(log.Event{
@@ -824,6 +851,7 @@ func (s *SpecReady) LogRejected() {
 func (s *SpecReady) LogDiscovered() {
 	s.LogRejected()
 	s.LogEnvRequirements()
+	s.LogVariables()
 	for _, p := range s.AllProfiles() {
 		p.LogDiscovered()
 	}
@@ -1181,6 +1209,9 @@ func deriveOpType(prev, next database.Object) string {
 }
 
 func (p *ProfileReady) resolveSrc(relativePath string) string {
+	if filepath.IsAbs(relativePath) {
+		return relativePath
+	}
 	return filepath.Join(p.resolveRoot(), relativePath)
 }
 

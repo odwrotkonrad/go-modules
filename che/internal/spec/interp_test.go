@@ -13,19 +13,19 @@ import (
 
 type loadInterpWant struct {
 	Env       map[string]string   `yaml:"env"`
-	Variables map[string]string   `yaml:"variables"`
 	Lookup    map[string]string   `yaml:"lookup"`
 	Include   []string            `yaml:"include"`
 	Workdir   map[string]string   `yaml:"workdir"`
+	Templates map[string][]string `yaml:"templates"`
 	Unset     map[string][]string `yaml:"unset"`
 	Sources   map[string]string   `yaml:"sources"`
 }
 
 type loadInterpLayers struct {
-	Below    []EnvLayer        `yaml:"below"`
-	Above    []EnvLayer        `yaml:"above"`
-	VarsBase map[string]string `yaml:"varsBase"`
-	VarsOver map[string]string `yaml:"varsOver"`
+	Below    []EnvLayer          `yaml:"below"`
+	Above    []EnvLayer          `yaml:"above"`
+	Vars     map[string]VarValue `yaml:"vars"`
+	Builtins map[string]string   `yaml:"builtins"`
 }
 
 func TestLoadInterpolates(t *testing.T) {
@@ -33,26 +33,20 @@ func TestLoadInterpolates(t *testing.T) {
 		a := c.Input.Args
 		var layers loadInterpLayers
 		a.To(t, 1, &layers)
-		in := Interp{Below: layers.Below, Above: layers.Above, VarsBase: layers.VarsBase, VarsOver: layers.VarsOver, Policy: envinterp.Policy(a.String(t, 2))}
+		in := Interp{Below: layers.Below, Above: layers.Above, Vars: layers.Vars, Builtins: layers.Builtins, Policy: envinterp.Policy(a.String(t, 2))}
 		dir := testutil.Tree(t, map[string]string{"che.yml": a.String(t, 0)})
 		d, err := Load(filepath.Join(dir, "che.yml"), in)
 		if err != nil {
 			return loadInterpWant{}, err
 		}
 		got := loadInterpWant{Env: d.Env, Unset: map[string][]string{}, Sources: map[string]string{}}
-		if c.Expected.Output.Variables != nil {
-			got.Variables = map[string]string{}
-			for k := range c.Expected.Output.Variables {
-				got.Variables[k] = d.Variables[k]
-			}
-		}
 		if c.Expected.Output.Lookup != nil {
 			got.Lookup = map[string]string{}
 			for k := range c.Expected.Output.Lookup {
 				got.Lookup[k] = d.Lookup[k]
 			}
 		}
-		for _, inc := range d.Include {
+		for _, inc := range d.SpecsInclude {
 			got.Include = append(got.Include, inc.URI)
 		}
 		for _, rec := range d.ProfileRecipes {
@@ -61,6 +55,12 @@ func TestLoadInterpolates(t *testing.T) {
 					got.Workdir = map[string]string{}
 				}
 				got.Workdir[rec.Source.ProfileName] = wd
+			}
+			for _, node := range rec.Include.RenderTemplates {
+				if got.Templates == nil {
+					got.Templates = map[string][]string{}
+				}
+				got.Templates[rec.Source.ProfileName] = append(got.Templates[rec.Source.ProfileName], node.Source)
 			}
 		}
 		for profile, unset := range d.EnvUnset {

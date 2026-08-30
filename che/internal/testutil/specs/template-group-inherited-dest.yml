@@ -1,20 +1,22 @@
 ##[>] 🤖🤖
-base:
-  include:
-    renderTemplates:
-      - source: templates/ruby
-        dest: shared/ci/ruby
-        <<<:
-          - source: /artifact.rb
-          - source: /declaration.rb
-          - source: nested
-            dest: deep
-            <<<:
-              - source: /event.rb
-              - {source: /gitlab.rb, dest: $HOME/.config/gitlab.rb}
+profilesDefinitions:
+  base:
+    include:
+      renderTemplates:
+        - source: templates/ruby
+          dest: shared/ci/ruby
+          <<<:
+            - source: /artifact.rb
+            - source: /declaration.rb
+            - source: nested
+              dest: deep
+              <<<:
+                - source: /event.rb
+                - {source: /gitlab.rb, dest: $HOME/.config/gitlab.rb}
 
-cli/macos:
-  options: {autoDiscover: true}
-  include:
-    profiles: [base]
+  'cli/macos':
+    options: {autoDiscover: true}
+    include:
+      profiles: [base]
+
 ##[<] 🤖🤖

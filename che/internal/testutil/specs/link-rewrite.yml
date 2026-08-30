@@ -1,19 +1,21 @@
 ##[>] 🤖🤖
-base:
-  include:
-    makeLinks:
-      - etc/zshrc
-      - {source: _home/.config/foo/**, dest: s/foo/bar/}
+profilesDefinitions:
+  base:
+    include:
+      makeLinks:
+        - etc/zshrc
+        - {source: _home/.config/foo/**, dest: s/foo/bar/}
 
-cli/macos:
-  options: {autoDiscover: true}
-  include:
-    profiles: [base]
+  'cli/macos':
+    options: {autoDiscover: true}
+    include:
+      profiles: [base]
 
-exclude-rewritten:
-  include:
-    profiles: [base]
-  exclude:
-    makeLinks:
-      - _home/.config/bar/b
+  exclude-rewritten:
+    include:
+      profiles: [base]
+    exclude:
+      makeLinks:
+        - _home/.config/bar/b
+
 ##[<] 🤖🤖

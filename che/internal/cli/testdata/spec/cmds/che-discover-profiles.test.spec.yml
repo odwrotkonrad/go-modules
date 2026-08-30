@@ -28,5 +28,5 @@ cases:
           render-templates: 1 change
           run-scripts: 1 change
         ## Profile ontoRepo  (profile workdir: {{/[^)]*/}})
-          render-templates: 2 changes
+          render-templates: 3 changes
 # [<] 🤖

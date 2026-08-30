@@ -1,5 +1,7 @@
 #[>] 🤖🤖
-main:
-  include:
-    profiles: [nonexistent-ref]
+profilesDefinitions:
+  main:
+    include:
+      profiles: [nonexistent-ref]
+
 #[<] 🤖🤖

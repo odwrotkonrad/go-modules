@@ -158,7 +158,7 @@ func (p *ProfileReady) renderTemplates(templates []spec.FileItem, skips renderSk
 }
 
 func (p *ProfileReady) templateSrcPath(item spec.FileItem) string {
-	return filepath.Join(p.resolveRoot(), item.Rel)
+	return p.resolveSrc(item.Rel)
 }
 
 func (p *ProfileReady) templateData(item spec.FileItem) render.Data {

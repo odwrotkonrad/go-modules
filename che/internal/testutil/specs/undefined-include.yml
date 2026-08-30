@@ -1,4 +1,5 @@
-cli/macos:
-  options: {autoDiscover: true}
-  include:
-    profiles: [nonexistent]
+profilesDefinitions:
+  'cli/macos':
+    options: {autoDiscover: true}
+    include:
+      profiles: [nonexistent]

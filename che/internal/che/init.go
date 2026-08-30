@@ -44,20 +44,21 @@ func (w *initWalker) walkSpec(src spec.SpecSourceRecipe, anchor, name string, ov
 		return nil
 	}
 	w.seen[ready.DefinitionURI] = true
-	in, err := w.repoFiles.interp(ready.DirectoryPath, root, over, w.opts.EnvUnset)
+	paths := specPaths(ready.SourceReady, root)
+	in, err := w.repoFiles.interp(paths, ready.DirectoryPath, root, over, w.opts.EnvUnset)
 	if err != nil {
 		return fmt.Errorf("init-remote-sources %s: %w", name, err)
 	}
-	doc, err := spec.Load(ready.DefinitionURI, in)
+	doc, err := spec.LoadMerged(paths, in)
 	if err != nil {
 		return fmt.Errorf("init-remote-sources %s: %w", name, err)
 	}
-	for _, inc := range doc.Include {
+	for _, inc := range doc.SpecsInclude {
 		if inc.Optional && inc.IsAbsentLocalDir(ready.DirectoryPath, w.home) {
 			log.EmitSkip(log.Levels.Warn, "init-remote-sources", "prepare", inc.URI, "optional source dir absent")
 			continue
 		}
-		if err := w.walkSpec(inc, ready.DirectoryPath, "spec", overlay{inherited: doc.Lookup, env: inc.Env, vars: inc.Variables}, false); err != nil {
+		if err := w.walkSpec(inc, ready.DirectoryPath, "spec", overlay{inherited: doc.Lookup, env: inc.Env, passed: inc.Variables, inheritedVars: doc.Vars.ForEmbedded()}, false); err != nil {
 			return err
 		}
 	}
@@ -68,13 +69,22 @@ func (w *initWalker) walkSpec(src spec.SpecSourceRecipe, anchor, name string, ov
 		}
 		for _, ref := range rec.SourcedRefs() {
 			log.EmitTrace("init-remote-sources", "detected-remote-ref", "profile "+ref.ProfileName+": "+ref.String())
-			err := w.walkSpec(ref.AsSpecSource(), ready.DirectoryPath, ref.ProfileName, overlay{inherited: doc.Lookup, env: ref.Env, vars: ref.Variables}, false)
+			err := w.walkSpec(ref.AsSpecSource(), ready.DirectoryPath, ref.ProfileName, overlay{inherited: doc.Lookup, env: ref.Env, passed: ref.Variables, inheritedVars: doc.Vars.ForEmbeddedProfiles()}, false)
 			if err != nil {
 				return err
 			}
 		}
 	}
 	return nil
+}
+
+// [why] the invoked spec is che.yml and .che/che.yml read as one; an embedded spec is the one
+// candidate file that resolved
+func specPaths(ready spec.SourceReady, root bool) []string {
+	if root {
+		return ready.Candidates
+	}
+	return []string{ready.DefinitionURI}
 }
 
 // [<] 🤖🤖

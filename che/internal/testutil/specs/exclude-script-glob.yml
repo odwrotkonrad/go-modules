@@ -1,12 +1,13 @@
-base:
-  include:
-    runScripts:
-      - ci/zsh/scripts/installs/*.zsh
+profilesDefinitions:
+  base:
+    include:
+      runScripts:
+        - ci/zsh/scripts/installs/*.zsh
 
-cli/macos:
-  options: {autoDiscover: true}
-  include:
-    profiles: [base]
-  exclude:
-    runScripts:
-      - ci/zsh/scripts/installs/20-foo.zsh
+  'cli/macos':
+    options: {autoDiscover: true}
+    include:
+      profiles: [base]
+    exclude:
+      runScripts:
+        - ci/zsh/scripts/installs/20-foo.zsh

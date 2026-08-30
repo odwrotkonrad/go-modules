@@ -17,12 +17,27 @@ import (
 )
 
 const (
-	SpecFileName      = "che.yml"
-	ExportFileName    = "che.export.yml"
-	VariablesFileName = "che.variables.yml"
-	CheEnvFileName    = "che.env"
-	CheDir            = ".che"
+	SpecFileName              = "che.yml"
+	ExportFileName            = "che.export.yml"
+	VariablesFileName         = "cheVariables.yml"
+	VariablesDefaultsFileName = "cheVariables.defaults.yml"
+	VariablesLocalFileName    = "cheVariables.local.yml"
+	legacyVariablesFileName   = "che.variables.yml"
+	CheEnvFileName            = "che.env"
+	CheDir                    = ".che"
 )
+
+// RootSpecPaths lists the invoked spec's files: che.yml and .che/che.yml, both when both exist,
+// loaded as one spec.
+func RootSpecPaths(dir string) []string {
+	var out []string
+	for _, path := range []string{filepath.Join(dir, SpecFileName), filepath.Join(dir, CheDir, SpecFileName)} {
+		if _, err := os.Stat(path); err == nil {
+			out = append(out, path)
+		}
+	}
+	return out
+}
 
 // CheFile resolves a che file under dir: <dir>/<name> first, <dir>/.che/<name> second.
 func CheFile(dir, name string) (string, bool) {
@@ -90,44 +105,106 @@ func CheFileCandidates(dir, name string) string {
 	return filepath.Join(dir, name) + " or " + filepath.Join(dir, CheDir, name)
 }
 
-// RepoFiles is what one repo declares beside its spec: che.env (implicit variables and env for its
-// specs and every spec they include) and che.variables.yml (explicit variables), both expanded.
+// RepoFiles is what one spec declares beside itself: che.env (env for its specs and every spec they
+// include, read at the git root) and the three cheVariables files, read at the spec's own dir (a
+// che.export.yml strictly beside itself, a che.yml at its dir or under its .che/), values expanded.
 type RepoFiles struct {
-	Root      string
-	Env       map[string]string
-	Variables map[string]string
+	Root     string
+	SpecDir  string
+	Env      map[string]string
+	Defaults VarSet
+	Shared   VarSet
+	Local    VarSet
 }
 
-// LoadRepoFiles reads che.variables.yml and che.env under root, values interpolating ${{ env.X }} from process.
-func LoadRepoFiles(root string, process map[string]string) (RepoFiles, error) {
-	vars, err := loadVariablesFile(root, process)
-	if err != nil {
-		return RepoFiles{}, err
+// IsExportSpec reports whether path names a che.export.yml.
+func IsExportSpec(path string) bool { return filepath.Base(path) == ExportFileName }
+
+// LoadRepoFiles reads che.env under root and the cheVariables files at specDir (beside an export,
+// else at specDir or under its .che/), values interpolating ${{ env.X }} from process.
+func LoadRepoFiles(specDir, root string, export bool, process map[string]string) (RepoFiles, error) {
+	files := RepoFiles{Root: root, SpecDir: specDir}
+	lookup := func(name string) (string, bool) {
+		if !export {
+			return CheFile(specDir, name)
+		}
+		path := filepath.Join(specDir, name)
+		_, err := os.Stat(path)
+		return path, err == nil
 	}
-	env, err := loadEnvFile(root, process)
-	if err != nil {
-		return RepoFiles{}, err
+	if path, ok := lookup(legacyVariablesFileName); ok {
+		return files, fmt.Errorf("%s is no longer read, rename to %s", path, VariablesFileName)
 	}
-	return RepoFiles{Root: root, Env: env, Variables: vars}, nil
+	var err error
+	if files.Defaults, err = loadVarsFileAt(lookup, VariablesDefaultsFileName, process); err != nil {
+		return files, err
+	}
+	if files.Shared, err = loadVarsFileAt(lookup, VariablesFileName, process); err != nil {
+		return files, err
+	}
+	if files.Local, err = loadVarsFileAt(lookup, VariablesLocalFileName, process); err != nil {
+		return files, err
+	}
+	if files.Env, err = loadEnvFile(root, process); err != nil {
+		return files, err
+	}
+	return files, nil
 }
 
-func loadVariablesFile(root string, process map[string]string) (map[string]string, error) {
-	path, ok := CheFile(root, VariablesFileName)
-	if !ok {
-		return nil, nil
+func loadVarsFileAt(lookup func(string) (string, bool), name string, process map[string]string) (VarSet, error) {
+	if path, ok := lookup(name); ok {
+		log.EmitDebug("discover-profiles", "resolve-che-file", path)
+		return loadVarsFile(path, process)
 	}
+	return nil, nil
+}
+
+type varsFileEntry struct {
+	Value string   `yaml:"value"`
+	Scope VarScope `yaml:"scope"`
+}
+
+func (e *varsFileEntry) UnmarshalYAML(node *yaml.Node) error {
+	if node.Kind == yaml.ScalarNode {
+		e.Value = node.Value
+		return nil
+	}
+	type alias varsFileEntry
+	if err := node.Decode((*alias)(e)); err != nil {
+		return err
+	}
+	if e.Scope != "" && !slices.Contains(VarScopeNames, string(e.Scope)) {
+		return fmt.Errorf("scope %q: want %s", e.Scope, strings.Join(VarScopeNames, " | "))
+	}
+	return nil
+}
+
+// loadVarsFile reads one cheVariables file: KEY: value or KEY: {value, scope}, ${{ env.X }} expanded.
+func loadVarsFile(path string, process map[string]string) (VarSet, error) {
 	b, err := os.ReadFile(path)
 	if err != nil {
 		return nil, fmt.Errorf("read %s: %w", path, err)
 	}
-	var raw map[string]string
+	var raw map[string]varsFileEntry
 	if err := yaml.Unmarshal(b, &raw); err != nil {
-		return nil, fmt.Errorf("parse %s: want a flat KEY: value map: %w", path, err)
+		return nil, fmt.Errorf("parse %s: want KEY: value or KEY: {value, scope}: %w", path, err)
 	}
-	if err := validateKeys(path, raw); err != nil {
+	values := make(map[string]string, len(raw))
+	for key, entry := range raw {
+		values[key] = entry.Value
+	}
+	if err := validateKeys(path, values); err != nil {
 		return nil, err
 	}
-	return expandValues(path, raw, envinterp.MapLookup(process, nil))
+	expanded, err := expandValues(path, values, envinterp.MapLookup(process, nil, nil))
+	if err != nil {
+		return nil, err
+	}
+	out := make(VarSet, len(raw))
+	for key, entry := range raw {
+		out[key] = VarValue{Value: expanded[key], Scope: entry.Scope, Source: path}
+	}
+	return out, nil
 }
 
 func loadEnvFile(root string, process map[string]string) (map[string]string, error) {
@@ -139,7 +216,7 @@ func loadEnvFile(root string, process map[string]string) (map[string]string, err
 	if err != nil {
 		return nil, fmt.Errorf("read %s: %w", path, err)
 	}
-	return expandValues(path, raw, envinterp.MapLookup(process, nil))
+	return expandValues(path, raw, envinterp.MapLookup(process, nil, nil))
 }
 
 func expandValues(path string, raw map[string]string, lookup envinterp.Lookup) (map[string]string, error) {

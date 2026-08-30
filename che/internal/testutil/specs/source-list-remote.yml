@@ -1,10 +1,13 @@
+##[>] 🤖🤖
 profilesDefinitions:
   base:
     include:
       renderTemplates:
-        - source: "git::gitlab.com/acme/tools//snippets/agent.md"
+        - source: [a.tpl, "git::gitlab.com/acme/tools//b.tpl"]
 
   'cli/macos':
     options: {autoDiscover: true}
     include:
       profiles: [base]
+
+##[<] 🤖🤖

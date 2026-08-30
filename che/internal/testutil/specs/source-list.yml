@@ -1,0 +1,25 @@
+##[>] 🤖🤖
+profilesDefinitions:
+  base:
+    include:
+      makeLinks:
+        - source: [_home/.config/foo/**, etc/**]
+      makeCopies:
+        - source: etc/daemons
+          dest: /Library/LaunchDaemons
+          <<<:
+            - source: [a.plist, b.plist]
+      renderTemplates:
+        - source: templates/ruby
+          dest: shared/ci/ruby
+          variables: {repo: Notes}
+          <<<:
+            - source: [artifact.rb, declaration.rb]
+        - source: [templates/top.tpl, templates/other.tpl]
+
+  'cli/macos':
+    options: {autoDiscover: true}
+    include:
+      profiles: [base]
+
+##[<] 🤖🤖

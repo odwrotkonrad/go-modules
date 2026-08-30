@@ -23,6 +23,12 @@ cases:
     notExpected:
       stdOut:
         - ${HOME}/.config/zsh/t
+  - name: ShouldReadRepoRootAnchoredSourceAsAbsolutePath
+    context:
+      command: che render-templates --profile ontoRepo
+    expected:
+      stdOut: |
+        created ${REPO}/docs/r-from-root.md
   - name: ShouldRenderGroupChildIntoInheritedRepoDest
     context:
       command: che render-templates --profile ontoRepo

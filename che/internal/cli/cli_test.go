@@ -140,7 +140,7 @@ func TestInit(t *testing.T) {
 			if extra := c.Input.Args.String(t, 2); extra != "" {
 				f, err := os.OpenFile(filepath.Join(a.flags.CheWorkingDirectory, "che.yml"), os.O_APPEND|os.O_WRONLY, 0o644)
 				require.NoError(t, err)
-				_, err = f.WriteString("\n" + extra)
+				_, err = f.WriteString(indentProfiles(extra))
 				require.NoError(t, err)
 				require.NoError(t, f.Close())
 			}
@@ -160,13 +160,18 @@ func TestInit(t *testing.T) {
 // [<] 🤖🤖
 
 // [>] 🤖🤖
+// [why] the fixture spec ends with its profilesDefinitions block: appended profiles nest under it
+func indentProfiles(profiles string) string {
+	return "\n  " + strings.TrimSuffix(strings.ReplaceAll(profiles, "\n", "\n  "), "  ")
+}
+
 func TestDiscoverReportsUnsetEnvRefs(t *testing.T) {
 	a, _, _ := setupRepoEnv(t, "testdata/fixture/commands/common/sample-tree")
 	t.Setenv("CHE_DRY_RUN", "")
 	t.Setenv("CHE_VALIDATE_SPEC", "")
 	f, err := os.OpenFile(filepath.Join(a.flags.CheWorkingDirectory, "che.yml"), os.O_APPEND|os.O_WRONLY, 0o644)
 	require.NoError(t, err)
-	_, err = f.WriteString("\nenvB:\n  include:\n    makeLinks: ['_home/${{ env.CHE_TEST_B_UNSET }}/**']\n")
+	_, err = f.WriteString(indentProfiles("envB:\n  include:\n    makeLinks: ['_home/${{ env.CHE_TEST_B_UNSET }}/**']\n"))
 	require.NoError(t, err)
 	require.NoError(t, f.Close())
 	a.flags.Profiles = []string{"envB"}

@@ -41,8 +41,8 @@ func TestRunScripts(t *testing.T) {
 		var err error
 		if c.Input.Args.Bool(t, 0) {
 			repo := testutil.Repo(t, map[string]string{
-				"che.yml": "p:\n  options: {autoDiscover: true}\n  include:\n    runScripts: [scripts/fail]\n" +
-					"q:\n  options: {autoDiscover: true}\n  include:\n    runScripts: [scripts/ok]\n",
+				"che.yml": "profilesDefinitions:\n  p:\n    options: {autoDiscover: true}\n    include:\n      runScripts: [scripts/fail]\n" +
+					"  q:\n    options: {autoDiscover: true}\n    include:\n      runScripts: [scripts/ok]\n",
 				"scripts/fail": "#!/bin/sh\n",
 				"scripts/ok":   "#!/bin/sh\n",
 			})

@@ -1,11 +1,13 @@
 ##[>] 🤖🤖
-base:
-  include:
-    makeCopies:
-      - {source: "git::gitlab.com/acme/tools//prompts/**", dest: 's:^prompts:$HOME/prompts:'}
+profilesDefinitions:
+  base:
+    include:
+      makeCopies:
+        - {source: "git::gitlab.com/acme/tools//prompts/**", dest: 's:^prompts:$HOME/prompts:'}
 
-cli/macos:
-  options: {autoDiscover: true}
-  include:
-    profiles: [base]
+  'cli/macos':
+    options: {autoDiscover: true}
+    include:
+      profiles: [base]
+
 ##[<] 🤖🤖

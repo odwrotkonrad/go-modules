@@ -244,6 +244,42 @@ cases:
       args: [spec: schema-invalid/template-empty-node, profile: cli/macos]
     expected:
       errorOutput: ['renderTemplates node needs a source, a glob or nested <<<']
+  - name: ShouldExpandSourceListIntoLeavesUnderGroupDest
+    context: {pwd: testdata/fixture/resolve/tree-link-rewrite}
+    input:
+      args: [spec: source-list, profile: cli/macos]
+    expected:
+      links: [_home/.config/foo/a, _home/.config/foo/b, etc/zshrc]
+      copies: [etc/daemons/a.plist, etc/daemons/b.plist]
+      templates: [templates/other.tpl, templates/ruby/artifact.rb, templates/ruby/declaration.rb, templates/top.tpl]
+      dests:
+        etc/daemons/a.plist: [/Library/LaunchDaemons/a.plist]
+        etc/daemons/b.plist: [/Library/LaunchDaemons/b.plist]
+        templates/ruby/artifact.rb: [shared/ci/ruby/artifact.rb]
+        templates/ruby/declaration.rb: [shared/ci/ruby/declaration.rb]
+        templates/top.tpl: []
+        templates/other.tpl: []
+      variables:
+        templates/ruby/artifact.rb: {repo: Notes}
+        templates/ruby/declaration.rb: {repo: Notes}
+  - name: ShouldErrorOnSourceListWithDest
+    context: {pwd: testdata/fixture/resolve/tree-empty}
+    input:
+      args: [spec: schema-invalid/source-list-dest, profile: cli/macos]
+    expected:
+      errorOutput: ['source list takes no dest']
+  - name: ShouldErrorOnSourceListWithChildren
+    context: {pwd: testdata/fixture/resolve/tree-empty}
+    input:
+      args: [spec: schema-invalid/source-list-group, profile: cli/macos]
+    expected:
+      errorOutput: ['source list takes no nested <<<']
+  - name: ShouldErrorOnRemoteSourceListItem
+    context: {pwd: testdata/fixture/resolve/tree-empty}
+    input:
+      args: [spec: source-list-remote, profile: cli/macos]
+    expected:
+      errorOutput: ['source list item cannot be remote: "git::gitlab.com/acme/tools//b.tpl"']
   - name: ShouldJoinLeafPathOntoRefOnlyGroupPrefix
     context: {pwd: testdata/fixture/resolve/tree-empty}
     input:

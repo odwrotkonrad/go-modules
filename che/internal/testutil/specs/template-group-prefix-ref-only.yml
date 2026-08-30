@@ -1,13 +1,15 @@
 ##[>] 🤖🤖
-base:
-  include:
-    renderTemplates:
-      - source: "git::gitlab.com/acme/tools@v1.0.0"
-        <<<:
-          - {source: snippets/ro.md, dest: .claude/agents/ro.md}
+profilesDefinitions:
+  base:
+    include:
+      renderTemplates:
+        - source: "git::gitlab.com/acme/tools@v1.0.0"
+          <<<:
+            - {source: snippets/ro.md, dest: .claude/agents/ro.md}
 
-cli/macos:
-  options: {autoDiscover: true}
-  include:
-    profiles: [base]
+  'cli/macos':
+    options: {autoDiscover: true}
+    include:
+      profiles: [base]
+
 ##[<] 🤖🤖

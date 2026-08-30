@@ -1,15 +1,16 @@
-base:
-  include:
-    renderTemplates:
-      - source: templates/1-env/local.env.ontoRepo.tpl
-        dest:
-          - {path: .env, options: {writeType: mergeUpsert}}
-      - source: templates/3-agents/AGENTS.md.ontoRepo.tpl
-        dest:
-          - CLAUDE.md
-          - {path: AGENTS.md, options: {renderReferencedFiles: true}}
+profilesDefinitions:
+  base:
+    include:
+      renderTemplates:
+        - source: templates/1-env/local.env.ontoRepo.tpl
+          dest:
+            - {path: .env, options: {writeType: mergeUpsert}}
+        - source: templates/3-agents/AGENTS.md.ontoRepo.tpl
+          dest:
+            - CLAUDE.md
+            - {path: AGENTS.md, options: {renderReferencedFiles: true}}
 
-cli/macos:
-  options: {autoDiscover: true}
-  include:
-    profiles: [base]
+  'cli/macos':
+    options: {autoDiscover: true}
+    include:
+      profiles: [base]

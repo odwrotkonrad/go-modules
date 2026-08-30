@@ -91,7 +91,7 @@ publish-prerelease:
 release-schemas:
 	@ci/release-schemas.zsh $(REF)
 
-#[what] MR pipeline: upload both generated schemas to the generic package registry as one per-MR prerelease
+#[what] MR pipeline: upload every generated schema to the generic package registry as one per-MR prerelease
 publish-schema-prerelease:
 	@ci/publish-schema-prerelease.zsh
 

@@ -1,6 +1,6 @@
 #!/usr/bin/env zsh
 ##[>] 🤖🤖
-# MR-pipeline prerelease publish for both schemas. Uploads the freshly generated
+# MR-pipeline prerelease publish for every schema. Uploads the freshly generated
 # che.schema.json and packages.schema.json to the generic package registry at
 # packages/generic/<name>-schema/0.0.0-mr<iid>/<name>.schema.json, so an unmerged
 # vocabulary change is validatable by che-packages before that che ships.
@@ -18,7 +18,7 @@ set -eu
 
 VERSION="0.0.0-mr${CI_MERGE_REQUEST_IID:?}"
 
-for schema in che che-packages; do
+for schema in che che-packages che-variables; do
   DOC="${schema}.schema.json"
   FILE="che/assets/data/${${schema#che-}}.schema.json"
   [[ -f "$FILE" ]] || { print -u2 "publish-schema-prerelease: ${FILE} not generated"; exit 1 }
@@ -30,5 +30,5 @@ for schema in che che-packages; do
   echo
 done
 
-echo "schema prereleases published: CHE_SCHEMA_REF=${VERSION} CHE_PACKAGES_SCHEMA_REF=${VERSION}"
+echo "schema prereleases published: CHE_SCHEMA_REF=${VERSION} CHE_PACKAGES_SCHEMA_REF=${VERSION} CHE_VARIABLES_SCHEMA_REF=${VERSION}"
 ##[<] 🤖🤖

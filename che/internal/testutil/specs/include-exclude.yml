@@ -1,24 +1,25 @@
-base:
-  include:
-    makeLinks:
-      - etc/zshrc
-      - etc/zsh/**
-      - _home/.config/extra/**
-      - _home/.config/oneoff/**
-    makeCopies:
-      - {source: _home/.config/zsh/c.ontoHost.cp, dest: [~/.config/zsh/c]}
-    runScripts:
-      - ci/zsh/scripts/installs/10-brew.zsh
-      - ci/zsh/scripts/installs/20-foo.zsh
+profilesDefinitions:
+  base:
+    include:
+      makeLinks:
+        - etc/zshrc
+        - etc/zsh/**
+        - _home/.config/extra/**
+        - _home/.config/oneoff/**
+      makeCopies:
+        - {source: _home/.config/zsh/c.ontoHost.cp, dest: [~/.config/zsh/c]}
+      runScripts:
+        - ci/zsh/scripts/installs/10-brew.zsh
+        - ci/zsh/scripts/installs/20-foo.zsh
 
-cli/macos:
-  options: {autoDiscover: true}
-  include:
-    profiles: [base]
-  exclude:
-    makeLinks:
-      - etc/zsh/**
-    makeCopies:
-      - _home/.config/zsh/c.ontoHost.cp
-    runScripts:
-      - ci/zsh/scripts/installs/20-foo.zsh
+  'cli/macos':
+    options: {autoDiscover: true}
+    include:
+      profiles: [base]
+    exclude:
+      makeLinks:
+        - etc/zsh/**
+      makeCopies:
+        - _home/.config/zsh/c.ontoHost.cp
+      runScripts:
+        - ci/zsh/scripts/installs/20-foo.zsh
