@@ -180,7 +180,7 @@ func PrepareSpecs(ctx Context, opts options.Options, src spec.SpecSourceRecipe) 
 	}
 	if err == nil && root != nil {
 		if missing := p.untakenForced(); len(missing) > 0 {
-			return root, fmt.Errorf("--profiles %v not defined in %s or the specs it composes", missing, root.Source.DefinitionURI)
+			return root, fmt.Errorf("--profiles %v not defined in %s or the local specs it composes", missing, root.Source.DefinitionURI)
 		}
 	}
 	if err == nil && root != nil && !root.gatedOff && len(root.AllProfiles()) == 0 && len(opts.Profiles) == 0 && opts.AutoDiscover {
@@ -614,9 +614,8 @@ func (r *SpecRecipe) selectEligibleNames(p *specPreparer, forced *spec.ProfileSo
 		}
 		return []string{forced.ProfileName}, nil
 	}
-	// [why] --profiles names a profile of the invoked spec or of any spec it composes, remote or local:
-	// each spec takes the names it defines, PrepareSpecs reports the ones no spec took. A sourced ref
-	// never reaches here, it arrives with forced set
+	// [why] --profiles names a profile of the invoked spec or of any spec it composes, remote ones
+	// included: each spec takes the names it defines, PrepareSpecs reports the ones no spec took
 	if len(p.opts.Profiles) > 0 {
 		own := r.ownForcedProfiles(p)
 		if len(own) == 0 {
@@ -718,14 +717,9 @@ func (r *SpecRecipe) makeProfileReady(p *specPreparer, rec spec.ProfileRecipe, l
 	if err != nil {
 		return nil, nil, fmt.Errorf("profile %q: %w", name, err)
 	}
-	// [why] a repo-doc render (relative dest, @-include, localFile) lands on the invoking checkout, so a
-	// composed or sourced spec renders into the repo that runs it, never into its own cache clone
-	gitRoot := p.repoRoot
-	if gitRoot == "" {
-		gitRoot, err = fsutil.ResolveRepoRoot(rec.Source.DirectoryPath)
-		if err != nil {
-			gitRoot = rec.Source.DirectoryPath
-		}
+	gitRoot, err := fsutil.ResolveRepoRoot(rec.Source.DirectoryPath)
+	if err != nil {
+		gitRoot = rec.Source.DirectoryPath
 	}
 	ops, sourced, err := rec.MakeProfile(lookup, workingDir)
 	if err != nil {

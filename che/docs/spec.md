@@ -59,8 +59,8 @@ Sources in a sub-spec resolve against the sub-spec's dir (`templates/x.tpl`),
 scripts and `profileWorkingDirectory` against the spec's checkout; a
 repo-relative dest, an `@`-include and a `localFile` path resolve against the
 git root of the spec, so a sub-spec under `.che/` renders onto the repo.
-`--profiles` names a profile of the invoked spec or of any local spec it
-composes.
+`--profiles` names a profile of the invoked spec or of any spec it composes,
+remote ones included.
 Outside a git repo the root is the nearest ancestor holding `che.yml` or
 `.che/che.yml`. The same lookup applies to every included spec
 (`specsInclude` dirs, `git::` clones, `specDirPath` dirs). `.env` is not
