@@ -400,7 +400,6 @@
           "anyOf": [
             {
               "required": [
-                "url",
                 "specDirPath"
               ]
             },
@@ -413,7 +412,7 @@
           "properties": {
             "url": {
               "type": "string",
-              "description": "the repo or dir holding the spec: a git url (host/path, scheme optional: gitlab.com/g/r, https://gitlab.com/g/r.git, git@gitlab.com:g/r.git) or a local dir (., ./sub, /abs, ~/, $VAR, relative to this spec's checkout)"
+              "description": "the git repo holding the spec, cloned/pulled into a managed cache checkout: host/path, scheme optional (gitlab.com/g/r, https://gitlab.com/g/r.git, git@gitlab.com:g/r.git); never a local path, a local spec is specDirPath alone"
             },
             "ref": {
               "type": "string",
@@ -421,7 +420,7 @@
             },
             "specDirPath": {
               "type": "string",
-              "description": "required with url: the dir under url holding the spec (its che.export.yml, then .che/che.export.yml, then a plain che.yml), . for the source root"
+              "description": "required: with url the dir under the repo holding the spec (. for the repo root); without url a local dir (./sub, /abs, ~/, $VAR, relative to this spec's checkout, . this repo's own exported spec); the dir offers its che.export.yml, then .che/che.export.yml, then a plain che.yml"
             },
             "source": {
               "type": "string",
@@ -1492,7 +1491,6 @@
                 "anyOf": [
                   {
                     "required": [
-                      "url",
                       "specDirPath"
                     ]
                   },
@@ -1505,7 +1503,7 @@
                 "properties": {
                   "url": {
                     "type": "string",
-                    "description": "the repo or dir holding the spec: a git url (host/path, scheme optional: gitlab.com/g/r, https://gitlab.com/g/r.git, git@gitlab.com:g/r.git) or a local dir (., ./sub, /abs, ~/, $VAR, relative to this spec's checkout)"
+                    "description": "the git repo holding the spec, cloned/pulled into a managed cache checkout: host/path, scheme optional (gitlab.com/g/r, https://gitlab.com/g/r.git, git@gitlab.com:g/r.git); never a local path, a local spec is specDirPath alone"
                   },
                   "ref": {
                     "type": "string",
@@ -1513,7 +1511,7 @@
                   },
                   "specDirPath": {
                     "type": "string",
-                    "description": "required with url: the dir under url holding the spec (its che.export.yml, then .che/che.export.yml, then a plain che.yml), . for the source root"
+                    "description": "required: with url the dir under the repo holding the spec (. for the repo root); without url a local dir (./sub, /abs, ~/, $VAR, relative to this spec's checkout, . this repo's own exported spec); the dir offers its che.export.yml, then .che/che.export.yml, then a plain che.yml"
                   },
                   "source": {
                     "type": "string",

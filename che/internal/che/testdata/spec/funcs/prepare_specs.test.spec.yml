@@ -1055,8 +1055,7 @@ cases:
                 options: {autoDiscover: true}
                 include:
                   profiles:
-                    - url: "${REF_DIR}"
-                      specDirPath: .
+                    - specDirPath: "${REF_DIR}"
                       profileName: p
         - flags: {targetProfileTypes: [repo-git-tracked]}
     expected:

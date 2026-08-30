@@ -322,15 +322,25 @@ func (r *ProfileSourceRecipe) normalizeRefKeys() error {
 
 func (k *sourceKeys) normalize(where string) error {
 	if k.Src != "" || k.SpecPath != "" {
-		warnDeprecated(fmt.Sprintf("%s %q: source/spec are renamed to url/specDirPath (specDirPath: . for the source root)", where, cmp.Or(k.Src, k.SpecPath)))
+		warnDeprecated(fmt.Sprintf("%s %q: source/spec are renamed to url/specDirPath (a local spec: specDirPath alone, ./dir)", where, cmp.Or(k.Src, k.SpecPath)))
 		k.Src, k.SpecPath = cmp.Or(k.URL, k.Src), cmp.Or(k.SpecDirPath, k.SpecPath)
 		return nil
 	}
-	if k.URL == "" {
+	if k.URL == "" && k.SpecDirPath == "" {
 		return nil
 	}
 	if k.SpecDirPath == "" {
-		return fmt.Errorf("%s %q: specDirPath is required (\".\" for the source root)", where, k.URL)
+		return fmt.Errorf("%s %q: specDirPath is required (\".\" for the repo root)", where, k.URL)
+	}
+	if isLocalPath(k.URL) {
+		return fmt.Errorf("%s %q: url names a git repo only, a local spec is {specDirPath: ./dir}", where, k.URL)
+	}
+	if k.URL == "" {
+		if k.GitRef != "" {
+			return fmt.Errorf("%s %q: ref needs a url", where, k.SpecDirPath)
+		}
+		k.Src, k.SpecPath = k.SpecDirPath, ""
+		return nil
 	}
 	k.Src, k.SpecPath = sourceStringOf(k.URL), strings.TrimSuffix(k.SpecDirPath, "/")
 	if k.SpecPath == "." {
@@ -339,10 +349,12 @@ func (k *sourceKeys) normalize(where string) error {
 	return nil
 }
 
-// [why] a path-looking url is a local dir, anything else names a git repo, scheme or not
+func isLocalPath(p string) bool {
+	return strings.HasPrefix(p, ".") || strings.HasPrefix(p, "/") || strings.HasPrefix(p, "~") || strings.HasPrefix(p, "$")
+}
+
 func sourceStringOf(url string) string {
-	switch {
-	case IsRemoteSrc(url), strings.HasPrefix(url, "."), strings.HasPrefix(url, "/"), strings.HasPrefix(url, "~"), strings.HasPrefix(url, "$"):
+	if IsRemoteSrc(url) {
 		return url
 	}
 	return RemoteSrcPrefix + url
