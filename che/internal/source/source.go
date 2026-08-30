@@ -55,6 +55,20 @@ func EnsureCheckout(home, url, ref string) (string, error) {
 	return dir, err
 }
 
+// CloneURL turns a schemeless host/path source into an https clone URL; scheme and scp forms pass through.
+//
+// [why] render remotes already default to https: an include url written the same way must clone the same way
+func CloneURL(url string) string {
+	if strings.Contains(url, "://") {
+		return url
+	}
+	host, _, _ := strings.Cut(url, "/")
+	if strings.Contains(host, ":") || strings.Contains(host, "@") {
+		return url
+	}
+	return "https://" + url
+}
+
 func cloneOrUpdate(home, url, ref string) (string, error) {
 	dir := ResolveDir(home, url, ref)
 	msg := "remote " + url + refSuffix(ref) + " into " + fsutil.AbbreviateHome(dir, home)
@@ -69,7 +83,7 @@ func cloneOrUpdate(home, url, ref string) (string, error) {
 		if ref != "" {
 			argv = append(argv, "--branch", ref)
 		}
-		if err := git(append(argv, url, dir)...); err != nil {
+		if err := git(append(argv, CloneURL(url), dir)...); err != nil {
 			return "", fmt.Errorf("source clone %s%s: %w", url, refSuffix(ref), err)
 		}
 		emitAction("cloned")

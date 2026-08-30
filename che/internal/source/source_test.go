@@ -39,6 +39,12 @@ type ensureWant struct {
 	Files  []string `yaml:"files"`
 }
 
+func TestCloneURL(t *testing.T) {
+	testyml.Eq(t, td, "testdata/spec/funcs/clone_url.test.spec.yml", func(t *testing.T, c testyml.Case[string]) (string, error) {
+		return CloneURL(c.Input.Args.String(t, 0)), nil
+	})
+}
+
 func TestEnsure(t *testing.T) {
 	testyml.Run(t, td, "testdata/spec/funcs/ensure_checkout.test.spec.yml", func(t *testing.T, c testyml.Case[ensureWant]) {
 		execx.Swap(t, testutil.NewCmdMockExecutor())

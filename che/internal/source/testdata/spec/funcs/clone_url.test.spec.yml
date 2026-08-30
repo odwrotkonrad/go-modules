@@ -1,0 +1,17 @@
+# [>] 🤖🤖
+context:
+  function: source.CloneURL
+cases:
+  - name: ShouldPrefixHttpsOnSchemelessHostPath
+    input: {args: [gitlab.com/konradodwrot/centralized/assets/generic]}
+    expected: {output: "https://gitlab.com/konradodwrot/centralized/assets/generic"}
+  - name: ShouldKeepHttpsUrl
+    input: {args: ["https://gitlab.com/g/r.git"]}
+    expected: {output: "https://gitlab.com/g/r.git"}
+  - name: ShouldKeepFileUrl
+    input: {args: ["file:///tmp/repo"]}
+    expected: {output: "file:///tmp/repo"}
+  - name: ShouldKeepScpForm
+    input: {args: ["git@gitlab.com:g/r.git"]}
+    expected: {output: "git@gitlab.com:g/r.git"}
+# [<] 🤖🤖
